@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Disc3 } from "@crate/ui/icons";
 
 import {
@@ -24,6 +25,7 @@ export function PlayerTrackMenu({
   onOverlayChange,
   className,
 }: PlayerTrackMenuProps) {
+  const { t } = useTranslation();
   const menuTrack = useMemo(
     () => trackToMenuData(currentTrack),
     [currentTrack],
@@ -51,6 +53,8 @@ export function PlayerTrackMenu({
         buttonRef={actionMenu.triggerRef}
         hasActions={actionMenu.hasActions}
         onClick={actionMenu.openFromTrigger}
+        expanded={actionMenu.open}
+        title={t("actions.menu.more")}
         className={className ?? "shrink-0 size-8"}
       />
       <ItemActionMenu
@@ -62,7 +66,7 @@ export function PlayerTrackMenu({
           detail: currentTrack.album,
           imageUrl: currentTrack.albumCover,
           imageAlt: currentTrack.album
-            ? `${currentTrack.title} cover`
+            ? t("trackRow.coverAlt", { title: currentTrack.title })
             : currentTrack.title,
           imageShape: "square",
           fallbackIcon: Disc3,

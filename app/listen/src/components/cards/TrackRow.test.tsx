@@ -534,7 +534,7 @@ describe("TrackRow playback behavior", () => {
       fireEvent.click(row);
 
       expect(
-        await screen.findByRole("dialog", { name: "Action sheet" }),
+        await screen.findByRole("dialog", { name: "Actions menu" }),
       ).toBeInTheDocument();
       expect(play).not.toHaveBeenCalled();
     });

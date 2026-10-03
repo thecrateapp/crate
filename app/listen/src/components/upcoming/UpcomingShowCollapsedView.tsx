@@ -158,6 +158,8 @@ function CollapsedShowActions({
         buttonRef={actionMenu.triggerRef}
         hasActions={actionMenu.hasActions}
         onClick={actionMenu.onOpen}
+        expanded={actionMenu.open}
+        title={t("actions.menu.more")}
         className=" size-7 opacity-40 transition-opacity hover:opacity-80"
       />
     </div>

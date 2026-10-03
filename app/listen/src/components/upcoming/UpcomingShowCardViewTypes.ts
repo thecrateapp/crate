@@ -5,6 +5,7 @@ import type { UpcomingItem } from "./upcoming-model";
 export interface ActionMenuSlot {
   triggerRef: RefObject<HTMLButtonElement | null>;
   hasActions: boolean;
+  open: boolean;
   onOpen: (event: ReactMouseEvent<HTMLButtonElement>) => void;
 }
 

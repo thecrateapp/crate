@@ -11,6 +11,8 @@
   "common.trackCount": "{count, plural, one {# titre} other {# titres}}",
   "common.followerCount": "{count, plural, one {# abonné} other {# abonnés}}",
   "common.playCount": "{count, plural, one {# écoute} other {# écoutes}}",
+  "common.offlineCount": "{count, plural, one {# hors ligne} other {# hors ligne}}",
+  "common.offlineProgress": "{ready}/{total} hors ligne",
   "common.follow": "Suivre",
   "common.following": "Suivi",
   "common.about": "À propos",
@@ -114,6 +116,8 @@
   "actions.offline.makeAvailable": "Rendre disponible hors ligne",
   "actions.offline.toasts.removed": "Copie hors ligne supprimée",
   "actions.offline.toasts.updateFailed": "Impossible de mettre à jour la copie hors ligne",
+  "actions.menu.more": "Plus d’actions",
+  "actions.menu.sheetLabel": "Menu des actions",
   "actions.track.playNow": "Lire maintenant",
   "actions.track.playNext": "Lire ensuite",
   "actions.track.addToQueue": "Ajouter à la file",
@@ -1774,5 +1778,6 @@
   "trackRow.pauseLabel": "Mettre {title} en pause",
   "trackRow.resolvingLabel": "Résolution de {title}",
   "trackRow.unknownTitle": "Inconnu",
-  "trackRow.soon": "Bientôt"
+  "trackRow.soon": "Bientôt",
+  "trackRow.coverAlt": "Pochette de {title}"
 }

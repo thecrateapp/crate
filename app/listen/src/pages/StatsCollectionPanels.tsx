@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from "react";
+import { useMemo, type ComponentType, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Disc3, Flame, Music2 } from "@crate/ui/icons";
 import { Link } from "react-router";
@@ -7,6 +7,8 @@ import { CrateImage } from "@/components/artwork/CrateImage";
 import {
   ItemActionMenu,
   ItemActionMenuButton,
+  type ItemActionMenuEntry,
+  type UseItemActionMenuReturn,
   useItemActionMenu,
   useItemActionTarget,
 } from "@/components/actions/ItemActionMenu";
@@ -28,6 +30,8 @@ import {
   statsArtistKey,
   statsTrackKey,
 } from "./stats-collection-keys";
+
+const NO_ACTIONS: ItemActionMenuEntry[] = [];
 
 export function StatsPlayMeta({
   playCount,
@@ -68,22 +72,13 @@ export function TopTracksPanel({
           <PanelLoading />
         ) : items.length ? (
           items.map((item, index) => (
-            <TrackRow
+            <TopTrackRow
               key={statsTrackKey(item)}
+              item={item}
               track={rows[index]!}
               rank={index + 1}
-              showCoverThumb
-              showArtist
-              showAlbum
-              showDuration={false}
               queueTracks={rows}
               playSource={playSource}
-              meta={
-                <StatsPlayMeta
-                  playCount={item.play_count}
-                  minutes={item.minutes_listened}
-                />
-              }
             />
           ))
         ) : (
@@ -91,6 +86,39 @@ export function TopTracksPanel({
         )}
       </div>
     </StatsPanel>
+  );
+}
+
+function TopTrackRow({
+  item,
+  track,
+  rank,
+  queueTracks,
+  playSource,
+}: {
+  item: StatsTrack;
+  track: TrackRowData;
+  rank: number;
+  queueTracks: TrackRowData[];
+  playSource: PlaySource;
+}) {
+  const { play_count: playCount, minutes_listened: minutes } = item;
+  const meta = useMemo(
+    () => <StatsPlayMeta playCount={playCount} minutes={minutes} />,
+    [playCount, minutes],
+  );
+  return (
+    <TrackRow
+      track={track}
+      rank={rank}
+      showCoverThumb
+      showArtist
+      showAlbum
+      showDuration={false}
+      queueTracks={queueTracks}
+      playSource={playSource}
+      meta={meta}
+    />
   );
 }
 
@@ -140,14 +168,7 @@ function TopArtistCard({ item, index }: { item: StatsArtist; index: number }) {
     },
     { size: 640 },
   );
-  const actions = useArtistActionEntries({
-    artistId: item.artist_id ?? undefined,
-    globalArtistUid: item.global_artist_uid ?? undefined,
-    artistSlug: item.artist_slug ?? undefined,
-    imageUrl: photo,
-    name: item.artist_name,
-  });
-  const actionMenu = useItemActionMenu(actions);
+  const actionMenu = useItemActionMenu(NO_ACTIONS, { hasActions: true });
   const actionTarget = useItemActionTarget(actionMenu);
 
   return (
@@ -194,24 +215,50 @@ function TopArtistCard({ item, index }: { item: StatsArtist; index: number }) {
         buttonRef={actionMenu.triggerRef}
         hasActions={actionMenu.hasActions}
         onClick={actionMenu.openFromTrigger}
+        expanded={actionMenu.open}
+        title={t("actions.menu.more")}
         className="absolute right-2 top-2 z-20 size-9 opacity-75 transition-opacity hover:opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
       />
-      <ItemActionMenu
-        actions={actions}
-        header={{
-          type: "media",
-          title: item.artist_name,
-          imageUrl: photo,
-          imageAlt: item.artist_name,
-          imageShape: "circle",
-          fallbackIcon: Flame,
-        }}
-        open={actionMenu.open}
-        position={actionMenu.position}
-        menuRef={actionMenu.menuRef}
-        onClose={actionMenu.close}
-      />
+      {actionMenu.open ? (
+        <TopArtistCardMenu actionMenu={actionMenu} item={item} photo={photo} />
+      ) : null}
     </article>
+  );
+}
+
+function TopArtistCardMenu({
+  actionMenu,
+  item,
+  photo,
+}: {
+  actionMenu: UseItemActionMenuReturn;
+  item: StatsArtist;
+  photo: string;
+}) {
+  const actions = useArtistActionEntries({
+    artistId: item.artist_id ?? undefined,
+    globalArtistUid: item.global_artist_uid ?? undefined,
+    artistSlug: item.artist_slug ?? undefined,
+    imageUrl: photo,
+    name: item.artist_name,
+  });
+
+  return (
+    <ItemActionMenu
+      actions={actions}
+      header={{
+        type: "media",
+        title: item.artist_name,
+        imageUrl: photo,
+        imageAlt: item.artist_name,
+        imageShape: "circle",
+        fallbackIcon: Flame,
+      }}
+      open={actionMenu.open}
+      position={actionMenu.position}
+      menuRef={actionMenu.menuRef}
+      onClose={actionMenu.close}
+    />
   );
 }
 
@@ -238,22 +285,10 @@ export function TopAlbumsPanel({
           className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6"
         >
           {items.slice(0, 12).map((item, index) => (
-            <AlbumCard
+            <TopAlbumCard
               key={statsAlbumKey(item)}
-              layout="grid"
+              item={item}
               rank={index + 1}
-              artist={item.artist}
-              album={item.album}
-              albumId={item.album_id ?? undefined}
-              globalAlbumUid={item.global_album_uid ?? undefined}
-              albumSlug={item.album_slug ?? undefined}
-              artistSlug={item.artist_slug ?? undefined}
-              meta={
-                <StatsPlayMeta
-                  playCount={item.play_count}
-                  minutes={item.minutes_listened}
-                />
-              }
             />
           ))}
         </div>
@@ -261,6 +296,27 @@ export function TopAlbumsPanel({
         <PanelEmpty text={t("stats.topAlbums.empty")} />
       )}
     </StatsPanel>
+  );
+}
+
+function TopAlbumCard({ item, rank }: { item: StatsAlbum; rank: number }) {
+  const { play_count: playCount, minutes_listened: minutes } = item;
+  const meta = useMemo(
+    () => <StatsPlayMeta playCount={playCount} minutes={minutes} />,
+    [playCount, minutes],
+  );
+  return (
+    <AlbumCard
+      layout="grid"
+      rank={rank}
+      artist={item.artist}
+      album={item.album}
+      albumId={item.album_id ?? undefined}
+      globalAlbumUid={item.global_album_uid ?? undefined}
+      albumSlug={item.album_slug ?? undefined}
+      artistSlug={item.artist_slug ?? undefined}
+      meta={meta}
+    />
   );
 }
 

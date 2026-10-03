@@ -7,6 +7,7 @@ import {
   ItemActionMenu,
   ItemActionMenuButton,
   useItemActionMenu,
+  useItemActionTarget,
 } from "@/components/actions/ItemActionMenu";
 import { useCrateActionEntries } from "@/components/actions/crate-actions";
 import { CrateImage } from "@/components/artwork/CrateImage";
@@ -119,16 +120,17 @@ export function CrateCard({
     offlineActionActive,
   });
   const actionMenu = useItemActionMenu(actions);
+  const actionTarget = useItemActionTarget(actionMenu);
   const ownerName = crateOwnerName(crate);
 
   return (
     <div
       data-testid="crate-card"
-      onContextMenu={actionMenu.handleContextMenu}
       className={cn(
-        "group relative flex flex-col rounded-xl border border-border-quiet bg-text-primary/[0.035] p-3 text-left transition-colors hover:bg-text-primary/[0.07]",
+        "item-action-target group relative flex flex-col rounded-xl border border-border-quiet bg-text-primary/[0.035] p-3 text-left transition-colors hover:bg-text-primary/[0.07]",
         layout === "rail" ? "w-[160px] shrink-0 snap-start" : "w-full min-w-0",
       )}
+      {...actionTarget}
     >
       <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-text-primary/5">
         <div
@@ -226,6 +228,8 @@ export function CrateCard({
           event.stopPropagation();
           actionMenu.openFromTrigger(event);
         }}
+        expanded={actionMenu.open}
+        title={t("actions.menu.more")}
         className="absolute right-4 top-4 z-10 size-9 shrink-0"
       />
       <ItemActionMenu

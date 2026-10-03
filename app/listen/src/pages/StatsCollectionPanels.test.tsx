@@ -1,6 +1,7 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { useArtistActionEntries } from "@/components/actions/artist-actions";
 import {
   statsTrackRowData,
   type StatsAlbum,
@@ -15,6 +16,17 @@ import {
   TopArtistsPanel,
   TopTracksPanel,
 } from "./StatsCollectionPanels";
+
+vi.mock("@/components/actions/artist-actions", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("@/components/actions/artist-actions")
+    >();
+  return {
+    ...actual,
+    useArtistActionEntries: vi.fn(actual.useArtistActionEntries),
+  };
+});
 
 vi.mock("@/contexts/LikedTracksContext", () => ({
   useLikedTracks: () => ({
@@ -253,7 +265,7 @@ describe("Stats collection panels", () => {
 
     await longPress(screen.getByRole("row", { name: "Waiting Room" }));
 
-    const sheet = await screen.findByRole("dialog", { name: "Action sheet" });
+    const sheet = await screen.findByRole("dialog", { name: "Actions menu" });
     expect(within(sheet).getByText("Play now")).toBeInTheDocument();
   });
 
@@ -276,7 +288,7 @@ describe("Stats collection panels", () => {
 
     await longPress(screen.getByText("13 Songs").closest("article")!);
 
-    const sheet = await screen.findByRole("dialog", { name: "Action sheet" });
+    const sheet = await screen.findByRole("dialog", { name: "Actions menu" });
     expect(within(sheet).getByText("Play album")).toBeInTheDocument();
   });
 
@@ -288,7 +300,23 @@ describe("Stats collection panels", () => {
     const card = screen.getByText("Fugazi").closest("article")!;
     fireEvent.contextMenu(card);
     expect(
-      await screen.findByRole("dialog", { name: "Action sheet" }),
+      await screen.findByRole("dialog", { name: "Actions menu" }),
     ).toBeInTheDocument();
+  });
+
+  it("computes artist menu entries only when the menu opens", async () => {
+    vi.mocked(useArtistActionEntries).mockClear();
+    renderWithListenProviders(
+      <TopArtistsPanel items={[artist]} loading={false} />,
+    );
+
+    expect(useArtistActionEntries).not.toHaveBeenCalled();
+    const trigger = screen.getByRole("button", { name: "More actions" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(trigger);
+
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+    expect(useArtistActionEntries).toHaveBeenCalled();
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
   });
 });

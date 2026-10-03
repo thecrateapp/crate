@@ -35,17 +35,19 @@ interface PlaylistOfflineRecord {
 function getPlaylistOfflineMeta(
   state: OfflineItemState,
   record: PlaylistOfflineRecord | null | undefined,
+  t: ReturnType<typeof useTranslation>["t"],
 ): string | null {
   if (state === "ready") {
     return record?.trackCount
-      ? `${record.trackCount} offline`
+      ? t("common.offlineCount", { count: record.trackCount })
       : getOfflineStateLabel(state);
   }
 
   if (isOfflineBusy(state) && record?.trackCount) {
-    return `${Math.min(record.readyTrackCount || 0, record.trackCount)}/${
-      record.trackCount
-    } offline`;
+    return t("common.offlineProgress", {
+      ready: Math.min(record.readyTrackCount || 0, record.trackCount),
+      total: record.trackCount,
+    });
   }
 
   return getOfflineStateLabel(state);
@@ -129,7 +131,7 @@ function PlaylistCardFollowButton({
     <ActionIconButton
       variant="card"
       active={isFollowed}
-      className="absolute top-2 right-2 z-10 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-action"
+      className="pointer-events-auto absolute top-2 right-2 z-10 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-action"
       onClick={async (event) => {
         event.stopPropagation();
         setTogglingFollow(true);
@@ -159,9 +161,10 @@ function PlaylistCardPlayButton({
   const [playing, setPlaying] = useState(false);
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-surface-canvas/0 transition-colors group-hover:bg-surface-canvas/40">
+    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-surface-canvas/0 transition-colors group-hover:bg-surface-canvas/40">
       <button
-        className="flex size-10 translate-y-2 items-center justify-center rounded-full bg-accent-action opacity-0 shadow-lg transition-[transform,opacity] focus-visible:translate-y-0 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-action group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:translate-y-0 group-hover:opacity-100"
+        type="button"
+        className="pointer-events-auto flex size-10 translate-y-2 items-center justify-center rounded-full bg-accent-action opacity-0 shadow-lg transition-[transform,opacity] focus-visible:translate-y-0 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-action group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:translate-y-0 group-hover:opacity-100"
         onClick={async (event) => {
           event.stopPropagation();
           setPlaying(true);
@@ -230,10 +233,11 @@ export function PlaylistCard({
   onStartRadio,
   onToggleFollow,
 }: PlaylistCardProps) {
+  const { t } = useTranslation();
   const { getPlaylistState, getPlaylistRecord } = useOffline();
   const offlineState = getPlaylistState(playlistId);
   const offlineRecord = getPlaylistRecord(playlistId);
-  const offlineMeta = getPlaylistOfflineMeta(offlineState, offlineRecord);
+  const offlineMeta = getPlaylistOfflineMeta(offlineState, offlineRecord, t);
   const actions = usePlaylistActionEntries({
     playlistId,
     name,
@@ -254,64 +258,66 @@ export function PlaylistCard({
   );
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      {...actionTarget}
-      onKeyDown={(event) => {
-        actionTarget.onKeyDown(event);
-        if (event.defaultPrevented) return;
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onClick();
-        }
-      }}
+    <article
       className={cn(
-        "group cursor-pointer rounded-xl p-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl",
+        "item-action-target group relative rounded-xl text-left transition-colors",
         layout === "grid" ? "w-full min-w-0" : "w-[160px] shrink-0",
         getPlaylistOfflineSurfaceClass(offlineState),
       )}
+      {...actionTarget}
     >
-      <div className="relative mb-2 overflow-hidden rounded-lg bg-text-primary/5">
-        <PlaylistCardArtwork
-          crateManaged={crateManaged}
-          editorialLabel={editorialLabel}
-          coverDataUrl={coverDataUrl}
-          tracks={tracks}
-          name={name}
-        />
-        {systemPlaylist && onToggleFollow ? (
-          <PlaylistCardFollowButton
-            isFollowed={isFollowed}
-            onToggleFollow={onToggleFollow}
+      <button
+        type="button"
+        onClick={onClick}
+        className="block w-full cursor-pointer rounded-xl p-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      >
+        <span className="relative mb-2 block overflow-hidden rounded-lg bg-text-primary/5">
+          <PlaylistCardArtwork
+            crateManaged={crateManaged}
+            editorialLabel={editorialLabel}
+            coverDataUrl={coverDataUrl}
+            tracks={tracks}
+            name={name}
           />
-        ) : null}
-        {onPlay ? <PlaylistCardPlayButton onPlay={onPlay} /> : null}
-        {badge && !crateManaged ? (
-          <div className="absolute left-2 top-2 rounded-full border border-accent-action/20 bg-surface-canvas/85 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-accent-action backdrop-blur-md">
-            {badge}
-          </div>
-        ) : null}
-        <OfflineBadge
-          state={offlineState}
-          compact
-          className={getPlaylistBadgePositionClass(badge, crateManaged)}
-        />
-      </div>
-      <div className="truncate text-sm font-medium text-text-primary">
-        {name}
-      </div>
-      <div className="truncate text-xs text-text-muted">
-        {description || meta}
-        {offlineMeta ? (
-          <span
-            className={cn("ml-1.5", getPlaylistOfflineMetaClass(offlineState))}
-          >
-            · {offlineMeta}
-          </span>
-        ) : null}
-      </div>
+          {badge && !crateManaged ? (
+            <span className="absolute left-2 top-2 rounded-full border border-accent-action/20 bg-surface-canvas/85 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-accent-action backdrop-blur-md">
+              {badge}
+            </span>
+          ) : null}
+          <OfflineBadge
+            state={offlineState}
+            compact
+            className={getPlaylistBadgePositionClass(badge, crateManaged)}
+          />
+        </span>
+        <span className="block truncate text-sm font-medium text-text-primary">
+          {name}
+        </span>
+        <span className="block truncate text-xs text-text-muted">
+          {description || meta}
+          {offlineMeta ? (
+            <span
+              className={cn(
+                "ml-1.5",
+                getPlaylistOfflineMetaClass(offlineState),
+              )}
+            >
+              · {offlineMeta}
+            </span>
+          ) : null}
+        </span>
+      </button>
+      {(systemPlaylist && onToggleFollow) || onPlay ? (
+        <div className="pointer-events-none absolute inset-x-2 top-2 z-10 aspect-square">
+          {systemPlaylist && onToggleFollow ? (
+            <PlaylistCardFollowButton
+              isFollowed={isFollowed}
+              onToggleFollow={onToggleFollow}
+            />
+          ) : null}
+          {onPlay ? <PlaylistCardPlayButton onPlay={onPlay} /> : null}
+        </div>
+      ) : null}
       <ItemActionMenu
         actions={actions}
         header={{
@@ -327,6 +333,6 @@ export function PlaylistCard({
         menuRef={actionMenu.menuRef}
         onClose={actionMenu.close}
       />
-    </div>
+    </article>
   );
 }

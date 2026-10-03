@@ -52,6 +52,16 @@ export const QueueTrackRow = memo(function QueueTrackRow({
     [onRemove, queueIndex, t],
   );
 
+  const meta = useMemo(
+    () =>
+      track.isSuggested ? (
+        <span className="rounded-full border border-accent-action/20 bg-accent-action/10 px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-accent-action">
+          {t("player.queue.suggested")}
+        </span>
+      ) : undefined,
+    [track.isSuggested, t],
+  );
+
   return (
     <div
       data-testid="queue-track-row"
@@ -73,13 +83,7 @@ export const QueueTrackRow = memo(function QueueTrackRow({
         onPlayOverride={handleJump}
         isActiveOverride={isCurrent}
         extraActions={extraActions}
-        meta={
-          track.isSuggested ? (
-            <span className="rounded-full border border-accent-action/20 bg-accent-action/10 px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-accent-action">
-              {t("player.queue.suggested")}
-            </span>
-          ) : undefined
-        }
+        meta={meta}
       />
     </div>
   );

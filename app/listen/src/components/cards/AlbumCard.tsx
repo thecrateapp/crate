@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { CRATE_ICON_SIZE, Disc3 } from "@crate/ui/icons";
 
@@ -43,6 +44,7 @@ export const AlbumCard = memo(function AlbumCard({
   meta,
   extraActions,
 }: AlbumCardProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { playAll } = usePlayerActions();
   const model = useAlbumCardModel({
@@ -134,6 +136,8 @@ export const AlbumCard = memo(function AlbumCard({
           buttonRef={model.actionMenu.triggerRef}
           hasActions={model.actionMenu.hasActions}
           onClick={model.actionMenu.openFromTrigger}
+          expanded={model.actionMenu.open}
+          title={t("actions.menu.more")}
           className="size-9 shrink-0 opacity-100 transition-opacity md:opacity-65 md:group-hover/card:opacity-100"
         />
         {menu}
@@ -188,6 +192,8 @@ export const AlbumCard = memo(function AlbumCard({
         buttonRef={model.actionMenu.triggerRef}
         hasActions={model.actionMenu.hasActions}
         onClick={model.actionMenu.openFromTrigger}
+        expanded={model.actionMenu.open}
+        title={t("actions.menu.more")}
         className="absolute left-4 top-4 z-20 size-10 opacity-75 transition-opacity hover:opacity-100 md:opacity-0 md:group-focus-within/card:opacity-100 md:group-hover/card:opacity-100"
       />
       {menu}

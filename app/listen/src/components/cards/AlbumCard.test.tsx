@@ -206,7 +206,7 @@ describe("AlbumCard", () => {
 
     await longPress(screen.getByText("Inlet").closest("article")!);
 
-    const sheet = await screen.findByRole("dialog", { name: "Action sheet" });
+    const sheet = await screen.findByRole("dialog", { name: "Actions menu" });
     expect(
       within(sheet).getByRole("menuitem", { name: "Play album" }),
     ).toBeInTheDocument();

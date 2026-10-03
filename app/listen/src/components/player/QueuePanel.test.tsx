@@ -145,7 +145,7 @@ describe("QueuePanel", () => {
     );
 
     expect(useApi).not.toHaveBeenCalledWith("/api/playlists");
-    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Más acciones" }));
 
     await waitFor(() => {
       expect(useApi).toHaveBeenCalledWith("/api/playlists");

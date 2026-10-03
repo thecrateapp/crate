@@ -8,6 +8,7 @@ import {
   ItemActionMenuButton,
   type ItemActionMenuEntry,
   useItemActionMenu,
+  useItemActionTarget,
 } from "@/components/actions/ItemActionMenu";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
 import { useOffline } from "@/contexts/OfflineContext";
@@ -110,6 +111,7 @@ export function PlaylistListRow({
     ];
   }, [baseActions, extraActions]);
   const actionMenu = useItemActionMenu(menuActions);
+  const actionTarget = useItemActionTarget(actionMenu);
 
   async function handleToggleFollow(
     event: React.MouseEvent<HTMLButtonElement>,
@@ -127,45 +129,42 @@ export function PlaylistListRow({
   const badgeLabel = getPlaylistBadgeLabel(crateManaged, badge);
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onContextMenu={actionMenu.handleContextMenu}
-      onClick={() => navigate(href)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          navigate(href);
-        }
-      }}
+    <article
       className={cn(
-        "flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        "item-action-target flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors",
         offlineState === "ready"
-          ? "bg-accent-action/[0.04] hover:bg-accent-action/[0.08] focus-visible:bg-accent-action/[0.08]"
+          ? "bg-accent-action/[0.04] hover:bg-accent-action/[0.08] focus-within:bg-accent-action/[0.08]"
           : isOfflineBusy(offlineState)
-            ? "bg-accent-action/[0.05] hover:bg-accent-action/[0.09] focus-visible:bg-accent-action/[0.09]"
+            ? "bg-accent-action/[0.05] hover:bg-accent-action/[0.09] focus-within:bg-accent-action/[0.09]"
             : offlineState === "error"
-              ? "bg-state-warning/[0.05] hover:bg-state-warning/[0.09] focus-visible:bg-state-warning/[0.09]"
-              : "hover:bg-text-primary/5 focus-visible:bg-text-primary/5",
+              ? "bg-state-warning/[0.05] hover:bg-state-warning/[0.09] focus-within:bg-state-warning/[0.09]"
+              : "hover:bg-text-primary/5 focus-within:bg-text-primary/5",
       )}
+      {...actionTarget}
     >
-      <PlaylistArtwork
-        name={name}
-        coverDataUrl={coverDataUrl}
-        tracks={artworkTracks}
-        showCrateMark={crateManaged}
-        className=" size-12 shrink-0 rounded-md"
-      />
+      <button
+        type="button"
+        onClick={() => navigate(href)}
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      >
+        <PlaylistArtwork
+          name={name}
+          coverDataUrl={coverDataUrl}
+          tracks={artworkTracks}
+          showCrateMark={crateManaged}
+          className=" size-12 shrink-0 rounded-md"
+        />
 
-      <PlaylistListRowInfo
-        badgeLabel={badgeLabel}
-        description={description}
-        meta={meta}
-        name={name}
-        offlineMeta={offlineMeta}
-        offlineState={offlineState}
-        trackCount={trackCount}
-      />
+        <PlaylistListRowInfo
+          badgeLabel={badgeLabel}
+          description={description}
+          meta={meta}
+          name={name}
+          offlineMeta={offlineMeta}
+          offlineState={offlineState}
+          trackCount={trackCount}
+        />
+      </button>
       <PlaylistListRowActions
         extraActions={extraActions}
         followState={followState}
@@ -186,6 +185,8 @@ export function PlaylistListRow({
           buttonRef={actionMenu.triggerRef}
           hasActions={actionMenu.hasActions}
           onClick={actionMenu.openFromTrigger}
+          expanded={actionMenu.open}
+          title={t("actions.menu.more")}
           className="opacity-80 transition-opacity hover:opacity-100"
         />
       </div>
@@ -206,6 +207,6 @@ export function PlaylistListRow({
         menuRef={actionMenu.menuRef}
         onClose={actionMenu.close}
       />
-    </div>
+    </article>
   );
 }

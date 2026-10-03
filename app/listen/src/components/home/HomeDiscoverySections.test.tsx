@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import {
   afterEach,
@@ -29,6 +30,7 @@ import type {
   HomeSuggestedAlbum,
 } from "@/components/home/home-model";
 import { artistHeroApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
+import { longPress, pressMenuKey } from "@/test/item-action-gestures";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 vi.mock("@/lib/library-routes", async (importOriginal) => {
@@ -941,6 +943,83 @@ describe("RecentEntityRow", () => {
     expect(within(albumRow).queryByText("album")).toBeNull();
     expect(within(artistRow).queryByText("artist")).toBeNull();
     expect(within(playlistRow).queryByText("playlist")).toBeNull();
+  });
+
+  it("opens the row menu with Enter on the nested menu button without navigating", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    renderWithListenProviders(
+      <RecentEntityRow
+        item={{
+          type: "album",
+          album_id: 42,
+          album_name: "El Cielo",
+          artist_name: "Dredg",
+        }}
+        onClick={onClick}
+      />,
+    );
+
+    const menuButton = screen.getByRole("button", { name: "More actions" });
+    expect(menuButton).toHaveAttribute("aria-expanded", "false");
+    expect(menuButton.closest("[role='button']")).toBeNull();
+
+    menuButton.focus();
+    await user.keyboard("{Enter}");
+
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+    expect(menuButton).toHaveAttribute("aria-expanded", "true");
+    expect(onClick).not.toHaveBeenCalled();
+
+    await user.keyboard("{Enter}");
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it("navigates with Enter on the row primary button", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    renderWithListenProviders(
+      <RecentEntityRow
+        item={{ type: "artist", artist_id: 7, artist_name: "Hum" }}
+        onClick={onClick}
+      />,
+    );
+
+    screen.getByRole("button", { name: /Hum/i }).focus();
+    await user.keyboard("{Enter}");
+
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  it("opens the row menu from context menu, menu key and long-press", async () => {
+    const item: HomeRecentItem = {
+      type: "album",
+      album_id: 42,
+      album_name: "El Cielo",
+      artist_name: "Dredg",
+    };
+    const first = renderWithListenProviders(
+      <RecentEntityRow item={item} onClick={vi.fn()} />,
+    );
+    fireEvent.contextMenu(screen.getByText("El Cielo").closest("article")!);
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+    first.unmount();
+
+    const second = renderWithListenProviders(
+      <RecentEntityRow item={item} onClick={vi.fn()} />,
+    );
+    pressMenuKey(screen.getByRole("button", { name: /El Cielo/i }));
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+    second.unmount();
+
+    mockMobilePointer();
+    renderWithListenProviders(
+      <RecentEntityRow item={item} onClick={vi.fn()} />,
+    );
+    await longPress(screen.getByText("El Cielo").closest("article")!);
+    expect(
+      await screen.findByRole("dialog", { name: "Actions menu" }),
+    ).toBeInTheDocument();
   });
 
   it("renders remote favorite artists with global catalog routes and artwork", () => {

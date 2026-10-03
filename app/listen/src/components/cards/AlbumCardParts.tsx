@@ -80,16 +80,18 @@ interface AlbumData {
 function albumOfflineMeta(
   state: OfflineItemState,
   record: OfflineItemRecord | null | undefined,
+  t: ReturnType<typeof useTranslation>["t"],
 ): string {
   if (state === "ready") {
     return record?.trackCount
-      ? `${record.trackCount} offline`
+      ? t("common.offlineCount", { count: record.trackCount })
       : getOfflineStateLabel(state) ?? "";
   }
   if (isOfflineBusy(state) && record?.trackCount) {
-    return `${Math.min(record.readyTrackCount || 0, record.trackCount)}/${
-      record.trackCount
-    } offline`;
+    return t("common.offlineProgress", {
+      ready: Math.min(record.readyTrackCount || 0, record.trackCount),
+      total: record.trackCount,
+    });
   }
   return getOfflineStateLabel(state) ?? "";
 }
@@ -469,7 +471,7 @@ export function useAlbumCardModel({
   const saved = isSaved(albumId, globalAlbumUid);
   const offlineState = getAlbumState(albumId);
   const offlineRecord = getAlbumRecord(albumId);
-  const offlineMeta = albumOfflineMeta(offlineState, offlineRecord);
+  const offlineMeta = albumOfflineMeta(offlineState, offlineRecord, t);
   const actionMenu = useItemActionMenu(NO_ACTIONS, { hasActions: true });
   const menuInput: AlbumMenuData = {
     artist,

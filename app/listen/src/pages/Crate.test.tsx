@@ -161,7 +161,7 @@ describe("Crate page", () => {
     expect(row).toHaveAttribute("data-variant", "row");
     fireEvent.contextMenu(row);
 
-    const sheet = await screen.findByRole("dialog", { name: "Action sheet" });
+    const sheet = await screen.findByRole("dialog", { name: "Actions menu" });
     expect(within(sheet).getByText("Play album")).toBeInTheDocument();
     expect(
       within(sheet).queryByText("Remove from Crate"),
@@ -173,14 +173,14 @@ describe("Crate page", () => {
 
     await longPress(albumRow("Blending"));
     expect(
-      await screen.findByRole("dialog", { name: "Action sheet" }),
+      await screen.findByRole("dialog", { name: "Actions menu" }),
     ).toBeInTheDocument();
     unmount();
 
     renderCrate();
     pressMenuKey(albumRow("Blending"));
     expect(
-      await screen.findByRole("dialog", { name: "Action sheet" }),
+      await screen.findByRole("dialog", { name: "Actions menu" }),
     ).toBeInTheDocument();
   });
 

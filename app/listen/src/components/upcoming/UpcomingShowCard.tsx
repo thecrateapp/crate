@@ -52,9 +52,15 @@ export function UpcomingShowCard({
     () => ({
       triggerRef: actionMenu.triggerRef,
       hasActions: actionMenu.hasActions,
+      open: actionMenu.open,
       onOpen: actionMenu.openFromTrigger,
     }),
-    [actionMenu.hasActions, actionMenu.openFromTrigger, actionMenu.triggerRef],
+    [
+      actionMenu.hasActions,
+      actionMenu.open,
+      actionMenu.openFromTrigger,
+      actionMenu.triggerRef,
+    ],
   );
 
   // Measure expanded content height for smooth animation
@@ -98,6 +104,7 @@ export function UpcomingShowCard({
       onKeyDown={
         !expanded && onToggle
           ? (event) => {
+              if (event.target !== event.currentTarget) return;
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
                 onToggle();

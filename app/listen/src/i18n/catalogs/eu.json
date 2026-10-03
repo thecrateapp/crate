@@ -11,6 +11,8 @@
   "common.trackCount": "{count, plural, one {# abesti} other {# abesti}}",
   "common.followerCount": "{count, plural, one {# jarraitzaile} other {# jarraitzaile}}",
   "common.playCount": "{count, plural, one {# entzunaldi} other {# entzunaldi}}",
+  "common.offlineCount": "{count, plural, one {# offline eskuragarri} other {# offline eskuragarri}}",
+  "common.offlineProgress": "{ready}/{total} offline eskuragarri",
   "common.follow": "Jarraitu",
   "common.following": "Jarraitzen",
   "common.about": "Honi buruz",
@@ -114,6 +116,8 @@
   "actions.offline.makeAvailable": "Eskuragarri egin offline",
   "actions.offline.toasts.removed": "Offline kopia kendu da",
   "actions.offline.toasts.updateFailed": "Ezin izan da offline kopia eguneratu",
+  "actions.menu.more": "Ekintza gehiago",
+  "actions.menu.sheetLabel": "Ekintzen menua",
   "actions.track.playNow": "Erreproduzitu orain",
   "actions.track.playNext": "Erreproduzitu hurrena",
   "actions.track.addToQueue": "Gehitu ilarara",
@@ -1774,5 +1778,6 @@
   "trackRow.pauseLabel": "Pausatu {title}",
   "trackRow.resolvingLabel": "{title} ebazten",
   "trackRow.unknownTitle": "Ezezaguna",
-  "trackRow.soon": "Laster"
+  "trackRow.soon": "Laster",
+  "trackRow.coverAlt": "{title} azala"
 }

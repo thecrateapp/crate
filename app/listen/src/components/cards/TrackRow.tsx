@@ -80,7 +80,7 @@ export const TrackRow = memo(function TrackRow({
   return (
     <div
       className={cn(
-        "group track-row flex items-center gap-[var(--content-row-gap)] rounded-lg transition-colors",
+        "item-action-target group track-row flex items-center gap-[var(--content-row-gap)] rounded-lg transition-colors",
         compact ? "px-2 py-1.5" : "px-3 py-[var(--content-row-padding-y)]",
       )}
       data-active={isActive}

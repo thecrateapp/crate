@@ -334,7 +334,7 @@ export function TrackRowLikeControl({
 
   return (
     <FollowHeartButton
-      className={` size-9 shrink-0 rounded-full transition-opacity ${
+      className={` size-9 shrink-0 rounded-full transition-opacity before:absolute before:left-1/2 before:top-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:content-[''] ${
         liked ? "opacity-100" : "md:opacity-0 md:group-hover:opacity-100"
       }`}
       title={t(liked ? "actions.track.unlike" : "actions.track.like")}
@@ -391,6 +391,7 @@ function TrackRowMenu({
   showLocalActions: boolean;
   track: TrackRowData;
 }) {
+  const { t } = useTranslation();
   const defaultPlaylistActions = useTrackPlaylistActions();
   const usesDefaultPlaylists = playlistOptions === undefined;
   const { ensurePlaylistOptionsLoaded } = defaultPlaylistActions;
@@ -432,7 +433,9 @@ function TrackRowMenu({
         subtitle: track.artist,
         detail: track.album,
         imageUrl: cover,
-        imageAlt: track.album ? `${track.title} cover` : track.title,
+        imageAlt: track.album
+          ? t("trackRow.coverAlt", { title: track.title })
+          : track.title,
         imageShape: "square",
         fallbackIcon: Disc3,
       }}
@@ -475,6 +478,7 @@ export function TrackRowActions({
   showLocalActions: boolean;
   track: TrackRowData;
 }) {
+  const { t } = useTranslation();
   if (!actionMenu.hasActions) {
     return <div className={cn("shrink-0", compact ? "size-8" : "size-9")} />;
   }
@@ -496,6 +500,8 @@ export function TrackRowActions({
             actionMenu.openFromTrigger(event);
           }}
           onContextMenu={actionMenu.handleContextMenu}
+          expanded={actionMenu.open}
+          title={t("actions.menu.more")}
           className={compact ? "size-8" : "size-9"}
         />
       </div>

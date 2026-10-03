@@ -11,6 +11,8 @@
   "common.trackCount": "{count, plural, one {# canción} other {# canciones}}",
   "common.followerCount": "{count, plural, one {# seguidor} other {# seguidores}}",
   "common.playCount": "{count, plural, one {# reproducción} other {# reproducciones}}",
+  "common.offlineCount": "{count, plural, one {# disponible offline} other {# disponibles offline}}",
+  "common.offlineProgress": "{ready}/{total} disponibles offline",
   "common.follow": "Seguir",
   "common.following": "Siguiendo",
   "common.about": "Acerca de",
@@ -114,6 +116,8 @@
   "actions.offline.makeAvailable": "Disponible offline",
   "actions.offline.toasts.removed": "Copia offline eliminada",
   "actions.offline.toasts.updateFailed": "No se pudo actualizar la copia offline",
+  "actions.menu.more": "Más acciones",
+  "actions.menu.sheetLabel": "Menú de acciones",
   "actions.track.playNow": "Reproducir ahora",
   "actions.track.playNext": "Reproducir a continuación",
   "actions.track.addToQueue": "Añadir a la cola",
@@ -1774,5 +1778,6 @@
   "trackRow.pauseLabel": "Pausar {title}",
   "trackRow.resolvingLabel": "Resolviendo {title}",
   "trackRow.unknownTitle": "Desconocida",
-  "trackRow.soon": "Pronto"
+  "trackRow.soon": "Pronto",
+  "trackRow.coverAlt": "Portada de {title}"
 }

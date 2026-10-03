@@ -11,6 +11,8 @@
   "common.trackCount": "{count, plural, one {# track} other {# tracks}}",
   "common.followerCount": "{count, plural, one {# follower} other {# followers}}",
   "common.playCount": "{count, plural, one {# play} other {# plays}}",
+  "common.offlineCount": "{count, plural, one {# offline} other {# offline}}",
+  "common.offlineProgress": "{ready}/{total} offline",
   "common.follow": "Follow",
   "common.following": "Following",
   "common.about": "About",
@@ -114,6 +116,8 @@
   "actions.offline.makeAvailable": "Make available offline",
   "actions.offline.toasts.removed": "Offline copy removed",
   "actions.offline.toasts.updateFailed": "Failed to update offline copy",
+  "actions.menu.more": "More actions",
+  "actions.menu.sheetLabel": "Actions menu",
   "actions.track.playNow": "Play now",
   "actions.track.playNext": "Play next",
   "actions.track.addToQueue": "Add to queue",
@@ -1774,5 +1778,6 @@
   "trackRow.pauseLabel": "Pause {title}",
   "trackRow.resolvingLabel": "Resolving {title}",
   "trackRow.unknownTitle": "Unknown",
-  "trackRow.soon": "Soon"
+  "trackRow.soon": "Soon",
+  "trackRow.coverAlt": "{title} cover"
 }

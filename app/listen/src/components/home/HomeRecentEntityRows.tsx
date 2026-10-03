@@ -1,4 +1,4 @@
-import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Disc3, Sparkles, UserRound } from "@crate/ui/icons";
 
@@ -8,6 +8,7 @@ import {
   type ContextMenuHeader,
   type ItemActionMenuEntry,
   useItemActionMenu,
+  useItemActionTarget,
 } from "@/components/actions/ItemActionMenu";
 import { useAlbumActionEntries } from "@/components/actions/album-actions";
 import { useArtistActionEntries } from "@/components/actions/artist-actions";
@@ -159,72 +160,69 @@ function RecentEntityRowFrame({
   const artworkUrl = recentArtwork(item);
   const title = recentTitle(item);
   const subtitle = recentSubtitle(item);
+  const { t } = useTranslation();
   const actionMenu = useItemActionMenu(actions);
-
-  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
-    actionMenu.handleKeyboardTrigger(event);
-    if (event.defaultPrevented) return;
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    onClick();
-  }
+  const actionTarget = useItemActionTarget(actionMenu);
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={handleKeyDown}
-      onContextMenu={actionMenu.handleContextMenu}
-      className="home-discovery-card group flex min-w-0 items-center gap-3 rounded-lg p-3 text-left"
-      {...actionMenu.longPressHandlers}
+    <article
+      className="item-action-target home-discovery-card group flex min-w-0 items-center gap-3 rounded-lg p-3 text-left"
+      {...actionTarget}
     >
-      <div className="home-discovery-artwork relative size-12 shrink-0 overflow-hidden rounded-xl">
-        {item.type === "playlist" ? (
-          <PlaylistArtwork
-            name={item.playlist_name}
-            coverDataUrl={item.playlist_cover_data_url}
-            tracks={item.playlist_tracks}
-            className=" size-full rounded-xl"
-          />
-        ) : artworkUrl ? (
-          <CrateImage
-            src={artworkUrl}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            className=" size-full object-cover"
-          />
-        ) : (
-          <div className="home-discovery-artwork flex size-full items-center justify-center">
-            {item.type === "artist" ? (
-              <UserRound
-                size={18}
-                className="home-discovery-placeholder-icon"
-              />
-            ) : (
-              <Disc3 size={18} className="home-discovery-placeholder-icon" />
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold text-text-primary">
-          {title}
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      >
+        <div className="home-discovery-artwork relative size-12 shrink-0 overflow-hidden rounded-xl">
+          {item.type === "playlist" ? (
+            <PlaylistArtwork
+              name={item.playlist_name}
+              coverDataUrl={item.playlist_cover_data_url}
+              tracks={item.playlist_tracks}
+              className=" size-full rounded-xl"
+            />
+          ) : artworkUrl ? (
+            <CrateImage
+              src={artworkUrl}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className=" size-full object-cover"
+            />
+          ) : (
+            <div className="home-discovery-artwork flex size-full items-center justify-center">
+              {item.type === "artist" ? (
+                <UserRound
+                  size={18}
+                  className="home-discovery-placeholder-icon"
+                />
+              ) : (
+                <Disc3 size={18} className="home-discovery-placeholder-icon" />
+              )}
+            </div>
+          )}
         </div>
-        {subtitle ? (
-          <div className="mt-1 truncate text-xs text-text-muted">
-            {subtitle}
-          </div>
-        ) : null}
-      </div>
+
+        <span className="block min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-text-primary">
+            {title}
+          </span>
+          {subtitle ? (
+            <span className="mt-1 block truncate text-xs text-text-muted">
+              {subtitle}
+            </span>
+          ) : null}
+        </span>
+      </button>
 
       <div className="flex shrink-0 items-center gap-2">
         <ItemActionMenuButton
           buttonRef={actionMenu.triggerRef}
           hasActions={actionMenu.hasActions}
           onClick={actionMenu.openFromTrigger}
+          expanded={actionMenu.open}
+          title={t("actions.menu.more")}
           className=" size-9 opacity-75 transition-opacity hover:opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
         />
       </div>
@@ -237,6 +235,6 @@ function RecentEntityRowFrame({
         menuRef={actionMenu.menuRef}
         onClose={actionMenu.close}
       />
-    </div>
+    </article>
   );
 }

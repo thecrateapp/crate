@@ -11,6 +11,8 @@
   "common.trackCount": "{count, plural, one {# cançó} other {# cançons}}",
   "common.followerCount": "{count, plural, one {# seguidor} other {# seguidors}}",
   "common.playCount": "{count, plural, one {# reproducció} other {# reproduccions}}",
+  "common.offlineCount": "{count, plural, one {# disponible offline} other {# disponibles offline}}",
+  "common.offlineProgress": "{ready}/{total} disponibles offline",
   "common.follow": "Segueix",
   "common.following": "Seguint",
   "common.about": "Sobre",
@@ -114,6 +116,8 @@
   "actions.offline.makeAvailable": "Disponible offline",
   "actions.offline.toasts.removed": "Còpia offline eliminada",
   "actions.offline.toasts.updateFailed": "No s’ha pogut actualitzar la còpia offline",
+  "actions.menu.more": "Més accions",
+  "actions.menu.sheetLabel": "Menú d’accions",
   "actions.track.playNow": "Reproduir ara",
   "actions.track.playNext": "Reproduir a continuació",
   "actions.track.addToQueue": "Afegir a la cua",
@@ -1774,5 +1778,6 @@
   "trackRow.pauseLabel": "Pausa {title}",
   "trackRow.resolvingLabel": "Resolent {title}",
   "trackRow.unknownTitle": "Desconeguda",
-  "trackRow.soon": "Aviat"
+  "trackRow.soon": "Aviat",
+  "trackRow.coverAlt": "Portada de {title}"
 }

@@ -19,6 +19,7 @@ vi.mock("@/lib/api", async () => {
 
 import { CrateCard } from "@/components/CrateCard";
 import { I18nProvider } from "@/i18n";
+import { longPress, pressMenuKey } from "@/test/item-action-gestures";
 
 function render(element: ReactElement) {
   return renderTestingLibrary(
@@ -350,5 +351,53 @@ describe("CrateCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
     expect(screen.getByRole("menuitem", { name: "Share Crate" })).toBeVisible();
     expect(screen.queryByRole("menuitem", { name: "Edit Crate" })).toBeNull();
+  });
+
+  it("opens the contextual menu with right click, menu key and long-press", async () => {
+    const first = render(
+      <I18nProvider initialLocale="en">
+        <CrateCard crate={crate} onEdit={vi.fn()} />
+      </I18nProvider>,
+    );
+    fireEvent.contextMenu(screen.getByTestId("crate-card"));
+    expect(
+      await screen.findByRole("menuitem", { name: "Edit Crate" }),
+    ).toBeVisible();
+    first.unmount();
+
+    const second = render(
+      <I18nProvider initialLocale="en">
+        <CrateCard crate={crate} onEdit={vi.fn()} />
+      </I18nProvider>,
+    );
+    pressMenuKey(screen.getByRole("link", { name: "Open Year-end records" }));
+    expect(
+      await screen.findByRole("menuitem", { name: "Edit Crate" }),
+    ).toBeVisible();
+    second.unmount();
+
+    render(
+      <I18nProvider initialLocale="en">
+        <CrateCard crate={crate} onEdit={vi.fn()} />
+      </I18nProvider>,
+    );
+    await longPress(screen.getByTestId("crate-card"));
+    expect(
+      await screen.findByRole("dialog", { name: "Actions menu" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Crate detail page")).toBeNull();
+  });
+
+  it("reflects the menu state on the trigger", () => {
+    render(
+      <I18nProvider initialLocale="en">
+        <CrateCard crate={crate} onEdit={vi.fn()} />
+      </I18nProvider>,
+    );
+
+    const trigger = screen.getByRole("button", { name: "More actions" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
   });
 });
