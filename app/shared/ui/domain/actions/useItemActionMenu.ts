@@ -92,6 +92,10 @@ export function useItemActionMenu(
     onOpenChange?.(open);
   }, [onOpenChange, open]);
 
+  useEffect(() => {
+    if (!open) longPressTriggeredRef.current = false;
+  }, [open]);
+
   const clearLongPress = () => {
     if (longPressTimerRef.current != null) {
       window.clearTimeout(longPressTimerRef.current);
@@ -136,6 +140,11 @@ export function useItemActionMenu(
 
   const handleLongPressClickCapture = (event: ReactMouseEvent<HTMLElement>) => {
     if (!longPressTriggeredRef.current) return;
+    const menu = controller.menuRef.current;
+    if (menu && event.target instanceof Node && menu.contains(event.target)) {
+      longPressTriggeredRef.current = false;
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     longPressTriggeredRef.current = false;

@@ -22,19 +22,13 @@ export interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   closeLabel?: string;
+  ariaLabel?: string;
+  backdropLabel?: string;
   tone?: ConfirmDialogTone;
   variant?: "default" | "destructive";
   pending?: boolean;
   initialFocus?: "cancel" | "confirm";
   size?: AppModalSize;
-}
-
-function isPromiseLike(value: unknown): value is Promise<void> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as Promise<void>).then === "function"
-  );
 }
 
 export function ConfirmDialog({
@@ -47,15 +41,20 @@ export function ConfirmDialog({
   body,
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
-  closeLabel,
+  closeLabel = "Close",
+  ariaLabel = "Confirmation dialog",
+  backdropLabel = "Close dialog backdrop",
   tone,
   variant,
-  pending = false,
+  pending: controlledPending,
   initialFocus,
   size = "sm",
 }: ConfirmDialogProps) {
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
+  const submittingRef = useRef(false);
+  const isPendingControlled = controlledPending !== undefined;
+  const pending = controlledPending ?? false;
   const resolvedTone: ConfirmDialogTone =
     tone ?? (variant === "destructive" ? "danger" : "default");
   const resolvedInitialFocus =
@@ -76,24 +75,29 @@ export function ConfirmDialog({
     onOpenChange?.(false);
   };
 
-  const handleConfirm = () => {
-    if (pending) return;
-    const result = onConfirm();
-    if (!onOpenChange) return;
-    if (isPromiseLike(result)) {
-      void result.then(
-        () => onOpenChange(false),
-        () => undefined,
-      );
-      return;
+  const handleConfirm = async () => {
+    if (pending || submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      if (!isPendingControlled) {
+        onOpenChange?.(false);
+        await onConfirm();
+        return;
+      }
+      await onConfirm();
+      onOpenChange?.(false);
+    } finally {
+      submittingRef.current = false;
     }
-    onOpenChange(false);
   };
 
   return (
     <AppModal
       open={open}
       onClose={handleCancel}
+      role="alertdialog"
+      ariaLabel={ariaLabel}
+      backdropLabel={backdropLabel}
       title={title}
       description={description}
       size={size}
@@ -124,7 +128,7 @@ export function ConfirmDialog({
           disabled={pending}
           aria-busy={pending || undefined}
           data-tone={resolvedTone}
-          onClick={handleConfirm}
+          onClick={() => void handleConfirm()}
         >
           {pending ? (
             <Loader2

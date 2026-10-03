@@ -105,6 +105,51 @@ describe("ContextMenu", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("does not bubble clicks or pointer downs on the desktop menu to the parent row", () => {
+    const onRowClick = vi.fn();
+    const onRowPointerDown = vi.fn();
+    render(
+      <div onClick={onRowClick} onPointerDown={onRowPointerDown}>
+        <ContextMenu
+          header={header}
+          items={actions()}
+          menuRef={createRef<HTMLDivElement>()}
+          onClose={vi.fn()}
+          open
+          position={{ x: 40, y: 64 }}
+        />
+      </div>,
+    );
+
+    fireEvent.pointerDown(screen.getByText("El Cielo"));
+    fireEvent.click(screen.getByText("El Cielo"));
+    fireEvent.click(screen.getByRole("menu"));
+
+    expect(onRowClick).not.toHaveBeenCalled();
+    expect(onRowPointerDown).not.toHaveBeenCalled();
+  });
+
+  it("does not bubble clicks on the mobile sheet to the parent row", () => {
+    isDesktop = false;
+    const onRowClick = vi.fn();
+    render(
+      <div onClick={onRowClick}>
+        <ContextMenu
+          header={header}
+          items={actions()}
+          menuRef={createRef<HTMLDivElement>()}
+          onClose={vi.fn()}
+          open
+          position={null}
+        />
+      </div>,
+    );
+
+    fireEvent.click(screen.getByText("El Cielo"));
+
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+
   it("shows fallback icon when imageUrl is null", () => {
     render(
       <ContextMenu

@@ -98,6 +98,20 @@ describe("SegmentedControl", () => {
     );
   });
 
+  it("extends the hit area to 44px on coarse pointers without changing visual size", () => {
+    render(<Harness size="sm" />);
+    for (const tab of screen.getAllByRole("tab")) {
+      expect(tab).toHaveClass(
+        "relative",
+        "h-7",
+        "after:absolute",
+        "after:h-11",
+        "after:-translate-y-1/2",
+        "pointer-fine:after:hidden",
+      );
+    }
+  });
+
   it("does not fire for the current value", async () => {
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);

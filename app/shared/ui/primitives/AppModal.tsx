@@ -33,6 +33,7 @@ export interface AppModalProps {
   title?: ReactNode;
   description?: ReactNode;
   size?: AppModalSize;
+  role?: "dialog" | "alertdialog";
   ariaLabel?: string;
   ariaLabelledBy?: string;
   ariaDescribedBy?: string;
@@ -69,6 +70,7 @@ export function AppModal({
   title,
   description,
   size,
+  role = "dialog",
   ariaLabel = "Dialog",
   ariaLabelledBy,
   ariaDescribedBy,
@@ -268,6 +270,7 @@ export function AppModal({
   return createPortal(
     <dialog
       open
+      role={role === "alertdialog" ? "alertdialog" : undefined}
       aria-modal="true"
       aria-label={labelledBy ? undefined : ariaLabel}
       aria-labelledby={labelledBy}

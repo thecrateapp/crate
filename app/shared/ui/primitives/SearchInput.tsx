@@ -1,6 +1,7 @@
 import {
   forwardRef,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -49,7 +50,8 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     const [uncontrolledValue, setUncontrolledValue] = useState(defaultValue);
     const isControlled = controlledValue !== undefined;
     const value = isControlled ? controlledValue : uncontrolledValue;
-    const debouncedValue = useDebouncedValue(value, debounceMs);
+    const pendingEmission = useMemo(() => ({ value }), [value]);
+    const debouncedEmission = useDebouncedValue(pendingEmission, debounceMs);
     const lastEmittedRef = useRef(value);
     const onDebouncedChangeRef = useRef(onDebouncedChange);
     const innerRef = useRef<HTMLInputElement | null>(null);
@@ -59,10 +61,11 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     }, [onDebouncedChange]);
 
     useEffect(() => {
-      if (debouncedValue === lastEmittedRef.current) return;
-      lastEmittedRef.current = debouncedValue;
-      onDebouncedChangeRef.current?.(debouncedValue);
-    }, [debouncedValue]);
+      const next = debouncedEmission.value;
+      if (next === lastEmittedRef.current) return;
+      lastEmittedRef.current = next;
+      onDebouncedChangeRef.current?.(next);
+    }, [debouncedEmission]);
 
     const setValue = (next: string) => {
       if (!isControlled) setUncontrolledValue(next);

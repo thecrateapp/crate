@@ -418,5 +418,71 @@ describe("useItemActionMenu", () => {
 
       expect(click.preventDefault).not.toHaveBeenCalled();
     });
+
+    function createTargetedClick(target: Node): React.MouseEvent<HTMLElement> {
+      return {
+        target,
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      } as unknown as React.MouseEvent<HTMLElement>;
+    }
+
+    it("lets taps inside the open menu through after a long press", () => {
+      const { result } = renderTouchMenu();
+      const menu = document.createElement("div");
+      const item = document.createElement("button");
+      menu.appendChild(item);
+
+      act(() => {
+        result.current.longPressHandlers.onPointerDown(
+          createPointerEvent("touch"),
+        );
+        vi.advanceTimersByTime(420);
+      });
+      result.current.menuRef.current = menu;
+
+      const itemClick = createTargetedClick(item);
+      result.current.longPressHandlers.onClickCapture(itemClick);
+      expect(itemClick.preventDefault).not.toHaveBeenCalled();
+      expect(itemClick.stopPropagation).not.toHaveBeenCalled();
+
+      const rowClick = createTargetedClick(document.createElement("div"));
+      result.current.longPressHandlers.onClickCapture(rowClick);
+      expect(rowClick.preventDefault).not.toHaveBeenCalled();
+    });
+
+    it("still swallows the long-press ghost click outside the menu", () => {
+      const { result } = renderTouchMenu();
+
+      act(() => {
+        result.current.longPressHandlers.onPointerDown(
+          createPointerEvent("touch"),
+        );
+        vi.advanceTimersByTime(420);
+      });
+
+      const ghostClick = createTargetedClick(document.createElement("div"));
+      result.current.longPressHandlers.onClickCapture(ghostClick);
+      expect(ghostClick.preventDefault).toHaveBeenCalled();
+      expect(ghostClick.stopPropagation).toHaveBeenCalled();
+    });
+
+    it("resets the long-press flag when the menu closes without a click", () => {
+      const { result } = renderTouchMenu();
+
+      act(() => {
+        result.current.longPressHandlers.onPointerDown(
+          createPointerEvent("touch"),
+        );
+        vi.advanceTimersByTime(420);
+      });
+      act(() => {
+        result.current.close();
+      });
+
+      const nextClick = createTargetedClick(document.createElement("div"));
+      result.current.longPressHandlers.onClickCapture(nextClick);
+      expect(nextClick.preventDefault).not.toHaveBeenCalled();
+    });
   });
 });

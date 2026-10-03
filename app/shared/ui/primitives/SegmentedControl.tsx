@@ -141,7 +141,8 @@ export function SegmentedControl<T extends string = string>({
             }}
             onKeyDown={(event) => handleKeyDown(event, index)}
             className={cn(
-              "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full font-medium outline-none transition-[color,background-color,box-shadow] focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50",
+              "relative inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full font-medium outline-none transition-[color,background-color,box-shadow] focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50",
+              "after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 pointer-fine:after:hidden",
               SIZE_CLASS_NAME[size],
               fullWidth && "flex-1",
               selected

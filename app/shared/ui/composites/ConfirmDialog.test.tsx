@@ -99,7 +99,7 @@ describe("ConfirmDialog", () => {
     );
 
     expect(
-      screen.getByRole("dialog", { name: "¿Borrar playlist?" }),
+      screen.getByRole("alertdialog", { name: "¿Borrar playlist?" }),
     ).toHaveAccessibleDescription("No se puede deshacer.");
     expect(screen.getByText("Se perderán 12 canciones.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Borrar" })).toHaveClass(
@@ -190,7 +190,7 @@ describe("ConfirmDialog", () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
-  it("closes through onOpenChange only after an async confirm resolves", async () => {
+  it("closes through onOpenChange only after an async confirm resolves when pending is controlled", async () => {
     let resolve: () => void = () => {};
     const onConfirm = vi.fn(
       () =>
@@ -202,13 +202,16 @@ describe("ConfirmDialog", () => {
     render(
       <ConfirmDialog
         open
+        pending={false}
         onOpenChange={onOpenChange}
         title="Delete?"
         onConfirm={onConfirm}
       />,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    const confirm = screen.getByRole("button", { name: "Confirm" });
+    await userEvent.click(confirm);
+    await userEvent.click(confirm);
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onOpenChange).not.toHaveBeenCalled();
 
@@ -216,6 +219,86 @@ describe("ConfirmDialog", () => {
       resolve();
     });
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("closes immediately on confirm when pending is not controlled", async () => {
+    const onConfirm = vi.fn(() => new Promise<void>(() => {}));
+    const onOpenChange = vi.fn();
+    render(
+      <ConfirmDialog
+        open
+        onOpenChange={onOpenChange}
+        title="Delete?"
+        onConfirm={onConfirm}
+      />,
+    );
+
+    const confirm = screen.getByRole("button", { name: "Confirm" });
+    await userEvent.click(confirm);
+    await userEvent.click(confirm);
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("propagates async confirm rejections and stays open when pending is controlled", async () => {
+    const vitestListeners = process.listeners("unhandledRejection");
+    process.removeAllListeners("unhandledRejection");
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    try {
+      const error = new Error("boom");
+      const onConfirm = vi
+        .fn<() => Promise<void>>()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValueOnce(undefined);
+      const onOpenChange = vi.fn();
+      render(
+        <ConfirmDialog
+          open
+          pending={false}
+          onOpenChange={onOpenChange}
+          title="Delete?"
+          onConfirm={onConfirm}
+        />,
+      );
+
+      const confirm = screen.getByRole("button", { name: "Confirm" });
+      await userEvent.click(confirm);
+      await act(async () => {
+        await new Promise((done) => setTimeout(done, 0));
+      });
+      expect(onOpenChange).not.toHaveBeenCalled();
+      expect(unhandled).toHaveBeenCalledWith(error, expect.anything());
+
+      await userEvent.click(confirm);
+      expect(onConfirm).toHaveBeenCalledTimes(2);
+      expect(onOpenChange).toHaveBeenCalledWith(false);
+    } finally {
+      process.removeAllListeners("unhandledRejection");
+      for (const listener of vitestListeners) {
+        process.on("unhandledRejection", listener);
+      }
+    }
+  });
+
+  it("forwards translatable aria and backdrop labels", () => {
+    render(
+      <ConfirmDialog
+        open
+        title={null}
+        ariaLabel="Confirmar"
+        backdropLabel="Cerrar fondo"
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole("alertdialog", { name: "Confirmar" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Cerrar fondo" }),
+    ).toBeInTheDocument();
   });
 
   it("does not render when closed", () => {
@@ -227,6 +310,6 @@ describe("ConfirmDialog", () => {
         onConfirm={vi.fn()}
       />,
     );
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 });

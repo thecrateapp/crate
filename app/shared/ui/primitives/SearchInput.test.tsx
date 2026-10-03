@@ -65,6 +65,27 @@ describe("SearchInput", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("emits the previous debounced value when retyped quickly after clearing", () => {
+    vi.useFakeTimers();
+    const onDebouncedChange = vi.fn();
+    render(
+      <SearchInput debounceMs={200} onDebouncedChange={onDebouncedChange} />,
+    );
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "rival" } });
+    act(() => vi.advanceTimersByTime(200));
+    expect(onDebouncedChange).toHaveBeenLastCalledWith("rival");
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(onDebouncedChange).toHaveBeenLastCalledWith("");
+
+    act(() => vi.advanceTimersByTime(50));
+    fireEvent.change(input, { target: { value: "rival" } });
+    act(() => vi.advanceTimersByTime(200));
+    expect(onDebouncedChange).toHaveBeenLastCalledWith("rival");
+    expect(onDebouncedChange).toHaveBeenCalledTimes(3);
+  });
+
   it("hides the clear button when not clearable", () => {
     render(<SearchInput defaultValue="x" clearable={false} />);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();

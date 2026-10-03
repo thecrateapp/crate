@@ -644,6 +644,8 @@ export function ContextMenu({
       ref={menuRef}
       role="menu"
       onKeyDown={handleKeyDown}
+      onClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
       className={cn(
         surfaceClassName,
         "fixed z-app-context-menu w-72 max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] origin-top-left overflow-y-auto overflow-x-hidden rounded-2xl animate-pop-in",
