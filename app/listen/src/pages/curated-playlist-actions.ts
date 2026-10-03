@@ -229,7 +229,7 @@ export function buildCuratedPlaylistActions({
     ? [
         {
           key: "radio",
-          label: "Radio",
+          label: t("radio.title"),
           ariaLabel: t("playlist.actions.radio"),
           icon: Radio,
           disabled: playerTracks.length === 0,

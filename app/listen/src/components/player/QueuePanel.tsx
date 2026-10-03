@@ -1,150 +1,16 @@
-import { useMemo } from "react";
-import { CRATE_ICON_SIZE, Disc3, X } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, X } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
-import {
-  ItemActionMenu,
-  ItemActionMenuButton,
-  MobileActionSheet,
-  type ItemActionMenuEntry,
-  useItemActionMenu,
-} from "@/components/actions/ItemActionMenu";
+import { MobileActionSheet } from "@/components/actions/ItemActionMenu";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
-import { trackToMenuData } from "@/components/actions/shared";
-import { useTrackActionEntries } from "@/components/actions/track-actions";
-import { useTrackPlaylistActions } from "@/hooks/use-track-playlist-actions";
-import type { Track } from "@/contexts/PlayerContext";
 import { usePlayerActions, usePlayerState } from "@/contexts/PlayerContext";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { JamQueueLockedNotice } from "@/components/player/JamQueueLockedNotice";
+import { QueueTrackRow } from "@/components/player/QueueTrackRow";
 
 interface QueuePanelProps {
   open: boolean;
   onClose: () => void;
-}
-
-function QueuePanelRow({
-  track,
-  indexLabel,
-  onJump,
-  onRemove,
-  faded = false,
-  locked = false,
-}: {
-  track: Track;
-  indexLabel: string;
-  onJump: () => void;
-  onRemove?: () => void;
-  faded?: boolean;
-  locked?: boolean;
-}) {
-  const menuTrack = useMemo(() => trackToMenuData(track), [track]);
-  const playlistActions = useTrackPlaylistActions();
-  const baseActions = useTrackActionEntries({
-    track: menuTrack,
-    albumCover: track.albumCover,
-    // In a queue context "Play now" must jump to this position, not reset the queue.
-    onPlayNowOverride: onJump,
-    ...playlistActions,
-  });
-  const actions = useMemo<ItemActionMenuEntry[]>(() => {
-    if (locked) return [];
-    if (!onRemove) return baseActions;
-    return [
-      ...baseActions,
-      {
-        type: "divider",
-        key: `queue-remove-divider-${track.id}-${indexLabel}`,
-      },
-      {
-        key: `queue-remove-${track.id}-${indexLabel}`,
-        label: "Remove from queue",
-        icon: X,
-        danger: true,
-        onSelect: onRemove,
-      },
-    ];
-  }, [baseActions, indexLabel, locked, onRemove, track.id]);
-  const actionMenu = useItemActionMenu(actions, {
-    onOpenChange: playlistActions.onOpenChange,
-  });
-
-  return (
-    <div
-      role={locked ? undefined : "button"}
-      tabIndex={locked ? -1 : 0}
-      aria-disabled={locked}
-      onClick={locked ? undefined : onJump}
-      onKeyDown={(event) => {
-        if (!locked && (event.key === "Enter" || event.key === " ")) {
-          event.preventDefault();
-          onJump();
-        }
-      }}
-      onContextMenu={locked ? undefined : actionMenu.handleContextMenu}
-      className={`group flex w-full items-center gap-3 px-4 py-2 text-left transition-colors ${
-        locked
-          ? "cursor-not-allowed opacity-55"
-          : "hover:bg-surface-control focus-visible:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/40"
-      } ${faded && !locked ? "opacity-50" : ""}`}
-    >
-      <span className="w-5 shrink-0 text-right text-xs tabular-nums text-text-faint">
-        {indexLabel}
-      </span>
-      {track.albumCover ? (
-        <CrateImage
-          src={track.albumCover}
-          alt=""
-          loading="lazy"
-          className={` size-8 shrink-0 rounded object-cover ${
-            locked ? "grayscale" : ""
-          }`}
-        />
-      ) : (
-        <div className=" size-8 shrink-0 rounded bg-surface-control-hover" />
-      )}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p
-            className={`min-w-0 flex-1 truncate text-[0.75rem] ${
-              faded || locked ? "text-text-secondary" : "text-text-primary"
-            }`}
-          >
-            {track.title}
-          </p>
-          {track.isSuggested ? (
-            <span className="rounded-full border border-accent-action/20 bg-accent-action/10 px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-accent-action">
-              Suggested
-            </span>
-          ) : null}
-        </div>
-        <p className="truncate text-xs text-text-muted">{track.artist}</p>
-      </div>
-      <ItemActionMenuButton
-        buttonRef={actionMenu.triggerRef}
-        hasActions={actionMenu.hasActions}
-        onClick={actionMenu.openFromTrigger}
-        className=" size-9 shrink-0 opacity-80 transition-opacity hover:opacity-100"
-      />
-      <ItemActionMenu
-        actions={actions}
-        header={{
-          type: "media",
-          title: track.title,
-          subtitle: track.artist,
-          detail: track.album,
-          imageUrl: track.albumCover,
-          imageAlt: track.album ? `${track.title} cover` : track.title,
-          imageShape: "square",
-          fallbackIcon: Disc3,
-        }}
-        open={actionMenu.open}
-        position={actionMenu.position}
-        menuRef={actionMenu.menuRef}
-        onClose={actionMenu.close}
-      />
-    </div>
-  );
 }
 
 export function QueuePanel({ open, onClose }: QueuePanelProps) {
@@ -239,19 +105,22 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
             </p>
           </div>
         )}
-        {upcoming.map((track, i) => {
-          const idx = currentIndex + 1 + i;
-          return (
-            <QueuePanelRow
-              key={`${track.id}-${idx}`}
-              track={track}
-              indexLabel={String(i + 1)}
-              onJump={() => jumpTo(idx)}
-              onRemove={jamQueueLocked ? undefined : () => removeFromQueue(idx)}
-              locked={jamQueueLocked}
-            />
-          );
-        })}
+        <div className="px-2">
+          {upcoming.map((track, i) => {
+            const idx = currentIndex + 1 + i;
+            return (
+              <QueueTrackRow
+                key={`${track.id}-${idx}`}
+                track={track}
+                queueIndex={idx}
+                position={i + 1}
+                onJump={jumpTo}
+                onRemove={jamQueueLocked ? undefined : removeFromQueue}
+                locked={jamQueueLocked}
+              />
+            );
+          })}
+        </div>
 
         {upcoming.length === 0 && (
           <div className="px-4 py-8 text-center text-sm text-text-faint">
@@ -267,16 +136,19 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
                 {t("player.queue.previous")}
               </p>
             </div>
-            {played.map(({ track, queueIndex }) => (
-              <QueuePanelRow
-                key={`${track.id}-prev-${queueIndex}`}
-                track={track}
-                indexLabel={String(queueIndex + 1)}
-                onJump={() => jumpTo(queueIndex)}
-                faded
-                locked={jamQueueLocked}
-              />
-            ))}
+            <div className="px-2">
+              {played.map(({ track, queueIndex }) => (
+                <QueueTrackRow
+                  key={`${track.id}-prev-${queueIndex}`}
+                  track={track}
+                  queueIndex={queueIndex}
+                  position={queueIndex + 1}
+                  onJump={jumpTo}
+                  faded
+                  locked={jamQueueLocked}
+                />
+              ))}
+            </div>
           </>
         )}
       </div>

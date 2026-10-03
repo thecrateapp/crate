@@ -6,23 +6,12 @@ import {
   useRemoteImport,
   type RemoteImportStatus,
 } from "@/hooks/useRemoteImport";
+import { formatBytes } from "@/lib/utils";
 
 interface RemoteImportActionProps {
   globalAlbumUid: string;
   estimatedBytes?: number | null;
   sourceName?: string | null;
-}
-
-function formatBytes(bytes?: number | null): string | null {
-  if (!bytes || bytes <= 0) return null;
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1000 && unit < units.length - 1) {
-    value /= 1000;
-    unit += 1;
-  }
-  return `${value.toFixed(unit > 1 ? 1 : 0)} ${units[unit]}`;
 }
 
 function RemoteImportCompleted() {
@@ -190,7 +179,8 @@ export function RemoteImportAction({
   const { t } = useTranslation();
   const [confirming, setConfirming] = useState(false);
   const { status, progress, start, reset } = useRemoteImport(globalAlbumUid);
-  const estimatedSize = formatBytes(estimatedBytes);
+  const estimatedSize =
+    estimatedBytes && estimatedBytes > 0 ? formatBytes(estimatedBytes) : null;
 
   if (status === "completed") return <RemoteImportCompleted />;
   if (["awaiting_approval", "requested", "approved"].includes(status)) {

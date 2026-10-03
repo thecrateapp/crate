@@ -33,8 +33,9 @@ export function StatsCollectionsSection({
       <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
         <TopTracksPanel
           items={page.topTrackItems}
+          rows={page.topTrackRows}
           loading={page.dashboardLoading}
-          onPlayTrack={page.playTopTrack}
+          playSource={page.topTrackSource}
         />
         <TopArtistsPanel
           items={page.topArtistItems}

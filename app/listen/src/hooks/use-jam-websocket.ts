@@ -1,4 +1,6 @@
+import type { TFunction } from "i18next";
 import { useCallback, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
@@ -12,14 +14,11 @@ import {
 
 export { projectJamClockPosition } from "@/hooks/jam-websocket-utils";
 
-function jamCloseMessage(code: number) {
-  if (code === 4401)
-    return "Your session is not valid anymore. Log in again to join this room.";
-  if (code === 4403)
-    return "You do not have access to this room, or the room is no longer active.";
-  if (code === 4500)
-    return "Room sync is temporarily unavailable. Retrying... (4500)";
-  return `Room connection dropped. Retrying... (${code || "unknown"})`;
+function jamCloseMessage(code: number, t: TFunction) {
+  if (code === 4401) return t("jam.connection.sessionInvalid");
+  if (code === 4403) return t("jam.connection.noAccess");
+  if (code === 4500) return t("jam.connection.syncUnavailable");
+  return t("jam.connection.dropped", { code: code || "?" });
 }
 
 function shouldReconnectJamClose(code: number) {
@@ -47,6 +46,11 @@ export function useJamWebSocket({
   const seenEventIdsRef = useRef<Set<number>>(new Set());
   const roomRevisionRef = useRef(0);
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
 
   const {
     authoritativeQueueRef,
@@ -68,7 +72,7 @@ export function useJamWebSocket({
     (payload: Record<string, unknown>) => {
       const socket = socketRef.current;
       if (!socket || socket.readyState !== WebSocket.OPEN) {
-        const message = "Room connection dropped. Retrying... (not open)";
+        const message = tRef.current("jam.connection.notOpen");
         dispatch({ type: "SEND_EVENT_FAIL", payload: message });
         toast.error(message);
         return false;
@@ -145,6 +149,7 @@ export function useJamWebSocket({
           roomRevisionRef,
           seenEventIdsRef,
           syncSeek,
+          t: tRef.current,
         });
       };
 
@@ -154,7 +159,10 @@ export function useJamWebSocket({
         socketRef.current = null;
         dispatch({
           type: "WEBSOCKET_CLOSED",
-          payload: { code: event.code, message: jamCloseMessage(event.code) },
+          payload: {
+            code: event.code,
+            message: jamCloseMessage(event.code, tRef.current),
+          },
         });
 
         if (event.code === 4409) {
@@ -169,7 +177,7 @@ export function useJamWebSocket({
         if (cancelled) return;
 
         if (!shouldReconnectJamClose(event.code)) {
-          toast.error(jamCloseMessage(event.code));
+          toast.error(jamCloseMessage(event.code, tRef.current));
           return;
         }
 

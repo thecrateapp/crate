@@ -84,7 +84,7 @@ export function ArtistHeroActions({
             aria-label={t("artist.actions.radio")}
           >
             <Radio size={CRATE_ICON_SIZE.lg} />
-            <span>Radio</span>
+            <span>{t("radio.title")}</span>
           </button>
           <button
             type="button"

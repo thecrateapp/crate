@@ -288,7 +288,7 @@ export function PlaylistCreateModal({
             onClick={onClose}
             disabled={submitting}
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="submit"

@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import type { Track } from "@/contexts/PlayerContext";
 
-import { QueueTabRow } from "./QueueTabRow";
+import { QueueTrackRow } from "@/components/player/QueueTrackRow";
 
 export function QueueTabPastTracks({
   tracks,
@@ -26,11 +26,12 @@ export function QueueTabPastTracks({
       {tracks.map((track, i) => {
         const realIdx = currentIndex - 1 - i;
         return (
-          <QueueTabRow
+          <QueueTrackRow
             key={`hist-${track.id}-${realIdx}`}
             track={track}
-            indexLabel={String(realIdx + 1)}
-            onJump={() => onJump(realIdx)}
+            queueIndex={realIdx}
+            position={realIdx + 1}
+            onJump={onJump}
             faded
             locked={locked}
           />

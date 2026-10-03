@@ -1,12 +1,15 @@
-import { useId, type MouseEvent } from "react";
+import { useEffect, useId, useMemo, type MouseEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { CRATE_ICON_SIZE, Disc3, Pause, Play } from "@crate/ui/icons";
 import {
   ItemActionMenu,
   ItemActionMenuButton,
-  useItemActionMenu,
+  type ItemActionMenuEntry,
+  type UseItemActionMenuReturn,
 } from "@/components/actions/ItemActionMenu";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
+import { useTrackPlaylistActions } from "@/hooks/use-track-playlist-actions";
 import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import { TrackCoverThumb } from "@/components/artwork/TrackCoverThumb";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
@@ -14,7 +17,10 @@ import { usePlayerProgress } from "@/contexts/PlayerContext";
 import { isOfflineBusy, type OfflineItemState } from "@/lib/offline";
 import { cn } from "@/lib/utils";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
-import type { TrackRowData } from "@/components/cards/TrackRowModel";
+import type {
+  TrackRowData,
+  TrackRowProps,
+} from "@/components/cards/TrackRowModel";
 
 function TrackRowPlaybackProgress({ isPlaying }: { isPlaying: boolean }) {
   const { currentTime, duration } = usePlayerProgress();
@@ -105,6 +111,7 @@ function TrackRowPlaybackProgress({ isPlaying }: { isPlaying: boolean }) {
 }
 
 export function TrackRowLeadingControl({
+  compact = false,
   cover,
   disabled,
   index,
@@ -115,6 +122,7 @@ export function TrackRowLeadingControl({
   trackNumber,
   onClick,
 }: {
+  compact?: boolean;
   cover?: string;
   disabled: boolean;
   index?: number;
@@ -140,7 +148,10 @@ export function TrackRowLeadingControl({
       type="button"
       className={cn(
         showCoverThumb
-          ? "relative h-12 w-12 shrink-0 rounded-md border-0 bg-transparent p-0 text-inherit"
+          ? cn(
+              "relative shrink-0 rounded-md border-0 bg-transparent p-0 text-inherit",
+              compact ? "size-10" : "size-12",
+            )
           : "flex w-10 shrink-0 justify-center rounded-full border-0 bg-transparent p-0 text-center text-inherit",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/45 disabled:cursor-not-allowed",
       )}
@@ -318,6 +329,7 @@ export function TrackRowLikeControl({
   toggleTrackLike: ReturnType<typeof useLikedTracks>["toggleTrackLike"];
   track: TrackRowData;
 }) {
+  const { t } = useTranslation();
   if (!hasTrackRef) return <div className=" size-9 shrink-0" />;
 
   return (
@@ -325,7 +337,7 @@ export function TrackRowLikeControl({
       className={` size-9 shrink-0 rounded-full transition-opacity ${
         liked ? "opacity-100" : "md:opacity-0 md:group-hover:opacity-100"
       }`}
-      title={liked ? "Unlike" : "Like"}
+      title={t(liked ? "actions.track.unlike" : "actions.track.like")}
       following={liked}
       heartTestId="track-like-heart"
       particlesTestId="track-like-particles"
@@ -348,34 +360,123 @@ export function TrackRowLikeControl({
   );
 }
 
+const LINK_ACTION_KEYS = new Set(["share", "artist", "album"]);
+
+function withoutLocalActions(entries: ItemActionMenuEntry[]) {
+  return entries.filter(
+    (entry) => entry.type !== "divider" && LINK_ACTION_KEYS.has(entry.key),
+  );
+}
+
+function TrackRowMenu({
+  actionMenu,
+  cover,
+  extraActions,
+  onActionMenuOpen,
+  onAddToPlaylist,
+  onCreatePlaylist,
+  onPlayOverride,
+  playlistOptions,
+  showLocalActions,
+  track,
+}: {
+  actionMenu: UseItemActionMenuReturn;
+  cover?: string;
+  extraActions?: ItemActionMenuEntry[];
+  onActionMenuOpen?: () => void;
+  onAddToPlaylist?: TrackRowProps["onAddToPlaylist"];
+  onCreatePlaylist?: TrackRowProps["onCreatePlaylist"];
+  onPlayOverride?: () => void;
+  playlistOptions?: TrackRowProps["playlistOptions"];
+  showLocalActions: boolean;
+  track: TrackRowData;
+}) {
+  const defaultPlaylistActions = useTrackPlaylistActions();
+  const usesDefaultPlaylists = playlistOptions === undefined;
+  const { ensurePlaylistOptionsLoaded } = defaultPlaylistActions;
+  const entries = useTrackActionEntries({
+    track,
+    albumCover: cover,
+    playlistOptions: playlistOptions ?? defaultPlaylistActions.playlistOptions,
+    playlistPickerOpen: defaultPlaylistActions.playlistPickerOpen,
+    onTogglePlaylistPicker: defaultPlaylistActions.onTogglePlaylistPicker,
+    onAddToPlaylist: onAddToPlaylist ?? defaultPlaylistActions.onAddToPlaylist,
+    onCreatePlaylist:
+      onCreatePlaylist ?? defaultPlaylistActions.onCreatePlaylist,
+    onPlayNowOverride: onPlayOverride,
+  });
+  const actions = useMemo(() => {
+    const base = showLocalActions ? entries : withoutLocalActions(entries);
+    if (!extraActions?.length) return base;
+    return [
+      ...base,
+      { type: "divider" as const, key: "divider-extra-actions" },
+      ...extraActions,
+    ];
+  }, [entries, extraActions, showLocalActions]);
+
+  useEffect(() => {
+    if (showLocalActions && usesDefaultPlaylists) ensurePlaylistOptionsLoaded();
+  }, [ensurePlaylistOptionsLoaded, showLocalActions, usesDefaultPlaylists]);
+
+  useEffect(() => {
+    onActionMenuOpen?.();
+  }, [onActionMenuOpen]);
+
+  return (
+    <ItemActionMenu
+      actions={actions}
+      header={{
+        type: "media",
+        title: track.title,
+        subtitle: track.artist,
+        detail: track.album,
+        imageUrl: cover,
+        imageAlt: track.album ? `${track.title} cover` : track.title,
+        imageShape: "square",
+        fallbackIcon: Disc3,
+      }}
+      open={actionMenu.open}
+      position={actionMenu.position}
+      menuRef={actionMenu.menuRef}
+      onClose={actionMenu.close}
+    />
+  );
+}
+
 export function TrackRowActions({
   actionMenu,
-  actions,
+  compact,
   cover,
-  disabled,
+  extraActions,
   onActionMenuOpen,
+  onAddToPlaylist,
+  onCreatePlaylist,
+  onPlayOverride,
   onSelectionActionMenuOpen,
+  playlistOptions,
   selectable,
   selected,
   showLocalActions,
   track,
 }: {
-  actionMenu: ReturnType<typeof useItemActionMenu>;
-  actions: ReturnType<typeof useTrackActionEntries>;
+  actionMenu: UseItemActionMenuReturn;
+  compact: boolean;
   cover?: string;
-  disabled: boolean;
+  extraActions?: ItemActionMenuEntry[];
   onActionMenuOpen?: () => void;
-  onSelectionActionMenuOpen?: (
-    track: TrackRowData,
-    event: MouseEvent<HTMLButtonElement>,
-  ) => boolean | void;
+  onAddToPlaylist?: TrackRowProps["onAddToPlaylist"];
+  onCreatePlaylist?: TrackRowProps["onCreatePlaylist"];
+  onPlayOverride?: () => void;
+  onSelectionActionMenuOpen?: TrackRowProps["onSelectionActionMenuOpen"];
+  playlistOptions?: TrackRowProps["playlistOptions"];
   selectable: boolean;
   selected: boolean;
   showLocalActions: boolean;
   track: TrackRowData;
 }) {
-  if (!showLocalActions || disabled) {
-    return <div className=" size-9 shrink-0" />;
+  if (!actionMenu.hasActions) {
+    return <div className={cn("shrink-0", compact ? "size-8" : "size-9")} />;
   }
 
   return (
@@ -392,33 +493,26 @@ export function TrackRowActions({
             ) {
               return;
             }
-            onActionMenuOpen?.();
             actionMenu.openFromTrigger(event);
           }}
-          onContextMenu={(event) => {
-            onActionMenuOpen?.();
-            actionMenu.handleContextMenu(event);
-          }}
-          className=" size-9"
+          onContextMenu={actionMenu.handleContextMenu}
+          className={compact ? "size-8" : "size-9"}
         />
       </div>
-      <ItemActionMenu
-        actions={actions}
-        header={{
-          type: "media",
-          title: track.title,
-          subtitle: track.artist,
-          detail: track.album,
-          imageUrl: cover,
-          imageAlt: track.album ? `${track.title} cover` : track.title,
-          imageShape: "square",
-          fallbackIcon: Disc3,
-        }}
-        open={actionMenu.open}
-        position={actionMenu.position}
-        menuRef={actionMenu.menuRef}
-        onClose={actionMenu.close}
-      />
+      {actionMenu.open ? (
+        <TrackRowMenu
+          actionMenu={actionMenu}
+          cover={cover}
+          extraActions={extraActions}
+          onActionMenuOpen={onActionMenuOpen}
+          onAddToPlaylist={onAddToPlaylist}
+          onCreatePlaylist={onCreatePlaylist}
+          onPlayOverride={onPlayOverride}
+          playlistOptions={playlistOptions}
+          showLocalActions={showLocalActions}
+          track={track}
+        />
+      ) : null}
     </>
   );
 }

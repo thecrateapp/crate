@@ -1,12 +1,15 @@
 import { useTranslation } from "react-i18next";
-import { Search } from "@crate/ui/icons";
+import { RefreshCw, Search } from "@crate/ui/icons";
+import { Button } from "@crate/ui/shadcn/button";
 
 export function SearchErrorState({
   query,
   message,
+  onRetry,
 }: {
   query: string;
   message: string;
+  onRetry?: () => void;
 }) {
   const { t } = useTranslation();
 
@@ -23,6 +26,17 @@ export function SearchErrorState({
           {t("search.unavailable")}
         </p>
         <p className="mt-2 text-sm text-text-muted">{message}</p>
+        {onRetry ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-5"
+            onClick={onRetry}
+          >
+            <RefreshCw size={14} />
+            {t("common.retry")}
+          </Button>
+        ) : null}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { api } from "@/lib/api";
+import { clamp } from "@/lib/utils";
 import {
   ErrorCard,
   LoadingCard,
@@ -26,10 +27,6 @@ export function clearProfileCardCacheForTests() {
 
 function cacheProfileCard(username: string, card: ProfileCardPayload) {
   profileCardCache.set(username, card);
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
 }
 
 export function ProfileHoverCard({

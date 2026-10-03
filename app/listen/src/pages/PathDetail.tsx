@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
 import { ArrowLeft, Loader2, Play, RefreshCw, Trash2 } from "@crate/ui/icons";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { toast } from "sonner";
 
 import { CrateLoader } from "@/components/ui/CrateLoader";
@@ -33,7 +34,13 @@ export function PathDetail() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: path, loading, refetch } = useApi<PathData>(`/api/paths/${id}`);
+  const {
+    data: path,
+    loading,
+    error,
+    status,
+    refetch,
+  } = useApi<PathData>(`/api/paths/${id}`);
   const { playAll, currentTrack } = usePlayerActions();
   const [regenerating, setRegenerating] = useState(false);
   const [animate, setAnimate] = useState(true);
@@ -82,8 +89,25 @@ export function PathDetail() {
     requestAnimationFrame(() => requestAnimationFrame(() => setAnimate(true)));
   }, []);
 
-  if (loading || !path) {
-    return <CrateLoader label={t("paths.loadingDetail")} />;
+  if (!path) {
+    if (loading) {
+      return <CrateLoader label={t("paths.loadingDetail")} />;
+    }
+    const notFound = status === 404 || !error;
+    return (
+      <div className="animate-page-in px-4 sm:p-6">
+        <button
+          onClick={() => navigate("/paths")}
+          className="mb-5 flex items-center gap-1.5 text-sm text-text-primary/40 transition hover:text-text-primary"
+        >
+          <ArrowLeft size={14} /> {t("paths.back")}
+        </button>
+        <ErrorState
+          message={t(notFound ? "paths.notFound" : "paths.toasts.loadFailed")}
+          onRetry={notFound ? undefined : refetch}
+        />
+      </div>
+    );
   }
 
   return (
@@ -156,7 +180,6 @@ export function PathDetail() {
         path={path}
         activeStep={activeStep}
         activeTrackRef={activeTrackRef}
-        onPlayFromStep={playFromStep}
       />
     </div>
   );

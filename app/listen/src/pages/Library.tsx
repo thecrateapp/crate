@@ -39,12 +39,12 @@ interface MeStats {
 }
 
 const tabs: { key: Tab; labelKey: string; icon: TabIcon }[] = [
-  { key: "playlists", labelKey: "nav.collection.playlists", icon: ListMusic },
   { key: "artists", labelKey: "nav.collection.artists", icon: Users },
+  { key: "crates", labelKey: "nav.collection.crates", icon: Disc3 },
+  { key: "playlists", labelKey: "nav.collection.playlists", icon: ListMusic },
   { key: "albums", labelKey: "nav.collection.albums", icon: Disc },
   { key: "liked", labelKey: "library.tabs.liked", icon: Heart },
   { key: "bandcamp", labelKey: "nav.collection.bandcamp", icon: BandcampLogo },
-  { key: "crates", labelKey: "nav.collection.crates", icon: Disc3 },
   {
     key: "contributions",
     labelKey: "nav.collection.contributions",
@@ -167,7 +167,9 @@ export function Library() {
       {tab === "albums" && <LibraryAlbumsTab key={refreshKey} />}
       {tab === "liked" && <LibraryLikedTab key={refreshKey} />}
       {tab === "bandcamp" && <LibraryBandcampTab key={refreshKey} />}
-      {tab === "crates" && <Crates key={refreshKey} />}
+      {tab === "crates" && (
+        <Crates key={refreshKey} onCrateChange={refetchStats} />
+      )}
       {tab === "contributions" && <LibraryContributionsTab key={refreshKey} />}
     </div>
   );

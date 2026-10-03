@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import type { Track } from "@/contexts/PlayerContext";
 
-import { QueueTabRow } from "./QueueTabRow";
+import { QueueTrackRow } from "@/components/player/QueueTrackRow";
 
 export function QueueTabUpcoming({
   tracks,
@@ -33,12 +33,13 @@ export function QueueTabUpcoming({
       {tracks.map((track, i) => {
         const index = currentIndex + 1 + i;
         return (
-          <QueueTabRow
+          <QueueTrackRow
             key={`next-${track.id}-${index}`}
             track={track}
-            indexLabel={String(i + 1)}
-            onJump={() => onJump(index)}
-            onRemove={locked ? undefined : () => onRemove(index)}
+            queueIndex={index}
+            position={i + 1}
+            onJump={onJump}
+            onRemove={locked ? undefined : onRemove}
             locked={locked}
           />
         );

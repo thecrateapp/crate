@@ -53,6 +53,7 @@ export function SearchTrackResults({
             }
             track={track}
             index={index}
+            showCoverThumb
             showArtist
             showAlbum
             queueTracks={trackRowData}

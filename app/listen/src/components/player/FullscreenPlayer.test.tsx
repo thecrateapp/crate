@@ -188,6 +188,15 @@ vi.mock("@/components/actions/ItemActionMenu", () => ({
     close: vi.fn(),
     handleContextMenu: vi.fn(),
   }),
+  useItemActionTarget: () => ({
+    onContextMenu: vi.fn(),
+    onKeyDown: vi.fn(),
+    onPointerDown: vi.fn(),
+    onPointerUp: vi.fn(),
+    onPointerCancel: vi.fn(),
+    onPointerLeave: vi.fn(),
+    onClickCapture: vi.fn(),
+  }),
 }));
 
 vi.mock("@/components/actions/shared", () => ({
@@ -1266,13 +1275,10 @@ describe("FullscreenPlayer", () => {
       await user.click(screen.getByText("Queue"));
 
       const queueRow = await screen.findByText("Queue One");
-      const row = queueRow.closest('[role="button"]');
+      const row = queueRow.closest('[role="row"]');
 
-      expect(row).toHaveClass(
-        "active:bg-surface-control",
-        "focus-visible:bg-surface-control",
-        "focus-visible:ring-focus-ring/40",
-      );
+      expect(row).toHaveClass("track-row");
+      expect(row).toHaveAttribute("data-density", "compact");
       expect(queueRow).toHaveClass("text-text-primary");
       expect(row?.className).not.toContain("white/");
     });

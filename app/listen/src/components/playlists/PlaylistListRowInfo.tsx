@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Sparkles } from "@crate/ui/icons";
 
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
@@ -21,6 +22,7 @@ export function PlaylistListRowInfo({
   offlineState: OfflineItemState;
   trackCount: number;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="min-w-0 flex-1">
       <div className="flex items-center gap-2">
@@ -36,7 +38,7 @@ export function PlaylistListRowInfo({
         <OfflineBadge state={offlineState} compact />
       </div>
       <div className="truncate text-xs text-text-muted">
-        {trackCount} track{trackCount !== 1 ? "s" : ""}
+        {t("common.trackCountLabel", { count: trackCount })}
         {meta ? ` · ${meta}` : ""}
         {offlineMeta ? (
           <span

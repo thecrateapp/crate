@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import { renderWithListenProviders as render } from "@/test/render-with-listen-providers";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Track } from "@/contexts/player-types";

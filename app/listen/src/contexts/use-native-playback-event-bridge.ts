@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { Track } from "@/contexts/player-types";
 import { subscribeNativePlayerEvents } from "@/contexts/subscribe-native-player-events";
@@ -217,6 +218,11 @@ export function useNativePlaybackEventBridge({
   retryNativePlaybackAfterAuthError,
   scheduleNativeBufferingWatchdog,
 }: UseNativePlaybackEventBridgeParams) {
+  const { t } = useTranslation();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
   const resumeAuthorizationCoordinatorRef = useRef<ReturnType<
     typeof createNativeResumeAuthorizationCoordinator
   > | null>(null);
@@ -283,8 +289,8 @@ export function useNativePlaybackEventBridge({
         void recovery
           .then((outcome) => {
             if (outcome !== "failed") return;
-            toast.error("Open Crate to resume playback", {
-              description: "The saved queue needs fresh server authorization.",
+            toast.error(tRef.current("player.native.resumeTitle"), {
+              description: tRef.current("player.native.resumeDescription"),
             });
           })
           .catch((error) => {
@@ -292,8 +298,8 @@ export function useNativePlaybackEventBridge({
               "[native-player] failed to authorize restored playback:",
               error,
             );
-            toast.error("Open Crate to resume playback", {
-              description: "The saved queue needs fresh server authorization.",
+            toast.error(tRef.current("player.native.resumeTitle"), {
+              description: tRef.current("player.native.resumeDescription"),
             });
           });
         return;
@@ -311,7 +317,7 @@ export function useNativePlaybackEventBridge({
         if (retryNativePlaybackAfterAuthError(nativeError)) {
           return;
         }
-        toast.error("Native playback failed", {
+        toast.error(tRef.current("player.native.playbackFailed"), {
           description: summary,
           duration: 9000,
         });

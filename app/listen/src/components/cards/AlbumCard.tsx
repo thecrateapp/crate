@@ -1,8 +1,12 @@
 import { memo } from "react";
 import { useNavigate } from "react-router";
-import { Disc3 } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Disc3 } from "@crate/ui/icons";
 
-import { ItemActionMenu } from "@/components/actions/ItemActionMenu";
+import {
+  ItemActionMenuButton,
+  useItemActionTarget,
+} from "@/components/actions/ItemActionMenu";
+import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { albumPagePath } from "@/lib/library-routes";
 import { isOfflineBusy } from "@/lib/offline";
@@ -11,6 +15,7 @@ import {
   AlbumCardArtworkControls,
   AlbumCardArtworkSurface,
   AlbumCardDetails,
+  AlbumCardMenu,
   useAlbumCardModel,
   useAlbumCardPlayback,
   type AlbumCardProps,
@@ -33,6 +38,10 @@ export const AlbumCard = memo(function AlbumCard({
   releaseDate,
   compact,
   layout = "rail",
+  variant = "tile",
+  rank,
+  meta,
+  extraActions,
 }: AlbumCardProps) {
   const navigate = useNavigate();
   const { playAll } = usePlayerActions();
@@ -51,7 +60,9 @@ export const AlbumCard = memo(function AlbumCard({
     releaseDate,
     compact,
     layout,
+    variant,
   });
+  const actionTarget = useItemActionTarget(model.actionMenu);
 
   const { playing, handlePlayOverlay } = useAlbumCardPlayback({
     albumRouteInput: model.albumRouteInput,
@@ -63,16 +74,82 @@ export const AlbumCard = memo(function AlbumCard({
     playAll,
   });
 
+  const openAlbum = () => navigate(albumPagePath(model.albumRouteInput));
+  const menu = model.actionMenu.open ? (
+    <AlbumCardMenu
+      actionMenu={model.actionMenu}
+      extraActions={extraActions}
+      input={model.menuInput}
+    />
+  ) : null;
+  const details = (
+    <AlbumCardDetails
+      album={album}
+      artist={artist}
+      year={year}
+      isPreRelease={model.isPreRelease}
+      releaseDate={model.releaseDate}
+      offlineMeta={model.offlineMeta}
+      offlineState={model.offlineState}
+      rank={variant === "tile" ? rank : undefined}
+      meta={meta}
+    />
+  );
+
+  if (variant === "row") {
+    return (
+      <article
+        className="item-action-target group/card relative flex items-center gap-[var(--content-row-gap)] rounded-lg px-3 py-[var(--content-row-padding-y)] text-left transition-colors hover:bg-text-primary/5"
+        data-variant="row"
+        {...actionTarget}
+      >
+        {rank != null ? (
+          <span className="w-6 shrink-0 text-right text-xs tabular-nums text-text-muted">
+            {rank}
+          </span>
+        ) : null}
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-center gap-[var(--content-row-gap)] rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          onClick={openAlbum}
+        >
+          <ArtworkSurface
+            source={{
+              ...model.coverArtwork,
+              sizes: model.coverArtwork.srcSet ? model.coverSizes : undefined,
+            }}
+            alt={album}
+            className="relative size-12 shrink-0 overflow-hidden rounded-md bg-text-primary/5"
+            fallback={
+              <div className="grid size-full place-items-center bg-surface-elevated text-text-primary/35">
+                <Disc3 size={CRATE_ICON_SIZE.md} />
+              </div>
+            }
+            imageProps={{ loading: "lazy", decoding: "async" }}
+            imageClassName="object-cover"
+          />
+          <span className="block min-w-0 flex-1">{details}</span>
+        </button>
+        <ItemActionMenuButton
+          buttonRef={model.actionMenu.triggerRef}
+          hasActions={model.actionMenu.hasActions}
+          onClick={model.actionMenu.openFromTrigger}
+          className="size-9 shrink-0 opacity-100 transition-opacity md:opacity-65 md:group-hover/card:opacity-100"
+        />
+        {menu}
+      </article>
+    );
+  }
+
   return (
     <article
       className={cn(
-        "group/card relative snap-start rounded-xl text-left transition-colors",
+        "item-action-target group/card relative snap-start rounded-xl text-left transition-colors",
         layout === "grid"
           ? "listen-deferred-grid-item w-full min-w-0"
           : `shrink-0 ${compact ? "w-[120px]" : "w-[160px]"}`,
       )}
-      onContextMenu={model.actionMenu.handleContextMenu}
-      {...model.actionMenu.longPressHandlers}
+      {...actionTarget}
     >
       <button
         type="button"
@@ -86,14 +163,7 @@ export const AlbumCard = memo(function AlbumCard({
                 ? "bg-state-warning/[0.05]"
                 : "hover:bg-text-primary/5",
         )}
-        onClick={() => navigate(albumPagePath(model.albumRouteInput))}
-        onKeyDown={(event) => {
-          model.actionMenu.handleKeyboardTrigger(event);
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            navigate(albumPagePath(model.albumRouteInput));
-          }
-        }}
+        onClick={openAlbum}
       >
         <AlbumCardArtworkSurface
           coverArtwork={model.coverArtwork}
@@ -102,15 +172,7 @@ export const AlbumCard = memo(function AlbumCard({
           offlineState={model.offlineState}
           isPreRelease={model.isPreRelease}
         />
-        <AlbumCardDetails
-          album={album}
-          artist={artist}
-          year={year}
-          isPreRelease={model.isPreRelease}
-          releaseDate={model.releaseDate}
-          offlineMeta={model.offlineMeta}
-          offlineState={model.offlineState}
-        />
+        {details}
       </button>
       <AlbumCardArtworkControls
         album={album}
@@ -122,22 +184,13 @@ export const AlbumCard = memo(function AlbumCard({
         playing={playing}
         onPlayOverlay={handlePlayOverlay}
       />
-      <ItemActionMenu
-        actions={model.actions}
-        header={{
-          type: "media",
-          title: album,
-          subtitle: artist,
-          imageUrl: model.menuCoverUrl,
-          imageAlt: album,
-          imageShape: "square",
-          fallbackIcon: Disc3,
-        }}
-        open={model.actionMenu.open}
-        position={model.actionMenu.position}
-        menuRef={model.actionMenu.menuRef}
-        onClose={model.actionMenu.close}
+      <ItemActionMenuButton
+        buttonRef={model.actionMenu.triggerRef}
+        hasActions={model.actionMenu.hasActions}
+        onClick={model.actionMenu.openFromTrigger}
+        className="absolute left-4 top-4 z-20 size-10 opacity-75 transition-opacity hover:opacity-100 md:opacity-0 md:group-focus-within/card:opacity-100 md:group-hover/card:opacity-100"
       />
+      {menu}
     </article>
   );
 });

@@ -2,7 +2,6 @@ import type {
   HomeDiscoveryPayload,
   HomeHeroArtist,
   HomeRecommendedTrack,
-  HomeSectionId,
   HomeUpcomingInsight,
   HomeUpcomingItem,
   ReplayMix,
@@ -89,10 +88,6 @@ export function toPlayerTrack(item: HomeRecommendedTrack): Track {
           ) || undefined
         : undefined,
   });
-}
-
-export function homeSectionPath(sectionId: HomeSectionId): string {
-  return `/home/section/${sectionId}`;
 }
 
 export function homePlaylistPath(playlistId: string): string {

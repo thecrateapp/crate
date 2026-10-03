@@ -4,6 +4,7 @@ import { Loader2 } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
+import { cratePagePath } from "@/components/crates/crate-model";
 import { api } from "@/lib/api";
 
 export function CrateInvite() {
@@ -18,7 +19,7 @@ export function CrateInvite() {
       .then((response) => {
         if (cancelled) return;
         toast.success(t("crateInvite.toasts.joined"));
-        navigate(`/crate/${response.crate_id}`, { replace: true });
+        navigate(cratePagePath({ id: response.crate_id }), { replace: true });
       })
       .catch(() => {
         if (cancelled) return;

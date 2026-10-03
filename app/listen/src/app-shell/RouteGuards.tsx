@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { loginPathWithReturnTo } from "@/lib/auth-route-policy";
 import { connectCacheEvents } from "@/lib/cache";
 import { usesConfigurableServer } from "@/lib/platform";
 import { getCurrentServer, SERVER_STORE_EVENT } from "@/lib/server-store";
@@ -23,12 +24,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 
   if (!user) {
     const returnTo = `${location.pathname}${location.search}${location.hash}`;
-    return (
-      <Navigate
-        to={`/login?return_to=${encodeURIComponent(returnTo)}`}
-        replace
-      />
-    );
+    return <Navigate to={loginPathWithReturnTo(returnTo)} replace />;
   }
 
   return <>{children}</>;

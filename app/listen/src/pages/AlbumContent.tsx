@@ -2,15 +2,8 @@ import { AlbumActions } from "@/components/album/AlbumActions";
 import { AlbumHero } from "@/components/album/AlbumHero";
 import { AlbumMobileMenuPortal } from "@/components/album/AlbumMobileMenuPortal";
 import { AlbumTrackList } from "@/components/album/AlbumTrackList";
+import { genreSlug } from "@/lib/utils";
 import type { LoadedAlbumPageController } from "@/pages/use-album-page-controller";
-
-function albumGenreSlug(name: string) {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/[\s-]+/g, "-");
-}
 
 export function AlbumContent({ page }: { page: LoadedAlbumPageController }) {
   const {
@@ -85,7 +78,7 @@ export function AlbumContent({ page }: { page: LoadedAlbumPageController }) {
         onGenreSelect={(item) =>
           navigate(
             `/explore?genre=${encodeURIComponent(
-              item.slug || albumGenreSlug(item.name),
+              item.slug || genreSlug(item.name),
             )}`,
           )
         }

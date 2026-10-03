@@ -89,13 +89,27 @@ export function useAlbumPageController() {
 
   async function handleAddToCrate(crateId: string) {
     if (!globalAlbumUid) return;
+    const crateName = crates.find((crate) => crate.id === crateId)?.name ?? "";
+    if (
+      crates.some(
+        (crate) =>
+          crate.id === crateId && crate.albumUids.includes(globalAlbumUid),
+      )
+    ) {
+      toast.info(t("album.toasts.alreadyInCrate", { name: crateName }));
+      return;
+    }
     try {
       await api(`/api/crates/${crateId}/albums`, "POST", {
         global_album_uid: globalAlbumUid,
       });
       toast.success(t("album.toasts.addedToCrate"));
       closeAlbumMenu();
-    } catch {
+    } catch (error) {
+      if ((error as { status?: number }).status === 409) {
+        toast.info(t("album.toasts.alreadyInCrate", { name: crateName }));
+        return;
+      }
       toast.error(t("album.toasts.addToCrateFailed"));
     }
   }
@@ -157,6 +171,8 @@ export function useAlbumPageController() {
     albumId,
     albumMenuController,
     artistName,
+    canPlay: playerTracks.length > 0,
+    canRadio: albumRadioSeed != null && !isPreRelease,
     cratePickerOpen,
     crates,
     data,
@@ -169,12 +185,14 @@ export function useAlbumPageController() {
     handleAddSelectedToQueue,
     handleAddToPlaylist,
     handleAddToCrate,
+    handleAlbumRadio,
     handleCreateCrate,
     handleCreatePlaylistFromAlbum,
     handleCreatePlaylistFromSelection,
     handlePlay,
     handlePlayNextAlbum,
     handlePlaySelectedNext,
+    handleShuffle,
     handleToggleSelectionMenuPlaylist,
     ensureCrateOptionsLoaded,
     mobileHeroInfoOffset,

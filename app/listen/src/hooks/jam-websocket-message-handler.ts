@@ -25,6 +25,7 @@ export function handleJamWebSocketMessage(
     serverClockOffsetMsRef,
     roomRevisionRef,
     seenEventIdsRef,
+    t,
   } = context;
   try {
     const payload = JSON.parse(data) as JamWebSocketPayload;
@@ -54,7 +55,7 @@ export function handleJamWebSocketMessage(
     if (payload.type === "room_updated" && payload.room) {
       dispatch({ type: "APPLY_ROOM_DATA", payload: payload.room });
       roomNameRef.current = payload.room.name;
-      toast.info("Room settings updated");
+      toast.info(t("jam.toasts.roomSettingsUpdated"));
       return;
     }
 

@@ -18,10 +18,6 @@ vi.mock("@crate/ui/lib/use-hover-capability", () => ({
   useHoverCapability: () => canHover,
 }));
 
-vi.mock("@/lib/input-capabilities", () => ({
-  isTouchDominantPointer: () => false,
-}));
-
 vi.mock("@/lib/platform", () => ({
   capacitorPlatform: "web",
   getListenAppId: () => "listen-web",

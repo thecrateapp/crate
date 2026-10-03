@@ -1,9 +1,15 @@
-import { useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { CRATE_ICON_SIZE, Disc3, Loader2, Play } from "@crate/ui/icons";
 
-import { useItemActionMenu } from "@/components/actions/ItemActionMenu";
+import {
+  ItemActionMenu,
+  useItemActionMenu,
+  type ItemActionMenuEntry,
+  type UseItemActionMenuReturn,
+} from "@/components/actions/ItemActionMenu";
 import { useAlbumActionEntries } from "@/components/actions/album-actions";
+import type { AlbumMenuData } from "@/components/actions/shared";
 import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { useOffline } from "@/contexts/OfflineContext";
@@ -41,7 +47,13 @@ export interface AlbumCardProps {
   releaseDate?: string | null;
   compact?: boolean;
   layout?: "rail" | "grid";
+  variant?: "tile" | "row";
+  rank?: number;
+  meta?: ReactNode;
+  extraActions?: ItemActionMenuEntry[];
 }
+
+const NO_ACTIONS: ItemActionMenuEntry[] = [];
 
 interface AlbumData {
   artist: string;
@@ -169,6 +181,7 @@ export function AlbumCardArtworkSurface({
   offlineState: OfflineItemState;
   isPreRelease: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <ArtworkSurface
       source={{
@@ -192,7 +205,7 @@ export function AlbumCardArtworkSurface({
       />
       {isPreRelease ? (
         <span className="absolute bottom-2 left-2 z-10 rounded-full border border-accent-action/25 bg-surface-canvas/55 px-2 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-accent-action backdrop-blur-sm">
-          Pre-release
+          {t("radar.release.preRelease")}
         </span>
       ) : null}
     </ArtworkSurface>
@@ -218,6 +231,7 @@ export function AlbumCardArtworkControls({
   playing: boolean;
   onPlayOverlay: (event: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       {albumId != null || globalAlbumUid ? (
@@ -243,7 +257,7 @@ export function AlbumCardArtworkControls({
           type="button"
           className="pointer-events-auto flex size-11 items-center justify-center rounded-full bg-accent-action opacity-0 shadow-lg transition-[transform,opacity] focus-visible:translate-y-0 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-action md:translate-y-2 md:group-focus-within/card:translate-y-0 md:group-focus-within/card:opacity-100 md:group-hover/card:translate-y-0 md:group-hover/card:opacity-100"
           onClick={onPlayOverlay}
-          aria-label={`Play ${album}`}
+          aria-label={t("common.playItem", { name: album })}
         >
           {playing ? (
             <Loader2
@@ -263,6 +277,31 @@ export function AlbumCardArtworkControls({
   );
 }
 
+export function albumCardSubtitle({
+  artist,
+  year,
+  isPreRelease,
+  releaseDate,
+  language,
+  t,
+}: {
+  artist: string;
+  year?: string;
+  isPreRelease: boolean;
+  releaseDate?: string | null;
+  language: string;
+  t: ReturnType<typeof useTranslation>["t"];
+}) {
+  if (isPreRelease && releaseDate) {
+    const date = new Date(`${releaseDate}T12:00:00`).toLocaleDateString(
+      language,
+      { month: "short", day: "numeric" },
+    );
+    return `${t("album.card.releasesOn", { date })} · ${artist}`;
+  }
+  return year ? `${year} · ${artist}` : artist;
+}
+
 export function AlbumCardDetails({
   album,
   artist,
@@ -271,6 +310,8 @@ export function AlbumCardDetails({
   releaseDate,
   offlineMeta,
   offlineState,
+  rank,
+  meta,
 }: {
   album: string;
   artist: string;
@@ -279,21 +320,27 @@ export function AlbumCardDetails({
   releaseDate?: string | null;
   offlineMeta: string;
   offlineState: OfflineItemState;
+  rank?: number;
+  meta?: ReactNode;
 }) {
+  const { t, i18n } = useTranslation();
   return (
     <>
       <div className="truncate text-sm font-medium text-text-primary">
+        {rank != null ? (
+          <span className="mr-1.5 tabular-nums text-text-muted">{rank}</span>
+        ) : null}
         {album}
       </div>
       <div className="truncate text-xs text-text-muted">
-        {isPreRelease && releaseDate
-          ? `Releases ${new Date(`${releaseDate}T12:00:00`).toLocaleDateString(
-              "en-US",
-              { month: "short", day: "numeric" },
-            )} · ${artist}`
-          : year
-            ? `${year} · ${artist}`
-            : artist}
+        {albumCardSubtitle({
+          artist,
+          year,
+          isPreRelease,
+          releaseDate,
+          language: i18n.language,
+          t,
+        })}
         {offlineMeta ? (
           <span
             className={cn(
@@ -311,7 +358,57 @@ export function AlbumCardDetails({
           </span>
         ) : null}
       </div>
+      {meta != null ? (
+        <div className="truncate text-xs tabular-nums text-text-muted">
+          {meta}
+        </div>
+      ) : null}
     </>
+  );
+}
+
+export function AlbumCardMenu({
+  actionMenu,
+  extraActions,
+  input,
+}: {
+  actionMenu: UseItemActionMenuReturn;
+  extraActions?: ItemActionMenuEntry[];
+  input: AlbumMenuData;
+}) {
+  const entries = useAlbumActionEntries(input);
+  const actions = useMemo(
+    () =>
+      extraActions?.length
+        ? [
+            ...entries,
+            { type: "divider" as const, key: "divider-extra-actions" },
+            ...extraActions,
+          ]
+        : entries,
+    [entries, extraActions],
+  );
+  const menuCoverUrl = input.cover
+    ? resolveMaybeApiAssetUrl(input.cover) || input.cover
+    : null;
+
+  return (
+    <ItemActionMenu
+      actions={actions}
+      header={{
+        type: "media",
+        title: input.album,
+        subtitle: input.artist,
+        imageUrl: menuCoverUrl,
+        imageAlt: input.album,
+        imageShape: "square",
+        fallbackIcon: Disc3,
+      }}
+      open={actionMenu.open}
+      position={actionMenu.position}
+      menuRef={actionMenu.menuRef}
+      onClose={actionMenu.close}
+    />
   );
 }
 
@@ -330,6 +427,7 @@ export function useAlbumCardModel({
   releaseDate,
   compact,
   layout,
+  variant = "tile",
 }: AlbumCardProps & {
   isPreRelease: boolean;
   layout: "rail" | "grid";
@@ -349,7 +447,8 @@ export function useAlbumCardModel({
   };
   const generatedArtwork = albumCoverArtwork(albumRouteInput, {
     preset: "album-card",
-    size: layout === "grid" ? 320 : compact ? 192 : 256,
+    size:
+      variant === "row" ? 128 : layout === "grid" ? 320 : compact ? 192 : 256,
   });
   const coverArtwork = cover
     ? artworkFromUrl(cover, {
@@ -360,16 +459,19 @@ export function useAlbumCardModel({
     : generatedArtwork;
   const coverUrl = coverArtwork.src ?? "";
   const coverSizes =
-    layout === "grid"
-      ? "(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 17vw"
-      : compact
-        ? "120px"
-        : "160px";
+    variant === "row"
+      ? "48px"
+      : layout === "grid"
+        ? "(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 17vw"
+        : compact
+          ? "120px"
+          : "160px";
   const saved = isSaved(albumId, globalAlbumUid);
   const offlineState = getAlbumState(albumId);
   const offlineRecord = getAlbumRecord(albumId);
   const offlineMeta = albumOfflineMeta(offlineState, offlineRecord);
-  const actions = useAlbumActionEntries({
+  const actionMenu = useItemActionMenu(NO_ACTIONS, { hasActions: true });
+  const menuInput: AlbumMenuData = {
     artist,
     album,
     albumId,
@@ -377,12 +479,10 @@ export function useAlbumCardModel({
     globalAlbumUid,
     artistEntityUid,
     albumSlug,
+    artistSlug,
     cover: coverUrl,
-  });
-  const actionMenu = useItemActionMenu(actions);
-  const menuCoverUrl = actionMenu.open
-    ? resolveMaybeApiAssetUrl(coverUrl) || coverUrl
-    : null;
+    isPreRelease,
+  };
   const savedLabel = saved
     ? t("album.actions.removeFromCollection")
     : t("album.actions.addToCollection");
@@ -392,14 +492,13 @@ export function useAlbumCardModel({
   }
 
   return {
-    actions,
     actionMenu,
     albumRouteInput,
     coverArtwork,
     coverSizes,
     coverUrl,
     isPreRelease,
-    menuCoverUrl,
+    menuInput,
     offlineMeta,
     offlineState,
     saved,

@@ -127,28 +127,3 @@ export function getQualityBadge(input: QualityBadgeInput): QualityBadge | null {
   const label = br ? `${fmtLabel} ${formatBitrateKbps(br)}` : fmtLabel;
   return { label, detail, tier };
 }
-
-export function generateWaveformBars(seed: string, count: number): number[] {
-  let hash = 0;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = ((hash << 5) - hash + seed.charCodeAt(index)) | 0;
-  }
-
-  const bars: number[] = [];
-  for (let index = 0; index < count; index += 1) {
-    hash = (hash * 1103515245 + 12345) & 0x7fffffff;
-    bars.push(0.15 + ((hash % 1000) / 1000) * 0.85);
-  }
-  return bars;
-}
-
-export function currentTrackToPlaylistSeed(track: Track, duration: number) {
-  return {
-    title: track.title,
-    artist: track.artist,
-    album: track.album,
-    duration: duration || 0,
-    path: track.path,
-    libraryTrackId: track.libraryTrackId,
-  };
-}

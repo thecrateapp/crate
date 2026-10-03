@@ -120,7 +120,7 @@ function deferred(element: ReactNode) {
 }
 
 export const publicAppRoutes: AppRouteDefinition[] = [
-  { path: "/crate/:crateId", element: deferred(<PublicCrate />) },
+  { path: "/crate/:crateRef", element: deferred(<PublicCrate />) },
   { path: "/server-setup", element: deferred(<ServerSetup />) },
   { path: "/auth/callback", element: deferred(<AuthCallback />) },
   { path: "/login", element: deferred(<Login />) },

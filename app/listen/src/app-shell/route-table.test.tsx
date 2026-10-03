@@ -29,9 +29,12 @@ describe("public app routes", () => {
       .map((route) => route.path)
       .filter((path): path is string => Boolean(path));
 
-    expect(paths).toContain("/crate/:crateId");
+    expect(paths).toContain("/crate/:crateRef");
+    expect(protectedAppRoutes.map((route) => route.path)).toContain(
+      "crate/invite/:token",
+    );
     expect(protectedAppRoutes.map((route) => route.path)).not.toContain(
-      "crate/:crateId",
+      "crate/:crateRef",
     );
   });
 });

@@ -1,9 +1,11 @@
-import type { RefObject } from "react";
+import { useMemo, type RefObject } from "react";
 import { MapPin } from "@crate/ui/icons";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
+import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
+import type { PlaySource } from "@/contexts/PlayerContext";
 import { albumCoverApiUrl } from "@/lib/library-routes";
-import type { PathDetail } from "./paths-model";
+import type { PathDetail, PathTrack } from "./paths-model";
 
 export function PathRouteVisualization({
   path,
@@ -116,91 +118,62 @@ export function PathRouteVisualization({
   );
 }
 
+function pathTrackRowData(track: PathTrack): TrackRowData {
+  return {
+    id: track.track_id,
+    library_track_id: track.track_id,
+    entity_uid: track.entity_uid,
+    title: track.title,
+    artist: track.artist,
+    artist_entity_uid: track.artist_entity_uid,
+    album: track.album,
+    album_id: track.album_id,
+    album_entity_uid: track.album_entity_uid,
+    bpm: track.bpm,
+    audio_key: track.audio_key,
+    audio_scale: track.audio_scale,
+    energy: track.energy,
+    danceability: track.danceability,
+    valence: track.valence,
+    bliss_vector: track.bliss_vector,
+  };
+}
+
 export function PathTrackList({
   path,
   activeStep,
   activeTrackRef,
-  onPlayFromStep,
 }: {
   path: PathDetail;
   activeStep: number;
   activeTrackRef: RefObject<HTMLDivElement | null>;
-  onPlayFromStep: (startIndex: number) => void;
 }) {
+  const rows = useMemo(() => path.tracks.map(pathTrackRowData), [path.tracks]);
+  const playSource = useMemo<PlaySource>(
+    () => ({ type: "playlist", name: path.name, id: path.id }),
+    [path.id, path.name],
+  );
+
   return (
     <div className="space-y-1">
-      {path.tracks.map((track, index) => {
-        const isActive = index === activeStep;
-        return (
-          <div
-            key={track.step}
-            ref={isActive ? activeTrackRef : null}
-            role="button"
-            tabIndex={0}
-            onClick={() => onPlayFromStep(index)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                onPlayFromStep(index);
-              }
-            }}
-            className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition ${
-              isActive
-                ? "border-accent-action/30 bg-accent-action/10"
-                : "border-transparent hover:bg-text-primary/[0.03]"
-            }`}
-          >
-            <div className="flex size-7 shrink-0 items-center justify-center">
-              {isActive ? (
-                <div className="path-node-active size-2.5 rounded-full bg-accent-action" />
-              ) : (
-                <span className="font-mono text-xs tabular-nums text-text-primary/20">
-                  {index + 1}
-                </span>
-              )}
-            </div>
-
-            {track.album_id ? (
-              <CrateImage
-                src={albumCoverApiUrl(
-                  {
-                    albumId: track.album_id,
-                    albumEntityUid: track.album_entity_uid,
-                    artistEntityUid: track.artist_entity_uid,
-                  },
-                  { size: 80 },
-                )}
-                alt=""
-                className=" size-10 shrink-0 rounded-md bg-text-primary/5 object-cover"
-              />
-            ) : (
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-text-primary/5">
-                <MapPin size={14} className="text-text-primary/15" />
-              </div>
-            )}
-
-            <div className="min-w-0 flex-1">
-              <div
-                className={`truncate text-sm ${
-                  isActive
-                    ? "font-semibold text-accent-action"
-                    : "text-text-primary"
-                }`}
-              >
-                {track.title}
-              </div>
-              <div className="truncate text-xs text-text-primary/40">
-                {track.artist}
-                {track.album ? <> · {track.album}</> : null}
-              </div>
-            </div>
-
-            <span className="shrink-0 rounded-full border border-text-primary/6 bg-text-primary/[0.02] px-2 py-0.5 font-mono text-xs tabular-nums text-text-primary/25">
-              {track.distance.toFixed(3)}
-            </span>
-          </div>
-        );
-      })}
+      {path.tracks.map((track, index) => (
+        <div
+          key={track.step}
+          ref={index === activeStep ? activeTrackRef : null}
+        >
+          <TrackRow
+            track={rows[index]!}
+            rank={index + 1}
+            showCoverThumb
+            showArtist
+            showAlbum
+            showDuration={false}
+            queueTracks={rows}
+            playSource={playSource}
+            meta={track.distance.toFixed(3)}
+          />
+        </div>
+      ))}
     </div>
   );
 }

@@ -120,8 +120,7 @@ export function PlaylistComposerTrackList({
             </DndContext>
           ) : (
             <div className="px-4 py-8 text-center text-sm text-text-muted">
-              Start by searching for tracks or open this modal from an album or
-              track menu.
+              {t("playlistComposer.emptyTracks")}
             </div>
           )}
         </div>

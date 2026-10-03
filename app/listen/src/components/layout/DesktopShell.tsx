@@ -1,10 +1,12 @@
 import { Outlet } from "react-router";
+import type { ReactNode } from "react";
 
 import { PlayerBar } from "@/components/player/PlayerBar";
 import { Sidebar } from "@/components/layout/sidebar/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 
 interface DesktopShellProps {
+  children?: ReactNode;
   desktopContentPadClass: string;
   desktopOverlayHeader: boolean;
   hasTrack: boolean;
@@ -16,6 +18,7 @@ interface DesktopShellProps {
 }
 
 export function DesktopShell({
+  children,
   desktopContentPadClass,
   desktopOverlayHeader,
   hasTrack,
@@ -58,7 +61,7 @@ export function DesktopShell({
             homeDesktopOverlay ? "max-w-[1480px] px-0" : "max-w-[1480px] px-6"
           } transition-[padding-top,padding-right,padding-left] duration-200 ${headerOffsetClass}`}
         >
-          <Outlet />
+          {children ?? <Outlet />}
         </div>
       </main>
       <PlayerBar />

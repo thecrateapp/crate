@@ -23,8 +23,8 @@ export function SearchResults() {
   const query = searchParams.get("q") || "";
   const [emptyQuery, setEmptyQuery] = useState("");
   const [data, setData] = useState<SearchData | null>(null);
-  const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const { playAll } = usePlayerActions();
 
   useEffect(() => {
@@ -34,7 +34,6 @@ export function SearchResults() {
       return;
     }
     const controller = new AbortController();
-    setLoading(true);
     setSearchError(null);
     api<SearchData>(
       "/api/catalog/search?q=" + encodeURIComponent(query) + "&limit=50",
@@ -55,19 +54,16 @@ export function SearchResults() {
             tryAgain: t("search.tryAgain"),
           }),
         );
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [query, t]);
+  }, [query, retryKey, t]);
 
   const trackRowData = useMemo(
     () => buildTrackRowData(data?.tracks ?? []),
     [data?.tracks],
   );
 
-  if (!query) {
+  if (!query.trim()) {
     return (
       <EmptySearchState
         value={emptyQuery}
@@ -76,13 +72,18 @@ export function SearchResults() {
       />
     );
   }
-  if (loading && !data) {
+  if (searchError) {
+    return (
+      <SearchErrorState
+        query={query}
+        message={searchError}
+        onRetry={() => setRetryKey((key) => key + 1)}
+      />
+    );
+  }
+  if (!data) {
     return <CrateLoader label={t("search.loadingResults")} />;
   }
-  if (searchError) {
-    return <SearchErrorState query={query} message={searchError} />;
-  }
-  if (!data) return null;
 
   return (
     <SearchResultsContent

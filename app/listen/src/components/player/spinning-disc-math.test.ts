@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  clamp,
   getJogTime,
   getPointerAngle,
   normalizeDeltaDegrees,
@@ -16,12 +15,6 @@ const bounds = {
 } as DOMRect;
 
 describe("spinning disc math", () => {
-  it("clamps values to the requested range", () => {
-    expect(clamp(-1, 0, 10)).toBe(0);
-    expect(clamp(4, 0, 10)).toBe(4);
-    expect(clamp(11, 0, 10)).toBe(10);
-  });
-
   it("normalizes pointer deltas across the rotation boundary", () => {
     expect(normalizeDeltaDegrees(270)).toBe(-90);
     expect(normalizeDeltaDegrees(-270)).toBe(90);

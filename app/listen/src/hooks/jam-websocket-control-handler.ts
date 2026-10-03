@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import type { Dispatch, MutableRefObject } from "react";
 import type { NavigateFunction } from "react-router";
 import { toast } from "sonner";
@@ -55,6 +56,7 @@ export interface JamWebSocketMessageHandlerContext {
   roomRevisionRef: MutableRefObject<number>;
   seenEventIdsRef: MutableRefObject<Set<number>>;
   syncSeek: SyncSeek;
+  t: TFunction;
 }
 
 type JamWebSocketControlContext = Pick<
@@ -70,6 +72,7 @@ type JamWebSocketControlContext = Pick<
   | "roomRevisionRef"
   | "seenEventIdsRef"
   | "syncSeek"
+  | "t"
 >;
 
 export function handleJamWebSocketControlMessage(
@@ -86,6 +89,7 @@ export function handleJamWebSocketControlMessage(
     roomRevisionRef,
     seenEventIdsRef,
     syncSeek,
+    t,
   }: JamWebSocketControlContext,
 ): boolean {
   if (payload.type === "pong") {
@@ -138,13 +142,13 @@ export function handleJamWebSocketControlMessage(
 
   if (payload.type === "room_ended" && payload.room) {
     dispatch({ type: "ROOM_ENDED", payload: payload.room });
-    toast.info("This jam room has ended");
+    toast.info(t("jam.toasts.remoteRoomEnded"));
     return true;
   }
 
   if (payload.type === "room_deleted") {
     dispatch({ type: "ROOM_DELETED" });
-    toast.info("This jam room was deleted");
+    toast.info(t("jam.toasts.remoteRoomDeleted"));
     navigate("/jam", { replace: true });
     return true;
   }

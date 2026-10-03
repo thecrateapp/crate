@@ -31,11 +31,6 @@ const MOBILE_NAV = [
 
 const COLLECTION_SECTIONS = [
   {
-    to: "/collection/playlists",
-    icon: ListMusic,
-    labelKey: "nav.collection.playlists",
-  },
-  {
     to: "/collection/artists",
     icon: Users,
     labelKey: "nav.collection.artists",
@@ -44,6 +39,11 @@ const COLLECTION_SECTIONS = [
     to: "/collection/crates",
     icon: Disc3,
     labelKey: "nav.collection.crates",
+  },
+  {
+    to: "/collection/playlists",
+    icon: ListMusic,
+    labelKey: "nav.collection.playlists",
   },
   { to: "/collection/albums", icon: Disc, labelKey: "nav.collection.albums" },
   {

@@ -68,10 +68,14 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
             {results.albums.map((album) => (
               <AlbumCard
                 key={album.id || `${album.artist}-${album.name}`}
+                layout="rail"
                 artist={album.artist}
                 album={album.name}
                 albumId={album.id}
+                albumEntityUid={album.entity_uid}
+                artistEntityUid={album.artist_entity_uid}
                 albumSlug={album.slug}
+                artistSlug={album.artist_slug}
                 year={album.year}
               />
             ))}

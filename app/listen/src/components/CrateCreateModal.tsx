@@ -2,8 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "@crate/ui/icons";
 import { Button } from "@crate/ui/shadcn/button";
-import { Input } from "@crate/ui/shadcn/input";
-import { Textarea } from "@crate/ui/shadcn/textarea";
+import { toast } from "sonner";
 import {
   AppModal,
   ModalBody,
@@ -12,105 +11,136 @@ import {
   ModalHeader,
 } from "@crate/ui/primitives/AppModal";
 
+import {
+  CrateForm,
+  EMPTY_CRATE_FORM_VALUES,
+  crateFormPayload,
+  isCrateFormValid,
+  type CrateFormValues,
+} from "@/components/crates/CrateForm";
+import { api } from "@/lib/api";
+
 export interface CrateComposerAlbum {
   globalAlbumUid: string;
   name: string;
   artistName: string;
 }
 
+export interface CreatedCrate {
+  id: string;
+  public_ref?: string | null;
+}
+
 interface CrateCreateModalProps {
   open: boolean;
   initialAlbum?: CrateComposerAlbum;
-  submitting: boolean;
   onClose: () => void;
-  onSubmit: (payload: { name: string; description: string }) => Promise<void>;
+  onCreated: (crate: CreatedCrate) => void;
 }
+
+const FORM_ID = "crate-create-form";
 
 export function CrateCreateModal({
   open,
   initialAlbum,
-  submitting,
   onClose,
-  onSubmit,
+  onCreated,
 }: CrateCreateModalProps) {
   const { t } = useTranslation();
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [values, setValues] = useState<CrateFormValues>(
+    EMPTY_CRATE_FORM_VALUES,
+  );
+  const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const trimmedName = name.trim();
-    if (!trimmedName || submitting) return;
-    await onSubmit({ name: trimmedName, description: description.trim() });
+    if (!isCrateFormValid(values) || submitting) return;
+
+    setSubmitting(true);
+    try {
+      const created = await api<CreatedCrate>(
+        "/api/crates",
+        "POST",
+        crateFormPayload(values, true),
+      );
+      let albumAddFailed = false;
+      if (initialAlbum) {
+        try {
+          await api(`/api/crates/${created.id}/albums`, "POST", {
+            global_album_uid: initialAlbum.globalAlbumUid,
+          });
+        } catch {
+          albumAddFailed = true;
+        }
+      }
+      toast.success(t("library.crates.created"));
+      if (albumAddFailed) toast.error(t("album.toasts.addToCrateFailed"));
+      onCreated(created);
+    } catch {
+      toast.error(t("library.crates.createFailed"));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function close() {
+    if (!submitting) onClose();
   }
 
   return (
     <AppModal
       open={open}
-      onClose={() => {
-        if (!submitting) onClose();
-      }}
-      maxWidthClassName="sm:max-w-lg"
+      onClose={close}
+      maxWidthClassName="sm:max-w-2xl"
       panelClassName="listen-glass-panel border-border-quiet"
       closeOnEscape={!submitting}
       closeOnOverlay={!submitting}
     >
-      <form onSubmit={handleSubmit}>
+      <div className="flex max-h-[92vh] flex-col">
         <ModalHeader className="flex items-center justify-between gap-4 bg-transparent px-5 py-4">
-          <div>
+          <div className="min-w-0">
             <h2 className="text-lg font-semibold text-text-primary">
               {t("library.crates.createTitle")}
             </h2>
             {initialAlbum ? (
-              <p className="mt-1 text-xs text-text-muted">
+              <p className="mt-1 truncate text-xs text-text-muted">
                 {initialAlbum.name} · {initialAlbum.artistName}
               </p>
             ) : null}
           </div>
-          <ModalCloseButton onClick={onClose} disabled={submitting} />
+          <ModalCloseButton onClick={close} disabled={submitting} />
         </ModalHeader>
-
-        <ModalBody className="space-y-4 px-5 py-2">
-          <label className="flex flex-col gap-2 text-sm font-medium text-text-primary">
-            {t("common.name")}
-            <Input
-              aria-label={t("common.name")}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              maxLength={120}
-              required
-              className="h-11 rounded-lg bg-surface-canvas/25 px-3 text-sm"
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm font-medium text-text-primary">
-            {t("library.crates.description")}
-            <Textarea
-              aria-label={t("library.crates.description")}
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              maxLength={2000}
-              rows={3}
-              className="min-h-0 rounded-lg bg-surface-canvas/25 px-3 py-2 text-sm"
-            />
-          </label>
+        <ModalBody className="p-5">
+          <CrateForm
+            id={FORM_ID}
+            values={values}
+            isOwner
+            disabled={submitting}
+            onChange={(patch) =>
+              setValues((current) => ({ ...current, ...patch }))
+            }
+            onSubmit={(event) => void handleSubmit(event)}
+          />
         </ModalBody>
-
         <ModalFooter className="flex items-center justify-end gap-3 bg-transparent px-5 py-4">
           <Button
             type="button"
             variant="ghost"
-            className="text-text-muted"
-            onClick={onClose}
+            onClick={close}
             disabled={submitting}
           >
             {t("common.cancel")}
           </Button>
-          <Button type="submit" disabled={submitting || !name.trim()}>
-            {submitting ? <Loader2 size={15} className="animate-spin" /> : null}
+          <Button
+            type="submit"
+            form={FORM_ID}
+            disabled={submitting || !isCrateFormValid(values)}
+          >
+            {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
             {t("library.crates.create")}
           </Button>
         </ModalFooter>
-      </form>
+      </div>
     </AppModal>
   );
 }

@@ -194,7 +194,9 @@ export function LibraryPlaylistsTab() {
               meta={[
                 playlist.category,
                 playlist.follower_count > 0
-                  ? `${playlist.follower_count} followers`
+                  ? t("common.followerCountLabel", {
+                      count: playlist.follower_count,
+                    })
                   : null,
               ]
                 .filter(Boolean)

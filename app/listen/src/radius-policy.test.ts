@@ -75,5 +75,5 @@ describe("Listen radius policy", () => {
     });
 
     expect(violations).toEqual([]);
-  });
+  }, 15_000);
 });

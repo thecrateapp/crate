@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
@@ -49,6 +50,7 @@ export function PlaylistComposerProvider({
 }: {
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -130,15 +132,15 @@ export function PlaylistComposerProvider({
 
         refreshPlaylistOptions();
         setOpen(false);
-        toast.success("Playlist created");
+        toast.success(t("playlistComposer.toasts.created"));
         navigate(`/playlist/${created.id}`);
       } catch {
-        toast.error("Failed to create playlist");
+        toast.error(t("playlistComposer.toasts.createFailed"));
       } finally {
         setSubmitting(false);
       }
     },
-    [navigate, refreshPlaylistOptions],
+    [navigate, refreshPlaylistOptions, t],
   );
 
   const handleClose = useCallback(() => {

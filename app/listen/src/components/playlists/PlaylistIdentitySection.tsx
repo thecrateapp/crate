@@ -155,7 +155,7 @@ export function PlaylistIdentitySection({
             onClick={() => dispatch({ type: "set-cover", value: null })}
           >
             <ImagePlus size={14} />
-            Use collage instead
+            {t("playlistComposer.useCollage")}
           </button>
         ) : null}
 
@@ -172,7 +172,7 @@ export function PlaylistIdentitySection({
               dispatch({ type: "set-visibility", value: "private" })
             }
           >
-            Private
+            {t("playlist.visibility.private")}
           </button>
           <button
             type="button"
@@ -186,7 +186,7 @@ export function PlaylistIdentitySection({
               dispatch({ type: "set-visibility", value: "public" })
             }
           >
-            Public
+            {t("playlist.visibility.public")}
           </button>
           <button
             type="button"
@@ -198,7 +198,7 @@ export function PlaylistIdentitySection({
             )}
             onClick={() => dispatch({ type: "toggle-collaborative" })}
           >
-            Collaborative
+            {t("playlist.badges.collaborative")}
           </button>
         </div>
       </div>

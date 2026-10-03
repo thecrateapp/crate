@@ -1,4 +1,5 @@
 import { readCanvasColorToken } from "@/lib/canvas-color";
+import { clamp } from "@/lib/utils";
 import { WAVEFORM_COLOR_TOKENS } from "../visualizer-color-tokens";
 
 const MIN_DISPLAY_DB = -85;
@@ -232,10 +233,6 @@ export function drawWaveformFrame({
   }
 
   return { gradient, gradientHeight };
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
 }
 
 function dbToAmplitude(db: number) {

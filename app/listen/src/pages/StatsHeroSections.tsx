@@ -3,6 +3,8 @@ import { Flame, Play, Repeat2, Search } from "@crate/ui/icons";
 
 import type { StatsPageController } from "@/pages/use-stats-page-controller";
 import { CrateImage } from "@/components/artwork/CrateImage";
+import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
+import type { PlaySource } from "@/contexts/PlayerContext";
 import {
   formatStatsMinutes,
   type ReplayMix,
@@ -11,7 +13,6 @@ import {
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
 import { MiniStat, SignalCard } from "./StatsAnalyticsSections";
-import { TrackCover } from "./StatsCollectionPanels";
 import { statsTrackKey } from "./stats-collection-keys";
 
 const STATS_MOSAIC_CELL_IDS = [
@@ -33,9 +34,10 @@ export function StatsHeroSection({ page }: { page: StatsPageController }) {
         <ReplayCard
           replay={page.replay}
           items={page.replayItems}
+          rows={page.replayRows}
+          playSource={page.replaySource}
           loading={page.dashboardLoading}
           onPlay={page.playReplay}
-          onPlayTrack={page.playTopTrack}
         />
         <StatsSignalCards page={page} />
       </aside>
@@ -194,14 +196,16 @@ function ReplayCard({
   replay,
   items,
   loading,
+  rows,
+  playSource,
   onPlay,
-  onPlayTrack,
 }: {
   replay?: ReplayMix;
   items: StatsTrack[];
+  rows: TrackRowData[];
+  playSource: PlaySource;
   loading: boolean;
   onPlay: () => void;
-  onPlayTrack: (item: StatsTrack) => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -239,32 +243,28 @@ function ReplayCard({
         />
       </div>
 
-      <div className="mt-5 space-y-2">
+      <div className="mt-5 space-y-1">
         {loading ? (
           <div className="stats-card-empty rounded-lg border-dashed px-4 py-5 text-sm">
             {t("stats.replay.loading")}
           </div>
         ) : items.length ? (
-          items.slice(0, 5).map((item, index) => (
-            <button
-              key={statsTrackKey(item)}
-              onClick={() => onPlayTrack(item)}
-              className="stats-replay-row flex w-full items-center gap-3 rounded-lg border-transparent px-3 py-2.5 text-left transition"
-            >
-              <TrackCover item={item} size="sm" />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-text-primary">
-                  {item.title}
-                </div>
-                <div className="truncate text-xs text-text-muted">
-                  {item.artist}
-                </div>
-              </div>
-              <div className="text-xs font-bold text-accent-action">
-                {index + 1}
-              </div>
-            </button>
-          ))
+          items
+            .slice(0, 5)
+            .map((item, index) => (
+              <TrackRow
+                key={statsTrackKey(item)}
+                track={rows[index]!}
+                rank={index + 1}
+                density="compact"
+                showCoverThumb
+                showArtist
+                showLike={false}
+                showDuration={false}
+                queueTracks={rows}
+                playSource={playSource}
+              />
+            ))
         ) : (
           <div className="stats-card-empty rounded-lg border-dashed px-4 py-5 text-sm">
             {t("stats.replay.empty")}

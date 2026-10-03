@@ -1,4 +1,5 @@
 import { useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import type { Track } from "@/contexts/player-types";
 import {
@@ -69,6 +70,7 @@ export function usePlayerBarActions({
   toggleShuffle,
   cycleRepeat,
 }: UsePlayerBarActionsOptions) {
+  const { t } = useTranslation();
   const coverLongPressTimerRef = useRef<number | null>(null);
   const coverLongPressTriggeredRef = useRef(false);
 
@@ -234,11 +236,11 @@ export function usePlayerBarActions({
         displayTrack.path || displayTrack.id,
         displayTrack.globalTrackUid ?? null,
       );
-      toast.success("Added to collection");
+      toast.success(t("player.toasts.addedToCollection"));
     } catch {
       // The collection action reports failures through its own UI.
     }
-  }, [displayTrack, likeTrack]);
+  }, [displayTrack, likeTrack, t]);
 
   return {
     clearCoverLongPressTimer,

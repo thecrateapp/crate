@@ -1,142 +1,253 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Loader2, Plus } from "@crate/ui/icons";
+import { Button } from "@crate/ui/shadcn/button";
 import { toast } from "sonner";
 
 import { CrateCard } from "@/components/CrateCard";
+import { CrateCreateModal } from "@/components/CrateCreateModal";
 import { CrateEditor } from "@/components/CrateEditor";
+import { useCrateDownload } from "@/components/crates/crate-download";
+import { cratePagePath } from "@/components/crates/crate-model";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
+import { useOffline } from "@/contexts/OfflineContext";
 import { api } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
 import { albumCoverApiUrl } from "@/lib/library-routes";
+import { startShapedRadio } from "@/lib/radio";
+import { getOfflineActionLabelKey, isOfflineBusy } from "@/lib/offline";
+import { shuffleArray } from "@/lib/utils";
 import { toPlayableTrack } from "@/lib/playable-track";
 import type { CratePlaybackTrack, CrateSummary } from "@/pages/crates-types";
 
-export function Crates() {
+interface CratesProps {
+  onCrateChange?: () => void | Promise<void>;
+}
+
+export function Crates({ onCrateChange }: CratesProps) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const { playAll, setRepeatMode } = usePlayerActions();
+  const {
+    supported: offlineSupported,
+    getCrateState,
+    toggleCrateOffline: toggleCrateOfflineState,
+  } = useOffline();
   const {
     data: crates,
     loading,
     error,
     refetch,
   } = useApi<CrateSummary[]>("/api/me/crates");
+  const { data: followedCrates, loading: followedLoading } = useApi<
+    CrateSummary[]
+  >("/api/me/crates/followed");
   const [selectedCrateId, setSelectedCrateId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const downloadCrate = useCrateDownload();
 
-  async function playCrate(crate: CrateSummary) {
+  async function loadCrateTracks(crate: CrateSummary): Promise<Track[]> {
+    const playback = await api<CratePlaybackTrack[]>(
+      `/api/crates/${crate.id}/playback`,
+    );
+    return playback.map((track) =>
+      toPlayableTrack(
+        {
+          id: track.local_track_id ?? track.global_track_uid,
+          globalTrackUid: track.global_track_uid,
+          globalAlbumUid: track.global_album_uid,
+          globalArtistUid: track.global_artist_uid,
+          entity_uid: track.local_track_entity_uid,
+          title: track.title,
+          artist: track.artist,
+          album: track.album,
+          duration: track.duration,
+          libraryTrackId: track.local_track_id,
+        },
+        {
+          cover: albumCoverApiUrl(
+            {
+              globalAlbumUid: track.global_album_uid,
+              albumName: track.album,
+              artistName: track.artist,
+            },
+            { size: 512 },
+          ),
+        },
+      ),
+    );
+  }
+
+  function startCratePlayback(crate: CrateSummary, tracks: Track[]) {
+    if (tracks.length === 0) return;
+    setRepeatMode(crate.loop_enabled ? "all" : "off");
+    playAll(tracks, 0, {
+      type: "crate",
+      name: crate.name,
+      id: crate.id,
+      href: cratePagePath(crate),
+    });
+  }
+
+  async function playCrate(crate: CrateSummary, shuffle = false) {
     try {
-      const playback = await api<CratePlaybackTrack[]>(
-        `/api/crates/${crate.id}/playback`,
-      );
-      const tracks: Track[] = playback.map((track) =>
-        toPlayableTrack(
-          {
-            id: track.local_track_id ?? track.global_track_uid,
-            globalTrackUid: track.global_track_uid,
-            globalAlbumUid: track.global_album_uid,
-            globalArtistUid: track.global_artist_uid,
-            entity_uid: track.local_track_entity_uid,
-            title: track.title,
-            artist: track.artist,
-            album: track.album,
-            duration: track.duration,
-            libraryTrackId: track.local_track_id,
-          },
-          {
-            cover: albumCoverApiUrl(
-              {
-                globalAlbumUid: track.global_album_uid,
-                albumName: track.album,
-                artistName: track.artist,
-              },
-              { size: 512 },
-            ),
-          },
-        ),
-      );
-      if (tracks.length === 0) return;
-      setRepeatMode(crate.loop_enabled ? "all" : "off");
-      playAll(tracks, 0, {
-        type: "crate",
-        name: crate.name,
-        id: crate.id,
-        href: `/crate/${crate.id}`,
-      });
+      const tracks = await loadCrateTracks(crate);
+      startCratePlayback(crate, shuffle ? shuffleArray(tracks) : tracks);
     } catch {
       toast.error(t("library.crates.playFailed"));
     }
   }
 
-  if (selectedCrateId || creating) {
+  async function startCrateRadio(crate: CrateSummary) {
+    try {
+      const radio = await startShapedRadio("seeded", "crate", crate.id);
+      if (!radio?.tracks.length) {
+        toast.info(t("actions.crate.toasts.radioUnavailable"));
+        return;
+      }
+      playAll(radio.tracks, 0, radio.source);
+    } catch {
+      toast.error(t("actions.crate.toasts.radioFailed"));
+    }
+  }
+
+  async function toggleCrateOffline(crate: CrateSummary) {
+    try {
+      const result = await toggleCrateOfflineState({
+        crateId: crate.id,
+        title: crate.name,
+      });
+      toast.success(
+        result === "removed"
+          ? t("actions.offline.toasts.removed")
+          : t("actions.crate.toasts.offlineReady"),
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t("actions.offline.toasts.updateFailed"),
+      );
+    }
+  }
+
+  function renderCrateCard(crate: CrateSummary, editable: boolean) {
+    const offlineState = getCrateState(crate.id);
     return (
-      <CrateEditor
-        crateId={selectedCrateId}
-        onBack={() => {
-          setSelectedCrateId(null);
-          setCreating(false);
-        }}
-        onCreated={(crateId) => {
-          setCreating(false);
-          setSelectedCrateId(crateId);
-          refetch();
-        }}
-        onDeleted={() => {
-          setSelectedCrateId(null);
-          refetch();
-        }}
+      <CrateCard
+        key={crate.id}
+        crate={crate}
+        layout="grid"
+        onEdit={editable ? () => setSelectedCrateId(crate.id) : undefined}
+        onPlay={() => void playCrate(crate)}
+        onShuffle={() => void playCrate(crate, true)}
+        onStartRadio={() => void startCrateRadio(crate)}
+        onMakeAvailableOffline={
+          offlineSupported ? () => void toggleCrateOffline(crate) : undefined
+        }
+        onDownload={() => void downloadCrate(crate)}
+        offlineActionLabel={t(getOfflineActionLabelKey(offlineState))}
+        offlineActionDisabled={isOfflineBusy(offlineState)}
+        offlineActionActive={offlineState === "ready"}
       />
     );
   }
 
   return (
-    <section className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="hidden text-lg font-semibold text-text-primary md:block">
-          {t("library.crates.title")}
-        </h2>
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className="flex min-h-11 shrink-0 items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-semibold text-accent-action-foreground transition-colors hover:bg-accent-action/90"
-        >
-          <Plus size={17} />
-          {t("library.crates.new")}
-        </button>
-      </div>
+    <>
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="hidden text-lg font-semibold text-text-primary md:block">
+            {t("library.crates.title")}
+          </h2>
+          <Button
+            type="button"
+            size="lg"
+            onClick={() => setCreating(true)}
+            className="shrink-0"
+          >
+            <Plus size={17} />
+            {t("library.crates.new")}
+          </Button>
+        </div>
 
-      {loading && !crates ? (
-        <div className="flex justify-center py-12">
-          <Loader2 size={24} className="animate-spin text-accent-action" />
-        </div>
-      ) : error ? (
-        <p role="alert" className="py-10 text-center text-sm text-state-danger">
-          {t("library.crates.loadFailed")}
-        </p>
-      ) : crates?.length ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {crates.map((crate) => (
-            <CrateCard
-              key={crate.id}
-              crate={crate}
-              onOpen={() => navigate(`/crate/${crate.id}`)}
-              onEdit={() => setSelectedCrateId(crate.id)}
-              onPlay={() => void playCrate(crate)}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-dashed border-border-quiet px-5 py-12 text-center">
-          <h3 className="text-base font-semibold text-text-primary">
-            {t("library.crates.emptyTitle")}
-          </h3>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-text-muted">
-            {t("library.crates.emptyDescription")}
+        {loading && !crates ? (
+          <div className="flex justify-center py-12">
+            <Loader2 size={24} className="animate-spin text-accent-action" />
+          </div>
+        ) : error ? (
+          <p
+            role="alert"
+            className="py-10 text-center text-sm text-state-danger"
+          >
+            {t("library.crates.loadFailed")}
           </p>
-        </div>
-      )}
-    </section>
+        ) : crates?.length ? (
+          <div
+            data-testid="crate-grid"
+            className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6"
+          >
+            {crates.map((crate) => renderCrateCard(crate, true))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-border-quiet px-5 py-12 text-center">
+            <h3 className="text-base font-semibold text-text-primary">
+              {t("library.crates.emptyTitle")}
+            </h3>
+            <p className="mx-auto mt-2 max-w-sm text-sm text-text-muted">
+              {t("library.crates.emptyDescription")}
+            </p>
+          </div>
+        )}
+      </section>
+      <section
+        aria-labelledby="followed-crates-title"
+        className="mt-10 space-y-4"
+      >
+        <h2
+          id="followed-crates-title"
+          className="text-lg font-semibold text-text-primary"
+        >
+          {t("library.crates.followedTitle")}
+        </h2>
+        {followedLoading && !followedCrates ? (
+          <div className="flex justify-center py-8">
+            <Loader2 size={20} className="animate-spin text-accent-action" />
+          </div>
+        ) : followedCrates?.length ? (
+          <div
+            data-testid="followed-crate-grid"
+            className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6"
+          >
+            {followedCrates.map((crate) => renderCrateCard(crate, false))}
+          </div>
+        ) : (
+          <p className="rounded-xl border border-dashed border-border-quiet px-5 py-8 text-center text-sm text-text-muted">
+            {t("library.crates.followedEmpty")}
+          </p>
+        )}
+      </section>
+      <CrateCreateModal
+        key={creating ? "open" : "closed"}
+        open={creating}
+        onClose={() => setCreating(false)}
+        onCreated={(created) => {
+          setCreating(false);
+          setSelectedCrateId(created.id);
+          refetch();
+          void onCrateChange?.();
+        }}
+      />
+      {selectedCrateId ? (
+        <CrateEditor
+          crateId={selectedCrateId}
+          onBack={() => setSelectedCrateId(null)}
+          onDeleted={() => {
+            setSelectedCrateId(null);
+            refetch();
+            void onCrateChange?.();
+          }}
+        />
+      ) : null}
+    </>
   );
 }

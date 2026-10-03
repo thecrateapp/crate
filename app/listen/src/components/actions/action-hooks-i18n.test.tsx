@@ -170,11 +170,13 @@ describe("action hooks i18n", () => {
     expect(result.current.album).toEqual(
       expect.arrayContaining([
         "Reproducir álbum",
+        "Reproducir después",
         "Reproducir álbum aleatoriamente",
-        "Guardar álbum",
+        "Añadir a colección",
         "Iniciar radio de álbum",
         "Disponible offline",
         "Descargar ZIP del álbum",
+        "Ir al artista",
         "Compartir álbum",
       ]),
     );

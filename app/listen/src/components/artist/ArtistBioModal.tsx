@@ -2,16 +2,14 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
-import {
-  artistGenreSlug,
-  type ArtistData,
-} from "@/components/artist/artist-model";
+import type { ArtistData } from "@/components/artist/artist-model";
 import { AppModal } from "@crate/ui/primitives/AppModal";
 import {
   ArtistBioProfile,
   type ArtistBioMember,
 } from "@crate/ui/domain/ArtistBioProfile";
 import { openExternalUrl } from "@/lib/external-links";
+import { genreSlug } from "@/lib/utils";
 
 import type { ArtistBioModalProps } from "./artist-bio-types";
 import { useArtistBioEnrichment } from "./use-artist-bio-enrichment";
@@ -100,7 +98,7 @@ export function ArtistBioModal({
         onGenreSelect={(item) => {
           navigate(
             `/explore?genre=${encodeURIComponent(
-              item.slug || artistGenreSlug(item.name),
+              item.slug || genreSlug(item.name),
             )}`,
           );
           onClose();
@@ -117,7 +115,7 @@ function getGenreItems(artist: ArtistData, tags: string[]) {
   }
   return tags.map((tag) => ({
     name: tag,
-    slug: artistGenreSlug(tag),
+    slug: genreSlug(tag),
     source: "artist" as const,
   }));
 }

@@ -137,7 +137,9 @@ function FullscreenPlayerUtilityControls({
       <button
         type="button"
         onClick={() => void actions.toggleLikeWithFeedback()}
-        aria-label={state.liked ? "Unlike track" : "Like track"}
+        aria-label={t(
+          state.liked ? "actions.track.unlike" : "actions.track.like",
+        )}
         className="flex size-12 touch-manipulation items-center justify-center rounded-full border border-border-subtle bg-surface-control text-text-secondary transition-colors active:bg-surface-control-hover active:text-text-primary"
       >
         {state.liked ? (

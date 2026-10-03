@@ -11,24 +11,37 @@ import {
   type SocialShareColors,
 } from "./social-share-colors";
 import {
-  drawEditorialStoryCard,
+  CRATE_CARD_MAX_ALBUMS,
+  drawCrateArtworkBackground,
+  drawCrateSquareCard,
   drawCrateStoryCard,
+  drawEditorialStoryCard,
+  drawSquareEditorialCard,
   drawStoryArtworkBackground,
   drawStoryBackground,
   drawStoryBrand,
   type CrateStoryArtwork,
+  SQUARE_POST_SIZE,
   STORY_HEIGHT,
   STORY_WIDTH,
 } from "./social-share-story-canvas";
 export { resolveCrateStoryComposition } from "./social-share-story-canvas";
 import { getNativeHttpPlugin, nativeSocialShare } from "./social-share-native";
-import type { SharePayload } from "./social-share";
+import type {
+  ShareCardLabels,
+  ShareImageFormat,
+  SharePayload,
+} from "./social-share";
 
 const STORY_ASSET_TIMEOUT_MS = 4500;
 const STORY_FONT_TIMEOUT_MS = 1500;
 const CRATE_LOGO_URL = "/icons/logo.svg";
 const POPPINS_600_URL = new URL(
   "../../../shared/fonts/poppins/poppins-600.woff2",
+  import.meta.url,
+).href;
+const POPPINS_700_URL = new URL(
+  "../../../shared/fonts/poppins/poppins-700.woff2",
   import.meta.url,
 ).href;
 const POPPINS_800_URL = new URL(
@@ -38,7 +51,31 @@ const POPPINS_800_URL = new URL(
 
 export async function buildInstagramStoryCard(
   payload: SharePayload,
+  labels?: ShareCardLabels,
 ): Promise<string> {
+  const blob = await renderShareCard(payload, "story", labels);
+  return blobToDataUrl(blob);
+}
+
+export function buildInstagramStoryBlob(
+  payload: SharePayload,
+  labels?: ShareCardLabels,
+): Promise<Blob> {
+  return renderShareCard(payload, "story", labels);
+}
+
+export function buildSquarePostCard(
+  payload: SharePayload,
+  labels?: ShareCardLabels,
+): Promise<Blob> {
+  return renderShareCard(payload, "square", labels);
+}
+
+async function renderShareCard(
+  payload: SharePayload,
+  format: ShareImageFormat,
+  labels?: ShareCardLabels,
+): Promise<Blob> {
   await withTimeout(
     loadInstagramStoryFonts(),
     STORY_FONT_TIMEOUT_MS,
@@ -46,91 +83,107 @@ export async function buildInstagramStoryCard(
   ).catch((error) => {
     recordDevLog(
       "share",
-      "Instagram story fonts unavailable; using fallback fonts",
+      "Share card fonts unavailable; using fallback fonts",
       { error: formatArtworkError(error) },
       "warn",
     );
   });
 
   const canvas = document.createElement("canvas");
-  canvas.width = STORY_WIDTH;
-  canvas.height = STORY_HEIGHT;
+  canvas.width = format === "story" ? STORY_WIDTH : SQUARE_POST_SIZE;
+  canvas.height = format === "story" ? STORY_HEIGHT : SQUARE_POST_SIZE;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas is not available");
   const colors = readStoryColors();
+  const isCrate = payload.kind === "crate";
+  const crateAlbums = isCrate
+    ? (payload.crateAlbums ?? []).slice(0, CRATE_CARD_MAX_ALBUMS)
+    : [];
 
-  const [artwork, logo] = await Promise.all([
-    payload.imageUrl
+  const [artwork, logo, ...crateArtworks] = await Promise.all([
+    payload.imageUrl && (!isCrate || crateAlbums.length === 0)
       ? loadOptionalCanvasImage(payload.imageUrl, "artwork")
       : Promise.resolve(null),
     loadOptionalCanvasImage(CRATE_LOGO_URL, "logo"),
+    ...crateAlbums.map((album, index) =>
+      album.imageUrl
+        ? loadOptionalCanvasImage(album.imageUrl, `crate album ${index + 1}`)
+        : Promise.resolve(null),
+    ),
   ]);
-  const crateArtworks =
-    payload.kind === "crate"
-      ? await Promise.all(
-          (payload.crateAlbums ?? [])
-            .slice(0, 4)
-            .map((album, index) =>
-              album.imageUrl
-                ? loadOptionalCanvasImage(
-                    album.imageUrl,
-                    `crate album ${index + 1}`,
-                  )
-                : Promise.resolve(null),
-            ),
-        )
-      : [];
   try {
-    const backgroundArtwork =
-      crateArtworks.find(Boolean)?.image ?? artwork?.image;
-    if (backgroundArtwork) {
-      drawStoryArtworkBackground(
+    if (isCrate) {
+      const albums = crateAlbums.map(
+        (album, index): CrateStoryArtwork => ({
+          image: crateArtworks[index]?.image ?? null,
+          position: album.position ?? index,
+          name: album.name,
+          artistName: album.artistName,
+        }),
+      );
+      if (albums.length === 0 && artwork) {
+        albums.push({ image: artwork.image, position: 0 });
+      }
+      const backgroundArtwork =
+        albums.find((album) => album.image)?.image ?? null;
+      drawCrateArtworkBackground(
         ctx,
         backgroundArtwork,
         canvas.width,
         canvas.height,
         colors,
       );
-    } else {
-      drawStoryBackground(ctx, canvas.width, canvas.height, colors);
-    }
-
-    drawStoryBrand(ctx, logo?.image ?? null, colors);
-    if (payload.kind === "crate") {
-      drawCrateStoryCard(
+      const draw =
+        format === "story" ? drawCrateStoryCard : drawCrateSquareCard;
+      draw(ctx, payload, albums, logo?.image ?? null, colors, labels);
+    } else if (format === "square") {
+      drawCrateArtworkBackground(
         ctx,
-        payload,
-        crateArtworks.flatMap((value, index): CrateStoryArtwork[] =>
-          value
-            ? [
-                {
-                  image: value.image,
-                  position: payload.crateAlbums?.[index]?.position ?? index,
-                },
-              ]
-            : [],
-        ),
-        logo?.image ?? null,
+        artwork?.image ?? null,
+        canvas.width,
+        canvas.height,
         colors,
       );
+      drawSquareEditorialCard(
+        ctx,
+        payload,
+        artwork?.image ?? null,
+        logo?.image ?? null,
+        colors,
+        labels,
+      );
     } else {
+      if (artwork) {
+        drawStoryArtworkBackground(
+          ctx,
+          artwork.image,
+          canvas.width,
+          canvas.height,
+          colors,
+        );
+      } else {
+        drawStoryBackground(ctx, canvas.width, canvas.height, colors);
+      }
+      drawStoryBrand(ctx, logo?.image ?? null, colors);
       drawEditorialStoryCard(
         ctx,
         payload,
         artwork?.image ?? null,
         logo?.image ?? null,
         colors,
+        labels,
       );
     }
 
     const encodeStartedAt = performance.now();
     const blob = await canvasToJpegBlob(canvas);
-    const dataUrl = await blobToDataUrl(blob);
-    recordDevLog("share", "Instagram story card encoded", {
+    recordDevLog("share", "Share card encoded", {
+      format,
+      kind: payload.kind,
       durationMs: Math.round(performance.now() - encodeStartedAt),
       byteLength: blob.size,
     });
-    return dataUrl;
+    return blob;
   } finally {
     artwork?.release();
     crateArtworks.forEach((value) => value?.release());
@@ -189,6 +242,7 @@ async function loadInstagramStoryFonts(): Promise<void> {
   if (typeof FontFace === "undefined" || !document.fonts) return;
   storyFontsPromise ??= Promise.all([
     loadFontFace("Poppins", POPPINS_600_URL, "600"),
+    loadFontFace("Poppins", POPPINS_700_URL, "700"),
     loadFontFace("Poppins", POPPINS_800_URL, "800"),
   ]).then(() => undefined);
   await storyFontsPromise;

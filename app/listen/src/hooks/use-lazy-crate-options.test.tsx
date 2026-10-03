@@ -46,7 +46,7 @@ describe("useLazyCrateOptions", () => {
     const { result } = renderHook(() => useLazyCrateOptions(true));
 
     expect(result.current.crateOptions).toEqual([
-      { id: "crate-1", name: "Year-end records" },
+      { id: "crate-1", name: "Year-end records", albumUids: [] },
     ]);
   });
 });

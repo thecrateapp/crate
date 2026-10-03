@@ -3,6 +3,7 @@ import { Download, ExternalLink, Loader2 } from "@crate/ui/icons";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
+import { openExternalUrl } from "@/lib/external-links";
 
 import type { BandcampItem } from "./library-model";
 
@@ -80,13 +81,7 @@ export function LibraryBandcampPurchases({
             {item.item_url ? (
               <button
                 type="button"
-                onClick={() =>
-                  window.open(
-                    item.item_url || "",
-                    "_blank",
-                    "noopener,noreferrer",
-                  )
-                }
+                onClick={() => void openExternalUrl(item.item_url || "")}
                 className="inline-flex min-h-10 items-center rounded-full border border-border-quiet px-3 text-xs font-bold text-text-muted"
               >
                 <ExternalLink size={14} />

@@ -4,6 +4,7 @@ import type {
   MouseEvent as ReactMouseEvent,
   MouseEventHandler,
 } from "react";
+import { useTranslation } from "react-i18next";
 
 import { HeartBold } from "@crate/ui/icons";
 
@@ -115,11 +116,12 @@ function PlayerBarArtworkImage({
 }
 
 function PlayerBarLikedIndicator({ liked }: { liked: boolean }) {
+  const { t } = useTranslation();
   if (!liked) return null;
 
   return (
     <span
-      aria-label="Liked track"
+      aria-label={t("player.likedTrack")}
       className="listen-player-liked-indicator absolute -bottom-1 -right-1 flex size-4 items-center justify-center rounded-full backdrop-blur-md"
     >
       <HeartBold size={10} className="animate-crate-icon-active-pulse" />

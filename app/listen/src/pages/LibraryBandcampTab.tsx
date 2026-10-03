@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { useApi } from "@/hooks/use-api";
 import { api, apiAssetUrl } from "@/lib/api";
+import { openExternalUrl } from "@/lib/external-links";
 
 import { EmptyState, Spinner } from "./LibraryPrimitives";
 import { LibraryBandcampHeader } from "./LibraryBandcampHeader";
@@ -20,10 +21,8 @@ import type {
 } from "./library-model";
 
 function exportContribution(contribution: LibraryContribution) {
-  window.open(
+  void openExternalUrl(
     apiAssetUrl(`/api/me/contributions/${contribution.id}/export`),
-    "_blank",
-    "noopener,noreferrer",
   );
 }
 

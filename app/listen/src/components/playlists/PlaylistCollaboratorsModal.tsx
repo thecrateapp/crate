@@ -114,7 +114,7 @@ export function PlaylistCollaboratorsModal({
             const label =
               member.display_name ||
               member.username ||
-              `User ${member.user_id}`;
+              t("playlist.collaborators.userFallback", { id: member.user_id });
             const isCurrentUser = user?.id === member.user_id;
             return (
               <div

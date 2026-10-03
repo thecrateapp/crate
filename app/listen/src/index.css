@@ -5,6 +5,8 @@
 @import "tailwindcss";
 @source ".";
 @source "../../shared/ui";
+@source "../node_modules/@ashishgogula/coverflow/dist";
+@source "../../../node_modules/@ashishgogula/coverflow/dist";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -133,6 +135,20 @@ input,
 textarea {
   -webkit-user-select: auto;
   user-select: auto;
+}
+
+.item-action-target {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@media (hover: none) {
+  .item-action-target,
+  .item-action-target * {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
 }
 
 /* ── Listen-only: gradient backgrounds ── */

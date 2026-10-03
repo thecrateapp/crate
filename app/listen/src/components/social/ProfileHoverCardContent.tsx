@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import { Loader2, UserPlus, UserRoundCheck } from "@crate/ui/icons";
@@ -5,6 +6,7 @@ import { Loader2, UserPlus, UserRoundCheck } from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
+import { formatMinutes } from "@/pages/user-profile-model";
 
 export type AffinityBand = "low" | "medium" | "high" | "very_high" | string;
 
@@ -42,16 +44,6 @@ export interface ProfileCardPayload {
   badges: ProfileCardBadge[];
 }
 
-function formatMinutes(minutes: number) {
-  if (!Number.isFinite(minutes) || minutes <= 0) return "0m";
-  if (minutes >= 60) {
-    const hours = Math.floor(minutes / 60);
-    const rest = Math.round(minutes % 60);
-    return rest > 0 ? `${hours}h ${rest}m` : `${hours}h`;
-  }
-  return `${Math.round(minutes)}m`;
-}
-
 function affinityTone(band: AffinityBand) {
   if (band === "very_high") return "profile-hover-affinity-very-high";
   if (band === "high") return "profile-hover-affinity-high";
@@ -74,16 +66,17 @@ function badgeTone(tone: string) {
   }
 }
 
-function mainBadge(card: ProfileCardPayload) {
-  return card.badges[0]?.label || "Crate listener";
+function mainBadge(card: ProfileCardPayload, t: TFunction) {
+  return card.badges[0]?.label || t("profileHover.defaultBadge");
 }
 
-function cardLabel(card: ProfileCardPayload) {
-  return card.display_name || card.username || "Crate user";
+function cardLabel(card: ProfileCardPayload, t: TFunction) {
+  return card.display_name || card.username || t("profileHover.defaultName");
 }
 
 function ProfileAvatar({ card }: { card: ProfileCardPayload }) {
-  const label = cardLabel(card);
+  const { t } = useTranslation();
+  const label = cardLabel(card, t);
   const { avatarUrl, handleAvatarError } = useUserAvatarUrl(
     card.avatar,
     card.id,
@@ -140,7 +133,7 @@ export function ProfileCardBody({
           <div className="flex items-center gap-2">
             <div className="min-w-0">
               <div className="profile-hover-title truncate text-base font-black">
-                {cardLabel(card)}
+                {cardLabel(card, t)}
               </div>
               <div className="profile-hover-username truncate text-xs">
                 {username ? `@${username}` : t("profileHover.noUsername")}
@@ -154,7 +147,7 @@ export function ProfileCardBody({
           </div>
 
           <div className="profile-hover-main-badge mt-3 inline-flex rounded-full border px-2.5 py-1 text-xs font-black uppercase tracking-[0.18em]">
-            {mainBadge(card)}
+            {mainBadge(card, t)}
           </div>
         </div>
 
@@ -168,14 +161,14 @@ export function ProfileCardBody({
             {card.affinity_score}
           </div>
           <div className="profile-hover-score-label text-xs font-bold uppercase tracking-[0.18em]">
-            Match
+            {t("profileHover.match")}
           </div>
         </div>
       </div>
 
       <div className="profile-hover-top-panel relative mt-4 border-t border-border-quiet pt-3">
         <div className="profile-hover-top-label text-xs font-bold uppercase tracking-[0.18em]">
-          Top sound
+          {t("profileHover.topSound")}
         </div>
         <div className="profile-hover-top-genre mt-1 truncate text-sm font-bold">
           {topGenre}
@@ -188,10 +181,22 @@ export function ProfileCardBody({
       </div>
 
       <div className="relative mt-3 grid grid-cols-4 gap-2">
-        <MiniStat label="Plays" value={String(card.stats.plays_30d)} />
-        <MiniStat label="Time" value={formatMinutes(card.stats.minutes_30d)} />
-        <MiniStat label="Adds" value={String(card.stats.contributions)} />
-        <MiniStat label="Lists" value={String(card.stats.public_playlists)} />
+        <MiniStat
+          label={t("profileHover.stats.plays")}
+          value={String(card.stats.plays_30d)}
+        />
+        <MiniStat
+          label={t("profileHover.stats.time")}
+          value={formatMinutes(card.stats.minutes_30d, t)}
+        />
+        <MiniStat
+          label={t("profileHover.stats.adds")}
+          value={String(card.stats.contributions)}
+        />
+        <MiniStat
+          label={t("profileHover.stats.lists")}
+          value={String(card.stats.public_playlists)}
+        />
       </div>
 
       {card.badges.length ? (
@@ -215,13 +220,13 @@ export function ProfileCardBody({
           to={profilePath}
           className="profile-hover-secondary-control flex-1 rounded-full border px-3 py-2 text-center text-xs font-bold transition-colors"
         >
-          View profile
+          {t("people.viewProfile")}
         </Link>
         <Link
           to={statsPath}
           className="profile-hover-accent-control flex-1 rounded-full border px-3 py-2 text-center text-xs font-bold transition-colors"
         >
-          Listening DNA
+          {t("home.sections.listeningDna.title")}
         </Link>
         <button
           type="button"
@@ -233,7 +238,8 @@ export function ProfileCardBody({
               ? "profile-hover-following"
               : "profile-hover-follow-default",
           )}
-          title={following ? "Following" : "Follow"}
+          title={t(following ? "common.following" : "common.follow")}
+          aria-label={t(following ? "common.following" : "common.follow")}
         >
           {busy ? (
             <Loader2 size={14} className="animate-spin" />

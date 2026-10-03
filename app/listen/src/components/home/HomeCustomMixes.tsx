@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Play, Sparkles } from "@crate/ui/icons";
 
@@ -7,16 +8,15 @@ import {
 } from "@/components/actions/ItemActionMenu";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
 import { MixArtwork } from "@/components/home/MixArtwork";
-import {
-  SectionHeader,
-  SectionRail,
-  useSectionRail,
-} from "@/components/home/HomeSections";
+import { SectionHeader, SectionRail } from "@/components/home/HomeSections";
 import { cn } from "@/lib/utils";
 
 import type { HomeGeneratedPlaylistSummary, HomeSectionId } from "./home-model";
 
-function mixArtistSummary(item: HomeGeneratedPlaylistSummary): string {
+function mixArtistSummary(
+  item: HomeGeneratedPlaylistSummary,
+  t: TFunction,
+): string {
   const names = (item.artwork_artists || []).flatMap((artist) => {
     const name = artist.artist_name?.trim();
     return name ? [name] : [];
@@ -27,7 +27,9 @@ function mixArtistSummary(item: HomeGeneratedPlaylistSummary): string {
   if (names.length === 1) return first;
   if (names.length === 2) return `${first}, ${second}`;
   if (names.length === 3) return `${first}, ${second}, ${third}`;
-  return `${first}, ${second}, ${third} and more`;
+  return t("home.mixes.artistsAndMore", {
+    artists: `${first}, ${second}, ${third}`,
+  });
 }
 
 export function CustomMixesSection({
@@ -46,7 +48,6 @@ export function CustomMixesSection({
   onViewAll: (sectionId: HomeSectionId) => void;
 }) {
   const { t } = useTranslation();
-  const rail = useSectionRail(mixes.length);
   if (!mixes.length) return null;
 
   return (
@@ -56,9 +57,8 @@ export function CustomMixesSection({
         subtitle={t("home.sections.customMixes.subtitle")}
         actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("custom-mixes")}
-        railControls={rail}
       />
-      <SectionRail railRef={rail.railRef} fit="square-card">
+      <SectionRail fit="square-card">
         {mixes.map((mix) => (
           <CustomMixCard
             key={mix.id}
@@ -144,7 +144,7 @@ export function CustomMixCard({
         {item.name}
       </div>
       <div className="mt-1 line-clamp-2 min-h-[2.5rem] text-xs leading-5 text-text-muted">
-        {mixArtistSummary(item)}
+        {mixArtistSummary(item, t)}
       </div>
       <div className="home-discovery-meta mt-2 text-xs uppercase tracking-[0.18em]">
         {t("common.trackCount", { count: item.track_count })}
@@ -154,7 +154,7 @@ export function CustomMixCard({
         header={{
           type: "media",
           title: item.name,
-          subtitle: mixArtistSummary(item),
+          subtitle: mixArtistSummary(item, t),
           detail: t("common.trackCount", { count: item.track_count }),
           imageShape: "square",
           fallbackIcon: Sparkles,

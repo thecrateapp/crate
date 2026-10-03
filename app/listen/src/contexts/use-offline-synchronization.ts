@@ -50,50 +50,68 @@ export function useOfflineSynchronization({
     const items = Object.values(snapshotRef.current.items);
     if (!items.length) return;
     setSyncing(true);
+    let firstError: unknown = null;
     try {
       for (const item of items) {
-        if (item.kind === "track") {
-          const firstTrack = item.tracks[0];
-          const trackRef = getOfflineTrackAssetKey(firstTrack) || item.entityId;
-          const manifestPaths = getOfflineTrackManifestPaths(
-            firstTrack ?? item.entityId,
-          );
-          let synced = false;
-          let lastError: unknown = null;
-          for (const manifestPath of manifestPaths) {
-            try {
-              await syncManifestIntoItem("track", trackRef, manifestPath);
-              synced = true;
-              break;
-            } catch (error) {
-              lastError = error;
+        try {
+          if (item.kind === "track") {
+            const firstTrack = item.tracks[0];
+            const trackRef =
+              getOfflineTrackAssetKey(firstTrack) || item.entityId;
+            const manifestPaths = getOfflineTrackManifestPaths(
+              firstTrack ?? item.entityId,
+            );
+            let synced = false;
+            let lastError: unknown = null;
+            for (const manifestPath of manifestPaths) {
+              try {
+                await syncManifestIntoItem("track", trackRef, manifestPath);
+                synced = true;
+                break;
+              } catch (error) {
+                lastError = error;
+              }
             }
+            if (!synced) {
+              throw lastError instanceof Error
+                ? lastError
+                : new Error("Failed to fetch offline track manifest");
+            }
+          } else if (item.kind === "album") {
+            // Album and playlist manifests update the same item snapshot; keep
+            // the outer sync sequential to avoid lost updates.
+            // react-doctor-disable-next-line async-await-in-loop
+            await syncManifestIntoItem(
+              "album",
+              item.entityId,
+              `/api/offline/albums/${item.entityId}/manifest`,
+            );
+          } else if (item.kind === "playlist") {
+            // Album and playlist manifests update the same item snapshot; keep
+            // the outer sync sequential to avoid lost updates.
+            // react-doctor-disable-next-line async-await-in-loop
+            await syncManifestIntoItem(
+              "playlist",
+              item.entityId,
+              `/api/offline/playlists/${item.entityId}/manifest`,
+            );
+          } else if (item.kind === "crate") {
+            // Crate manifests use the same track transfer pipeline as albums and playlists.
+            // Keep the outer sync sequential so snapshot writes cannot race each other.
+            // react-doctor-disable-next-line async-await-in-loop
+            await syncManifestIntoItem(
+              "crate",
+              item.entityId,
+              `/api/offline/crates/${encodeURIComponent(
+                item.entityId,
+              )}/manifest`,
+            );
           }
-          if (!synced) {
-            throw lastError instanceof Error
-              ? lastError
-              : new Error("Failed to fetch offline track manifest");
-          }
-        } else if (item.kind === "album") {
-          // Album and playlist manifests update the same item snapshot; keep
-          // the outer sync sequential to avoid lost updates.
-          // react-doctor-disable-next-line async-await-in-loop
-          await syncManifestIntoItem(
-            "album",
-            item.entityId,
-            `/api/offline/albums/${item.entityId}/manifest`,
-          );
-        } else if (item.kind === "playlist") {
-          // Album and playlist manifests update the same item snapshot; keep
-          // the outer sync sequential to avoid lost updates.
-          // react-doctor-disable-next-line async-await-in-loop
-          await syncManifestIntoItem(
-            "playlist",
-            item.entityId,
-            `/api/offline/playlists/${item.entityId}/manifest`,
-          );
+        } catch (error) {
+          firstError ??= error;
         }
       }
+      if (firstError) throw firstError;
     } finally {
       setSyncing(false);
     }

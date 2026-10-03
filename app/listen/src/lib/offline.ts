@@ -52,6 +52,11 @@ export {
   getOfflineTrackManifestPaths,
 } from "@/lib/offline-track-identity";
 export type { OfflineTrackIdentityInput } from "@/lib/offline-track-identity";
+export {
+  getOfflineActionLabel,
+  getOfflineStateLabel,
+  isOfflineBusy,
+} from "@crate/ui/lib/offline";
 
 export function deriveOfflineProfileKey(
   userId: number,
@@ -126,40 +131,19 @@ export function summarizeOfflineSnapshot(
   );
 }
 
-export function isOfflineBusy(state: OfflineItemState): boolean {
-  return state === "queued" || state === "downloading" || state === "syncing";
-}
-
-export function getOfflineStateLabel(state: OfflineItemState): string | null {
-  switch (state) {
-    case "queued":
-      return "Queued for offline";
-    case "downloading":
-      return "Downloading for offline";
-    case "syncing":
-      return "Syncing offline copy";
-    case "ready":
-      return "Available offline";
-    case "error":
-      return "Offline copy failed";
-    default:
-      return null;
-  }
-}
-
-export function getOfflineActionLabel(state: OfflineItemState): string {
+export function getOfflineActionLabelKey(state: OfflineItemState): string {
   switch (state) {
     case "ready":
-      return "Remove offline copy";
+      return "actions.offline.removeCopy";
     case "error":
-      return "Retry offline copy";
+      return "actions.offline.retryCopy";
     case "queued":
     case "downloading":
-      return "Downloading...";
+      return "actions.offline.downloading";
     case "syncing":
-      return "Syncing...";
+      return "actions.offline.syncing";
     default:
-      return "Make available offline";
+      return "actions.offline.makeAvailable";
   }
 }
 

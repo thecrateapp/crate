@@ -1,11 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { AlbumCard } from "@/components/cards/AlbumCard";
-import {
-  SectionHeader,
-  SectionRail,
-  useSectionRail,
-} from "@/components/home/HomeSections";
+import { SectionHeader, SectionRail } from "@/components/home/HomeSections";
 
 import type { HomeSectionId, HomeSuggestedAlbum } from "./home-model";
 
@@ -17,7 +13,6 @@ export function SuggestedAlbumsSection({
   onViewAll: (sectionId: HomeSectionId) => void;
 }) {
   const { t } = useTranslation();
-  const rail = useSectionRail(albums.length);
   if (!albums.length) return null;
 
   return (
@@ -27,9 +22,8 @@ export function SuggestedAlbumsSection({
         subtitle={t("home.sections.suggestedAlbums.subtitle")}
         actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("suggested-albums")}
-        railControls={rail}
       />
-      <SectionRail railRef={rail.railRef} fit="square-card">
+      <SectionRail fit="square-card">
         {albums.map((album) => (
           <AlbumCard
             key={`${
@@ -62,7 +56,6 @@ export function UpcomingAlbumsSection({
   onViewAll: (sectionId: HomeSectionId) => void;
 }) {
   const { t } = useTranslation();
-  const rail = useSectionRail(albums.length);
   if (!albums.length) return null;
 
   return (
@@ -72,9 +65,8 @@ export function UpcomingAlbumsSection({
         subtitle={t("home.sections.upcomingAlbums.subtitle")}
         actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("upcoming-albums")}
-        railControls={rail}
       />
-      <SectionRail railRef={rail.railRef} fit="square-card">
+      <SectionRail fit="square-card">
         {albums.map((album) => (
           <AlbumCard
             key={`upcoming-${

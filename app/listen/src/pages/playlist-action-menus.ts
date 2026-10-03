@@ -60,7 +60,7 @@ export function buildPlaylistSecondaryActions({
   return [
     {
       key: "radio",
-      label: "Radio",
+      label: t("radio.title"),
       ariaLabel: t("playlist.actions.radio"),
       icon: Radio,
       disabled: playerTracks.length === 0,

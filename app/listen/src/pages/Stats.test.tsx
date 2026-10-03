@@ -11,6 +11,34 @@ vi.mock("@/hooks/use-api", () => ({
   useApi: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-lazy-crate-options", () => ({
+  useLazyCrateOptions: () => ({
+    crateOptions: [],
+    ensureCrateOptionsLoaded: vi.fn(),
+  }),
+}));
+
+vi.mock("@/contexts/LikedTracksContext", () => ({
+  useLikedTracks: () => ({
+    isLiked: () => false,
+    toggleTrackLike: vi.fn(),
+  }),
+}));
+
+vi.mock("@/contexts/SavedAlbumsContext", () => ({
+  useSavedAlbums: () => ({
+    isSaved: () => false,
+    toggleAlbumSaved: vi.fn(),
+  }),
+}));
+
+vi.mock("@/contexts/ArtistFollowsContext", () => ({
+  useArtistFollows: () => ({
+    isFollowing: () => false,
+    toggleArtistFollow: vi.fn(),
+  }),
+}));
+
 const mockUseApi = vi.mocked(useApi);
 
 describe("Stats page", () => {

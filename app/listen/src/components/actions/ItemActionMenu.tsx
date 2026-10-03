@@ -12,12 +12,14 @@ export {
   ItemActionMenuButton,
   MobileActionSheet,
   useItemActionMenu,
+  useItemActionTarget,
 } from "@crate/ui/domain/actions";
 export type {
   ContextMenuEntry,
   ContextMenuHeader,
   ItemActionMenuEntry,
   ItemActionMenuProps,
+  ItemActionTargetProps,
   UseItemActionMenuOptions,
   UseItemActionMenuReturn,
 } from "@crate/ui/domain/actions";

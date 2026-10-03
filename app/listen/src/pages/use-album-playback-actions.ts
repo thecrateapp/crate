@@ -97,6 +97,7 @@ export function useAlbumPlaybackActions({
   }
 
   const handlePlayNextAlbum = () => {
+    if (playerTracks.length === 0) return;
     [...playerTracks].reverse().forEach((track) => playNext(track));
     toast.success(t("album.toasts.queuedNext"));
     closeAlbumMenu();

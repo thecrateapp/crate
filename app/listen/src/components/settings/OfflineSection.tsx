@@ -5,20 +5,7 @@ import { ArrowDownToLine, Loader2, RefreshCw, Trash2 } from "@crate/ui/icons";
 
 import { Section } from "@/components/settings/SettingsPrimitives";
 import { useOffline } from "@/contexts/OfflineContext";
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let value = bytes;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  return `${
-    value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)
-  } ${units[unitIndex]}`;
-}
+import { formatBytes } from "@/lib/utils";
 
 export function OfflineSection() {
   const { t } = useTranslation();

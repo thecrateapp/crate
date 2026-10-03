@@ -1,4 +1,5 @@
 import { readCanvasColorToken } from "@/lib/canvas-color";
+import { clamp } from "@/lib/utils";
 
 export type VisualizerColorTriplet = [number, number, number];
 export type VisualizerColorPalette = [
@@ -23,16 +24,12 @@ function parseColorChannel(value: string): number | null {
   const trimmed = value.trim();
   if (trimmed.endsWith("%")) {
     const percentage = Number.parseFloat(trimmed.slice(0, -1));
-    return Number.isFinite(percentage) ? clamp(percentage / 100) : null;
+    return Number.isFinite(percentage) ? clamp(percentage / 100, 0, 1) : null;
   }
 
   const channel = Number.parseFloat(trimmed);
   if (!Number.isFinite(channel)) return null;
-  return clamp(channel > 1 ? channel / 255 : channel);
-}
-
-function clamp(value: number): number {
-  return Math.max(0, Math.min(1, value));
+  return clamp(channel > 1 ? channel / 255 : channel, 0, 1);
 }
 
 export function parseVisualizerColor(

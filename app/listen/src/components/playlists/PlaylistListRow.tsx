@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { Sparkles, type LucideIcon } from "@crate/ui/icons";
 
@@ -67,6 +68,7 @@ export function PlaylistListRow({
   followState,
   extraActions,
 }: PlaylistListRowProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { getPlaylistState, getPlaylistRecord } = useOffline();
   const [togglingFollow, setTogglingFollow] = useState(false);
@@ -192,7 +194,7 @@ export function PlaylistListRow({
         header={{
           type: "media",
           title: name,
-          subtitle: `${trackCount} track${trackCount !== 1 ? "s" : ""}${
+          subtitle: `${t("common.trackCountLabel", { count: trackCount })}${
             meta ? ` · ${meta}` : ""
           }`,
           detail: description,

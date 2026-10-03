@@ -1,10 +1,12 @@
 import { Outlet } from "react-router";
+import type { ReactNode } from "react";
 
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { PlayerBar } from "@/components/player/PlayerBar";
 import { TopBar } from "@/components/layout/TopBar";
 
 interface MobileShellProps {
+  children?: ReactNode;
   collectionActive: boolean;
   hasTrack: boolean;
   homeMobileOverlay: boolean;
@@ -15,6 +17,7 @@ interface MobileShellProps {
 }
 
 export function MobileShell({
+  children,
   collectionActive,
   hasTrack,
   homeMobileOverlay,
@@ -55,7 +58,7 @@ export function MobileShell({
             paddingRight: homePage ? 0 : "max(1rem, var(--listen-safe-right))",
           }}
         >
-          <Outlet />
+          {children ?? <Outlet />}
         </div>
       </main>
       <div

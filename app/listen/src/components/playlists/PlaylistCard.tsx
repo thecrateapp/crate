@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Heart, HeartBold, Loader2, Play, Sparkles } from "@crate/ui/icons";
 
 import {
   ItemActionMenu,
   useItemActionMenu,
+  useItemActionTarget,
 } from "@/components/actions/ItemActionMenu";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
@@ -13,6 +15,7 @@ import {
   type PlaylistArtworkTrack,
 } from "@/components/playlists/PlaylistArtwork";
 import {
+  EDITORIAL_PLAYLIST_KICKER_KEYS,
   EditorialPlaylistArtwork,
   editorialPlaylistLabel,
 } from "@/components/playlists/EditorialPlaylistArtwork";
@@ -88,11 +91,12 @@ function PlaylistCardArtwork({
   tracks,
   name,
 }: PlaylistCardArtworkProps) {
+  const { t } = useTranslation();
   if (crateManaged) {
     return (
       <EditorialPlaylistArtwork
         title={editorialLabel.title}
-        kicker={editorialLabel.kicker}
+        kicker={t(EDITORIAL_PLAYLIST_KICKER_KEYS[editorialLabel.kind])}
         coverDataUrl={coverDataUrl}
         tracks={tracks}
         variant="core"
@@ -243,9 +247,10 @@ export function PlaylistCard({
     onStartRadio,
   });
   const actionMenu = useItemActionMenu(actions);
+  const actionTarget = useItemActionTarget(actionMenu);
   const editorialLabel = editorialPlaylistLabel(
     name,
-    isSmart ? "Core Tracks" : "Crate Selects",
+    isSmart ? "core" : "crate",
   );
 
   return (
@@ -253,15 +258,15 @@ export function PlaylistCard({
       role="button"
       tabIndex={0}
       onClick={onClick}
+      {...actionTarget}
       onKeyDown={(event) => {
-        actionMenu.handleKeyboardTrigger(event);
+        actionTarget.onKeyDown(event);
+        if (event.defaultPrevented) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           onClick();
         }
       }}
-      onContextMenu={actionMenu.handleContextMenu}
-      {...actionMenu.longPressHandlers}
       className={cn(
         "group cursor-pointer rounded-xl p-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl",
         layout === "grid" ? "w-full min-w-0" : "w-[160px] shrink-0",

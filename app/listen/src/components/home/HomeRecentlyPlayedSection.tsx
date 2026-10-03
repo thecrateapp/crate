@@ -2,11 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
-import {
-  SectionHeader,
-  SectionRail,
-  useSectionRail,
-} from "@/components/home/HomeSections";
+import { SectionHeader, SectionRail } from "@/components/home/HomeSections";
 
 import type {
   HomeDiscoveryPayload,
@@ -29,7 +25,6 @@ export function RecentlyPlayedSection({
   const isDesktop = useIsDesktop();
   const visibleItems = isDesktop ? items : items.slice(0, 4);
   const pages = chunkItems(visibleItems, 9);
-  const rail = useSectionRail(pages.length);
   if (!items.length) return null;
 
   return (
@@ -39,9 +34,8 @@ export function RecentlyPlayedSection({
         subtitle={t("home.sections.recentlyPlayed.subtitle")}
         actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("recently-played")}
-        railControls={rail}
       />
-      <SectionRail railRef={rail.railRef} className="gap-0">
+      <SectionRail className="gap-0">
         {pages.map((pageItems, pageIndex) => (
           <div
             key={`recent-page-${pageIndex}`}

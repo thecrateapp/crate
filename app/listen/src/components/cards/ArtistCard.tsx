@@ -10,7 +10,10 @@ import {
   ArtistCardInlineActions,
   type ArtistCardProps,
 } from "./ArtistCardParts";
-import { ItemActionMenu } from "@/components/actions/ItemActionMenu";
+import {
+  ItemActionMenu,
+  useItemActionTarget,
+} from "@/components/actions/ItemActionMenu";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 
 export type { ArtistCardProps } from "./ArtistCardParts";
@@ -50,6 +53,7 @@ export function ArtistCard({
     layout,
     fillGrid,
   });
+  const actionTarget = useItemActionTarget(model.actionMenu);
   const playback = useArtistCardPlayback({
     artistId,
     artistEntityUid,
@@ -112,15 +116,13 @@ export function ArtistCard({
 
   return (
     <article
-      className={`${model.wrapperClassName} relative`}
-      onContextMenu={model.actionMenu.handleContextMenu}
-      {...model.actionMenu.longPressHandlers}
+      className={`item-action-target ${model.wrapperClassName} relative`}
+      {...actionTarget}
     >
       <Link
         to={model.targetHref}
         aria-label={model.t("actions.artist.openNamed", { name })}
         className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-        onKeyDown={model.actionMenu.handleKeyboardTrigger}
       />
       <div className="pointer-events-none relative z-10">
         {artwork(true)}

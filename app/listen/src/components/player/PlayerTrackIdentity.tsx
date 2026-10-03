@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { cn } from "@crate/ui/lib/cn";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
@@ -41,6 +42,7 @@ export function PlayerTrackIdentity({
   badgeTextClassName,
   badgeMaxWidthClassName,
 }: PlayerTrackIdentityProps) {
+  const { t } = useTranslation();
   const center = align === "center";
 
   return (
@@ -52,7 +54,7 @@ export function PlayerTrackIdentity({
             sourceClassName,
           )}
         >
-          Playing from: {sourceLabel}
+          {t("player.playingFrom")} {sourceLabel}
         </p>
       ) : null}
 
@@ -129,7 +131,7 @@ export function PlayerTrackIdentity({
       >
         <button
           onClick={onArtistClick}
-          aria-label={`Go to ${currentTrack.artist}`}
+          aria-label={t("player.goToArtist", { name: currentTrack.artist })}
           disabled={!artistClickable}
           className={cn(
             "inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-quiet-subtle px-2 py-1.5 transition-colors",

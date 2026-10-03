@@ -99,16 +99,25 @@ describe("CrateComposerProvider", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Open crate composer" }),
     );
+    expect(screen.getByTestId("crate-form")).toBeInTheDocument();
+    expect(screen.getByText("Blending · High Vis")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Nombre"), {
       target: { value: "Best of 2026" },
     });
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Reproducción en bucle" }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Crear Crate" }));
 
     await waitFor(() => {
       expect(api).toHaveBeenNthCalledWith(1, "/api/crates", "POST", {
         name: "Best of 2026",
         description: "",
+        visibility: "private",
         is_collaborative: false,
+        is_ordered: false,
+        sort_direction: "asc",
+        loop_enabled: true,
       });
       expect(api).toHaveBeenNthCalledWith(
         2,

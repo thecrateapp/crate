@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { Plus, Trash2, Server, CheckCircle2 } from "@crate/ui/icons";
 import { toast } from "sonner";
@@ -24,6 +25,7 @@ import { useAuth } from "@/contexts/AuthContext";
  * back to the setup screen if it was the only one.
  */
 export function ServersSection() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [servers, setServers] = useState<ServerConfig[]>([]);
@@ -46,7 +48,9 @@ export function ServersSection() {
     setCurrentServerId(server.id);
     // Force a full re-auth against the new server. If the stored token
     // is still valid we land back in the app; if not, login screen.
-    toast.success(`Switched to ${server.label}`);
+    toast.success(
+      t("settings.servers.toasts.switched", { name: server.label }),
+    );
     if (server.token) {
       // Reload so all in-flight queries drop and re-hit the new host.
       window.location.href = "/";
@@ -58,7 +62,7 @@ export function ServersSection() {
   const handleRemove = async (server: ServerConfig) => {
     const wasCurrent = server.id === currentId;
     removeServer(server.id);
-    toast.success(`Removed ${server.label}`);
+    toast.success(t("settings.servers.toasts.removed", { name: server.label }));
     if (wasCurrent) {
       // Currently-logged-in server was removed. Logout flushes local
       // state and navigates to /login; ServerGate then bounces to
@@ -71,11 +75,12 @@ export function ServersSection() {
     <section className="rounded-[12px] border border-border-quiet bg-text-primary/[0.03] p-5 sm:p-6">
       <div className="mb-1 flex items-center gap-2">
         <Server size={16} className="text-accent-action" />
-        <h2 className="text-sm font-semibold text-text-primary">Servers</h2>
+        <h2 className="text-sm font-semibold text-text-primary">
+          {t("settings.servers.title")}
+        </h2>
       </div>
       <p className="mb-4 text-[0.75rem] text-text-muted">
-        Crate servers this app can talk to. Switching drops you back to the
-        login screen for the new host.
+        {t("settings.servers.description")}
       </p>
 
       <div className="space-y-2">
@@ -107,7 +112,7 @@ export function ServersSection() {
                   {isCurrent ? (
                     <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-text-accent">
                       <CheckCircle2 size={10} />
-                      Current
+                      {t("settings.servers.current")}
                     </span>
                   ) : null}
                 </div>
@@ -116,7 +121,9 @@ export function ServersSection() {
               <button
                 type="button"
                 onClick={() => handleRemove(server)}
-                aria-label={`Remove ${server.label}`}
+                aria-label={t("settings.servers.remove", {
+                  name: server.label,
+                })}
                 className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border-quiet text-text-muted transition hover:border-state-danger/40 hover:bg-state-danger/10 hover:text-state-danger-text"
               >
                 <Trash2 size={14} />
@@ -132,7 +139,7 @@ export function ServersSection() {
         className="mt-4 inline-flex items-center gap-2 rounded-full border border-text-primary/15 bg-text-primary/5 px-4 py-2 text-sm font-medium text-text-primary/80 transition hover:border-accent-action/30 hover:bg-accent-action/10 hover:text-text-accent"
       >
         <Plus size={14} />
-        Add another server
+        {t("settings.servers.add")}
       </button>
     </section>
   );

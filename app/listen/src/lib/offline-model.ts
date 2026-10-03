@@ -1,4 +1,4 @@
-export type OfflineItemKind = "track" | "album" | "playlist";
+export type OfflineItemKind = "track" | "album" | "playlist" | "crate";
 
 export type OfflineItemState =
   | "idle"

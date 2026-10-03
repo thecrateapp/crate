@@ -1,5 +1,6 @@
 import { vec3 } from "gl-matrix";
 import { type VisualizerMode } from "@/lib/player-visualizer-prefs";
+import { clamp } from "@/lib/utils";
 import {
   DEFAULT_VISUALIZER_COLORS,
   type VisualizerColorTriplet,
@@ -10,10 +11,6 @@ import {
 } from "./visualizer-audio-analyzer";
 import { renderVisualizerSpheres } from "./visualizer-spheres-renderer";
 import { VisualizerWebGLResources } from "./visualizer-webgl-resources";
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;

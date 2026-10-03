@@ -10,14 +10,21 @@ describe("EditorialPlaylistArtwork", () => {
   it("normalizes Core Tracks names into editorial title and kicker", () => {
     expect(editorialPlaylistLabel("Hardcore Core Tracks")).toEqual({
       title: "Hardcore",
-      kicker: "Core Tracks",
+      kind: "core",
     });
   });
 
   it("treats legacy Mix smart playlists as Core Tracks", () => {
     expect(editorialPlaylistLabel("Screamo Mix")).toEqual({
       title: "Screamo",
-      kicker: "Core Tracks",
+      kind: "core",
+    });
+  });
+
+  it("keeps the Crate Selects kind for non-smart playlists", () => {
+    expect(editorialPlaylistLabel("Screamo Mix", "crate")).toEqual({
+      title: "Screamo Mix",
+      kind: "crate",
     });
   });
 

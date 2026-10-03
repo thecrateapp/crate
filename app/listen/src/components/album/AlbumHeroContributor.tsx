@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { User } from "@crate/ui/icons";
 
 import {
@@ -23,6 +24,7 @@ export function AlbumHeroContributor({
   primaryContributorSource: string | null;
   onGenreSelect: (item: GenreProfileItem) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       {visibleContributor ? (
@@ -42,7 +44,7 @@ export function AlbumHeroContributor({
             )}
           </span>
           <span>
-            Added to Crate by{" "}
+            {t("album.contributor.addedBy")}{" "}
             {primaryContributorPath ? (
               <UserProfileLink
                 username={visibleContributor.user_username}
@@ -59,7 +61,9 @@ export function AlbumHeroContributor({
             {primaryContributorSource ? (
               <span className="text-text-muted/70">
                 {" "}
-                via {primaryContributorSource}
+                {t("album.contributor.via", {
+                  source: primaryContributorSource,
+                })}
               </span>
             ) : null}
           </span>

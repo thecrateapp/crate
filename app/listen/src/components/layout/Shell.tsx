@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
@@ -20,6 +20,7 @@ function hasOverlayHeader(pathname: string, search = "") {
     /^\/artists\/[^/]+$/.test(pathname) ||
     /^\/albums\/[^/]+\/[^/]+$/.test(pathname) ||
     /^\/playlist\/[^/]+$/.test(pathname) ||
+    /^\/crate\/[^/]+$/.test(pathname) ||
     /^\/curation\/playlist\/[^/]+$/.test(pathname) ||
     /^\/home\/playlist\/[^/]+$/.test(pathname)
   ) {
@@ -31,7 +32,7 @@ function hasOverlayHeader(pathname: string, search = "") {
   return !isReservedArtistChildSlug(childSlug);
 }
 
-export function Shell() {
+export function Shell({ children }: { children?: ReactNode }) {
   const isDesktop = useIsDesktop();
   const location = useLocation();
   const { currentTrack } = usePlayerActions();
@@ -70,6 +71,7 @@ export function Shell() {
   if (isDesktop) {
     return (
       <DesktopShell
+        children={children}
         desktopContentPadClass={desktopContentPadClass}
         desktopOverlayHeader={desktopOverlayHeader}
         hasTrack={hasTrack}
@@ -84,6 +86,7 @@ export function Shell() {
 
   return (
     <MobileShell
+      children={children}
       collectionActive={collectionActive}
       hasTrack={hasTrack}
       headerChromeClass={headerChromeClass}

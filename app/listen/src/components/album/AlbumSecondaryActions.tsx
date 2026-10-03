@@ -40,7 +40,7 @@ export function AlbumSecondaryActions({
           aria-label={t("album.actions.radio")}
         >
           <Radio size={CRATE_ICON_SIZE.lg} />
-          <span>Radio</span>
+          <span>{t("radio.title")}</span>
         </button>
       ) : null}
       <AlbumOfflineAction state={state} actions={actions} t={t} />

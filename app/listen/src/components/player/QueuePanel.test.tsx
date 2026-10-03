@@ -11,6 +11,7 @@ vi.mock("@/hooks/use-api", () => ({ useApi }));
 
 import { QueuePanel } from "@/components/player/QueuePanel";
 import { PlaylistComposerProvider } from "@/contexts/PlaylistComposerContext";
+import { longPress, pressMenuKey } from "@/test/item-action-gestures";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 import type { Track } from "@/contexts/PlayerContext";
 
@@ -100,8 +101,10 @@ describe("QueuePanel", () => {
         "Playback is controlled by the room while you are connected.",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByAltText("")).toHaveClass("grayscale");
-    expect(screen.getByText("Next").closest('[role="button"]')).toBeNull();
+    const lockedRow = screen.getAllByTestId("queue-track-row")[0]!;
+    expect(lockedRow).toHaveClass("grayscale");
+    expect(lockedRow).toHaveAttribute("inert");
+    expect(lockedRow).not.toHaveAttribute("aria-disabled");
   });
 
   it("uses semantic tokens for queue surfaces and track states", () => {
@@ -116,17 +119,14 @@ describe("QueuePanel", () => {
     });
 
     const panel = screen.getByText("Queue").closest(".listen-glass-panel");
-    const nextRow = screen.getByText("Next").closest('[role="button"]');
+    const nextRow = screen.getByRole("row", { name: "Next" });
 
     expect(panel).toHaveClass("border-l", "border-border-quiet");
     expect(screen.getByText("Queue")).toHaveClass("text-text-primary");
-    expect(nextRow).toHaveClass(
-      "hover:bg-surface-control",
-      "focus-visible:bg-surface-control",
-      "focus-visible:ring-focus-ring/40",
-    );
+    expect(nextRow).toHaveClass("track-row");
+    expect(nextRow).toHaveAttribute("data-density", "compact");
     expect(screen.getByText("Next")).toHaveClass("text-text-primary");
-    expect(nextRow?.className).not.toContain("white/");
+    expect(nextRow.className).not.toContain("white/");
   });
 
   it("loads existing playlists when a queue track menu opens", async () => {
@@ -159,5 +159,72 @@ describe("QueuePanel", () => {
         screen.getByRole("menuitem", { name: "Añadir a Favorites" }),
       ).toBeInTheDocument();
     });
+  });
+
+  function renderQueue(playerActions = {}) {
+    return renderWithListenProviders(<QueuePanel open onClose={vi.fn()} />, {
+      playerActions: {
+        currentTrack,
+        queue: [currentTrack, nextTrack],
+        currentIndex: 0,
+        ...playerActions,
+      },
+    });
+  }
+
+  it("jumps to the queue position when a row is clicked", () => {
+    const jumpTo = vi.fn();
+    renderQueue({ jumpTo });
+
+    fireEvent.click(screen.getByRole("row", { name: "Next" }));
+
+    expect(jumpTo).toHaveBeenCalledWith(1);
+  });
+
+  it("opens the queue row menu with right click and removes from the queue", async () => {
+    isDesktop = true;
+    const removeFromQueue = vi.fn();
+    renderQueue({ removeFromQueue });
+
+    fireEvent.contextMenu(screen.getByRole("row", { name: "Next" }));
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "Remove from queue" }),
+    );
+
+    expect(removeFromQueue).toHaveBeenCalledWith(1);
+  });
+
+  it("opens the queue row menu with the menu key", async () => {
+    isDesktop = true;
+    renderQueue();
+
+    pressMenuKey(screen.getByRole("row", { name: "Next" }));
+
+    expect(
+      await screen.findByRole("menuitem", { name: "Remove from queue" }),
+    ).toBeInTheDocument();
+  });
+
+  it("opens the queue row action sheet with a touch long-press", async () => {
+    renderQueue();
+
+    await longPress(screen.getByRole("row", { name: "Next" }));
+
+    expect(
+      await screen.findByRole("menuitem", { name: "Remove from queue" }),
+    ).toBeInTheDocument();
+  });
+
+  it("hides the remove action while the Jam queue is locked", async () => {
+    renderQueue({ jamQueueLocked: true });
+
+    fireEvent.contextMenu(screen.getByRole("row", { name: "Next" }));
+
+    expect(
+      await screen.findByRole("menuitem", { name: "Play now" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: "Remove from queue" }),
+    ).not.toBeInTheDocument();
   });
 });

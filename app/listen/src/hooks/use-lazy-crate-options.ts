@@ -6,6 +6,7 @@ import type { CrateSummary } from "@/pages/crates-types";
 export interface CrateOption {
   id: string;
   name: string;
+  albumUids: string[];
 }
 
 export function useLazyCrateOptions(initiallyEnabled = false) {
@@ -21,6 +22,7 @@ export function useLazyCrateOptions(initiallyEnabled = false) {
       (data ?? []).map((crate) => ({
         id: crate.id,
         name: crate.name,
+        albumUids: (crate.albums ?? []).map((album) => album.global_album_uid),
       })),
     [data],
   );

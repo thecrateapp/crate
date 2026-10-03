@@ -12,7 +12,23 @@ import {
 } from "./ArtistPageSections";
 
 vi.mock("@/components/cards/AlbumCard", () => ({
-  AlbumCard: ({ album }: { album: string }) => <div>{album}</div>,
+  AlbumCard: ({
+    album,
+    globalAlbumUid,
+    albumSlug,
+  }: {
+    album: string;
+    globalAlbumUid?: string;
+    albumSlug?: string;
+  }) => (
+    <div
+      data-testid="album-card"
+      data-global-album-uid={globalAlbumUid}
+      data-album-slug={albumSlug}
+    >
+      {album}
+    </div>
+  ),
 }));
 
 vi.mock("@/components/cards/ArtistCard", () => ({
@@ -30,7 +46,7 @@ vi.mock("@/components/upcoming/UpcomingRows", () => ({
 }));
 
 describe("ArtistPageSections", () => {
-  it("uses authenticated responsive artwork for global album cards", () => {
+  it("routes global album cards through AlbumCard actions", () => {
     render(
       <MemoryRouter>
         <I18nProvider initialLocale="en">
@@ -57,13 +73,13 @@ describe("ArtistPageSections", () => {
       </MemoryRouter>,
     );
 
-    const artwork = screen.getByRole("img", { name: "Ten" });
-    expect(artwork.tagName).toBe("IMG");
-    expect(artwork).toHaveAttribute("sizes");
-    expect(artwork.getAttribute("srcset")).toContain("size=320");
+    expect(screen.getByTestId("album-card")).toHaveAttribute(
+      "data-global-album-uid",
+      "global-album-1",
+    );
   });
 
-  it("uses the API-provided canonical artist slug for album links", () => {
+  it("passes the API-provided canonical album slug to AlbumCard", () => {
     render(
       <MemoryRouter>
         <I18nProvider initialLocale="en">
@@ -89,11 +105,9 @@ describe("ArtistPageSections", () => {
       </MemoryRouter>,
     );
 
-    expect(
-      screen.getByRole("link", { name: /Bolsa Amarilla y Piedra Potente/i }),
-    ).toHaveAttribute(
-      "href",
-      "/artists/derby-motoretas-burrito-kachimba/bolsa-amarilla-y-piedra-potente",
+    expect(screen.getByTestId("album-card")).toHaveAttribute(
+      "data-album-slug",
+      "bolsa-amarilla-y-piedra-potente",
     );
   });
 

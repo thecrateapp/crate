@@ -15,7 +15,11 @@ import {
   resolveArtworkAuthHeaders,
   resolveCrateStoryComposition,
 } from "@/lib/social-share-story-builder";
-import { buildCrateStoryMetadata } from "@/lib/social-share-story-canvas";
+import {
+  buildCrateStoryByline,
+  buildCrateStoryMetadata,
+  formatShareDisplayUrl,
+} from "@/lib/social-share-story-canvas";
 
 describe("resolveArtworkAuthHeaders", () => {
   afterEach(() => {
@@ -74,7 +78,7 @@ describe("resolveCrateStoryComposition", () => {
     ).toBe("ranked-stack");
   });
 
-  it("uses the editorial hero for unordered Crates", () => {
+  it("uses the coverflow fan for unordered Crates", () => {
     expect(
       resolveCrateStoryComposition({
         kind: "crate",
@@ -82,25 +86,63 @@ describe("resolveCrateStoryComposition", () => {
         url: "/crate/2",
         crateIsOrdered: false,
       }),
-    ).toBe("hero-editorial");
+    ).toBe("coverflow-fan");
+  });
+
+  it("never uses the ranked stack for other kinds", () => {
+    expect(
+      resolveCrateStoryComposition({
+        kind: "playlist",
+        title: "Mix",
+        url: "/playlist/2",
+        crateIsOrdered: true,
+      }),
+    ).toBe("coverflow-fan");
   });
 });
 
-describe("buildCrateStoryMetadata", () => {
-  it("includes owner, album count and track count for editorial Crates", () => {
-    expect(
-      buildCrateStoryMetadata({
-        kind: "crate",
-        title: "Road trip records",
-        subtitle: "Diego",
-        url: "/crate/2",
-        crateAlbums: [
-          { imageUrl: null, name: "One", artistName: "Artist", position: 0 },
-          { imageUrl: null, name: "Two", artistName: "Artist", position: 1 },
-        ],
-        crateTrackCount: 18,
-        crateIsOrdered: false,
-      }),
-    ).toBe("Diego · 2 albums · 18 tracks");
+describe("Crate story text", () => {
+  const payload = {
+    kind: "crate" as const,
+    title: "Road trip records",
+    subtitle: "Diego",
+    url: "https://listen.example/share/crate/2",
+    crateAlbums: [
+      { imageUrl: null, name: "One", artistName: "Artist", position: 0 },
+      { imageUrl: null, name: "Two", artistName: "Artist", position: 1 },
+    ],
+    crateTrackCount: 18,
+    crateIsOrdered: false,
+  };
+
+  it("falls back to English metadata when no labels are provided", () => {
+    expect(buildCrateStoryMetadata(payload)).toBe("2 albums · 18 tracks");
+    expect(buildCrateStoryByline(payload)).toBe("Crate by Diego");
+  });
+
+  it("prefers the explicit owner and album count fields", () => {
+    expect(buildCrateStoryByline({ ...payload, crateOwnerName: "Jane" })).toBe(
+      "Crate by Jane",
+    );
+    expect(buildCrateStoryMetadata({ ...payload, crateAlbumCount: 12 })).toBe(
+      "12 albums · 18 tracks",
+    );
+  });
+
+  it("uses localized labels when provided", () => {
+    const labels = {
+      subtitle: "Crate de Diego",
+      metadata: "2 álbumes · 18 canciones",
+    };
+    expect(buildCrateStoryByline(payload, labels)).toBe("Crate de Diego");
+    expect(buildCrateStoryMetadata(payload, labels)).toBe(
+      "2 álbumes · 18 canciones",
+    );
+  });
+
+  it("shows the share URL without protocol", () => {
+    expect(formatShareDisplayUrl(payload.url)).toBe(
+      "listen.example/share/crate/2",
+    );
   });
 });

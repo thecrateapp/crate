@@ -1,15 +1,6 @@
 import { useMemo } from "react";
 import type { TFunction } from "i18next";
 
-import {
-  ItemActionMenu,
-  ItemActionMenuButton,
-  useItemActionMenu,
-} from "@/components/actions/ItemActionMenu";
-import { trackToMenuData } from "@/components/actions/shared";
-import { useTrackActionEntries } from "@/components/actions/track-actions";
-import { useTrackPlaylistActions } from "@/hooks/use-track-playlist-actions";
-import { CrateImage } from "@/components/artwork/CrateImage";
 import { FullscreenPlayerArtwork } from "@/components/player/FullscreenPlayerArtwork";
 import { FullscreenPlayerControls } from "@/components/player/FullscreenPlayerControls";
 import { PlayerSeekBar } from "@/components/player/bar/PlayerSeekBar";
@@ -21,9 +12,8 @@ import type {
   ViewRefs,
 } from "@/components/player/fullscreen-player-view-types";
 import type { FullscreenLyrics } from "@/components/player/fullscreen-player-types";
-import type { Track } from "@/contexts/player-types";
 import { InfoTab } from "@/components/player/extended/InfoTab";
-import { Disc3 } from "@crate/ui/icons";
+import { QueueTrackRow } from "@/components/player/QueueTrackRow";
 import { cn } from "@crate/ui/lib/cn";
 import { triggerHaptic } from "@/lib/haptics";
 
@@ -39,94 +29,6 @@ function withStableDuplicateKeys<T>(
     occurrences.set(identity, occurrence + 1);
     return { item, key: `${identity}-${occurrence}` };
   });
-}
-
-function FullscreenQueueRow({
-  track,
-  onJump,
-}: {
-  track: Track;
-  onJump: () => void;
-}) {
-  const menuTrack = useMemo(() => trackToMenuData(track), [track]);
-  const playlistActions = useTrackPlaylistActions();
-  const actions = useTrackActionEntries({
-    track: menuTrack,
-    albumCover: track.albumCover,
-    onPlayNowOverride: onJump,
-    ...playlistActions,
-  });
-  const actionMenu = useItemActionMenu(actions, {
-    onOpenChange: playlistActions.onOpenChange,
-  });
-
-  const jumpWithFeedback = () => {
-    triggerHaptic("selection");
-    onJump();
-  };
-
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={jumpWithFeedback}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          jumpWithFeedback();
-        }
-      }}
-      onContextMenu={actionMenu.handleContextMenu}
-      className="flex w-full items-center gap-3 rounded-lg py-2 text-left transition-colors active:bg-surface-control focus-visible:bg-surface-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/40"
-    >
-      {track.albumCover ? (
-        <CrateImage
-          src={track.albumCover}
-          alt=""
-          loading="lazy"
-          className=" size-8 shrink-0 rounded object-cover"
-        />
-      ) : (
-        <div className=" size-8 shrink-0 rounded bg-surface-control-hover" />
-      )}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="min-w-0 flex-1 truncate text-sm text-text-primary">
-            {track.title}
-          </p>
-          {track.isSuggested ? (
-            <span className="rounded-full border border-accent-action/20 bg-accent-action/10 px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-accent-action">
-              Suggested
-            </span>
-          ) : null}
-        </div>
-        <p className="truncate text-xs text-text-muted">{track.artist}</p>
-      </div>
-      <ItemActionMenuButton
-        buttonRef={actionMenu.triggerRef}
-        hasActions={actionMenu.hasActions}
-        onClick={actionMenu.openFromTrigger}
-        className=" size-11 shrink-0 opacity-85 transition-opacity hover:opacity-100"
-      />
-      <ItemActionMenu
-        actions={actions}
-        header={{
-          type: "media",
-          title: track.title,
-          subtitle: track.artist,
-          detail: track.album,
-          imageUrl: track.albumCover,
-          imageAlt: track.album ? `${track.title} cover` : track.title,
-          imageShape: "square",
-          fallbackIcon: Disc3,
-        }}
-        open={actionMenu.open}
-        position={actionMenu.position}
-        menuRef={actionMenu.menuRef}
-        onClose={actionMenu.close}
-      />
-    </div>
-  );
 }
 
 export function FullscreenPlayerPlayerTab({
@@ -201,11 +103,13 @@ export function FullscreenPlayerQueueTab({
   player,
   t,
   jumpTo,
+  locked,
   scrollTabBottomClearance,
 }: {
   player: ViewPlayer;
   t: TFunction;
   jumpTo: (index: number) => void;
+  locked: boolean;
   scrollTabBottomClearance: string;
 }) {
   const keyedTracks = useMemo(
@@ -234,10 +138,13 @@ export function FullscreenPlayerQueueTab({
           </p>
         )}
         {keyedTracks.map(({ item: track, key }, index) => (
-          <FullscreenQueueRow
+          <QueueTrackRow
             key={key}
             track={track}
-            onJump={() => jumpTo(index)}
+            queueIndex={index}
+            onJump={jumpTo}
+            locked={locked}
+            haptic
           />
         ))}
       </div>

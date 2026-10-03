@@ -117,6 +117,7 @@ const completedNextCutEnglishFallbackAllowlist = new Set<string>([
   "nav.collection.playlists",
   "nav.collection.albums",
   "nav.collection.bandcamp",
+  "nav.collection.crates",
   "nav.collection.contributions",
   "search.recent",
   "search.resultType.artist",
@@ -126,6 +127,7 @@ const completedNextCutEnglishFallbackAllowlist = new Set<string>([
   "search.albumsCount",
   "share.kind.album",
   "share.kind.playlist",
+  "share.kind.crate",
   "share.instagramStory",
 ]);
 const fullyLocalizedActionPrefixes = [

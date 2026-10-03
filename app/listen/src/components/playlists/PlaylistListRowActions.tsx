@@ -1,4 +1,5 @@
 import type { MouseEvent } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Heart,
   HeartBold,
@@ -36,16 +37,25 @@ export function PlaylistListRowActions({
   playingMode: "play" | "shuffle" | null;
   togglingFollow: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex shrink-0 items-center gap-1">
-      <ActionIconButton onClick={onPlay} title="Play">
+      <ActionIconButton
+        onClick={onPlay}
+        title={t("player.play")}
+        aria-label={t("player.play")}
+      >
         {playingMode === "play" ? (
           <Loader2 size={15} className="animate-spin" />
         ) : (
           <Play size={15} fill="currentColor" className="ml-0.5" />
         )}
       </ActionIconButton>
-      <ActionIconButton onClick={onShuffle} title="Shuffle">
+      <ActionIconButton
+        onClick={onShuffle}
+        title={t("player.shuffle")}
+        aria-label={t("player.shuffle")}
+      >
         {playingMode === "shuffle" ? (
           <Loader2 size={15} className="animate-spin" />
         ) : (
@@ -56,7 +66,12 @@ export function PlaylistListRowActions({
         <ActionIconButton
           onClick={onToggleFollow}
           active={followState.isFollowed}
-          title={followState.isFollowed ? "Following" : "Follow"}
+          title={t(
+            followState.isFollowed ? "common.following" : "common.follow",
+          )}
+          aria-label={t(
+            followState.isFollowed ? "common.following" : "common.follow",
+          )}
         >
           {togglingFollow ? (
             <Loader2 size={15} className="animate-spin" />
@@ -79,6 +94,7 @@ export function PlaylistListRowActions({
             }}
             tone={action.tone}
             title={action.title}
+            aria-label={action.title}
           >
             {action.loading ? (
               <Loader2 size={15} className="animate-spin" />

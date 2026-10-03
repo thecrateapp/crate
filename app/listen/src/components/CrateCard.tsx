@@ -1,13 +1,6 @@
 import { useMemo, useState } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Disc3,
-  Lock,
-  Play,
-  Share2,
-  Users,
-} from "@crate/ui/icons";
+import { Link } from "react-router";
+import { ChevronLeft, ChevronRight, Disc3, Lock, Play } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -15,36 +8,75 @@ import {
   ItemActionMenuButton,
   useItemActionMenu,
 } from "@/components/actions/ItemActionMenu";
+import { useCrateActionEntries } from "@/components/actions/crate-actions";
 import { CrateImage } from "@/components/artwork/CrateImage";
+import {
+  buildCrateSharePayload,
+  crateOwnerName,
+  cratePagePath,
+  crateSummaryAlbums,
+  isShareableCrate,
+  orderCrateAlbums,
+} from "@/components/crates/crate-model";
+import { useCrateFollow } from "@/components/crates/use-crate-follow";
 import { albumCoverApiUrl } from "@/lib/library-routes";
-import { publicShareUrl } from "@/lib/share-url";
 import { openShareSheet } from "@/lib/social-share";
-import type { CrateShareAlbum } from "@/lib/social-share";
-import type { CrateAlbum, CrateSummary } from "@/pages/crates-types";
+import { cn } from "@/lib/utils";
+import type { CrateSummary } from "@/pages/crates-types";
 
 interface CrateCardProps {
   crate: CrateSummary;
-  onOpen: () => void;
-  onEdit: () => void;
-  onPlay?: (album: CrateAlbum) => void;
+  onEdit?: () => void;
+  onPlay?: () => void | Promise<void>;
+  onShuffle?: () => void | Promise<void>;
+  onStartRadio?: () => void | Promise<void>;
+  onMakeAvailableOffline?: () => void | Promise<void>;
+  onDownload?: () => void | Promise<void>;
+  offlineActionLabel?: string;
+  offlineActionDisabled?: boolean;
+  offlineActionActive?: boolean;
+  layout?: "rail" | "grid";
 }
 
-export function CrateCard({ crate, onOpen, onEdit, onPlay }: CrateCardProps) {
+function crateAccessLabelKey(crate: CrateSummary) {
+  if (crate.access === "collaborator") return "library.crates.sharedWithYou";
+  return crate.visibility === "private"
+    ? "library.crates.private"
+    : "library.crates.public";
+}
+
+export function CrateCard({
+  crate,
+  onEdit,
+  onPlay,
+  onShuffle,
+  onStartRadio,
+  onMakeAvailableOffline,
+  onDownload,
+  offlineActionLabel,
+  offlineActionDisabled,
+  offlineActionActive,
+  layout = "rail",
+}: CrateCardProps) {
   const { t } = useTranslation();
-  const albums = useMemo(() => {
-    const source = crate.albums?.length
-      ? crate.albums
-      : crate.first_album
-        ? [crate.first_album]
-        : [];
-    const direction =
-      crate.is_ordered && crate.sort_direction === "desc" ? -1 : 1;
-    return [...source].sort(
-      (left, right) => direction * (left.position - right.position),
-    );
-  }, [crate.albums, crate.first_album, crate.is_ordered, crate.sort_direction]);
+  const albums = useMemo(
+    () =>
+      orderCrateAlbums(
+        crateSummaryAlbums(crate),
+        crate.is_ordered,
+        crate.sort_direction,
+      ),
+    [crate],
+  );
   const [activeIndex, setActiveIndex] = useState(0);
   const activeAlbum = albums[activeIndex] ?? albums[0] ?? null;
+  const canFollow = crate.access === "public" && crate.visibility === "public";
+  const crateFollow = useCrateFollow({
+    crateId: crate.id,
+    initialFollowed: crate.is_followed ?? false,
+    initialFollowerCount: crate.follower_count ?? 0,
+    enabled: canFollow,
+  });
   const cover = activeAlbum?.has_cover
     ? albumCoverApiUrl(
         {
@@ -55,8 +87,7 @@ export function CrateCard({ crate, onOpen, onEdit, onPlay }: CrateCardProps) {
         { size: 256 },
       )
     : null;
-  const shared = crate.access === "collaborator";
-  const canEdit = crate.access === "owner" || crate.access === "collaborator";
+  const hasAlbums = crate.album_count > 0;
   const moveActiveAlbum = (delta: number) => {
     if (albums.length === 0) return;
     setActiveIndex((index) => {
@@ -67,172 +98,134 @@ export function CrateCard({ crate, onOpen, onEdit, onPlay }: CrateCardProps) {
       return Math.max(0, Math.min(albums.length - 1, nextIndex));
     });
   };
-  const actions = [
-    {
-      key: "open",
-      label: t("library.crates.open", { name: crate.name }),
-      icon: Disc3,
-      onSelect: onOpen,
-    },
-    ...(crate.visibility === "public"
-      ? [
-          {
-            key: "share",
-            label: t("crate.page.share"),
-            icon: Share2,
-            onSelect: () =>
-              openShareSheet({
-                kind: "crate",
-                title: crate.name,
-                subtitle: crate.owner_name ?? crate.owner_username ?? undefined,
-                imageUrl: cover ?? undefined,
-                url: publicShareUrl(`/share/crate/${crate.id}`),
-                crateAlbums: albums.map(
-                  (album) =>
-                    ({
-                      imageUrl: album.has_cover
-                        ? albumCoverApiUrl(
-                            {
-                              globalAlbumUid: album.global_album_uid,
-                              albumName: album.name,
-                              artistName: album.artist_name,
-                            },
-                            { size: 768 },
-                          )
-                        : null,
-                      name: album.name,
-                      artistName: album.artist_name,
-                      position: album.position,
-                    }) satisfies CrateShareAlbum,
-                ),
-                crateIsOrdered: crate.is_ordered,
-                crateSortDirection: crate.sort_direction,
-                crateTrackCount: crate.track_count,
-              }),
-          },
-        ]
-      : []),
-    ...(canEdit
-      ? [
-          {
-            key: "edit",
-            label: t("crate.page.edit"),
-            onSelect: onEdit,
-          },
-        ]
-      : []),
-  ];
+  const onShare = () => {
+    if (!isShareableCrate(crate)) return;
+    openShareSheet(buildCrateSharePayload(crate, albums));
+  };
+  const actions = useCrateActionEntries({
+    crate,
+    onPlay: hasAlbums ? onPlay : undefined,
+    onShuffle: hasAlbums ? onShuffle : undefined,
+    onEdit,
+    onStartRadio: hasAlbums ? onStartRadio : undefined,
+    onMakeAvailableOffline: hasAlbums ? onMakeAvailableOffline : undefined,
+    onDownload: hasAlbums ? onDownload : undefined,
+    onShare,
+    onToggleFollow: canFollow ? crateFollow.toggle : undefined,
+    followed: crateFollow.followed,
+    followPending: crateFollow.pending,
+    offlineActionLabel,
+    offlineActionDisabled,
+    offlineActionActive,
+  });
   const actionMenu = useItemActionMenu(actions);
+  const ownerName = crateOwnerName(crate);
 
   return (
     <div
+      data-testid="crate-card"
       onContextMenu={actionMenu.handleContextMenu}
-      className="relative flex w-full flex-col rounded-xl border border-border-quiet bg-text-primary/[0.035] p-3 text-left transition-colors hover:bg-text-primary/[0.07]"
+      className={cn(
+        "group relative flex flex-col rounded-xl border border-border-quiet bg-text-primary/[0.035] p-3 text-left transition-colors hover:bg-text-primary/[0.07]",
+        layout === "rail" ? "w-[160px] shrink-0 snap-start" : "w-full min-w-0",
+      )}
     >
-      <div className="group min-w-0 flex-1 text-left">
-        <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-text-primary/5">
+      <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-text-primary/5">
+        <div
+          key={activeAlbum?.global_album_uid ?? "empty"}
+          className="size-full animate-hero-fade-in"
+        >
+          {cover ? (
+            <CrateImage
+              src={cover}
+              alt={activeAlbum?.name ?? ""}
+              loading="lazy"
+              className="size-full object-cover"
+            />
+          ) : (
+            <div className="flex size-full items-center justify-center text-accent-action/70">
+              <Disc3 size={28} />
+            </div>
+          )}
+        </div>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
+        {crate.visibility === "private" ? (
           <div
-            key={activeAlbum?.global_album_uid ?? "empty"}
-            className="size-full animate-hero-fade-in"
+            data-testid="crate-visibility"
+            role="img"
+            aria-label={t("library.crates.private")}
+            className="pointer-events-none absolute left-2 top-2 z-10 flex items-center rounded-full border border-white/15 bg-black/45 p-2 text-white backdrop-blur-md"
           >
-            {cover ? (
-              <CrateImage
-                src={cover}
-                alt={activeAlbum?.name ?? ""}
-                loading="lazy"
-                className="size-full object-cover"
-              />
-            ) : (
-              <div className="flex size-full items-center justify-center text-accent-action/70">
-                <Disc3 size={28} />
-              </div>
-            )}
+            <Lock size={12} aria-hidden="true" />
           </div>
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
-          {albums.length > 1 ? (
-            <>
-              <button
-                type="button"
-                aria-label={t("library.crates.previousAlbum")}
-                disabled={!crate.loop_enabled && activeIndex === 0}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  moveActiveAlbum(-1);
-                }}
-                className="absolute left-2 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white transition hover:bg-black/65 disabled:opacity-30"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <button
-                type="button"
-                aria-label={t("library.crates.nextAlbum")}
-                disabled={
-                  !crate.loop_enabled && activeIndex === albums.length - 1
-                }
-                onClick={(event) => {
-                  event.stopPropagation();
-                  moveActiveAlbum(1);
-                }}
-                className="absolute right-2 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white transition hover:bg-black/65 disabled:opacity-30"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </>
-          ) : null}
-          <span className="absolute bottom-3 left-3 right-3 truncate text-sm font-semibold text-white">
-            {activeAlbum?.name ?? crate.name}
+        ) : null}
+        {crate.is_ordered && activeAlbum ? (
+          <span className="pointer-events-none absolute bottom-1 right-2 text-5xl font-black leading-none tracking-[-0.08em] text-white/25">
+            <span className="sr-only">
+              {t("stats.rank", { rank: activeAlbum.displayNumber })}
+            </span>
+            {String(activeAlbum.displayNumber).padStart(2, "0")}
           </span>
+        ) : null}
+        {albums.length > 1 ? (
+          <>
+            <button
+              type="button"
+              aria-label={t("library.crates.previousAlbum")}
+              disabled={!crate.loop_enabled && activeIndex === 0}
+              onClick={() => moveActiveAlbum(-1)}
+              className="absolute left-2 top-1/2 z-10 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white opacity-0 transition hover:bg-black/65 focus-visible:opacity-100 disabled:opacity-0 group-hover:opacity-100 group-hover:disabled:opacity-30 pointer-coarse:hidden"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              type="button"
+              aria-label={t("library.crates.nextAlbum")}
+              disabled={
+                !crate.loop_enabled && activeIndex === albums.length - 1
+              }
+              onClick={() => moveActiveAlbum(1)}
+              className="absolute right-2 top-1/2 z-10 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white opacity-0 transition hover:bg-black/65 focus-visible:opacity-100 disabled:opacity-0 group-hover:opacity-100 group-hover:disabled:opacity-30 pointer-coarse:hidden"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </>
+        ) : null}
+        {hasAlbums && onPlay ? (
           <button
             type="button"
             aria-label={t("library.crates.play", { name: crate.name })}
-            onClick={(event) => {
-              event.stopPropagation();
-              if (activeAlbum) onPlay?.(activeAlbum);
-            }}
-            className="absolute left-1/2 top-1/2 flex size-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-accent-action text-accent-action-foreground shadow-lg transition-transform group-hover:scale-105"
+            onClick={() => void onPlay()}
+            className="absolute bottom-2 left-2 z-10 flex size-11 items-center justify-center rounded-full bg-accent-action text-accent-action-foreground shadow-lg transition-transform hover:scale-105"
           >
-            <Play size={20} fill="currentColor" />
+            <Play size={18} fill="currentColor" />
           </button>
-        </div>
+        ) : null}
       </div>
       <div className="min-w-0 px-0.5 pb-1 pt-3">
-        <button
-          type="button"
+        <Link
+          to={cratePagePath(crate)}
           aria-label={t("library.crates.open", { name: crate.name })}
-          onClick={onOpen}
-          className="block max-w-full truncate text-left font-semibold text-text-primary"
+          className="block max-w-full truncate text-left font-semibold text-text-primary after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-accent-action/60"
         >
           {crate.name}
-        </button>
-        {crate.description && (
-          <p className="mt-0.5 line-clamp-1 text-sm text-text-muted">
-            {crate.description}
-          </p>
-        )}
-        <div className="mt-1 flex items-center gap-1.5 text-xs text-text-muted">
-          {shared ? <Users size={13} /> : <Lock size={13} />}
-          <span>
-            {shared
-              ? t("library.crates.sharedWithYou")
-              : crate.visibility === "public"
-                ? t("library.crates.public")
-                : t("library.crates.private")}
-          </span>
-          <span aria-hidden="true">·</span>
-          <span>
-            {t("common.albumCountLabel", { count: crate.album_count })}
-            {crate.track_count > 0
-              ? ` · ${t("common.trackCountLabel", {
-                  count: crate.track_count,
-                })}`
-              : ""}
-          </span>
+        </Link>
+        <div className="mt-1 truncate text-xs text-text-muted">
+          {t("common.albumCountLabel", { count: crate.album_count })}
+          {` · ${t("common.trackCountLabel", { count: crate.track_count })}`}
+        </div>
+        <div className="mt-0.5 truncate text-xs text-text-muted">
+          {t(crateAccessLabelKey(crate))}
+          {canFollow && ownerName ? ` · ${ownerName}` : ""}
         </div>
       </div>
       <ItemActionMenuButton
         buttonRef={actionMenu.triggerRef}
         hasActions={actionMenu.hasActions}
-        onClick={actionMenu.openFromTrigger}
+        onClick={(event) => {
+          event.stopPropagation();
+          actionMenu.openFromTrigger(event);
+        }}
         className="absolute right-4 top-4 z-10 size-9 shrink-0"
       />
       <ItemActionMenu
@@ -240,7 +233,7 @@ export function CrateCard({ crate, onOpen, onEdit, onPlay }: CrateCardProps) {
         header={{
           type: "media",
           title: crate.name,
-          subtitle: crate.owner_name ?? crate.owner_username ?? undefined,
+          subtitle: ownerName ?? undefined,
           detail: t("common.albumCountLabel", { count: crate.album_count }),
           imageUrl: cover ?? undefined,
           imageAlt: crate.name,

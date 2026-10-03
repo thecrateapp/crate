@@ -5,14 +5,15 @@ import type { TFunction } from "i18next";
 
 import {
   buildRecapHighlights,
-  formatStatsMinutes,
+  statsTrackRowData,
   toPlayerTrack,
   type ReplayMix,
   type StatsDashboard,
   type StatsStory,
   type StatsWindow,
 } from "@/components/stats/stats-model";
-import { usePlayerActions } from "@/contexts/PlayerContext";
+import type { TrackRowData } from "@/components/cards/TrackRowModel";
+import { usePlayerActions, type PlaySource } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
 import { usePendingStatsSnapshotRefresh } from "@/hooks/use-pending-stats-snapshot-refresh";
 import {
@@ -30,6 +31,7 @@ const EMPTY_TOP_TRACKS: StatsDashboard["top_tracks"]["items"] = [];
 const EMPTY_TOP_ARTISTS: StatsDashboard["top_artists"]["items"] = [];
 const EMPTY_TOP_ALBUMS: StatsDashboard["top_albums"]["items"] = [];
 const EMPTY_TOP_GENRES: StatsDashboard["top_genres"]["items"] = [];
+const EMPTY_REPLAY_ITEMS: ReplayMix["items"] = [];
 
 export interface StatsPageController {
   changeWindow: (window: StatsWindow) => void;
@@ -47,10 +49,11 @@ export interface StatsPageController {
   overview: StatsDashboard["overview"] | undefined;
   period: StatsPeriod;
   playReplay: () => void;
-  playTopTrack: (item: StatsDashboard["top_tracks"]["items"][number]) => void;
   recapHighlights: ReturnType<typeof buildRecapHighlights>;
   replay: ReplayMix | undefined;
   replayItems: ReplayMix["items"];
+  replayRows: TrackRowData[];
+  replaySource: PlaySource;
   selectedMonth: string | null;
   selectedWindow: StatsWindow;
   soundProfile: SoundProfile;
@@ -61,6 +64,8 @@ export interface StatsPageController {
   topArtistItems: StatsDashboard["top_artists"]["items"];
   topGenreItems: StatsDashboard["top_genres"]["items"];
   topTrackItems: StatsDashboard["top_tracks"]["items"];
+  topTrackRows: TrackRowData[];
+  topTrackSource: PlaySource;
   topComeback: StatsStory["comebacks"][number] | undefined;
   topDiscovery: StatsStory["discoveries"][number] | undefined;
   topMover: StatsStory["movers"][number] | undefined;
@@ -158,7 +163,7 @@ export function useStatsPageController(): StatsPageController {
     t,
     windowCopy,
   );
-  const { play, playAll } = usePlayerActions();
+  const { playAll } = usePlayerActions();
   const statsEndpoint = buildStatsEndpoint(isGlobalStats, username);
   const {
     data: dashboard,
@@ -191,7 +196,24 @@ export function useStatsPageController(): StatsPageController {
   );
   const replay = dashboard?.replay as ReplayMix | undefined;
   const story = dashboard?.story;
-  const replayItems = replay?.items ?? [];
+  const replayItems = replay?.items ?? EMPTY_REPLAY_ITEMS;
+  const replayTitle = replay?.title || t("stats.replay.title");
+  const topTrackRows = useMemo(
+    () => topTrackItems.map(statsTrackRowData),
+    [topTrackItems],
+  );
+  const replayRows = useMemo(
+    () => replayItems.map(statsTrackRowData),
+    [replayItems],
+  );
+  const topTrackSource = useMemo<PlaySource>(
+    () => ({ type: "playlist", name: t("stats.topTracks.title") }),
+    [t],
+  );
+  const replaySource = useMemo<PlaySource>(
+    () => ({ type: "playlist", name: replayTitle }),
+    [replayTitle],
+  );
   const recapHighlights = useMemo(
     () =>
       buildRecapHighlights(
@@ -222,20 +244,9 @@ export function useStatsPageController(): StatsPageController {
     setSearchParams({ window });
   }
 
-  function playTopTrack(item: StatsDashboard["top_tracks"]["items"][number]) {
-    play(toPlayerTrack(item), {
-      type: "track",
-      name: item.title,
-      id: item.track_id ?? item.track_path,
-    });
-  }
-
   function playReplay() {
     if (!replayItems.length) return;
-    playAll(replayItems.map(toPlayerTrack), 0, {
-      type: "playlist",
-      name: replay?.title || t("stats.replay.title"),
-    });
+    playAll(replayItems.map(toPlayerTrack), 0, replaySource);
   }
 
   return {
@@ -253,10 +264,11 @@ export function useStatsPageController(): StatsPageController {
     overview,
     period,
     playReplay,
-    playTopTrack,
     recapHighlights,
     replay,
     replayItems,
+    replayRows,
+    replaySource,
     selectedMonth,
     selectedWindow,
     soundProfile,
@@ -270,13 +282,11 @@ export function useStatsPageController(): StatsPageController {
     topGenreItems,
     topMover,
     topTrackItems,
+    topTrackRows,
+    topTrackSource,
     trends,
     username,
   };
-}
-
-export function statsFormatMinutes(value: number): string {
-  return formatStatsMinutes(value);
 }
 
 function resolveSubjectName(

@@ -1,8 +1,5 @@
 import type { VisualizerColorTriplet } from "@/components/player/visualizer/visualizer-colors";
-
-export function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
+import { clamp } from "@/lib/utils";
 
 function rgbToHsl([r, g, b]: VisualizerColorTriplet): VisualizerColorTriplet {
   const max = Math.max(r, g, b);

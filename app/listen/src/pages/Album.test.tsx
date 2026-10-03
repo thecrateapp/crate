@@ -5,6 +5,8 @@ import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 import { useApi } from "@/hooks/use-api";
 import { fetchAlbumRadio } from "@/lib/radio";
 
+import { AlbumCard } from "@/components/cards/AlbumCard";
+
 import { Album } from "./Album";
 
 const openCrateComposerForAlbum = vi.hoisted(() => vi.fn(() => true));
@@ -593,8 +595,42 @@ describe("Album page", () => {
       "z-app-context-menu",
     );
 
-    const menuItem = await screen.findByRole("menuitem", { name: "Play now" });
+    const menuItem = await screen.findByRole("menuitem", {
+      name: "Play album",
+    });
     expect(menuItem.closest(".overflow-x-auto")).toBeNull();
+  });
+
+  it("builds the same album menu entries on the page and on the album card", async () => {
+    const page = renderWithListenProviders(<Album />, {
+      route: "/artists/crossed/morir",
+      path: "/artists/:artistSlug/:albumSlug",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    const pageMenu = await screen.findByRole("menu");
+    const pageEntries = within(pageMenu)
+      .getAllByRole("menuitem")
+      .map((item) => item.textContent);
+    page.unmount();
+
+    renderWithListenProviders(
+      <AlbumCard
+        artist="Crossed"
+        album="MORIR"
+        albumId={42}
+        albumEntityUid="album-entity-42"
+        albumSlug="morir"
+        artistSlug="crossed"
+      />,
+    );
+    fireEvent.contextMenu(screen.getByText("MORIR").closest("article")!);
+    const cardMenu = await screen.findByRole("menu");
+    const cardEntries = within(cardMenu)
+      .getAllByRole("menuitem")
+      .map((item) => item.textContent);
+
+    expect(cardEntries).toEqual(pageEntries);
   });
 
   it("opens the Crate composer from the album menu and closes the menu", async () => {
@@ -676,7 +712,7 @@ describe("Album page", () => {
 
     fireEvent.click(heroMenu);
     expect(
-      await screen.findByRole("menuitem", { name: "Play now" }),
+      await screen.findByRole("menuitem", { name: "Play album" }),
     ).toBeInTheDocument();
   });
 

@@ -5,6 +5,7 @@ import { useNavigate } from "react-router";
 
 import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
 import { action } from "@/components/actions/shared";
+import { openExternalUrl } from "@/lib/external-links";
 import { artistPagePath } from "@/lib/library-routes";
 import type { UpcomingItem } from "@/components/upcoming/upcoming-model";
 
@@ -63,7 +64,7 @@ export function useShowActionEntries(
         disabled: !input.item.url,
         onSelect: () => {
           if (!input.item.url) return;
-          window.open(input.item.url, "_blank", "noopener,noreferrer");
+          void openExternalUrl(input.item.url);
         },
       }),
     ],

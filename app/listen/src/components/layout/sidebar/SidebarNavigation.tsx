@@ -16,6 +16,7 @@ import {
   PanelLeftOpen,
   Radar,
   Search,
+  Upload,
   Users,
 } from "@crate/ui/icons";
 import { VtNavLink as NavLink } from "@crate/ui/primitives/VtNavLink";
@@ -26,6 +27,16 @@ interface SidebarNavigationProps {
 }
 
 const COLLECTION_ITEMS = [
+  {
+    to: "/library?tab=artists",
+    icon: Users,
+    labelKey: "nav.collection.artists",
+  },
+  {
+    to: "/library?tab=crates",
+    icon: Disc3,
+    labelKey: "nav.collection.crates",
+  },
   {
     to: "/library?tab=playlists",
     icon: ListMusic,
@@ -42,19 +53,14 @@ const COLLECTION_ITEMS = [
     labelKey: "nav.collection.likedTracks",
   },
   {
-    to: "/library?tab=artists",
-    icon: Users,
-    labelKey: "nav.collection.artists",
-  },
-  {
-    to: "/library?tab=crates",
-    icon: Disc3,
-    labelKey: "nav.collection.crates",
-  },
-  {
     to: "/bandcamp",
     icon: BandcampLogo,
     labelKey: "nav.collection.bandcamp",
+  },
+  {
+    to: "/library?tab=contributions",
+    icon: Upload,
+    labelKey: "nav.collection.contributions",
   },
 ] as const;
 

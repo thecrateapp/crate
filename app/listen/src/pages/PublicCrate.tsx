@@ -1,14 +1,34 @@
+import { AuthSpinner } from "@/app-shell/AppFallbacks";
 import { AppProviders } from "@/app-shell/AppProviders";
+import { PublicAppProviders } from "@/app-shell/PublicAppProviders";
+import { PublicShell } from "@/app-shell/PublicShell";
+import { Shell } from "@/components/layout/Shell";
 import { ShareSheetHost } from "@/components/share/ShareSheet";
+import { useAuth } from "@/contexts/AuthContext";
 import { Crate } from "@/pages/Crate";
 
 export function PublicCrate() {
+  const { user, loading } = useAuth();
+
+  if (user) {
+    return (
+      <AppProviders>
+        <Shell>
+          <Crate />
+        </Shell>
+        <ShareSheetHost />
+      </AppProviders>
+    );
+  }
+
+  if (loading) return <AuthSpinner />;
+
   return (
-    <AppProviders>
-      <main className="min-h-screen bg-surface-canvas px-4 py-8 text-text-primary sm:px-8">
+    <PublicAppProviders>
+      <PublicShell>
         <Crate />
-      </main>
+      </PublicShell>
       <ShareSheetHost />
-    </AppProviders>
+    </PublicAppProviders>
   );
 }

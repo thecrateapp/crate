@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -22,6 +23,7 @@ vi.mock("@/contexts/PlaylistComposerContext", () => ({
   useOptionalPlaylistComposer: () => ({ openCreatePlaylist: vi.fn() }),
 }));
 
+import { Crates } from "@/pages/Crates";
 import { Library } from "@/pages/Library";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 import { api } from "@/lib/api";
@@ -101,22 +103,80 @@ describe("Collection Crates", () => {
     renderCrates();
 
     expect(
-      screen.getByRole("button", { name: "Open Year-end records" }),
+      screen.getByRole("link", { name: "Open Year-end records" }),
     ).toBeVisible();
-    expect(
-      screen.getByRole("button", { name: "Open Tour picks" }),
-    ).toBeVisible();
+    expect(screen.getByRole("link", { name: "Open Tour picks" })).toBeVisible();
+    expect(screen.getByText("Shared with you")).toBeVisible();
   });
 
-  it("opens the Crate detail page from the collection card", () => {
+  it("renders Crate cards in the same six-column grid as Albums", () => {
     mocks.crates = [ownedCrate("Year-end records", "owner")];
 
     renderCrates();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Open Year-end records" }),
-    );
 
-    expect(navigate).toHaveBeenCalledWith(`/crate/${crateId}`);
+    expect(screen.getByTestId("crate-grid")).toHaveClass(
+      "grid-cols-2",
+      "sm:grid-cols-3",
+      "lg:grid-cols-6",
+    );
+    expect(screen.getByTestId("crate-card")).toHaveClass("w-full");
+    expect(screen.getByRole("button", { name: "New Crate" })).toHaveAttribute(
+      "data-slot",
+      "button",
+    );
+  });
+
+  it("notifies the library when a Crate is created", async () => {
+    const onCrateChange = vi.fn();
+
+    renderWithListenProviders(<Crates onCrateChange={onCrateChange} />, {
+      locale: "en",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "New Crate" }));
+    expect(screen.getByTestId("crate-form")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Name"), {
+      target: { value: "Year-end records" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create Crate" }));
+
+    await waitFor(() => expect(onCrateChange).toHaveBeenCalledOnce());
+  });
+
+  it("links the collection card to the Crate detail and keeps Edit in the menu", async () => {
+    mocks.crates = [ownedCrate("Year-end records", "owner")];
+    mocks.detail = ownedCrate("Year-end records", "owner");
+
+    renderCrates();
+
+    expect(
+      screen.getByRole("link", { name: "Open Year-end records" }),
+    ).toHaveAttribute("href", `/crate/${crateId}`);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    openCrateEditor();
+
+    expect(
+      within(screen.getByRole("dialog")).getByRole("heading", {
+        name: "Year-end records",
+      }),
+    ).toBeVisible();
+  });
+
+  it("lists followed Crates with an empty state", () => {
+    mocks.crates = [ownedCrate("Year-end records", "owner")];
+
+    renderCrates();
+
+    expect(
+      screen.getByRole("heading", { name: "Crates you follow" }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "Follow public Crates from other listeners to see them here.",
+      ),
+    ).toBeVisible();
+    expect(useApi).toHaveBeenCalledWith("/api/me/crates/followed");
   });
 
   it("plays the complete Crate from its card", async () => {
@@ -188,6 +248,91 @@ describe("Collection Crates", () => {
     });
   });
 
+  it("wires shuffle and Crate radio from the contextual menu", async () => {
+    const playAll = vi.fn();
+    const setRepeatMode = vi.fn();
+    mocks.crates = [
+      {
+        ...ownedCrate("Year-end records", "owner"),
+        album_count: 1,
+        track_count: 2,
+        albums: [],
+      },
+    ];
+    mocks.api.mockImplementation(async (path: string, method?: string) => {
+      if (path === `/api/crates/${crateId}/playback`) {
+        return [
+          {
+            global_track_uid: "track-1",
+            global_album_uid: "album-1",
+            title: "First song",
+            artist: "Artist",
+            album: "Album",
+            duration: 180,
+          },
+          {
+            global_track_uid: "track-2",
+            global_album_uid: "album-1",
+            title: "Second song",
+            artist: "Artist",
+            album: "Album",
+            duration: 180,
+          },
+        ];
+      }
+      if (path === "/api/radio/start" && method === "POST") {
+        return {
+          session_id: "radio-session",
+          seed_label: "Year-end records",
+          tracks: [
+            {
+              track_id: 99,
+              title: "Radio song",
+              artist: "Artist",
+              distance: 0,
+            },
+          ],
+        };
+      }
+      return { id: crateId };
+    });
+
+    renderWithListenProviders(<Library />, {
+      path: "/collection/:section",
+      route: "/collection/crates",
+      locale: "en",
+      playerActions: { playAll, setRepeatMode },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Shuffle Crate" }));
+
+    await waitFor(() => {
+      expect(playAll).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ title: "First song" }),
+          expect.objectContaining({ title: "Second song" }),
+        ]),
+        0,
+        expect.objectContaining({ type: "crate" }),
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: "Start Crate radio" }),
+    );
+
+    await waitFor(() => {
+      expect(api).toHaveBeenCalledWith("/api/radio/start", "POST", {
+        mode: "seeded",
+        seed_type: "crate",
+        seed_value: crateId,
+      });
+      expect(playAll).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it("creates a private Crate with an empty album list", async () => {
     renderCrates();
 
@@ -202,12 +347,42 @@ describe("Collection Crates", () => {
         name: "Year-end records",
         description: "",
         is_collaborative: false,
+        visibility: "private",
+        is_ordered: false,
+        sort_direction: "asc",
+        loop_enabled: false,
       });
     });
     expect(useApi).toHaveBeenCalledWith("/api/me/crates");
   });
 
-  it("lets the owner edit visibility and create collaboration invites", () => {
+  it("creates an unordered Crate when ordering is set to none", async () => {
+    const user = userEvent.setup();
+    renderCrates();
+
+    await user.click(screen.getByRole("button", { name: "New Crate" }));
+    await user.type(
+      screen.getByRole("textbox", { name: "Name" }),
+      "Unranked favorites",
+    );
+    await user.click(screen.getByRole("combobox", { name: "Ordering" }));
+    await user.click(screen.getByRole("option", { name: "No order" }));
+    await user.click(screen.getByRole("button", { name: "Create Crate" }));
+
+    await waitFor(() => {
+      expect(api).toHaveBeenCalledWith(
+        "/api/crates",
+        "POST",
+        expect.objectContaining({
+          name: "Unranked favorites",
+          is_ordered: false,
+          sort_direction: "asc",
+        }),
+      );
+    });
+  });
+
+  it("lets the owner edit visibility and collaboration without invite management", () => {
     mocks.crates = [ownedCrate("Year-end records", "owner")];
     mocks.detail = {
       ...ownedCrate("Year-end records", "owner"),
@@ -217,10 +392,14 @@ describe("Collection Crates", () => {
     renderCrates();
     openCrateEditor();
 
+    expect(screen.getByTestId("crate-form")).toBeInTheDocument();
     expect(screen.getByLabelText("Visibility")).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "Create collaboration invite" }),
+      screen.getByRole("checkbox", { name: "Allow collaboration" }),
     ).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Create collaboration invite" }),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps visibility and invitation controls away from collaborators", () => {
@@ -278,7 +457,6 @@ describe("Collection Crates", () => {
     fireEvent.change(screen.getByRole("searchbox", { name: "Search albums" }), {
       target: { value: "Jane Doe" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Find albums" }));
 
     fireEvent.click(
       await screen.findByRole("button", { name: "Add Jane Doe by Converge" }),
@@ -293,47 +471,6 @@ describe("Collection Crates", () => {
         },
       );
     });
-  });
-
-  it("requires collaboration to be saved before creating an invite", async () => {
-    mocks.crates = [ownedCrate("Year-end records", "owner")];
-    mocks.detail = {
-      ...ownedCrate("Year-end records", "owner"),
-      is_collaborative: false,
-      albums: [],
-    };
-    mocks.api.mockImplementation(async (path: string, method?: string) => {
-      if (path.endsWith("/invites") && method === "POST") {
-        return { join_url: "/crate/invite/invite-token" };
-      }
-      return { id: crateId };
-    });
-
-    renderCrates();
-    openCrateEditor();
-    fireEvent.click(
-      screen.getByRole("checkbox", { name: "Allow collaboration" }),
-    );
-
-    const inviteButton = screen.getByRole("button", {
-      name: "Create collaboration invite",
-    });
-    expect(inviteButton).toBeDisabled();
-
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(inviteButton).toBeEnabled());
-    fireEvent.click(inviteButton);
-
-    expect(
-      await screen.findByRole("textbox", {
-        name: "Collaboration invite link",
-      }),
-    ).toHaveValue("http://localhost:3000/crate/invite/invite-token");
-    expect(api).toHaveBeenCalledWith(
-      `/api/crates/${crateId}/invites`,
-      "POST",
-      {},
-    );
   });
 
   it("persists album order changes by canonical album UID", async () => {

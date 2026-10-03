@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 
 import { ApiError, api } from "@/lib/api";
+import { formatBytes } from "@/lib/utils";
 
 interface UploadResponse {
   task_id: string;
@@ -36,20 +37,6 @@ interface UploadMusicFilesOptions {
 }
 
 const CHUNKED_UPLOAD_THRESHOLD_BYTES = 80 * 1024 * 1024;
-
-function formatBytes(bytes: number): string {
-  if (!bytes) return "0 B";
-  const units = ["B", "KB", "MB", "GB"];
-  let value = bytes;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${
-    units[unitIndex]
-  }`;
-}
 
 function totalFileBytes(files: File[]): number {
   return files.reduce((sum, file) => sum + file.size, 0);

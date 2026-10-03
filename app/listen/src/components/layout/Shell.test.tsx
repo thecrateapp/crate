@@ -92,6 +92,23 @@ describe("Shell", () => {
     ).not.toHaveClass("rounded-2xl");
   });
 
+  it("orders the mobile Collection sections consistently", () => {
+    renderWithListenProviders(<Shell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Collection" }));
+
+    const items = screen.getAllByRole("menuitem");
+    expect(items.map((item) => item.textContent?.trim())).toEqual([
+      "Artists",
+      "Crates",
+      "Playlists",
+      "Albums",
+      "Liked tracks",
+      "Bandcamp",
+      "Contributions",
+    ]);
+  });
+
   it("keeps Crates in the desktop Collection menu", () => {
     viewportState.isDesktop = true;
 

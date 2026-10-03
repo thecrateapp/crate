@@ -1,4 +1,5 @@
 import type { MouseEventHandler } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { CrossfadeTransition } from "@/contexts/player-context";
 import type { PlaySource, Track } from "@/contexts/player-types";
@@ -26,6 +27,7 @@ export function PlayerBarTrackCopy({
   onOpenArtist,
   onOpenSource,
 }: PlayerBarTrackCopyProps) {
+  const { t } = useTranslation();
   const hasAlbum = Boolean(displayTrack.globalAlbumUid || displayTrack.albumId);
   const hasArtist = Boolean(
     displayTrack.globalArtistUid || displayTrack.artistId,
@@ -99,7 +101,7 @@ export function PlayerBarTrackCopy({
             key={`src-${sourceLabel}`}
             className="animate-fade-in truncate text-xs leading-tight text-text-muted"
           >
-            Playing from:{" "}
+            {t("player.playingFrom")}{" "}
             {displayPlaySource?.href && sourceLabel !== "Discovery Radio" ? (
               <button
                 type="button"

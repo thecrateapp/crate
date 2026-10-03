@@ -14,11 +14,13 @@ import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
 import type { PlaylistOption } from "@/contexts/PlaylistComposerContext";
 import type { CrateOption } from "@/hooks/use-lazy-crate-options";
 import { openShareSheet } from "@/lib/social-share";
-import { artistPagePath } from "@/lib/library-routes";
 import {
-  buildAlbumMenuItems,
-  buildAlbumSelectionMenuItems,
-} from "@/pages/album-menu-model";
+  albumDownloadApiPath,
+  artistPagePath,
+  downloadApiUrl,
+} from "@/lib/library-routes";
+import { buildAlbumMenuEntries } from "@/components/actions/album-actions";
+import { buildAlbumSelectionMenuItems } from "@/pages/album-menu-model";
 import type { AlbumData, AlbumTrack } from "@/pages/album-types";
 import {
   buildAlbumPresentationState,
@@ -39,6 +41,8 @@ export function useAlbumPresentation({
   albumId,
   albumMenuController,
   artistName,
+  canPlay,
+  canRadio,
   cratePickerOpen,
   crates,
   data,
@@ -52,12 +56,14 @@ export function useAlbumPresentation({
   handleAddSelectedToQueue,
   handleAddToPlaylist,
   handleAddToCrate,
+  handleAlbumRadio,
   handleCreateCrate,
   handleCreatePlaylistFromAlbum,
   handleCreatePlaylistFromSelection,
   handlePlay,
   handlePlayNextAlbum,
   handlePlaySelectedNext,
+  handleShuffle,
   handleToggleSelectionMenuPlaylist,
   mobileHeroInfoOffset,
   navigate,
@@ -73,6 +79,8 @@ export function useAlbumPresentation({
   albumId: number;
   albumMenuController: UseContextMenuControllerReturn<HTMLButtonElement>;
   artistName: string;
+  canPlay: boolean;
+  canRadio: boolean;
   data: AlbumData | null;
   displayName: string;
   ensurePlaylistOptionsLoaded: () => void;
@@ -84,12 +92,14 @@ export function useAlbumPresentation({
   handleAddSelectedToQueue: () => void;
   handleAddToPlaylist: (playlistId: number) => void | Promise<void>;
   handleAddToCrate: (crateId: string) => void | Promise<void>;
+  handleAlbumRadio: () => void | Promise<void>;
   handleCreateCrate: () => void;
   handleCreatePlaylistFromAlbum: () => void;
   handleCreatePlaylistFromSelection: () => void;
   handlePlay: () => void;
   handlePlayNextAlbum: () => void;
   handlePlaySelectedNext: () => void;
+  handleShuffle: () => void;
   handleToggleSelectionMenuPlaylist: () => void;
   mobileHeroInfoOffset: number;
   navigate: NavigateFunction;
@@ -233,29 +243,48 @@ export function useAlbumPresentation({
           }),
     );
 
-  const albumMenuItems = buildAlbumMenuItems(
+  function handleDownload() {
+    const url = downloadApiUrl(
+      albumDownloadApiPath({
+        albumId: albumId > 0 ? albumId : undefined,
+        albumEntityUid: data?.entity_uid,
+        artistName,
+        albumName: data?.name ?? displayName,
+      }),
+    );
+    if (url) window.location.assign(url);
+  }
+
+  const albumMenuItems = buildAlbumMenuEntries(
     {
-      playlistPickerOpen,
-      cratePickerOpen,
-      canAddToCrate,
-      canPersistAlbum,
-      canSaveAlbum,
       saved,
-      offlineSupported,
+      canSave: canSaveAlbum,
+      canAddToCrate,
+      canAddToPlaylist: canPersistAlbum,
+      canRadio,
+      canPlay,
+      canDownload: albumId > 0 || Boolean(data?.entity_uid),
+      offlineEnabled: offlineSupported && canPersistAlbum,
       offlineState,
-      offlineButtonLabel,
-      playlists,
+      offlineLabel: offlineButtonLabel,
+      globalAlbumUid,
       crates,
+      cratePickerOpen,
+      playlists,
+      playlistPickerOpen,
       onPlay: handlePlay,
       onPlayNext: handlePlayNextAlbum,
-      onTogglePlaylistPicker: handleTogglePlaylistPicker,
+      onShuffle: handleShuffle,
       onToggleCratePicker: handleToggleCratePicker,
       onCreateCrate: handleCreateCrate,
+      onAddToCrate: (crate) => handleAddToCrate(crate.id),
+      onTogglePlaylistPicker: handleTogglePlaylistPicker,
       onCreatePlaylist: handleCreatePlaylistFromAlbum,
       onAddToPlaylist: handleAddToPlaylist,
-      onAddToCrate: handleAddToCrate,
       onToggleSaved: handleToggleSaved,
+      onRadio: handleAlbumRadio,
       onToggleOffline: handleToggleOffline,
+      onDownload: handleDownload,
       onGoToArtist: handleGoToArtist,
       onShare: handleShare,
     },

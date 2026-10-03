@@ -9,11 +9,7 @@ import { usePlaylistActionEntries } from "@/components/actions/playlist-actions"
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { CoreTracksArtwork } from "@/components/home/CoreTracksArtwork";
-import {
-  SectionHeader,
-  SectionRail,
-  useSectionRail,
-} from "@/components/home/HomeSections";
+import { SectionHeader, SectionRail } from "@/components/home/HomeSections";
 import { cn } from "@/lib/utils";
 
 import type {
@@ -40,7 +36,6 @@ export function RecommendedTracksSection({
 }) {
   const { t } = useTranslation();
   const pages = chunkItems(tracks, 9);
-  const rail = useSectionRail(pages.length);
   if (!tracks.length) return null;
 
   return (
@@ -50,9 +45,8 @@ export function RecommendedTracksSection({
         subtitle={t("home.sections.recommendedTracks.subtitle")}
         actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("recommended-tracks")}
-        railControls={rail}
       />
-      <SectionRail railRef={rail.railRef}>
+      <SectionRail>
         {pages.map((pageTracks, pageIndex) => (
           <div
             key={`recommended-page-${pageIndex}`}
@@ -91,7 +85,6 @@ export function FavoriteArtistsSection({
   onViewAll: (sectionId: HomeSectionId) => void;
 }) {
   const { t } = useTranslation();
-  const rail = useSectionRail(artists.length);
   if (!artists.length) return null;
 
   return (
@@ -101,9 +94,8 @@ export function FavoriteArtistsSection({
         subtitle={t("home.sections.favoriteArtists.subtitle")}
         actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("favorite-artists")}
-        railControls={rail}
       />
-      <SectionRail railRef={rail.railRef} fit="square-card">
+      <SectionRail fit="square-card">
         {artists.map((artist) => (
           <ArtistCard
             key={
@@ -224,7 +216,6 @@ export function EssentialsSection({
   onViewAll: (sectionId: HomeSectionId) => void;
 }) {
   const { t } = useTranslation();
-  const rail = useSectionRail(items.length);
   if (!items.length) return null;
 
   return (
@@ -234,9 +225,8 @@ export function EssentialsSection({
         subtitle={t("home.sections.artistSets.subtitle")}
         actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("core-tracks")}
-        railControls={rail}
       />
-      <SectionRail railRef={rail.railRef} fit="square-card">
+      <SectionRail fit="square-card">
         {items.map((item) => (
           <CoreTracksPlaylistCard
             key={item.id}
