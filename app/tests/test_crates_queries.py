@@ -689,3 +689,111 @@ def test_crate_playback_is_empty_when_no_tracks_are_available(pg_db):
     add_crate_album(crate_id, album_uid, added_by=1)
 
     assert get_crate_playback_tracks(crate_id) == []
+
+
+def _seed_local_track(
+    album_uid: str, title: str, *, track_number: int, bliss: float
+) -> dict:
+    from crate.db.tx import transaction_scope
+
+    entity_uid = str(uuid4())
+    with transaction_scope() as session:
+        track_id = session.execute(
+            text(
+                """
+                INSERT INTO library_tracks (
+                    entity_uid, artist, album, filename, title, duration, path,
+                    bliss_vector
+                ) VALUES (
+                    CAST(:entity_uid AS uuid), 'Crate Test Artist', :album,
+                    :filename, :title, 120, :path, :bliss
+                )
+                RETURNING id
+                """
+            ),
+            {
+                "entity_uid": entity_uid,
+                "album": album_uid,
+                "filename": f"{track_number:02d} {title}.flac",
+                "title": title,
+                "path": f"/music/crate-test/{album_uid}/{track_number:02d}.flac",
+                "bliss": [bliss] * 20,
+            },
+        ).scalar_one()
+    global_track_uid = _seed_global_track(
+        album_uid, title, disc_number=1, track_number=track_number
+    )
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE global_catalog_tracks
+                SET local_track_id = :track_id,
+                    local_track_entity_uid = CAST(:entity_uid AS uuid)
+                WHERE global_track_uid = CAST(:uid AS uuid)
+                """
+            ),
+            {"track_id": track_id, "entity_uid": entity_uid, "uid": global_track_uid},
+        )
+    return {"id": track_id, "entity_uid": entity_uid, "global": global_track_uid}
+
+
+def test_crate_offline_tracks_do_not_duplicate_mismatched_local_links(pg_db):
+    from crate.db.queries.crates import get_crate_offline_tracks_for_user
+    from crate.db.repositories.crates import add_crate_album, create_crate
+    from crate.db.tx import transaction_scope
+
+    crate_id = create_crate(owner_id=1, name="Offline links")
+    album_uid = _seed_global_album("Offline album")
+    first = _seed_local_track(album_uid, "First", track_number=1, bliss=0.1)
+    second = _seed_local_track(album_uid, "Second", track_number=2, bliss=0.2)
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE global_catalog_tracks
+                SET local_track_entity_uid = CAST(:entity_uid AS uuid)
+                WHERE global_track_uid = CAST(:uid AS uuid)
+                """
+            ),
+            {"entity_uid": second["entity_uid"], "uid": first["global"]},
+        )
+    add_crate_album(crate_id, album_uid, added_by=1)
+
+    crate, tracks = get_crate_offline_tracks_for_user(crate_id, 1)
+
+    assert crate is not None
+    assert [track["id"] for track in tracks] == [first["id"], second["id"]]
+
+
+def test_crate_radio_seed_samples_across_albums_in_crate_order(pg_db):
+    from crate.db.queries.radio_seed_queries import get_crate_seed_context
+    from crate.db.repositories.crates import add_crate_album, create_crate
+
+    crate_id = create_crate(owner_id=1, name="Seeded", sort_direction="desc")
+    first_album = _seed_global_album("Seed first")
+    second_album = _seed_global_album("Seed second")
+    first_tracks = [
+        _seed_local_track(first_album, f"A{n}", track_number=n, bliss=0.1)
+        for n in (1, 2, 3)
+    ]
+    second_tracks = [
+        _seed_local_track(second_album, f"B{n}", track_number=n, bliss=0.2)
+        for n in (1, 2)
+    ]
+    add_crate_album(crate_id, first_album, added_by=1)
+    add_crate_album(crate_id, second_album, added_by=1)
+
+    resolved = get_crate_seed_context(1, crate_id, limit=4)
+
+    assert resolved is not None
+    vectors, label, context = resolved
+    assert label == "Seeded"
+    assert len(vectors) == 4
+    assert context["seed_track_ids"] == [
+        second_tracks[0]["id"],
+        first_tracks[0]["id"],
+        second_tracks[1]["id"],
+        first_tracks[1]["id"],
+    ]
+    assert get_crate_seed_context(1, "not-a-uuid") is None

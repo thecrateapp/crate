@@ -13,6 +13,7 @@ from crate.db.queries.radio_library_queries import (
 )
 from crate.db.queries.radio_seed_queries import (
     get_album_seed_context,
+    get_crate_seed_context,
     get_home_playlist_seed,
     get_home_playlist_seed_context,
     get_playlist_seed,
@@ -38,6 +39,7 @@ from crate.db.queries.radio_user_queries import (
 __all__ = [
     "count_user_radio_signals",
     "get_album_seed_context",
+    "get_crate_seed_context",
     "get_album_for_radio",
     "get_discovery_excluded_artist_keys",
     "get_discovery_seed_sources",

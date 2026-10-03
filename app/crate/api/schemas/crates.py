@@ -14,6 +14,7 @@ class CreateCrateRequest(BaseModel):
 
     name: str = Field(min_length=1, max_length=120)
     description: str = Field(default="", max_length=2000)
+    visibility: Literal["private", "public"] = "private"
     is_collaborative: bool = False
     is_ordered: bool = True
     sort_direction: Literal["asc", "desc"] = "asc"
@@ -64,6 +65,8 @@ class CrateSummaryResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     id: str
+    short_code: str | None = None
+    public_ref: str | None = None
     owner_id: int
     owner_username: str | None = None
     owner_name: str | None = None
@@ -77,6 +80,8 @@ class CrateSummaryResponse(BaseModel):
     access: Literal["owner", "collaborator", "public"] | None = None
     album_count: int = 0
     track_count: int = 0
+    follower_count: int = 0
+    is_followed: bool = False
     first_album: CrateAlbumResponse | None = None
     albums: list[CrateAlbumResponse] = Field(default_factory=list)
     created_at: datetime | str | None = None
@@ -112,8 +117,10 @@ class CrateMemberResponse(BaseModel):
     invited_by: int | None = None
     created_at: datetime | str | None = None
     username: str | None = None
+    name: str | None = None
     display_name: str | None = None
     avatar: str | None = None
+    role: Literal["owner", "collaborator"] = "collaborator"
 
 
 class CrateMembersMutationResponse(OkResponse):
@@ -144,11 +151,19 @@ class CrateInviteAcceptResponse(OkResponse):
     crate_id: str
 
 
+class CrateDownloadResponse(BaseModel):
+    status: Literal["ready", "pending"]
+    filename: str
+    download_url: str | None = None
+    task_id: str | None = None
+
+
 __all__ = [
     "AddCrateAlbumRequest",
     "CrateAlbumResponse",
     "CrateCreateResponse",
     "CrateDetailResponse",
+    "CrateDownloadResponse",
     "CrateInviteAcceptResponse",
     "CrateInvitePreviewResponse",
     "CrateInviteResponse",

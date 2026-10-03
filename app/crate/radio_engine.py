@@ -46,6 +46,7 @@ from crate.db.queries.paths import find_candidate_rows, find_seeded_radio_candid
 from crate.db.queries.global_catalog import get_global_radio_seed_tracks
 from crate.db.queries.radio import (
     count_user_radio_signals,
+    get_crate_seed_context,
     get_album_seed_context,
     get_discovery_excluded_artist_keys,
     get_discovery_seed_sources,
@@ -132,6 +133,7 @@ _SEEDED_CONTEXT_RADIO_TYPES = {
     "album",
     "track",
     "playlist",
+    "crate",
     "home-playlist",
     "genre",
 }
@@ -418,6 +420,13 @@ def _resolve_seed(
 
     if seed_type == "home-playlist":
         resolved = get_home_playlist_seed_context(user_id, seed_value, session=session)
+        if not resolved:
+            return None
+        vectors, label, context = resolved
+        return _centroid(vectors), label, context
+
+    if seed_type == "crate":
+        resolved = get_crate_seed_context(user_id, seed_value, session=session)
         if not resolved:
             return None
         vectors, label, context = resolved

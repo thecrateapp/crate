@@ -3,6 +3,7 @@ import json
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -32,6 +33,7 @@ from crate.db.repositories.playlists import (
     get_playlist,
     get_playlist_tracks,
 )
+from crate.db.queries.crates import get_crate_offline_tracks_for_user
 
 router = APIRouter(prefix="/api/offline", tags=["offline"])
 
@@ -291,6 +293,64 @@ def _build_playlist_manifest(
     }
 
 
+def _build_crate_manifest(
+    crate: Mapping[str, Any], tracks: Sequence[Mapping[str, Any]]
+) -> dict:
+    artist_cache: dict[str, Mapping[str, Any] | None] = {}
+    manifest_tracks = [
+        _track_manifest_row(
+            track,
+            album_slug=track.get("album_slug"),
+            artist_cache=artist_cache,
+        )
+        for track in tracks
+    ]
+    version_parts = [
+        crate.get("id"),
+        crate.get("updated_at"),
+        [
+            (
+                track.get("crate_position"),
+                _track_manifest_identity(track),
+                _iso(track.get("updated_at")),
+            )
+            for track in tracks
+        ],
+    ]
+    first_album_id = next(
+        (
+            track.get("album_id")
+            for track in manifest_tracks
+            if track.get("album_id") is not None
+        ),
+        None,
+    )
+    return {
+        "kind": "crate",
+        "id": str(crate["id"]),
+        "title": crate.get("name") or "Crate",
+        "content_version": _hash_payload(version_parts),
+        "updated_at": _iso(crate.get("updated_at")),
+        "track_count": len(manifest_tracks),
+        "total_bytes": sum(
+            int(track.get("byte_length") or 0) for track in manifest_tracks
+        ),
+        "tracks": manifest_tracks,
+        "artwork": {
+            "cover_url": (
+                f"/api/albums/{first_album_id}/cover"
+                if first_album_id is not None
+                else None
+            ),
+        },
+        "metadata": {
+            "crate_id": str(crate["id"]),
+            "crate_name": crate.get("name"),
+            "album_count": crate.get("album_count"),
+        },
+    }
+
+
 @router.get(
     "/tracks/{track_id}/manifest",
     response_model=OfflineManifestResponse,
@@ -393,3 +453,19 @@ def get_playlist_manifest(request: Request, playlist_id: int):
     if not tracks:
         raise HTTPException(status_code=404, detail="Playlist has no playable tracks")
     return _build_playlist_manifest(playlist, tracks)
+
+
+@router.get(
+    "/crates/{crate_id}/manifest",
+    response_model=OfflineManifestResponse,
+    responses=_OFFLINE_RESPONSES,
+    summary="Get an offline manifest for an accessible Crate",
+)
+def get_crate_manifest(request: Request, crate_id: UUID):
+    user = _require_auth(request)
+    crate, tracks = get_crate_offline_tracks_for_user(str(crate_id), user["id"])
+    if crate is None or tracks is None:
+        raise HTTPException(status_code=404, detail="Crate not found")
+    if not tracks:
+        raise HTTPException(status_code=404, detail="Crate has no playable tracks")
+    return _build_crate_manifest(crate, tracks)

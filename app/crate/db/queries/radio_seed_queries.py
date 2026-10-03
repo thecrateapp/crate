@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from sqlalchemy import text
 
 from crate.db.queries.playable_media_filters import (
     playable_media_params,
     playable_track_clause,
 )
+from crate.db.queries.crates import get_crate_access
 from crate.db.tx import optional_scope
 from crate.track_versions import track_song_identity
 
@@ -226,6 +229,112 @@ def get_playlist_seed(
     return vectors, label
 
 
+def get_crate_seed_context(
+    user_id: int,
+    crate_id: str,
+    limit: int = 30,
+    *,
+    session=None,
+) -> tuple[list[list[float]], str, dict] | None:
+    """Build a radio seed sampled across the albums of an accessible Crate."""
+
+    try:
+        crate_ref = str(UUID(str(crate_id)))
+    except (TypeError, ValueError):
+        return None
+
+    with optional_scope(session) as s:
+        if get_crate_access(crate_ref, user_id, session=s) == "none":
+            return None
+        crate = (
+            s.execute(
+                text(
+                    """
+                    SELECT name, is_ordered, sort_direction
+                    FROM crates
+                    WHERE id = CAST(:crate_id AS uuid)
+                    """
+                ),
+                {"crate_id": crate_ref},
+            )
+            .mappings()
+            .first()
+        )
+        if not crate:
+            return None
+        rows = (
+            s.execute(
+                text(
+                    f"""
+                    WITH crate_tracks AS (
+                        SELECT DISTINCT ON (library_track.id)
+                            library_track.id AS track_id,
+                            library_track.artist,
+                            library_track.title,
+                            library_track.bliss_vector,
+                            crate_album.global_album_uid,
+                            crate_album.position,
+                            COALESCE(catalog_track.disc_number, 1) AS disc_number,
+                            COALESCE(catalog_track.track_number, 0) AS track_number
+                        FROM crate_albums crate_album
+                        JOIN global_catalog_tracks catalog_track
+                          ON catalog_track.global_album_uid = crate_album.global_album_uid
+                        JOIN LATERAL (
+                            SELECT candidate.*
+                            FROM library_tracks candidate
+                            WHERE candidate.id = catalog_track.local_track_id
+                               OR candidate.entity_uid = catalog_track.local_track_entity_uid
+                            ORDER BY (candidate.id = catalog_track.local_track_id)
+                                     DESC NULLS LAST
+                            LIMIT 1
+                        ) library_track ON TRUE
+                        LEFT JOIN library_albums library_album
+                          ON library_album.id = library_track.album_id
+                        WHERE crate_album.crate_id = CAST(:crate_id AS uuid)
+                          AND library_track.bliss_vector IS NOT NULL
+                          AND {playable_track_clause("library_track", "library_album")}
+                        ORDER BY library_track.id, crate_album.position
+                    ),
+                    ranked_tracks AS (
+                        SELECT
+                            crate_tracks.*,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY crate_tracks.global_album_uid
+                                ORDER BY crate_tracks.disc_number,
+                                         crate_tracks.track_number,
+                                         crate_tracks.track_id
+                            ) AS album_rank
+                        FROM crate_tracks
+                    )
+                    SELECT track_id, artist, title, bliss_vector
+                    FROM ranked_tracks
+                    ORDER BY album_rank,
+                             CASE
+                                 WHEN :descending THEN -position
+                                 ELSE position
+                             END,
+                             track_id
+                    LIMIT :limit
+                    """
+                ),
+                {
+                    "crate_id": crate_ref,
+                    "limit": limit,
+                    "descending": bool(crate["is_ordered"])
+                    and crate["sort_direction"] == "desc",
+                    **playable_media_params(),
+                },
+            )
+            .mappings()
+            .all()
+        )
+
+    vectors = [list(row["bliss_vector"]) for row in rows]
+    if not vectors:
+        return None
+    return vectors, str(crate["name"]), _seed_context_from_rows(rows)
+
+
 def _get_track_seed_contexts_batch(
     track_refs: list[str], *, session=None
 ) -> list[dict]:
@@ -352,6 +461,7 @@ def get_home_playlist_seed(
 __all__ = [
     "get_album_seed_context",
     "get_home_playlist_seed_context",
+    "get_crate_seed_context",
     "get_home_playlist_seed",
     "get_playlist_seed_context",
     "get_playlist_seed",

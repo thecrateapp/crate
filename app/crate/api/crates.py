@@ -3,7 +3,8 @@
 import os
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi.responses import FileResponse
 
 from crate.api.auth import _require_auth
 from crate.api.openapi_responses import (
@@ -17,6 +18,7 @@ from crate.api.schemas.crates import (
     CrateAlbumResponse,
     CrateCreateResponse,
     CrateDetailResponse,
+    CrateDownloadResponse,
     CrateInviteAcceptResponse,
     CrateInvitePreviewResponse,
     CrateInviteResponse,
@@ -29,13 +31,25 @@ from crate.api.schemas.crates import (
     ReorderCrateAlbumsRequest,
     UpdateCrateRequest,
 )
+from crate.crate_download import (
+    CRATE_DOWNLOAD_KIND,
+    CRATE_DOWNLOAD_TASK_TYPE,
+    crate_download_dedup_key,
+    crate_download_filename,
+    crate_download_url,
+    is_crate_download_cache_key,
+)
 from crate.db.queries.crates import (
+    get_active_crate_invites,
     get_crate_access,
+    get_crate_download_source_for_user,
     get_crate_for_user,
     get_crate_invite,
     get_crate_members,
     get_crate_playback_tracks_for_user,
     get_crates_for_user,
+    get_followed_crates_for_user,
+    resolve_crate_ref,
 )
 from crate.db.repositories.crates import (
     CrateAlbumAlreadyExistsError,
@@ -44,17 +58,31 @@ from crate.db.repositories.crates import (
     CrateCollaborationDisabledError,
     CrateInviteExhaustedError,
     CrateNotFoundError,
+    CrateSelfFollowError,
     InvalidCrateAlbumOrderError,
     accept_crate_invite,
     add_crate_album,
     create_crate,
     create_crate_invite,
     delete_crate,
+    follow_crate,
     remove_crate_album,
     remove_crate_member,
     reorder_crate_albums,
     revoke_crate_invite,
+    unfollow_crate,
     update_crate,
+)
+from crate.db.repositories.tasks import (
+    create_task_dedup,
+    find_active_task_by_type_params,
+)
+from crate.download_cache import (
+    crate_cache_ttl_seconds,
+    crate_download_cache_key,
+    download_cache_enabled,
+    find_cached_download,
+    get_cached_download,
 )
 
 router = APIRouter(prefix="/api/crates", tags=["crates"])
@@ -126,6 +154,17 @@ def list_my_crates(request: Request):
     return get_crates_for_user(user["id"])
 
 
+@me_router.get(
+    "/crates/followed",
+    response_model=list[CrateSummaryResponse],
+    responses=AUTH_ERROR_RESPONSES,
+    summary="List public Crates followed by the current user",
+)
+def list_followed_crates(request: Request):
+    user = _require_auth(request)
+    return get_followed_crates_for_user(user["id"])
+
+
 @router.post(
     "",
     response_model=CrateCreateResponse,
@@ -139,6 +178,7 @@ def create(request: Request, body: CreateCrateRequest):
         owner_id=user["id"],
         name=body.name,
         description=body.description,
+        visibility=body.visibility,
         is_collaborative=body.is_collaborative,
         is_ordered=body.is_ordered,
         sort_direction=body.sort_direction,
@@ -188,9 +228,12 @@ def accept_invite(request: Request, token: str):
     responses=_CRATE_RESPONSES,
     summary="Get a Crate and its ordered albums",
 )
-def get_one(request: Request, crate_id: UUID):
+def get_one(request: Request, crate_id: str):
+    resolved_id = resolve_crate_ref(crate_id)
+    if resolved_id is None:
+        raise HTTPException(status_code=404, detail="Crate not found")
     user = getattr(getattr(request, "state", None), "user", None)
-    crate, access = get_crate_for_user(str(crate_id), int(user["id"]) if user else None)
+    crate, access = get_crate_for_user(resolved_id, int(user["id"]) if user else None)
     if crate is None:
         raise HTTPException(status_code=404, detail="Crate not found")
     crate["access"] = access
@@ -212,6 +255,141 @@ def playback(request: Request, crate_id: UUID):
     if tracks is None:
         raise HTTPException(status_code=404, detail="Crate not found")
     return tracks
+
+
+@router.post(
+    "/{crate_id}/follow",
+    response_model=OkResponse,
+    responses=_CRATE_RESPONSES,
+    summary="Follow a public Crate",
+)
+def follow(request: Request, crate_id: UUID):
+    user = _require_auth(request)
+    try:
+        follow_crate(str(crate_id), user["id"])
+    except CrateNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Public Crate not found") from exc
+    except CrateSelfFollowError as exc:
+        raise HTTPException(
+            status_code=409, detail="You cannot follow your own Crate"
+        ) from exc
+    return {"ok": True}
+
+
+@router.delete(
+    "/{crate_id}/follow",
+    response_model=OkResponse,
+    responses=_CRATE_RESPONSES,
+    summary="Unfollow a Crate",
+)
+def unfollow(request: Request, crate_id: UUID):
+    user = _require_auth(request)
+    unfollow_crate(str(crate_id), user["id"])
+    return {"ok": True}
+
+
+def _is_crate_download_cached(cache_key: str, filename: str) -> bool:
+    cached = get_cached_download(
+        CRATE_DOWNLOAD_KIND,
+        cache_key,
+        filename,
+        ttl_seconds=crate_cache_ttl_seconds(),
+    )
+    return cached is not None
+
+
+def _queue_crate_download(crate_id: str, cache_key: str) -> str | None:
+    dedup_key = crate_download_dedup_key(cache_key)
+    task_id = create_task_dedup(
+        CRATE_DOWNLOAD_TASK_TYPE, {"crate_id": crate_id}, dedup_key=dedup_key
+    )
+    return task_id or find_active_task_by_type_params(
+        CRATE_DOWNLOAD_TASK_TYPE, dedup_key=dedup_key
+    )
+
+
+@router.post(
+    "/{crate_id}/download",
+    response_model=CrateDownloadResponse,
+    responses=merge_responses(
+        _CRATE_RESPONSES,
+        {
+            202: {
+                "model": CrateDownloadResponse,
+                "description": "The ZIP archive is being prepared by the worker.",
+            },
+            503: error_response("The download cache is disabled."),
+        },
+    ),
+    summary="Prepare a ZIP archive of the local tracks in a Crate",
+)
+def request_download(request: Request, response: Response, crate_id: UUID):
+    user = _require_auth(request)
+    crate, tracks = get_crate_download_source_for_user(str(crate_id), user["id"])
+    if crate is None:
+        raise HTTPException(status_code=404, detail="Crate not found")
+    if not tracks:
+        raise HTTPException(
+            status_code=404, detail="Crate has no downloadable local tracks"
+        )
+    if not download_cache_enabled():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Download cache is disabled",
+        )
+
+    cache_key = crate_download_cache_key(crate, tracks)
+    filename = crate_download_filename(crate.get("name"))
+    ready = {
+        "status": "ready",
+        "download_url": crate_download_url(str(crate_id), cache_key),
+        "filename": filename,
+    }
+    if _is_crate_download_cached(cache_key, filename):
+        return ready
+    task_id = _queue_crate_download(str(crate_id), cache_key)
+    if task_id is None:
+        if _is_crate_download_cached(cache_key, filename):
+            return ready
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Crate download could not be queued",
+        )
+    response.status_code = status.HTTP_202_ACCEPTED
+    return {"status": "pending", "task_id": task_id, "filename": filename}
+
+
+@router.get(
+    "/{crate_id}/download/{cache_key}",
+    responses=merge_responses(
+        _CRATE_RESPONSES,
+        {
+            200: {
+                "description": "ZIP archive of the Crate's local tracks.",
+                "content": {"application/zip": {}},
+            }
+        },
+    ),
+    summary="Download a prepared Crate ZIP archive",
+)
+def download_artifact(request: Request, crate_id: UUID, cache_key: str):
+    user = _require_auth(request)
+    _require_crate_access(crate_id, user["id"])
+    if not is_crate_download_cache_key(cache_key):
+        raise HTTPException(status_code=404, detail="Download not found")
+    found = find_cached_download(
+        CRATE_DOWNLOAD_KIND, cache_key, ttl_seconds=crate_cache_ttl_seconds()
+    )
+    if found is None:
+        raise HTTPException(status_code=404, detail="Download not found")
+    cached, metadata = found
+    if metadata.get("crate_id") != str(crate_id):
+        raise HTTPException(status_code=404, detail="Download not found")
+    return FileResponse(
+        cached.path,
+        media_type="application/zip",
+        filename=str(metadata.get("filename") or cached.filename),
+    )
 
 
 @router.put(
@@ -359,15 +537,15 @@ def reorder_albums(request: Request, crate_id: UUID, body: ReorderCrateAlbumsReq
     "/{crate_id}/members",
     response_model=list[CrateMemberResponse],
     responses=_CRATE_RESPONSES,
-    summary="List Crate collaborators",
+    summary="List the Crate owner and collaborators",
 )
 def members(request: Request, crate_id: UUID):
     user = _require_auth(request)
-    _require_owner(
-        crate_id,
-        user["id"],
-        detail="Only the owner can manage Crate members",
-    )
+    access = _require_crate_access(crate_id, user["id"])
+    if access not in {"owner", "collaborator"}:
+        raise HTTPException(
+            status_code=403, detail="Only Crate members can view its members"
+        )
     return get_crate_members(str(crate_id))
 
 
@@ -375,15 +553,20 @@ def members(request: Request, crate_id: UUID):
     "/{crate_id}/members/{user_id}",
     response_model=CrateMembersMutationResponse,
     responses=_CRATE_RESPONSES,
-    summary="Remove a Crate collaborator",
+    summary="Remove a Crate collaborator, or leave a Crate as a collaborator",
 )
 def delete_member(request: Request, crate_id: UUID, user_id: int):
     user = _require_auth(request)
-    _require_owner(
-        crate_id,
-        user["id"],
-        detail="Only the owner can manage Crate members",
-    )
+    access = _require_crate_access(crate_id, user["id"])
+    is_self = user_id == user["id"]
+    if access == "owner" and is_self:
+        raise HTTPException(
+            status_code=409, detail="The owner cannot leave their own Crate"
+        )
+    if access != "owner" and not (is_self and access == "collaborator"):
+        raise HTTPException(
+            status_code=403, detail="Only the owner can manage Crate members"
+        )
     try:
         removed = remove_crate_member(str(crate_id), user_id, actor_id=user["id"])
     except CrateNotFoundError as exc:
@@ -394,7 +577,39 @@ def delete_member(request: Request, crate_id: UUID, user_id: int):
         ) from exc
     if not removed:
         raise HTTPException(status_code=404, detail="Crate member not found")
+    if is_self:
+        return {"ok": True, "members": []}
     return {"ok": True, "members": get_crate_members(str(crate_id))}
+
+
+@router.get(
+    "/{crate_id}/invites",
+    response_model=list[CrateInviteResponse],
+    responses=_CRATE_RESPONSES,
+    summary="List active Crate collaboration invites",
+)
+def list_invites(request: Request, crate_id: UUID):
+    user = _require_auth(request)
+    _require_owner(
+        crate_id,
+        user["id"],
+        detail="Only the owner can manage Crate invites",
+    )
+    invites = get_active_crate_invites(str(crate_id))
+    if not invites:
+        return []
+    try:
+        listen_origin = _listen_public_origin()
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Listen public URL is not configured",
+        ) from exc
+    result = []
+    for invite_row in invites:
+        join_url = _invite_join_url(invite_row["token"], listen_origin=listen_origin)
+        result.append({**invite_row, "join_url": join_url, "qr_value": join_url})
+    return result
 
 
 @router.post(

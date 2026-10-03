@@ -185,6 +185,8 @@ func TestUserLibraryCountsQueryKeepsCanonicalAndUnresolvedLegacyRefs(t *testing.
 	for _, table := range []string{"user_follows", "user_saved_albums"} {
 		assert.Contains(t, userLibraryCountsQuery, table)
 	}
+	assert.Contains(t, userLibraryCountsQuery, "FROM crates c")
+	assert.Contains(t, userLibraryCountsQuery, "AS crates")
 	assert.Contains(t, userLibraryCountsQuery, "projected.user_id IS NULL")
 }
 

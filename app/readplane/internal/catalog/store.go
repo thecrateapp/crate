@@ -52,7 +52,21 @@ const userLibraryCountsQuery = `
 				)
 			)::INTEGER AS saved_albums,
 			(SELECT COUNT(*) FROM user_liked_tracks WHERE user_id = $1)::INTEGER AS liked_tracks,
-			(SELECT COUNT(*) FROM playlists WHERE user_id = $1)::INTEGER AS playlists
+			(SELECT COUNT(*) FROM playlists WHERE user_id = $1)::INTEGER AS playlists,
+			(
+				SELECT COUNT(*)
+				FROM crates c
+				WHERE c.owner_id = $1
+				   OR (
+					   c.is_collaborative IS TRUE
+					   AND EXISTS (
+						   SELECT 1
+						   FROM crate_members member
+						   WHERE member.crate_id = c.id
+							 AND member.user_id = $1
+					   )
+				   )
+			)::INTEGER AS crates
 	`
 
 const followedArtistsQuery = `
@@ -333,7 +347,7 @@ type Store struct {
 	artistRowFn                func(context.Context, string, ...any) (map[string]any, error)
 	artistTopTracksFn          func(context.Context, string, int) ([]map[string]any, error)
 	favoritesFn                func(context.Context, int64) (map[string]any, error)
-	trackInfoFn                 func(context.Context, int64, string, any) (map[string]any, error)
+	trackInfoFn                func(context.Context, int64, string, any) (map[string]any, error)
 }
 
 type historyFallbackRef struct {

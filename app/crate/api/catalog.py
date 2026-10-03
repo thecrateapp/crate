@@ -908,6 +908,18 @@ def catalog_album_cover(
     image_format: str | None = Query(None, alias="format", pattern="^webp$"),
 ):
     _require_auth(request)
+    return serve_global_album_cover(
+        request, global_album_uid, size=size, image_format=image_format
+    )
+
+
+def serve_global_album_cover(
+    request: Request,
+    global_album_uid: str,
+    *,
+    size: int | None,
+    image_format: str | None,
+):
     try:
         selection = resolve_global_album_artwork(global_album_uid)
     except GlobalAlbumNotFound:
