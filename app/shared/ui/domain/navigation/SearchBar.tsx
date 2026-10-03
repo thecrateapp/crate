@@ -14,6 +14,8 @@ export interface SearchBarProps {
   onBlur?: () => void;
   className?: string;
   inputClassName?: string;
+  label?: string;
+  clearLabel?: string;
 }
 
 export function SearchBar({
@@ -28,6 +30,8 @@ export function SearchBar({
   onBlur,
   className,
   inputClassName,
+  label = "Search",
+  clearLabel = "Clear search",
 }: SearchBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -67,7 +71,7 @@ export function SearchBar({
         placeholder={placeholder}
         disabled={disabled}
         autoFocus={autoFocus}
-        aria-label="Search"
+        aria-label={label}
         className={cn(
           "h-12 w-full rounded-xl border-0 bg-transparent py-0 pl-12 pr-11 text-[0.9375rem] text-text-primary outline-none",
           "placeholder:text-text-primary/40",
@@ -87,7 +91,7 @@ export function SearchBar({
             type="button"
             onClick={handleClear}
             disabled={disabled}
-            aria-label="Clear search"
+            aria-label={clearLabel}
             className="pointer-events-auto flex size-9 items-center justify-center text-text-primary/30 transition-colors hover:text-text-primary/65 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <X size={CRATE_ICON_SIZE.lg} />

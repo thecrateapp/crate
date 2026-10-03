@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ConfirmDialog } from "./ConfirmDialog";
 
@@ -80,5 +80,153 @@ describe("ConfirmDialog", () => {
     expect(screen.getByRole("button", { name: /Confirm/i })).toHaveClass(
       "bg-state-danger",
     );
+  });
+
+  it("renders the danger tone with translated labels and a body", () => {
+    render(
+      <ConfirmDialog
+        open
+        title="¿Borrar playlist?"
+        description="No se puede deshacer."
+        body={<p>Se perderán 12 canciones.</p>}
+        tone="danger"
+        confirmLabel="Borrar"
+        cancelLabel="Cancelar"
+        closeLabel="Cerrar"
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "¿Borrar playlist?" }),
+    ).toHaveAccessibleDescription("No se puede deshacer.");
+    expect(screen.getByText("Se perderán 12 canciones.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Borrar" })).toHaveClass(
+      "bg-state-danger",
+    );
+    expect(screen.getByRole("button", { name: "Cerrar" })).toBeInTheDocument();
+  });
+
+  it("focuses cancel by default for danger and confirm for default tone", () => {
+    const { rerender } = render(
+      <ConfirmDialog
+        open
+        title="Delete?"
+        tone="danger"
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+
+    rerender(
+      <ConfirmDialog
+        open={false}
+        title="Save?"
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+      />,
+    );
+    rerender(
+      <ConfirmDialog
+        open
+        title="Save?"
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Confirm" })).toHaveFocus();
+  });
+
+  it("calls onCancel from the cancel button, close button and Escape", async () => {
+    const onCancel = vi.fn();
+    render(
+      <ConfirmDialog
+        open
+        title="Delete?"
+        onCancel={onCancel}
+        onConfirm={vi.fn()}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+
+    expect(onCancel).toHaveBeenCalledTimes(3);
+  });
+
+  it("blocks confirm, cancel and dismissal while pending", async () => {
+    const onCancel = vi.fn();
+    const onConfirm = vi.fn();
+    render(
+      <ConfirmDialog
+        open
+        pending
+        title="Delete?"
+        tone="danger"
+        onCancel={onCancel}
+        onConfirm={onConfirm}
+      />,
+    );
+
+    const confirm = screen.getByRole("button", { name: "Confirm" });
+    expect(confirm).toBeDisabled();
+    expect(confirm).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Close" })).toBeDisabled();
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    await userEvent.click(
+      screen.getByRole("button", { name: "Close dialog backdrop" }),
+    );
+
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("closes through onOpenChange only after an async confirm resolves", async () => {
+    let resolve: () => void = () => {};
+    const onConfirm = vi.fn(
+      () =>
+        new Promise<void>((done) => {
+          resolve = done;
+        }),
+    );
+    const onOpenChange = vi.fn();
+    render(
+      <ConfirmDialog
+        open
+        onOpenChange={onOpenChange}
+        title="Delete?"
+        onConfirm={onConfirm}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolve();
+    });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("does not render when closed", () => {
+    render(
+      <ConfirmDialog
+        open={false}
+        title="Delete?"
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

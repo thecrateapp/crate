@@ -6,25 +6,15 @@ import {
 } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
+import {
+  iconButtonToneClassName,
+  type IconButtonTone,
+} from "@crate/ui/primitives/IconButton";
 
-type ActionTone = "default" | "primary" | "danger";
+type ActionTone = IconButtonTone;
 type ActionVariant = "row" | "card";
 
-function actionToneClassName(tone: ActionTone, disabled: boolean) {
-  if (disabled) {
-    return "pointer-events-none text-text-subtle";
-  }
-
-  if (tone === "primary") {
-    return "text-accent-action hover:text-accent-action hover:drop-shadow-accent-action-active";
-  }
-
-  if (tone === "danger") {
-    return "text-state-danger hover:text-state-danger hover:drop-shadow-state-danger";
-  }
-
-  return "text-text-muted hover:text-accent-action hover:drop-shadow-accent-action";
-}
+const actionToneClassName = iconButtonToneClassName;
 
 function actionVariantClassName(variant: ActionVariant) {
   if (variant === "card") {
@@ -64,7 +54,7 @@ export const ActionIconButton = forwardRef<
       type={type}
       disabled={disabled}
       className={cn(
-        "flex items-center justify-center rounded-full transition-[color,filter,transform] hover:-translate-y-px [&_svg:not([class*='size-'])]:size-[18px]",
+        "flex items-center justify-center rounded-full outline-none transition-[color,filter,transform,box-shadow] hover:-translate-y-px focus-visible:shadow-focus [&_svg:not([class*='size-'])]:size-[18px]",
         actionVariantClassName(variant),
         actionToneClassName(active ? "primary" : tone, disabled),
         active && "animate-crate-icon-active-pulse",
@@ -100,7 +90,7 @@ export function ActionIconLink({
       href={href || "#"}
       aria-disabled={disabled || !href}
       className={cn(
-        "flex items-center justify-center rounded-full transition-[color,filter,transform] hover:-translate-y-px [&_svg:not([class*='size-'])]:size-[18px]",
+        "flex items-center justify-center rounded-full outline-none transition-[color,filter,transform,box-shadow] hover:-translate-y-px focus-visible:shadow-focus [&_svg:not([class*='size-'])]:size-[18px]",
         actionVariantClassName(variant),
         actionToneClassName(active ? "primary" : tone, disabled || !href),
         active && "animate-crate-icon-active-pulse",

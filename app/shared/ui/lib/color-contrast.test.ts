@@ -93,6 +93,25 @@ describe("color contrast", () => {
     });
   });
 
+  it("keeps the focus ring at 3:1 against every skin surface", () => {
+    expect(contrastRatio("#06b6d4", "#0a0a0f")).toBeGreaterThanOrEqual(3);
+
+    Object.values(SKIN_REGISTRY).forEach(({ modes }) => {
+      Object.values(modes).forEach((variables) => {
+        const ring = variables["--color-primary"];
+        const app = variables["--surface-app"];
+        const panel = variables["--surface-panel"];
+
+        if (ring && app) {
+          expect(contrastRatio(ring, app)).toBeGreaterThanOrEqual(3);
+        }
+        if (ring && panel) {
+          expect(contrastRatio(ring, panel)).toBeGreaterThanOrEqual(3);
+        }
+      });
+    });
+  });
+
   it("keeps the high-contrast Listen theme on the AA-safe base pairing", () => {
     const pairings = [
       ["#ffffff", "#000000"],

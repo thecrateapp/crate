@@ -1,14 +1,18 @@
+import type { ReactNode } from "react";
+
 import { AlertTriangle, CRATE_ICON_SIZE, RefreshCw } from "@crate/ui/icons";
 import { Button } from "@crate/ui/shadcn/button";
 
-interface ErrorStateProps {
-  message?: string;
+export interface ErrorStateProps {
+  message?: ReactNode;
   onRetry?: () => void;
+  retryLabel?: string;
 }
 
 export function ErrorState({
   message = "Something went wrong",
   onRetry,
+  retryLabel = "Retry",
 }: ErrorStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -16,7 +20,7 @@ export function ErrorState({
       <p className="text-text-muted mb-4">{message}</p>
       {onRetry && (
         <Button variant="outline" size="sm" onClick={onRetry}>
-          <RefreshCw size={CRATE_ICON_SIZE.sm} className="mr-1" /> Retry
+          <RefreshCw size={CRATE_ICON_SIZE.sm} className="mr-1" /> {retryLabel}
         </Button>
       )}
     </div>

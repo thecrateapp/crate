@@ -24,6 +24,7 @@ export type ItemActionMenuEntry = ContextMenuEntry;
 
 export interface UseItemActionMenuOptions {
   disabled?: boolean;
+  hasActions?: boolean;
   onOpenChange?: (open: boolean) => void;
   placement?: ContextMenuPlacement;
 }
@@ -43,6 +44,7 @@ export interface UseItemActionMenuReturn {
   shouldUseDesktopMenu: boolean;
   longPressHandlers: {
     onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
+    onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
     onPointerUp: () => void;
     onPointerCancel: () => void;
     onPointerLeave: () => void;
@@ -50,23 +52,33 @@ export interface UseItemActionMenuReturn {
   };
 }
 
+const LONG_PRESS_MS = 420;
+const LONG_PRESS_MOVE_TOLERANCE_PX = 10;
+
 export function useItemActionMenu(
   actions: ItemActionMenuEntry[],
   options: UseItemActionMenuOptions = {},
 ): UseItemActionMenuReturn {
   const isDesktop = useIsDesktop();
-  const { disabled = false, onOpenChange, placement } = options;
+  const {
+    disabled = false,
+    hasActions: hasActionsOverride,
+    onOpenChange,
+    placement,
+  } = options;
   const longPressTimerRef = useRef<number | null>(null);
   const longPressTriggeredRef = useRef(false);
+  const longPressOriginRef = useRef<{ x: number; y: number } | null>(null);
   const hasActions = useMemo(
     () =>
+      hasActionsOverride ??
       actions.some(
         (entry) =>
           entry.type == null ||
           entry.type === "action" ||
           entry.type === "disclosure",
       ),
-    [actions],
+    [actions, hasActionsOverride],
   );
   const controller = useContextMenuController<HTMLButtonElement>({
     disabled: disabled || !hasActions,
@@ -85,21 +97,37 @@ export function useItemActionMenu(
       window.clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+    longPressOriginRef.current = null;
   };
 
   const handleLongPressPointerDown = (
     event: ReactPointerEvent<HTMLElement>,
   ) => {
+    longPressTriggeredRef.current = false;
     if (controller.shouldUseDesktopMenu || !hasActions || disabled) return;
     if (event.pointerType === "mouse") return;
-    longPressTriggeredRef.current = false;
     clearLongPress();
     const target = event.currentTarget;
+    longPressOriginRef.current = { x: event.clientX, y: event.clientY };
     longPressTimerRef.current = window.setTimeout(() => {
       const rect = target.getBoundingClientRect();
+      longPressTimerRef.current = null;
+      longPressOriginRef.current = null;
       longPressTriggeredRef.current = true;
       openAtPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-    }, 420);
+    }, LONG_PRESS_MS);
+  };
+
+  const handleLongPressPointerMove = (
+    event: ReactPointerEvent<HTMLElement>,
+  ) => {
+    const origin = longPressOriginRef.current;
+    if (!origin || longPressTimerRef.current == null) return;
+    const distance = Math.hypot(
+      event.clientX - origin.x,
+      event.clientY - origin.y,
+    );
+    if (distance > LONG_PRESS_MOVE_TOLERANCE_PX) clearLongPress();
   };
 
   const handleLongPressPointerUp = () => {
@@ -128,6 +156,7 @@ export function useItemActionMenu(
     shouldUseDesktopMenu: controller.shouldUseDesktopMenu,
     longPressHandlers: {
       onPointerDown: handleLongPressPointerDown,
+      onPointerMove: handleLongPressPointerMove,
       onPointerUp: handleLongPressPointerUp,
       onPointerCancel: handleLongPressPointerUp,
       onPointerLeave: handleLongPressPointerUp,
@@ -144,6 +173,8 @@ export interface ItemActionMenuProps {
   menuRef: RefObject<HTMLDivElement | null>;
   onClose: () => void;
   renderMediaImage?: ContextMenuMediaImageRenderer;
+  surfaceClassName?: string;
+  sheetLabel?: string;
 }
 
 export interface ItemActionMenuButtonProps {
@@ -153,4 +184,5 @@ export interface ItemActionMenuButtonProps {
   title?: string;
   onContextMenu?: (event: ReactMouseEvent<HTMLButtonElement>) => void;
   hasActions?: boolean;
+  expanded?: boolean;
 }

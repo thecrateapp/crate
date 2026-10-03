@@ -66,4 +66,14 @@ describe("runtime token bridge", () => {
     expect(typography).toContain("--text-counter: 0.5rem");
     expect(typography).toContain("--text-counter--line-height: 1");
   });
+
+  it("renders the focus token as a visible 2px ring on the focus colour", () => {
+    const semantic = readTokenFile("semantic.css");
+
+    expect(semantic).toMatch(
+      /--focus-shadow:\s*0 0 0 2px var\(--focus-ring\);/,
+    );
+    expect(semantic).toContain("--shadow-focus: var(--focus-shadow);");
+    expect(semantic).toContain("--focus-ring: var(--color-ring);");
+  });
 });

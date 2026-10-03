@@ -32,4 +32,11 @@ describe("ErrorState", () => {
     await userEvent.click(screen.getByRole("button", { name: /Retry/i }));
     expect(handleRetry).toHaveBeenCalledTimes(1);
   });
+
+  it("uses a translated retry label", () => {
+    render(<ErrorState onRetry={() => {}} retryLabel="Reintentar" />);
+    expect(
+      screen.getByRole("button", { name: /Reintentar/i }),
+    ).toBeInTheDocument();
+  });
 });

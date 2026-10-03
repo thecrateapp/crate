@@ -145,3 +145,61 @@ describe("FollowHeartButton", () => {
     }
   });
 });
+
+describe("FollowHeartButton labels and loading", () => {
+  it("uses label and labelActive depending on state", () => {
+    const { rerender } = render(
+      <FollowHeartButton
+        following={false}
+        label="Follow"
+        labelActive="Unfollow"
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Follow", pressed: false }),
+    ).toBeInTheDocument();
+
+    rerender(
+      <FollowHeartButton following label="Follow" labelActive="Unfollow" />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Unfollow", pressed: true }),
+    ).toBeInTheDocument();
+  });
+
+  it("falls back to label when labelActive is missing", () => {
+    render(<FollowHeartButton following label="Saved" />);
+    expect(screen.getByRole("button", { name: "Saved" })).toBeInTheDocument();
+  });
+
+  it("keeps an explicit aria-label", () => {
+    render(
+      <FollowHeartButton
+        following={false}
+        label="Follow"
+        aria-label="Custom"
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Custom" })).toBeInTheDocument();
+  });
+
+  it("disables, marks busy and spins while loading", () => {
+    const onClick = vi.fn();
+    render(
+      <FollowHeartButton
+        following={false}
+        label="Follow"
+        loading
+        heartTestId="heart"
+        onClick={onClick}
+      />,
+    );
+    const button = screen.getByRole("button", { name: "Follow" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("aria-busy", "true");
+    expect(button).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("heart")).toHaveClass("animate-spin");
+    fireEvent.click(button);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+});

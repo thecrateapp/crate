@@ -90,3 +90,34 @@ describe("MediaCover", () => {
     );
   });
 });
+
+describe("MediaCover fallback", () => {
+  it("renders a ReactNode fallback after an image error", () => {
+    const { getByTestId, queryByTestId } = render(
+      <MediaCover src="broken.jpg" fallback={<span data-testid="custom" />} />,
+    );
+    fireEvent.error(getByTestId("media-cover-image"));
+    expect(queryByTestId("media-cover-image")).not.toBeInTheDocument();
+    expect(getByTestId("custom")).toBeInTheDocument();
+  });
+
+  it("renders string fallbacks as initials text", () => {
+    const { getByText, container } = render(<MediaCover fallback="AB" />);
+    expect(getByText("AB")).toBeInTheDocument();
+    expect(container.querySelector("svg")).not.toBeInTheDocument();
+  });
+
+  it("exposes alt on the fallback container", () => {
+    const { getByRole } = render(<MediaCover alt="Album cover" />);
+    expect(getByRole("img", { name: "Album cover" })).toBeInTheDocument();
+  });
+
+  it("resets the error when src changes", () => {
+    const { getByTestId, rerender } = render(
+      <MediaCover src="broken.jpg" fallback="X" />,
+    );
+    fireEvent.error(getByTestId("media-cover-image"));
+    rerender(<MediaCover src="next.jpg" fallback="X" />);
+    expect(getByTestId("media-cover-image")).toHaveAttribute("src", "next.jpg");
+  });
+});

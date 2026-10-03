@@ -2,10 +2,11 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
 
+import { Loader2 } from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap font-medium transition-[color,background-color,border-color,box-shadow,opacity,transform] outline-none disabled:pointer-events-none disabled:opacity-50 focus-visible:border-border-focus focus-visible:shadow-focus aria-invalid:border-state-danger [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px]",
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap font-medium transition-[color,background-color,border-color,box-shadow,opacity,transform] outline-none disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 focus-visible:border-border-focus focus-visible:shadow-focus aria-invalid:border-state-danger [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px]",
   {
     variants: {
       variant: {
@@ -13,6 +14,8 @@ const buttonVariants = cva(
           "rounded-md bg-accent-action text-accent-action-foreground shadow-action hover:bg-accent-action-hover",
         destructive:
           "rounded-md bg-state-danger text-state-danger-foreground hover:bg-state-danger/90 dark:bg-state-danger/60",
+        "danger-soft":
+          "rounded-md border border-state-danger/25 bg-state-danger/10 text-state-danger-text hover:border-state-danger/40 hover:bg-state-danger/15",
         outline:
           "rounded-md border border-border-subtle bg-surface-control text-text-primary shadow-control-inset hover:bg-surface-control-hover hover:text-text-primary",
         secondary:
@@ -32,6 +35,10 @@ const buttonVariants = cva(
         "icon-sm": "size-8 rounded-md [&_svg:not([class*='size-'])]:size-4",
         "icon-lg": "size-11 rounded-md [&_svg:not([class*='size-'])]:size-5",
       },
+      shape: {
+        rect: "",
+        pill: "rounded-full",
+      },
     },
     defaultVariants: {
       variant: "default",
@@ -40,27 +47,61 @@ const buttonVariants = cva(
   },
 );
 
+type ButtonProps = React.ComponentProps<"button"> &
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean;
+    loading?: boolean;
+  };
+
 function Button({
   className,
   variant = "default",
   size = "default",
+  shape = "rect",
   asChild = false,
+  loading = false,
+  children,
   ...props
-}: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean;
-  }) {
-  const Comp = asChild ? Slot.Root : "button";
+}: ButtonProps) {
+  const sharedProps = {
+    "data-slot": "button",
+    "data-variant": variant,
+    "data-size": size,
+    "data-shape": shape,
+    "aria-busy": loading || undefined,
+    className: cn(buttonVariants({ variant, size, shape, className })),
+  };
+
+  if (asChild) {
+    return (
+      <Slot.Root
+        {...sharedProps}
+        aria-disabled={props.disabled || loading || undefined}
+        {...props}
+      >
+        {children}
+      </Slot.Root>
+    );
+  }
 
   return (
-    <Comp
-      data-slot="button"
-      data-variant={variant}
-      data-size={size}
-      className={cn(buttonVariants({ variant, size, className }))}
+    <button
+      {...sharedProps}
       {...props}
-    />
+      type={props.type ?? "button"}
+      disabled={props.disabled || loading}
+    >
+      {loading ? (
+        <Loader2
+          data-slot="button-spinner"
+          aria-hidden="true"
+          className="animate-spin"
+        />
+      ) : null}
+      {children}
+    </button>
   );
 }
 
 export { Button, buttonVariants };
+export type { ButtonProps };

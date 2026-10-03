@@ -184,8 +184,7 @@
   --font-brand: "Poppins";
   --action-shadow: 0 14px 28px
     color-mix(in srgb, var(--accent-action) 22%, transparent);
-  --focus-shadow: 0 0 0 1px
-    color-mix(in srgb, var(--focus-ring) 8%, transparent);
+  --focus-shadow: 0 0 0 2px var(--focus-ring);
   --control-inset-shadow: inset 0 1px 0
     color-mix(in srgb, var(--text-primary) 4%, transparent);
   --icon-control-shadow: 0 8px 24px

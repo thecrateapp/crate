@@ -93,6 +93,33 @@ describe("ItemActionMenuButton", () => {
     expect(button).toBeInTheDocument();
   });
 
+  it("exposes menu popup semantics and the focus ring", () => {
+    const { rerender } = render(
+      <ItemActionMenuButton
+        buttonRef={createRef<HTMLButtonElement>()}
+        onClick={vi.fn()}
+      />,
+    );
+
+    const button = screen.getByRole("button", { name: "More actions" });
+    expect(button).toHaveAttribute("aria-haspopup", "menu");
+    expect(button).not.toHaveAttribute("aria-expanded");
+    expect(button).toHaveClass("focus-visible:shadow-focus");
+
+    rerender(
+      <ItemActionMenuButton
+        buttonRef={createRef<HTMLButtonElement>()}
+        onClick={vi.fn()}
+        title="Más acciones"
+        expanded
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Más acciones" }),
+    ).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("returns null when hasActions=false", () => {
     const { container } = render(
       <ItemActionMenuButton

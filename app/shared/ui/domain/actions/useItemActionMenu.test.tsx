@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 
 import { useItemActionMenu } from "./useItemActionMenu";
@@ -318,5 +318,105 @@ describe("useItemActionMenu", () => {
       useItemActionMenu([{ key: "a", label: "A", onSelect: vi.fn() }]),
     );
     expect(result.current.isDesktop).toBe(true);
+  });
+
+  describe("long press", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function createPointerEvent(
+      pointerType: string,
+      clientX = 10,
+      clientY = 10,
+    ): React.PointerEvent<HTMLElement> {
+      const target = document.createElement("div");
+      target.getBoundingClientRect = () =>
+        ({ left: 0, top: 0, width: 100, height: 40 }) as DOMRect;
+      return {
+        pointerType,
+        clientX,
+        clientY,
+        currentTarget: target,
+      } as unknown as React.PointerEvent<HTMLElement>;
+    }
+
+    function renderTouchMenu() {
+      canHover = false;
+      return renderHook(() =>
+        useItemActionMenu([{ key: "a", label: "A", onSelect: vi.fn() }]),
+      );
+    }
+
+    it("opens after a stationary touch press", () => {
+      const { result } = renderTouchMenu();
+
+      act(() => {
+        result.current.longPressHandlers.onPointerDown(
+          createPointerEvent("touch"),
+        );
+        vi.advanceTimersByTime(420);
+      });
+
+      expect(result.current.open).toBe(true);
+    });
+
+    it("cancels the press when the pointer moves past the threshold", () => {
+      const { result } = renderTouchMenu();
+
+      act(() => {
+        result.current.longPressHandlers.onPointerDown(
+          createPointerEvent("touch", 10, 10),
+        );
+        result.current.longPressHandlers.onPointerMove(
+          createPointerEvent("touch", 10, 24),
+        );
+        vi.advanceTimersByTime(420);
+      });
+
+      expect(result.current.open).toBe(false);
+    });
+
+    it("keeps the press alive for small jitter", () => {
+      const { result } = renderTouchMenu();
+
+      act(() => {
+        result.current.longPressHandlers.onPointerDown(
+          createPointerEvent("touch", 10, 10),
+        );
+        result.current.longPressHandlers.onPointerMove(
+          createPointerEvent("touch", 14, 13),
+        );
+        vi.advanceTimersByTime(420);
+      });
+
+      expect(result.current.open).toBe(true);
+    });
+
+    it("does not swallow the next mouse click after a touch long press", () => {
+      const { result } = renderTouchMenu();
+
+      act(() => {
+        result.current.longPressHandlers.onPointerDown(
+          createPointerEvent("touch"),
+        );
+        vi.advanceTimersByTime(420);
+      });
+      act(() => {
+        result.current.close();
+        result.current.longPressHandlers.onPointerDown(
+          createPointerEvent("mouse"),
+        );
+      });
+
+      const click = createMouseEvent<HTMLElement>(0, 0);
+      result.current.longPressHandlers.onClickCapture(click);
+
+      expect(click.preventDefault).not.toHaveBeenCalled();
+    });
   });
 });

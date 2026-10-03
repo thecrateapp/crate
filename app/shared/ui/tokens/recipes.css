@@ -455,38 +455,6 @@
   accent-color: var(--accent-action);
 }
 
-.home-playback-row:hover,
-.home-playback-row:focus-visible {
-  background: var(--surface-placeholder);
-}
-
-.home-playback-row:focus-visible,
-.home-queue-card:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--border-accent-focus);
-}
-
-.home-playback-cover-overlay {
-  background: transparent;
-  transition: background-color var(--motion-duration-fast) ease;
-}
-
-.home-playback-row:hover .home-playback-cover-overlay,
-.home-queue-card:hover .home-playback-cover-overlay {
-  background: var(--surface-canvas-hover);
-}
-
-.home-playback-cover-play-icon {
-  color: var(--text-primary);
-  opacity: 0;
-  transition: opacity var(--motion-duration-fast) ease;
-}
-
-.home-playback-row:hover .home-playback-cover-play-icon,
-.home-queue-card:hover .home-playback-cover-play-icon {
-  opacity: 1;
-}
-
 .home-playback-panel,
 .home-replay-panel {
   border: 1px solid var(--border-quiet);
@@ -500,12 +468,6 @@
 
 .home-playback-empty-state {
   border: 1px dashed var(--border-quiet);
-}
-
-.home-playback-card,
-.home-queue-card {
-  border: 1px solid var(--border-quiet);
-  background: var(--surface-card);
 }
 
 .home-playback-empty-card {
@@ -527,16 +489,6 @@
   border: 1px solid var(--border-accent-soft);
   background: var(--surface-accent);
   color: var(--accent-action);
-}
-
-.home-replay-count-badge {
-  border: 1px solid var(--border-quiet);
-  background: var(--surface-card);
-  color: var(--text-muted);
-}
-
-.home-playback-album-text {
-  color: var(--text-meta);
 }
 
 .home-replay-card {
@@ -1618,9 +1570,7 @@
   box-shadow: 0 25px 50px -12px color-mix(in srgb, var(--surface-canvas) 20%, transparent);
 }
 
-.stats-mosaic-cell,
-.stats-track-cover,
-.stats-album-cover {
+.stats-mosaic-cell {
   border: 1px solid var(--border-quiet);
   background: var(--surface-card);
 }
@@ -1652,16 +1602,6 @@
   border: 1px solid color-mix(in srgb, var(--accent-action) 25%, transparent);
   background: var(--surface-canvas-panel);
   color: var(--accent-action);
-}
-
-.stats-replay-row {
-  background: color-mix(in srgb, var(--surface-canvas) 15%, transparent);
-}
-
-.stats-replay-row:hover,
-.stats-list-row:hover {
-  border-color: var(--border-quiet);
-  background: var(--surface-quiet);
 }
 
 .stats-narrative-tile {
@@ -1782,10 +1722,6 @@
   );
 }
 
-.stats-list-row {
-  border-color: transparent;
-}
-
 .stats-artist-card {
   border: 1px solid var(--border-quiet);
   background: var(--surface-card);
@@ -1826,17 +1762,12 @@
   color: var(--border-control);
 }
 
-.stats-artist-title,
-.stats-album-rank {
+.stats-artist-title {
   color: var(--text-primary);
 }
 
 .stats-artist-meta {
   color: var(--text-secondary-soft);
-}
-
-.stats-album-rank {
-  background: var(--surface-canvas-overlay);
 }
 
 .user-profile-hero {

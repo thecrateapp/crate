@@ -1,8 +1,11 @@
 import {
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   type MouseEvent as ReactMouseEvent,
+  type RefObject,
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useRef,
   useState,
@@ -85,6 +88,97 @@ export function shouldRenderDesktopContextMenu(
   if (typeof window === "undefined") return false;
   if (isTouchDominant) return false;
   return true;
+}
+
+const DEFAULT_SURFACE_CLASS_NAME = "listen-glass-panel";
+const MENU_ITEM_FOCUS_CLASS_NAME =
+  "focus-visible:shadow-focus focus-visible:outline-none";
+const MENU_ITEM_SELECTOR = '[role="menuitem"]:not([disabled])';
+
+function getMenuItems(container: HTMLElement | null): HTMLElement[] {
+  if (!container) return [];
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(MENU_ITEM_SELECTOR),
+  ).filter((item) => item.closest('[role="menu"]') === container);
+}
+
+function focusMenuItem(item: HTMLElement | undefined) {
+  item?.focus({ preventScroll: true });
+}
+
+function focusFirstMenuItem(container: HTMLElement | null) {
+  focusMenuItem(getMenuItems(container)[0]);
+}
+
+function handleMenuNavigationKey(
+  event: ReactKeyboardEvent<HTMLElement>,
+  container: HTMLElement | null,
+): boolean {
+  const items = getMenuItems(container);
+  if (items.length === 0) return false;
+  const currentIndex = items.findIndex(
+    (item) => item === document.activeElement,
+  );
+  let nextIndex: number | null = null;
+
+  switch (event.key) {
+    case "ArrowDown":
+      nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % items.length;
+      break;
+    case "ArrowUp":
+      nextIndex =
+        currentIndex < 0
+          ? items.length - 1
+          : (currentIndex - 1 + items.length) % items.length;
+      break;
+    case "Home":
+      nextIndex = 0;
+      break;
+    case "End":
+      nextIndex = items.length - 1;
+      break;
+    default:
+      return false;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  focusMenuItem(items[nextIndex]);
+  return true;
+}
+
+function useMenuFocusManagement(
+  active: boolean,
+  mode: "desktop" | "sheet",
+  containerRef: RefObject<HTMLElement | null>,
+) {
+  const getContainer = useEffectEvent(() => containerRef.current);
+
+  useEffect(() => {
+    if (!active) return;
+    const container = getContainer();
+    const previous =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    focusFirstMenuItem(container);
+
+    return () => {
+      const current = document.activeElement;
+      const focusWasInMenu =
+        !current ||
+        current === document.body ||
+        Boolean(container?.contains(current));
+      if (
+        focusWasInMenu &&
+        previous &&
+        previous !== document.body &&
+        document.contains(previous)
+      ) {
+        previous.focus({ preventScroll: true });
+      }
+    };
+  }, [active, mode]);
 }
 
 function hasSelectableEntries(items: ContextMenuEntry[]): boolean {
@@ -218,12 +312,16 @@ function ContextMenuDisclosure({
   entry,
   onClose,
   desktop,
+  surfaceClassName,
 }: {
   entry: Extract<ContextMenuEntry, { type: "disclosure" }>;
   onClose: () => void;
   desktop: boolean;
+  surfaceClassName: string;
 }) {
   const anchorRef = useRef<HTMLDivElement>(null);
+  const submenuRef = useRef<HTMLDivElement>(null);
+  const focusSubmenuOnOpenRef = useRef(false);
   const [position, setPosition] = useState({ left: 12, top: 12 });
   const Icon = entry.icon;
   const Indicator = entry.expanded ? ChevronDown : ChevronRight;
@@ -251,16 +349,69 @@ function ContextMenuDisclosure({
     });
   }, [desktop, entry.expanded]);
 
+  useEffect(() => {
+    if (!desktop || !entry.expanded || !focusSubmenuOnOpenRef.current) return;
+    focusSubmenuOnOpenRef.current = false;
+    focusFirstMenuItem(submenuRef.current);
+  }, [desktop, entry.expanded]);
+
+  const handleTriggerKeyDown = (
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+  ) => {
+    if (entry.disabled) return;
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      event.stopPropagation();
+      if (entry.expanded) {
+        if (desktop) focusFirstMenuItem(submenuRef.current);
+        return;
+      }
+      focusSubmenuOnOpenRef.current = desktop;
+      entry.onToggle();
+      return;
+    }
+    if (event.key === "ArrowLeft" && entry.expanded && !desktop) {
+      event.preventDefault();
+      event.stopPropagation();
+      entry.onToggle();
+    }
+  };
+
+  const handleSubmenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      event.stopPropagation();
+      entry.onToggle();
+      anchorRef.current
+        ?.querySelector<HTMLElement>('[role="menuitem"]')
+        ?.focus({ preventScroll: true });
+      return;
+    }
+    if (handleMenuNavigationKey(event, submenuRef.current)) return;
+    if (event.key !== "Escape") event.stopPropagation();
+  };
+
   const submenu = (
     <div
+      ref={submenuRef}
       data-dismissible-layer-boundary="true"
       data-testid={`context-menu-submenu-${entry.key}`}
       role="menu"
-      className="listen-glass-panel fixed z-app-context-menu w-72 max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-y-auto rounded-2xl animate-pop-in"
+      aria-label={entry.label}
+      className={cn(
+        surfaceClassName,
+        "fixed z-app-context-menu w-72 max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-y-auto rounded-2xl animate-pop-in",
+      )}
       style={{ left: position.left, top: position.top }}
+      onKeyDown={handleSubmenuKeyDown}
     >
       <div className="p-1.5">
-        <ContextMenuItems items={entry.items} onClose={onClose} desktop />
+        <ContextMenuItems
+          items={entry.items}
+          onClose={onClose}
+          desktop
+          surfaceClassName={surfaceClassName}
+        />
       </div>
     </div>
   );
@@ -273,13 +424,18 @@ function ContextMenuDisclosure({
     >
       <AppMenuButton
         role="menuitem"
+        aria-haspopup={desktop ? "menu" : undefined}
         aria-expanded={entry.expanded}
         disabled={entry.disabled}
         onClick={(event) => {
           event.stopPropagation();
           if (!entry.disabled) entry.onToggle();
         }}
-        className={cn(entry.disabled ? "opacity-50" : undefined)}
+        onKeyDown={handleTriggerKeyDown}
+        className={cn(
+          MENU_ITEM_FOCUS_CLASS_NAME,
+          entry.disabled ? "opacity-50" : undefined,
+        )}
       >
         <span className="flex min-w-0 flex-1 items-center gap-3">
           {Icon ? (
@@ -296,7 +452,11 @@ function ContextMenuDisclosure({
         : null}
       {!desktop && entry.expanded ? (
         <div className="space-y-1 px-3 pb-2">
-          <ContextMenuItems items={entry.items} onClose={onClose} />
+          <ContextMenuItems
+            items={entry.items}
+            onClose={onClose}
+            surfaceClassName={surfaceClassName}
+          />
         </div>
       ) : null}
     </div>
@@ -307,10 +467,12 @@ function ContextMenuItems({
   items,
   onClose,
   desktop = false,
+  surfaceClassName,
 }: {
   items: ContextMenuEntry[];
   onClose: () => void;
   desktop?: boolean;
+  surfaceClassName: string;
 }) {
   const handleSelect = (
     entry: Extract<ContextMenuEntry, { type?: "action" }>,
@@ -352,6 +514,7 @@ function ContextMenuItems({
               entry={entry}
               onClose={onClose}
               desktop={desktop}
+              surfaceClassName={surfaceClassName}
             />
           );
         }
@@ -367,6 +530,7 @@ function ContextMenuItems({
               handleSelect(entry);
             }}
             className={cn(
+              MENU_ITEM_FOCUS_CLASS_NAME,
               entry.active ? "text-accent-action" : undefined,
               entry.disabled ? "opacity-50" : undefined,
             )}
@@ -403,6 +567,8 @@ export function ContextMenu({
   menuRef,
   onClose,
   className,
+  surfaceClassName = DEFAULT_SURFACE_CLASS_NAME,
+  sheetLabel,
   renderMediaImage,
 }: ContextMenuProps) {
   const isDesktop = useIsDesktop();
@@ -412,8 +578,21 @@ export function ContextMenu({
     canHover,
     isTouchDominant: detectTouchDominant(),
   });
+  const sheetMenuRef = useRef<HTMLDivElement>(null);
+  const isRendered = open && hasSelectableEntries(items);
+  const keyboardContainerRef = shouldUseDesktopMenu ? menuRef : sheetMenuRef;
 
-  if (!open || !hasSelectableEntries(items)) return null;
+  useMenuFocusManagement(
+    isRendered,
+    shouldUseDesktopMenu ? "desktop" : "sheet",
+    keyboardContainerRef,
+  );
+
+  if (!isRendered) return null;
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    handleMenuNavigationKey(event, keyboardContainerRef.current);
+  };
 
   const content = (desktop: boolean) => (
     <>
@@ -422,17 +601,30 @@ export function ContextMenu({
         renderMediaImage={renderMediaImage}
       />
       <div className="p-1.5">
-        <ContextMenuItems items={items} onClose={onClose} desktop={desktop} />
+        <ContextMenuItems
+          items={items}
+          onClose={onClose}
+          desktop={desktop}
+          surfaceClassName={surfaceClassName}
+        />
       </div>
     </>
   );
 
   if (!shouldUseDesktopMenu) {
     return (
-      <MobileActionSheet open={open} panelRef={menuRef} onClose={onClose}>
+      <MobileActionSheet
+        open={open}
+        panelRef={menuRef}
+        onClose={onClose}
+        ariaLabel={sheetLabel}
+        surfaceClassName={surfaceClassName}
+      >
         <div
+          ref={sheetMenuRef}
           role="menu"
           className="max-h-[calc(100%-5rem)] overflow-y-auto pb-3"
+          onKeyDown={handleKeyDown}
         >
           {content(false)}
         </div>
@@ -451,8 +643,10 @@ export function ContextMenu({
     <div
       ref={menuRef}
       role="menu"
+      onKeyDown={handleKeyDown}
       className={cn(
-        "listen-glass-panel fixed z-app-context-menu w-72 max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] origin-top-left overflow-y-auto overflow-x-hidden rounded-2xl animate-pop-in",
+        surfaceClassName,
+        "fixed z-app-context-menu w-72 max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] origin-top-left overflow-y-auto overflow-x-hidden rounded-2xl animate-pop-in",
         className,
       )}
       style={style}

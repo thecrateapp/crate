@@ -53,6 +53,8 @@ export interface ContextMenuProps {
   menuRef: RefObject<HTMLDivElement | null>;
   onClose: () => void;
   className?: string;
+  surfaceClassName?: string;
+  sheetLabel?: string;
   renderMediaImage?: ContextMenuMediaImageRenderer;
 }
 
@@ -62,6 +64,8 @@ export interface MobileActionSheetProps {
   onClose: () => void;
   open: boolean;
   className?: string;
+  ariaLabel?: string;
+  surfaceClassName?: string;
 }
 
 export interface DesktopMenuEnvironment {
