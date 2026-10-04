@@ -20,7 +20,7 @@ export function MobileActionSheet({
   open,
   className,
   ariaLabel = "Action sheet",
-  surfaceClassName = "listen-glass-panel",
+  surfaceClassName,
 }: MobileActionSheetProps) {
   const [shouldRender, setShouldRender] = useState(open);
   const [isClosing, setIsClosing] = useState(false);
@@ -200,6 +200,7 @@ export function MobileActionSheet({
         ref={resolvedPanelRef}
         data-dismissible-layer-boundary="true"
         className={cn(
+          "listen-glass-panel",
           surfaceClassName,
           "fixed inset-x-0 overflow-hidden overscroll-contain rounded-t-3xl border border-border-quiet shadow-2xl",
           isClosing && swipeY === 0

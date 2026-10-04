@@ -567,10 +567,11 @@ export function ContextMenu({
   menuRef,
   onClose,
   className,
-  surfaceClassName = DEFAULT_SURFACE_CLASS_NAME,
+  surfaceClassName: surfaceClassNameProp,
   sheetLabel,
   renderMediaImage,
 }: ContextMenuProps) {
+  const surfaceClassName = cn(DEFAULT_SURFACE_CLASS_NAME, surfaceClassNameProp);
   const isDesktop = useIsDesktop();
   const canHover = useHoverCapability();
   const shouldUseDesktopMenu = shouldRenderDesktopContextMenu({

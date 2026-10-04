@@ -576,7 +576,7 @@ describe("ContextMenu", () => {
     expect(parent).toHaveFocus();
   });
 
-  it("lets consumers override the panel surface class", () => {
+  it("adds consumer surface classes on top of the glass panel", () => {
     render(
       <ContextMenu
         items={[
@@ -599,10 +599,10 @@ describe("ContextMenu", () => {
 
     const [menu] = screen.getAllByRole("menu");
     expect(menu).toHaveClass("bg-surface-popover");
-    expect(menu).not.toHaveClass("listen-glass-panel");
+    expect(menu).toHaveClass("listen-glass-panel");
     const submenu = screen.getByTestId("context-menu-submenu-playlist");
     expect(submenu).toHaveClass("bg-surface-popover");
-    expect(submenu).not.toHaveClass("listen-glass-panel");
+    expect(submenu).toHaveClass("listen-glass-panel");
   });
 
   it("keeps the listen glass surface on the submenu by default", () => {

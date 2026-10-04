@@ -289,7 +289,7 @@ describe("MobileActionSheet", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps the listen glass surface by default and allows overriding it", () => {
+  it("keeps the listen glass surface and adds consumer surface classes", () => {
     const panelRef = createRef<HTMLDivElement>();
     const { rerender } = render(
       <MobileActionSheet open onClose={vi.fn()} panelRef={panelRef}>
@@ -314,7 +314,7 @@ describe("MobileActionSheet", () => {
     );
 
     expect(panelRef.current).toHaveClass("bg-surface-popover");
-    expect(panelRef.current).not.toHaveClass("listen-glass-panel");
+    expect(panelRef.current).toHaveClass("listen-glass-panel");
   });
 
   it("snaps back when dragged less than half the sheet height", () => {
