@@ -175,16 +175,16 @@ describe("Library", () => {
       "library-new-playlist",
     );
     expect(
-      screen.queryByRole("button", { name: /Playlists/i }),
+      screen.queryByRole("tab", { name: /Playlists/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /Artists/i }),
+      screen.queryByRole("tab", { name: /Artists/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /Bandcamp/i }),
+      screen.queryByRole("tab", { name: /Bandcamp/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /Contributions/i }),
+      screen.queryByRole("tab", { name: /Contributions/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -214,7 +214,7 @@ describe("Library", () => {
 
     renderLibrary();
 
-    fireEvent.click(screen.getByRole("button", { name: "Crates" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Crates" }));
 
     expect(screen.getByRole("button", { name: "New Crate" })).toBeVisible();
   });
@@ -223,7 +223,7 @@ describe("Library", () => {
     isDesktop = true;
 
     renderLibrary("/collection/artists", "/collection/:section");
-    fireEvent.click(screen.getByRole("button", { name: "Crates" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Crates" }));
 
     expect(screen.getByRole("button", { name: "New Crate" })).toBeVisible();
   });
@@ -296,10 +296,8 @@ describe("Library", () => {
     expect(
       screen.getByRole("heading", { name: "Your Library" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Bandcamp/i })).toBeVisible();
-    expect(
-      screen.getByRole("button", { name: /Contributions/i }),
-    ).toBeVisible();
+    expect(screen.getByRole("tab", { name: /Bandcamp/i })).toBeVisible();
+    expect(screen.getByRole("tab", { name: /Contributions/i })).toBeVisible();
   });
 
   it("orders desktop collection sections consistently", () => {
@@ -307,9 +305,7 @@ describe("Library", () => {
 
     renderLibrary();
 
-    const tabButtons = screen
-      .getAllByRole("button")
-      .filter((button) => button.className.includes("rounded-full"));
+    const tabButtons = screen.getAllByRole("tab");
 
     expect(tabButtons.map((button) => button.textContent?.trim())).toEqual([
       "Artists",

@@ -43,6 +43,7 @@ export function ArtistTopTracksSection({
         </h2>
         {topTracksPath ? (
           <button
+            type="button"
             className="text-sm link-accent"
             onClick={() => navigate(topTracksPath)}
           >

@@ -2,6 +2,7 @@ import { Search } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
+import { Checkbox } from "@crate/ui/primitives/Checkbox";
 
 import type { JamRoomCreatePanelProps } from "./jam-lobby-types";
 
@@ -103,11 +104,10 @@ export function AutoDjOptions({
       </div>
       <label className="jam-toggle-card flex cursor-pointer items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm text-text-primary">
         <span>{t("jam.lobby.autoDjVoting")}</span>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={roomAutoDjVoting}
-          onChange={(event) => setRoomAutoDjVoting(event.target.checked)}
-          className=" size-4 accent-[var(--accent-action)]"
+          onCheckedChange={(checked) => setRoomAutoDjVoting(checked === true)}
+          className="size-4"
         />
       </label>
     </>

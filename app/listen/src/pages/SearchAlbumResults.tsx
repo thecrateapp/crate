@@ -4,10 +4,17 @@ import { MediaGrid, SectionHeader } from "@crate/ui/domain/lists";
 import { Disc3 } from "@crate/ui/icons";
 
 import { AlbumCard } from "@/components/cards/AlbumCard";
-import { CrateImage } from "@/components/artwork/CrateImage";
+import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 import { albumCoverApiUrl, albumPagePath } from "@/lib/library-routes";
 
 import { albumGlobalUid, type SearchAlbum } from "./search-results-model";
+
+const LAZY_IMAGE_PROPS = { loading: "lazy" } as const;
+const ALBUM_COVER_FALLBACK = (
+  <div className="flex size-full items-center justify-center">
+    <Disc3 size={32} className="text-text-primary/25" />
+  </div>
+);
 
 export function SearchAlbumResults({ albums }: { albums: SearchAlbum[] }) {
   const { t } = useTranslation();
@@ -37,22 +44,19 @@ export function SearchAlbumResults({ albums }: { albums: SearchAlbum[] }) {
             >
               <div className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-text-primary/5">
                 {album.has_cover ? (
-                  <CrateImage
-                    src={albumCoverApiUrl(
+                  <ArtworkSurface
+                    source={albumCoverApiUrl(
                       { globalAlbumUid: globalUid },
                       { size: 320 },
                     )}
                     alt={album.name}
-                    loading="lazy"
-                    className=" size-full object-cover"
-                    onError={(event) => {
-                      (event.target as HTMLImageElement).style.display = "none";
-                    }}
+                    fallback={ALBUM_COVER_FALLBACK}
+                    imageProps={LAZY_IMAGE_PROPS}
+                    imageClassName="object-cover"
+                    className="size-full"
                   />
                 ) : (
-                  <div className="flex size-full items-center justify-center">
-                    <Disc3 size={32} className="text-text-primary/25" />
-                  </div>
+                  ALBUM_COVER_FALLBACK
                 )}
               </div>
               <p className="truncate text-sm font-medium text-text-primary">

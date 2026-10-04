@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { cn } from "@crate/ui/lib/cn";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import {
   loadPlaybackTargetGroups,
@@ -172,7 +172,7 @@ export function PlaybackTargetMenu({
   const handleTarget = useCallback(
     async (target: PlaybackTarget) => {
       if (!target.available) {
-        toast.info(
+        notify.info(
           target.unavailableReason || t("player.output.unavailableToast"),
         );
         return;
@@ -182,7 +182,7 @@ export function PlaybackTargetMenu({
         targetContextRef.current,
       );
       if (!result.ok && result.message) {
-        toast.info(result.message);
+        notify.info(result.message);
         return;
       }
       runRefreshTargets();
@@ -200,7 +200,7 @@ export function PlaybackTargetMenu({
           : await stopCastSession();
       setCastAction(null);
       if (!result.ok) {
-        toast.info(result.message || t("player.output.cast.actionFailed"));
+        notify.info(result.message || t("player.output.cast.actionFailed"));
         return;
       }
       runRefreshTargets();

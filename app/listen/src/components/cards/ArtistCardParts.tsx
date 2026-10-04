@@ -2,7 +2,7 @@ import { useCallback, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { UserRound } from "@crate/ui/icons";
 import { useHoverCapability } from "@crate/ui/lib/use-hover-capability";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import {
   ItemActionMenu,
@@ -196,7 +196,7 @@ export function useArtistCardPlayback({
         name,
       });
       if (!tracks.length) {
-        toast.info(t("actions.artist.toasts.noTopTracks"));
+        notify.info(t("actions.artist.toasts.noTopTracks"));
         return;
       }
       playAll(tracks, 0, {
@@ -204,7 +204,7 @@ export function useArtistCardPlayback({
         name: t("actions.artist.topTracksSource", { name }),
       });
     } catch {
-      toast.error(t("actions.artist.toasts.loadTopTracksFailed"));
+      notify.error(t("actions.artist.toasts.loadTopTracksFailed"));
     } finally {
       setPlayingTopTracks(false);
     }

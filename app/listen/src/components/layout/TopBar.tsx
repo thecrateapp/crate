@@ -2,8 +2,13 @@ import { ChevronLeft, ChevronRight, CRATE_ICON_SIZE } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
+import { IconButton } from "@crate/ui/primitives/IconButton";
+
 import { TopBarSearch } from "@/components/layout/topbar/TopBarSearch";
 import { TopBarUserMenu } from "@/components/layout/topbar/TopBarUserMenu";
+
+const NAV_BUTTON_CLASS_NAME =
+  "text-text-secondary hover:translate-y-0 hover:text-text-primary hover:drop-shadow-none";
 
 interface TopBarProps {
   hideMobileActions?: boolean;
@@ -18,25 +23,23 @@ export function TopBar({ hideMobileActions = false }: TopBarProps) {
   return (
     <div className="flex h-16 w-full items-center gap-2 px-3 pointer-events-none sm:gap-4 sm:px-4">
       <div className="flex shrink-0 items-center gap-2 pointer-events-auto">
-        <button
+        <IconButton
           onClick={() => navigate(-1)}
-          className="flex size-11 touch-manipulation items-center justify-center text-text-secondary transition-colors hover:text-text-primary md:size-10"
-          aria-label={backLabel}
-          title={backLabel}
+          className={`${NAV_BUTTON_CLASS_NAME} size-11 touch-manipulation md:size-10`}
+          label={backLabel}
         >
           <ChevronLeft
             size={CRATE_ICON_SIZE.navMobile}
             className="md:size-[21px]"
           />
-        </button>
-        <button
+        </IconButton>
+        <IconButton
           onClick={() => navigate(1)}
-          className="hidden size-10 items-center justify-center text-text-secondary transition-colors hover:text-text-primary md:flex"
-          aria-label={forwardLabel}
-          title={forwardLabel}
+          className={`${NAV_BUTTON_CLASS_NAME} hidden size-10 md:inline-flex`}
+          label={forwardLabel}
         >
-          <ChevronRight size={CRATE_ICON_SIZE.nav} />
-        </button>
+          <ChevronRight size={CRATE_ICON_SIZE.nav} className="size-[21px]" />
+        </IconButton>
       </div>
 
       <div className="hidden md:block flex-1" />

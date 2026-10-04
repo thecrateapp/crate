@@ -27,14 +27,18 @@ describe("PlayerSurfaceModeSwitch", () => {
       "border-border-subtle",
       "bg-surface-chrome",
     );
+    expect(screen.getByRole("tab", { name: "CD" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(screen.getByRole("tab", { name: "CD" })).toHaveClass(
-      "bg-accent-action/18",
+      "data-[state=active]:bg-accent-action/18",
       "text-accent-action",
     );
     expect(screen.getByRole("tab", { name: "Cover" })).toHaveClass(
-      "text-text-muted",
-      "hover:bg-surface-control",
-      "hover:text-text-secondary",
+      "data-[state=inactive]:text-text-muted",
+      "data-[state=inactive]:hover:bg-surface-control",
+      "data-[state=inactive]:hover:text-text-secondary",
     );
     expect(screen.getByRole("tab", { name: "Cover" }).className).not.toContain(
       "white/",

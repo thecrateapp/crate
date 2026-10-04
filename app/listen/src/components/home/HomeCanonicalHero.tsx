@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { ArtistHeroFrame } from "@crate/ui/domain/ArtistHeroFrame";
 import { ArtistHeroPresentation } from "@crate/ui/domain/ArtistHeroPresentation";
-import { ChevronDown, ChevronUp } from "@crate/ui/icons";
+import { ChevronDown, ChevronUp, CRATE_ICON_SIZE } from "@crate/ui/icons";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 
 import { cn } from "@/lib/utils";
 
@@ -174,22 +175,22 @@ export function DesktopHeroNavigation({
         ))}
       </div>
       <div className="flex flex-col items-center gap-0.5">
-        <button
-          type="button"
-          aria-label={t("home.hero.previousArtist")}
-          className="home-hero-nav-control-plain flex size-8 items-center justify-center border-0 bg-transparent p-0 shadow-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-action"
+        <IconButton
+          label={t("home.hero.previousArtist")}
+          size="lg"
+          className="home-hero-nav-control-plain size-8"
           onClick={onPrevious}
         >
-          <ChevronUp size={20} />
-        </button>
-        <button
-          type="button"
-          aria-label={t("home.hero.nextArtist")}
-          className="home-hero-nav-control-plain flex size-8 items-center justify-center border-0 bg-transparent p-0 shadow-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-action"
+          <ChevronUp size={CRATE_ICON_SIZE.lg} />
+        </IconButton>
+        <IconButton
+          label={t("home.hero.nextArtist")}
+          size="lg"
+          className="home-hero-nav-control-plain size-8"
           onClick={onNext}
         >
-          <ChevronDown size={20} />
-        </button>
+          <ChevronDown size={CRATE_ICON_SIZE.lg} />
+        </IconButton>
       </div>
     </div>
   );

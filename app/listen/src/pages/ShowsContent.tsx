@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { PageHeader } from "@crate/ui/domain/navigation";
 import { EmptyState, LoadingState } from "@crate/ui/domain/states";
 import { Calendar, Sparkles } from "@crate/ui/icons";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 
 import {
   groupByMonth,
@@ -122,29 +124,27 @@ const SHOW_FILTERS: ShowsFilter[] = ["all", "shows", "releases"];
 function ShowsFilters({ page }: ShowsSectionProps) {
   return (
     <div className="flex flex-col gap-3 rounded-[12px] border border-text-primary/5 bg-text-primary/[0.02] p-4 md:flex-row md:items-center md:justify-between">
-      <div className="flex flex-wrap items-center gap-2">
-        {SHOW_FILTERS.map((value) => (
-          <button
-            key={value}
-            onClick={() => page.setFilter(value)}
-            className={cn(
-              "rounded-full border px-4 py-2 text-sm transition-colors",
-              page.filter === value
-                ? "border-accent-action/40 bg-accent-action/15 text-accent-action"
-                : "border-border-quiet text-text-muted hover:border-text-primary/20 hover:text-text-primary",
-            )}
-          >
-            {filterLabel(page, value)}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        as="radio"
+        variant="tonal"
+        label={page.t("radar.filtersLabel")}
+        items={SHOW_FILTERS.map((value) => ({
+          value,
+          label: filterLabel(page, value),
+        }))}
+        value={page.filter}
+        onValueChange={page.setFilter}
+        className="flex-wrap gap-2 p-0"
+        itemClassName="h-auto border border-border-quiet px-4 py-2 font-normal text-text-muted hover:border-text-primary/20 data-[state=active]:border-accent-action/40 data-[state=active]:bg-accent-action/15 data-[state=active]:text-accent-action"
+      />
       <div className="relative w-full md:w-[280px]">
-        <input
-          type="text"
+        <SearchInput
           value={page.search}
-          onChange={(event) => page.setSearch(event.target.value)}
+          onValueChange={page.setSearch}
+          label={page.t("radar.searchPlaceholder")}
+          clearLabel={page.t("common.clear")}
           placeholder={page.t("radar.searchPlaceholder")}
-          className="h-11 w-full rounded-lg border border-border-quiet bg-surface-canvas/25 px-4 text-base text-text-primary placeholder:text-text-primary/40 focus:border-accent-action/40 focus:outline-none"
+          className="rounded-lg focus-visible:border-accent-action/40 md:text-base"
         />
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useLocation, useParams } from "react-router";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import type { Track } from "@/contexts/PlayerContext";
 import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
@@ -121,7 +121,7 @@ export function useArtistPageController(): ArtistPageController {
     try {
       const radio = await fetchArtistRadio(currentArtistSeed, data.name);
       if (!radio.tracks.length) {
-        toast.info(t("artist.toasts.radioUnavailable"));
+        notify.info(t("artist.toasts.radioUnavailable"));
         return;
       }
       const queue: Track[] = radio.tracks.map((track) => ({
@@ -130,13 +130,13 @@ export function useArtistPageController(): ArtistPageController {
       }));
       playAll(queue, 0, radio.source);
     } catch {
-      toast.error(t("artist.toasts.radioFailed"));
+      notify.error(t("artist.toasts.radioFailed"));
     }
   }
 
   function handlePlayTopTracks(startIndex = 0, shuffle = false) {
     if (!page?.playerTracks.length) {
-      toast.info(t("artist.toasts.noTopTracks"));
+      notify.info(t("artist.toasts.noTopTracks"));
       return;
     }
     const queue = shuffle ? shuffleArray(page.playerTracks) : page.playerTracks;
@@ -156,16 +156,18 @@ export function useArtistPageController(): ArtistPageController {
         artistName: data.name,
       });
       if (!queue.length) {
-        toast.info(t("artist.toasts.noSetlistMatches"));
+        notify.info(t("artist.toasts.noSetlistMatches"));
         return;
       }
       playAll(queue, 0, {
         type: "playlist",
         name: t("artist.playSource.probableSetlist", { name: data.name }),
       });
-      toast.success(t("artist.toasts.playingSetlist", { count: queue.length }));
+      notify.success(
+        t("artist.toasts.playingSetlist", { count: queue.length }),
+      );
     } catch {
-      toast.error(t("artist.toasts.setlistFailed"));
+      notify.error(t("artist.toasts.setlistFailed"));
     }
   }
 

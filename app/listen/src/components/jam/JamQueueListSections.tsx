@@ -2,6 +2,7 @@ import { type ReactNode } from "react";
 import {
   ArrowDown,
   ArrowUp,
+  CRATE_ICON_SIZE,
   GripVertical,
   ListMusic,
   Search,
@@ -17,6 +18,7 @@ import { CSS } from "@dnd-kit/utilities";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import { Button } from "@crate/ui/shadcn/button";
 
 import type { JamQueuePanelProps } from "./JamQueueSections";
@@ -208,42 +210,46 @@ export function JamQueueList(props: JamQueueListProps) {
                 ) : null}
                 {canManageQueue ? (
                   <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      aria-label={t("jam.room.queueMoveUpAria", {
+                    <IconButton
+                      size="sm"
+                      label={t("jam.room.queueMoveUpAria", {
                         title: track.title,
                       })}
                       onClick={() =>
                         handleMoveInRoomQueue(item.id, index, index - 1)
                       }
                       disabled={index === 0}
-                      className="jam-chip rounded-full p-1.5 text-text-muted hover:bg-surface-quiet-subtle disabled:opacity-30"
+                      className="jam-chip size-auto p-1.5 text-text-muted hover:bg-surface-quiet-subtle disabled:opacity-30"
                     >
-                      <ArrowUp size={13} />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={t("jam.room.queueMoveDownAria", {
+                      <ArrowUp size={CRATE_ICON_SIZE.xs} className="size-3.5" />
+                    </IconButton>
+                    <IconButton
+                      size="sm"
+                      label={t("jam.room.queueMoveDownAria", {
                         title: track.title,
                       })}
                       onClick={() =>
                         handleMoveInRoomQueue(item.id, index, index + 1)
                       }
                       disabled={index === queueItems.length - 1}
-                      className="jam-chip rounded-full p-1.5 text-text-muted hover:bg-surface-quiet-subtle disabled:opacity-30"
+                      className="jam-chip size-auto p-1.5 text-text-muted hover:bg-surface-quiet-subtle disabled:opacity-30"
                     >
-                      <ArrowDown size={13} />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={t("jam.room.queueRemoveAria", {
+                      <ArrowDown
+                        size={CRATE_ICON_SIZE.xs}
+                        className="size-3.5"
+                      />
+                    </IconButton>
+                    <IconButton
+                      size="sm"
+                      tone="danger"
+                      label={t("jam.room.queueRemoveAria", {
                         title: track.title,
                       })}
                       onClick={() => handleRemoveFromRoomQueue(item.id)}
-                      className="jam-danger-control rounded-full p-1.5"
+                      className="jam-danger-control size-auto p-1.5"
                     >
-                      <Trash2 size={13} />
-                    </button>
+                      <Trash2 size={CRATE_ICON_SIZE.xs} className="size-3.5" />
+                    </IconButton>
                   </div>
                 ) : null}
               </JamQueueItemShell>

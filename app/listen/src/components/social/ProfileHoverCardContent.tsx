@@ -1,11 +1,18 @@
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
-import { Loader2, UserPlus, UserRoundCheck } from "@crate/ui/icons";
+import {
+  CRATE_ICON_SIZE,
+  Loader2,
+  UserPlus,
+  UserRoundCheck,
+} from "@crate/ui/icons";
 
 import { cn } from "@crate/ui/lib/cn";
+import { CratePill } from "@crate/ui/primitives/CrateBadge";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import { UserAvatar } from "@/components/social/UserAvatar";
-import { formatMinutes } from "@/pages/user-profile-model";
+import { badgeTone, formatMinutes } from "@/pages/user-profile-model";
 
 export type AffinityBand = "low" | "medium" | "high" | "very_high" | string;
 
@@ -50,20 +57,8 @@ function affinityTone(band: AffinityBand) {
   return "profile-hover-affinity-low";
 }
 
-function badgeTone(tone: string) {
-  switch (tone) {
-    case "gold":
-      return "profile-hover-badge-gold";
-    case "green":
-      return "profile-hover-badge-green";
-    case "rose":
-      return "profile-hover-badge-rose";
-    case "cyan":
-      return "profile-hover-badge-cyan";
-    default:
-      return "profile-hover-badge-neutral";
-  }
-}
+const PROFILE_BADGE_CLASS_NAME =
+  "gap-0 px-2 text-xs leading-4 font-bold uppercase tracking-[0.12em]";
 
 function mainBadge(card: ProfileCardPayload, t: TFunction) {
   return card.badges[0]?.label || t("profileHover.defaultBadge");
@@ -131,9 +126,12 @@ export function ProfileCardBody({
               </div>
             </div>
             {card.relationship_state.is_friend ? (
-              <span className="profile-hover-friend rounded-full border px-2 py-0.5 text-xs font-bold uppercase tracking-[0.16em]">
+              <CratePill
+                tone="accent"
+                className="gap-0 px-2 py-0.5 text-xs leading-4 font-bold uppercase tracking-[0.16em]"
+              >
                 {t("profileHover.friend")}
-              </span>
+              </CratePill>
             ) : null}
           </div>
 
@@ -193,15 +191,13 @@ export function ProfileCardBody({
       {card.badges.length ? (
         <div className="relative mt-3 flex flex-wrap gap-1.5">
           {card.badges.map((badge) => (
-            <span
+            <CratePill
               key={badge.key}
-              className={cn(
-                "rounded-full border px-2 py-1 text-xs font-bold uppercase tracking-[0.12em]",
-                badgeTone(badge.tone),
-              )}
+              tone={badgeTone(badge.tone)}
+              className={PROFILE_BADGE_CLASS_NAME}
             >
               {badge.label}
-            </span>
+            </CratePill>
           ))}
         </div>
       ) : null}
@@ -219,27 +215,24 @@ export function ProfileCardBody({
         >
           {t("home.sections.listeningDna.title")}
         </Link>
-        <button
-          type="button"
+        <IconButton
+          label={t(following ? "common.following" : "common.follow")}
+          size="sm"
+          loading={busy}
           onClick={onFollowToggle}
-          disabled={busy}
           className={cn(
-            "profile-hover-follow-control flex h-9 w-9 items-center justify-center rounded-full border transition-colors disabled:opacity-60",
+            "profile-hover-follow-control size-9 border disabled:opacity-60",
             following
               ? "profile-hover-following"
               : "profile-hover-follow-default",
           )}
-          title={t(following ? "common.following" : "common.follow")}
-          aria-label={t(following ? "common.following" : "common.follow")}
         >
-          {busy ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : following ? (
-            <UserRoundCheck size={14} />
+          {following ? (
+            <UserRoundCheck size={CRATE_ICON_SIZE.xs} />
           ) : (
-            <UserPlus size={14} />
+            <UserPlus size={CRATE_ICON_SIZE.xs} />
           )}
-        </button>
+        </IconButton>
       </div>
     </div>
   );

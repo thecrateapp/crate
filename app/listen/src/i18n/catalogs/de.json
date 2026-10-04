@@ -1779,5 +1779,15 @@
   "actions.genre.open": "Genre öffnen",
   "actions.path.open": "Pfad öffnen",
   "actions.jam.open": "Raum öffnen",
-  "actions.bandcamp.open": "Auf Bandcamp öffnen"
+  "actions.bandcamp.open": "Auf Bandcamp öffnen",
+  "common.close": "Schließen",
+  "settings.connectDevices.revokeConfirmTitle": "Dieses Gerät widerrufen?",
+  "settings.connectDevices.revokeConfirmDescription": "{name} wird von Crate Connect abgemeldet und muss sich erneut anmelden.",
+  "library.tabs.label": "Sammlungsbereiche",
+  "stats.window.label": "Zeitraum",
+  "common.closeDialog": "Dialog schließen",
+  "paths.delete.confirmTitle": "Diesen Pfad löschen?",
+  "paths.delete.confirmDescription": "\"{name}\" wird aus deinen Pfaden entfernt. Das kann nicht rückgängig gemacht werden.",
+  "radar.filtersLabel": "Radar filtern",
+  "player.tabsLabel": "Player-Bereiche"
 }

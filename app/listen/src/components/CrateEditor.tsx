@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  CRATE_ICON_SIZE,
   ChevronDown,
   ChevronUp,
   Disc3,
@@ -15,14 +16,14 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import {
   AppModal,
   ModalBody,
-  ModalCloseButton,
   ModalFooter,
-  ModalHeader,
 } from "@crate/ui/primitives/AppModal";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import { Button } from "@crate/ui/shadcn/button";
 
 import { useApi } from "@/hooks/use-api";
@@ -64,16 +65,13 @@ export function CrateEditor({ crateId, onBack, onDeleted }: CrateEditorProps) {
       <AppModal
         open
         onClose={onBack}
-        maxWidthClassName="sm:max-w-4xl"
-        panelClassName="listen-glass-panel border-border-quiet"
+        size="xl"
+        title={t("library.crates.title")}
+        closeLabel={t("common.close")}
+        headerClassName="bg-transparent"
+        panelClassName="listen-glass-panel flex flex-col border-border-quiet"
       >
-        <section className="flex max-h-[92vh] flex-col">
-          <ModalHeader className="flex items-center justify-between gap-4 bg-transparent px-5 py-4">
-            <h2 className="text-lg font-semibold text-text-primary">
-              {t("library.crates.title")}
-            </h2>
-            <ModalCloseButton onClick={onBack} />
-          </ModalHeader>
+        <section className="flex min-h-0 flex-col">
           <ModalBody className="p-5">
             {error ? (
               <p
@@ -85,7 +83,7 @@ export function CrateEditor({ crateId, onBack, onDeleted }: CrateEditorProps) {
             ) : (
               <div className="flex justify-center py-12">
                 <Loader2
-                  size={24}
+                  size={CRATE_ICON_SIZE.xl}
                   className="animate-spin text-accent-action"
                 />
               </div>
@@ -123,6 +121,7 @@ function CrateEditorForm({
   const [albums, setAlbums] = useState<CrateAlbum[]>(crate.albums);
   const [saving, setSaving] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const isOrdered = values.ordering !== "none";
 
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -136,10 +135,10 @@ function CrateEditorForm({
         "PUT",
         crateFormPayload(values, isOwner),
       );
-      toast.success(t("library.crates.saved"));
+      notify.success(t("library.crates.saved"));
       onBack();
     } catch {
-      toast.error(t("library.crates.saveFailed"));
+      notify.error(t("library.crates.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -156,9 +155,9 @@ function CrateEditorForm({
         { global_album_uid: uid },
       );
       setAlbums((current) => [...current, added]);
-      toast.success(t("library.crates.albumAdded"));
+      notify.success(t("library.crates.albumAdded"));
     } catch (error) {
-      toast.error(
+      notify.error(
         (error as { status?: number }).status === 409
           ? t("library.crates.albumAlreadyInCrate", { name: crate.name })
           : t("library.crates.albumAddFailed"),
@@ -180,7 +179,7 @@ function CrateEditorForm({
         ),
       );
     } catch {
-      toast.error(t("library.crates.albumRemoveFailed"));
+      notify.error(t("library.crates.albumRemoveFailed"));
     }
   }
 
@@ -206,7 +205,7 @@ function CrateEditorForm({
       });
       setAlbums(reordered.map((album, position) => ({ ...album, position })));
     } catch {
-      toast.error(t("library.crates.reorderFailed"));
+      notify.error(t("library.crates.reorderFailed"));
     }
   }
 
@@ -226,12 +225,14 @@ function CrateEditorForm({
   }
 
   async function deleteCrate() {
+    setDeleting(true);
     try {
       await api(`/api/crates/${crate.id}`, "DELETE");
-      toast.success(t("library.crates.deleted"));
+      notify.success(t("library.crates.deleted"));
       onDeleted();
     } catch {
-      toast.error(t("library.crates.deleteFailed"));
+      notify.error(t("library.crates.deleteFailed"));
+      setDeleting(false);
     }
   }
 
@@ -243,16 +244,14 @@ function CrateEditorForm({
     <AppModal
       open
       onClose={onBack}
-      maxWidthClassName="sm:max-w-4xl"
-      panelClassName="listen-glass-panel border-border-quiet"
+      size="xl"
+      title={<span className="block truncate">{crate.name}</span>}
+      closeLabel={t("common.close")}
+      closeOnEscape={!deleteConfirmation}
+      headerClassName="bg-transparent"
+      panelClassName="listen-glass-panel flex flex-col border-border-quiet"
     >
-      <section className="flex max-h-[92vh] flex-col">
-        <ModalHeader className="flex items-center justify-between gap-4 bg-transparent px-5 py-4">
-          <h2 className="min-w-0 truncate text-lg font-semibold text-text-primary">
-            {crate.name}
-          </h2>
-          <ModalCloseButton onClick={onBack} />
-        </ModalHeader>
+      <section className="flex min-h-0 flex-col">
         <ModalBody className="space-y-5 p-5">
           <CrateForm
             id={EDITOR_FORM_ID}
@@ -310,54 +309,41 @@ function CrateEditorForm({
 
           {isOwner && (
             <section className="border-t border-border-quiet pt-5">
-              {deleteConfirmation ? (
-                <div className="space-y-3 rounded-xl border border-state-danger/20 bg-state-danger/5 p-4">
-                  <p className="text-sm text-text-primary">
-                    {t("library.crates.deleteConfirmation", {
-                      name: crate.name,
-                    })}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      onClick={() => void deleteCrate()}
-                    >
-                      {t("library.crates.confirmDelete")}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => setDeleteConfirmation(false)}
-                    >
-                      {t("common.cancel")}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setDeleteConfirmation(true)}
-                  className="text-state-danger hover:text-state-danger"
-                >
-                  <Trash2 size={15} />
-                  {t("library.crates.delete")}
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                onClick={() => setDeleteConfirmation(true)}
+                className="text-state-danger hover:text-state-danger"
+              >
+                <Trash2 size={CRATE_ICON_SIZE.sm} />
+                {t("library.crates.delete")}
+              </Button>
+              <ConfirmDialog
+                open={deleteConfirmation}
+                tone="danger"
+                pending={deleting}
+                title={t("library.crates.delete")}
+                body={t("library.crates.deleteConfirmation", {
+                  name: crate.name,
+                })}
+                confirmLabel={t("library.crates.confirmDelete")}
+                cancelLabel={t("common.cancel")}
+                closeLabel={t("common.close")}
+                onCancel={() => setDeleteConfirmation(false)}
+                onConfirm={() => void deleteCrate()}
+              />
             </section>
           )}
         </ModalBody>
         <ModalFooter className="flex items-center justify-end gap-3 bg-transparent px-5 py-4">
-          <Button type="button" variant="ghost" onClick={onBack}>
+          <Button variant="ghost" onClick={onBack}>
             {t("common.cancel")}
           </Button>
           <Button
             type="submit"
             form={EDITOR_FORM_ID}
-            disabled={saving || !isCrateFormValid(values)}
+            loading={saving}
+            disabled={!isCrateFormValid(values)}
           >
-            {saving ? <Loader2 size={16} className="animate-spin" /> : null}
             {t("common.save")}
           </Button>
         </ModalFooter>
@@ -414,16 +400,15 @@ function CrateAlbumRow({
       className="flex items-center gap-3 px-3 py-2.5"
     >
       {reorderable ? (
-        <button
-          type="button"
-          aria-label={t("library.crates.dragAlbum", { name: album.name })}
-          title={t("library.crates.dragAlbum", { name: album.name })}
-          className="shrink-0 touch-none cursor-grab text-text-muted/60 hover:text-text-primary active:cursor-grabbing"
+        <IconButton
           {...sortable.attributes}
           {...sortable.listeners}
+          label={t("library.crates.dragAlbum", { name: album.name })}
+          size="sm"
+          className="size-6 cursor-grab touch-none text-text-muted/60 hover:translate-y-0 hover:text-text-primary hover:drop-shadow-none active:cursor-grabbing"
         >
-          <GripVertical size={16} />
-        </button>
+          <GripVertical size={CRATE_ICON_SIZE.sm} />
+        </IconButton>
       ) : null}
       <div className="size-12 shrink-0 overflow-hidden rounded-md bg-text-primary/5">
         {album.has_cover ? (
@@ -435,7 +420,7 @@ function CrateAlbumRow({
           />
         ) : (
           <div className="flex size-full items-center justify-center text-text-primary/30">
-            <Disc3 size={20} />
+            <Disc3 size={CRATE_ICON_SIZE.lg} />
           </div>
         )}
       </div>
@@ -451,36 +436,32 @@ function CrateAlbumRow({
       <div className="flex shrink-0 items-center">
         {reorderable ? (
           <>
-            <button
-              type="button"
-              aria-label={t("library.crates.moveAlbumUp", { name: album.name })}
+            <IconButton
+              label={t("library.crates.moveAlbumUp", { name: album.name })}
+              className="size-9 disabled:opacity-25"
               disabled={index === 0}
               onClick={() => onMove(index, -1)}
-              className="flex size-9 items-center justify-center rounded-full text-text-muted hover:bg-text-primary/8 hover:text-text-primary disabled:opacity-25"
             >
-              <ChevronUp size={17} />
-            </button>
-            <button
-              type="button"
-              aria-label={t("library.crates.moveAlbumDown", {
-                name: album.name,
-              })}
+              <ChevronUp size={CRATE_ICON_SIZE.md} />
+            </IconButton>
+            <IconButton
+              label={t("library.crates.moveAlbumDown", { name: album.name })}
+              className="size-9 disabled:opacity-25"
               disabled={index === total - 1}
               onClick={() => onMove(index, 1)}
-              className="flex size-9 items-center justify-center rounded-full text-text-muted hover:bg-text-primary/8 hover:text-text-primary disabled:opacity-25"
             >
-              <ChevronDown size={17} />
-            </button>
+              <ChevronDown size={CRATE_ICON_SIZE.md} />
+            </IconButton>
           </>
         ) : null}
-        <button
-          type="button"
-          aria-label={t("library.crates.removeAlbum", { name: album.name })}
+        <IconButton
+          label={t("library.crates.removeAlbum", { name: album.name })}
+          size="sm"
+          className="size-9 hover:text-state-danger hover:drop-shadow-none"
           onClick={onRemove}
-          className="flex size-9 items-center justify-center rounded-full text-text-muted hover:bg-text-primary/8 hover:text-state-danger"
         >
-          <Trash2 size={15} />
-        </button>
+          <Trash2 size={CRATE_ICON_SIZE.sm} />
+        </IconButton>
       </div>
     </li>
   );

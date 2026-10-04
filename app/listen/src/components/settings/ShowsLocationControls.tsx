@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 
-import { Loader2, MapPin, Navigation } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Loader2, MapPin, Navigation } from "@crate/ui/icons";
+import { Input } from "@crate/ui/shadcn/input";
 
 const RADIUS_OPTIONS = [20, 40, 60, 100, 150, 200];
 
@@ -80,12 +81,12 @@ function LocationModeOption({
     >
       {icon === "map" ? (
         <MapPin
-          size={16}
+          size={CRATE_ICON_SIZE.sm}
           className={active ? "text-accent-action" : "text-text-primary/40"}
         />
       ) : (
         <Navigation
-          size={16}
+          size={CRATE_ICON_SIZE.sm}
           className={active ? "text-accent-action" : "text-text-primary/40"}
         />
       )}
@@ -154,15 +155,15 @@ export function FixedCityPicker({
           className="flex items-center gap-1 text-xs link-accent disabled:opacity-50"
         >
           {detecting ? (
-            <Loader2 size={10} className="animate-spin" />
+            <Loader2 size={CRATE_ICON_SIZE.micro} className="animate-spin" />
           ) : (
-            <Navigation size={10} />
+            <Navigation size={CRATE_ICON_SIZE.micro} />
           )}
           {t("settings.shows.detectFromIp")}
         </button>
       </div>
       <div className="relative">
-        <input
+        <Input
           id="settings-city"
           type="text"
           value={searchQuery || city}
@@ -173,11 +174,11 @@ export function FixedCityPicker({
           onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
           onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
           placeholder={t("settings.shows.cityPlaceholder")}
-          className="h-10 w-full rounded-lg border border-border-quiet/10 bg-text-primary/5 px-3 text-base text-text-primary outline-none placeholder:text-text-primary/40 focus:border-accent-action/40"
+          className="h-10 rounded-lg border-border-quiet/10 bg-text-primary/5 px-3 shadow-none backdrop-blur-none focus-visible:border-accent-action/40 md:text-base"
         />
         {searching ? (
           <Loader2
-            size={14}
+            size={CRATE_ICON_SIZE.xs}
             className="absolute right-3 top-3 animate-spin text-text-primary/40"
           />
         ) : null}
@@ -190,7 +191,10 @@ export function FixedCityPicker({
                 onMouseDown={() => selectCity(result)}
                 className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-text-primary transition-colors hover:bg-text-primary/5"
               >
-                <MapPin size={12} className="shrink-0 text-accent-action/60" />
+                <MapPin
+                  size={CRATE_ICON_SIZE.micro}
+                  className="shrink-0 text-accent-action/60"
+                />
                 <span>{result.display_name}</span>
               </button>
             ))}
@@ -225,6 +229,7 @@ export function RadiusPicker({
           <button
             key={option}
             type="button"
+            aria-pressed={radius === option}
             onClick={() => onChange(option)}
             className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
               radius === option

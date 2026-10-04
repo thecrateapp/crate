@@ -1,5 +1,12 @@
 import { Link } from "react-router";
-import { BarChart3, Loader2, UserPlus, UserRoundCheck } from "@crate/ui/icons";
+import {
+  BarChart3,
+  CRATE_ICON_SIZE,
+  UserPlus,
+  UserRoundCheck,
+} from "@crate/ui/icons";
+import { CratePill } from "@crate/ui/primitives/CrateBadge";
+import { Button } from "@crate/ui/shadcn/button";
 import { useTranslation } from "react-i18next";
 
 import { UserProfileAvatar } from "./UserProfileAvatar";
@@ -75,9 +82,12 @@ function UserProfileHeader({
               {displayName}
             </h1>
             {data.relationship_state.is_friend && !isOwnProfile ? (
-              <span className="user-profile-accent-badge inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium">
+              <CratePill
+                tone="accent"
+                className="gap-0 text-xs leading-4 font-medium"
+              >
                 {t("people.friends")}
-              </span>
+              </CratePill>
             ) : null}
           </div>
           <div className="mt-1 text-sm text-text-muted">
@@ -130,28 +140,21 @@ function UserProfileActions({
         {t("userProfile.actions.viewListeningDna")}
       </Link>
       {!isOwnProfile ? (
-        <button
-          type="button"
+        <Button
+          variant={data.relationship_state.following ? "outline" : "default"}
+          loading={busy}
           onClick={onFollowToggle}
-          disabled={busy}
-          className={
-            "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors " +
-            (data.relationship_state.following
-              ? "border border-border-quiet/15 bg-text-primary/5 text-text-primary hover:bg-text-primary/10"
-              : "bg-accent-action text-accent-action-foreground hover:bg-accent-action/90")
-          }
+          className="rounded-lg px-4 has-[>svg]:px-4"
         >
-          {busy ? (
-            <Loader2 size={15} className="animate-spin" />
-          ) : data.relationship_state.following ? (
-            <UserRoundCheck size={15} />
+          {busy ? null : data.relationship_state.following ? (
+            <UserRoundCheck size={CRATE_ICON_SIZE.sm} />
           ) : (
-            <UserPlus size={15} />
+            <UserPlus size={CRATE_ICON_SIZE.sm} />
           )}
           {data.relationship_state.following
             ? t("common.following")
             : t("common.follow")}
-        </button>
+        </Button>
       ) : (
         <Link
           to="/settings"

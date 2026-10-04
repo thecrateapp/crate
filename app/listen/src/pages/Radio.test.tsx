@@ -108,7 +108,7 @@ describe("RadioPage", () => {
     expect(
       screen.getByRole("button", { name: /Converge/i }).closest("article"),
     ).toHaveClass("home-radio-card");
-    expect(screen.getByRole("textbox")).toHaveClass("radio-seed-input");
+    expect(screen.getByRole("searchbox")).toHaveClass("radio-seed-input");
   });
 
   it("localizes radio chrome", async () => {

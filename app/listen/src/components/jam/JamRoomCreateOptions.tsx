@@ -1,4 +1,4 @@
-import { Globe2, Lock } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Globe2, Lock } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -62,24 +62,26 @@ export function RoomVisibilityOptions({
     <div className="grid gap-2 sm:grid-cols-2">
       <button
         type="button"
+        aria-pressed={roomVisibility === "private"}
         onClick={() => setRoomVisibility("private")}
         className={`jam-toggle-option flex items-center gap-2 rounded-lg p-3 text-left text-sm transition-colors ${
           roomVisibility === "private" ? "" : "text-text-muted"
         }`}
         data-active={roomVisibility === "private" ? "true" : "false"}
       >
-        <Lock size={15} />
+        <Lock size={CRATE_ICON_SIZE.sm} />
         {t("jam.visibility.inviteOnly")}
       </button>
       <button
         type="button"
+        aria-pressed={roomVisibility === "public"}
         onClick={() => setRoomVisibility("public")}
         className={`jam-toggle-option flex items-center gap-2 rounded-lg p-3 text-left text-sm transition-colors ${
           roomVisibility === "public" ? "" : "text-text-muted"
         }`}
         data-active={roomVisibility === "public" ? "true" : "false"}
       >
-        <Globe2 size={15} />
+        <Globe2 size={CRATE_ICON_SIZE.sm} />
         {t("jam.visibility.public")}
       </button>
     </div>

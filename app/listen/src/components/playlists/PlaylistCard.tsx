@@ -9,9 +9,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Heart,
-  HeartBold,
-  Loader2,
+  CRATE_ICON_SIZE,
   Play,
   Shuffle,
   Sparkles,
@@ -25,7 +23,9 @@ import {
   type EntityCardOverlay,
 } from "@crate/ui/domain/entity";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
-import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
+import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
+import { IconButton } from "@crate/ui/primitives/IconButton";
+import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import { action } from "@/components/actions/shared";
 import { usePlaylistActionMenu } from "@/components/actions/playlist-actions";
 import {
@@ -421,67 +421,54 @@ function PlaylistRowActions({
   extraActions?: PlaylistCardExtraAction[];
 }) {
   const { t } = useTranslation();
-  const followLabel = t(isFollowed ? "common.following" : "common.follow");
   return (
     <>
       {onPlay ? (
-        <ActionIconButton
+        <IconButton
+          label={t("player.play")}
           onClick={onPlay}
-          title={t("player.play")}
-          aria-label={t("player.play")}
+          loading={playingMode === "play"}
         >
-          {playingMode === "play" ? (
-            <Loader2 size={15} className="animate-spin" />
-          ) : (
-            <Play size={15} fill="currentColor" className="ml-0.5" />
-          )}
-        </ActionIconButton>
+          <Play
+            size={CRATE_ICON_SIZE.sm}
+            fill="currentColor"
+            className="ml-0.5"
+          />
+        </IconButton>
       ) : null}
       {onShuffle ? (
-        <ActionIconButton
+        <IconButton
+          label={t("player.shuffle")}
           onClick={onShuffle}
-          title={t("player.shuffle")}
-          aria-label={t("player.shuffle")}
+          loading={playingMode === "shuffle"}
         >
-          {playingMode === "shuffle" ? (
-            <Loader2 size={15} className="animate-spin" />
-          ) : (
-            <Shuffle size={15} />
-          )}
-        </ActionIconButton>
+          <Shuffle size={CRATE_ICON_SIZE.sm} />
+        </IconButton>
       ) : null}
       {canFollow ? (
-        <ActionIconButton
+        <FollowHeartButton
+          following={isFollowed}
+          loading={togglingFollow}
+          label={t("common.follow")}
+          labelActive={t("common.following")}
+          title={t(isFollowed ? "common.following" : "common.follow")}
+          iconSize={CRATE_ICON_SIZE.sm}
+          className="size-10 shrink-0 rounded-full"
           onClick={onToggleFollow}
-          active={isFollowed}
-          title={followLabel}
-          aria-label={followLabel}
-        >
-          {togglingFollow ? (
-            <Loader2 size={15} className="animate-spin" />
-          ) : isFollowed ? (
-            <HeartBold size={15} />
-          ) : (
-            <Heart size={15} />
-          )}
-        </ActionIconButton>
+        />
       ) : null}
       {extraActions?.map((item) => {
         const Icon = item.icon;
         return (
-          <ActionIconButton
+          <IconButton
             key={item.key}
-            onClick={() => void item.onClick()}
+            label={item.title}
             tone={item.tone}
-            title={item.title}
-            aria-label={item.title}
+            loading={item.loading}
+            onClick={() => void item.onClick()}
           >
-            {item.loading ? (
-              <Loader2 size={15} className="animate-spin" />
-            ) : (
-              <Icon size={15} />
-            )}
-          </ActionIconButton>
+            <Icon size={CRATE_ICON_SIZE.sm} />
+          </IconButton>
         );
       })}
     </>
@@ -549,10 +536,13 @@ function PlaylistRow(props: PlaylistCardProps) {
       titleAccessory={
         <>
           {badge ? (
-            <span className="inline-flex shrink-0 items-center rounded-md border border-accent-action/30 px-1.5 py-0 text-xs font-medium text-accent-action">
-              <Sparkles size={10} className="mr-0.5" />
+            <CrateChip
+              tone="accent"
+              icon={Sparkles}
+              className="shrink-0 py-0 text-xs font-medium"
+            >
               {badge}
-            </span>
+            </CrateChip>
           ) : null}
           <OfflineBadge state={offlineState} compact />
         </>

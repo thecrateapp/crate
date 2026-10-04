@@ -1779,5 +1779,15 @@
   "actions.genre.open": "Obre el gènere",
   "actions.path.open": "Obre la ruta",
   "actions.jam.open": "Obre la sala",
-  "actions.bandcamp.open": "Obre a Bandcamp"
+  "actions.bandcamp.open": "Obre a Bandcamp",
+  "common.close": "Tanca",
+  "settings.connectDevices.revokeConfirmTitle": "Vols revocar aquest dispositiu?",
+  "settings.connectDevices.revokeConfirmDescription": "{name} es desconnectarà de Crate Connect i haurà de tornar a iniciar la sessió.",
+  "library.tabs.label": "Seccions de la col·lecció",
+  "stats.window.label": "Període",
+  "common.closeDialog": "Tanca el diàleg",
+  "paths.delete.confirmTitle": "Vols eliminar aquesta ruta?",
+  "paths.delete.confirmDescription": "\"{name}\" s'eliminarà de les teves rutes. No es pot desfer.",
+  "radar.filtersLabel": "Filtra el radar",
+  "player.tabsLabel": "Panells del reproductor"
 }

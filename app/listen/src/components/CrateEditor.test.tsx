@@ -94,8 +94,15 @@ function crateDetail(name: string): CrateDetail {
   };
 }
 
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
 describe("CrateEditor", () => {
   beforeEach(() => {
+    vi.stubGlobal("ResizeObserver", ResizeObserverStub);
     mocks.crate = crateDetail("Original name");
     mocks.api.mockReset();
     mocks.dndOnDragEnd = null;
@@ -227,8 +234,8 @@ describe("CrateEditor", () => {
 
     const form = screen.getByTestId("crate-form");
     const labels = Array.from(
-      form.querySelectorAll("[aria-label]"),
-      (element) => element.getAttribute("aria-label"),
+      form.querySelectorAll("[data-slot='form-field-label'], [aria-label]"),
+      (element) => element.getAttribute("aria-label") ?? element.textContent,
     );
     expect(labels).toEqual([
       "Name",

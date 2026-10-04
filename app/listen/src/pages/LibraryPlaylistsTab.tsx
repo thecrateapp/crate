@@ -1,15 +1,10 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, Pencil, Plus, Trash2 } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { CRATE_ICON_SIZE, Pencil, Plus, Trash2 } from "@crate/ui/icons";
 
-import {
-  AppModal,
-  ModalBody,
-  ModalCloseButton,
-  ModalFooter,
-  ModalHeader,
-} from "@crate/ui/primitives/AppModal";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
+import { notify } from "@crate/ui/lib/notify";
+import { Button } from "@crate/ui/shadcn/button";
 import { EmptyState, LoadingState } from "@crate/ui/domain/states";
 import { useApi } from "@/hooks/use-api";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
@@ -63,12 +58,12 @@ export function LibraryPlaylistsTab() {
   async function toggleSystemPlaylistFollow(playlist: CuratedPlaylist) {
     try {
       await api(`/api/curation/playlists/${playlist.id}/follow`, "DELETE");
-      toast.success(
+      notify.success(
         t("playlist.toasts.removedNamedLibrary", { name: playlist.name }),
       );
       refetch();
     } catch {
-      toast.error(t("playlist.toasts.updateFailed"));
+      notify.error(t("playlist.toasts.updateFailed"));
     }
   }
 
@@ -77,7 +72,7 @@ export function LibraryPlaylistsTab() {
       const detail = await api<PlaylistDetail>(`/api/playlists/${playlistId}`);
       setEditingPlaylist(detail);
     } catch {
-      toast.error(t("playlist.toasts.loadFailed"));
+      notify.error(t("playlist.toasts.loadFailed"));
     }
   }
 
@@ -140,11 +135,11 @@ export function LibraryPlaylistsTab() {
         });
       }
 
-      toast.success(t("playlist.toasts.updated"));
+      notify.success(t("playlist.toasts.updated"));
       setEditingPlaylist(null);
       refetch();
     } catch {
-      toast.error(t("playlist.toasts.updateFailed"));
+      notify.error(t("playlist.toasts.updateFailed"));
     } finally {
       setSaving(false);
     }
@@ -155,11 +150,11 @@ export function LibraryPlaylistsTab() {
     setDeleting(true);
     try {
       await api(`/api/playlists/${deletingPlaylist.id}`, "DELETE");
-      toast.success(t("playlist.toasts.deleted"));
+      notify.success(t("playlist.toasts.deleted"));
       setDeletingPlaylist(null);
       refetch();
     } catch {
-      toast.error(t("playlist.toasts.deleteFailed"));
+      notify.error(t("playlist.toasts.deleteFailed"));
     } finally {
       setDeleting(false);
     }
@@ -167,14 +162,14 @@ export function LibraryPlaylistsTab() {
 
   return (
     <div className="space-y-3">
-      <button
-        type="button"
+      <Button
+        variant="secondary"
         onClick={() => openCreatePlaylist()}
-        className="library-new-playlist flex w-full items-center gap-2 rounded-lg bg-text-primary/5 px-4 py-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-text-primary/10"
+        className="library-new-playlist w-full justify-start rounded-lg bg-text-primary/5 px-4 hover:bg-text-primary/10 has-[>svg]:px-4"
       >
-        <Plus size={16} className="text-accent-action" />
+        <Plus size={CRATE_ICON_SIZE.sm} className="text-accent-action" />
         {t("library.playlists.new")}
-      </button>
+      </Button>
 
       {followedCurated && followedCurated.length > 0 ? (
         <div className="space-y-1">
@@ -275,54 +270,28 @@ export function LibraryPlaylistsTab() {
         onSubmit={handleSavePlaylist}
       />
 
-      <AppModal
+      <ConfirmDialog
         open={!!deletingPlaylist}
-        onClose={() => !deleting && setDeletingPlaylist(null)}
-        maxWidthClassName="sm:max-w-md"
-      >
-        <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
-          <div>
-            <h2 className="text-lg font-semibold text-text-primary">
-              {t("playlist.delete.title")}
-            </h2>
-            <p className="text-xs text-text-muted">
-              {t("playlist.delete.subtitle")}
-            </p>
-          </div>
-          <ModalCloseButton
-            onClick={() => setDeletingPlaylist(null)}
-            disabled={deleting}
-          />
-        </ModalHeader>
-        <ModalBody className="p-5 ">
-          <p className="text-sm text-text-muted">
+        tone="danger"
+        pending={deleting}
+        title={t("playlist.delete.title")}
+        description={t("playlist.delete.subtitle")}
+        body={
+          <>
             {t("playlist.delete.confirmPrefix")}{" "}
             <span className="font-medium text-text-primary">
               {deletingPlaylist?.name}
             </span>{" "}
             {t("playlist.delete.confirmSuffix")}
-          </p>
-        </ModalBody>
-        <ModalFooter className="flex items-center justify-end gap-3 px-5 py-4">
-          <button
-            type="button"
-            className="rounded-lg px-4 py-2.5 text-sm text-text-muted transition-colors hover:bg-text-primary/5 hover:text-text-primary"
-            onClick={() => setDeletingPlaylist(null)}
-            disabled={deleting}
-          >
-            {t("common.cancel")}
-          </button>
-          <button
-            type="button"
-            disabled={deleting}
-            className="inline-flex items-center gap-2 rounded-lg bg-state-danger px-4 py-2.5 text-sm font-medium text-state-danger-foreground transition-colors hover:bg-state-danger/90 disabled:opacity-50"
-            onClick={() => void handleDeletePlaylist()}
-          >
-            {deleting ? <Loader2 size={15} className="animate-spin" /> : null}
-            {t("playlist.delete.title")}
-          </button>
-        </ModalFooter>
-      </AppModal>
+          </>
+        }
+        confirmLabel={t("playlist.delete.title")}
+        cancelLabel={t("common.cancel")}
+        closeLabel={t("common.close")}
+        backdropLabel={t("common.closeDialog")}
+        onCancel={() => setDeletingPlaylist(null)}
+        onConfirm={handleDeletePlaylist}
+      />
     </div>
   );
 }

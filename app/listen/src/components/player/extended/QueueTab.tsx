@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { JamQueueLockedNotice } from "@/components/player/JamQueueLockedNotice";
 import { usePlayerActions, usePlayerState } from "@/contexts/PlayerContext";
@@ -32,7 +32,7 @@ export function QueueTab() {
       (track) => track.path && track.path.includes("/"),
     );
     if (!validTracks.length) {
-      toast.error(t("player.queue.toasts.noLocalTracks"));
+      notify.error(t("player.queue.toasts.noLocalTracks"));
       return;
     }
     try {
@@ -45,11 +45,11 @@ export function QueueTab() {
           album: track.album || "",
         })),
       });
-      toast.success(
+      notify.success(
         t("player.queue.toasts.saved", { count: validTracks.length }),
       );
     } catch {
-      toast.error(t("player.queue.toasts.saveFailed"));
+      notify.error(t("player.queue.toasts.saveFailed"));
     }
   }
 

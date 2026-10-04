@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+
+import { notify } from "@crate/ui/lib/notify";
+import { Button } from "@crate/ui/shadcn/button";
+import { Input } from "@crate/ui/shadcn/input";
 
 import { Section, ToggleRow } from "@/components/settings/SettingsPrimitives";
 import { api } from "@/lib/api";
+
+const CONNECT_BUTTON_CLASS_NAME =
+  "h-auto bg-accent-action/15 px-4 py-2 text-xs text-accent-action hover:bg-accent-action/25";
+const DISCONNECT_BUTTON_CLASS_NAME =
+  "h-auto border-0 bg-state-danger/15 px-4 py-2 text-xs text-state-danger hover:bg-state-danger/25";
 
 interface ScrobbleProviderStatus {
   connected: boolean;
@@ -44,7 +52,7 @@ export function ScrobbleSection() {
       setRemoteScrobblingEnabled(preference.remote_scrobbling_enabled);
     } catch {
       setRemoteScrobblingEnabled(previous);
-      toast.error(t("settings.scrobbling.toasts.preferenceFailed"));
+      notify.error(t("settings.scrobbling.toasts.preferenceFailed"));
     } finally {
       setSavingRemotePreference(false);
     }
@@ -61,7 +69,7 @@ export function ScrobbleSection() {
       );
       window.location.href = `https://www.last.fm/api/auth/?api_key=${api_key}&cb=${cb}`;
     } catch {
-      toast.error(t("settings.scrobbling.toasts.lastfmNotConfigured"));
+      notify.error(t("settings.scrobbling.toasts.lastfmNotConfigured"));
       setConnecting(null);
     }
   };
@@ -71,11 +79,11 @@ export function ScrobbleSection() {
       setConnecting("lastfm");
       try {
         await api("/api/me/scrobble/lastfm", "POST", { token });
-        toast.success(t("settings.scrobbling.toasts.lastfmConnected"));
+        notify.success(t("settings.scrobbling.toasts.lastfmConnected"));
         const updated = await api<ScrobbleStatus>("/api/me/scrobble/status");
         setStatus(updated);
       } catch {
-        toast.error(t("settings.scrobbling.toasts.lastfmConnectFailed"));
+        notify.error(t("settings.scrobbling.toasts.lastfmConnectFailed"));
       } finally {
         setConnecting(null);
       }
@@ -92,7 +100,7 @@ export function ScrobbleSection() {
         "POST",
         { token: lbToken.trim() },
       );
-      toast.success(
+      notify.success(
         t("settings.scrobbling.toasts.listenbrainzConnected", {
           username: result.username,
         }),
@@ -101,7 +109,7 @@ export function ScrobbleSection() {
       const updated = await api<ScrobbleStatus>("/api/me/scrobble/status");
       setStatus(updated);
     } catch {
-      toast.error(t("settings.scrobbling.toasts.invalidListenbrainzToken"));
+      notify.error(t("settings.scrobbling.toasts.invalidListenbrainzToken"));
     } finally {
       setConnecting(null);
     }
@@ -114,13 +122,13 @@ export function ScrobbleSection() {
         ...previous,
         [provider]: { connected: false },
       }));
-      toast.success(
+      notify.success(
         t("settings.scrobbling.toasts.disconnected", {
           provider: provider === "lastfm" ? "Last.fm" : "ListenBrainz",
         }),
       );
     } catch {
-      toast.error(t("common.toasts.disconnectFailed"));
+      notify.error(t("common.toasts.disconnectFailed"));
     }
   };
 
@@ -168,22 +176,26 @@ export function ScrobbleSection() {
           )}
         </div>
         {lastfm?.connected ? (
-          <button
+          <Button
+            variant="danger-soft"
+            shape="pill"
             onClick={() => handleDisconnect("lastfm")}
-            className="rounded-full bg-state-danger/15 px-4 py-2 text-xs font-medium text-state-danger transition-colors hover:bg-state-danger/25"
+            className={DISCONNECT_BUTTON_CLASS_NAME}
           >
             {t("common.disconnect")}
-          </button>
+          </Button>
         ) : (
-          <button
+          <Button
+            variant="secondary"
+            shape="pill"
             onClick={handleLastfmConnect}
             disabled={connecting === "lastfm"}
-            className="rounded-full bg-accent-action/15 px-4 py-2 text-xs font-medium text-accent-action transition-colors hover:bg-accent-action/25 disabled:opacity-50"
+            className={CONNECT_BUTTON_CLASS_NAME}
           >
             {connecting === "lastfm"
               ? t("common.connecting")
               : t("common.connect")}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -205,20 +217,23 @@ export function ScrobbleSection() {
           )}
         </div>
         {listenbrainz?.connected ? (
-          <button
+          <Button
+            variant="danger-soft"
+            shape="pill"
             onClick={() => handleDisconnect("listenbrainz")}
-            className="rounded-full bg-state-danger/15 px-4 py-2 text-xs font-medium text-state-danger transition-colors hover:bg-state-danger/25"
+            className={DISCONNECT_BUTTON_CLASS_NAME}
           >
             {t("common.disconnect")}
-          </button>
+          </Button>
         ) : (
           <div className="flex items-center gap-2">
-            <input
+            <Input
               type="text"
               value={lbToken}
               onChange={(event) => setLbToken(event.target.value)}
               placeholder={t("settings.scrobbling.apiToken")}
-              className="w-36 rounded-lg border border-border-quiet/10 bg-text-primary/5 px-3 py-1.5 text-base text-text-primary placeholder:text-text-primary/40 focus:border-accent-action/50 focus:outline-none"
+              aria-label={t("settings.scrobbling.apiToken")}
+              className="h-auto w-36 rounded-lg border-border-quiet/10 bg-text-primary/5 px-3 py-1.5 shadow-none backdrop-blur-none focus-visible:border-accent-action/50 md:text-base"
               onKeyDown={(event) => {
                 if (
                   !event.nativeEvent.isComposing &&
@@ -229,13 +244,15 @@ export function ScrobbleSection() {
                 }
               }}
             />
-            <button
+            <Button
+              variant="secondary"
+              shape="pill"
               onClick={handleListenBrainzConnect}
               disabled={connecting === "listenbrainz" || !lbToken.trim()}
-              className="rounded-full bg-accent-action/15 px-4 py-2 text-xs font-medium text-accent-action transition-colors hover:bg-accent-action/25 disabled:opacity-50"
+              className={CONNECT_BUTTON_CLASS_NAME}
             >
               {connecting === "listenbrainz" ? "..." : t("common.connect")}
-            </button>
+            </Button>
           </div>
         )}
       </div>

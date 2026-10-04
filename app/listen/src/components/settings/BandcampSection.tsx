@@ -2,13 +2,24 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
-import { Loader2, Lock, RefreshCw, Smartphone } from "@crate/ui/icons";
+import {
+  CRATE_ICON_SIZE,
+  Loader2,
+  Lock,
+  RefreshCw,
+  Smartphone,
+} from "@crate/ui/icons";
+import { Button } from "@crate/ui/shadcn/button";
+import { Textarea } from "@crate/ui/shadcn/textarea";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { Section } from "@/components/settings/SettingsPrimitives";
 
 import type { BandcampCounts, BandcampStatus } from "./bandcamp-types";
 import { useBandcampConnection } from "./use-bandcamp-connection";
+
+const PRIMARY_PILL_CLASS_NAME =
+  "h-auto px-4 py-2 text-xs font-semibold shadow-none has-[>svg]:px-4 hover:bg-accent-action/90 [&_svg:not([class*='size-'])]:size-3.5";
 
 export function BandcampSection() {
   const { t } = useTranslation();
@@ -104,25 +115,28 @@ function BandcampConnectionSummary({
               <BandcampLogo size={14} />
               {t("settings.bandcamp.viewPurchases")}
             </Link>
-            <button
+            <Button
+              shape="pill"
               onClick={() => void onSync()}
               disabled={busy !== null}
-              className="inline-flex items-center gap-2 rounded-full bg-accent-action px-4 py-2 text-xs font-semibold text-accent-action-foreground transition-colors hover:bg-accent-action/90 disabled:opacity-50"
+              className={PRIMARY_PILL_CLASS_NAME}
             >
               {busy === "sync" ? (
-                <Loader2 size={14} className="animate-spin" />
+                <Loader2 size={CRATE_ICON_SIZE.xs} className="animate-spin" />
               ) : (
-                <RefreshCw size={14} />
+                <RefreshCw size={CRATE_ICON_SIZE.xs} />
               )}
               {t("bandcamp.actions.sync")}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="danger-soft"
+              shape="pill"
               onClick={() => void onDisconnect()}
               disabled={busy !== null}
-              className="rounded-full border border-state-danger/25 px-4 py-2 text-xs font-semibold text-state-danger transition-colors hover:bg-state-danger/10 disabled:opacity-50"
+              className="h-auto bg-transparent px-4 py-2 text-xs font-semibold text-state-danger hover:border-state-danger/25 hover:bg-state-danger/10 has-[>svg]:px-4"
             >
               {t("common.disconnect")}
-            </button>
+            </Button>
           </div>
         ) : null}
       </div>
@@ -164,18 +178,19 @@ function BandcampConnectInstructions({
             />
             <p>{t("settings.bandcamp.desktopConnectorDescription")}</p>
           </div>
-          <button
+          <Button
+            shape="pill"
             onClick={() => void onOpenDesktop()}
             disabled={busy !== null}
-            className="inline-flex items-center gap-2 rounded-full bg-accent-action px-4 py-2 text-xs font-semibold text-accent-action-foreground transition-colors hover:bg-accent-action/90 disabled:opacity-50"
+            className={PRIMARY_PILL_CLASS_NAME}
           >
             {busy === "tauri-connect" ? (
-              <Loader2 size={14} className="animate-spin" />
+              <Loader2 size={CRATE_ICON_SIZE.xs} className="animate-spin" />
             ) : (
-              <BandcampLogo size={14} />
+              <BandcampLogo size={CRATE_ICON_SIZE.xs} />
             )}
             {t("settings.bandcamp.connectWindow")}
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -193,26 +208,29 @@ function BandcampConnectInstructions({
             {t("settings.bandcamp.cookieInstructionsEnd")}
           </p>
         </div>
-        <textarea
+        <Textarea
           value={bandcampCookie}
           onChange={(event) => setBandcampCookie(event.target.value)}
           rows={3}
           spellCheck={false}
           placeholder={t("settings.bandcamp.cookiePlaceholder")}
-          className="w-full resize-none rounded-lg border border-border-quiet/10 bg-surface-canvas/30 px-3 py-2 font-mono text-base leading-5 text-text-primary outline-none transition-colors placeholder:text-text-primary/25 focus:border-accent-action/50"
+          aria-label={t("settings.bandcamp.cookiePlaceholder")}
+          className="min-h-0 resize-none rounded-lg border-border-quiet/10 bg-surface-canvas/30 px-3 py-2 font-mono leading-5 shadow-none backdrop-blur-none placeholder:text-text-primary/25 focus-visible:border-accent-action/50 md:text-base"
         />
-        <button
+        <Button
+          variant="ghost"
+          shape="pill"
           onClick={() => void onConnect(bandcampCookie)}
           disabled={busy !== null || !bandcampCookie.trim()}
-          className="inline-flex items-center gap-2 rounded-full border border-border-quiet/10 px-4 py-2 text-xs font-semibold text-text-primary transition-colors hover:bg-text-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-auto border border-border-quiet/10 px-4 py-2 text-xs font-semibold text-text-primary hover:bg-text-primary/10 [&_svg:not([class*='size-'])]:size-3.5 has-[>svg]:px-4"
         >
           {busy === "cookie-connect" ? (
-            <Loader2 size={14} className="animate-spin" />
+            <Loader2 size={CRATE_ICON_SIZE.xs} className="animate-spin" />
           ) : (
-            <BandcampLogo size={14} />
+            <BandcampLogo size={CRATE_ICON_SIZE.xs} />
           )}
           {t("settings.bandcamp.connectWithCookie")}
-        </button>
+        </Button>
       </div>
     </div>
   );

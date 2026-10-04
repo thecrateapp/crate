@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowRight, Radio } from "@crate/ui/icons";
+import { ArrowRight, CRATE_ICON_SIZE, Radio } from "@crate/ui/icons";
 import { MediaRail, SectionHeader } from "@crate/ui/domain/lists";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import {
   type BrowseFilters,
@@ -48,11 +48,11 @@ export function ExploreFeatureCard({
       <div className="relative flex h-full flex-col justify-between gap-8">
         <div className="flex items-center justify-between">
           <Icon
-            size={24}
+            size={CRATE_ICON_SIZE.xl}
             className="text-accent-action drop-shadow-accent-action-feature"
           />
           <ArrowRight
-            size={18}
+            size={CRATE_ICON_SIZE.md}
             className="text-text-primary/35 transition group-hover:translate-x-1 group-hover:text-accent-action"
           />
         </div>
@@ -231,10 +231,10 @@ export function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
           },
         );
       } else {
-        toast.info(t("explore.toasts.noMoodTracks"));
+        notify.info(t("explore.toasts.noMoodTracks"));
       }
     } catch {
-      toast.error(t("explore.toasts.loadMoodTracksFailed"));
+      notify.error(t("explore.toasts.loadMoodTracksFailed"));
     } finally {
       setLoadingMood(null);
     }
@@ -252,6 +252,7 @@ export function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
         {moods.map((mood) => (
           <button
             key={mood.name}
+            type="button"
             onClick={() => void playMood(mood.name)}
             disabled={loadingMood !== null}
             className={`rounded-lg border px-4 py-3 text-left transition-colors ${

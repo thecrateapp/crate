@@ -1,7 +1,14 @@
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
-import { ArrowDownToLine, Loader2, RefreshCw, Trash2 } from "@crate/ui/icons";
+import {
+  ArrowDownToLine,
+  CRATE_ICON_SIZE,
+  Loader2,
+  RefreshCw,
+  Trash2,
+} from "@crate/ui/icons";
+import { Button } from "@crate/ui/shadcn/button";
 
 import { Section } from "@/components/settings/SettingsPrimitives";
 import { useOffline } from "@/contexts/OfflineContext";
@@ -66,8 +73,8 @@ export function OfflineSection() {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           disabled={
             !offlineSupported ||
             offlineSyncing ||
@@ -76,26 +83,29 @@ export function OfflineSection() {
           onClick={() => {
             void syncAll()
               .then(() => {
-                toast.success(t("settings.offline.toasts.synced"));
+                notify.success(t("settings.offline.toasts.synced"));
               })
               .catch((error) => {
-                toast.error(
+                notify.error(
                   (error as Error).message ||
                     t("settings.offline.toasts.syncFailed"),
                 );
               });
           }}
-          className="inline-flex items-center gap-2 rounded-lg border border-accent-action/30 bg-accent-action/10 px-4 py-2 text-sm font-medium text-accent-action transition-colors hover:bg-accent-action/15 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-auto rounded-lg border border-accent-action/30 bg-accent-action/10 px-4 py-2 text-accent-action hover:bg-accent-action/15 has-[>svg]:px-4"
         >
           {offlineSyncing ? (
-            <Loader2 size={16} className="animate-spin" />
+            <Loader2
+              size={CRATE_ICON_SIZE.sm}
+              className="size-4 animate-spin"
+            />
           ) : (
-            <RefreshCw size={16} />
+            <RefreshCw size={CRATE_ICON_SIZE.sm} className="size-4" />
           )}
           {t("settings.offline.syncNow")}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="danger-soft"
           disabled={
             !offlineSupported ||
             offlineSyncing ||
@@ -104,20 +114,20 @@ export function OfflineSection() {
           onClick={() => {
             void clearActiveProfile()
               .then(() => {
-                toast.success(t("settings.offline.toasts.removed"));
+                notify.success(t("settings.offline.toasts.removed"));
               })
               .catch((error) => {
-                toast.error(
+                notify.error(
                   (error as Error).message ||
                     t("settings.offline.toasts.clearFailed"),
                 );
               });
           }}
-          className="inline-flex items-center gap-2 rounded-lg border border-state-danger/25 bg-state-danger/10 px-4 py-2 text-sm font-medium text-state-danger transition-colors hover:bg-state-danger/15 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-auto rounded-lg px-4 py-2 text-state-danger has-[>svg]:px-4"
         >
-          <Trash2 size={16} />
+          <Trash2 size={CRATE_ICON_SIZE.sm} className="size-4" />
           {t("settings.offline.removeCopies")}
-        </button>
+        </Button>
       </div>
 
       <div className="rounded-lg border border-border-quiet/10 bg-text-primary/[0.03] px-4 py-3 text-sm text-text-muted">

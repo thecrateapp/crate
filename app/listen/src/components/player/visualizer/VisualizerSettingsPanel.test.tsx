@@ -76,7 +76,11 @@ describe("VisualizerSettingsPanel", () => {
     );
 
     expect(screen.getByText("Visualizer settings")).toBeInTheDocument();
-    expect(container.querySelector(".bg-accent-action")).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("switch")
+        .some((toggle) => toggle.getAttribute("aria-checked") === "true"),
+    ).toBe(true);
     expect(container.querySelector(".bg-text-primary")).toBeInTheDocument();
     expect(container.querySelector(".border-border-quiet")).toBeInTheDocument();
     expect(container.querySelector(".text-text-muted")).toBeInTheDocument();
@@ -95,9 +99,7 @@ describe("VisualizerSettingsPanel", () => {
       />,
     );
 
-    expect(
-      container.querySelector(".bg-border-interactive"),
-    ).toBeInTheDocument();
+    expect(container.querySelector(".bg-surface-control")).toBeInTheDocument();
     expect(container.querySelector(".bg-text-primary")).toBeInTheDocument();
     expect(container.querySelector("input[type='range']")).toBeDisabled();
     expect(container.innerHTML).not.toContain("bg-white");

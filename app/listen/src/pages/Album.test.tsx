@@ -764,16 +764,17 @@ describe("Album page", () => {
       "hidden",
       "sm:block",
     );
-    expect(screen.getByTestId("album-hero-background")).toHaveClass(
+    const heroBackgroundImage = screen
+      .getByTestId("album-hero-background")
+      .querySelector("img");
+    expect(heroBackgroundImage).toHaveClass(
       "brightness-[0.72]",
       "opacity-[0.82]",
       "sm:grayscale",
       "sm:brightness-[0.42]",
       "sm:opacity-[0.42]",
     );
-    expect(screen.getByTestId("album-hero-background")).not.toHaveClass(
-      "grayscale",
-    );
+    expect(heroBackgroundImage).not.toHaveClass("grayscale");
     expect(screen.getByTestId("page-hero-background")).toBeInTheDocument();
     const heroContent = screen.getByRole("heading", { level: 1, name: "MORIR" })
       .parentElement!.parentElement!.parentElement!;

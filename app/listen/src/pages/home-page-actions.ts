@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { fetchArtistTopTracks } from "@/components/actions/shared";
 import type {
@@ -79,7 +79,7 @@ export function buildHomePageActions({
         name: artist.name,
       });
       if (!queue.length) {
-        toast.info(t("actions.artist.toasts.noTopTracks"));
+        notify.info(t("actions.artist.toasts.noTopTracks"));
         return;
       }
       playAll(queue, 0, {
@@ -88,7 +88,7 @@ export function buildHomePageActions({
         radio: { seedType: "artist", seedId: artist.id },
       });
     } catch {
-      toast.error(t("actions.artist.toasts.loadTopTracksFailed"));
+      notify.error(t("actions.artist.toasts.loadTopTracksFailed"));
     }
   }
 
@@ -112,7 +112,7 @@ export function buildHomePageActions({
       const playlist = await loadHomePlaylist(item.id);
       const queue = (playlist.tracks || []).map(toPlayerTrack);
       if (!queue.length) {
-        toast.info(t("home.playlists.warming"));
+        notify.info(t("home.playlists.warming"));
         return;
       }
       playAll(queue, 0, {
@@ -121,7 +121,7 @@ export function buildHomePageActions({
         id: playlist.id,
       });
     } catch {
-      toast.error(t("home.playlists.loadFailed"));
+      notify.error(t("home.playlists.loadFailed"));
     }
   }
 
@@ -130,7 +130,7 @@ export function buildHomePageActions({
       const playlist = await loadHomePlaylist(item.id);
       const queue = (playlist.tracks || []).map(toPlayerTrack);
       if (!queue.length) {
-        toast.info(t("home.playlists.warming"));
+        notify.info(t("home.playlists.warming"));
         return;
       }
       playAll(shuffleArray(queue), 0, {
@@ -139,7 +139,7 @@ export function buildHomePageActions({
         id: playlist.id,
       });
     } catch {
-      toast.error(t("home.playlists.loadFailed"));
+      notify.error(t("home.playlists.loadFailed"));
     }
   }
 
@@ -150,12 +150,12 @@ export function buildHomePageActions({
         playlistName: item.name,
       });
       if (!radio.tracks.length) {
-        toast.info(t("actions.playlist.toasts.radioUnavailable"));
+        notify.info(t("actions.playlist.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error(t("actions.playlist.toasts.radioFailed"));
+      notify.error(t("actions.playlist.toasts.radioFailed"));
     }
   }
 
@@ -164,10 +164,10 @@ export function buildHomePageActions({
       await api(`/api/me/shows/${insight.show_id}/reminders`, "POST", {
         reminder_type: insight.type,
       });
-      toast.success(t("home.radar.toasts.savedForLater"));
+      notify.success(t("home.radar.toasts.savedForLater"));
       navigate("/upcoming");
     } catch {
-      toast.error(t("home.radar.toasts.saveReminderFailed"));
+      notify.error(t("home.radar.toasts.saveReminderFailed"));
     }
   }
 
@@ -179,7 +179,7 @@ export function buildHomePageActions({
         artistName: insight.artist,
       });
       if (!queue.length) {
-        toast.info(t("artist.toasts.noSetlistMatches"));
+        notify.info(t("artist.toasts.noSetlistMatches"));
         return;
       }
       playAll(queue, 0, {
@@ -191,11 +191,11 @@ export function buildHomePageActions({
       await api(`/api/me/shows/${insight.show_id}/reminders`, "POST", {
         reminder_type: insight.type,
       });
-      toast.success(
+      notify.success(
         t("radar.show.toasts.playingSetlist", { count: queue.length }),
       );
     } catch {
-      toast.error(t("radar.show.toasts.loadSetlistFailed"));
+      notify.error(t("radar.show.toasts.loadSetlistFailed"));
     }
   }
 
@@ -207,18 +207,18 @@ export function buildHomePageActions({
         artistName: item.artist,
       });
       if (!queue.length) {
-        toast.info(t("artist.toasts.noSetlistMatches"));
+        notify.info(t("artist.toasts.noSetlistMatches"));
         return;
       }
       playAll(queue, 0, {
         type: "playlist",
         name: t("radar.show.probableSetlistSource", { name: item.artist }),
       });
-      toast.success(
+      notify.success(
         t("radar.show.toasts.playingSetlist", { count: queue.length }),
       );
     } catch {
-      toast.error(t("radar.show.toasts.loadSetlistFailed"));
+      notify.error(t("radar.show.toasts.loadSetlistFailed"));
     }
   }
 

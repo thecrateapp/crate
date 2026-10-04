@@ -1,12 +1,21 @@
-import { type ComponentType, useCallback, useState } from "react";
+import { type ComponentType, useCallback, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Plus, Heart, Users, Disc, Disc3, ListMusic } from "@crate/ui/icons";
+import {
+  CRATE_ICON_SIZE,
+  Plus,
+  Heart,
+  Users,
+  Disc,
+  Disc3,
+  ListMusic,
+} from "@crate/ui/icons";
 import { useApi } from "@/hooks/use-api";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { PullIndicator } from "@crate/ui/primitives/PullIndicator";
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 import { PageHeader } from "@crate/ui/domain/navigation";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
 import { LibraryBandcampTab } from "./LibraryBandcampTab";
@@ -52,6 +61,12 @@ const tabs: { key: Tab; labelKey: string; icon: TabIcon }[] = [
     icon: Plus,
   },
 ];
+
+const TAB_LIST_CLASS_NAME =
+  "flex scroll-px-4 gap-2 overflow-x-auto rounded-none p-0 pr-8 transform-gpu will-change-scroll [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:pr-0";
+
+const TAB_ITEM_CLASS_NAME =
+  "h-auto min-h-11 gap-1.5 bg-text-primary/5 px-4 py-2 text-sm text-text-muted transition-colors data-[state=inactive]:hover:bg-text-primary/10 data-[state=inactive]:hover:text-text-primary data-[state=active]:bg-accent-action data-[state=active]:text-accent-action-foreground";
 
 const tabTitleKeys: Record<Tab, string> = {
   playlists: "nav.collection",
@@ -99,6 +114,16 @@ export function Library() {
     refreshing,
   } = usePullToRefresh(onRefresh);
 
+  const tabItems = useMemo(
+    () =>
+      tabs.map(({ key, labelKey, icon: Icon }) => ({
+        value: key,
+        label: t(labelKey),
+        icon: <Icon size={CRATE_ICON_SIZE.xs} />,
+      })),
+    [t],
+  );
+
   function setTab(tab: Tab) {
     if (section) {
       navigate(`/collection/${tab}`);
@@ -142,22 +167,15 @@ export function Library() {
       {/* Tab bar */}
       {isDesktop ? (
         <div className="relative -mx-4 px-4 sm:mx-0 sm:px-0">
-          <div className="flex scroll-px-4 gap-2 overflow-x-auto pr-8 transform-gpu will-change-scroll [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:pr-0">
-            {tabs.map(({ key, labelKey, icon: Icon }) => (
-              <button
-                key={key}
-                onClick={() => setTab(key)}
-                className={`flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                  tab === key
-                    ? "bg-accent-action text-accent-action-foreground"
-                    : "bg-text-primary/5 text-text-muted hover:bg-text-primary/10 hover:text-text-primary"
-                }`}
-              >
-                <Icon size={14} />
-                {t(labelKey)}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            items={tabItems}
+            value={tab}
+            onValueChange={setTab}
+            variant="tonal"
+            label={t("library.tabs.label")}
+            className={TAB_LIST_CLASS_NAME}
+            itemClassName={TAB_ITEM_CLASS_NAME}
+          />
         </div>
       ) : null}
 

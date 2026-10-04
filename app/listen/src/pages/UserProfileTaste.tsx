@@ -1,5 +1,7 @@
 import { useTranslation } from "react-i18next";
 
+import { CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import {
   badgeTone,
   formatMinutes,
@@ -77,15 +79,13 @@ function ProfileBadges({ badges }: { badges: PublicProfile["badges"] }) {
       {badges.length ? (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {badges.map((badge) => (
-            <span
+            <CratePill
               key={badge.key}
-              className={
-                "rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-[0.12em] " +
-                badgeTone(badge.tone)
-              }
+              tone={badgeTone(badge.tone)}
+              className="gap-0 text-xs leading-4 font-bold uppercase tracking-[0.12em]"
             >
               {badge.label}
-            </span>
+            </CratePill>
           ))}
         </div>
       ) : (

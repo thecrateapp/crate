@@ -1,3 +1,5 @@
+import { Switch } from "@crate/ui/primitives/Switch";
+
 import type { VisualizerConfigState } from "./useVisualizerConfig";
 
 interface VisualizerSettingsPanelProps {
@@ -35,20 +37,12 @@ function Toggle({
   onToggle: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Switch
+      size="sm"
       aria-label={label}
-      onClick={onToggle}
-      className={`h-5 w-9 rounded-full transition-colors ${
-        on ? "bg-accent-action" : "bg-border-interactive"
-      }`}
-    >
-      <div
-        className={` size-4 rounded-full bg-text-primary shadow transition-transform ${
-          on ? "translate-x-4.5" : "translate-x-0.5"
-        }`}
-      />
-    </button>
+      checked={on}
+      onCheckedChange={onToggle}
+    />
   );
 }
 
@@ -76,7 +70,11 @@ export function VisualizerSettingsPanel({
         <span className="text-xs font-bold uppercase tracking-wider text-text-muted">
           Visualizer settings
         </span>
-        <button onClick={resetConfig} className="text-xs link-accent">
+        <button
+          type="button"
+          onClick={resetConfig}
+          className="text-xs link-accent"
+        >
           Reset
         </button>
       </div>

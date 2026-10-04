@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { Flame, Play, Repeat2, Search } from "@crate/ui/icons";
+import { Flame, Repeat2, Search } from "@crate/ui/icons";
+import { PlayButton } from "@crate/ui/domain/media/PlayButton";
 
 import type { StatsPageController } from "@/pages/use-stats-page-controller";
 import { CrateImage } from "@/components/artwork/CrateImage";
@@ -223,13 +224,14 @@ function ReplayCard({
             {replay?.subtitle || t("stats.replay.defaultSubtitle")}
           </p>
         </div>
-        <button
+        <PlayButton
           onClick={onPlay}
           disabled={!items.length}
-          className="flex size-12 shrink-0 items-center justify-center rounded-full bg-accent-action text-accent-action-foreground shadow-xl shadow-primary/20 transition hover:scale-105 disabled:opacity-50"
-        >
-          <Play size={18} fill="currentColor" />
-        </button>
+          label={t("common.playItem", {
+            name: replay?.title || t("stats.replay.title"),
+          })}
+          className="size-12"
+        />
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3">

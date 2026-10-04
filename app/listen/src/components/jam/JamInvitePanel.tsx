@@ -1,7 +1,9 @@
-import { Users } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Users } from "@crate/ui/icons";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
+import { Button } from "@crate/ui/shadcn/button";
+import { Input } from "@crate/ui/shadcn/input";
 
 import { extractInviteToken } from "@/pages/jam-session-utils";
 
@@ -24,27 +26,28 @@ export function JamInvitePanel({
         {t("jam.lobby.joinInviteSubtitle")}
       </p>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-        <input
+        <Input
           value={inviteInput}
           onChange={(event) => setInviteInput(event.target.value)}
           placeholder={t("jam.lobby.invitePlaceholder")}
-          className="jam-input h-11 min-w-0 flex-1 rounded-lg px-4 text-base text-text-primary"
+          aria-label={t("jam.lobby.invitePlaceholder")}
+          className="jam-input flex-1 rounded-lg px-4 shadow-none backdrop-blur-none placeholder:text-text-primary/40 md:text-base"
         />
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           onClick={() => {
             const token = extractInviteToken(inviteInput);
             if (!token) {
-              toast.error(t("jam.toasts.invalidInvite"));
+              notify.error(t("jam.toasts.invalidInvite"));
               return;
             }
             navigate(`/jam/invite/${token}`);
           }}
-          className="jam-secondary-action inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-text-primary transition-colors"
+          className="jam-secondary-action h-auto rounded-lg px-4 py-2.5 text-text-primary hover:text-text-primary [&_svg:not([class*='size-'])]:size-4 has-[>svg]:px-4"
         >
-          <Users size={15} />
+          <Users size={CRATE_ICON_SIZE.sm} />
           {t("jam.lobby.joinRoom")}
-        </button>
+        </Button>
       </div>
     </section>
   );

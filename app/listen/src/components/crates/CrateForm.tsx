@@ -1,6 +1,8 @@
 import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Users } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Users } from "@crate/ui/icons";
+import { Checkbox } from "@crate/ui/primitives/Checkbox";
+import { FormField } from "@crate/ui/primitives/FormField";
 import { Input } from "@crate/ui/shadcn/input";
 import { Textarea } from "@crate/ui/shadcn/textarea";
 import {
@@ -75,8 +77,6 @@ export function crateFormPayload(values: CrateFormValues, isOwner: boolean) {
   };
 }
 
-const FIELD_LABEL_CLASS =
-  "flex flex-col gap-2 text-sm font-medium text-text-primary";
 const TOGGLE_CLASS =
   "flex min-h-11 items-center gap-3 rounded-lg bg-text-primary/[0.035] px-3 py-2 text-sm text-text-primary";
 
@@ -105,106 +105,94 @@ export function CrateForm({
       data-testid="crate-form"
     >
       <fieldset disabled={disabled} className="space-y-4">
-        <label className={FIELD_LABEL_CLASS}>
-          {t("common.name")}
+        <FormField className="gap-2" label={t("common.name")}>
           <Input
             value={values.name}
             onChange={(event) => onChange({ name: event.target.value })}
             maxLength={120}
             required
-            aria-label={t("common.name")}
           />
-        </label>
-        <label className={FIELD_LABEL_CLASS}>
-          {t("library.crates.description")}
+        </FormField>
+        <FormField className="gap-2" label={t("library.crates.description")}>
           <Textarea
             value={values.description}
             onChange={(event) => onChange({ description: event.target.value })}
             maxLength={2000}
             rows={3}
-            aria-label={t("library.crates.description")}
           />
-        </label>
+        </FormField>
         <div className="grid gap-4 rounded-xl border border-border-quiet bg-text-primary/[0.025] p-4 sm:grid-cols-2">
           {isOwner ? (
-            <label className={FIELD_LABEL_CLASS}>
-              {t("library.crates.visibility")}
+            <FormField className="gap-2" label={t("library.crates.visibility")}>
+              {(control) => (
+                <Select
+                  value={values.visibility}
+                  onValueChange={(value) =>
+                    onChange({
+                      visibility: value as CrateFormValues["visibility"],
+                    })
+                  }
+                >
+                  <SelectTrigger {...control} className="h-11 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="private">
+                      {t("library.crates.private")}
+                    </SelectItem>
+                    <SelectItem value="public">
+                      {t("library.crates.public")}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </FormField>
+          ) : null}
+          <FormField className="gap-2" label={t("library.crates.ordering")}>
+            {(control) => (
               <Select
-                value={values.visibility}
+                value={values.ordering}
                 onValueChange={(value) =>
-                  onChange({
-                    visibility: value as CrateFormValues["visibility"],
-                  })
+                  onChange({ ordering: value as CrateOrdering })
                 }
               >
-                <SelectTrigger
-                  aria-label={t("library.crates.visibility")}
-                  className="h-11 w-full"
-                >
+                <SelectTrigger {...control} className="h-11 w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="private">
-                    {t("library.crates.private")}
+                  <SelectItem value="none">
+                    {t("library.crates.unordered")}
                   </SelectItem>
-                  <SelectItem value="public">
-                    {t("library.crates.public")}
+                  <SelectItem value="asc">
+                    {t("library.crates.ascending")}
+                  </SelectItem>
+                  <SelectItem value="desc">
+                    {t("library.crates.descending")}
                   </SelectItem>
                 </SelectContent>
               </Select>
-            </label>
-          ) : null}
-          <label className={FIELD_LABEL_CLASS}>
-            {t("library.crates.ordering")}
-            <Select
-              value={values.ordering}
-              onValueChange={(value) =>
-                onChange({ ordering: value as CrateOrdering })
-              }
-            >
-              <SelectTrigger
-                aria-label={t("library.crates.ordering")}
-                className="h-11 w-full"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">
-                  {t("library.crates.unordered")}
-                </SelectItem>
-                <SelectItem value="asc">
-                  {t("library.crates.ascending")}
-                </SelectItem>
-                <SelectItem value="desc">
-                  {t("library.crates.descending")}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </label>
+            )}
+          </FormField>
           <label className={TOGGLE_CLASS}>
-            <input
-              type="checkbox"
+            <Checkbox
               checked={values.loopEnabled}
-              onChange={(event) =>
-                onChange({ loopEnabled: event.target.checked })
+              onCheckedChange={(checked) =>
+                onChange({ loopEnabled: checked === true })
               }
               aria-label={t("library.crates.loopPlayback")}
-              className="size-4 accent-primary"
             />
             {t("library.crates.loopPlayback")}
           </label>
           {isOwner ? (
             <label className={TOGGLE_CLASS}>
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={values.collaborative}
-                onChange={(event) =>
-                  onChange({ collaborative: event.target.checked })
+                onCheckedChange={(checked) =>
+                  onChange({ collaborative: checked === true })
                 }
                 aria-label={t("library.crates.allowCollaboration")}
-                className="size-4 accent-primary"
               />
-              <Users size={16} className="text-accent-action" />
+              <Users size={CRATE_ICON_SIZE.sm} className="text-accent-action" />
               {t("library.crates.allowCollaboration")}
             </label>
           ) : null}

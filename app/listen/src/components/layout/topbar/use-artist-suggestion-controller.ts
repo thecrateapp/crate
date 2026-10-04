@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 import { useTranslation } from "react-i18next";
 
 import { api, ApiError } from "@/lib/api";
@@ -27,13 +27,13 @@ export function useArtistSuggestionController() {
         artist_url: url.trim() || undefined,
         note: note.trim() || undefined,
       });
-      toast.success(t("userMenu.suggest.toasts.sent"));
+      notify.success(t("userMenu.suggest.toasts.sent"));
       setArtist("");
       setUrl("");
       setNote("");
       setOpen(false);
     } catch (err) {
-      toast.error(
+      notify.error(
         err instanceof ApiError
           ? err.message
           : t("userMenu.suggest.toasts.failed"),

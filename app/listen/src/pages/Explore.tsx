@@ -4,7 +4,7 @@ import { Radio, Route } from "@crate/ui/icons";
 import { SectionHeader } from "@crate/ui/domain/lists";
 import { EmptyState, LoadingState } from "@crate/ui/domain/states";
 import { PageHeader } from "@crate/ui/domain/navigation/PageHeader";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import {
   DecadeDetailView,
@@ -53,7 +53,7 @@ export function Explore() {
         playAll(playlist.tracks, 0, { ...playlist.source, name: playlistName });
       }
     } catch {
-      toast.error(t("explore.toasts.playPlaylistFailed"));
+      notify.error(t("explore.toasts.playPlaylistFailed"));
     }
   }
 
@@ -63,14 +63,14 @@ export function Explore() {
         `/api/curation/playlists/${playlistId}/follow`,
         isFollowed ? "DELETE" : "POST",
       );
-      toast.success(
+      notify.success(
         isFollowed
           ? t("explore.toasts.removedFromLibrary")
           : t("explore.toasts.addedToLibrary"),
       );
       refetch();
     } catch {
-      toast.error(t("explore.toasts.updatePlaylistFailed"));
+      notify.error(t("explore.toasts.updatePlaylistFailed"));
     }
   }
 

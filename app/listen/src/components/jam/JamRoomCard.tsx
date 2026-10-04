@@ -1,9 +1,18 @@
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
-import { Globe2, Loader2, Lock, Pin, Trash2, Users } from "@crate/ui/icons";
+import {
+  CRATE_ICON_SIZE,
+  Globe2,
+  Loader2,
+  Lock,
+  Pin,
+  Trash2,
+  Users,
+} from "@crate/ui/icons";
 import type { TFunction } from "i18next";
 
 import type { ContextMenuHeader } from "@crate/ui/domain/actions";
 import { useEntityMenu } from "@crate/ui/domain/entity/useEntityMenu";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import { ItemActionMenuButton } from "@/components/actions/ItemActionMenu";
 import { useListenEntityMenu } from "@/components/actions/entity-menu";
 import { buildJamRoomActions } from "@/components/actions/jam-actions";
@@ -246,19 +255,15 @@ function RoomCardDeleteButton({
   t: TFunction;
 }) {
   return (
-    <button
-      type="button"
+    <IconButton
+      tone="danger"
       onClick={() => onDelete(room)}
-      disabled={deleting}
+      loading={deleting}
       title={t("jam.delete.title")}
-      aria-label={t("jam.delete.aria", { name: room.name })}
-      className="jam-danger-control inline-flex size-9 items-center justify-center rounded-full transition-colors disabled:opacity-50"
+      label={t("jam.delete.aria", { name: room.name })}
+      className="jam-danger-control size-9 [&_svg:not([class*='size-'])]:size-3.5"
     >
-      {deleting ? (
-        <Loader2 size={13} className="animate-spin" />
-      ) : (
-        <Trash2 size={14} />
-      )}
-    </button>
+      <Trash2 size={CRATE_ICON_SIZE.xs} />
+    </IconButton>
   );
 }

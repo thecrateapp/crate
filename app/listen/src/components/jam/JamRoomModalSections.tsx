@@ -1,14 +1,25 @@
-import { Copy, ListMusic, Loader2, QrCode } from "@crate/ui/icons";
-
 import {
-  AppModal,
-  ModalBody,
-  ModalCloseButton,
-  ModalHeader,
-} from "@crate/ui/primitives/AppModal";
+  Copy,
+  CRATE_ICON_SIZE,
+  ListMusic,
+  Loader2,
+  QrCode,
+} from "@crate/ui/icons";
+
+import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
+import { FormField } from "@crate/ui/primitives/FormField";
 import { QrCodeImage } from "@crate/ui/primitives/QrCodeImage";
+import { Button } from "@crate/ui/shadcn/button";
+import { Input } from "@crate/ui/shadcn/input";
+import { Textarea } from "@crate/ui/shadcn/textarea";
 
 import type { JamRoomModalsProps } from "./JamRoomModals";
+
+const FIELD_LABEL_CLASS_NAME = "text-xs text-text-muted";
+const PRIMARY_ACTION_CLASS_NAME =
+  "h-auto rounded-lg px-4 py-2.5 shadow-none has-[>svg]:px-4 hover:bg-accent-action/90 [&_svg:not([class*='size-'])]:size-4";
+const SECONDARY_ACTION_CLASS_NAME =
+  "jam-secondary-action h-auto rounded-lg px-4 py-2.5 has-[>svg]:px-4 text-text-primary hover:text-text-primary [&_svg:not([class*='size-'])]:size-4";
 
 type JamRoomMetadataModalProps = Pick<
   JamRoomModalsProps,
@@ -47,65 +58,59 @@ export function JamRoomMetadataModal({
     <AppModal
       open={metadataModalOpen}
       onClose={() => setMetadataModalOpen(false)}
-      maxWidthClassName="sm:max-w-lg"
+      size="md"
+      title={t("jam.room.profileModalTitle")}
+      description={t("jam.room.profileModalDescription")}
+      closeLabel={t("common.close")}
+      backdropLabel={t("common.close")}
     >
-      <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
-        <div>
-          <h2 className="text-lg font-semibold text-text-primary">
-            {t("jam.room.profileModalTitle")}
-          </h2>
-          <p className="text-xs text-text-muted">
-            {t("jam.room.profileModalDescription")}
-          </p>
-        </div>
-        <ModalCloseButton onClick={() => setMetadataModalOpen(false)} />
-      </ModalHeader>
       <ModalBody className="p-5 ">
         <div className="space-y-4">
-          <label className="block">
-            <span className="text-xs font-medium text-text-muted">
-              {t("jam.room.descriptionLabel")}
-            </span>
-            <textarea
+          <FormField
+            label={t("jam.room.descriptionLabel")}
+            className="gap-2"
+            labelClassName={FIELD_LABEL_CLASS_NAME}
+          >
+            <Textarea
               value={metadataDescription}
               onChange={(event) => setMetadataDescription(event.target.value)}
               rows={4}
               placeholder={t("jam.room.descriptionPlaceholder")}
-              className="jam-input mt-2 w-full resize-none rounded-lg px-4 py-3 text-base text-text-primary placeholder:text-text-muted"
+              className="jam-input min-h-0 resize-none rounded-lg px-4 py-3 shadow-none backdrop-blur-none placeholder:text-text-muted md:text-base"
             />
-          </label>
-          <label className="block">
-            <span className="text-xs font-medium text-text-muted">
-              {t("jam.room.tagsLabel")}
-            </span>
-            <input
+          </FormField>
+          <FormField
+            label={t("jam.room.tagsLabel")}
+            className="gap-2"
+            labelClassName={FIELD_LABEL_CLASS_NAME}
+          >
+            <Input
               value={metadataTagsInput}
               onChange={(event) => setMetadataTagsInput(event.target.value)}
               placeholder={t("jam.room.tagsPlaceholder")}
-              className="jam-input mt-2 h-11 w-full rounded-lg px-4 text-base text-text-primary placeholder:text-text-muted"
+              className="jam-input rounded-lg px-4 shadow-none backdrop-blur-none placeholder:text-text-muted md:text-base"
             />
-          </label>
+          </FormField>
           <div className="flex flex-wrap justify-end gap-2">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={() => setMetadataModalOpen(false)}
-              className="jam-secondary-action rounded-lg px-4 py-2.5 text-sm font-medium text-text-primary transition-colors"
+              className={SECONDARY_ACTION_CLASS_NAME}
             >
               {t("common.cancel")}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
               onClick={() => void saveRoomMetadata()}
               disabled={updatingRoomField === "metadata"}
-              className="inline-flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90 disabled:opacity-60"
+              className={PRIMARY_ACTION_CLASS_NAME}
             >
               {updatingRoomField === "metadata" ? (
-                <Loader2 size={15} className="animate-spin" />
+                <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
               ) : (
-                <ListMusic size={15} />
+                <ListMusic size={CRATE_ICON_SIZE.sm} />
               )}
               {t("jam.room.saveProfile")}
-            </button>
+            </Button>
           </div>
         </div>
       </ModalBody>
@@ -124,19 +129,12 @@ export function JamRoomInviteModal({
     <AppModal
       open={inviteModalOpen}
       onClose={() => setInviteModalOpen(false)}
-      maxWidthClassName="sm:max-w-md"
+      size="sm"
+      title={t("jam.room.inviteModalTitle")}
+      description={t("jam.room.inviteModalDescription")}
+      closeLabel={t("common.close")}
+      backdropLabel={t("common.close")}
     >
-      <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
-        <div>
-          <h2 className="text-lg font-semibold text-text-primary">
-            {t("jam.room.inviteModalTitle")}
-          </h2>
-          <p className="text-xs text-text-muted">
-            {t("jam.room.inviteModalDescription")}
-          </p>
-        </div>
-        <ModalCloseButton onClick={() => setInviteModalOpen(false)} />
-      </ModalHeader>
       <ModalBody className="p-5 ">
         {inviteLink ? (
           <div className="space-y-4">
@@ -151,25 +149,24 @@ export function JamRoomInviteModal({
               {inviteLink}
             </div>
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
+              <Button
                 onClick={() => copyInviteLink(inviteLink)}
-                className="inline-flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90"
+                className={PRIMARY_ACTION_CLASS_NAME}
               >
-                <Copy size={15} />
+                <Copy size={CRATE_ICON_SIZE.sm} />
                 {t("jam.room.copyLink")}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="ghost"
                 onClick={() => {
                   void copyInviteLink(inviteLink);
                   setInviteModalOpen(false);
                 }}
-                className="jam-secondary-action inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-text-primary transition-colors"
+                className={SECONDARY_ACTION_CLASS_NAME}
               >
-                <QrCode size={15} />
+                <QrCode size={CRATE_ICON_SIZE.sm} />
                 {t("jam.room.done")}
-              </button>
+              </Button>
             </div>
           </div>
         ) : null}

@@ -12,7 +12,7 @@ import { CrateLoader } from "@/components/ui/CrateLoader";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import {
   type DecadeArtists,
@@ -168,7 +168,7 @@ export function PlaylistCategoryView({
         playAll(playlist.tracks, 0, { ...playlist.source, name: playlistName });
       }
     } catch {
-      toast.error(t("playlist.toasts.playFailed"));
+      notify.error(t("playlist.toasts.playFailed"));
     }
   }
 
@@ -178,14 +178,14 @@ export function PlaylistCategoryView({
         `/api/curation/playlists/${playlistId}/follow`,
         isFollowed ? "DELETE" : "POST",
       );
-      toast.success(
+      notify.success(
         isFollowed
           ? t("actions.playlist.toasts.removedFromLibrary")
           : t("actions.playlist.toasts.addedToLibrary"),
       );
       refetch();
     } catch {
-      toast.error(t("playlist.toasts.updateFailed"));
+      notify.error(t("playlist.toasts.updateFailed"));
     }
   }
 

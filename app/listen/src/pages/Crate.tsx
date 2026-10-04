@@ -32,7 +32,7 @@ import { ErrorState } from "@crate/ui/domain/states";
 import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import { Button } from "@crate/ui/shadcn/button";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { buildCrateMenuItems } from "@/components/actions/crate-actions";
 import { action } from "@/components/actions/shared";
@@ -288,7 +288,7 @@ function AuthenticatedCrate() {
         );
         refetch();
       } catch {
-        toast.error(t("library.crates.albumRemoveFailed"));
+        notify.error(t("library.crates.albumRemoveFailed"));
       }
     },
     [crateId, refetch, t],
@@ -310,12 +310,12 @@ function AuthenticatedCrate() {
     try {
       const radio = await startShapedRadio("seeded", "crate", data.id);
       if (!radio?.tracks.length) {
-        toast.info(t("actions.crate.toasts.radioUnavailable"));
+        notify.info(t("actions.crate.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error(t("actions.crate.toasts.radioFailed"));
+      notify.error(t("actions.crate.toasts.radioFailed"));
     }
   }
 
@@ -326,13 +326,13 @@ function AuthenticatedCrate() {
         crateId: data.id,
         title: data.name,
       });
-      toast.success(
+      notify.success(
         result === "removed"
           ? t("actions.offline.toasts.removed")
           : t("actions.crate.toasts.offlineReady"),
       );
     } catch (error) {
-      toast.error(
+      notify.error(
         error instanceof Error
           ? error.message
           : t("actions.offline.toasts.updateFailed"),

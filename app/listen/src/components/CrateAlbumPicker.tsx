@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Loader2, Plus, Search } from "@crate/ui/icons";
-import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
-import { Input } from "@crate/ui/shadcn/input";
+import { CRATE_ICON_SIZE, Check, Loader2, Plus } from "@crate/ui/icons";
+import { IconButton } from "@crate/ui/primitives/IconButton";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { albumCoverApiUrl } from "@/lib/library-routes";
@@ -87,30 +87,22 @@ export function CrateAlbumPicker({
         {t("library.crates.addAlbums")}
       </h2>
       <form onSubmit={search} role="search">
-        <label className="relative block min-w-0">
-          <span className="sr-only">{t("library.crates.searchAlbums")}</span>
-          <Search
-            size={15}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
-          />
-          <Input
-            type="search"
-            aria-label={t("library.crates.searchAlbums")}
+        <div className="relative min-w-0">
+          <SearchInput
+            label={t("library.crates.searchAlbums")}
+            clearLabel={t("search.clear")}
             value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-            }}
+            onValueChange={setQuery}
             placeholder={t("library.crates.searchAlbums")}
-            className="pl-9 pr-9"
           />
           {searching ? (
             <Loader2
-              size={15}
+              size={CRATE_ICON_SIZE.sm}
               aria-hidden="true"
-              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-text-muted"
+              className="pointer-events-none absolute top-1/2 right-10 -translate-y-1/2 animate-spin text-text-muted"
             />
           ) : null}
-        </label>
+        </div>
       </form>
 
       {error && (
@@ -182,24 +174,19 @@ export function CrateAlbumPicker({
                 </div>
                 {uid && alreadyAdded ? (
                   <span className="flex min-h-11 shrink-0 items-center gap-1.5 px-2 text-xs font-medium text-accent-action">
-                    <Check size={15} aria-hidden="true" />
+                    <Check size={CRATE_ICON_SIZE.sm} aria-hidden="true" />
                     {t("library.crates.albumInCrate")}
                   </span>
                 ) : (
-                  <ActionIconButton
-                    aria-label={addLabel}
-                    title={addLabel}
-                    disabled={!uid || addingUid === uid}
-                    onClick={() => uid && void add(album, uid)}
+                  <IconButton
+                    label={addLabel}
                     tone="primary"
-                    className="shrink-0 disabled:cursor-default"
+                    disabled={!uid}
+                    loading={addingUid === uid}
+                    onClick={() => uid && void add(album, uid)}
                   >
-                    {addingUid === uid ? (
-                      <Loader2 size={17} className="animate-spin" />
-                    ) : (
-                      <Plus size={18} />
-                    )}
-                  </ActionIconButton>
+                    <Plus size={CRATE_ICON_SIZE.md} />
+                  </IconButton>
                 )}
               </li>
             );

@@ -7,8 +7,12 @@ import {
   Server,
   AlertCircle,
   CheckCircle2,
+  CRATE_ICON_SIZE,
 } from "@crate/ui/icons";
 import { CrateLogo } from "@crate/ui/domain/brand/CrateLogo";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { Button } from "@crate/ui/shadcn/button";
+import { Input } from "@crate/ui/shadcn/input";
 
 import {
   addServer,
@@ -139,61 +143,68 @@ export function ServerSetup() {
           </p>
         </div>
 
-        <label className="mt-8 flex flex-col gap-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.22em] text-text-muted">
-            {t("serverSetup.urlLabel")}
-          </span>
-          <div className="relative">
-            <Server
-              size={18}
-              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-text-accent/50"
-            />
-            <input
-              type="url"
-              inputMode="url"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://api.your-crate.com"
-              className="h-14 w-full rounded-lg border border-border-quiet bg-text-primary/[0.04] pl-12 pr-4 text-base text-text-primary outline-none transition placeholder:text-text-muted/70 hover:border-text-primary/20 focus:border-accent-action/70 focus:bg-text-primary/[0.06] focus:shadow-focus"
-              required
-            />
-          </div>
-        </label>
+        <FormField
+          label={t("serverSetup.urlLabel")}
+          className="mt-8 gap-2"
+          labelClassName="text-xs font-semibold uppercase tracking-[0.22em] text-text-muted"
+        >
+          {(control) => (
+            <div className="relative">
+              <Server
+                size={CRATE_ICON_SIZE.md}
+                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-text-accent/50"
+              />
+              <Input
+                {...control}
+                type="url"
+                inputMode="url"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://api.your-crate.com"
+                className="h-14 rounded-lg bg-text-primary/[0.04] pl-12 pr-4 shadow-none backdrop-blur-none placeholder:text-text-muted/70 hover:border-text-primary/20 focus-visible:border-accent-action/70 focus-visible:bg-text-primary/[0.06] md:text-base"
+                required
+              />
+            </div>
+          )}
+        </FormField>
 
         {/* Status strip. One line, changes tone based on probeState. */}
         <StatusLine state={probeState} />
 
         <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-          <button
+          <Button
             type="submit"
             disabled={probeState.status === "probing"}
-            className="group flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-accent-action px-5 text-sm font-semibold text-accent-action-foreground shadow-action-solid transition hover:bg-accent-action-hover disabled:cursor-not-allowed disabled:opacity-60"
+            className="group h-auto min-h-12 flex-1 rounded-lg px-5 font-semibold shadow-action-solid has-[>svg]:px-5"
           >
             {probeState.status === "probing" ? (
               <>
-                <Loader2 size={16} className="animate-spin" />
+                <Loader2
+                  size={CRATE_ICON_SIZE.sm}
+                  className="size-4 animate-spin"
+                />
                 {t("serverSetup.checking")}
               </>
             ) : (
               <>
                 {t("serverSetup.continue")}
                 <ArrowRight
-                  size={16}
-                  className="transition group-hover:translate-x-0.5"
+                  size={CRATE_ICON_SIZE.sm}
+                  className="size-4 transition group-hover:translate-x-0.5"
                 />
               </>
             )}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
             onClick={() => setUrl("http://localhost:8585")}
-            className="min-h-12 rounded-lg border border-border-quiet px-5 text-sm font-semibold text-text-secondary-strong transition hover:border-text-primary/20 hover:bg-text-primary/[0.05] hover:text-text-primary"
+            className="h-auto min-h-12 rounded-lg border border-border-quiet px-5 font-semibold text-text-secondary-strong hover:border-text-primary/20 hover:bg-text-primary/[0.05] hover:text-text-primary has-[>svg]:px-5"
           >
             {t("serverSetup.localDev")}
-          </button>
+          </Button>
         </div>
 
         <p className="pt-5 text-center text-[0.75rem] leading-5 text-text-muted">

@@ -5,7 +5,7 @@ import { MediaGrid } from "@crate/ui/domain/lists";
 import { BackLink } from "@crate/ui/domain/navigation/BackLink";
 import { PageHeader } from "@crate/ui/domain/navigation/PageHeader";
 import { EmptyState, ErrorState } from "@crate/ui/domain/states";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
@@ -93,7 +93,7 @@ export function HomeSection() {
       const playlist = await loadHomePlaylist(item.id);
       const queue = (playlist.tracks || []).map(toPlayerTrack);
       if (!queue.length) {
-        toast.info(t("home.playlists.warming"));
+        notify.info(t("home.playlists.warming"));
         return;
       }
       playAll(queue, 0, {
@@ -102,7 +102,7 @@ export function HomeSection() {
         id: playlist.id,
       });
     } catch {
-      toast.error(t("home.playlists.loadFailed"));
+      notify.error(t("home.playlists.loadFailed"));
     }
   }
 
@@ -111,7 +111,7 @@ export function HomeSection() {
       const playlist = await loadHomePlaylist(item.id);
       const queue = (playlist.tracks || []).map(toPlayerTrack);
       if (!queue.length) {
-        toast.info(t("home.playlists.warming"));
+        notify.info(t("home.playlists.warming"));
         return;
       }
       playAll(shuffleArray(queue), 0, {
@@ -120,7 +120,7 @@ export function HomeSection() {
         id: playlist.id,
       });
     } catch {
-      toast.error(t("home.playlists.loadFailed"));
+      notify.error(t("home.playlists.loadFailed"));
     }
   }
 
@@ -131,12 +131,12 @@ export function HomeSection() {
         playlistName: item.name,
       });
       if (!radio.tracks.length) {
-        toast.info(t("actions.playlist.toasts.radioUnavailable"));
+        notify.info(t("actions.playlist.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error(t("actions.playlist.toasts.radioFailed"));
+      notify.error(t("actions.playlist.toasts.radioFailed"));
     }
   }
 
@@ -157,7 +157,7 @@ export function HomeSection() {
           50,
         );
         if (!radio.tracks.length) {
-          toast.info(t("actions.artist.toasts.radioUnavailable"));
+          notify.info(t("actions.artist.toasts.radioUnavailable"));
           return;
         }
         playAll(radio.tracks, 0, radio.source);
@@ -170,13 +170,13 @@ export function HomeSection() {
           albumName: station.album_name || station.title,
         });
         if (!radio.tracks.length) {
-          toast.info(t("actions.album.toasts.radioUnavailable"));
+          notify.info(t("actions.album.toasts.radioUnavailable"));
           return;
         }
         playAll(radio.tracks, 0, radio.source);
       }
     } catch {
-      toast.error(t("home.radio.toasts.startFailed"));
+      notify.error(t("home.radio.toasts.startFailed"));
     }
   }
 

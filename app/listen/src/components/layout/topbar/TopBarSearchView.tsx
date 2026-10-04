@@ -1,4 +1,5 @@
 import { CRATE_ICON_SIZE, Loader2, Search, X } from "@crate/ui/icons";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
@@ -299,8 +300,9 @@ function TopBarSearchControls({
           />
         ) : null}
         {!loading && query && searchOpen ? (
-          <button
-            type="button"
+          <IconButton
+            label={t("search.clear")}
+            size="lg"
             onClick={() => {
               setQuery("");
               setResults([]);
@@ -309,11 +311,10 @@ function TopBarSearchControls({
               setShowDropdown(true);
               focusInputSoon();
             }}
-            className="absolute right-3 z-20 flex size-9 touch-manipulation items-center justify-center text-text-primary/30 hover:text-text-primary/65"
-            aria-label={t("search.clear")}
+            className="absolute right-3 z-20 size-9 touch-manipulation text-text-primary/30 hover:text-text-primary/65"
           >
             <X size={CRATE_ICON_SIZE.lg} />
-          </button>
+          </IconButton>
         ) : null}
         <input
           ref={inputRef}

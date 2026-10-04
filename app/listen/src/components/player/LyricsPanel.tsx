@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { CRATE_ICON_SIZE, X, Loader2 } from "@crate/ui/icons";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import { useTranslation } from "react-i18next";
 import { usePlayerActions, usePlayerProgress } from "@/contexts/PlayerContext";
 import { api } from "@/lib/api";
@@ -96,13 +97,13 @@ export function LyricsPanel({ open, onClose }: LyricsPanelProps) {
         <h2 className="text-sm font-bold text-text-primary">
           {t("player.lyrics")}
         </h2>
-        <button
+        <IconButton
           onClick={onClose}
-          aria-label={t("player.lyrics.close")}
-          className="flex size-10 items-center justify-center text-text-muted transition-colors hover:text-text-primary"
+          label={t("player.lyrics.close")}
+          className="size-10 text-text-muted hover:translate-y-0 hover:drop-shadow-none hover:text-text-primary"
         >
-          <X size={CRATE_ICON_SIZE.xl} />
-        </button>
+          <X size={CRATE_ICON_SIZE.xl} className="size-6" />
+        </IconButton>
       </div>
 
       {/* Track info */}
@@ -146,6 +147,7 @@ export function LyricsPanel({ open, onClose }: LyricsPanelProps) {
               return (
                 <button
                   key={[line.time, line.text].join(":")}
+                  type="button"
                   ref={isActive ? activeRef : null}
                   onClick={() => seek(line.time)}
                   className={`relative z-20 w-full rounded-md px-2 py-1 text-left transition-[color,background-color,font-size] duration-500 ${

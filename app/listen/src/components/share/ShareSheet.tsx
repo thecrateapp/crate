@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  CRATE_ICON_SIZE,
   Camera,
   Copy,
   ImagePlus,
@@ -9,9 +10,10 @@ import {
   X,
 } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { AppModal } from "@crate/ui/primitives/AppModal";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import {
   buildInstagramStoryBlob,
@@ -79,10 +81,10 @@ export function ShareSheetHost() {
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(payload.url);
-      toast.success(t("share.toasts.linkCopied"));
+      notify.success(t("share.toasts.linkCopied"));
       setPayload(null);
     } catch {
-      toast.error(t("share.toasts.copyFailed"));
+      notify.error(t("share.toasts.copyFailed"));
     }
   };
 
@@ -91,7 +93,7 @@ export function ShareSheetHost() {
       await openExternalUrl(url);
       setPayload(null);
     } catch {
-      toast.error(t("share.toasts.targetFailed"));
+      notify.error(t("share.toasts.targetFailed"));
     }
   };
 
@@ -116,7 +118,7 @@ export function ShareSheetHost() {
       );
       if (result === "cancelled") return;
       if (result === "downloaded") {
-        toast.success(t("share.toasts.imageDownloaded"));
+        notify.success(t("share.toasts.imageDownloaded"));
       }
       setPayload(null);
     } catch (error) {
@@ -130,7 +132,7 @@ export function ShareSheetHost() {
         },
         "error",
       );
-      toast.error(
+      notify.error(
         action === "story"
           ? t("share.toasts.instagramFailed")
           : t("share.toasts.imageFailed"),
@@ -152,6 +154,7 @@ export function ShareSheetHost() {
     <AppModal
       open
       onClose={close}
+      ariaLabel={t("share.title", { kind: t(`share.kind.${payload.kind}`) })}
       maxWidthClassName="sm:max-w-[420px]"
       panelClassName="listen-glass-panel overflow-hidden rounded-[12px]"
       overlayClassName="bg-surface-canvas/58"
@@ -175,14 +178,14 @@ export function ShareSheetHost() {
               </p>
             ) : null}
           </div>
-          <button
-            type="button"
-            aria-label={t("share.closeMenu")}
+          <IconButton
+            label={t("share.closeMenu")}
+            variant="card"
+            size="sm"
             onClick={close}
-            className="rounded-full border border-border-quiet bg-text-primary/[0.04] p-2 text-text-primary/50 transition hover:bg-text-primary/10 hover:text-text-primary"
           >
-            <X size={18} />
-          </button>
+            <X size={CRATE_ICON_SIZE.md} />
+          </IconButton>
         </div>
 
         <div className="relative space-y-2 p-4 ">

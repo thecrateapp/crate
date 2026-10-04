@@ -31,6 +31,7 @@ export function RadioHero({
         </div>
 
         <button
+          type="button"
           onClick={onStartDiscovery}
           disabled={starting || !discoveryAvailable}
           className="radio-discovery-button group inline-flex min-h-12 items-center justify-center gap-3 rounded-full px-5 text-sm font-semibold transition duration-300"

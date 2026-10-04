@@ -56,8 +56,8 @@ describe("settings primitives", () => {
       />,
     );
 
-    const toggle = screen.getByRole("button", { name: "Smart transitions" });
-    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    const toggle = screen.getByRole("switch", { name: "Smart transitions" });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
 
     fireEvent.click(toggle);
 

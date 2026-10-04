@@ -1,17 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { Button } from "@crate/ui/shadcn/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@crate/ui/shadcn/alert-dialog";
 
 import { Section } from "@/components/settings/SettingsPrimitives";
 import { api } from "@/lib/api";
@@ -286,42 +277,37 @@ export function OpenSubsonicCredentialsSection() {
         </>
       )}
 
-      <AlertDialog
+      <ConfirmDialog
         open={confirmingAction !== null}
         onOpenChange={(open) => {
           if (!open) setConfirmingAction(null);
         }}
-      >
-        <AlertDialogContent className="border-border-subtle bg-surface-container">
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {confirmingAction === "rotate"
-                ? t("settings.openSubsonic.rotateConfirmTitle")
-                : t("settings.openSubsonic.revokeConfirmTitle")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirmingAction === "rotate"
-                ? t("settings.openSubsonic.rotateConfirmDescription")
-                : t("settings.openSubsonic.revokeConfirmDescription")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => void confirmAction()}
-              className={
-                confirmingAction === "revoke"
-                  ? "bg-state-danger text-state-danger-foreground hover:bg-state-danger/90"
-                  : ""
-              }
-            >
-              {confirmingAction === "rotate"
-                ? t("settings.openSubsonic.rotateConfirmAction")
-                : t("settings.openSubsonic.revokeConfirmAction")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onConfirm={confirmAction}
+        tone={confirmingAction === "revoke" ? "danger" : "default"}
+        title={
+          confirmingAction === "rotate"
+            ? t("settings.openSubsonic.rotateConfirmTitle")
+            : t("settings.openSubsonic.revokeConfirmTitle")
+        }
+        description={
+          confirmingAction === "rotate"
+            ? t("settings.openSubsonic.rotateConfirmDescription")
+            : t("settings.openSubsonic.revokeConfirmDescription")
+        }
+        confirmLabel={
+          confirmingAction === "rotate"
+            ? t("settings.openSubsonic.rotateConfirmAction")
+            : t("settings.openSubsonic.revokeConfirmAction")
+        }
+        cancelLabel={t("common.cancel")}
+        closeLabel={t("common.close")}
+        ariaLabel={
+          confirmingAction === "rotate"
+            ? t("settings.openSubsonic.rotateConfirmTitle")
+            : t("settings.openSubsonic.revokeConfirmTitle")
+        }
+        backdropLabel={t("common.close")}
+      />
     </Section>
   );
 }

@@ -1,5 +1,6 @@
 import { CRATE_ICON_SIZE, PanelLeftClose } from "@crate/ui/icons";
 import { CrateLogo } from "@crate/ui/domain/brand/CrateLogo";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 
 interface SidebarBrandProps {
   discoveryGlowStrength: number;
@@ -70,16 +71,20 @@ export function SidebarBrand({
           >
             Crate
           </span>
-          <button
+          <IconButton
             onClick={onCollapse}
-            aria-label={collapseLabel}
-            className="text-text-subtle transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action"
+            label={collapseLabel}
+            className="size-auto text-text-subtle"
           >
-            <PanelLeftClose size={CRATE_ICON_SIZE.nav} />
-          </button>
+            <PanelLeftClose
+              size={CRATE_ICON_SIZE.nav}
+              className="size-[21px]"
+            />
+          </IconButton>
         </>
       ) : (
         <button
+          type="button"
           onClick={onExpand}
           className="relative flex size-10 items-center justify-center transition-[filter,transform] hover:-translate-y-px hover:drop-shadow-accent-action"
           aria-label={expandLabel}

@@ -1,34 +1,31 @@
 import { memo, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { Calendar, Disc3 } from "@crate/ui/icons";
+import { Calendar, CRATE_ICON_SIZE, Disc3 } from "@crate/ui/icons";
 
 import type { ContextMenuHeader } from "@crate/ui/domain/actions";
 import { EntityRow } from "@crate/ui/domain/entity";
 import { useListenEntityMenu } from "@/components/actions/entity-menu";
 import { buildReleaseActions } from "@/components/actions/show-actions";
-import { CrateImage } from "@/components/artwork/CrateImage";
+import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 
 import { buildUpcomingEventRowModel } from "./upcoming-event-row-model";
 import type { UpcomingItem } from "./upcoming-model";
 
 function ReleaseArtwork({ coverUrl }: { coverUrl?: string }) {
   return (
-    <span className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border-quiet bg-text-primary/5 text-accent-action">
-      {coverUrl ? (
-        <CrateImage
-          src={coverUrl}
-          alt=""
-          loading="lazy"
-          className="size-full object-cover"
-          onError={(event) => {
-            (event.target as HTMLImageElement).style.display = "none";
-          }}
-        />
-      ) : (
-        <Disc3 size={24} />
-      )}
-    </span>
+    <ArtworkSurface
+      source={coverUrl ?? null}
+      alt=""
+      imageClassName="object-cover"
+      imageProps={{ loading: "lazy" }}
+      className="size-16 shrink-0 rounded-xl border border-border-quiet bg-text-primary/5 text-accent-action"
+      fallback={
+        <span className="flex size-full items-center justify-center">
+          <Disc3 size={CRATE_ICON_SIZE.xl} />
+        </span>
+      }
+    />
   );
 }
 

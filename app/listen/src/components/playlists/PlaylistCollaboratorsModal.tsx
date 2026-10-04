@@ -1,12 +1,9 @@
 import type { TFunction } from "i18next";
-import { Copy, Loader2, UserMinus, Users } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Copy, UserMinus, Users } from "@crate/ui/icons";
 
-import {
-  AppModal,
-  ModalBody,
-  ModalCloseButton,
-  ModalHeader,
-} from "@crate/ui/primitives/AppModal";
+import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
+import { CratePill } from "@crate/ui/primitives/CrateBadge";
+import { Button } from "@crate/ui/shadcn/button";
 import { QrCodeImage } from "@crate/ui/primitives/QrCodeImage";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
 import type { AuthUser } from "@/contexts/auth-context";
@@ -42,20 +39,18 @@ export function PlaylistCollaboratorsModal({
   user: AuthUser | null;
 }) {
   return (
-    <AppModal open={open} onClose={onClose} maxWidthClassName="sm:max-w-lg">
-      <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
-        <div>
-          <h2 className="text-lg font-semibold text-text-primary">
-            {t("playlist.collaborators.title")}
-          </h2>
-          <p className="text-xs text-text-muted">
-            {data.is_collaborative
-              ? t("playlist.collaborators.subtitle")
-              : t("playlist.collaborators.notCollaborative")}
-          </p>
-        </div>
-        <ModalCloseButton onClick={onClose} />
-      </ModalHeader>
+    <AppModal
+      open={open}
+      onClose={onClose}
+      size="md"
+      title={t("playlist.collaborators.title")}
+      description={
+        data.is_collaborative
+          ? t("playlist.collaborators.subtitle")
+          : t("playlist.collaborators.notCollaborative")
+      }
+      closeLabel={t("common.close")}
+    >
       <ModalBody className="space-y-5 p-5 ">
         {data.is_collaborative && isOwner ? (
           <div className="rounded-xl border border-accent-action/15 bg-accent-action/5 p-4">
@@ -68,19 +63,14 @@ export function PlaylistCollaboratorsModal({
                   {t("playlist.collaborators.inviteSubtitle")}
                 </div>
               </div>
-              <button
-                type="button"
+              <Button
                 onClick={onCreateInvite}
-                disabled={creatingInvite}
-                className="inline-flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90 disabled:opacity-60"
+                loading={creatingInvite}
+                className="rounded-lg"
               >
-                {creatingInvite ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : (
-                  <Users size={15} />
-                )}
+                {creatingInvite ? null : <Users size={CRATE_ICON_SIZE.sm} />}
                 {t("playlist.collaborators.createInvite")}
-              </button>
+              </Button>
             </div>
             {inviteLink ? (
               <div className="mt-4 grid gap-4 sm:grid-cols-[0.9fr_1.1fr]">
@@ -95,14 +85,14 @@ export function PlaylistCollaboratorsModal({
                   <div className="break-all border-l-2 border-border-quiet px-4 py-3 text-xs text-text-muted">
                     {inviteLink}
                   </div>
-                  <button
-                    type="button"
+                  <Button
+                    variant="outline"
                     onClick={onCopyInviteLink}
-                    className="inline-flex items-center gap-2 rounded-lg border border-text-primary/15 bg-text-primary/5 px-4 py-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-text-primary/10"
+                    className="rounded-lg"
                   >
-                    <Copy size={15} />
+                    <Copy size={CRATE_ICON_SIZE.sm} />
                     {t("playlist.collaborators.copyInvite")}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : null}
@@ -143,25 +133,24 @@ export function PlaylistCollaboratorsModal({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="rounded-full border border-border-quiet px-2.5 py-1 text-xs text-text-muted">
+                  <CratePill tone="neutral">
                     {member.role === "owner"
                       ? t("playlist.collaborators.owner")
                       : t("playlist.collaborators.collab")}
-                  </div>
+                  </CratePill>
                   {isOwner && member.role !== "owner" && !isCurrentUser ? (
-                    <button
-                      type="button"
+                    <Button
+                      variant="danger-soft"
+                      size="xs"
+                      shape="pill"
                       onClick={() => onRemoveMember(member.user_id)}
-                      disabled={removingMemberId === member.user_id}
-                      className="inline-flex items-center gap-1 rounded-full border border-state-danger/20 px-2.5 py-1 text-xs text-state-danger-text transition-colors hover:bg-state-danger/10 disabled:opacity-60"
+                      loading={removingMemberId === member.user_id}
                     >
-                      {removingMemberId === member.user_id ? (
-                        <Loader2 size={12} className="animate-spin" />
-                      ) : (
-                        <UserMinus size={12} />
+                      {removingMemberId === member.user_id ? null : (
+                        <UserMinus size={CRATE_ICON_SIZE.micro} />
                       )}
                       {t("common.remove")}
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               </div>

@@ -286,13 +286,18 @@ describe("HomeTasteHero", () => {
     expect(
       screen.getByRole("heading", { name: "Converge" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Previous artist" }),
+    ).toHaveAttribute("data-variant", "ghost");
     expect(screen.getByRole("button", { name: "Previous artist" })).toHaveClass(
-      "bg-transparent",
-      "border-0",
+      "home-hero-nav-control-plain",
+    );
+    expect(screen.getByRole("button", { name: "Next artist" })).toHaveAttribute(
+      "data-variant",
+      "ghost",
     );
     expect(screen.getByRole("button", { name: "Next artist" })).toHaveClass(
-      "bg-transparent",
-      "border-0",
+      "home-hero-nav-control-plain",
     );
     expect(screen.getByRole("button", { name: "Show Botch" })).toHaveClass(
       "rounded-full",

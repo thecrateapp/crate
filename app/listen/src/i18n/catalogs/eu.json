@@ -1779,5 +1779,15 @@
   "actions.genre.open": "Ireki generoa",
   "actions.path.open": "Ireki ibilbidea",
   "actions.jam.open": "Ireki gela",
-  "actions.bandcamp.open": "Ireki Bandcamp-en"
+  "actions.bandcamp.open": "Ireki Bandcamp-en",
+  "common.close": "Itxi",
+  "settings.connectDevices.revokeConfirmTitle": "Gailu hau baliogabetu?",
+  "settings.connectDevices.revokeConfirmDescription": "{name} Crate Connect-etik deskonektatuko da eta saioa berriro hasi beharko du.",
+  "library.tabs.label": "Bildumaren atalak",
+  "stats.window.label": "Denbora-tartea",
+  "common.closeDialog": "Itxi elkarrizketa-koadroa",
+  "paths.delete.confirmTitle": "Ibilbide hau ezabatu?",
+  "paths.delete.confirmDescription": "\"{name}\" zure ibilbideetatik kenduko da. Ezin da desegin.",
+  "radar.filtersLabel": "Iragazi radarra",
+  "player.tabsLabel": "Erreproduzigailuaren panelak"
 }

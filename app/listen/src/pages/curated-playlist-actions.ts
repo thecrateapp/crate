@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
 import type { CrateIcon } from "@crate/ui/icons";
 import type { ContextMenuEntry } from "@crate/ui/domain/actions";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import type { TrackRowData } from "@/components/cards/TrackRow";
 import type { PlaylistHeroSecondaryAction } from "@/components/playlists/PlaylistHeroSection";
@@ -122,12 +122,12 @@ export function buildCuratedPlaylistActions({
         playlistName: data.name,
       });
       if (!radio.tracks.length) {
-        toast.info(t("playlist.toasts.radioUnavailable"));
+        notify.info(t("playlist.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error(t("playlist.toasts.radioFailed"));
+      notify.error(t("playlist.toasts.radioFailed"));
     }
   }
 
@@ -157,9 +157,9 @@ export function buildCuratedPlaylistActions({
           }),
         ],
       });
-      toast.success(t("playlist.toasts.trackAdded"));
+      notify.success(t("playlist.toasts.trackAdded"));
     } catch {
-      toast.error(t("playlist.toasts.trackAddFailed"));
+      notify.error(t("playlist.toasts.trackAddFailed"));
     }
   }
 
@@ -175,14 +175,14 @@ export function buildCuratedPlaylistActions({
     try {
       if (data.is_followed) {
         await api(`/api/curation/playlists/${id}/follow`, "DELETE");
-        toast.success(t("playlist.toasts.removedLibrary"));
+        notify.success(t("playlist.toasts.removedLibrary"));
       } else {
         await api(`/api/curation/playlists/${id}/follow`, "POST");
-        toast.success(t("playlist.toasts.addedLibrary"));
+        notify.success(t("playlist.toasts.addedLibrary"));
       }
       refetch();
     } catch {
-      toast.error(t("playlist.toasts.updateFailed"));
+      notify.error(t("playlist.toasts.updateFailed"));
     } finally {
       setTogglingFollow(false);
     }
@@ -196,13 +196,13 @@ export function buildCuratedPlaylistActions({
         title: data.name,
         isSmart: data.is_smart,
       });
-      toast.success(
+      notify.success(
         result === "removed"
           ? t("playlist.toasts.offlineRemoved")
           : t("playlist.toasts.availableOffline"),
       );
     } catch (offlineError) {
-      toast.error(
+      notify.error(
         (offlineError as Error).message ||
           t("playlist.toasts.offlineUpdateFailed"),
       );

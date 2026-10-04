@@ -247,8 +247,8 @@ describe("ExtendedPlayer", () => {
     const visualizerSettingsButton = screen.getByLabelText(
       "Visualizer settings",
     );
-    const activeTab = screen.getByRole("button", { name: "Queue" });
-    const inactiveTab = screen.getByRole("button", { name: "Suggested" });
+    const activeTab = screen.getByRole("tab", { name: "Queue" });
+    const inactiveTab = screen.getByRole("tab", { name: "Suggested" });
 
     for (const button of [closeButton, equalizerButton]) {
       expect(button).toHaveClass(
@@ -268,10 +268,14 @@ describe("ExtendedPlayer", () => {
     expect(visualizerSettingsButton.className).not.toContain("black/");
     expect(visualizerSettingsButton.className).not.toContain("white/");
 
-    expect(activeTab).toHaveClass("bg-surface-control", "text-text-primary");
+    expect(activeTab).toHaveAttribute("aria-selected", "true");
+    expect(activeTab).toHaveClass(
+      "data-[state=active]:bg-surface-control",
+      "data-[state=active]:text-text-primary",
+    );
     expect(inactiveTab).toHaveClass(
-      "text-text-muted",
-      "hover:text-text-secondary",
+      "data-[state=inactive]:text-text-muted",
+      "data-[state=inactive]:hover:text-text-secondary",
     );
     expect(activeTab.className).not.toContain("white/");
     expect(inactiveTab.className).not.toContain("white/");

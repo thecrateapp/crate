@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Loader2 } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { cratePagePath } from "@/components/crates/crate-model";
 import { api } from "@/lib/api";
@@ -18,12 +18,12 @@ export function CrateInvite() {
     api<{ crate_id: string }>(`/api/crates/invites/${token}/accept`, "POST", {})
       .then((response) => {
         if (cancelled) return;
-        toast.success(t("crateInvite.toasts.joined"));
+        notify.success(t("crateInvite.toasts.joined"));
         navigate(cratePagePath({ id: response.crate_id }), { replace: true });
       })
       .catch(() => {
         if (cancelled) return;
-        toast.error(t("crateInvite.toasts.invalid"));
+        notify.error(t("crateInvite.toasts.invalid"));
         navigate("/collection?tab=crates", { replace: true });
       });
     return () => {

@@ -4,6 +4,9 @@ import { useTranslation } from "react-i18next";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { CrateLoader } from "@/components/ui/CrateLoader";
 import { CrateLogo } from "@crate/ui/domain/brand/CrateLogo";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { Button } from "@crate/ui/shadcn/button";
+import { Input } from "@crate/ui/shadcn/input";
 import { api, ApiError, setAuthTokens } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { isTauriRuntime } from "@/lib/platform";
@@ -13,6 +16,9 @@ import {
   type TauriAuthDiagnostic,
 } from "@/lib/tauri-auth-diagnostic";
 import { waitForPendingSecureSessionWrites } from "@/lib/server-store";
+
+const AUTH_INPUT_CLASS_NAME =
+  "h-10 rounded-lg bg-text-primary/5 px-3 shadow-none backdrop-blur-none md:text-base";
 
 export function Login() {
   const navigate = useNavigate();
@@ -116,50 +122,48 @@ export function Login() {
         ) : null}
 
         {error && (
-          <p className="text-sm text-state-danger text-center">{error}</p>
+          <p role="alert" className="text-sm text-state-danger text-center">
+            {error}
+          </p>
         )}
 
-        <div>
-          <label
-            htmlFor="email"
-            className="block text-sm text-text-primary/60 mb-1"
-          >
-            {t("common.email")}
-          </label>
-          <input
+        <FormField
+          label={t("common.email")}
+          className="gap-1"
+          labelClassName="font-normal text-text-primary/60"
+        >
+          <Input
             id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="h-10 w-full rounded-lg border border-border-quiet bg-text-primary/5 px-3 text-base text-text-primary focus:border-accent-action/50 focus:outline-none"
+            className={AUTH_INPUT_CLASS_NAME}
           />
-        </div>
+        </FormField>
 
-        <div>
-          <label
-            htmlFor="password"
-            className="block text-sm text-text-primary/60 mb-1"
-          >
-            {t("common.password")}
-          </label>
-          <input
+        <FormField
+          label={t("common.password")}
+          className="gap-1"
+          labelClassName="font-normal text-text-primary/60"
+        >
+          <Input
             id="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="h-10 w-full rounded-lg border border-border-quiet bg-text-primary/5 px-3 text-base text-text-primary focus:border-accent-action/50 focus:outline-none"
+            className={AUTH_INPUT_CLASS_NAME}
           />
-        </div>
+        </FormField>
 
-        <button
+        <Button
           type="submit"
           disabled={submitting}
-          className="w-full h-10 rounded-lg bg-accent-action text-accent-action-foreground font-medium text-sm hover:bg-accent-action-hover transition-colors disabled:opacity-50"
+          className="h-10 w-full rounded-lg"
         >
           {submitting ? t("auth.login.submitting") : t("auth.login.submit")}
-        </button>
+        </Button>
 
         <OAuthButtons returnTo={returnTo} />
 

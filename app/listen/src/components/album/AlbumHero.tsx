@@ -2,22 +2,19 @@ import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Clock, Disc } from "@crate/ui/icons";
+import { CratePill } from "@crate/ui/primitives/CrateBadge";
 import { PageHero } from "@crate/ui/domain/hero";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import type { GenreProfileItem } from "@crate/ui/domain/genres/GenrePill";
 
 import { AlbumHeroContributor } from "@/components/album/AlbumHeroContributor";
 import { ReleaseCountdown } from "@/components/album/ReleaseCountdown";
-import { CrateImage } from "@/components/artwork/CrateImage";
+import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 import { QualityBadge } from "@/components/player/bar/QualityBadge";
 import type { QualityBadge as QualityBadgeData } from "@/components/player/bar/player-bar-utils";
 import type { OfflineItemState } from "@/lib/offline";
 import { cn, formatTotalDuration } from "@/lib/utils";
 import type { AlbumData, AlbumContributor } from "@/pages/album-types";
-
-function hideBrokenImage(event: React.SyntheticEvent<HTMLImageElement>) {
-  (event.target as HTMLImageElement).style.display = "none";
-}
 
 export function AlbumHero({
   data,
@@ -77,15 +74,16 @@ export function AlbumHero({
         hasCover
           ? {
               render: (className) => (
-                <CrateImage
+                <ArtworkSurface
                   data-testid="album-hero-background"
-                  src={coverUrl}
+                  source={coverUrl}
                   alt=""
-                  className={cn(
+                  fallback={null}
+                  className="absolute inset-0"
+                  imageClassName={cn(
                     className,
                     "scale-[1.04] sm:brightness-[0.42] sm:opacity-[0.42]",
                   )}
-                  onError={hideBrokenImage}
                 />
               ),
             }
@@ -102,18 +100,17 @@ export function AlbumHero({
             data-testid="album-desktop-cover"
             className="hidden size-full sm:block"
           >
-            {hasCover ? (
-              <CrateImage
-                src={coverUrl}
-                alt={displayName}
-                className="size-full object-cover"
-                onError={hideBrokenImage}
-              />
-            ) : (
-              <div className="flex size-full items-center justify-center">
-                <Disc size={64} className="text-text-primary/10" />
-              </div>
-            )}
+            <ArtworkSurface
+              source={hasCover ? coverUrl : null}
+              alt={displayName}
+              className="size-full"
+              imageClassName="object-cover"
+              fallback={
+                <div className="flex size-full items-center justify-center">
+                  <Disc size={64} className="text-text-primary/10" />
+                </div>
+              }
+            />
           </div>
         </>
       }
@@ -121,9 +118,12 @@ export function AlbumHero({
         isPreRelease || canPersistAlbum ? (
           <>
             {isPreRelease ? (
-              <span className="rounded-full border border-accent-action/20 bg-accent-action/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-accent-action">
+              <CratePill
+                tone="accent"
+                className="px-3 font-semibold uppercase tracking-[0.18em]"
+              >
                 {t("radar.release.preRelease")}
-              </span>
+              </CratePill>
             ) : null}
             {canPersistAlbum ? <OfflineBadge state={offlineState} /> : null}
           </>
@@ -136,14 +136,13 @@ export function AlbumHero({
           className="link-meta inline-flex items-center gap-2 self-start text-sm"
           onClick={onArtistNavigate}
         >
-          <span className="size-6 shrink-0 overflow-hidden rounded-full bg-text-primary/5">
-            <CrateImage
-              src={artistPhotoUrl}
-              alt={data.artist}
-              className="size-full object-cover"
-              onError={hideBrokenImage}
-            />
-          </span>
+          <ArtworkSurface
+            source={artistPhotoUrl}
+            alt={data.artist}
+            fallback={null}
+            className="size-6 shrink-0 rounded-full bg-text-primary/5"
+            imageClassName="object-cover"
+          />
           {data.artist}
         </button>
       }

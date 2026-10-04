@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { MobileActionSheet } from "@/components/actions/ItemActionMenu";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import { usePlayerActions, usePlayerState } from "@/contexts/PlayerContext";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { JamQueueLockedNotice } from "@/components/player/JamQueueLockedNotice";
@@ -41,13 +42,13 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
         <h2 className="text-sm font-bold text-text-primary">
           {t("player.queue")}
         </h2>
-        <button
+        <IconButton
           onClick={onClose}
-          aria-label={t("player.queue.close")}
-          className="flex size-10 items-center justify-center text-text-muted transition-colors hover:text-text-primary"
+          label={t("player.queue.close")}
+          className="size-10 text-text-muted hover:translate-y-0 hover:drop-shadow-none hover:text-text-primary"
         >
-          <X size={CRATE_ICON_SIZE.xl} />
-        </button>
+          <X size={CRATE_ICON_SIZE.xl} className="size-6" />
+        </IconButton>
       </div>
 
       {jamQueueLocked ? <JamQueueLockedNotice /> : null}

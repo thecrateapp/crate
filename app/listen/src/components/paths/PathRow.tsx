@@ -1,10 +1,11 @@
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { Play, Route } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Play, Route } from "@crate/ui/icons";
 
 import type { ContextMenuHeader } from "@crate/ui/domain/actions";
 import { EntityRow } from "@crate/ui/domain/entity";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import { useListenEntityMenu } from "@/components/actions/entity-menu";
 import {
   buildPathActions,
@@ -78,14 +79,14 @@ export const PathRow = memo(function PathRow({
       }
       href={href}
       trailing={
-        <button
-          type="button"
-          aria-label={t("player.play")}
+        <IconButton
+          tone="primary"
+          label={t("player.play")}
           onClick={onPlay}
-          className="flex size-9 items-center justify-center rounded-full bg-accent-action/15 text-accent-action transition hover:bg-accent-action/25"
+          className="size-9 bg-accent-action/15 hover:bg-accent-action/25 [&_svg:not([class*='size-'])]:size-3.5"
         >
-          <Play size={14} className="ml-0.5 fill-current" />
-        </button>
+          <Play size={CRATE_ICON_SIZE.xs} className="ml-0.5 fill-current" />
+        </IconButton>
       }
       actionMenu={actionMenu}
       menuLabel={t("actions.menu.more")}

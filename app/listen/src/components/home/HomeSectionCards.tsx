@@ -1,9 +1,12 @@
 import { useTranslation } from "react-i18next";
+import { CratePill } from "@crate/ui/primitives/CrateBadge";
 
-import { CrateImage } from "@/components/artwork/CrateImage";
+import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
 
 import type { HomeUpcomingItem } from "./home-model";
+
+const LAZY_IMAGE_PROPS = { loading: "lazy" } as const;
 
 export function UpcomingPreviewRow({
   item,
@@ -23,18 +26,18 @@ export function UpcomingPreviewRow({
 
   return (
     <button
+      type="button"
       onClick={onClick}
       className="group relative flex w-full items-center gap-3 overflow-hidden rounded-lg border border-transparent px-3 py-2 text-left transition-colors hover:border-border-quiet hover:bg-text-primary/5"
     >
       {artworkUrl ? (
-        <CrateImage
-          src={artworkUrl}
+        <ArtworkSurface
+          source={artworkUrl}
           alt=""
-          loading="lazy"
-          className="absolute inset-0 size-full object-cover opacity-20 grayscale transition-opacity group-hover:opacity-30"
-          onError={(event) => {
-            (event.target as HTMLImageElement).style.display = "none";
-          }}
+          fallback={null}
+          imageProps={LAZY_IMAGE_PROPS}
+          imageClassName="object-cover"
+          className="absolute inset-0 opacity-20 grayscale transition-opacity group-hover:opacity-30"
         />
       ) : null}
       <div className="home-upcoming-row-scrim absolute inset-0" />
@@ -52,9 +55,12 @@ export function UpcomingPreviewRow({
             {item.type === "show" ? item.artist : item.title}
           </span>
           {item.user_attending && item.type === "show" ? (
-            <span className="rounded-full border border-accent-action/20 bg-accent-action/10 px-2 py-0.5 text-xs font-medium text-accent-action">
+            <CratePill
+              tone="accent"
+              className="px-2 py-0.5 text-xs font-medium"
+            >
               {t("radar.show.going")}
-            </span>
+            </CratePill>
           ) : null}
         </div>
         <div className="truncate text-xs text-text-muted">
@@ -63,11 +69,14 @@ export function UpcomingPreviewRow({
             : `${item.artist} · ${item.title}`}
         </div>
       </div>
-      <div className="relative shrink-0 rounded-full border border-accent-action/15 bg-accent-action/10 px-2 py-1 text-xs font-medium uppercase tracking-[0.14em] text-accent-action">
+      <CratePill
+        tone="accent"
+        className="relative shrink-0 px-2 py-1 text-xs font-medium uppercase tracking-[0.14em]"
+      >
         {item.type === "show"
           ? t("home.radar.itemType.show")
           : t("home.radar.itemType.release")}
-      </div>
+      </CratePill>
     </button>
   );
 }

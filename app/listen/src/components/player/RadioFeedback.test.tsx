@@ -2,8 +2,8 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("sonner", () => ({
-  toast: Object.assign(vi.fn(), { success: vi.fn() }),
+vi.mock("@crate/ui/lib/notify", () => ({
+  notify: { info: vi.fn(), success: vi.fn(), error: vi.fn() },
 }));
 
 vi.mock("@/lib/radio", () => ({

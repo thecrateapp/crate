@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, Star } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { CRATE_ICON_SIZE, Loader2, Star } from "@crate/ui/icons";
+import { notify } from "@crate/ui/lib/notify";
+import { Button } from "@crate/ui/shadcn/button";
 
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import {
@@ -50,12 +51,12 @@ export function SuggestedTab() {
         title: currentTrack.title,
       });
       if (!radio.tracks.length) {
-        toast.info(t("actions.track.toasts.radioUnavailable"));
+        notify.info(t("actions.track.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error(t("actions.track.toasts.radioFailed"));
+      notify.error(t("actions.track.toasts.radioFailed"));
     } finally {
       setStartingRadio(false);
     }
@@ -80,22 +81,24 @@ export function SuggestedTab() {
   return (
     <div className="flex-1 overflow-y-auto pr-1">
       <div className="mb-3 px-1">
-        <button
+        <Button
+          variant="ghost"
+          shape="pill"
           onClick={handleStartTrackRadio}
           disabled={
             startingRadio ||
             !currentTrack ||
             !hasPlayableTrackReference(currentTrack)
           }
-          className="inline-flex items-center gap-2 rounded-full border border-border-quiet bg-text-primary/5 px-3 py-1.5 text-xs font-medium text-text-primary/80 transition hover:bg-text-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-auto border border-border-quiet bg-text-primary/5 px-3 py-1.5 text-xs text-text-primary/80 hover:bg-text-primary/10 hover:text-text-primary/80 has-[>svg]:px-3 [&_svg:not([class*='size-'])]:size-3"
         >
           {startingRadio ? (
-            <Loader2 size={12} className="animate-spin" />
+            <Loader2 size={CRATE_ICON_SIZE.micro} className="animate-spin" />
           ) : (
-            <Star size={12} />
+            <Star size={CRATE_ICON_SIZE.micro} />
           )}
           {t("actions.track.radio")}
-        </button>
+        </Button>
       </div>
       {tracks.map((track, index) => (
         <SuggestedTrackRow

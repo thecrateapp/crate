@@ -51,6 +51,7 @@ export function PathRouteVisualization({
               return (
                 <button
                   key={track.step}
+                  type="button"
                   onClick={() => onPlayFromStep(index)}
                   title={`${track.title} — ${track.artist}`}
                   className="group relative flex size-4 shrink-0 items-center justify-center"

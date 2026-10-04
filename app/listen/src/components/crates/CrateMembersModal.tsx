@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  CRATE_ICON_SIZE,
   Copy,
   Link,
   Loader2,
@@ -9,12 +10,10 @@ import {
   UserMinus,
   Users,
 } from "@crate/ui/icons";
-import {
-  AppModal,
-  ModalBody,
-  ModalCloseButton,
-  ModalHeader,
-} from "@crate/ui/primitives/AppModal";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
+import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import { QrCodeImage } from "@crate/ui/primitives/QrCodeImage";
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
@@ -25,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@crate/ui/shadcn/select";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { UserProfileLink } from "@/components/social/UserProfileLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -54,20 +53,22 @@ interface MemberRow {
   role: "owner" | "collaborator";
 }
 
+const FIELD_LABEL_CLASS_NAME = "text-xs font-medium text-text-muted";
+
 function absoluteInviteUrl(joinUrl: string) {
   return new URL(joinUrl, window.location.origin).toString();
 }
 
 async function copyToClipboard(value: string, t: (key: string) => string) {
   if (!navigator.clipboard) {
-    toast.error(t("share.toasts.copyFailed"));
+    notify.error(t("share.toasts.copyFailed"));
     return;
   }
   try {
     await navigator.clipboard.writeText(value);
-    toast.success(t("share.toasts.linkCopied"));
+    notify.success(t("share.toasts.linkCopied"));
   } catch {
-    toast.error(t("share.toasts.copyFailed"));
+    notify.error(t("share.toasts.copyFailed"));
   }
 }
 
@@ -152,10 +153,10 @@ export function CrateMembersModal({
     try {
       await api(crateBase, "PUT", { is_collaborative: true });
       setEnabledLocally(true);
-      toast.success(t("crate.members.collaborationEnabled"));
+      notify.success(t("crate.members.collaborationEnabled"));
       onCrateChange();
     } catch {
-      toast.error(t("crate.members.enableFailed"));
+      notify.error(t("crate.members.enableFailed"));
     } finally {
       setEnabling(false);
     }
@@ -167,7 +168,7 @@ export function CrateMembersModal({
       await api(`${crateBase}/members/${userId}`, "DELETE");
       members.refetch();
     } catch {
-      toast.error(t("library.crates.memberRemoveFailed"));
+      notify.error(t("library.crates.memberRemoveFailed"));
     } finally {
       setRemovingUserId(null);
     }
@@ -178,10 +179,10 @@ export function CrateMembersModal({
     setLeaving(true);
     try {
       await api(`${crateBase}/members/${user.id}`, "DELETE");
-      toast.success(t("crate.members.left", { name: crate.name }));
+      notify.success(t("crate.members.left", { name: crate.name }));
       onLeft();
     } catch {
-      toast.error(t("crate.members.leaveFailed"));
+      notify.error(t("crate.members.leaveFailed"));
       setLeaving(false);
     }
   }
@@ -198,7 +199,7 @@ export function CrateMembersModal({
       setCreatedInviteUrl(absoluteInviteUrl(invite.join_url));
       invites.refetch();
     } catch {
-      toast.error(t("library.crates.inviteFailed"));
+      notify.error(t("library.crates.inviteFailed"));
     } finally {
       setCreatingInvite(false);
     }
@@ -219,7 +220,7 @@ export function CrateMembersModal({
       }
       invites.refetch();
     } catch {
-      toast.error(t("crate.members.revokeFailed"));
+      notify.error(t("crate.members.revokeFailed"));
     } finally {
       setRevokingToken(null);
     }
@@ -229,25 +230,21 @@ export function CrateMembersModal({
     <AppModal
       open={open}
       onClose={onClose}
-      maxWidthClassName="sm:max-w-lg"
-      panelClassName="listen-glass-panel border-border-quiet"
+      size="md"
+      title={t("library.crates.collaborators")}
+      description={
+        isOwner
+          ? collaborative
+            ? t("library.crates.inviteDescription")
+            : t("crate.members.collaborationOff")
+          : t("crate.members.readOnlySubtitle")
+      }
+      closeLabel={t("common.close")}
+      closeOnEscape={!leaveConfirmation}
+      headerClassName="bg-transparent"
+      panelClassName="listen-glass-panel flex flex-col border-border-quiet"
     >
-      <div className="flex max-h-[92vh] flex-col">
-        <ModalHeader className="flex items-center justify-between gap-4 bg-transparent px-5 py-4">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-text-primary">
-              {t("library.crates.collaborators")}
-            </h2>
-            <p className="text-xs text-text-muted">
-              {isOwner
-                ? collaborative
-                  ? t("library.crates.inviteDescription")
-                  : t("crate.members.collaborationOff")
-                : t("crate.members.readOnlySubtitle")}
-            </p>
-          </div>
-          <ModalCloseButton onClick={onClose} />
-        </ModalHeader>
+      <div className="flex min-h-0 flex-col">
         <ModalBody className="space-y-5 p-5">
           {isOwner && !collaborative ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent-action/15 bg-accent-action/5 p-4">
@@ -255,15 +252,10 @@ export function CrateMembersModal({
                 {t("crate.members.enableHint")}
               </p>
               <Button
-                type="button"
                 onClick={() => void enableCollaboration()}
-                disabled={enabling}
+                loading={enabling}
               >
-                {enabling ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : (
-                  <Users size={15} />
-                )}
+                {enabling ? null : <Users size={CRATE_ICON_SIZE.sm} />}
                 {t("crate.members.enableCollaboration")}
               </Button>
             </div>
@@ -308,22 +300,21 @@ export function CrateMembersModal({
                       </div>
                     </div>
                     {isOwner && row.role !== "owner" ? (
-                      <button
-                        type="button"
+                      <Button
+                        variant="danger-soft"
+                        size="xs"
+                        shape="pill"
                         onClick={() => void removeMember(row.userId)}
-                        disabled={removingUserId === row.userId}
+                        loading={removingUserId === row.userId}
                         aria-label={t("library.crates.removeMember", {
                           name: row.name,
                         })}
-                        className="inline-flex shrink-0 items-center gap-1 rounded-full border border-state-danger/20 px-2.5 py-1 text-xs text-state-danger-text transition-colors hover:bg-state-danger/10 disabled:opacity-60"
                       >
-                        {removingUserId === row.userId ? (
-                          <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                          <UserMinus size={12} />
+                        {removingUserId === row.userId ? null : (
+                          <UserMinus size={CRATE_ICON_SIZE.micro} />
                         )}
                         {t("common.remove")}
-                      </button>
+                      </Button>
                     ) : null}
                   </li>
                 );
@@ -338,7 +329,6 @@ export function CrateMembersModal({
                   {t("crate.members.membersFailed")}
                 </p>
                 <Button
-                  type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => members.refetch()}
@@ -383,7 +373,7 @@ export function CrateMembersModal({
                 ) : invites.loading ? (
                   <div className="flex justify-center py-3">
                     <Loader2
-                      size={18}
+                      size={CRATE_ICON_SIZE.md}
                       className="animate-spin text-accent-action"
                     />
                   </div>
@@ -404,32 +394,37 @@ export function CrateMembersModal({
                   {t("crate.members.newInvite")}
                 </h3>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col gap-2 text-xs font-medium text-text-muted">
-                    {t("crate.members.expiry")}
-                    <Select
-                      value={expiresInHours}
-                      onValueChange={setExpiresInHours}
-                    >
-                      <SelectTrigger
-                        aria-label={t("crate.members.expiry")}
-                        className="h-11 w-full"
+                  <FormField
+                    className="gap-2"
+                    label={t("crate.members.expiry")}
+                    labelClassName={FIELD_LABEL_CLASS_NAME}
+                  >
+                    {(control) => (
+                      <Select
+                        value={expiresInHours}
+                        onValueChange={setExpiresInHours}
                       >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {EXPIRY_OPTIONS.map((option) => (
-                          <SelectItem
-                            key={option.hours}
-                            value={String(option.hours)}
-                          >
-                            {t(option.labelKey)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </label>
-                  <label className="flex flex-col gap-2 text-xs font-medium text-text-muted">
-                    {t("crate.members.maxUses")}
+                        <SelectTrigger {...control} className="h-11 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {EXPIRY_OPTIONS.map((option) => (
+                            <SelectItem
+                              key={option.hours}
+                              value={String(option.hours)}
+                            >
+                              {t(option.labelKey)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </FormField>
+                  <FormField
+                    className="gap-2"
+                    label={t("crate.members.maxUses")}
+                    labelClassName={FIELD_LABEL_CLASS_NAME}
+                  >
                     <Input
                       type="number"
                       inputMode="numeric"
@@ -438,17 +433,12 @@ export function CrateMembersModal({
                       value={maxUses}
                       onChange={(event) => setMaxUses(event.target.value)}
                       placeholder={t("crate.members.unlimited")}
-                      aria-label={t("crate.members.maxUses")}
                       className="h-11"
                     />
-                  </label>
+                  </FormField>
                 </div>
-                <Button type="submit" disabled={creatingInvite}>
-                  {creatingInvite ? (
-                    <Loader2 size={15} className="animate-spin" />
-                  ) : (
-                    <Link size={15} />
-                  )}
+                <Button type="submit" loading={creatingInvite}>
+                  {creatingInvite ? null : <Link size={CRATE_ICON_SIZE.sm} />}
                   {t("library.crates.createInvite")}
                 </Button>
                 {createdInviteUrl ? (
@@ -463,20 +453,19 @@ export function CrateMembersModal({
                       />
                     </div>
                     <div className="min-w-0 space-y-3">
-                      <input
+                      <Input
                         aria-label={t("library.crates.inviteLink")}
                         readOnly
                         value={createdInviteUrl}
-                        className="h-10 w-full min-w-0 rounded-lg border border-border-quiet bg-text-primary/[0.04] px-3 text-xs text-text-muted"
+                        className="h-10 rounded-lg bg-text-primary/[0.04] px-3 text-xs text-text-muted md:text-xs"
                       />
                       <Button
-                        type="button"
                         variant="outline"
                         onClick={() =>
                           void copyToClipboard(createdInviteUrl, t)
                         }
                       >
-                        <Copy size={15} />
+                        <Copy size={CRATE_ICON_SIZE.sm} />
                         {t("share.copyLink")}
                       </Button>
                     </div>
@@ -488,46 +477,28 @@ export function CrateMembersModal({
 
           {isCollaborator ? (
             <section className="border-t border-border-quiet pt-4">
-              {leaveConfirmation ? (
-                <div className="space-y-3 rounded-xl border border-state-danger/20 bg-state-danger/5 p-4">
-                  <p className="text-sm text-text-primary">
-                    {t("crate.members.leaveConfirmation", {
-                      name: crate.name,
-                    })}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      disabled={leaving}
-                      onClick={() => void leaveCrate()}
-                    >
-                      {leaving ? (
-                        <Loader2 size={15} className="animate-spin" />
-                      ) : null}
-                      {t("crate.members.confirmLeave")}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      disabled={leaving}
-                      onClick={() => setLeaveConfirmation(false)}
-                    >
-                      {t("common.cancel")}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setLeaveConfirmation(true)}
-                  className="text-state-danger hover:text-state-danger"
-                >
-                  <LogOut size={15} />
-                  {t("crate.members.leave")}
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                onClick={() => setLeaveConfirmation(true)}
+                className="text-state-danger hover:text-state-danger"
+              >
+                <LogOut size={CRATE_ICON_SIZE.sm} />
+                {t("crate.members.leave")}
+              </Button>
+              <ConfirmDialog
+                open={leaveConfirmation}
+                tone="danger"
+                pending={leaving}
+                title={t("crate.members.leave")}
+                body={t("crate.members.leaveConfirmation", {
+                  name: crate.name,
+                })}
+                confirmLabel={t("crate.members.confirmLeave")}
+                cancelLabel={t("common.cancel")}
+                closeLabel={t("common.close")}
+                onCancel={() => setLeaveConfirmation(false)}
+                onConfirm={() => void leaveCrate()}
+              />
             </section>
           ) : null}
         </ModalBody>
@@ -572,29 +543,23 @@ function InviteRow({
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
+        <IconButton
+          label={t("share.copyLink")}
+          size="sm"
+          className="size-9"
           onClick={onCopy}
-          aria-label={t("share.copyLink")}
-          title={t("share.copyLink")}
-          className="flex size-9 items-center justify-center rounded-full text-text-muted hover:bg-text-primary/8 hover:text-text-primary"
         >
-          <Copy size={15} />
-        </button>
-        <button
-          type="button"
+          <Copy size={CRATE_ICON_SIZE.sm} />
+        </IconButton>
+        <IconButton
+          label={t("crate.members.revoke")}
+          size="sm"
+          className="size-9 hover:text-state-danger hover:drop-shadow-none"
           onClick={onRevoke}
-          disabled={revoking}
-          aria-label={t("crate.members.revoke")}
-          title={t("crate.members.revoke")}
-          className="flex size-9 items-center justify-center rounded-full text-text-muted hover:bg-text-primary/8 hover:text-state-danger disabled:opacity-50"
+          loading={revoking}
         >
-          {revoking ? (
-            <Loader2 size={15} className="animate-spin" />
-          ) : (
-            <Trash2 size={15} />
-          )}
-        </button>
+          <Trash2 size={CRATE_ICON_SIZE.sm} />
+        </IconButton>
       </div>
     </li>
   );

@@ -255,6 +255,14 @@ describe("Crate page", () => {
 
   it("keeps the public page and player shell mounted while editing in a modal", async () => {
     const user = userEvent.setup();
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
     mocks.detail = crate("owner");
     renderCrate();
 

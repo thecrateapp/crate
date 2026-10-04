@@ -1,8 +1,12 @@
 import type { TFunction } from "i18next";
-import { Loader2, Search } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 import { UserRow } from "@/components/social/UserRow";
 import type { UserSearchResult } from "@/pages/people-types";
+
+const PEOPLE_SEARCH_INPUT_CLASS_NAME =
+  "h-7 rounded-none border-0 bg-transparent pl-9 shadow-none backdrop-blur-none md:text-base focus-visible:bg-transparent";
 
 export function PeopleSearch({
   onQueryChange,
@@ -21,20 +25,20 @@ export function PeopleSearch({
 
   return (
     <section className="rounded-[12px] border border-border-quiet bg-text-primary/[0.03] p-5 sm:p-6">
-      <div className="flex items-center gap-3 border-b border-border-quiet px-1 py-3">
-        <Search size={16} className="text-text-muted" />
-        <input
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder={t("people.search.placeholder")}
-          className="h-7 flex-1 bg-transparent text-base text-text-primary outline-none placeholder:text-text-primary/40"
-        />
-      </div>
+      <SearchInput
+        value={query}
+        onValueChange={onQueryChange}
+        label={t("people.search.placeholder")}
+        clearLabel={t("search.clear")}
+        placeholder={t("people.search.placeholder")}
+        containerClassName="border-b border-border-quiet py-3"
+        className={PEOPLE_SEARCH_INPUT_CLASS_NAME}
+      />
 
       <div className="mt-4 space-y-3">
         {trimmedQuery && searching ? (
           <div className="flex items-center gap-2 text-sm text-text-muted">
-            <Loader2 size={15} className="animate-spin" />
+            <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
             {t("people.search.loading")}
           </div>
         ) : null}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router";
 import { ErrorState } from "@crate/ui/domain/states";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
@@ -28,7 +28,7 @@ export function UserProfile() {
     try {
       if (data.relationship_state.following) {
         await api("/api/users/" + data.id + "/follow", "DELETE");
-        toast.success(
+        notify.success(
           t("userProfile.toasts.unfollowed", {
             name:
               data.display_name || data.username || t("userProfile.thisUser"),
@@ -36,7 +36,7 @@ export function UserProfile() {
         );
       } else {
         await api("/api/users/" + data.id + "/follow", "POST");
-        toast.success(
+        notify.success(
           t("userProfile.toasts.following", {
             name:
               data.display_name || data.username || t("userProfile.thisUser"),
@@ -45,7 +45,7 @@ export function UserProfile() {
       }
       refetch();
     } catch {
-      toast.error(t("userProfile.toasts.updateFailed"));
+      notify.error(t("userProfile.toasts.updateFailed"));
     } finally {
       setBusy(false);
     }

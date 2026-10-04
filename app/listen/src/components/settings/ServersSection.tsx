@@ -1,8 +1,16 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { Plus, Trash2, Server, CheckCircle2 } from "@crate/ui/icons";
-import { toast } from "sonner";
+import {
+  CheckCircle2,
+  CRATE_ICON_SIZE,
+  Plus,
+  Server,
+  Trash2,
+} from "@crate/ui/icons";
+import { notify } from "@crate/ui/lib/notify";
+import { IconButton } from "@crate/ui/primitives/IconButton";
+import { Button } from "@crate/ui/shadcn/button";
 
 import { usesConfigurableServer } from "@/lib/platform";
 import {
@@ -48,7 +56,7 @@ export function ServersSection() {
     setCurrentServerId(server.id);
     // Force a full re-auth against the new server. If the stored token
     // is still valid we land back in the app; if not, login screen.
-    toast.success(
+    notify.success(
       t("settings.servers.toasts.switched", { name: server.label }),
     );
     if (server.token) {
@@ -62,7 +70,9 @@ export function ServersSection() {
   const handleRemove = async (server: ServerConfig) => {
     const wasCurrent = server.id === currentId;
     removeServer(server.id);
-    toast.success(t("settings.servers.toasts.removed", { name: server.label }));
+    notify.success(
+      t("settings.servers.toasts.removed", { name: server.label }),
+    );
     if (wasCurrent) {
       // Currently-logged-in server was removed. Logout flushes local
       // state and navigates to /login; ServerGate then bounces to
@@ -74,7 +84,7 @@ export function ServersSection() {
   return (
     <section className="rounded-[12px] border border-border-quiet bg-text-primary/[0.03] p-5 sm:p-6">
       <div className="mb-1 flex items-center gap-2">
-        <Server size={16} className="text-accent-action" />
+        <Server size={CRATE_ICON_SIZE.sm} className="text-accent-action" />
         <h2 className="text-sm font-semibold text-text-primary">
           {t("settings.servers.title")}
         </h2>
@@ -111,36 +121,37 @@ export function ServersSection() {
                   </span>
                   {isCurrent ? (
                     <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-text-accent">
-                      <CheckCircle2 size={10} />
+                      <CheckCircle2 size={CRATE_ICON_SIZE.micro} />
                       {t("settings.servers.current")}
                     </span>
                   ) : null}
                 </div>
                 <div className="text-xs text-text-muted">{server.url}</div>
               </button>
-              <button
-                type="button"
+              <IconButton
+                tone="danger"
                 onClick={() => handleRemove(server)}
-                aria-label={t("settings.servers.remove", {
+                label={t("settings.servers.remove", {
                   name: server.label,
                 })}
-                className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border-quiet text-text-muted transition hover:border-state-danger/40 hover:bg-state-danger/10 hover:text-state-danger-text"
+                className="size-9 rounded-lg border border-border-quiet text-text-muted hover:border-state-danger/40 hover:bg-state-danger/10 hover:text-state-danger-text"
               >
-                <Trash2 size={14} />
-              </button>
+                <Trash2 size={CRATE_ICON_SIZE.xs} className="size-3.5" />
+              </IconButton>
             </div>
           );
         })}
       </div>
 
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        shape="pill"
         onClick={() => navigate("/server-setup")}
-        className="mt-4 inline-flex items-center gap-2 rounded-full border border-text-primary/15 bg-text-primary/5 px-4 py-2 text-sm font-medium text-text-primary/80 transition hover:border-accent-action/30 hover:bg-accent-action/10 hover:text-text-accent"
+        className="mt-4 h-auto border border-text-primary/15 bg-text-primary/5 px-4 py-2 text-text-primary/80 hover:border-accent-action/30 hover:bg-accent-action/10 hover:text-text-accent has-[>svg]:px-4"
       >
-        <Plus size={14} />
+        <Plus size={CRATE_ICON_SIZE.xs} className="size-3.5" />
         {t("settings.servers.add")}
-      </button>
+      </Button>
     </section>
   );
 }

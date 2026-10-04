@@ -6,7 +6,9 @@ import {
   TrackList,
   type TrackListVirtualListProps,
 } from "@crate/ui/domain/tracks";
-import { Play, Search } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Play } from "@crate/ui/icons";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
+import { Button } from "@crate/ui/shadcn/button";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { WindowVirtualList } from "@/components/ui/WindowVirtualList";
@@ -18,6 +20,9 @@ import { toTrackRowData } from "@/lib/track-row-data";
 
 import { CollectionSortDropdown } from "./LibraryCollectionSortDropdown";
 import { likedSortOptions, type LikedSort } from "./library-collection-model";
+
+const LIKED_FILTER_INPUT_CLASS_NAME =
+  "h-10 rounded-lg border-transparent bg-text-primary/5 pl-9 shadow-none backdrop-blur-none md:text-base focus-visible:bg-text-primary/8";
 
 function LikedTracksVirtualList({
   itemKey,
@@ -116,31 +121,25 @@ export function LibraryLikedTab() {
     <div className="space-y-3">
       <FilterBar
         leading={
-          <button
-            type="button"
+          <Button
             onClick={handlePlayAll}
-            className="flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90"
+            className="rounded-lg px-4 has-[>svg]:px-4"
           >
-            <Play size={16} fill="currentColor" />
+            <Play size={CRATE_ICON_SIZE.sm} fill="currentColor" />
             {filtered.length < tracks.length
               ? t("library.liked.playFiltered", { count: filtered.length })
               : t("library.liked.playAll")}
-          </button>
+          </Button>
         }
         search={
-          <div className="relative">
-            <Search
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-text-primary/40"
-            />
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={t("library.liked.filterPlaceholder")}
-              className="h-10 w-full rounded-lg bg-text-primary/5 pl-9 pr-3 text-base text-text-primary outline-none placeholder:text-text-primary/40 focus:bg-text-primary/8"
-            />
-          </div>
+          <SearchInput
+            value={search}
+            onValueChange={setSearch}
+            label={t("library.liked.filterPlaceholder")}
+            clearLabel={t("search.clear")}
+            placeholder={t("library.liked.filterPlaceholder")}
+            className={LIKED_FILTER_INPUT_CLASS_NAME}
+          />
         }
         sort={
           <CollectionSortDropdown

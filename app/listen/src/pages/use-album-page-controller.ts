@@ -20,7 +20,7 @@ import { useAlbumPlaylistActions } from "@/pages/use-album-playlist-actions";
 import { useAlbumPresentation } from "@/pages/use-album-presentation";
 import { useAlbumSelection } from "@/pages/use-album-selection";
 import { api } from "@/lib/api";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 export function useAlbumPageController() {
   const { t } = useTranslation();
@@ -92,21 +92,21 @@ export function useAlbumPageController() {
           crate.id === crateId && crate.albumUids.includes(globalAlbumUid),
       )
     ) {
-      toast.info(t("album.toasts.alreadyInCrate", { name: crateName }));
+      notify.info(t("album.toasts.alreadyInCrate", { name: crateName }));
       return;
     }
     try {
       await api(`/api/crates/${crateId}/albums`, "POST", {
         global_album_uid: globalAlbumUid,
       });
-      toast.success(t("album.toasts.addedToCrate"));
+      notify.success(t("album.toasts.addedToCrate"));
       closeAlbumMenu();
     } catch (error) {
       if ((error as { status?: number }).status === 409) {
-        toast.info(t("album.toasts.alreadyInCrate", { name: crateName }));
+        notify.info(t("album.toasts.alreadyInCrate", { name: crateName }));
         return;
       }
-      toast.error(t("album.toasts.addToCrateFailed"));
+      notify.error(t("album.toasts.addToCrateFailed"));
     }
   }
 

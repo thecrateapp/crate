@@ -1779,5 +1779,15 @@
   "actions.genre.open": "Open genre",
   "actions.path.open": "Open path",
   "actions.jam.open": "Open room",
-  "actions.bandcamp.open": "Open on Bandcamp"
+  "actions.bandcamp.open": "Open on Bandcamp",
+  "common.close": "Close",
+  "settings.connectDevices.revokeConfirmTitle": "Revoke this device?",
+  "settings.connectDevices.revokeConfirmDescription": "{name} will be signed out of Crate Connect and will need to sign in again.",
+  "library.tabs.label": "Collection sections",
+  "stats.window.label": "Time range",
+  "common.closeDialog": "Close dialog",
+  "paths.delete.confirmTitle": "Delete this path?",
+  "paths.delete.confirmDescription": "\"{name}\" will be removed from your paths. This can't be undone.",
+  "radar.filtersLabel": "Filter radar",
+  "player.tabsLabel": "Player panels"
 }

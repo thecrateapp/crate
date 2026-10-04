@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { ChevronLeft, ChevronRight } from "@crate/ui/icons";
+import { ChevronLeft, ChevronRight, CRATE_ICON_SIZE } from "@crate/ui/icons";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import {
   ArtistHeroFrame,
   artistHeroArtworkFitClassName,
@@ -179,14 +180,13 @@ export function LegacyDesktopHeroNavigation({
   const { t } = useTranslation();
   return (
     <div className="absolute inset-x-0 bottom-5 z-30 flex items-center justify-center gap-3">
-      <button
-        type="button"
-        aria-label={t("home.hero.previousArtist")}
-        className="home-hero-nav-control flex size-9 items-center justify-center rounded-full backdrop-blur-sm"
+      <IconButton
+        label={t("home.hero.previousArtist")}
+        className="home-hero-nav-control size-9 backdrop-blur-sm"
         onClick={onPrevious}
       >
-        <ChevronLeft size={18} />
-      </button>
+        <ChevronLeft size={CRATE_ICON_SIZE.md} />
+      </IconButton>
       <div className="flex items-center gap-1.5">
         {heroes.map((hero, index) => (
           <button
@@ -208,14 +208,13 @@ export function LegacyDesktopHeroNavigation({
           </button>
         ))}
       </div>
-      <button
-        type="button"
-        aria-label={t("home.hero.nextArtist")}
-        className="home-hero-nav-control flex size-9 items-center justify-center rounded-full backdrop-blur-sm"
+      <IconButton
+        label={t("home.hero.nextArtist")}
+        className="home-hero-nav-control size-9 backdrop-blur-sm"
         onClick={onNext}
       >
-        <ChevronRight size={18} />
-      </button>
+        <ChevronRight size={CRATE_ICON_SIZE.md} />
+      </IconButton>
     </div>
   );
 }

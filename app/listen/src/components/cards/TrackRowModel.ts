@@ -20,7 +20,7 @@ import {
 import { resolveRemotePlayableTrack } from "@/lib/remote-track-playback";
 import { getOfflineStateLabel } from "@/lib/offline";
 import { albumCoverApiUrl } from "@/lib/library-routes";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 export interface TrackRowData {
   id?: string | number;
@@ -311,7 +311,7 @@ export function useTrackRowPlayback({
       const resolved = await resolveRemotePlayableTrack(playerTrack);
       play(resolved);
     } catch {
-      toast.error(t("search.tryAgain"));
+      notify.error(t("search.tryAgain"));
     } finally {
       setResolvingRemote(false);
     }

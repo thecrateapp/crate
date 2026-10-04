@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { api, getApiBase } from "@/lib/api";
 import { beginNativeOAuth, isNative } from "@/lib/capacitor";
@@ -53,7 +53,7 @@ export function OAuthButtons({
             ),
           )
           .catch((error) => {
-            toast.error(
+            notify.error(
               error instanceof Error && error.message
                 ? error.message
                 : t("auth.login.connectionError"),

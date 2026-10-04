@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
 import type { CrateIcon } from "@crate/ui/icons";
 import type { ContextMenuEntry } from "@crate/ui/domain/actions";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import type { TrackRowData } from "@/components/cards/TrackRow";
 import type { PlaylistHeroSecondaryAction } from "@/components/playlists/PlaylistHeroSection";
@@ -157,12 +157,12 @@ export function buildPlaylistActions({
         playlistName: data.name,
       });
       if (!radio.tracks.length) {
-        toast.info(t("playlist.toasts.radioUnavailable"));
+        notify.info(t("playlist.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error(t("playlist.toasts.radioFailed"));
+      notify.error(t("playlist.toasts.radioFailed"));
     }
   }
 
@@ -185,13 +185,13 @@ export function buildPlaylistActions({
         title: data.name,
         isSmart: data.is_smart,
       });
-      toast.success(
+      notify.success(
         result === "removed"
           ? t("playlist.toasts.offlineRemoved")
           : t("playlist.toasts.availableOffline"),
       );
     } catch (error) {
-      toast.error(
+      notify.error(
         (error as Error).message || t("playlist.toasts.offlineUpdateFailed"),
       );
     }
@@ -212,9 +212,9 @@ export function buildPlaylistActions({
           }),
         ],
       });
-      toast.success(t("playlist.toasts.trackAdded"));
+      notify.success(t("playlist.toasts.trackAdded"));
     } catch {
-      toast.error(t("playlist.toasts.trackAddFailed"));
+      notify.error(t("playlist.toasts.trackAddFailed"));
     }
   }
 
@@ -228,10 +228,10 @@ export function buildPlaylistActions({
     if (!id) return;
     try {
       await api(`/api/playlists/${id}/generate`, "POST");
-      toast.success(t("playlist.toasts.regenerated"));
+      notify.success(t("playlist.toasts.regenerated"));
       refetch();
     } catch {
-      toast.error(t("playlist.toasts.regenerateFailed"));
+      notify.error(t("playlist.toasts.regenerateFailed"));
     }
   }
 
@@ -285,11 +285,11 @@ export function buildPlaylistActions({
         });
       }
 
-      toast.success(t("playlist.toasts.updated"));
+      notify.success(t("playlist.toasts.updated"));
       setEditorOpen(false);
       refetch();
     } catch {
-      toast.error(t("playlist.toasts.updateFailed"));
+      notify.error(t("playlist.toasts.updateFailed"));
     } finally {
       setSaving(false);
     }
@@ -300,10 +300,10 @@ export function buildPlaylistActions({
     setDeleting(true);
     try {
       await api(`/api/playlists/${id}`, "DELETE");
-      toast.success(t("playlist.toasts.deleted"));
+      notify.success(t("playlist.toasts.deleted"));
       navigate("/library?tab=playlists");
     } catch {
-      toast.error(t("playlist.toasts.deleteFailed"));
+      notify.error(t("playlist.toasts.deleteFailed"));
     } finally {
       setDeleting(false);
       setDeleteOpen(false);
@@ -320,9 +320,9 @@ export function buildPlaylistActions({
         {},
       );
       onInviteCreated(invite);
-      toast.success(t("playlist.toasts.inviteCreated"));
+      notify.success(t("playlist.toasts.inviteCreated"));
     } catch {
-      toast.error(t("playlist.toasts.inviteCreateFailed"));
+      notify.error(t("playlist.toasts.inviteCreateFailed"));
     } finally {
       setCreatingInvite(false);
     }
@@ -333,9 +333,9 @@ export function buildPlaylistActions({
     const inviteLink = `${window.location.origin}${inviteData.join_url}`;
     try {
       await navigator.clipboard.writeText(inviteLink);
-      toast.success(t("playlist.toasts.inviteCopied"));
+      notify.success(t("playlist.toasts.inviteCopied"));
     } catch {
-      toast.error(t("playlist.toasts.inviteCopyFailed"));
+      notify.error(t("playlist.toasts.inviteCopyFailed"));
     }
   }
 
@@ -344,10 +344,10 @@ export function buildPlaylistActions({
     setRemovingMemberId(memberUserId);
     try {
       await api(`/api/playlists/${data.id}/members/${memberUserId}`, "DELETE");
-      toast.success(t("playlist.toasts.collaboratorRemoved"));
+      notify.success(t("playlist.toasts.collaboratorRemoved"));
       refetch();
     } catch {
-      toast.error(t("playlist.toasts.collaboratorRemoveFailed"));
+      notify.error(t("playlist.toasts.collaboratorRemoveFailed"));
     } finally {
       setRemovingMemberId(null);
     }

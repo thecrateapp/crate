@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { ThumbsDown, ThumbsUp } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { CRATE_ICON_SIZE, ThumbsDown, ThumbsUp } from "@crate/ui/icons";
+import { notify } from "@crate/ui/lib/notify";
 import { useTranslation } from "react-i18next";
 
 import { sendRadioFeedback } from "@/lib/radio";
@@ -32,7 +32,7 @@ export function RadioFeedback({
   if (!trackId && !globalTrackUid) return null;
 
   const buttonClass = size === "sm" ? "h-11 w-11" : "h-8 w-8";
-  const iconSize = size === "sm" ? 16 : 14;
+  const iconSize = size === "sm" ? CRATE_ICON_SIZE.sm : CRATE_ICON_SIZE.xs;
 
   const handleLike = async () => {
     if (liked) return;
@@ -41,7 +41,7 @@ export function RadioFeedback({
     await (globalTrackUid
       ? sendRadioFeedback(sessionId, trackId, "like", globalTrackUid)
       : sendRadioFeedback(sessionId, trackId, "like"));
-    toast.success(t("player.radio.moreLikeThis"), { duration: 1500 });
+    notify.success(t("player.radio.moreLikeThis"), { duration: 1500 });
   };
 
   const handleDislike = async () => {
@@ -52,13 +52,15 @@ export function RadioFeedback({
       ? sendRadioFeedback(sessionId, trackId, "dislike", globalTrackUid)
       : sendRadioFeedback(sessionId, trackId, "dislike"));
     onDislike?.();
-    toast(t("player.radio.lessLikeThis"), { duration: 1500 });
+    notify.info(t("player.radio.lessLikeThis"), { duration: 1500 });
   };
 
   return (
     <div className="flex items-center gap-1">
       {trackId || globalTrackUid ? (
         <button
+          type="button"
+          aria-pressed={liked}
           onClick={handleLike}
           className={`flex ${buttonClass} touch-manipulation items-center justify-center rounded-full transition ${
             liked
@@ -72,6 +74,8 @@ export function RadioFeedback({
         </button>
       ) : null}
       <button
+        type="button"
+        aria-pressed={disliked}
         onClick={handleDislike}
         className={`flex ${buttonClass} touch-manipulation items-center justify-center rounded-full transition ${
           disliked

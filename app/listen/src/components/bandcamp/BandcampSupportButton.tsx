@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 import {
@@ -195,11 +195,11 @@ function useBandcampActivation(
         "POST",
         { bandcamp_item_id: state.link.bandcamp_item_id, format: "flac" },
       );
-      toast.success(
+      notify.success(
         t("bandcamp.toasts.importQueued", { taskId: result.task_id }),
       );
     } catch (error) {
-      toast.error(
+      notify.error(
         (error as Error).message || t("bandcamp.toasts.importFailed"),
       );
     } finally {

@@ -1,4 +1,5 @@
-import { ListMusic, Loader2, Search, Zap } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, ListMusic, Loader2, Zap } from "@crate/ui/icons";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { searchTrackToTrack, trackIdentity } from "@/pages/jam-session-utils";
@@ -212,25 +213,28 @@ function JamQueueSearch(props: JamQueueSearchProps) {
     addSearchTrackToRoom,
     canAddToQueue,
   } = props;
+  const searchPlaceholder = canEditQueue
+    ? t("jam.room.queueSearchPlaceholder")
+    : t("jam.room.queueSearchDisabledPlaceholder");
 
   return (
     <div className="mt-4 space-y-2">
-      <div className="jam-input flex items-center gap-2 rounded-lg px-3 py-2">
-        <Search size={15} className="text-text-muted" />
-        <input
+      <div className="relative">
+        <SearchInput
           ref={queueSearchInputRef}
           value={queueSearch}
-          onChange={(event) => setQueueSearch(event.target.value)}
+          onValueChange={setQueueSearch}
           disabled={!canEditQueue}
-          placeholder={
-            canEditQueue
-              ? t("jam.room.queueSearchPlaceholder")
-              : t("jam.room.queueSearchDisabledPlaceholder")
-          }
-          className="h-8 min-w-0 flex-1 bg-transparent text-base text-text-primary outline-none placeholder:text-text-muted disabled:opacity-60"
+          clearable={false}
+          label={searchPlaceholder}
+          placeholder={searchPlaceholder}
+          className="jam-input h-12 rounded-lg pr-10 shadow-none backdrop-blur-none placeholder:text-text-muted disabled:opacity-60 md:text-base"
         />
         {queueSearchLoading ? (
-          <Loader2 size={15} className="animate-spin text-accent-action" />
+          <Loader2
+            size={CRATE_ICON_SIZE.sm}
+            className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 animate-spin text-accent-action"
+          />
         ) : null}
       </div>
       {queueSearchResults.length > 0 ? (

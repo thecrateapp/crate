@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { Loader2, Search } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 import type { SearchTrackResult } from "@/components/playlists/playlist-composer-model";
 import { searchTrackKey } from "@/components/playlists/playlist-composer-model";
@@ -21,17 +22,20 @@ export function PlaylistTrackSearch({
 }) {
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 rounded-xl border border-border-quiet bg-text-primary/5 px-3 py-2.5">
-        <Search size={15} className="text-text-muted" />
-        <input
-          type="text"
+      <div className="relative">
+        <SearchInput
+          label={t("playlistComposer.searchPlaceholder")}
+          clearLabel={t("search.clear")}
           placeholder={t("playlistComposer.searchPlaceholder")}
           value={search}
-          onChange={(event) => onSearchChange(event.target.value)}
-          className="w-full bg-transparent text-base text-text-primary placeholder:text-text-muted focus:outline-none"
+          onValueChange={onSearchChange}
+          className="rounded-xl bg-text-primary/5 placeholder:text-text-muted md:text-base"
         />
         {searching ? (
-          <Loader2 size={14} className="text-accent-action animate-spin" />
+          <Loader2
+            size={CRATE_ICON_SIZE.xs}
+            className="pointer-events-none absolute top-1/2 right-11 -translate-y-1/2 animate-spin text-accent-action"
+          />
         ) : null}
       </div>
 

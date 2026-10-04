@@ -19,6 +19,7 @@ import {
   Upload,
   Users,
 } from "@crate/ui/icons";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import { VtNavLink as NavLink } from "@crate/ui/primitives/VtNavLink";
 
 interface SidebarNavigationProps {
@@ -142,6 +143,8 @@ export function SidebarNavigation({
 
         <div className="relative" ref={collectionRef}>
           <button
+            type="button"
+            aria-expanded={collectionOpen}
             onClick={() => setCollectionOpen(!collectionOpen)}
             title={t("nav.collection")}
             className={`flex w-full items-center gap-3 rounded-lg transition-colors ${
@@ -179,6 +182,7 @@ export function SidebarNavigation({
               {COLLECTION_ITEMS.map(({ to, icon: Icon, labelKey }) => (
                 <button
                   key={to}
+                  type="button"
                   onClick={() => {
                     navigate(to);
                     setCollectionOpen(false);
@@ -187,7 +191,7 @@ export function SidebarNavigation({
                     expanded ? "px-3 py-1.5" : "px-4 py-2"
                   }`}
                 >
-                  <Icon size={17} />
+                  <Icon size={CRATE_ICON_SIZE.md} />
                   <span className="text-[0.75rem] font-medium">
                     {t(labelKey)}
                   </span>
@@ -200,13 +204,13 @@ export function SidebarNavigation({
 
       {!expanded && (
         <div className="mt-auto flex justify-center pb-4">
-          <button
+          <IconButton
             onClick={onToggleExpanded}
-            aria-label={t("nav.sidebar.expand")}
-            className="text-text-faint transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action"
+            label={t("nav.sidebar.expand")}
+            className="size-auto text-text-faint"
           >
-            <PanelLeftOpen size={CRATE_ICON_SIZE.nav} />
-          </button>
+            <PanelLeftOpen size={CRATE_ICON_SIZE.nav} className="size-[21px]" />
+          </IconButton>
         </div>
       )}
     </>

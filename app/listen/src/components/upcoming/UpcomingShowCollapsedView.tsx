@@ -1,7 +1,15 @@
 import { useTranslation } from "react-i18next";
-import { CalendarCheck, CalendarPlus, Loader2, MapPin } from "@crate/ui/icons";
+import {
+  CalendarCheck,
+  CalendarPlus,
+  CRATE_ICON_SIZE,
+  Loader2,
+  MapPin,
+} from "@crate/ui/icons";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 
 import { ItemActionMenuButton } from "@/components/actions/ItemActionMenu";
+import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import {
@@ -26,19 +34,14 @@ function PreloadBackground({ item }: { item: CollapsedViewProps["item"] }) {
 
 function CollapsedShowArtwork({ artistImageUrl }: { artistImageUrl?: string }) {
   return (
-    <span className="block h-full w-[88px] shrink-0 bg-text-primary/5">
-      {artistImageUrl && (
-        <CrateImage
-          src={artistImageUrl}
-          alt=""
-          loading="lazy"
-          className=" size-full object-cover"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
-        />
-      )}
-    </span>
+    <ArtworkSurface
+      source={artistImageUrl ?? null}
+      alt=""
+      imageClassName="object-cover"
+      imageProps={{ loading: "lazy" }}
+      className="h-full w-[88px] shrink-0 bg-text-primary/5"
+      fallback={null}
+    />
   );
 }
 
@@ -127,27 +130,32 @@ function CollapsedShowActions({
 
   return (
     <div className="flex shrink-0 flex-col items-center gap-1 pr-2">
-      <button
-        type="button"
+      <IconButton
+        size="sm"
         onClick={() => {
           void onToggleAttendance();
         }}
         disabled={!item.id || savingAttendance}
-        title={
+        aria-pressed={attending}
+        active={false}
+        label={
           attending
             ? t("radar.show.attending")
             : t("actions.show.markAttending")
         }
-        className="flex size-8 items-center justify-center rounded-lg text-text-primary/30 transition-colors hover:bg-text-primary/8 hover:text-text-primary/60 disabled:opacity-30"
+        className="rounded-lg text-text-primary/30 hover:bg-text-primary/8 hover:text-text-primary/60 disabled:opacity-30"
       >
         {savingAttendance ? (
-          <Loader2 size={15} className="animate-spin" />
+          <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
         ) : attending ? (
-          <CalendarCheck size={15} className="text-accent-action" />
+          <CalendarCheck
+            size={CRATE_ICON_SIZE.sm}
+            className="text-accent-action"
+          />
         ) : (
-          <CalendarPlus size={15} />
+          <CalendarPlus size={CRATE_ICON_SIZE.sm} />
         )}
-      </button>
+      </IconButton>
       <ItemActionMenuButton
         buttonRef={actionMenu.triggerRef}
         hasActions={actionMenu.hasActions}

@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
+import { notify } from "@crate/ui/lib/notify";
 import { toast } from "sonner";
 
 import { api, apiSseUrl } from "@/lib/api";
@@ -93,7 +94,7 @@ function failDownload(
   messageKey: CrateDownloadErrorKey = "crate.download.failed",
 ) {
   activeDownloads.delete(crateId);
-  toast.error(t(messageKey), {
+  notify.error(t(messageKey), {
     id: downloadToastId(crateId),
     duration: 6000,
   });
@@ -101,7 +102,7 @@ function failDownload(
 
 function completeDownload(crateId: string, url: string, t: TFunction) {
   activeDownloads.delete(crateId);
-  toast.success(t("crate.download.ready"), {
+  notify.success(t("crate.download.ready"), {
     id: downloadToastId(crateId),
     duration: 4000,
   });

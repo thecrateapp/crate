@@ -1,5 +1,7 @@
 import { useTranslation } from "react-i18next";
-import { Search, X } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, X } from "@crate/ui/icons";
+import { IconButton } from "@crate/ui/primitives/IconButton";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 import { cn } from "@/lib/utils";
 
@@ -53,16 +55,13 @@ export function PlaylistTrackFilterBar({
   return (
     <div className={cn("flex w-full", className)}>
       <div className="relative min-w-0 flex-1">
-        <Search
-          size={16}
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-primary/40"
-        />
-        <input
-          type="text"
+        <SearchInput
           value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
+          onValueChange={onQueryChange}
+          clearable={false}
+          label={t("playlist.filter.placeholder")}
           placeholder={t("playlist.filter.placeholder")}
-          className="h-11 w-full rounded-lg border border-border-quiet bg-surface-canvas/10 pl-10 pr-28 text-base text-text-primary outline-none transition-[border-color,box-shadow] placeholder:text-text-muted focus:border-accent-action/40 focus:ring-2 focus:ring-primary/20 sm:pr-36"
+          className="rounded-lg bg-surface-canvas/10 pr-28 placeholder:text-text-muted sm:pr-36 md:text-base"
         />
         <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium uppercase tracking-[0.18em] text-accent-action/85">
           {countLabel}
@@ -71,14 +70,14 @@ export function PlaylistTrackFilterBar({
           </span>
         </div>
         {filtering ? (
-          <button
-            type="button"
+          <IconButton
+            label={t("playlist.filter.clear")}
+            size="sm"
             onClick={() => onQueryChange("")}
-            className="absolute right-24 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-text-primary/8 hover:text-text-primary/75 sm:right-32"
-            aria-label={t("playlist.filter.clear")}
+            className="absolute top-1/2 right-24 size-7 -translate-y-1/2 hover:-translate-y-1/2 sm:right-32"
           >
-            <X size={14} />
-          </button>
+            <X size={CRATE_ICON_SIZE.xs} />
+          </IconButton>
         ) : null}
       </div>
     </div>

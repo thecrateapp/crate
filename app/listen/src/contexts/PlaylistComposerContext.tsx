@@ -8,7 +8,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import {
   PlaylistCreateModal,
@@ -132,10 +132,10 @@ export function PlaylistComposerProvider({
 
         refreshPlaylistOptions();
         setOpen(false);
-        toast.success(t("playlistComposer.toasts.created"));
+        notify.success(t("playlistComposer.toasts.created"));
         navigate(`/playlist/${created.id}`);
       } catch {
-        toast.error(t("playlistComposer.toasts.createFailed"));
+        notify.error(t("playlistComposer.toasts.createFailed"));
       } finally {
         setSubmitting(false);
       }

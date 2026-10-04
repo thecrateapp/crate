@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { type ItemActionMenuEntry } from "@/components/actions/ItemActionMenu";
 import { action } from "@/components/actions/shared";
@@ -38,12 +38,12 @@ export function useGenreDetailActions({
         data.canonical_slug || data.slug,
       );
       if (!radio?.tracks.length) {
-        toast.info(t("genre.toasts.radioUnavailable"));
+        notify.info(t("genre.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error(t("genre.toasts.radioFailed"));
+      notify.error(t("genre.toasts.radioFailed"));
     } finally {
       setStartingRadio(false);
     }

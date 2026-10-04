@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { api } from "@/lib/api";
 
@@ -44,7 +44,7 @@ export function useCrateFollow({
       );
     } catch {
       setOverride({ sourceKey, followed: !nextFollowed });
-      toast.error(t("actions.crate.toasts.followFailed"));
+      notify.error(t("actions.crate.toasts.followFailed"));
     } finally {
       setPending(false);
     }

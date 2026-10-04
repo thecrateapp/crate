@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { Shield } from "@crate/ui/icons";
 
@@ -68,14 +68,14 @@ export function AccountSection() {
         username: username.trim() || null,
         bio: bio.trim() || null,
       });
-      toast.success(t("settings.account.toasts.profileUpdated"));
+      notify.success(t("settings.account.toasts.profileUpdated"));
       await refetch();
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       if (message.includes("Username is already taken")) {
-        toast.error(t("settings.account.toasts.usernameTaken"));
+        notify.error(t("settings.account.toasts.usernameTaken"));
       } else {
-        toast.error(t("settings.account.toasts.profileUpdateFailed"));
+        notify.error(t("settings.account.toasts.profileUpdateFailed"));
       }
     } finally {
       setSaving(false);
@@ -84,11 +84,11 @@ export function AccountSection() {
 
   async function handleChangePassword() {
     if (!newPassword || newPassword.length < 6) {
-      toast.error(t("settings.account.toasts.passwordTooShort"));
+      notify.error(t("settings.account.toasts.passwordTooShort"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast.error(t("settings.account.toasts.passwordMismatch"));
+      notify.error(t("settings.account.toasts.passwordMismatch"));
       return;
     }
     setSaving(true);
@@ -97,13 +97,13 @@ export function AccountSection() {
         current_password: currentPassword,
         new_password: newPassword,
       });
-      toast.success(t("settings.account.toasts.passwordChanged"));
+      notify.success(t("settings.account.toasts.passwordChanged"));
       setShowPassword(false);
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch {
-      toast.error(t("settings.account.toasts.passwordChangeFailed"));
+      notify.error(t("settings.account.toasts.passwordChangeFailed"));
     } finally {
       setSaving(false);
     }
@@ -121,7 +121,7 @@ export function AccountSection() {
       );
       window.location.href = response.login_url;
     } catch {
-      toast.error(t("settings.account.toasts.linkFailed", { provider }));
+      notify.error(t("settings.account.toasts.linkFailed", { provider }));
       setLinkingProvider(null);
     }
   }
@@ -130,10 +130,10 @@ export function AccountSection() {
     setUnlinkingProvider(provider);
     try {
       await api(`/api/auth/oauth/${provider}/unlink`, "POST");
-      toast.success(t("settings.account.toasts.unlinked", { provider }));
+      notify.success(t("settings.account.toasts.unlinked", { provider }));
       await refetch();
     } catch {
-      toast.error(t("settings.account.toasts.unlinkFailed", { provider }));
+      notify.error(t("settings.account.toasts.unlinkFailed", { provider }));
     } finally {
       setUnlinkingProvider(null);
     }

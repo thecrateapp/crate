@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Moon } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Moon } from "@crate/ui/icons";
+import { Button } from "@crate/ui/shadcn/button";
 
 import { Section } from "@/components/settings/SettingsPrimitives";
 import { usePlayerActions } from "@/contexts/PlayerContext";
@@ -41,6 +42,8 @@ export function SleepTimerSection() {
         {SLEEP_MODES.map(({ mode, labelKey }) => (
           <button
             key={mode}
+            type="button"
+            aria-pressed={timer.mode === mode}
             onClick={() => startSleepTimer(mode, pause)}
             className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               timer.mode === mode
@@ -55,7 +58,7 @@ export function SleepTimerSection() {
       {timer.active && timer.remainingSeconds > 0 ? (
         <div className="flex items-center justify-between rounded-lg border border-accent-action/20 bg-accent-action/5 px-4 py-3">
           <div className="flex items-center gap-2">
-            <Moon size={16} className="text-accent-action" />
+            <Moon size={CRATE_ICON_SIZE.sm} className="text-accent-action" />
             <span className="text-sm text-text-primary">
               {t("settings.sleep.pausingIn")}{" "}
               <span className="font-mono font-semibold text-accent-action">
@@ -63,12 +66,14 @@ export function SleepTimerSection() {
               </span>
             </span>
           </div>
-          <button
+          <Button
+            variant="danger-soft"
+            shape="pill"
             onClick={cancelSleepTimer}
-            className="rounded-full bg-state-danger/15 px-3 py-1.5 text-xs font-medium text-state-danger transition-colors hover:bg-state-danger/25"
+            className="h-auto border-0 bg-state-danger/15 px-3 py-1.5 text-xs text-state-danger hover:bg-state-danger/25 has-[>svg]:px-3"
           >
             {t("common.cancel")}
-          </button>
+          </Button>
         </div>
       ) : null}
     </Section>

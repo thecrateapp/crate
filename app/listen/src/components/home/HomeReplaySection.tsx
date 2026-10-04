@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
-import { Clock3, Play, Sparkles } from "@crate/ui/icons";
+import { Clock3, CRATE_ICON_SIZE, Play, Sparkles } from "@crate/ui/icons";
 import { SectionHeader } from "@crate/ui/domain/lists";
+import { Button } from "@crate/ui/shadcn/button";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { albumCoverApiUrl } from "@/lib/library-routes";
@@ -105,14 +106,15 @@ export function HomeReplaySection({
               </div>
             </div>
           </div>
-          <button
-            type="button"
+          <Button
+            size="sm"
+            shape="pill"
             onClick={onPlayReplay}
-            className="mt-5 inline-flex items-center gap-2 rounded-full bg-accent-action px-4 py-2 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90"
+            className="mt-5 h-9 gap-2 px-4 shadow-none has-[>svg]:px-4"
           >
-            <Play size={15} fill="currentColor" />
+            <Play size={CRATE_ICON_SIZE.sm} fill="currentColor" />
             {t("home.replay.play")}
-          </button>
+          </Button>
         </div>
 
         <div className="home-replay-panel overflow-hidden rounded-[12px] p-4">

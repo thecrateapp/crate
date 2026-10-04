@@ -140,12 +140,12 @@ describe("Settings", () => {
 
     renderWithListenProviders(<Settings />, { locale: "en" });
 
-    const toggle = screen.getByRole("button", { name: "Equalizer" });
-    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const toggle = screen.getByRole("switch", { name: "Equalizer" });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
 
     await user.click(toggle);
     expect(localStorage.getItem("listen-eq-enabled")).toBe("false");
-    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(toggle).toHaveAttribute("aria-checked", "false");
   });
 
   it("keeps crossfade controls on desktop", () => {
@@ -161,16 +161,16 @@ describe("Settings", () => {
 
     renderWithListenProviders(<Settings />, { locale: "en" });
 
-    const toggle = await screen.findByRole("button", {
+    const toggle = await screen.findByRole("switch", {
       name: "Scrobble remote plays",
     });
-    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(toggle).toHaveAttribute("aria-checked", "false");
 
     await user.click(toggle);
 
     expect(api).toHaveBeenCalledWith("/api/me/scrobble/preferences", "PUT", {
       remote_scrobbling_enabled: true,
     });
-    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(toggle).toHaveAttribute("aria-checked", "true");
   });
 });

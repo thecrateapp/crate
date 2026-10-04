@@ -1,6 +1,8 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { CRATE_ICON_SIZE, MonitorSpeaker, X } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
+import { IconButton } from "@crate/ui/primitives/IconButton";
+import { Button } from "@crate/ui/shadcn/button";
 import { useTranslation } from "react-i18next";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -142,14 +144,14 @@ function useContinuePlaybackAction({
     );
     if (connect.transport === "ws") {
       if (!connect.playbackInstanceId) {
-        toast.error(t("player.continue.toasts.connecting"));
+        notify.error(t("player.continue.toasts.connecting"));
         return;
       }
       setTransferring(true);
       const sent = connect.requestTransfer(connect.playbackInstanceId);
       setTransferring(false);
       if (!sent) {
-        toast.error(t("player.continue.toasts.transferFailed"));
+        notify.error(t("player.continue.toasts.transferFailed"));
         return;
       }
       setDismissed(true);
@@ -164,7 +166,7 @@ function useContinuePlaybackAction({
         });
         setDismissed(true);
       } catch {
-        toast.error(t("player.continue.toasts.transferFailed"));
+        notify.error(t("player.continue.toasts.transferFailed"));
       } finally {
         setTransferring(false);
       }
@@ -219,35 +221,35 @@ function ContinuePlaybackBanner({
             {formatPosition(promptState.position_ms)}
           </div>
           <div className="mt-3 flex items-center gap-2">
-            <button
-              type="button"
+            <Button
+              size="xs"
               onClick={onContinue}
               disabled={transferring}
-              className="rounded-lg bg-accent-action px-3 py-1.5 text-xs font-semibold text-accent-action-foreground transition-colors hover:bg-accent-action-hover"
+              className="h-auto rounded-lg px-3 py-1.5 font-semibold shadow-none has-[>svg]:px-3"
             >
               {transferring
                 ? t("player.continue.transferring")
                 : activeRemote
                   ? t("player.continue.playHere")
                   : t("player.continue.continue")}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
+              size="xs"
               onClick={onDismiss}
-              className="rounded-lg border border-border-quiet px-3 py-1.5 text-xs font-medium text-text-muted transition-colors hover:bg-text-primary/10 hover:text-text-primary"
+              className="h-auto rounded-lg border border-border-quiet px-3 py-1.5 text-text-muted hover:bg-text-primary/10 hover:text-text-primary has-[>svg]:px-3"
             >
               {t("player.continue.notNow")}
-            </button>
+            </Button>
           </div>
         </div>
-        <button
-          type="button"
-          aria-label={t("player.continue.dismiss")}
+        <IconButton
+          label={t("player.continue.dismiss")}
           onClick={onDismiss}
-          className="flex size-9 items-center justify-center text-text-muted transition-colors hover:text-text-primary"
+          className="size-9 text-text-muted hover:translate-y-0 hover:text-text-primary hover:drop-shadow-none"
         >
-          <X size={CRATE_ICON_SIZE.lg} />
-        </button>
+          <X size={CRATE_ICON_SIZE.lg} className="size-5" />
+        </IconButton>
       </div>
     </div>
   );

@@ -1779,5 +1779,15 @@
   "actions.genre.open": "Ouvrir le genre",
   "actions.path.open": "Ouvrir le chemin",
   "actions.jam.open": "Ouvrir le salon",
-  "actions.bandcamp.open": "Ouvrir sur Bandcamp"
+  "actions.bandcamp.open": "Ouvrir sur Bandcamp",
+  "common.close": "Fermer",
+  "settings.connectDevices.revokeConfirmTitle": "Révoquer cet appareil ?",
+  "settings.connectDevices.revokeConfirmDescription": "{name} sera déconnecté de Crate Connect et devra se reconnecter.",
+  "library.tabs.label": "Sections de la collection",
+  "stats.window.label": "Période",
+  "common.closeDialog": "Fermer la boîte de dialogue",
+  "paths.delete.confirmTitle": "Supprimer ce chemin ?",
+  "paths.delete.confirmDescription": "« {name} » sera retiré de vos chemins. Cette action est irréversible.",
+  "radar.filtersLabel": "Filtrer le radar",
+  "player.tabsLabel": "Panneaux du lecteur"
 }

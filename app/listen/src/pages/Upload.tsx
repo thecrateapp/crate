@@ -2,13 +2,15 @@ import { useMemo, useState, type ChangeEvent } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
+  Archive,
+  CheckCircle2,
+  CRATE_ICON_SIZE,
   Loader2,
   Music,
   Upload as UploadIcon,
-  Archive,
-  CheckCircle2,
 } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
+import { Button } from "@crate/ui/shadcn/button";
 
 import { ApiError, api } from "@/lib/api";
 import { formatBytes } from "@/lib/utils";
@@ -154,10 +156,10 @@ export function Upload() {
         onProgress: setUploadProgress,
       });
       setLastUpload(response);
-      toast.success(t("upload.toasts.queued"));
+      notify.success(t("upload.toasts.queued"));
       setFiles([]);
     } catch (error) {
-      toast.error(uploadErrorMessage(error, t));
+      notify.error(uploadErrorMessage(error, t));
     } finally {
       setSubmitting(false);
       setUploadProgress(null);
@@ -216,6 +218,7 @@ export function Upload() {
                     </div>
                   </div>
                   <button
+                    type="button"
                     onClick={() => setFiles([])}
                     className="link-meta text-xs"
                   >
@@ -263,15 +266,16 @@ export function Upload() {
               <li>{t("upload.next.saved")}</li>
               <li>{t("upload.next.attributed")}</li>
             </ul>
-            <button
+            <Button
+              shape="pill"
               onClick={handleSubmit}
               disabled={submitting || files.length === 0}
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-accent-action px-4 py-3 text-sm font-semibold text-accent-action-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-auto w-full px-4 py-3 font-semibold shadow-none hover:bg-accent-action [&_svg:not([class*='size-'])]:size-4 has-[>svg]:px-4"
             >
               {submitting ? (
-                <Loader2 size={16} className="animate-spin" />
+                <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
               ) : (
-                <UploadIcon size={16} />
+                <UploadIcon size={CRATE_ICON_SIZE.sm} />
               )}
               {uploadProgress
                 ? t("upload.progress", {
@@ -279,7 +283,7 @@ export function Upload() {
                     total: uploadProgress.total,
                   })
                 : t("upload.import")}
-            </button>
+            </Button>
             {lastUpload ? (
               <div className="border-l-2 border-state-success/40 bg-state-success/10 px-4 py-3 text-sm text-state-success-text">
                 <div className="flex items-center gap-2 font-medium">

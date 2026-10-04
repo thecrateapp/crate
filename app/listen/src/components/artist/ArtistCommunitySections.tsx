@@ -1,4 +1,5 @@
-import { Calendar, Play } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Calendar, Play } from "@crate/ui/icons";
+import { Button } from "@crate/ui/shadcn/button";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
@@ -79,20 +80,21 @@ export function ArtistShowsSection({
 
               <div className="flex flex-wrap gap-2">
                 {nextAttendingShow.probable_setlist?.length ? (
-                  <button
+                  <Button
                     onClick={onPlayProbableSetlist}
-                    className="inline-flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90"
+                    className="rounded-lg"
                   >
-                    <Play size={14} fill="currentColor" />
+                    <Play size={CRATE_ICON_SIZE.xs} fill="currentColor" />
                     {t("artist.sections.playProbableSetlist")}
-                  </button>
+                  </Button>
                 ) : null}
-                <button
+                <Button
+                  variant="outline"
                   onClick={() => onToggleExpand(itemKey(nextAttendingShow, 0))}
-                  className="inline-flex items-center gap-2 rounded-lg border border-border-quiet px-4 py-2 text-sm text-text-primary/65 transition-colors hover:border-text-primary/20 hover:text-text-primary"
+                  className="rounded-lg"
                 >
                   {t("artist.sections.viewShowDetails")}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

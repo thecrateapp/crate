@@ -28,6 +28,10 @@ vi.mock("@/lib/social-share-story-builder", async () => {
   };
 });
 
+vi.mock("@crate/ui/lib/notify", () => ({
+  notify: { success: mocks.toastSuccess, error: mocks.toastError },
+}));
+
 vi.mock("sonner", () => ({
   toast: { success: mocks.toastSuccess, error: mocks.toastError },
 }));

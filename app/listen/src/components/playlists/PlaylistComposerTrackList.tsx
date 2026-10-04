@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { GripVertical, Music2, X } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, GripVertical, Music2, X } from "@crate/ui/icons";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -19,6 +20,7 @@ function SortableTrackItem({
   track: PlaylistComposerTrack;
   onRemove: () => void;
 }) {
+  const { t } = useTranslation();
   const {
     attributes,
     listeners,
@@ -38,17 +40,18 @@ function SortableTrackItem({
       style={style}
       className="flex items-center justify-between gap-2 px-3 py-2.5"
     >
-      <button
-        type="button"
+      <IconButton
         {...attributes}
         {...listeners}
-        className="shrink-0 cursor-grab text-text-primary/20 hover:text-text-primary/50 touch-none"
+        label={t("library.crates.dragAlbum", { name: track.title })}
+        size="sm"
+        className="size-6 cursor-grab touch-none text-text-primary/20 hover:translate-y-0 hover:text-text-primary/50"
       >
-        <GripVertical size={14} />
-      </button>
+        <GripVertical size={CRATE_ICON_SIZE.xs} className="size-3.5" />
+      </IconButton>
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <div className="size-9  rounded-md bg-text-primary/5 flex items-center justify-center shrink-0">
-          <Music2 size={15} className="text-text-muted" />
+          <Music2 size={CRATE_ICON_SIZE.sm} className="text-text-muted" />
         </div>
         <div className="min-w-0">
           <div className="truncate text-sm text-text-primary">
@@ -61,13 +64,13 @@ function SortableTrackItem({
           </div>
         </div>
       </div>
-      <button
-        type="button"
-        className="rounded-full p-1.5 text-text-muted hover:text-text-primary hover:bg-text-primary/5 transition-colors"
+      <IconButton
+        label={t("library.crates.removeAlbum", { name: track.title })}
+        size="sm"
         onClick={onRemove}
       >
-        <X size={14} />
-      </button>
+        <X size={CRATE_ICON_SIZE.xs} />
+      </IconButton>
     </div>
   );
 }

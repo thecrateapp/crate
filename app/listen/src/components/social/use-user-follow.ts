@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { api } from "@/lib/api";
 
@@ -66,13 +66,13 @@ export function useUserFollow({
           },
         });
       }
-      toast.success(
+      notify.success(
         next
           ? t("userProfile.toasts.following", { name: displayName })
           : t("userProfile.toasts.unfollowed", { name: displayName }),
       );
     } catch {
-      toast.error(t("actions.user.toasts.followFailed"));
+      notify.error(t("actions.user.toasts.followFailed"));
     } finally {
       setPending(false);
     }

@@ -1,7 +1,7 @@
 import type { CSSProperties, Dispatch, SetStateAction } from "react";
 import type { TFunction } from "i18next";
 import type { NavigateFunction } from "react-router";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { useOffline } from "@/contexts/OfflineContext";
 import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
@@ -192,13 +192,13 @@ export function useAlbumPresentation({
     if (!canPersistAlbum) return;
     try {
       const result = await toggleAlbumOffline({ albumId, title: displayName });
-      toast.success(
+      notify.success(
         result === "removed"
           ? t("playlist.toasts.offlineRemoved")
           : t("album.toasts.availableOffline"),
       );
     } catch (error) {
-      toast.error(
+      notify.error(
         (error as Error).message || t("playlist.toasts.offlineUpdateFailed"),
       );
     }

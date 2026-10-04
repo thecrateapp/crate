@@ -57,8 +57,8 @@ vi.mock("@/lib/remote-playback-state", () => ({
   registerCurrentConnectDevice: registerCurrentConnectDeviceMock,
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
+vi.mock("@crate/ui/lib/notify", () => ({
+  notify: {
     success: toastSuccessMock,
     error: vi.fn(),
   },
@@ -141,6 +141,13 @@ describe("ConnectDevicesSection", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Revoke Crate Desktop" }),
     );
+    expect(apiMock).not.toHaveBeenCalledWith(
+      "/api/me/devices/desktop",
+      "DELETE",
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Revoke device" }),
+    );
 
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith("/api/me/devices/desktop", "DELETE"),
@@ -153,7 +160,9 @@ describe("ConnectDevicesSection", () => {
     renderWithI18n(<ConnectDevicesSection />);
 
     await screen.findByText("Crate on Mobile Chrome (Android)");
-    fireEvent.click(screen.getByRole("switch", { name: "Enabled" }));
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Crate Connect devices" }),
+    );
 
     await waitFor(() =>
       expect(setCrateConnectEnabledMock).toHaveBeenCalledWith(false),

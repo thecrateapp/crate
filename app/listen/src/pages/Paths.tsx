@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { ArrowRight, Loader2, Route } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
+import { ArrowRight, CRATE_ICON_SIZE, Loader2, Route } from "@crate/ui/icons";
+import { notify } from "@crate/ui/lib/notify";
+import { Button } from "@crate/ui/shadcn/button";
 
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
@@ -23,6 +25,7 @@ export function Paths() {
   const [destination, setDestination] = useState<SearchResult | null>(null);
   const [steps, setSteps] = useState(20);
   const [creating, setCreating] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<PathSummary | null>(null);
 
   const canCreate = origin && destination && !creating;
 
@@ -35,11 +38,11 @@ export function Paths() {
         destination: { type: destination.type, value: destination.value },
         step_count: steps,
       });
-      toast.success(t("paths.toasts.created", { name: result.name }));
+      notify.success(t("paths.toasts.created", { name: result.name }));
       refetch();
       navigate(`/paths/${result.id}`);
     } catch {
-      toast.error(t("paths.toasts.createFailed"));
+      notify.error(t("paths.toasts.createFailed"));
     } finally {
       setCreating(false);
     }
@@ -69,17 +72,17 @@ export function Paths() {
         id: detail.id,
       });
     } catch {
-      toast.error(t("paths.toasts.loadFailed"));
+      notify.error(t("paths.toasts.loadFailed"));
     }
   };
 
   const deletePath = async (pathId: number) => {
     try {
       await api(`/api/paths/${pathId}`, "DELETE");
-      toast.success(t("paths.toasts.deleted"));
+      notify.success(t("paths.toasts.deleted"));
       refetch();
     } catch {
-      toast.error(t("paths.toasts.deleteFailed"));
+      notify.error(t("paths.toasts.deleteFailed"));
     }
   };
 
@@ -132,18 +135,18 @@ export function Paths() {
             </span>
           </div>
         </div>
-        <button
+        <Button
           onClick={create}
           disabled={!canCreate}
-          className="flex items-center justify-center gap-2 rounded-lg bg-accent-action px-6 py-3 text-sm font-semibold text-accent-action-foreground shadow-accent-action transition hover:bg-accent-action/90 disabled:opacity-25 disabled:shadow-none"
+          className="h-auto rounded-lg px-6 py-3 font-semibold shadow-accent-action hover:bg-accent-action/90 disabled:opacity-25 disabled:shadow-none [&_svg:not([class*='size-'])]:size-4 has-[>svg]:px-6"
         >
           {creating ? (
-            <Loader2 size={15} className="animate-spin" />
+            <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
           ) : (
-            <Route size={15} />
+            <Route size={CRATE_ICON_SIZE.sm} />
           )}
           {t("paths.compute")}
-        </button>
+        </Button>
       </div>
 
       {paths && paths.length > 0 ? (
@@ -156,11 +159,32 @@ export function Paths() {
               key={path.id}
               path={path}
               onPlay={() => void playPath(path.id)}
-              onDelete={() => void deletePath(path.id)}
+              onDelete={() => setPendingDelete(path)}
             />
           ))}
         </div>
       ) : null}
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        onConfirm={async () => {
+          if (pendingDelete) await deletePath(pendingDelete.id);
+        }}
+        tone="danger"
+        title={t("paths.delete.confirmTitle")}
+        description={
+          pendingDelete
+            ? t("paths.delete.confirmDescription", { name: pendingDelete.name })
+            : undefined
+        }
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
+        closeLabel={t("common.close")}
+        ariaLabel={t("paths.delete.confirmTitle")}
+        backdropLabel={t("common.close")}
+      />
     </div>
   );
 }

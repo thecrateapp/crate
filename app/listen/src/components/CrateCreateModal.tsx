@@ -1,14 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2 } from "@crate/ui/icons";
 import { Button } from "@crate/ui/shadcn/button";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 import {
   AppModal,
   ModalBody,
-  ModalCloseButton,
   ModalFooter,
-  ModalHeader,
 } from "@crate/ui/primitives/AppModal";
 
 import {
@@ -73,11 +70,11 @@ export function CrateCreateModal({
           albumAddFailed = true;
         }
       }
-      toast.success(t("library.crates.created"));
-      if (albumAddFailed) toast.error(t("album.toasts.addToCrateFailed"));
+      notify.success(t("library.crates.created"));
+      if (albumAddFailed) notify.error(t("album.toasts.addToCrateFailed"));
       onCreated(created);
     } catch {
-      toast.error(t("library.crates.createFailed"));
+      notify.error(t("library.crates.createFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -91,25 +88,23 @@ export function CrateCreateModal({
     <AppModal
       open={open}
       onClose={close}
-      maxWidthClassName="sm:max-w-2xl"
-      panelClassName="listen-glass-panel border-border-quiet"
+      size="lg"
+      title={t("library.crates.createTitle")}
+      description={
+        initialAlbum ? (
+          <span className="mt-1 block truncate">
+            {initialAlbum.name} · {initialAlbum.artistName}
+          </span>
+        ) : undefined
+      }
+      closeLabel={t("common.close")}
+      closeDisabled={submitting}
+      headerClassName="bg-transparent"
+      panelClassName="listen-glass-panel flex flex-col border-border-quiet"
       closeOnEscape={!submitting}
       closeOnOverlay={!submitting}
     >
-      <div className="flex max-h-[92vh] flex-col">
-        <ModalHeader className="flex items-center justify-between gap-4 bg-transparent px-5 py-4">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-text-primary">
-              {t("library.crates.createTitle")}
-            </h2>
-            {initialAlbum ? (
-              <p className="mt-1 truncate text-xs text-text-muted">
-                {initialAlbum.name} · {initialAlbum.artistName}
-              </p>
-            ) : null}
-          </div>
-          <ModalCloseButton onClick={close} disabled={submitting} />
-        </ModalHeader>
+      <div className="flex min-h-0 flex-col">
         <ModalBody className="p-5">
           <CrateForm
             id={FORM_ID}
@@ -123,20 +118,15 @@ export function CrateCreateModal({
           />
         </ModalBody>
         <ModalFooter className="flex items-center justify-end gap-3 bg-transparent px-5 py-4">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={close}
-            disabled={submitting}
-          >
+          <Button variant="ghost" onClick={close} disabled={submitting}>
             {t("common.cancel")}
           </Button>
           <Button
             type="submit"
             form={FORM_ID}
-            disabled={submitting || !isCrateFormValid(values)}
+            loading={submitting}
+            disabled={!isCrateFormValid(values)}
           >
-            {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
             {t("library.crates.create")}
           </Button>
         </ModalFooter>

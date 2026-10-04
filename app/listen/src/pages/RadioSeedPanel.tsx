@@ -1,5 +1,11 @@
 import { useTranslation } from "react-i18next";
-import { Music, Radio as RadioIcon, Loader2 } from "@crate/ui/icons";
+import {
+  CRATE_ICON_SIZE,
+  Loader2,
+  Music,
+  Radio as RadioIcon,
+} from "@crate/ui/icons";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 
@@ -25,20 +31,27 @@ export function RadioSeedPanel({
   return (
     <div className="radio-seed-panel rounded-[12px] p-5">
       <div className="radio-seed-heading mb-4 flex items-center gap-2 text-sm font-semibold">
-        <RadioIcon size={16} className="radio-seed-heading-icon" />
+        <RadioIcon
+          size={CRATE_ICON_SIZE.sm}
+          className="radio-seed-heading-icon"
+        />
         {t("radio.seed.title")}
       </div>
 
-      <input
-        type="text"
+      <SearchInput
         value={query}
-        onChange={(event) => onQueryChange(event.target.value)}
+        onValueChange={onQueryChange}
+        label={t("radio.seed.title")}
+        clearLabel={t("common.clear")}
         placeholder={t("radio.seed.placeholder")}
-        className="radio-seed-input h-12 w-full rounded-lg px-4 text-base"
+        className="radio-seed-input h-12 rounded-lg shadow-none backdrop-blur-none md:text-base"
       />
 
       {searching && (
-        <Loader2 size={14} className="radio-seed-spinner mt-2 animate-spin" />
+        <Loader2
+          size={CRATE_ICON_SIZE.xs}
+          className="radio-seed-spinner mt-2 animate-spin"
+        />
       )}
 
       {results.length > 0 && (
@@ -46,6 +59,7 @@ export function RadioSeedPanel({
           {results.map((result) => (
             <button
               key={`${result.type}-${result.value}`}
+              type="button"
               onClick={() => onStartSeeded(result)}
               disabled={starting}
               className="radio-seed-result flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition"

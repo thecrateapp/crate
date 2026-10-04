@@ -1,4 +1,5 @@
-import { Loader2, Search } from "@crate/ui/icons";
+import { Loader2 } from "@crate/ui/icons";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
@@ -38,15 +39,15 @@ export function JamOpenRoomsPanel({
         ) : null}
       </div>
 
-      <div className="jam-input mt-4 flex items-center gap-2 rounded-lg px-3 py-2">
-        <Search size={15} className="text-text-muted" />
-        <input
-          value={roomSearch}
-          onChange={(event) => setRoomSearch(event.target.value)}
-          placeholder={t("jam.lobby.searchPlaceholder")}
-          className="h-8 min-w-0 flex-1 bg-transparent text-base text-text-primary outline-none placeholder:text-text-muted"
-        />
-      </div>
+      <SearchInput
+        value={roomSearch}
+        onValueChange={setRoomSearch}
+        label={t("jam.lobby.searchPlaceholder")}
+        clearLabel={t("common.clear")}
+        placeholder={t("jam.lobby.searchPlaceholder")}
+        containerClassName="mt-4"
+        className="jam-input h-12 rounded-lg shadow-none backdrop-blur-none placeholder:text-text-muted md:text-base"
+      />
 
       <div className="mt-5 space-y-6">
         <RoomList

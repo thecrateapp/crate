@@ -2,7 +2,9 @@ import type { RefObject, MouseEvent } from "react";
 import type { TFunction } from "i18next";
 
 import { AppPopover, AppPopoverDivider } from "@crate/ui/primitives/AppPopover";
-import { Disc, ListPlus, X } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Disc, ListPlus, X } from "@crate/ui/icons";
+import { IconButton } from "@crate/ui/primitives/IconButton";
+import { Button } from "@crate/ui/shadcn/button";
 
 import {
   ContextMenu,
@@ -140,17 +142,21 @@ export function AlbumTrackList({
             </p>
           </div>
           <div className="relative">
-            <button
-              className="inline-flex h-9 items-center gap-2 rounded-full border border-text-primary/12 bg-text-primary/6 px-3 text-xs font-medium text-text-primary transition-colors hover:bg-text-primary/10"
+            <Button
+              variant="outline"
+              size="sm"
+              shape="pill"
+              className="h-9 text-xs"
               onClick={onToggleSelectionPlaylistPicker}
             >
-              <ListPlus size={14} />
+              <ListPlus size={CRATE_ICON_SIZE.xs} />
               {t("playlist.actions.addToPlaylist")}
-            </button>
+            </Button>
             {selectionPlaylistPickerOpen ? (
               <AppPopover className="absolute top-full right-0 z-app-popover mt-2 w-64 overflow-hidden rounded-[12px]">
                 <div className="p-1.5">
                   <button
+                    type="button"
                     className="w-full rounded-lg px-3 py-2 text-left text-sm text-text-primary transition-colors hover:bg-text-primary/5"
                     onClick={onCreatePlaylistFromSelection}
                   >
@@ -162,6 +168,7 @@ export function AlbumTrackList({
                   {playlists.map((playlist) => (
                     <button
                       key={playlist.id}
+                      type="button"
                       className="w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted transition-colors hover:bg-text-primary/5 hover:text-text-primary"
                       onClick={() => void onAddSelectedToPlaylist(playlist.id)}
                     >
@@ -172,19 +179,24 @@ export function AlbumTrackList({
               </AppPopover>
             ) : null}
           </div>
-          <button
-            className="inline-flex h-9 items-center gap-2 rounded-full border border-text-primary/12 bg-text-primary/6 px-3 text-xs font-medium text-text-primary transition-colors hover:bg-text-primary/10"
+          <Button
+            variant="outline"
+            size="sm"
+            shape="pill"
+            className="h-9 text-xs"
             onClick={onCreatePlaylistFromSelection}
           >
             {t("playlist.actions.create")}
-          </button>
-          <button
-            className="inline-flex size-9 items-center justify-center rounded-full border border-text-primary/12 bg-text-primary/6 text-text-muted transition-colors hover:bg-text-primary/10 hover:text-text-primary"
+          </Button>
+          <IconButton
+            label={t("album.selection.clear")}
+            variant="card"
+            size="sm"
+            className="size-9"
             onClick={onClearSelection}
-            aria-label={t("album.selection.clear")}
           >
-            <X size={14} />
-          </button>
+            <X size={CRATE_ICON_SIZE.xs} />
+          </IconButton>
         </div>
       ) : null}
 

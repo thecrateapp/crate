@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2, Plus } from "@crate/ui/icons";
 import { Button } from "@crate/ui/shadcn/button";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { CrateCard } from "@/components/CrateCard";
 import { CrateCreateModal } from "@/components/CrateCreateModal";
@@ -93,7 +93,7 @@ export function Crates({ onCrateChange }: CratesProps) {
       const tracks = await loadCrateTracks(crate);
       startCratePlayback(crate, shuffle ? shuffleArray(tracks) : tracks);
     } catch {
-      toast.error(t("library.crates.playFailed"));
+      notify.error(t("library.crates.playFailed"));
     }
   }
 
@@ -101,12 +101,12 @@ export function Crates({ onCrateChange }: CratesProps) {
     try {
       const radio = await startShapedRadio("seeded", "crate", crate.id);
       if (!radio?.tracks.length) {
-        toast.info(t("actions.crate.toasts.radioUnavailable"));
+        notify.info(t("actions.crate.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error(t("actions.crate.toasts.radioFailed"));
+      notify.error(t("actions.crate.toasts.radioFailed"));
     }
   }
 
@@ -116,13 +116,13 @@ export function Crates({ onCrateChange }: CratesProps) {
         crateId: crate.id,
         title: crate.name,
       });
-      toast.success(
+      notify.success(
         result === "removed"
           ? t("actions.offline.toasts.removed")
           : t("actions.crate.toasts.offlineReady"),
       );
     } catch (error) {
-      toast.error(
+      notify.error(
         error instanceof Error
           ? error.message
           : t("actions.offline.toasts.updateFailed"),

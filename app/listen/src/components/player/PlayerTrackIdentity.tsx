@@ -130,6 +130,7 @@ export function PlayerTrackIdentity({
         className={cn("mt-2 flex", center ? "justify-center" : "justify-start")}
       >
         <button
+          type="button"
           onClick={onArtistClick}
           aria-label={t("player.goToArtist", { name: currentTrack.artist })}
           disabled={!artistClickable}

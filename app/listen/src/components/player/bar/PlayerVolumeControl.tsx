@@ -110,6 +110,7 @@ export function PlayerVolumeControl({
   return (
     <div className="relative flex items-center" onWheel={handleWheel}>
       <button
+        type="button"
         ref={volumeButtonRef}
         onClick={() => {
           const nextOpen = !showVolume;

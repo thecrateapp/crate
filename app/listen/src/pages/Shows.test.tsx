@@ -131,9 +131,9 @@ describe("Shows page", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Artistas seguidos")).toBeInTheDocument();
     expect(screen.getByText("Próximo concierto")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Todo" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Todo" })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Conciertos" }),
+      screen.getByRole("radio", { name: "Conciertos" }),
     ).toBeInTheDocument();
     expect(
       screen.getByPlaceholderText("Filtra por artista, sala o ciudad..."),

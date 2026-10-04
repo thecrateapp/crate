@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
 
 import { EmptyState, LoadingState } from "@crate/ui/domain/states";
+import { notify } from "@crate/ui/lib/notify";
 import { useApi } from "@/hooks/use-api";
 import { api, apiAssetUrl } from "@/lib/api";
 import { openExternalUrl } from "@/lib/external-links";
@@ -11,7 +11,7 @@ import { openExternalUrl } from "@/lib/external-links";
 import { LibraryBandcampHeader } from "./LibraryBandcampHeader";
 import { LibraryBandcampImported } from "./LibraryBandcampImported";
 import { LibraryBandcampPurchases } from "./LibraryBandcampPurchases";
-import { LibraryBandcampWithdrawModal } from "./LibraryBandcampWithdrawModal";
+import { ContributionWithdrawDialog } from "./LibraryPrimitives";
 import type {
   BandcampCollectionResponse,
   BandcampItem,
@@ -55,13 +55,13 @@ export function LibraryBandcampTab() {
         "POST",
         { bandcamp_item_id: itemId, format: "flac" },
       );
-      toast.success(
+      notify.success(
         t("bandcamp.toasts.importQueued", { taskId: response.task_id }),
       );
       refetchCollection();
       refetchContributions();
     } catch (error) {
-      toast.error(
+      notify.error(
         (error as Error).message || t("bandcamp.toasts.importFailed"),
       );
     } finally {
@@ -77,7 +77,7 @@ export function LibraryBandcampTab() {
         `/api/me/contributions/${withdrawTarget.id}/withdraw`,
         "POST",
       );
-      toast.success(
+      notify.success(
         t("library.bandcamp.toasts.removalQueued", {
           taskId: response.task_id,
         }),
@@ -86,7 +86,7 @@ export function LibraryBandcampTab() {
       refetchCollection();
       refetchContributions();
     } catch (error) {
-      toast.error(
+      notify.error(
         (error as Error).message || t("library.bandcamp.toasts.removeFailed"),
       );
     } finally {
@@ -120,6 +120,7 @@ export function LibraryBandcampTab() {
         title={t("library.bandcamp.imported.title")}
         description={t("library.bandcamp.imported.description")}
         exportLabel={t("common.export")}
+        withdrawLabel={t("library.contributions.withdraw.confirm")}
         onExport={exportContribution}
         onWithdraw={setWithdrawTarget}
       />
@@ -146,17 +147,15 @@ export function LibraryBandcampTab() {
         />
       )}
 
-      <LibraryBandcampWithdrawModal
-        target={withdrawTarget}
-        withdrawing={withdrawing}
+      <ContributionWithdrawDialog
+        open={Boolean(withdrawTarget)}
+        pending={withdrawing}
         title={t("library.bandcamp.withdraw.title")}
-        description={t("library.bandcamp.withdraw.description", {
+        body={t("library.bandcamp.withdraw.description", {
           album: withdrawTarget?.album_name,
         })}
-        keepLabel={t("common.keepIt")}
-        confirmLabel={t("library.contributions.withdraw.confirm")}
-        onClose={() => setWithdrawTarget(null)}
-        onConfirm={() => void withdrawContribution()}
+        onCancel={() => setWithdrawTarget(null)}
+        onConfirm={withdrawContribution}
       />
     </div>
   );

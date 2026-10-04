@@ -1,7 +1,8 @@
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { Calendar, Play, Sparkles } from "@crate/ui/icons";
+import { Calendar, CRATE_ICON_SIZE, Play, Sparkles } from "@crate/ui/icons";
 import { SectionHeader } from "@crate/ui/domain/lists";
+import { Button } from "@crate/ui/shadcn/button";
 
 import type { HomeUpcomingInsight } from "./home-model";
 
@@ -66,23 +67,26 @@ export function HomeShowPrepSection({
 
             <div className="mt-5 flex flex-wrap gap-2">
               {insight.has_setlist ? (
-                <button
-                  type="button"
+                <Button
+                  size="sm"
+                  shape="pill"
                   onClick={() => onPlaySetlist(insight)}
-                  className="inline-flex items-center gap-2 rounded-full bg-accent-action px-4 py-2 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90"
+                  className="h-9 gap-2 px-4 shadow-none has-[>svg]:px-4 [&_svg:not([class*='size-'])]:size-3.5"
                 >
-                  <Play size={14} fill="currentColor" />
+                  <Play size={CRATE_ICON_SIZE.xs} fill="currentColor" />
                   {t("radar.show.playSetlist")}
-                </button>
+                </Button>
               ) : null}
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
+                shape="pill"
                 onClick={() => onSaveReminder(insight)}
-                className="home-upcoming-show-prep-reminder inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm transition-colors"
+                className="home-upcoming-show-prep-reminder h-9 gap-2 px-4 font-normal has-[>svg]:px-4 [&_svg:not([class*='size-'])]:size-3.5"
               >
-                <Calendar size={14} />
+                <Calendar size={CRATE_ICON_SIZE.xs} />
                 {t("home.radar.showPrep.saveForLater")}
-              </button>
+              </Button>
             </div>
           </div>
         ))}

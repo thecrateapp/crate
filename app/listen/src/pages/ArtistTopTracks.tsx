@@ -1,8 +1,10 @@
 import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Play } from "@crate/ui/icons";
+import { ArrowLeft, CRATE_ICON_SIZE, Play } from "@crate/ui/icons";
+import { IconButton } from "@crate/ui/primitives/IconButton";
+import { Button } from "@crate/ui/shadcn/button";
 import { useLocation, useNavigate, useParams } from "react-router";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { CrateLoader } from "@/components/ui/CrateLoader";
@@ -78,7 +80,7 @@ export function ArtistTopTracks() {
   function handlePlayAll() {
     const queue = toPlayerTracks(topTracks || []);
     if (!queue.length) {
-      toast.info(t("actions.artist.toasts.noTopTracks"));
+      notify.info(t("actions.artist.toasts.noTopTracks"));
       return;
     }
     playAll(queue, 0, {
@@ -100,7 +102,9 @@ export function ArtistTopTracks() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <button
+          <IconButton
+            label={t("common.back")}
+            variant="card"
             onClick={() =>
               navigate(
                 artistPagePath({
@@ -110,10 +114,9 @@ export function ArtistTopTracks() {
                 }),
               )
             }
-            className="flex size-10 items-center justify-center rounded-full border border-border-quiet text-text-primary/70 transition-colors hover:bg-text-primary/5 hover:text-text-primary"
           >
-            <ArrowLeft size={18} />
-          </button>
+            <ArrowLeft size={CRATE_ICON_SIZE.md} />
+          </IconButton>
           <div>
             <h1 className="text-2xl font-bold text-text-primary">
               {artistName}
@@ -124,13 +127,10 @@ export function ArtistTopTracks() {
           </div>
         </div>
 
-        <button
-          className="flex items-center gap-2 rounded-lg bg-accent-action px-5 py-2.5 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90"
-          onClick={handlePlayAll}
-        >
-          <Play size={15} fill="currentColor" />
+        <Button className="rounded-lg px-5" onClick={handlePlayAll}>
+          <Play size={CRATE_ICON_SIZE.sm} fill="currentColor" />
           {t("player.play")}
-        </button>
+        </Button>
       </div>
 
       <div className="rounded-xl border border-text-primary/5 bg-text-primary/[0.02]">

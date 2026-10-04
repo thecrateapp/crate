@@ -3,7 +3,8 @@ import { useTranslation } from "react-i18next";
 import { useParams } from "react-router";
 import { Sparkles } from "@crate/ui/icons";
 import { EmptyState, ErrorState } from "@crate/ui/domain/states";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
+import { CratePill } from "@crate/ui/primitives/CrateBadge";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { CoreTracksArtwork } from "@/components/home/CoreTracksArtwork";
@@ -158,12 +159,12 @@ export function HomePlaylist() {
         playlistName: data.name,
       });
       if (!radio.tracks.length) {
-        toast.info(t("playlist.toasts.radioUnavailable"));
+        notify.info(t("playlist.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error(t("playlist.toasts.radioFailed"));
+      notify.error(t("playlist.toasts.radioFailed"));
     }
   }
 
@@ -182,9 +183,9 @@ export function HomePlaylist() {
           }),
         ],
       });
-      toast.success(t("playlist.toasts.trackAdded"));
+      notify.success(t("playlist.toasts.trackAdded"));
     } catch {
-      toast.error(t("playlist.toasts.trackAddFailed"));
+      notify.error(t("playlist.toasts.trackAddFailed"));
     }
   }
 
@@ -244,10 +245,13 @@ export function HomePlaylist() {
         description={data.description}
         metaItems={playlistMetaItems}
         badges={
-          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-accent-action/25 bg-accent-action/10 px-3 py-1 text-xs font-medium uppercase tracking-wider text-accent-action">
-            <Sparkles size={12} />
+          <CratePill
+            tone="accent"
+            icon={Sparkles}
+            className="w-fit gap-2 px-3 text-xs font-medium uppercase tracking-wider"
+          >
             {data.badge}
-          </span>
+          </CratePill>
         }
         artwork={renderArtwork}
         onPlay={handlePlay}

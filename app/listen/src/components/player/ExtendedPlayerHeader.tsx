@@ -1,6 +1,12 @@
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
-import { ChevronDown, Settings, SlidersHorizontal } from "@crate/ui/icons";
+import {
+  ChevronDown,
+  CRATE_ICON_SIZE,
+  Settings,
+  SlidersHorizontal,
+} from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import type { TFunction } from "i18next";
 
 import { EqualizerPanel } from "@/components/player/EqualizerPanel";
@@ -32,14 +38,13 @@ export function ExtendedPlayerHeader({
   return (
     <>
       <div className="z-app-header absolute top-4 right-4 left-4 flex justify-between">
-        <button
-          type="button"
+        <IconButton
           onClick={actions.closeWithFeedback}
-          aria-label={t("player.close")}
-          className="rounded-full bg-surface-control p-2 text-text-secondary backdrop-blur-sm transition-colors hover:bg-surface-control-hover hover:text-text-primary"
+          label={t("player.close")}
+          className="size-9 bg-surface-control text-text-secondary backdrop-blur-sm hover:translate-y-0 hover:drop-shadow-none hover:bg-surface-control-hover hover:text-text-primary"
         >
-          <ChevronDown size={20} />
-        </button>
+          <ChevronDown size={CRATE_ICON_SIZE.lg} className="size-5" />
+        </IconButton>
         <div className="flex items-center gap-2">
           <PlayerSurfaceModeSwitch
             mode={state.vizCfg.surfaceMode}

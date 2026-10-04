@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, MapPin, Music } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Loader2, MapPin, Music } from "@crate/ui/icons";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { api } from "@/lib/api";
@@ -159,7 +160,7 @@ export function EndpointPanel({
 
       <div className="relative p-5">
         <div className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-accent-action/60">
-          <MapPin size={10} className="mr-1 inline" />
+          <MapPin size={CRATE_ICON_SIZE.micro} className="mr-1 inline" />
           {label}
         </div>
 
@@ -181,6 +182,7 @@ export function EndpointPanel({
               {selected.type}
             </div>
             <button
+              type="button"
               onClick={() => {
                 onSelect(null);
                 setQuery("");
@@ -193,19 +195,20 @@ export function EndpointPanel({
           </div>
         ) : (
           <div>
-            <input
-              type="text"
+            <SearchInput
               value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                void search(event.target.value);
+              onValueChange={(value) => {
+                setQuery(value);
+                void search(value);
               }}
+              label={label}
+              clearLabel={t("common.clear")}
               placeholder={t("paths.endpoint.placeholder")}
-              className="h-11 w-full rounded-lg border border-border-quiet bg-surface-canvas/30 px-4 text-base text-text-primary placeholder:text-text-primary/25 focus:border-accent-action/30 focus:outline-none"
+              className="rounded-lg bg-surface-canvas/30 shadow-none backdrop-blur-none placeholder:text-text-primary/25 focus-visible:border-accent-action/30 md:text-base"
             />
             {searching ? (
               <Loader2
-                size={14}
+                size={CRATE_ICON_SIZE.xs}
                 className="mt-2 animate-spin text-accent-action"
               />
             ) : null}
@@ -214,6 +217,7 @@ export function EndpointPanel({
                 {results.map((result) => (
                   <button
                     key={`${result.type}-${result.value}`}
+                    type="button"
                     onClick={() => {
                       onSelect(result);
                       setQuery("");

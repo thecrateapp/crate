@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { Play } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Play } from "@crate/ui/icons";
+import { Button } from "@crate/ui/shadcn/button";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import type { PlayerActionsValue } from "@/contexts/player-context";
@@ -29,17 +30,20 @@ export function SearchTrackResults({
         <h2 className="text-lg font-semibold">
           {t("search.tracksCount", { count: data.tracks.length })}
         </h2>
-        <button
+        <Button
+          size="xs"
+          shape="pill"
           onClick={() =>
             playAll(data.tracks.map(toSearchPlayerTrack), 0, {
               type: "queue",
               name: t("search.playSource", { query }),
             })
           }
-          className="flex items-center gap-1.5 rounded-full bg-accent-action px-3 py-1.5 text-xs font-medium text-accent-action-foreground"
+          className="h-7 gap-1.5 px-3 shadow-none has-[>svg]:px-3 [&_svg:not([class*='size-'])]:size-3"
         >
-          <Play size={12} fill="currentColor" /> {t("search.playAll")}
-        </button>
+          <Play size={CRATE_ICON_SIZE.micro} fill="currentColor" />
+          {t("search.playAll")}
+        </Button>
       </div>
       <div>
         {trackRowData.map((track, index) => (
