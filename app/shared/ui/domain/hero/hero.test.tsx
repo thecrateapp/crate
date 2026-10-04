@@ -99,6 +99,19 @@ describe("PageHero", () => {
     expect(screen.getByTestId("bg")).toHaveClass("blur-2xl");
   });
 
+  it("isolates background stacking so layered fades never cover the content", () => {
+    render(
+      <PageHero
+        title="Crate"
+        background={{
+          render: () => <div className="absolute inset-0 z-10" />,
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("page-hero-background")).toHaveClass("isolate");
+  });
+
   it("renders actions below the hero, and inside the card for card heroes", () => {
     const { rerender } = render(
       <PageHero title="Album" actions={<button type="button">Play</button>} />,

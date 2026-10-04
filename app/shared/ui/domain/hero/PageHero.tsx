@@ -101,7 +101,7 @@ function HeroBackground({ background }: { background: PageHeroBackground }) {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0"
+      className="pointer-events-none absolute inset-0 isolate"
       data-testid="page-hero-background"
       data-treatment={treatment}
     >
