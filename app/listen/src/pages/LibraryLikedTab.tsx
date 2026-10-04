@@ -1,5 +1,11 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { FilterBar } from "@crate/ui/domain/filters";
+import { EmptyState, LoadingState } from "@crate/ui/domain/states";
+import {
+  TrackList,
+  type TrackListVirtualListProps,
+} from "@crate/ui/domain/tracks";
 import { Play, Search } from "@crate/ui/icons";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
@@ -11,8 +17,21 @@ import { toPlayableTrack } from "@/lib/playable-track";
 import { toTrackRowData } from "@/lib/track-row-data";
 
 import { CollectionSortDropdown } from "./LibraryCollectionSortDropdown";
-import { EmptyState, Spinner } from "./LibraryPrimitives";
 import { likedSortOptions, type LikedSort } from "./library-collection-model";
+
+function LikedTracksVirtualList({
+  itemKey,
+  ...props
+}: TrackListVirtualListProps<TrackRowData>) {
+  return (
+    <WindowVirtualList
+      {...props}
+      itemKey={
+        itemKey ? (item, index) => String(itemKey(item, index)) : undefined
+      }
+    />
+  );
+}
 
 export function LibraryLikedTab() {
   const { t } = useTranslation();
@@ -56,9 +75,9 @@ export function LibraryLikedTab() {
     [filtered],
   );
 
-  if (loading) return <Spinner />;
+  if (loading) return <LoadingState label={t("common.loadingShort")} />;
   if (!tracks || tracks.length === 0) {
-    return <EmptyState message={t("library.liked.empty")} />;
+    return <EmptyState variant="inline" message={t("library.liked.empty")} />;
   }
 
   function handlePlayAll() {
@@ -95,45 +114,52 @@ export function LibraryLikedTab() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={handlePlayAll}
-          className="flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90"
-        >
-          <Play size={16} fill="currentColor" />
-          {filtered.length < tracks.length
-            ? t("library.liked.playFiltered", { count: filtered.length })
-            : t("library.liked.playAll")}
-        </button>
-        <div className="relative min-w-[180px] flex-1">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-text-primary/40"
+      <FilterBar
+        leading={
+          <button
+            type="button"
+            onClick={handlePlayAll}
+            className="flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90"
+          >
+            <Play size={16} fill="currentColor" />
+            {filtered.length < tracks.length
+              ? t("library.liked.playFiltered", { count: filtered.length })
+              : t("library.liked.playAll")}
+          </button>
+        }
+        search={
+          <div className="relative">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-text-primary/40"
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={t("library.liked.filterPlaceholder")}
+              className="h-10 w-full rounded-lg bg-text-primary/5 pl-9 pr-3 text-base text-text-primary outline-none placeholder:text-text-primary/40 focus:bg-text-primary/8"
+            />
+          </div>
+        }
+        sort={
+          <CollectionSortDropdown
+            label={t("library.sort.likedTracks")}
+            value={sort}
+            options={likedSortOptions}
+            onChange={setSort}
           />
-          <input
-            type="text"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={t("library.liked.filterPlaceholder")}
-            className="h-10 w-full rounded-lg bg-text-primary/5 pl-9 pr-3 text-base text-text-primary outline-none placeholder:text-text-primary/40 focus:bg-text-primary/8"
-          />
-        </div>
-        <CollectionSortDropdown
-          label={t("library.sort.likedTracks")}
-          value={sort}
-          options={likedSortOptions}
-          onChange={setSort}
-        />
-      </div>
-      <WindowVirtualList
+        }
+      />
+      <TrackList
         items={trackRows}
+        virtualList={LikedTracksVirtualList}
         itemKey={(row, index) =>
           row.id ??
           row.path ??
           row.artist + "-" + row.album + "-" + row.title + "-" + index
         }
-        renderItem={(row, index) => (
+        renderRow={(row, index) => (
           <TrackRow
             track={row}
             index={index + 1}

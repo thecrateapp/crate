@@ -1197,7 +1197,7 @@ describe("RadioStationCard", () => {
 });
 
 describe("RadioStationsSection", () => {
-  it("uses the shared square-card rail fit", () => {
+  it("uses the shared columns rail fit", () => {
     const stations: HomeRadioStation[] = [
       {
         type: "artist",
@@ -1219,9 +1219,7 @@ describe("RadioStationsSection", () => {
       />,
     );
 
-    expect(container.querySelector('[data-rail-fit="square-card"]')).not.toBe(
-      null,
-    );
+    expect(container.querySelector('[data-rail-fit="columns"]')).not.toBe(null);
   });
 });
 

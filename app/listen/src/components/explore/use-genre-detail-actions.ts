@@ -3,10 +3,7 @@ import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
-import {
-  type ItemActionMenuEntry,
-  useItemActionMenu,
-} from "@/components/actions/ItemActionMenu";
+import { type ItemActionMenuEntry } from "@/components/actions/ItemActionMenu";
 import { action } from "@/components/actions/shared";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { startShapedRadio } from "@/lib/radio";
@@ -106,6 +103,5 @@ export function useGenreDetailActions({
     openGenreRadar,
     shareGenre,
     genreMenuActions,
-    genreMenu: useItemActionMenu(genreMenuActions),
   };
 }

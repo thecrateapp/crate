@@ -1,9 +1,9 @@
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Calendar, Play, Sparkles } from "@crate/ui/icons";
+import { SectionHeader } from "@crate/ui/domain/lists";
 
 import type { HomeUpcomingInsight } from "./home-model";
-import { SectionHeader } from "./HomeSections";
 
 function insightLabel(type: HomeUpcomingInsight["type"], t: TFunction): string {
   if (type === "show_prep") return t("home.radar.insight.showPrep");

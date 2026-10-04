@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useRef } from "react";
+import {
+  TrackList,
+  type TrackListVirtualListProps,
+} from "@crate/ui/domain/tracks";
 
 import { TrackRow } from "@/components/cards/TrackRow";
 import type { PlaylistTrack } from "@/pages/playlist-types";
@@ -10,6 +14,20 @@ interface PlaylistTrackListRow {
   key: number | string;
   data: TrackRowData;
   onPlay: () => void;
+}
+
+function PlaylistTracksVirtualList({
+  itemKey,
+  ...props
+}: TrackListVirtualListProps<PlaylistTrackListRow>) {
+  return (
+    <WindowVirtualList
+      {...props}
+      itemKey={
+        itemKey ? (item, index) => String(itemKey(item, index)) : undefined
+      }
+    />
+  );
 }
 
 export function PlaylistTrackList({
@@ -53,10 +71,11 @@ export function PlaylistTrackList({
   );
 
   return (
-    <WindowVirtualList
+    <TrackList
       items={rows}
+      virtualList={PlaylistTracksVirtualList}
       itemKey={(row) => row.key}
-      renderItem={(row, index) => (
+      renderRow={(row, index) => (
         <TrackRow
           track={row.data}
           index={index + 1}

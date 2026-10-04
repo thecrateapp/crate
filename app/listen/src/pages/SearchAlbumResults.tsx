@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
+import { MediaGrid, SectionHeader } from "@crate/ui/domain/lists";
 import { Disc3 } from "@crate/ui/icons";
 
 import { AlbumCard } from "@/components/cards/AlbumCard";
@@ -13,10 +14,11 @@ export function SearchAlbumResults({ albums }: { albums: SearchAlbum[] }) {
 
   return (
     <section>
-      <h2 className="mb-3 text-lg font-semibold">
-        {t("search.albumsCount", { count: albums.length })}
-      </h2>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <SectionHeader
+        className="mb-3"
+        title={t("search.albumsCount", { count: albums.length })}
+      />
+      <MediaGrid>
         {albums.map((album) => {
           const globalUid = albumGlobalUid(album);
           return globalUid ? (
@@ -76,7 +78,7 @@ export function SearchAlbumResults({ albums }: { albums: SearchAlbum[] }) {
             />
           );
         })}
-      </div>
+      </MediaGrid>
     </section>
   );
 }

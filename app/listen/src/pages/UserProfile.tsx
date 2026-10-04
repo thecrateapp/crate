@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router";
-import { ArrowLeft } from "@crate/ui/icons";
+import { useParams } from "react-router";
+import { ErrorState } from "@crate/ui/domain/states";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
@@ -57,18 +57,13 @@ export function UserProfile() {
 
   if (!data) {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-        <p className="text-lg font-medium text-text-primary">
-          {t("userProfile.notFound")}
-        </p>
-        <Link
-          to="/people"
-          className="inline-flex items-center gap-2 text-sm text-accent-action hover:underline"
-        >
-          <ArrowLeft size={14} />
-          {t("userProfile.backToPeople")}
-        </Link>
-      </div>
+      <ErrorState
+        kind="notFound"
+        title={t("userProfile.notFound")}
+        backTo="/people"
+        backLabel={t("userProfile.backToPeople")}
+        className="py-16"
+      />
     );
   }
 

@@ -8,7 +8,7 @@ import {
 } from "@/components/actions/ItemActionMenu";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
 import { MixArtwork } from "@/components/home/MixArtwork";
-import { SectionHeader, SectionRail } from "@/components/home/HomeSections";
+import { MediaRail, SectionHeader } from "@crate/ui/domain/lists";
 import { cn } from "@/lib/utils";
 
 import type { HomeGeneratedPlaylistSummary, HomeSectionId } from "./home-model";
@@ -58,7 +58,7 @@ export function CustomMixesSection({
         actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("custom-mixes")}
       />
-      <SectionRail fit="square-card">
+      <MediaRail fit="columns">
         {mixes.map((mix) => (
           <CustomMixCard
             key={mix.id}
@@ -69,7 +69,7 @@ export function CustomMixesSection({
             onStartRadio={onStartRadio}
           />
         ))}
-      </SectionRail>
+      </MediaRail>
     </section>
   );
 }

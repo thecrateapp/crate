@@ -1,5 +1,7 @@
-import { Link, useLocation, useParams } from "react-router";
-import { ArrowLeft, Loader2, UserPlus, Users } from "@crate/ui/icons";
+import { useLocation, useParams } from "react-router";
+import { BackLink } from "@crate/ui/domain/navigation";
+import { LoadingState } from "@crate/ui/domain/states";
+import { UserPlus, Users } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { useApi } from "@/hooks/use-api";
@@ -65,13 +67,10 @@ export function UserConnections() {
   return (
     <div className="space-y-6">
       <div className="rounded-[12px] border border-border-quiet bg-text-primary/5 p-5 sm:p-6">
-        <Link
+        <BackLink
           to={username ? `/users/${username}` : "/people"}
-          className="inline-flex items-center gap-2 text-sm text-text-muted hover:text-text-primary transition-colors"
-        >
-          <ArrowLeft size={14} />
-          {t("userConnections.backToProfile")}
-        </Link>
+          label={t("userConnections.backToProfile")}
+        />
         <div className="mt-4 flex items-center gap-3">
           <Users size={18} className="text-text-accent" />
           <div>
@@ -85,9 +84,7 @@ export function UserConnections() {
 
       <section className="rounded-[12px] border border-border-quiet bg-text-primary/[0.03] p-5 sm:p-6">
         {loading ? (
-          <div className="flex items-center justify-center py-12 text-text-muted">
-            <Loader2 size={18} className="animate-spin" />
-          </div>
+          <LoadingState label={t("common.loadingShort")} className="py-12" />
         ) : data && data.length > 0 ? (
           <div className="space-y-3">
             {data.map((item) => {

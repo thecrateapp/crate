@@ -27,7 +27,7 @@ export function StatsRecapSection({
           <NarrativeTile key={item.title} index={index} {...item} />
         ))
       ) : (
-        <div className="stats-card-empty rounded-[12px] border-dashed p-6 text-sm lg:col-span-3">
+        <div className="stats-card-empty rounded-[12px] border border-dashed p-6 text-sm lg:col-span-3">
           {t("stats.empty.recap")}
         </div>
       )}
@@ -37,7 +37,7 @@ export function StatsRecapSection({
 
 export function StatsEmptyState({ t }: { t: StatsPageController["t"] }) {
   return (
-    <div className="stats-card-empty mt-8 rounded-[12px] border-dashed p-8 text-center">
+    <div className="stats-card-empty mt-8 rounded-[12px] border border-dashed p-8 text-center">
       <h2 className="text-xl font-black text-text-primary">
         {t("stats.empty.title")}
       </h2>

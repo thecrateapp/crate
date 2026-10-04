@@ -1,14 +1,8 @@
-import type {
-  CSSProperties,
-  Dispatch,
-  MouseEvent,
-  SetStateAction,
-} from "react";
+import type { CSSProperties, Dispatch, SetStateAction } from "react";
 import type { TFunction } from "i18next";
 import type { NavigateFunction } from "react-router";
 import { toast } from "sonner";
 
-import type { UseContextMenuControllerReturn } from "@crate/ui/domain/actions";
 import { useOffline } from "@/contexts/OfflineContext";
 import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
 import type { PlaylistOption } from "@/contexts/PlaylistComposerContext";
@@ -39,7 +33,6 @@ function trackPreviewId(track: AlbumTrack) {
 
 export function useAlbumPresentation({
   albumId,
-  albumMenuController,
   artistName,
   canPlay,
   canRadio,
@@ -77,7 +70,6 @@ export function useAlbumPresentation({
   t,
 }: {
   albumId: number;
-  albumMenuController: UseContextMenuControllerReturn<HTMLButtonElement>;
   artistName: string;
   canPlay: boolean;
   canRadio: boolean;
@@ -222,10 +214,6 @@ export function useAlbumPresentation({
     setCratePickerOpen((open) => !open);
   }
 
-  function handleToggleAlbumMenu(event: MouseEvent<HTMLButtonElement>) {
-    albumMenuController.openFromTrigger(event);
-  }
-
   const handleGoToArtist = () =>
     navigate(
       globalArtistUid
@@ -320,7 +308,6 @@ export function useAlbumPresentation({
     genre,
     handleGoToArtist,
     handleShare,
-    handleToggleAlbumMenu,
     handleToggleOffline,
     handleTogglePlaylistPicker,
     handleToggleSaved,

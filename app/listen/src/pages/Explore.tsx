@@ -1,13 +1,14 @@
 import { useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Radio, Route } from "@crate/ui/icons";
+import { SectionHeader } from "@crate/ui/domain/lists";
+import { EmptyState, LoadingState } from "@crate/ui/domain/states";
+import { PageHeader } from "@crate/ui/domain/navigation/PageHeader";
 import { toast } from "sonner";
 
 import {
   DecadeDetailView,
-  ExploreLoadingState,
   ExplorePill,
-  ExploreSectionHeader,
   GenreDetailView,
   PlaylistCategoryView,
 } from "@/components/explore/ExploreViews";
@@ -95,9 +96,9 @@ export function Explore() {
   }
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">{t("explore.title")}</h1>
+      <PageHeader size="md" title={t("explore.title")} />
       <div className="space-y-6">
-        {loading ? <ExploreLoadingState /> : null}
+        {loading ? <LoadingState label={t("common.loadingShort")} /> : null}
 
         {filters ? (
           <>
@@ -132,7 +133,7 @@ export function Explore() {
 
             {filters.decades.length > 0 && (
               <div className="space-y-4">
-                <ExploreSectionHeader
+                <SectionHeader
                   title={t("explore.timeTunnels.title")}
                   subtitle={t("explore.timeTunnels.subtitle")}
                 />
@@ -162,8 +163,8 @@ export function Explore() {
               />
             ) : null}
           </>
-        ) : (
-          <p className="text-text-muted text-sm">{t("explore.noFilters")}</p>
+        ) : loading ? null : (
+          <EmptyState variant="inline" message={t("explore.noFilters")} />
         )}
       </div>
     </div>

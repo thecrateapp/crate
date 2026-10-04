@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 
-import { Calendar, Loader2, Sparkles } from "@crate/ui/icons";
+import { PageHeader } from "@crate/ui/domain/navigation";
+import { EmptyState, LoadingState } from "@crate/ui/domain/states";
+import { Calendar, Sparkles } from "@crate/ui/icons";
 
 import {
   groupByMonth,
@@ -21,17 +23,11 @@ function ShowsHeader({ page }: ShowsSectionProps) {
     : page.t("radar.intro");
 
   return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-      <div>
-        <h1 className="text-3xl font-bold text-text-primary">
-          {page.t("nav.radar")}
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-text-muted">
-          {headingCopy}
-        </p>
-      </div>
-      <ShowsSummary page={page} />
-    </div>
+    <PageHeader
+      title={page.t("nav.radar")}
+      subtitle={headingCopy}
+      actions={<ShowsSummary page={page} />}
+    />
   );
 }
 
@@ -170,26 +166,26 @@ function filterLabel(page: ShowsPageController, filter: ShowsFilter) {
 function ShowsEmptyStates({ page }: ShowsSectionProps) {
   if (page.loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 size={24} className="animate-spin text-accent-action" />
-      </div>
+      <LoadingState label={page.t("common.loadingShort")} className="py-24" />
     );
   }
   if (page.isGenreRadar && page.items.length === 0) {
     return (
       <EmptyState
-        icon={<Calendar size={22} className="text-accent-action" />}
+        titleAs="h2"
+        icon={Calendar}
         title={page.t("radar.empty.genreTitle")}
-        body={page.t("radar.empty.genreBody")}
+        description={page.t("radar.empty.genreBody")}
       />
     );
   }
   if (!page.isGenreRadar && !page.hasFollowedArtists) {
     return (
       <EmptyState
-        icon={<Sparkles size={22} className="text-accent-action" />}
+        titleAs="h2"
+        icon={Sparkles}
         title={page.t("radar.empty.followTitle")}
-        body={page.t("radar.empty.followBody")}
+        description={page.t("radar.empty.followBody")}
       />
     );
   }
@@ -200,9 +196,10 @@ function ShowsEmptyStates({ page }: ShowsSectionProps) {
   ) {
     return (
       <EmptyState
-        icon={<Sparkles size={22} className="text-accent-action" />}
+        titleAs="h2"
+        icon={Sparkles}
         title={page.t("radar.empty.noSignalsTitle")}
-        body={page.t("radar.empty.noSignalsBody")}
+        description={page.t("radar.empty.noSignalsBody")}
       />
     );
   }
@@ -213,9 +210,10 @@ function ShowsEmptyStates({ page }: ShowsSectionProps) {
   ) {
     return (
       <EmptyState
-        icon={<Calendar size={22} className="text-accent-action" />}
+        titleAs="h2"
+        icon={Calendar}
         title={page.t("radar.empty.filteredTitle")}
-        body={page.t("radar.empty.filteredBody")}
+        description={page.t("radar.empty.filteredBody")}
       />
     );
   }
@@ -285,26 +283,6 @@ function ShowsMonthSection({
         ))}
       </div>
     </section>
-  );
-}
-
-function EmptyState({
-  icon,
-  title,
-  body,
-}: {
-  icon: ReactNode;
-  title: string;
-  body: string;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-[12px] border border-text-primary/5 bg-text-primary/[0.02] px-6 py-16 text-center">
-      <div className="mb-4 flex size-12 items-center justify-center rounded-xl border border-border-quiet bg-text-primary/5">
-        {icon}
-      </div>
-      <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
-      <p className="mt-2 max-w-md text-sm leading-6 text-text-muted">{body}</p>
-    </div>
   );
 }
 

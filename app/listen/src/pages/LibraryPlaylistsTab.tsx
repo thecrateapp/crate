@@ -10,6 +10,7 @@ import {
   ModalFooter,
   ModalHeader,
 } from "@crate/ui/primitives/AppModal";
+import { EmptyState, LoadingState } from "@crate/ui/domain/states";
 import { useApi } from "@/hooks/use-api";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
 import { PlaylistListRow } from "@/components/playlists/PlaylistListRow";
@@ -25,7 +26,6 @@ import {
   toTrackReferencePayload,
 } from "@/lib/track-reference";
 
-import { EmptyState, Spinner } from "./LibraryPrimitives";
 import type {
   CuratedPlaylist,
   LibraryPlaylistsPageData,
@@ -58,7 +58,7 @@ export function LibraryPlaylistsTab() {
   const playlists = data?.playlists;
   const followedCurated = data?.followed_curated_playlists;
 
-  if (loading) return <Spinner />;
+  if (loading) return <LoadingState label={t("common.loadingShort")} />;
 
   async function toggleSystemPlaylistFollow(playlist: CuratedPlaylist) {
     try {
@@ -215,7 +215,7 @@ export function LibraryPlaylistsTab() {
 
       {!playlists || playlists.length === 0 ? (
         !followedCurated || followedCurated.length === 0 ? (
-          <EmptyState message={t("library.playlists.empty")} />
+          <EmptyState variant="inline" message={t("library.playlists.empty")} />
         ) : null
       ) : (
         <div className="space-y-1">

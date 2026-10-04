@@ -6,6 +6,8 @@ import type { ReactNode } from "react";
 import { toast } from "sonner";
 
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
+import { MediaGrid } from "@crate/ui/domain/lists";
+import { EmptyState } from "@crate/ui/domain/states";
 import { api } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
 import { BandcampCard } from "./BandcampCard";
@@ -314,9 +316,10 @@ function ItemGrid({
   onImport: (item: BandcampItem) => void;
   empty: string;
 }) {
-  if (!items.length) return <Empty label={empty} />;
+  if (!items.length)
+    return <EmptyState variant="dashed" message={empty} className="py-6" />;
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <MediaGrid density="wide">
       {items.map((item) => (
         <BandcampCard
           key={`${item.id}-${item.item_url}`}
@@ -325,7 +328,7 @@ function ItemGrid({
           onImport={onImport}
         />
       ))}
-    </div>
+    </MediaGrid>
   );
 }
 
@@ -340,7 +343,8 @@ function ItemList({
   onImport: (item: BandcampItem) => void;
   empty: string;
 }) {
-  if (!items.length) return <Empty label={empty} />;
+  if (!items.length)
+    return <EmptyState variant="dashed" message={empty} className="py-6" />;
   return (
     <div className="space-y-3">
       {items.map((item) => (
@@ -351,14 +355,6 @@ function ItemList({
           onImport={onImport}
         />
       ))}
-    </div>
-  );
-}
-
-function Empty({ label }: { label: string }) {
-  return (
-    <div className="rounded-lg border border-dashed border-border-quiet bg-surface-canvas/16 p-6 text-sm text-text-muted">
-      {label}
     </div>
   );
 }

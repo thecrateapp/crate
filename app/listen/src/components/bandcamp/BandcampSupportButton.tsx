@@ -4,8 +4,13 @@ import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
+import {
+  HERO_SECONDARY_ACTION_ACTIVE_CLASS,
+  HERO_SECONDARY_ACTION_CLASS,
+} from "@crate/ui/domain/hero";
 import { api } from "@/lib/api";
 import { openExternalUrl } from "@/lib/external-links";
+import { cn } from "@/lib/utils";
 
 interface BandcampLinkState {
   entity_type?: string;
@@ -43,9 +48,6 @@ interface BandcampActionState {
   ownedLabel: string;
   ownedShortLabel: string;
 }
-
-const SECONDARY_ACTION_CLASS =
-  "inline-flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-xs font-medium text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
 
 function linkUrlForType(
   entityType: "artist" | "album",
@@ -225,7 +227,11 @@ function BandcampSecondaryAction({
   if (state.ownedAlbum && !state.canImport) {
     return (
       <span
-        className={`${SECONDARY_ACTION_CLASS} text-accent-action drop-shadow-accent-action ${className}`}
+        className={cn(
+          HERO_SECONDARY_ACTION_CLASS,
+          HERO_SECONDARY_ACTION_ACTIVE_CLASS,
+          className,
+        )}
         aria-label={ariaLabel}
       >
         <BandcampLogo size={CRATE_ICON_SIZE.lg} />
@@ -239,7 +245,7 @@ function BandcampSecondaryAction({
       type="button"
       onClick={onActivate}
       disabled={busy}
-      className={`${SECONDARY_ACTION_CLASS} ${className}`}
+      className={cn(HERO_SECONDARY_ACTION_CLASS, className)}
       aria-label={ariaLabel}
     >
       {busy ? (

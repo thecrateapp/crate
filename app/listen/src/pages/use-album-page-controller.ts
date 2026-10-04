@@ -49,9 +49,6 @@ export function useAlbumPageController() {
   const albumHeroInfoRef = useRef<HTMLDivElement>(null);
   const albumPrimaryActionsRef = useRef<HTMLDivElement>(null);
   const [mobileHeroInfoOffset, setMobileHeroInfoOffset] = useState(0);
-  const albumMenuController = useContextMenuController<HTMLButtonElement>({
-    placement: "bottom-end",
-  });
   const selectionMenuController = useContextMenuController<HTMLButtonElement>();
   const playlistComposer = useOptionalPlaylistComposer();
   const playlists = playlistComposer?.playlistOptions ?? [];
@@ -82,7 +79,6 @@ export function useAlbumPageController() {
   });
 
   function closeAlbumMenu() {
-    albumMenuController.close();
     setPlaylistPickerOpen(false);
     setCratePickerOpen(false);
   }
@@ -169,7 +165,6 @@ export function useAlbumPageController() {
   });
   const presentation = useAlbumPresentation({
     albumId,
-    albumMenuController,
     artistName,
     canPlay: playerTracks.length > 0,
     canRadio: albumRadioSeed != null && !isPreRelease,
@@ -208,15 +203,9 @@ export function useAlbumPageController() {
   });
 
   useDismissibleLayer({
-    active:
-      playlistPickerOpen || cratePickerOpen || selectionPlaylistPickerOpen,
-    refs: [
-      albumMenuController.menuRef,
-      selectionBarRef,
-      selectionMenuController.menuRef,
-    ],
+    active: selectionPlaylistPickerOpen,
+    refs: [selectionBarRef, selectionMenuController.menuRef],
     onDismiss: () => {
-      closeAlbumMenu();
       setSelectionPlaylistPickerOpen(false);
       handleCloseSelectionMenu();
     },
@@ -238,7 +227,6 @@ export function useAlbumPageController() {
   return {
     albumHeroInfoRef,
     albumPrimaryActionsRef,
-    albumMenuController,
     canonicalPath,
     closeAlbumMenu,
     clearTrackSelection,

@@ -1,5 +1,5 @@
 import { CrateLoader } from "@/components/ui/CrateLoader";
-import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { ErrorState } from "@crate/ui/domain/states";
 import { HomeContent } from "@/pages/HomeContent";
 import { useHomePageController } from "@/pages/use-home-page-controller";
 
@@ -15,6 +15,7 @@ export function Home() {
     return (
       <ErrorState
         message={page.t("search.errors.tryAgain")}
+        retryLabel={page.t("common.retry")}
         onRetry={() => {
           page.refetchDiscovery();
           void page.refreshLiveDiscovery(true);

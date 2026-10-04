@@ -1,9 +1,10 @@
 import { useTranslation } from "react-i18next";
+import { MediaRail, SectionHeader } from "@crate/ui/domain/lists";
+import { EmptyState, LoadingState } from "@crate/ui/domain/states";
 
 import { ArtistCard } from "@/components/cards/ArtistCard";
 
 import type { GlobalArtist } from "./home-model";
-import { SectionHeader, SectionLoading, SectionRail } from "./HomeSections";
 
 export function JustLandedSection({
   artists,
@@ -24,10 +25,10 @@ export function JustLandedSection({
         onAction={onOpenExplore}
       />
       {loading ? (
-        <SectionLoading />
+        <LoadingState label={t("common.loadingShort")} className="py-10" />
       ) : artists?.length ? (
-        <SectionRail
-          fit="square-card"
+        <MediaRail
+          fit="columns"
           className="xl:grid-flow-row xl:grid-cols-7 xl:gap-4"
         >
           {artists.slice(0, 7).map((artist) => {
@@ -55,11 +56,13 @@ export function JustLandedSection({
               />
             );
           })}
-        </SectionRail>
+        </MediaRail>
       ) : (
-        <div className="rounded-lg border border-dashed border-border-quiet px-4 py-6 text-sm text-text-muted">
-          {t("home.library.justLanded.empty")}
-        </div>
+        <EmptyState
+          variant="dashed"
+          className="px-4 py-6"
+          message={t("home.library.justLanded.empty")}
+        />
       )}
     </section>
   );

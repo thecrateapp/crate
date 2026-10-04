@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, Radio } from "@crate/ui/icons";
+import { MediaRail, SectionHeader } from "@crate/ui/domain/lists";
 import { toast } from "sonner";
 
 import {
@@ -14,10 +15,6 @@ import { usePlayerActions } from "@/contexts/PlayerContext";
 import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
-import {
-  ExploreSectionHeader,
-  ExploreSectionRail,
-} from "@/components/explore/ExploreViews";
 
 const MOOD_COLORS: Record<string, string> = {
   energetic: "bg-state-warning/20 text-state-warning border-state-warning/30",
@@ -87,11 +84,11 @@ export function ExploreCratePlaylists({
 
   return (
     <section className="space-y-4">
-      <ExploreSectionHeader
+      <SectionHeader
         title={t("explore.fromCrate.title")}
         subtitle={t("explore.fromCrate.subtitle")}
       />
-      <ExploreSectionRail>
+      <MediaRail>
         {playlists.map((playlist) => (
           <PlaylistCard
             key={playlist.id}
@@ -123,7 +120,7 @@ export function ExploreCratePlaylists({
             onClick={() => onOpen(playlist.id)}
           />
         ))}
-      </ExploreSectionRail>
+      </MediaRail>
     </section>
   );
 }
@@ -145,7 +142,7 @@ export function GenreExplorer({
 
   return (
     <section className="space-y-4">
-      <ExploreSectionHeader
+      <SectionHeader
         title={t("explore.genreRooms.title")}
         subtitle={t("explore.genreRooms.subtitle")}
       />
@@ -282,7 +279,7 @@ export function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
 
   return (
     <div className="space-y-3">
-      <ExploreSectionHeader
+      <SectionHeader
         title={t("explore.moods.title")}
         subtitle={t("explore.moods.subtitle")}
       />

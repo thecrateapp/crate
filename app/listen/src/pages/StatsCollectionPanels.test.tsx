@@ -130,10 +130,9 @@ describe("Stats collection panels", () => {
       <TopAlbumsPanel items={[album]} loading={false} />,
     );
 
-    expect(screen.getByTestId("stats-top-albums-grid")).toHaveClass(
-      "grid-cols-2",
-      "sm:grid-cols-3",
-      "lg:grid-cols-6",
+    expect(screen.getByTestId("media-grid")).toHaveAttribute(
+      "data-density",
+      "default",
     );
   });
 

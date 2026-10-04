@@ -122,8 +122,11 @@ describe("Music paths pages", () => {
     });
 
     expect(screen.getByText("Ruta no encontrada")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Retry/ })).toBeNull();
-    expect(screen.getByRole("button", { name: /Rutas/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Reintentar/ })).toBeNull();
+    expect(screen.getByRole("link", { name: /Rutas/ })).toHaveAttribute(
+      "href",
+      "/paths",
+    );
   });
 
   it("offers a retry when the path fails to load", () => {
@@ -142,7 +145,7 @@ describe("Music paths pages", () => {
       locale: "es",
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /Retry/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Reintentar/ }));
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 

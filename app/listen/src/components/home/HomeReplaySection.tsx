@@ -1,11 +1,11 @@
 import { useTranslation } from "react-i18next";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { Clock3, Play, Sparkles } from "@crate/ui/icons";
+import { SectionHeader } from "@crate/ui/domain/lists";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 
-import { SectionHeader } from "./HomeSections";
 import type { ReplayMix, ReplayTrack } from "./home-model";
 
 function replayCoverUrl(item: ReplayTrack): string | undefined {

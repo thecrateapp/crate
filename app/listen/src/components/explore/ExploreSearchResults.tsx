@@ -1,12 +1,13 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { MediaRail, SectionHeader } from "@crate/ui/domain/lists";
+import { EmptyState } from "@crate/ui/domain/states";
 
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 
 import type { SearchResults } from "./explore-model";
-import { ExploreSectionRail } from "./ExplorePrimitives";
 
 export function SearchResultsView({ results }: { results: SearchResults }) {
   const { t } = useTranslation();
@@ -26,9 +27,7 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
 
   if (!hasArtists && !hasAlbums && !hasTracks) {
     return (
-      <p className="mt-8 text-sm text-text-muted">
-        {t("explore.search.noResults")}
-      </p>
+      <EmptyState variant="inline" message={t("explore.search.noResults")} />
     );
   }
 
@@ -36,10 +35,8 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
     <div className="space-y-8">
       {hasArtists ? (
         <div className="space-y-3">
-          <h2 className="px-1 text-lg font-bold">
-            {t("nav.collection.artists")}
-          </h2>
-          <ExploreSectionRail>
+          <SectionHeader className="px-1" title={t("nav.collection.artists")} />
+          <MediaRail>
             {results.artists.map((artist) => (
               <ArtistCard
                 key={artist.id ?? artist.name}
@@ -55,16 +52,14 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
                 }
               />
             ))}
-          </ExploreSectionRail>
+          </MediaRail>
         </div>
       ) : null}
 
       {hasAlbums ? (
         <div className="space-y-3">
-          <h2 className="px-1 text-lg font-bold">
-            {t("nav.collection.albums")}
-          </h2>
-          <ExploreSectionRail>
+          <SectionHeader className="px-1" title={t("nav.collection.albums")} />
+          <MediaRail>
             {results.albums.map((album) => (
               <AlbumCard
                 key={album.id || `${album.artist}-${album.name}`}
@@ -79,13 +74,13 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
                 year={album.year}
               />
             ))}
-          </ExploreSectionRail>
+          </MediaRail>
         </div>
       ) : null}
 
       {hasTracks ? (
         <div className="space-y-3">
-          <h2 className="px-1 text-lg font-bold">{t("common.tracks")}</h2>
+          <SectionHeader className="px-1" title={t("common.tracks")} />
           <div className="rounded-xl border border-border-quiet bg-surface-quiet-subtle">
             {trackRows.map((row, index) => (
               <TrackRow

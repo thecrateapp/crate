@@ -1,12 +1,9 @@
 import { useTranslation } from "react-i18next";
+import { MediaRail, SectionHeader } from "@crate/ui/domain/lists";
+import { LoadingState } from "@crate/ui/domain/states";
 import { Play } from "@crate/ui/icons";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
-import {
-  SectionHeader,
-  SectionLoading,
-  SectionRail,
-} from "@/components/home/HomeSections";
 
 import {
   stationArtwork,
@@ -89,11 +86,13 @@ export function RadioStationRail({
   disabled: boolean;
   onStart: (station: PersonalizedRadioStation) => void;
 }) {
+  const { t } = useTranslation();
+
   if (loading) {
     return (
       <section className="space-y-4">
         <SectionHeader title={title} subtitle={subtitle} />
-        <SectionLoading />
+        <LoadingState label={t("common.loadingShort")} className="py-10" />
       </section>
     );
   }
@@ -103,7 +102,7 @@ export function RadioStationRail({
   return (
     <section className="space-y-4">
       <SectionHeader title={title} subtitle={subtitle} />
-      <SectionRail fit="square-card">
+      <MediaRail fit="columns">
         {stations.map((station) => (
           <RadioStationCard
             key={`${station.seed_type}-${station.seed_value}`}
@@ -112,7 +111,7 @@ export function RadioStationRail({
             onStart={onStart}
           />
         ))}
-      </SectionRail>
+      </MediaRail>
     </section>
   );
 }

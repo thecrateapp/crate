@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { MediaGrid } from "@crate/ui/domain/lists";
+import { EmptyState, LoadingState } from "@crate/ui/domain/states";
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { useApi } from "@/hooks/use-api";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
 import { CollectionSortDropdown } from "./LibraryCollectionSortDropdown";
-import { EmptyState, Spinner } from "./LibraryPrimitives";
 import {
   albumSortOptions,
   type AlbumSort,
@@ -40,9 +41,9 @@ export function LibraryAlbumsTab() {
     });
   }, [albums, sort]);
 
-  if (loading) return <Spinner />;
+  if (loading) return <LoadingState label={t("common.loadingShort")} />;
   if (!albums || albums.length === 0) {
-    return <EmptyState message={t("library.albums.empty")} />;
+    return <EmptyState variant="inline" message={t("library.albums.empty")} />;
   }
 
   return (
@@ -60,7 +61,7 @@ export function LibraryAlbumsTab() {
           />
         </div>
       ) : null}
-      <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6">
+      <MediaGrid>
         {sortedAlbums.map((album) => (
           <AlbumCard
             key={album.global_album_uid ?? album.id}
@@ -76,7 +77,7 @@ export function LibraryAlbumsTab() {
             layout="grid"
           />
         ))}
-      </div>
+      </MediaGrid>
     </div>
   );
 }

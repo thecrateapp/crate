@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
-import { SectionHeader, SectionRail } from "@/components/home/HomeSections";
+import { MediaRail, SectionHeader } from "@crate/ui/domain/lists";
 
 import type {
   HomeDiscoveryPayload,
@@ -35,7 +35,7 @@ export function RecentlyPlayedSection({
         actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("recently-played")}
       />
-      <SectionRail className="gap-0">
+      <MediaRail className="gap-0">
         {pages.map((pageItems, pageIndex) => (
           <div
             key={`recent-page-${pageIndex}`}
@@ -56,7 +56,7 @@ export function RecentlyPlayedSection({
             </div>
           </div>
         ))}
-      </SectionRail>
+      </MediaRail>
     </section>
   );
 }

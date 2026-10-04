@@ -31,8 +31,8 @@ export const HERO_SECONDARY_ACTION_ACTIVE_CLASS =
 
 const SECONDARY_GROUP_CLASS: Record<HeroSecondaryLayout, string> = {
   fixed:
-    "grid grid-cols-5 items-start gap-2 md:ml-auto md:flex md:shrink-0 md:items-center md:gap-4",
-  fill: "grid grid-flow-col auto-cols-fr items-start gap-2 md:ml-auto md:flex md:shrink-0 md:items-center md:gap-4",
+    "empty:hidden grid grid-cols-5 items-start gap-2 md:ml-auto md:flex md:shrink-0 md:items-center md:gap-4",
+  fill: "empty:hidden grid grid-flow-col auto-cols-fr items-start gap-2 md:ml-auto md:flex md:shrink-0 md:items-center md:gap-4",
 };
 
 export type HeroPrimaryTone = "accent" | "neutral";
@@ -79,6 +79,8 @@ export interface HeroActionBarProps {
   menu?: HeroActionMenu;
   moreLabel?: string;
   mobileMenuPortal?: boolean;
+  primaryLabel?: string;
+  secondaryLabel?: string;
   className?: string;
 }
 
@@ -173,6 +175,8 @@ export function HeroActionBar({
   menu,
   moreLabel = "More",
   mobileMenuPortal = true,
+  primaryLabel,
+  secondaryLabel,
   className,
 }: HeroActionBarProps) {
   const hasPrimary = primaryActions.length > 0 || Boolean(primaryExtra);
@@ -188,7 +192,11 @@ export function HeroActionBar({
       data-testid="hero-action-bar"
     >
       {hasPrimary ? (
-        <div className={HERO_PRIMARY_ACTIONS_GROUP_CLASS}>
+        <div
+          className={HERO_PRIMARY_ACTIONS_GROUP_CLASS}
+          role={primaryLabel ? "group" : undefined}
+          aria-label={primaryLabel}
+        >
           {primaryActions.map((action) => (
             <button
               key={action.key}
@@ -220,7 +228,11 @@ export function HeroActionBar({
         </div>
       ) : null}
       {hasSecondary ? (
-        <div className={SECONDARY_GROUP_CLASS[secondaryLayout]}>
+        <div
+          className={SECONDARY_GROUP_CLASS[secondaryLayout]}
+          role={secondaryLabel ? "group" : undefined}
+          aria-label={secondaryLabel}
+        >
           {secondaryActions.map((action) => (
             <button
               key={action.key}

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { PageHeader } from "@crate/ui/domain/navigation";
 
 import { JamInvitePanel } from "@/components/jam/JamInvitePanel";
 import { JamOpenRoomsPanel } from "@/components/jam/JamOpenRoomsPanel";
@@ -54,14 +55,11 @@ export function JamLobbyView({
   return (
     <>
       <div className="space-y-6">
-        <div className="jam-lobby-header rounded-[12px] p-5 sm:p-6">
-          <h1 className="text-3xl font-bold text-text-primary">
-            {t("jam.lobby.title")}
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm text-text-muted">
-            {t("jam.lobby.subtitle")}
-          </p>
-        </div>
+        <PageHeader
+          className="jam-lobby-header rounded-[12px] p-5 sm:p-6"
+          title={t("jam.lobby.title")}
+          subtitle={t("jam.lobby.subtitle")}
+        />
 
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.35fr]">
           <JamRoomCreatePanel

@@ -5,41 +5,37 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import {
   ArrowDownToLine,
   ArrowDownToLineBold,
-  ArrowLeft,
   CRATE_ICON_SIZE,
   Disc3,
   Download,
   Loader2,
-  MoreHorizontal,
   Pencil,
   Play,
   Radio,
+  Shuffle,
   Trash2,
   Users,
 } from "@crate/ui/icons";
 import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
+import {
+  HERO_PRIMARY_ACTION_CLASS,
+  HERO_SECONDARY_ACTION_ACTIVE_CLASS,
+  HERO_SECONDARY_ACTION_CLASS,
+  type HeroSecondaryAction,
+} from "@crate/ui/domain/hero";
+import { ErrorState } from "@crate/ui/domain/states";
 import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import { Button } from "@crate/ui/shadcn/button";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
-import {
-  ItemActionMenu,
-  useItemActionMenu,
-} from "@/components/actions/ItemActionMenu";
 import { action } from "@/components/actions/shared";
-import { AlbumPrimaryActions } from "@/components/album/AlbumPrimaryActions";
-import {
-  PRIMARY_PLAY_ACTION_CLASS,
-  SECONDARY_ACTION_CLASS,
-} from "@/components/album/album-action-types";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import {
@@ -56,12 +52,11 @@ import {
   type NumberedCrateAlbum,
 } from "@/components/crates/crate-model";
 import {
-  CrateActionRow,
+  CRATE_SECONDARY_ACTION_CLASS,
   CrateHero,
-  CrateSecondaryAction,
-  CrateSecondaryActions,
-  CrateShareAction,
+  crateShareAction,
 } from "@/components/crates/CratePageHeader";
+import { ListenHeroActionBar } from "@/components/hero/ListenHeroActionBar";
 import { useCrateFollow } from "@/components/crates/use-crate-follow";
 import { CrateLoader } from "@/components/ui/CrateLoader";
 import { useAuth } from "@/contexts/AuthContext";
@@ -189,29 +184,30 @@ function AnonymousCrate() {
         albums={albums}
         coverUrl={coverUrl}
         followerCount={data.follower_count ?? 0}
-        className="pt-6"
-      />
-      <CrateActionRow
-        primary={
-          <div className="grid grid-cols-1 gap-3 md:flex md:shrink-0 md:items-center">
-            <Link to={loginPath} className={PRIMARY_PLAY_ACTION_CLASS}>
-              <Play size={17} fill="currentColor" />
-              <span>{t("crate.page.signInToListen")}</span>
-            </Link>
-          </div>
-        }
-        secondary={
-          <CrateSecondaryActions>
-            <CrateShareAction
-              crate={data}
-              onShare={() => shareCrate(data, albums)}
+        contentClassName="pt-6"
+        actions={
+          <>
+            <ListenHeroActionBar
+              primaryLabel={t("crate.page.primaryActions")}
+              secondaryLabel={t("crate.page.secondaryActions")}
+              primaryExtra={
+                <Link
+                  to={loginPath}
+                  className={cn(HERO_PRIMARY_ACTION_CLASS, "col-span-2")}
+                >
+                  <Play size={17} fill="currentColor" />
+                  <span>{t("crate.page.signInToListen")}</span>
+                </Link>
+              }
+              secondaryLayout="fill"
+              secondaryActions={[
+                crateShareAction(data, () => shareCrate(data, albums), t),
+              ]}
             />
-          </CrateSecondaryActions>
-        }
-        footer={
-          <p className="text-sm text-text-muted">
-            {t("crate.page.signInHint")}
-          </p>
+            <p className="mx-auto mt-3 w-full max-w-[1480px] text-sm text-text-muted">
+              {t("crate.page.signInHint")}
+            </p>
+          </>
         }
       />
       <CrateAlbumList albums={albums} coverUrl={coverUrl} linkAlbums={false} />
@@ -235,7 +231,6 @@ function AuthenticatedCrate() {
   const { playAll, setRepeatMode } = usePlayerActions();
   const [editing, setEditing] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
-  const primaryActionsRef = useRef<HTMLDivElement>(null);
   const downloadCrate = useCrateDownload();
   const canEdit = data?.access === "owner" || data?.access === "collaborator";
   const canManageMembers =
@@ -361,20 +356,8 @@ function AuthenticatedCrate() {
         albums={albums}
         coverUrl={authenticatedCrateCoverUrl}
         followerCount={crateFollow.followerCount}
-        className="pt-[var(--listen-mobile-page-top)] sm:pt-20"
-      />
-      <CrateActionRow
-        primary={
-          <AlbumPrimaryActions
-            groupLabel={t("crate.page.primaryActions")}
-            playerTracksAvailable={canPlay}
-            primaryRef={primaryActionsRef}
-            onPlay={() => startCratePlayback(playerTracks)}
-            onShuffle={() => startCratePlayback(shuffleArray(playerTracks))}
-            t={t}
-          />
-        }
-        secondary={
+        contentClassName="pt-[var(--listen-mobile-page-top)] sm:pt-20"
+        actions={
           <CratePageActions
             crate={data}
             canPlay={canPlay}
@@ -387,6 +370,8 @@ function AuthenticatedCrate() {
             offlineActive={offlineState === "ready"}
             followed={crateFollow.followed}
             followPending={crateFollow.pending}
+            onPlay={() => startCratePlayback(playerTracks)}
+            onShuffle={() => startCratePlayback(shuffleArray(playerTracks))}
             onRadio={() => void startCrateRadio()}
             onOffline={() => void toggleOffline()}
             onEdit={() => setEditing(true)}
@@ -447,26 +432,21 @@ function CrateUnavailable({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="mx-auto flex max-w-lg flex-col items-center gap-3 py-16 text-center">
-      <Disc3 size={28} className="text-accent-action" />
-      <p className="text-lg font-semibold text-text-primary">
-        {t("crate.page.notFound")}
-      </p>
-      {showBackLink ? (
-        <Link
-          to="/collection?tab=crates"
-          className="inline-flex items-center gap-2 text-sm text-accent-action hover:underline"
-        >
-          <ArrowLeft size={15} />
-          {t("crate.page.backToCollection")}
-        </Link>
-      ) : null}
-      {loginPath ? (
-        <Button asChild size="sm" variant="outline">
-          <Link to={loginPath}>{t("auth.login")}</Link>
-        </Button>
-      ) : null}
-    </div>
+    <ErrorState
+      kind="unavailable"
+      icon={Disc3}
+      title={t("crate.page.notFound")}
+      backTo={showBackLink ? "/collection?tab=crates" : undefined}
+      backLabel={t("crate.page.backToCollection")}
+      action={
+        loginPath ? (
+          <Button asChild size="sm" variant="outline">
+            <Link to={loginPath}>{t("auth.login")}</Link>
+          </Button>
+        ) : undefined
+      }
+      className="py-16"
+    />
   );
 }
 
@@ -609,6 +589,8 @@ function CratePageActions({
   offlineActive,
   followed,
   followPending,
+  onPlay,
+  onShuffle,
   onRadio,
   onOffline,
   onEdit,
@@ -628,6 +610,8 @@ function CratePageActions({
   offlineActive: boolean;
   followed: boolean;
   followPending: boolean;
+  onPlay: () => void;
+  onShuffle: () => void;
   onRadio: () => void;
   onOffline: () => void;
   onEdit: () => void;
@@ -651,99 +635,110 @@ function CratePageActions({
         : [],
     [onDownload, t],
   );
-  const actionMenu = useItemActionMenu(entries);
   const followLabel = followed ? t("common.following") : t("common.follow");
+  const secondaryActions: HeroSecondaryAction[] = [];
+  if (canPlay) {
+    secondaryActions.push({
+      key: "radio",
+      label: t("crate.page.radio"),
+      icon: <Radio size={CRATE_ICON_SIZE.lg} />,
+      ariaLabel: t("actions.crate.radio"),
+      title: t("actions.crate.radio"),
+      onClick: onRadio,
+      className: CRATE_SECONDARY_ACTION_CLASS,
+    });
+  }
+  if (offlineSupported) {
+    secondaryActions.push({
+      key: "offline",
+      label: t("common.offline"),
+      icon: offlineBusy ? (
+        <Loader2 size={CRATE_ICON_SIZE.lg} className="animate-spin" />
+      ) : offlineActive ? (
+        <ArrowDownToLineBold size={CRATE_ICON_SIZE.lg} />
+      ) : (
+        <ArrowDownToLine size={CRATE_ICON_SIZE.lg} />
+      ),
+      ariaLabel: offlineLabel,
+      title: offlineLabel,
+      disabled: offlineBusy,
+      onClick: onOffline,
+      className: cn(
+        CRATE_SECONDARY_ACTION_CLASS,
+        offlineActive && "text-text-accent drop-shadow-accent-action",
+      ),
+    });
+  }
+  if (canManageMembers) {
+    secondaryActions.push({
+      key: "members",
+      label: t("crate.page.members"),
+      icon: <Users size={CRATE_ICON_SIZE.lg} />,
+      ariaLabel: t("library.crates.collaborators"),
+      title: t("library.crates.collaborators"),
+      onClick: onMembers,
+      className: CRATE_SECONDARY_ACTION_CLASS,
+    });
+  }
+  if (canEdit) {
+    secondaryActions.push({
+      key: "edit",
+      label: t("common.edit"),
+      icon: <Pencil size={CRATE_ICON_SIZE.lg} />,
+      ariaLabel: t("crate.page.edit"),
+      title: t("crate.page.edit"),
+      onClick: onEdit,
+      className: CRATE_SECONDARY_ACTION_CLASS,
+    });
+  }
+  secondaryActions.push(crateShareAction(crate, onShare, t));
 
   return (
-    <CrateSecondaryActions>
-      {canPlay ? (
-        <CrateSecondaryAction
-          icon={<Radio size={CRATE_ICON_SIZE.lg} />}
-          label={t("crate.page.radio")}
-          aria-label={t("actions.crate.radio")}
-          title={t("actions.crate.radio")}
-          onClick={onRadio}
-        />
-      ) : null}
-      {offlineSupported ? (
-        <CrateSecondaryAction
-          icon={
-            offlineBusy ? (
-              <Loader2 size={CRATE_ICON_SIZE.lg} className="animate-spin" />
-            ) : offlineActive ? (
-              <ArrowDownToLineBold size={CRATE_ICON_SIZE.lg} />
-            ) : (
-              <ArrowDownToLine size={CRATE_ICON_SIZE.lg} />
-            )
-          }
-          label={t("common.offline")}
-          aria-label={offlineLabel}
-          title={offlineLabel}
-          disabled={offlineBusy}
-          className={
-            offlineActive
-              ? "text-text-accent drop-shadow-accent-action"
-              : undefined
-          }
-          onClick={onOffline}
-        />
-      ) : null}
-      {canFollow ? (
-        <FollowHeartButton
-          className={cn(
-            SECONDARY_ACTION_CLASS,
-            "min-w-0 px-0 md:px-1.5",
-            followed
-              ? "text-accent-action drop-shadow-accent-action"
-              : "text-text-primary/62",
-          )}
-          following={followed}
-          iconSize={CRATE_ICON_SIZE.lg}
-          aria-label={followLabel}
-          title={followLabel}
-          disabled={followPending}
-          onClick={onFollow}
-        >
-          <span>{followLabel}</span>
-        </FollowHeartButton>
-      ) : null}
-      {canManageMembers ? (
-        <CrateSecondaryAction
-          icon={<Users size={CRATE_ICON_SIZE.lg} />}
-          label={t("crate.page.members")}
-          aria-label={t("library.crates.collaborators")}
-          title={t("library.crates.collaborators")}
-          onClick={onMembers}
-        />
-      ) : null}
-      {canEdit ? (
-        <CrateSecondaryAction
-          icon={<Pencil size={CRATE_ICON_SIZE.lg} />}
-          label={t("common.edit")}
-          aria-label={t("crate.page.edit")}
-          title={t("crate.page.edit")}
-          onClick={onEdit}
-        />
-      ) : null}
-      <CrateShareAction crate={crate} onShare={onShare} />
-      {actionMenu.hasActions ? (
-        <>
-          <CrateSecondaryAction
-            buttonRef={actionMenu.triggerRef}
-            icon={<MoreHorizontal size={CRATE_ICON_SIZE.lg} />}
-            label={t("common.more")}
-            aria-label={t("common.more")}
-            onClick={actionMenu.openFromTrigger}
-          />
-          <ItemActionMenu
-            actions={entries}
-            open={actionMenu.open}
-            position={actionMenu.position}
-            menuRef={actionMenu.menuRef}
-            onClose={actionMenu.close}
-          />
-        </>
-      ) : null}
-    </CrateSecondaryActions>
+    <ListenHeroActionBar
+      primaryLabel={t("crate.page.primaryActions")}
+      secondaryLabel={t("crate.page.secondaryActions")}
+      primaryActions={[
+        {
+          key: "play",
+          label: t("player.play"),
+          icon: <Play size={17} fill="currentColor" />,
+          onClick: onPlay,
+          disabled: !canPlay,
+          ariaLabel: t("player.play"),
+        },
+        {
+          key: "shuffle",
+          label: t("player.shuffle"),
+          icon: <Shuffle size={17} />,
+          tone: "neutral",
+          onClick: onShuffle,
+          disabled: !canPlay,
+          ariaLabel: t("player.shuffle"),
+        },
+      ]}
+      secondaryLayout="fill"
+      secondaryActions={secondaryActions}
+      secondaryExtra={
+        canFollow ? (
+          <FollowHeartButton
+            className={cn(
+              HERO_SECONDARY_ACTION_CLASS,
+              CRATE_SECONDARY_ACTION_CLASS,
+              followed && HERO_SECONDARY_ACTION_ACTIVE_CLASS,
+            )}
+            following={followed}
+            iconSize={CRATE_ICON_SIZE.lg}
+            aria-label={followLabel}
+            title={followLabel}
+            disabled={followPending}
+            onClick={onFollow}
+          >
+            <span>{followLabel}</span>
+          </FollowHeartButton>
+        ) : null
+      }
+      menu={entries.length > 0 ? { actions: entries } : undefined}
+      mobileMenuPortal={false}
+    />
   );
 }

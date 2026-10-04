@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useParams } from "react-router";
 import { Play, Radio, Share2, Shuffle, Sparkles } from "@crate/ui/icons";
 import type { ContextMenuEntry } from "@crate/ui/domain/actions";
+import { EmptyState, ErrorState } from "@crate/ui/domain/states";
 import { toast } from "sonner";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
@@ -201,11 +202,7 @@ export function HomePlaylist() {
   }
 
   if (!data) {
-    return (
-      <div className="space-y-4 py-16 text-center">
-        <p className="text-sm text-text-muted">{t("playlist.notFound")}</p>
-      </div>
-    );
+    return <ErrorState kind="notFound" message={t("playlist.notFound")} />;
   }
 
   const secondaryActions: PlaylistHeroSecondaryAction[] = [
@@ -308,17 +305,9 @@ export function HomePlaylist() {
         />
 
         {data.tracks.length === 0 ? (
-          <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-text-muted">
-              {t("playlist.empty.noTracks")}
-            </p>
-          </div>
+          <EmptyState variant="inline" message={t("playlist.empty.noTracks")} />
         ) : filteredTracks.length === 0 ? (
-          <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-text-muted">
-              {t("playlist.empty.noFilter")}
-            </p>
-          </div>
+          <EmptyState variant="inline" message={t("playlist.empty.noFilter")} />
         ) : (
           <div className="space-y-1">
             {trackRows.map((row, index) => (

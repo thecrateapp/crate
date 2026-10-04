@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { MediaGrid, SectionHeader } from "@crate/ui/domain/lists";
 
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { artistPagePath } from "@/lib/library-routes";
@@ -10,10 +11,11 @@ export function SearchArtistResults({ artists }: { artists: SearchArtist[] }) {
 
   return (
     <section>
-      <h2 className="mb-3 text-lg font-semibold">
-        {t("search.artistsCount", { count: artists.length })}
-      </h2>
-      <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
+      <SectionHeader
+        className="mb-3"
+        title={t("search.artistsCount", { count: artists.length })}
+      />
+      <MediaGrid density="compact">
         {artists.map((artist) => {
           const globalUid = artistGlobalUid(artist);
           return globalUid ? (
@@ -42,7 +44,7 @@ export function SearchArtistResults({ artists }: { artists: SearchArtist[] }) {
             />
           );
         })}
-      </div>
+      </MediaGrid>
     </section>
   );
 }

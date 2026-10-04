@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, Loader2, Play, RefreshCw, Trash2 } from "@crate/ui/icons";
-import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { BackLink } from "@crate/ui/domain/navigation";
+import { ErrorState } from "@crate/ui/domain/states";
+import { Loader2, Play, RefreshCw, Trash2 } from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { CrateLoader } from "@/components/ui/CrateLoader";
@@ -96,15 +97,12 @@ export function PathDetail() {
     const notFound = status === 404 || !error;
     return (
       <div className="animate-page-in px-4 sm:p-6">
-        <button
-          onClick={() => navigate("/paths")}
-          className="mb-5 flex items-center gap-1.5 text-sm text-text-primary/40 transition hover:text-text-primary"
-        >
-          <ArrowLeft size={14} /> {t("paths.back")}
-        </button>
+        <BackLink to="/paths" label={t("paths.back")} className="mb-5" />
         <ErrorState
+          kind={notFound ? "notFound" : "error"}
           message={t(notFound ? "paths.notFound" : "paths.toasts.loadFailed")}
           onRetry={notFound ? undefined : refetch}
+          retryLabel={t("common.retry")}
         />
       </div>
     );
@@ -112,12 +110,7 @@ export function PathDetail() {
 
   return (
     <div className="animate-page-in px-4  sm:p-6">
-      <button
-        onClick={() => navigate("/paths")}
-        className="mb-5 flex items-center gap-1.5 text-sm text-text-primary/40 transition hover:text-text-primary"
-      >
-        <ArrowLeft size={14} /> {t("paths.back")}
-      </button>
+      <BackLink to="/paths" label={t("paths.back")} className="mb-5" />
 
       <div className="mb-6 flex items-start justify-between gap-3">
         <div>

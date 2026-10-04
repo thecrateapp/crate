@@ -165,6 +165,36 @@ describe("HeroActionBar", () => {
     expect(button).toBeDisabled();
   });
 
+  it("exposes labelled action groups only when labels are provided", () => {
+    const { rerender } = render(
+      <HeroActionBar
+        primaryActions={[{ key: "play", label: "Play" }]}
+        secondaryActions={[{ key: "radio", label: "Radio" }]}
+      />,
+    );
+    expect(screen.queryByRole("group")).not.toBeInTheDocument();
+
+    rerender(
+      <HeroActionBar
+        primaryActions={[{ key: "play", label: "Play" }]}
+        secondaryActions={[{ key: "radio", label: "Radio" }]}
+        primaryLabel="Primary actions"
+        secondaryLabel="Secondary actions"
+      />,
+    );
+    expect(
+      within(screen.getByRole("group", { name: "Primary actions" })).getByRole(
+        "button",
+        { name: "Play" },
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(
+        screen.getByRole("group", { name: "Secondary actions" }),
+      ).getByRole("button", { name: "Radio" }),
+    ).toBeInTheDocument();
+  });
+
   it("renders a labelled inline more button on desktop that opens the menu", async () => {
     const onShare = vi.fn();
     render(

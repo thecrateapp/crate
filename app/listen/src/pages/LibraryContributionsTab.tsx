@@ -11,6 +11,7 @@ import {
   ModalHeader,
 } from "@crate/ui/primitives/AppModal";
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
+import { EmptyState, LoadingState } from "@crate/ui/domain/states";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { useApi } from "@/hooks/use-api";
 import { api, apiAssetUrl } from "@/lib/api";
@@ -18,7 +19,6 @@ import { contributionSourceLabel } from "@/lib/contributions";
 import { openExternalUrl } from "@/lib/external-links";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 
-import { EmptyState, Spinner } from "./LibraryPrimitives";
 import type {
   BandcampTaskResponse,
   ContributionsResponse,
@@ -77,7 +77,7 @@ export function LibraryContributionsTab() {
     useState<LibraryContribution | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
 
-  if (loading) return <Spinner />;
+  if (loading) return <LoadingState label={t("common.loadingShort")} />;
 
   const contributions = data?.items ?? [];
 
@@ -118,7 +118,10 @@ export function LibraryContributionsTab() {
       </div>
 
       {!contributions.length ? (
-        <EmptyState message={t("library.contributions.empty")} />
+        <EmptyState
+          variant="inline"
+          message={t("library.contributions.empty")}
+        />
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {contributions.map((contribution) => (

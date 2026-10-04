@@ -9,7 +9,7 @@ import { usePlaylistActionEntries } from "@/components/actions/playlist-actions"
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { CoreTracksArtwork } from "@/components/home/CoreTracksArtwork";
-import { SectionHeader, SectionRail } from "@/components/home/HomeSections";
+import { MediaRail, SectionHeader } from "@crate/ui/domain/lists";
 import { cn } from "@/lib/utils";
 
 import type {
@@ -46,7 +46,7 @@ export function RecommendedTracksSection({
         actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("recommended-tracks")}
       />
-      <SectionRail>
+      <MediaRail>
         {pages.map((pageTracks, pageIndex) => (
           <div
             key={`recommended-page-${pageIndex}`}
@@ -72,7 +72,7 @@ export function RecommendedTracksSection({
             </div>
           </div>
         ))}
-      </SectionRail>
+      </MediaRail>
     </section>
   );
 }
@@ -95,7 +95,7 @@ export function FavoriteArtistsSection({
         actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("favorite-artists")}
       />
-      <SectionRail fit="square-card">
+      <MediaRail fit="columns">
         {artists.map((artist) => (
           <ArtistCard
             key={
@@ -111,7 +111,7 @@ export function FavoriteArtistsSection({
             fillGrid
           />
         ))}
-      </SectionRail>
+      </MediaRail>
     </section>
   );
 }
@@ -226,7 +226,7 @@ export function EssentialsSection({
         actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("core-tracks")}
       />
-      <SectionRail fit="square-card">
+      <MediaRail fit="columns">
         {items.map((item) => (
           <CoreTracksPlaylistCard
             key={item.id}
@@ -237,7 +237,7 @@ export function EssentialsSection({
             onStartRadio={onStartRadio}
           />
         ))}
-      </SectionRail>
+      </MediaRail>
     </section>
   );
 }

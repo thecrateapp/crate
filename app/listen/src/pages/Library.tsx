@@ -6,6 +6,7 @@ import { useApi } from "@/hooks/use-api";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { PullIndicator } from "@crate/ui/primitives/PullIndicator";
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
+import { PageHeader } from "@crate/ui/domain/navigation";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
 import { LibraryBandcampTab } from "./LibraryBandcampTab";
@@ -110,11 +111,10 @@ export function Library() {
     <div className="space-y-6" {...pullHandlers}>
       <PullIndicator distance={pullDistance} refreshing={refreshing} />
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">
-          {isDesktop ? t("library.title.desktop") : t(tabTitleKeys[tab])}
-        </h1>
-      </div>
+      <PageHeader
+        size="md"
+        title={isDesktop ? t("library.title.desktop") : t(tabTitleKeys[tab])}
+      />
 
       {/* Stats */}
       {stats && (

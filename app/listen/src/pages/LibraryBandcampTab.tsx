@@ -3,11 +3,11 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
+import { EmptyState, LoadingState } from "@crate/ui/domain/states";
 import { useApi } from "@/hooks/use-api";
 import { api, apiAssetUrl } from "@/lib/api";
 import { openExternalUrl } from "@/lib/external-links";
 
-import { EmptyState, Spinner } from "./LibraryPrimitives";
 import { LibraryBandcampHeader } from "./LibraryBandcampHeader";
 import { LibraryBandcampImported } from "./LibraryBandcampImported";
 import { LibraryBandcampPurchases } from "./LibraryBandcampPurchases";
@@ -99,7 +99,7 @@ export function LibraryBandcampTab() {
   const wishlistCount = wishlist?.total ?? 0;
 
   if (collectionLoading || wishlistLoading || contributionsLoading) {
-    return <Spinner />;
+    return <LoadingState label={t("common.loadingShort")} />;
   }
 
   return (
@@ -126,7 +126,10 @@ export function LibraryBandcampTab() {
 
       {!purchases.length ? (
         <div className="space-y-3">
-          <EmptyState message={t("library.bandcamp.emptyPurchases")} />
+          <EmptyState
+            variant="inline"
+            message={t("library.bandcamp.emptyPurchases")}
+          />
           <Link
             to="/settings"
             className="inline-flex min-h-11 items-center rounded-full bg-accent-action px-4 text-sm font-bold text-accent-action-foreground"

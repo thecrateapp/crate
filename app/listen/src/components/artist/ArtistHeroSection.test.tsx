@@ -78,6 +78,10 @@ function renderWithI18n(ui: ReactNode, locale: "en" | "es" = "en") {
   return render(<I18nProvider initialLocale={locale}>{ui}</I18nProvider>);
 }
 
+function heroActionGroup(index: number) {
+  return screen.getByTestId("hero-action-bar").children[index] as HTMLElement;
+}
+
 describe("ArtistHeroSection", () => {
   it("keeps artist genres out of the hero surface", () => {
     renderWithI18n(
@@ -168,13 +172,11 @@ describe("ArtistHeroSection", () => {
       </MemoryRouter>,
     );
 
-    const primary = screen.getByRole("group", {
-      name: "Primary artist actions",
-    });
+    const primary = heroActionGroup(0);
     const playButton = within(primary).getByRole("button", { name: "Play" });
     expect(playButton).toHaveTextContent("Play");
     expect(playButton).toHaveClass(
-      "rounded-lg",
+      "rounded-full",
       "shadow-action-solid",
       "hover:shadow-action-solid-hover",
     );
@@ -182,16 +184,14 @@ describe("ArtistHeroSection", () => {
       name: "Shuffle",
     });
     expect(shuffleButton).toHaveTextContent("Shuffle");
-    expect(shuffleButton).toHaveClass("rounded-lg", "shadow-control-inset");
+    expect(shuffleButton).toHaveClass("rounded-full", "shadow-control-inset");
 
     const actionRail = primary.parentElement;
     expect(actionRail).not.toBeNull();
-    expect(actionRail!).toHaveClass("sm:px-6");
-    expect(actionRail!.parentElement).toHaveClass("sm:px-0");
+    expect(actionRail!).toHaveClass("max-w-[1480px]");
+    expect(actionRail!.parentElement).toHaveClass("sm:px-6");
 
-    const secondary = screen.getByRole("group", {
-      name: "Secondary artist actions",
-    });
+    const secondary = heroActionGroup(1);
     expect(
       within(secondary).getByRole("button", { name: "Artist Radio" }),
     ).toHaveTextContent("Radio");
@@ -245,9 +245,7 @@ describe("ArtistHeroSection", () => {
       "es",
     );
 
-    const primary = screen.getByRole("group", {
-      name: "Acciones principales de artista",
-    });
+    const primary = heroActionGroup(0);
     expect(
       within(primary).getByRole("button", { name: "Reproducir" }),
     ).toHaveTextContent("Reproducir");
@@ -255,9 +253,7 @@ describe("ArtistHeroSection", () => {
       within(primary).getByRole("button", { name: "Aleatorio" }),
     ).toHaveTextContent("Aleatorio");
 
-    const secondary = screen.getByRole("group", {
-      name: "Acciones secundarias de artista",
-    });
+    const secondary = heroActionGroup(1);
     expect(
       within(secondary).getByRole("button", { name: "Radio de artista" }),
     ).toHaveTextContent("Radio");
@@ -359,7 +355,6 @@ describe("ArtistHeroSection", () => {
     expect(menu).toHaveClass(
       "listen-glass-panel",
       "w-72",
-      "rounded-[12px]",
       "z-app-context-menu",
     );
 
@@ -411,9 +406,7 @@ describe("ArtistHeroSection", () => {
       </MemoryRouter>,
     );
 
-    const primary = screen.getByRole("group", {
-      name: "Primary artist actions",
-    });
+    const primary = heroActionGroup(0);
     expect(primary).toHaveClass("grid", "grid-cols-2");
     expect(
       within(primary).getByRole("button", { name: "Play" }),
@@ -422,9 +415,7 @@ describe("ArtistHeroSection", () => {
       within(primary).getByRole("button", { name: "Shuffle" }),
     ).toHaveTextContent("Shuffle");
 
-    const secondary = screen.getByRole("group", {
-      name: "Secondary artist actions",
-    });
+    const secondary = heroActionGroup(1);
     expect(secondary).toHaveClass("grid", "grid-cols-5");
 
     const radio = within(secondary).getByRole("button", {
@@ -448,14 +439,11 @@ describe("ArtistHeroSection", () => {
       within(secondary).getByRole("button", { name: "Support on Bandcamp" }),
     ).toHaveTextContent("Bandcamp");
 
-    const heroMenu = screen.getByTestId("artist-mobile-hero-menu");
+    const heroMenu = screen.getByTestId("hero-mobile-menu-trigger");
     expect(heroMenu).toHaveAttribute("aria-label", "More");
     expect(heroMenu.parentElement).not.toBeNull();
     expect(heroMenu.parentElement!).toHaveClass("fixed", "z-app-header");
     expect(heroMenu.parentElement!).not.toHaveClass("z-app-context-menu");
-    expect(
-      screen.getByTestId("artist-mobile-hero-menu-icon"),
-    ).toBeInTheDocument();
     expect(
       within(secondary).queryByRole("button", { name: "More" }),
     ).toBeNull();

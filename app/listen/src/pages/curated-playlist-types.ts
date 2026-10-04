@@ -1,4 +1,3 @@
-import type { TrackRowData } from "@/components/cards/TrackRow";
 import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 import type { Track } from "@/contexts/PlayerContext";
 
@@ -43,18 +42,6 @@ export interface CuratedPlaylistData {
   follower_count: number;
   is_followed: boolean;
   tracks: CuratedPlaylistTrack[];
-}
-
-export interface CuratedTrackListProps {
-  tracks: CuratedPlaylistTrack[];
-  playlistOptions?: { id: number; name: string }[];
-  onAddToPlaylist: (
-    playlistId: number,
-    track: TrackRowData,
-  ) => void | Promise<void>;
-  onCreatePlaylist: (track: TrackRowData) => void | Promise<void>;
-  onActionMenuOpen: () => void;
-  onPlayTrack: (trackEntryId: number) => void;
 }
 
 export type CuratedPlayerTracks = Track[];

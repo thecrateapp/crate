@@ -406,7 +406,7 @@ describe("Explore", () => {
       screen.getByRole("button", { name: "Open next genre show in Radar" }),
     ).toHaveTextContent("Next show");
     expect(
-      screen.getByTestId("genre-mobile-hero-menu").parentElement,
+      screen.getByTestId("hero-mobile-menu-trigger").parentElement,
     ).toHaveClass("fixed", "z-app-header");
     expect(screen.getByRole("heading", { name: "Shows" })).toBeInTheDocument();
     expect(screen.getByText("Converge")).toBeInTheDocument();
@@ -425,7 +425,7 @@ describe("Explore", () => {
       screen.queryByRole("group", { name: "Secondary genre actions" }),
     ).toBeNull();
     expect(screen.queryByRole("button", { name: "Share genre" })).toBeNull();
-    expect(screen.getByTestId("genre-mobile-hero-menu")).toBeInTheDocument();
+    expect(screen.getByTestId("hero-mobile-menu-trigger")).toBeInTheDocument();
   });
 
   it("groups public genre actions into primary pills and secondary icon labels", () => {

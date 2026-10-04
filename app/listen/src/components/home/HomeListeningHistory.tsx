@@ -1,8 +1,8 @@
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
+import { SectionHeader } from "@crate/ui/domain/lists";
 
 import { EditorialPlaylistArtwork } from "@/components/playlists/EditorialPlaylistArtwork";
-import { SectionHeader } from "@/components/home/HomeSections";
 import { cn } from "@/lib/utils";
 
 import type { HomeListeningHistoryCard } from "./home-model";

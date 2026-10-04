@@ -1,5 +1,6 @@
 import { useMemo, type ComponentType, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { MediaGrid } from "@crate/ui/domain/lists";
 import { Disc3, Flame, Music2 } from "@crate/ui/icons";
 import { Link } from "react-router";
 
@@ -280,10 +281,7 @@ export function TopAlbumsPanel({
       {loading ? (
         <PanelLoading />
       ) : items.length ? (
-        <div
-          data-testid="stats-top-albums-grid"
-          className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6"
-        >
+        <MediaGrid>
           {items.slice(0, 12).map((item, index) => (
             <TopAlbumCard
               key={statsAlbumKey(item)}
@@ -291,7 +289,7 @@ export function TopAlbumsPanel({
               rank={index + 1}
             />
           ))}
-        </div>
+        </MediaGrid>
       ) : (
         <PanelEmpty text={t("stats.topAlbums.empty")} />
       )}
@@ -352,7 +350,7 @@ function StatsPanel({
 export function PanelLoading() {
   const { t } = useTranslation();
   return (
-    <div className="stats-card-empty rounded-lg border-dashed px-4 py-5 text-sm">
+    <div className="stats-card-empty rounded-lg border border-dashed px-4 py-5 text-sm">
       {t("common.loadingShort")}
     </div>
   );
@@ -360,7 +358,7 @@ export function PanelLoading() {
 
 export function PanelEmpty({ text }: { text: string }) {
   return (
-    <div className="stats-card-empty rounded-lg border-dashed px-4 py-5 text-sm">
+    <div className="stats-card-empty rounded-lg border border-dashed px-4 py-5 text-sm">
       {text}
     </div>
   );

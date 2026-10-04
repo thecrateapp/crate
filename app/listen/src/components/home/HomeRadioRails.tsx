@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Radio } from "@crate/ui/icons";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
-import { SectionHeader, SectionRail } from "@/components/home/HomeSections";
+import { MediaRail, SectionHeader } from "@crate/ui/domain/lists";
 import { albumCoverApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
 
@@ -150,7 +150,7 @@ export function RadioStationsSection({
         actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("radio-stations")}
       />
-      <SectionRail fit="square-card">
+      <MediaRail fit="columns">
         {stations.map((station) => (
           <RadioStationCard
             key={`${station.type}-${
@@ -165,7 +165,7 @@ export function RadioStationsSection({
             onPlay={() => onPlayStation(station)}
           />
         ))}
-      </SectionRail>
+      </MediaRail>
     </section>
   );
 }

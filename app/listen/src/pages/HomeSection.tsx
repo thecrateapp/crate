@@ -1,7 +1,10 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft } from "@crate/ui/icons";
+import { MediaGrid } from "@crate/ui/domain/lists";
+import { BackLink } from "@crate/ui/domain/navigation/BackLink";
+import { PageHeader } from "@crate/ui/domain/navigation/PageHeader";
+import { EmptyState, ErrorState } from "@crate/ui/domain/states";
 import { toast } from "sonner";
 
 import { AlbumCard } from "@/components/cards/AlbumCard";
@@ -183,36 +186,32 @@ export function HomeSection() {
 
   if (!data) {
     return (
-      <div className="space-y-4 py-16 text-center">
-        <p className="text-sm text-text-muted">{t("home.section.notFound")}</p>
-      </div>
+      <ErrorState
+        kind="notFound"
+        message={t("home.section.notFound")}
+        backTo="/"
+        backLabel={t("common.back")}
+      />
     );
   }
 
   return (
     <div className="space-y-6">
-      <button
-        onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-2 text-sm text-text-muted transition-colors hover:text-text-primary"
-      >
-        <ArrowLeft size={16} />
-        {t("common.back")}
-      </button>
-
-      <div>
-        <h1 className="text-3xl font-bold text-text-primary">{data.title}</h1>
-        <p className="mt-2 text-sm text-text-muted">{data.subtitle}</p>
-      </div>
+      <PageHeader
+        back={
+          <BackLink label={t("common.back")} onClick={() => navigate(-1)} />
+        }
+        title={data.title}
+        subtitle={data.subtitle}
+      />
 
       {!data.items.length ? (
-        <div className="rounded-[12px] border border-border-quiet bg-text-primary/[0.03] px-5 py-12 text-center">
-          <p className="text-sm font-medium text-text-primary">
-            {t("home.section.empty.title")}
-          </p>
-          <p className="mx-auto mt-2 max-w-md text-sm text-text-muted">
-            {t("home.section.empty.description")}
-          </p>
-        </div>
+        <EmptyState
+          variant="panel"
+          icon={null}
+          title={t("home.section.empty.title")}
+          message={t("home.section.empty.description")}
+        />
       ) : null}
 
       {data.id === "recently-played" ? (
@@ -232,7 +231,7 @@ export function HomeSection() {
       ) : null}
 
       {data.id === "custom-mixes" ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+        <MediaGrid>
           {data.items.map((item) => (
             <CustomMixCard
               key={item.id}
@@ -244,11 +243,11 @@ export function HomeSection() {
               layout="grid"
             />
           ))}
-        </div>
+        </MediaGrid>
       ) : null}
 
       {data.id === "suggested-albums" || data.id === "upcoming-albums" ? (
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
+        <MediaGrid>
           {data.items.map((album) => (
             <AlbumCard
               key={`${
@@ -270,7 +269,7 @@ export function HomeSection() {
               layout="grid"
             />
           ))}
-        </div>
+        </MediaGrid>
       ) : null}
 
       {data.id === "recommended-tracks" ? (
@@ -295,7 +294,7 @@ export function HomeSection() {
       ) : null}
 
       {data.id === "radio-stations" ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        <MediaGrid>
           {data.items.map((station) => (
             <RadioStationCard
               key={`${station.type}-${
@@ -311,11 +310,11 @@ export function HomeSection() {
               layout="grid"
             />
           ))}
-        </div>
+        </MediaGrid>
       ) : null}
 
       {data.id === "favorite-artists" ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        <MediaGrid>
           {data.items.map((artist) => (
             <ArtistCard
               key={
@@ -333,11 +332,11 @@ export function HomeSection() {
               fillGrid
             />
           ))}
-        </div>
+        </MediaGrid>
       ) : null}
 
       {data.id === "core-tracks" ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        <MediaGrid>
           {data.items.map((item) => (
             <CoreTracksPlaylistCard
               key={item.id}
@@ -351,7 +350,7 @@ export function HomeSection() {
               layout="grid"
             />
           ))}
-        </div>
+        </MediaGrid>
       ) : null}
     </div>
   );

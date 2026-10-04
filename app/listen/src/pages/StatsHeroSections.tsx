@@ -245,7 +245,7 @@ function ReplayCard({
 
       <div className="mt-5 space-y-1">
         {loading ? (
-          <div className="stats-card-empty rounded-lg border-dashed px-4 py-5 text-sm">
+          <div className="stats-card-empty rounded-lg border border-dashed px-4 py-5 text-sm">
             {t("stats.replay.loading")}
           </div>
         ) : items.length ? (
@@ -266,7 +266,7 @@ function ReplayCard({
               />
             ))
         ) : (
-          <div className="stats-card-empty rounded-lg border-dashed px-4 py-5 text-sm">
+          <div className="stats-card-empty rounded-lg border border-dashed px-4 py-5 text-sm">
             {t("stats.replay.empty")}
           </div>
         )}

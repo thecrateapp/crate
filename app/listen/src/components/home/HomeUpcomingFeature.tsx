@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
+import { SectionHeader } from "@crate/ui/domain/lists";
 
-import { SectionHeader } from "./HomeSections";
 import type { HomeUpcomingItem, HomeUpcomingResponse } from "./home-model";
 import { HomeUpcomingFeature } from "./HomeUpcomingFeatureCard";
 import { HomeUpcomingPreviewPanel } from "./HomeUpcomingPreviewPanel";
