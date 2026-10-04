@@ -25,7 +25,6 @@ export function QueueTab() {
 
   const history = queue.slice(0, currentIndex).reverse();
   const upcoming = queue.slice(currentIndex + 1);
-  const sourceName = getPlaySourceLabel(playSource) || t("player.queue");
 
   async function handleSaveAsPlaylist() {
     const validTracks = queue.filter(
@@ -56,25 +55,17 @@ export function QueueTab() {
   return (
     <div className="flex-1 overflow-y-auto pr-1">
       {jamQueueLocked ? <JamQueueLockedNotice /> : null}
-      <QueueTabPastTracks
-        tracks={history}
-        currentIndex={currentIndex}
-        onJump={jumpTo}
-        locked={jamQueueLocked}
-      />
       {currentTrack ? (
         <QueueTabCurrentTrack
           currentTrack={currentTrack}
           currentIndex={currentIndex}
           isPlaying={isPlaying}
-          sourceName={sourceName}
           onSave={() => void handleSaveAsPlaylist()}
         />
       ) : null}
       <QueueTabUpcoming
         tracks={upcoming}
         currentIndex={currentIndex}
-        sourceName={sourceName}
         locked={jamQueueLocked}
         onJump={jumpTo}
         onRemove={removeFromQueue}
@@ -84,6 +75,12 @@ export function QueueTab() {
           {t("player.queue.empty")}
         </div>
       ) : null}
+      <QueueTabPastTracks
+        tracks={history}
+        currentIndex={currentIndex}
+        onJump={jumpTo}
+        locked={jamQueueLocked}
+      />
     </div>
   );
 }

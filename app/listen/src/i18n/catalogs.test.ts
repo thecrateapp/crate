@@ -148,6 +148,7 @@ const completedCommonEnglishFallbackAllowlist = new Set<string>([
   "common.off",
   "common.offline",
   "common.album",
+  "common.genre",
   "common.name",
   "common.password",
   "common.email",
@@ -161,6 +162,7 @@ const fullyLocalizedGenrePrefixes = ["genre."] as const;
 const completedGenreEnglishFallbackAllowlist = new Set<string>([
   "genre.kind",
   "genre.sections.shows",
+  "genre.relation.fusion",
 ]);
 const fullyLocalizedRadioPrefixes = ["radio."] as const;
 const completedRadioEnglishFallbackAllowlist = new Set<string>([
@@ -186,6 +188,7 @@ const completedArtistAllFallbackAllowlist = new Set<string>([
 const fullyLocalizedExplorePrefixes = ["explore."] as const;
 const completedExploreFallbackAllowlist = new Set<string>([
   "explore.features.radio.title",
+  "explore.moods.names.intense",
 ]);
 const fullyLocalizedServerSetupPrefixes = ["serverSetup."] as const;
 const completedServerSetupFallbackAllowlist = new Set<string>([

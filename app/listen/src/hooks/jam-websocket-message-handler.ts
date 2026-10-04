@@ -10,7 +10,7 @@ import {
 } from "@/hooks/jam-websocket-utils";
 import type { JamQueueItem, JamRoom } from "@/pages/jam-reducer";
 import { payloadToTrack } from "@/pages/jam-reducer";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 export function handleJamWebSocketMessage(
   data: string,
@@ -55,7 +55,7 @@ export function handleJamWebSocketMessage(
     if (payload.type === "room_updated" && payload.room) {
       dispatch({ type: "APPLY_ROOM_DATA", payload: payload.room });
       roomNameRef.current = payload.room.name;
-      toast.info(t("jam.toasts.roomSettingsUpdated"));
+      notify.info(t("jam.toasts.roomSettingsUpdated"));
       return;
     }
 

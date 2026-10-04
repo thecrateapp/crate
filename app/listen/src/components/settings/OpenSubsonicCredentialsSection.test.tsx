@@ -191,6 +191,39 @@ describe("OpenSubsonicCredentialsSection", () => {
     expect(await screen.findByText(OPEN_SUBSONIC_KEY)).toBeVisible();
   });
 
+  it("keeps the rotate wording on the dialog until the rotation finishes", async () => {
+    const user = setupUser();
+    mockConfiguredStatus(true);
+    let resolveRotation: (value: { api_key: string }) => void = () => {};
+    apiMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRotation = resolve;
+      }),
+    );
+
+    renderSection();
+    await user.click(
+      await screen.findByRole("button", { name: /rotate.*key/i }),
+    );
+    const confirmation = screen.getByRole("alertdialog");
+    await user.click(
+      within(confirmation).getByRole("button", { name: /confirm.*rotat/i }),
+    );
+
+    expect(screen.getByRole("alertdialog")).toBe(confirmation);
+    expect(
+      within(confirmation).getByRole("button", { name: /confirm.*rotat/i }),
+    ).toBeDisabled();
+    expect(
+      within(confirmation).queryByRole("button", { name: /revoke/i }),
+    ).toBeNull();
+
+    resolveRotation({ api_key: OPEN_SUBSONIC_KEY });
+
+    expect(await screen.findByText(OPEN_SUBSONIC_KEY)).toBeVisible();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
   it("keeps the existing key when rotation is cancelled", async () => {
     const user = setupUser();
     mockConfiguredStatus(true);

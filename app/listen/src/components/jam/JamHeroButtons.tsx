@@ -54,7 +54,7 @@ export function HeroPrimaryButton({
       disabled={disabled || loading}
       variant="outline"
       size="lg"
-      className={`h-11 px-3.5 disabled:opacity-35 ${className}`}
+      className={`h-11 px-3.5 has-[>svg]:px-3.5 disabled:opacity-35 ${className}`}
       {...props}
     >
       {loading ? <Loader2 size={16} className="animate-spin" /> : children}

@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 import { Share2, UserMinus, UserPlus, UserRound } from "@crate/ui/icons";
 
 import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
@@ -38,7 +38,7 @@ export async function shareUserProfile(user: UserMenuData, t: TFunction) {
     }
   }
   await navigator.clipboard.writeText(url);
-  toast.success(t("share.toasts.linkCopied"));
+  notify.success(t("share.toasts.linkCopied"));
 }
 
 export function buildUserActions(

@@ -13,7 +13,6 @@ interface DesktopShellProps {
   headerOffsetClass: string;
   headerScrolled: boolean;
   homeDesktopOverlay: boolean;
-  overlayHeader: boolean;
   sidebarLeft: string;
   sidebarW: string;
 }
@@ -26,7 +25,6 @@ export function DesktopShell({
   headerOffsetClass,
   headerScrolled,
   homeDesktopOverlay,
-  overlayHeader,
   sidebarLeft,
   sidebarW,
 }: DesktopShellProps) {
@@ -52,7 +50,7 @@ export function DesktopShell({
           />
         )}
         <div className="relative z-10">
-          <TopBar hideMobileActions={overlayHeader} />
+          <TopBar />
         </div>
       </div>
       <main

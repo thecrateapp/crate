@@ -171,7 +171,7 @@ describe("Shell", () => {
     expect(screen.getByTestId("listen-header")).toHaveClass("bg-transparent");
     expect(screen.getByTestId("topbar")).toHaveAttribute(
       "data-hide-mobile-actions",
-      "true",
+      "false",
     );
     expect(
       container.querySelector(".listen-home-top-scrim"),

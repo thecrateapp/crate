@@ -7,14 +7,12 @@ import { QueueTrackRow } from "@/components/player/QueueTrackRow";
 export function QueueTabUpcoming({
   tracks,
   currentIndex,
-  sourceName,
   locked,
   onJump,
   onRemove,
 }: {
   tracks: Track[];
   currentIndex: number;
-  sourceName: string;
   locked: boolean;
   onJump: (index: number) => void;
   onRemove: (index: number) => void;
@@ -23,12 +21,9 @@ export function QueueTabUpcoming({
   if (!tracks.length) return null;
 
   return (
-    <div>
+    <div className="mb-4">
       <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wider text-text-muted">
-        {t("player.queue.nextUpFrom", {
-          source: sourceName,
-          count: tracks.length,
-        })}
+        {t("player.queue.nextUp", { count: tracks.length })}
       </p>
       {tracks.map((track, i) => {
         const index = currentIndex + 1 + i;

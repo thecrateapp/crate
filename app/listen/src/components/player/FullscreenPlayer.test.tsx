@@ -15,8 +15,8 @@ vi.mock("@/lib/haptics", () => ({
   triggerHaptic: vi.fn(),
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
+vi.mock("@crate/ui/lib/notify", () => ({
+  notify: {
     success: vi.fn(),
     error: vi.fn(),
     info: vi.fn(),
@@ -1168,7 +1168,7 @@ describe("FullscreenPlayer", () => {
       await user.click(screen.getByText("Queue"));
 
       await waitFor(() => {
-        expect(screen.getByText(/Up Next · 5 tracks/)).toBeInTheDocument();
+        expect(screen.getByText("Next up (5)")).toBeInTheDocument();
       });
     });
 

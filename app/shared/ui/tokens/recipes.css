@@ -1041,7 +1041,8 @@
 }
 
 .fullscreen-player-surface {
-  background: linear-gradient(
+  background-color: var(--surface-canvas);
+  background-image: linear-gradient(
     180deg,
     color-mix(in srgb, var(--surface-elevated) 88%, var(--surface-canvas)) 0%,
     var(--surface-canvas) 100%
@@ -1860,36 +1861,6 @@
   color: var(--text-secondary-strong);
 }
 
-.user-profile-badge-gold {
-  border-color: var(--state-warning-border);
-  background: var(--state-warning-surface);
-  color: var(--state-warning-text);
-}
-
-.user-profile-badge-green {
-  border-color: var(--state-success-border);
-  background: var(--state-success-surface);
-  color: var(--state-success-text);
-}
-
-.user-profile-badge-rose {
-  border-color: var(--user-profile-badge-rose-border);
-  background: var(--state-danger-surface);
-  color: var(--state-danger-text);
-}
-
-.user-profile-badge-cyan {
-  border-color: var(--border-accent);
-  background: var(--surface-accent);
-  color: var(--text-accent);
-}
-
-.user-profile-badge-neutral {
-  border-color: var(--border-quiet);
-  background: var(--surface-card);
-  color: var(--text-secondary-strong);
-}
-
 .profile-hover-popover {
   border: 0;
   background: transparent;
@@ -2035,36 +2006,6 @@
 
 .profile-hover-follow-default:hover {
   background: var(--border-accent-soft);
-}
-
-.profile-hover-badge-gold {
-  border-color: var(--state-warning-border);
-  background: var(--state-warning-surface);
-  color: var(--state-warning-text);
-}
-
-.profile-hover-badge-green {
-  border-color: var(--state-success-border);
-  background: var(--state-success-surface);
-  color: var(--state-success-text);
-}
-
-.profile-hover-badge-rose {
-  border-color: var(--user-profile-badge-rose-border);
-  background: var(--state-danger-surface);
-  color: var(--state-danger-text);
-}
-
-.profile-hover-badge-cyan {
-  border-color: var(--border-accent);
-  background: var(--surface-accent);
-  color: var(--text-accent);
-}
-
-.profile-hover-badge-neutral {
-  border-color: var(--border-quiet);
-  background: var(--surface-card);
-  color: var(--text-secondary-strong);
 }
 
 .profile-hover-loading {

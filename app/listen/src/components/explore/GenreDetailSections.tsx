@@ -17,6 +17,16 @@ import { GenreTile } from "./GenreTile";
 
 type RelatedGenre = NonNullable<GenreDetail["related_genres"]>[number];
 
+const RELATION_LABEL_KEY: Record<string, string> = {
+  parent: "genre.relation.parent",
+  child: "genre.relation.child",
+  sibling: "genre.relation.sibling",
+  related: "genre.relation.related",
+  influenced_by: "genre.relation.influencedBy",
+  influences: "genre.relation.influences",
+  fusion: "genre.relation.fusion",
+};
+
 function RelatedGenreTile({
   genre,
   onOpen,
@@ -29,6 +39,7 @@ function RelatedGenreTile({
     () => buildRelatedGenreImageCandidates(genre),
     [genre],
   );
+  const relationKey = RELATION_LABEL_KEY[genre.relation_type];
   const detail = [
     genre.artist_count > 0
       ? t("common.artistCountLabel", { count: genre.artist_count })
@@ -45,7 +56,7 @@ function RelatedGenreTile({
       variant="related"
       slug={genre.slug}
       name={genre.name}
-      kicker={genre.relation_label}
+      kicker={relationKey ? t(relationKey) : genre.relation_label}
       detail={detail}
       imageCandidates={imageCandidates}
       onOpen={() => onOpen(genre)}
@@ -65,7 +76,6 @@ function RelatedGenresSection({
   return (
     <section className="space-y-3">
       <SectionHeader
-        className="px-1"
         title={t("genre.related.title")}
         subtitle={t("genre.related.subtitle")}
       />
@@ -95,7 +105,7 @@ function ShowsSection({
   if (!shows.length) return null;
   return (
     <section className="space-y-3">
-      <SectionHeader className="px-1" title={t("genre.sections.shows")} />
+      <SectionHeader title={t("genre.sections.shows")} />
       <div className="grid gap-3 lg:grid-cols-2">
         {shows.map((show, index) => {
           const key = itemKey(show, index);
@@ -118,7 +128,7 @@ function ArtistsSection({ artists }: { artists: GenreDetail["artists"] }) {
   if (!artists.length) return null;
   return (
     <div className="space-y-3">
-      <SectionHeader className="px-1" title={t("nav.collection.artists")} />
+      <SectionHeader title={t("nav.collection.artists")} />
       <MediaGrid density="compact">
         {artists.map((artist) => (
           <ArtistCard
@@ -149,7 +159,7 @@ function AlbumsSection({ albums }: { albums: GenreDetail["albums"] }) {
   if (!albums.length) return null;
   return (
     <div className="space-y-3">
-      <SectionHeader className="px-1" title={t("nav.collection.albums")} />
+      <SectionHeader title={t("nav.collection.albums")} />
       <MediaGrid>
         {albums.map((album) => (
           <AlbumCard

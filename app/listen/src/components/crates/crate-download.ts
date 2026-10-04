@@ -2,7 +2,6 @@ import { useCallback } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { notify } from "@crate/ui/lib/notify";
-import { toast } from "sonner";
 
 import { api, apiSseUrl } from "@/lib/api";
 import { downloadApiUrl } from "@/lib/library-routes";
@@ -119,7 +118,7 @@ function showProgress(
   t: TFunction,
 ) {
   if (progress === null) return;
-  toast.loading(t("crate.download.preparing", { name: crate.name }), {
+  notify.loading(t("crate.download.preparing", { name: crate.name }), {
     id: downloadToastId(crate.id),
     description: t("crate.download.progress", { progress }),
     duration: Infinity,
@@ -264,7 +263,7 @@ export async function startCrateDownload(
       failDownload(crate.id, t);
       return;
     }
-    toast.loading(t("crate.download.preparing", { name: crate.name }), {
+    notify.loading(t("crate.download.preparing", { name: crate.name }), {
       id: toastId,
       description: t("crate.download.queued"),
       duration: Infinity,

@@ -60,9 +60,18 @@ export function radioStationTitle(station: RadioStationLike): string {
   );
 }
 
-export function radioStationSubtitle(station: RadioStationLike) {
+const SEED_SUBTITLE_KEY: Record<string, string> = {
+  Artist: "common.artist",
+  Album: "common.album",
+  Genre: "common.genre",
+};
+
+export function radioStationSubtitle(station: RadioStationLike, t: TFunction) {
+  const seedSubtitleKey = station.seed_subtitle
+    ? SEED_SUBTITLE_KEY[station.seed_subtitle]
+    : undefined;
   return (
-    station.seed_subtitle ||
+    (seedSubtitleKey ? t(seedSubtitleKey) : station.seed_subtitle) ||
     (station.type === "album" || station.type === "track"
       ? station.artist_name
       : null) ||

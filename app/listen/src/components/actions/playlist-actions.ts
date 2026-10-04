@@ -18,7 +18,7 @@ import {
   Users,
   type CrateIcon,
 } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import type {
   ContextMenuHeader,
@@ -265,12 +265,12 @@ function buildPlaylistItemEntries(
               playlistName: input.name,
             });
             if (!radio.tracks.length) {
-              toast.info(t("actions.playlist.toasts.radioUnavailable"));
+              notify.info(t("actions.playlist.toasts.radioUnavailable"));
               return;
             }
             playAll(radio.tracks, 0, radio.source);
           } catch {
-            toast.error(t("actions.playlist.toasts.radioFailed"));
+            notify.error(t("actions.playlist.toasts.radioFailed"));
           }
         }
       : undefined);
@@ -309,13 +309,13 @@ function buildPlaylistItemEntries(
             title: input.name,
             isSmart: input.isSmart,
           });
-          toast.success(
+          notify.success(
             result === "removed"
               ? t("actions.offline.toasts.removed")
               : t("actions.playlist.toasts.offlineReady"),
           );
         } catch (error) {
-          toast.error(
+          notify.error(
             (error as Error).message ||
               t("actions.offline.toasts.updateFailed"),
           );

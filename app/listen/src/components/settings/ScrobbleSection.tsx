@@ -7,6 +7,7 @@ import { Input } from "@crate/ui/shadcn/input";
 
 import { Section, ToggleRow } from "@/components/settings/SettingsPrimitives";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 const CONNECT_BUTTON_CLASS_NAME =
   "h-auto bg-accent-action/15 px-4 py-2 text-xs text-accent-action hover:bg-accent-action/25";
@@ -233,7 +234,7 @@ export function ScrobbleSection() {
               onChange={(event) => setLbToken(event.target.value)}
               placeholder={t("settings.scrobbling.apiToken")}
               aria-label={t("settings.scrobbling.apiToken")}
-              className="h-auto w-36 rounded-lg border-border-quiet/10 bg-text-primary/5 px-3 py-1.5 shadow-none backdrop-blur-none focus-visible:border-accent-action/50 md:text-base"
+              className="h-9 w-36 rounded-lg border-border-quiet/10 bg-text-primary/5 px-3 py-0 shadow-none backdrop-blur-none focus-visible:border-accent-action/50 md:text-base"
               onKeyDown={(event) => {
                 if (
                   !event.nativeEvent.isComposing &&
@@ -249,7 +250,7 @@ export function ScrobbleSection() {
               shape="pill"
               onClick={handleListenBrainzConnect}
               disabled={connecting === "listenbrainz" || !lbToken.trim()}
-              className={CONNECT_BUTTON_CLASS_NAME}
+              className={cn(CONNECT_BUTTON_CLASS_NAME, "h-9 py-0")}
             >
               {connecting === "listenbrainz" ? "..." : t("common.connect")}
             </Button>

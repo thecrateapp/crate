@@ -37,6 +37,16 @@ describe("runtime token bridge", () => {
     );
   });
 
+  it("paints the fullscreen player on an opaque canvas underlay", () => {
+    const recipes = readTokenFile("recipes.css");
+    const surface = recipes.match(
+      /\.fullscreen-player-surface\s*\{(?<rules>[^}]*)\}/s,
+    )?.groups?.rules;
+
+    expect(surface).toMatch(/background-color:\s*var\(--surface-canvas\)/);
+    expect(surface).not.toMatch(/(?:^|\s)background:/);
+  });
+
   it("derives runtime defaults in the theme layer", () => {
     const themes = readTokenFile("themes.css");
 

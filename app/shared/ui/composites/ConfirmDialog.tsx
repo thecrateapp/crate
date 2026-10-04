@@ -86,7 +86,8 @@ export function ConfirmDialog({
       await onConfirm();
       onOpenChange?.(false);
     } catch (error) {
-      onError?.(error);
+      if (onError) onError(error);
+      else console.error(error);
     } finally {
       submittingRef.current = false;
       if (!isPendingControlled) setInternalPending(false);

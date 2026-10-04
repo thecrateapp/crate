@@ -15,7 +15,9 @@ export interface NotifyPromiseMessages<T> {
   error: ReactNode | ((error: unknown) => ReactNode);
 }
 
-function toToastOptions(options?: NotifyOptions) {
+type ToastMethod = (message: ReactNode, options?: NotifyOptions) => NotifyId;
+
+function toToastOptions(options?: NotifyOptions): NotifyOptions | undefined {
   if (!options) return undefined;
   const { id, description, duration } = options;
   return {
@@ -25,15 +27,31 @@ function toToastOptions(options?: NotifyOptions) {
   };
 }
 
+function show(
+  method: ToastMethod,
+  message: ReactNode,
+  options?: NotifyOptions,
+): NotifyId {
+  const toastOptions = toToastOptions(options);
+  return toastOptions ? method(message, toastOptions) : method(message);
+}
+
 export const notify = {
   success(message: ReactNode, options?: NotifyOptions): NotifyId {
-    return toast.success(message, toToastOptions(options));
+    return show(toast.success, message, options);
   },
   error(message: ReactNode, options?: NotifyOptions): NotifyId {
-    return toast.error(message, toToastOptions(options));
+    return show(toast.error, message, options);
   },
   info(message: ReactNode, options?: NotifyOptions): NotifyId {
-    return toast.info(message, toToastOptions(options));
+    return show(toast.info, message, options);
+  },
+  loading(message: ReactNode, options?: NotifyOptions): NotifyId {
+    return show(toast.loading, message, options);
+  },
+  dismiss(id?: NotifyId): void {
+    if (id === undefined) toast.dismiss();
+    else toast.dismiss(id);
   },
   promise<T>(
     promise: Promise<T> | (() => Promise<T>),

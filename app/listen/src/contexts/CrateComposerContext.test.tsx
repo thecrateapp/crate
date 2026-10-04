@@ -15,7 +15,6 @@ vi.mock("react-router", async (importOriginal) => {
 });
 
 vi.mock("@/lib/api", () => ({ api }));
-vi.mock("sonner", () => ({ toast }));
 vi.mock("@crate/ui/lib/notify", () => ({ notify: toast }));
 
 import {

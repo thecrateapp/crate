@@ -40,21 +40,26 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
       <div className="stats-page-atmosphere pointer-events-none absolute inset-0 -z-10" />
       <div className="stats-page-grid pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] opacity-30" />
       <StatsHeader page={page} />
-      <StatsHeroSection page={page} />
-      <StatsRecapSection highlights={recapHighlights} t={page.t} />
-      <StatsStorySection
-        story={story}
-        fallbackMover={topMover}
-        fallbackDiscovery={topDiscovery}
-        fallbackComeback={topComeback}
-      />
-      <AffinityCard
-        affinity={dashboard?.viewer_affinity}
-        subject={subjectName}
-      />
-      <StatsAnalyticsSection page={page} />
-      <StatsCollectionsSection page={page} />
-      {!dashboardLoading && !hasStats ? <StatsEmptyState t={page.t} /> : null}
+      {!dashboardLoading && !hasStats ? (
+        <StatsEmptyState t={page.t} />
+      ) : (
+        <>
+          <StatsHeroSection page={page} />
+          <StatsRecapSection highlights={recapHighlights} t={page.t} />
+          <StatsStorySection
+            story={story}
+            fallbackMover={topMover}
+            fallbackDiscovery={topDiscovery}
+            fallbackComeback={topComeback}
+          />
+          <AffinityCard
+            affinity={dashboard?.viewer_affinity}
+            subject={subjectName}
+          />
+          <StatsAnalyticsSection page={page} />
+          <StatsCollectionsSection page={page} />
+        </>
+      )}
     </div>
   );
 }

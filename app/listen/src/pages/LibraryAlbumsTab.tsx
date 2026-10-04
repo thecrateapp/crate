@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router";
 
 import { MediaGrid } from "@crate/ui/domain/lists";
 import { EmptyState, LoadingState } from "@crate/ui/domain/states";
+import { Button } from "@crate/ui/shadcn/button";
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { useApi } from "@/hooks/use-api";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
@@ -43,7 +45,18 @@ export function LibraryAlbumsTab() {
 
   if (loading) return <LoadingState label={t("common.loadingShort")} />;
   if (!albums || albums.length === 0) {
-    return <EmptyState variant="inline" message={t("library.albums.empty")} />;
+    return (
+      <EmptyState
+        variant="dashed"
+        title={t("library.albums.emptyTitle")}
+        description={t("library.albums.emptyDescription")}
+        action={
+          <Button asChild size="sm">
+            <Link to="/explore">{t("nav.explore")}</Link>
+          </Button>
+        }
+      />
+    );
   }
 
   return (

@@ -32,8 +32,9 @@ export function OpenSubsonicCredentialsSection() {
   const [error, setError] = useState<RequestError | null>(null);
   const [busy, setBusy] = useState(false);
   const copyInProgress = useRef(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmingAction, setConfirmingAction] =
-    useState<ConfirmedAction | null>(null);
+    useState<ConfirmedAction>("rotate");
 
   useEffect(() => {
     let active = true;
@@ -88,12 +89,15 @@ export function OpenSubsonicCredentialsSection() {
     }
   }
 
+  function requestConfirmation(action: ConfirmedAction) {
+    setConfirmingAction(action);
+    setConfirmOpen(true);
+  }
+
   async function confirmAction() {
-    const action = confirmingAction;
-    setConfirmingAction(null);
-    if (action === "rotate") {
+    if (confirmingAction === "rotate") {
       await createCredential();
-    } else if (action === "revoke") {
+    } else {
       await revokeCredential();
     }
   }
@@ -248,7 +252,7 @@ export function OpenSubsonicCredentialsSection() {
                   type="button"
                   variant="outline"
                   disabled={busy}
-                  onClick={() => setConfirmingAction("rotate")}
+                  onClick={() => requestConfirmation("rotate")}
                   className="w-full sm:w-auto"
                 >
                   {t("settings.openSubsonic.rotateKey")}
@@ -257,7 +261,7 @@ export function OpenSubsonicCredentialsSection() {
                   type="button"
                   variant="destructive"
                   disabled={busy}
-                  onClick={() => setConfirmingAction("revoke")}
+                  onClick={() => requestConfirmation("revoke")}
                   className="w-full sm:w-auto"
                 >
                   {t("settings.openSubsonic.revokeKey")}
@@ -278,10 +282,8 @@ export function OpenSubsonicCredentialsSection() {
       )}
 
       <ConfirmDialog
-        open={confirmingAction !== null}
-        onOpenChange={(open) => {
-          if (!open) setConfirmingAction(null);
-        }}
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
         onConfirm={confirmAction}
         tone={confirmingAction === "revoke" ? "danger" : "default"}
         title={

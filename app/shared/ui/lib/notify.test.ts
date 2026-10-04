@@ -4,6 +4,8 @@ const toastMock = vi.hoisted(() => ({
   success: vi.fn(() => "success-id"),
   error: vi.fn(() => "error-id"),
   info: vi.fn(() => "info-id"),
+  loading: vi.fn(() => "loading-id"),
+  dismiss: vi.fn(),
   promise: vi.fn(),
 }));
 
@@ -21,9 +23,34 @@ describe("notify", () => {
     expect(notify.error("Failed")).toBe("error-id");
     expect(notify.info("Heads up")).toBe("info-id");
 
-    expect(toastMock.success).toHaveBeenCalledWith("Saved", undefined);
-    expect(toastMock.error).toHaveBeenCalledWith("Failed", undefined);
-    expect(toastMock.info).toHaveBeenCalledWith("Heads up", undefined);
+    expect(toastMock.success).toHaveBeenCalledWith("Saved");
+    expect(toastMock.error).toHaveBeenCalledWith("Failed");
+    expect(toastMock.info).toHaveBeenCalledWith("Heads up");
+    expect(toastMock.success.mock.calls[0]).toHaveLength(1);
+  });
+
+  it("shows loading toasts with id and duration", () => {
+    expect(
+      notify.loading("Preparing", {
+        id: "download",
+        description: "Queued",
+        duration: Infinity,
+      }),
+    ).toBe("loading-id");
+
+    expect(toastMock.loading).toHaveBeenCalledWith("Preparing", {
+      id: "download",
+      description: "Queued",
+      duration: Infinity,
+    });
+  });
+
+  it("dismisses a single toast or all toasts", () => {
+    notify.dismiss("download");
+    notify.dismiss();
+
+    expect(toastMock.dismiss).toHaveBeenNthCalledWith(1, "download");
+    expect(toastMock.dismiss.mock.calls[1]).toHaveLength(0);
   });
 
   it("passes id and description so repeated toasts deduplicate", () => {

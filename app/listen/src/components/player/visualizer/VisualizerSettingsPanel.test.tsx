@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { VisualizerSettingsPanel } from "./VisualizerSettingsPanel";
 import type { VisualizerConfigState } from "./useVisualizerConfig";
+import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 function makeConfig(
   overrides: Partial<VisualizerConfigState> = {},
@@ -71,7 +72,7 @@ function makeConfig(
 
 describe("VisualizerSettingsPanel", () => {
   it("uses semantic tokens for toggles, status, and sliders", () => {
-    const { container } = render(
+    const { container } = renderWithListenProviders(
       <VisualizerSettingsPanel config={makeConfig()} />,
     );
 
@@ -92,8 +93,30 @@ describe("VisualizerSettingsPanel", () => {
     expect(container.innerHTML).not.toContain("text-white/");
   });
 
+  it("translates labels, switches, sliders and statuses", () => {
+    renderWithListenProviders(
+      <VisualizerSettingsPanel
+        config={makeConfig({ vizEnabled: false, surfaceMode: "cd" })}
+      />,
+      { locale: "es" },
+    );
+
+    expect(screen.getByText("Ajustes del visualizador")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Restablecer" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", { name: "Paleta del álbum" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("slider", { name: "Separación" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Modo CD activo")).toBeInTheDocument();
+    expect(screen.queryByText("Separation")).toBeNull();
+  });
+
   it("keeps the disabled visualizer state on semantic control tokens", () => {
-    const { container } = render(
+    const { container } = renderWithListenProviders(
       <VisualizerSettingsPanel
         config={makeConfig({ vizEnabled: false, surfaceMode: "cover" })}
       />,

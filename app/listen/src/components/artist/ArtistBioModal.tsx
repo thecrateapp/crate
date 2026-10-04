@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
@@ -24,6 +25,7 @@ export function ArtistBioModal({
   tags,
   onClose,
 }: ArtistBioModalProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const bio = artistInfo?.bio ?? "";
   const [bioExpanded, setBioExpanded] = useState(true);
@@ -72,7 +74,9 @@ export function ArtistBioModal({
           />
         }
         meta={[
-          ...(mb?.begin_date ? [`Since ${mb.begin_date}`] : []),
+          ...(mb?.begin_date
+            ? [t("artist.bio.since", { date: mb.begin_date })]
+            : []),
           ...(mb?.country
             ? [mb.area ? `${mb.area}, ${mb.country}` : mb.country]
             : []),

@@ -268,7 +268,7 @@ export function JamQueueList(props: JamQueueListProps) {
             variant="outline"
             size="default"
             onClick={focusQueueSearch}
-            className="jam-secondary-action inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-text-primary transition-colors"
+            className="jam-secondary-action inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-text-primary transition-colors has-[>svg]:px-4"
           >
             <Search size={15} />
             {t("jam.room.browseLibrary")}

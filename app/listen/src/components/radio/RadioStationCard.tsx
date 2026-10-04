@@ -41,7 +41,7 @@ export const RadioStationCard = memo(function RadioStationCard({
   const artworkUrl = radioStationArtwork(station);
   const typeLabel = radioTypeLabel(station, t);
   const title = radioStationTitle(station);
-  const subtitle = radioStationSubtitle(station);
+  const subtitle = radioStationSubtitle(station, t);
   const plays = station.play_count || 0;
   const seedKind = radioSeedKind(station);
   const seedPath = radioStationSeedPath(station);
@@ -116,8 +116,9 @@ export const RadioStationCard = memo(function RadioStationCard({
           />
         )}
         <span className="home-radio-overlay absolute inset-0" />
-        <span className="home-radio-badge absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-semibold uppercase tracking-[0.16em] backdrop-blur-md">
-          <Radio size={12} className="inline-block" /> {typeLabel}
+        <span className="home-radio-badge absolute left-2.5 top-2.5 inline-flex max-w-[calc(100%-1.25rem)] items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.06em] backdrop-blur-md">
+          <Radio size={12} className="shrink-0" />
+          <span className="min-w-0 truncate">{typeLabel}</span>
         </span>
         <span className="absolute inset-x-0 bottom-0 block p-4">
           <span className="home-radio-title block truncate text-sm font-semibold">

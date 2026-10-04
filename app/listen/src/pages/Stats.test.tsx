@@ -121,7 +121,56 @@ describe("Stats page", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a single global empty state without per-section empties", () => {
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "es",
+    });
+
+    expect(screen.getAllByTestId("empty-state")).toHaveLength(1);
+    expect(
+      screen.queryByText(
+        "Sigue escuchando y esta página empezará a escribir tu recap.",
+      ),
+    ).not.toBeInTheDocument();
+  });
+
   it("uses semantic tokens for the stats shell and hero", () => {
+    const period = "30d";
+    const dashboard: StatsDashboard = {
+      window: period,
+      overview: {
+        window: period,
+        play_count: 1,
+        complete_play_count: 1,
+        skip_count: 0,
+        minutes_listened: 3,
+        active_days: 1,
+        skip_rate: 0,
+        top_artist: null,
+      },
+      trends: { window: period, points: [] },
+      top_tracks: { window: period, items: [] },
+      top_artists: { window: period, items: [] },
+      top_albums: { window: period, items: [] },
+      top_genres: { window: period, items: [] },
+      replay: {
+        window: period,
+        title: "Replay",
+        subtitle: "Snapshot",
+        track_count: 0,
+        minutes_listened: 0,
+        items: [],
+      },
+    };
+    mockUseApi.mockReturnValue({
+      data: dashboard,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
     const { container } = renderWithListenProviders(<Stats />, {
       route: "/stats",
       path: "/stats",

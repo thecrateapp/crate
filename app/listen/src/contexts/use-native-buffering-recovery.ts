@@ -19,7 +19,7 @@ import {
   nativePlaybackRecoveryCancellationSince,
   subscribeNativePlaybackIntentChanges,
 } from "@/lib/native-playback-intent";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 const NATIVE_BUFFERING_WATCHDOG_MS = 12000;
 const NATIVE_PLAYBACK_DIAGNOSTIC_KEY = "listen-native-playback-diagnostic:v1";
@@ -329,7 +329,7 @@ export function useNativeBufferingRecovery({
         });
       }
     }
-    toast.error(tRef.current("player.native.stuckBuffering"), {
+    notify.error(tRef.current("player.native.stuckBuffering"), {
       description: tRef.current("player.native.streamProbe", {
         status: detail ? `${status} · ${detail}` : status,
       }),
@@ -412,7 +412,7 @@ export function useNativeBufferingRecovery({
           url: redactDiagnosticUrl(nativeError.url),
           retryError: error instanceof Error ? error.message : String(error),
         });
-        toast.error(tRef.current("player.native.playbackFailed"), {
+        notify.error(tRef.current("player.native.playbackFailed"), {
           description: summary,
           duration: 9000,
         });

@@ -86,6 +86,19 @@ describe("SearchInput", () => {
     expect(onDebouncedChange).toHaveBeenCalledTimes(3);
   });
 
+  it("layers the search icon and clear button above inputs with their own stacking context", () => {
+    const { container } = render(
+      <SearchInput defaultValue="x" className="backdrop-blur-md" />,
+    );
+    const icon = container.querySelector("svg[aria-hidden='true']");
+
+    expect(icon).toHaveClass("z-10", "pointer-events-none", "absolute");
+    expect(screen.getByRole("button", { name: "Clear search" })).toHaveClass(
+      "z-10",
+      "absolute",
+    );
+  });
+
   it("hides the clear button when not clearable", () => {
     render(<SearchInput defaultValue="x" clearable={false} />);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();

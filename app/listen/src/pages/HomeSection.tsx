@@ -38,6 +38,7 @@ import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 import { toTrackRowData } from "@/lib/track-row-data";
 import { shuffleArray } from "@/lib/utils";
+import { dedupeTrackRows } from "@/pages/home-page-model";
 
 function toPlayerTrack(item: HomeRecommendedTrack): Track {
   return toPlayableTrack(item, {
@@ -83,7 +84,9 @@ export function HomeSection() {
   const recommendedTracks = useMemo(
     () =>
       data?.id === "recommended-tracks"
-        ? data.items.map((item): TrackRowData => toTrackRowData(item))
+        ? dedupeTrackRows(
+            data.items.map((item): TrackRowData => toTrackRowData(item)),
+          )
         : [],
     [data],
   );

@@ -103,7 +103,7 @@ export function PathDetail() {
     }
     const notFound = status === 404 || !error;
     return (
-      <div className="animate-page-in px-4 sm:p-6">
+      <div className="animate-page-in sm:py-6">
         <BackLink to="/paths" label={t("paths.back")} className="mb-5" />
         <ErrorState
           kind={notFound ? "notFound" : "error"}
@@ -116,7 +116,7 @@ export function PathDetail() {
   }
 
   return (
-    <div className="animate-page-in px-4  sm:p-6">
+    <div className="animate-page-in sm:py-6">
       <BackLink to="/paths" label={t("paths.back")} className="mb-5" />
 
       <div className="mb-6 flex items-start justify-between gap-3">

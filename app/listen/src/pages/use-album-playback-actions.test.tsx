@@ -1,14 +1,15 @@
 import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { toast } from "sonner";
 import { describe, expect, it, vi } from "vitest";
+
+import { notify } from "@crate/ui/lib/notify";
 
 import { PlayerActionsContext } from "@/contexts/player-context";
 import { useAlbumPlaybackActions } from "@/pages/use-album-playback-actions";
 import { createMockPlayerActions } from "@/test/render-with-listen-providers";
 
-vi.mock("sonner", () => ({
-  toast: { success: vi.fn(), info: vi.fn(), error: vi.fn() },
+vi.mock("@crate/ui/lib/notify", () => ({
+  notify: { success: vi.fn(), info: vi.fn(), error: vi.fn() },
 }));
 
 describe("useAlbumPlaybackActions", () => {
@@ -40,6 +41,6 @@ describe("useAlbumPlaybackActions", () => {
     result.current.handlePlayNextAlbum();
 
     expect(playerActions.playNext).not.toHaveBeenCalled();
-    expect(toast.success).not.toHaveBeenCalled();
+    expect(notify.success).not.toHaveBeenCalled();
   });
 });

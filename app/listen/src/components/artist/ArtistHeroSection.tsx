@@ -50,6 +50,8 @@ interface ArtistHeroSectionProps {
   onOpenBio: () => void;
 }
 
+const ARTIST_SECONDARY_ACTION_CLASS = "text-[0.6875rem] md:text-xs";
+
 function withHeroCacheBust(url: string) {
   return `${url}${url.includes("?") ? "&" : "?"}v=artist-hero-bg-v1`;
 }
@@ -197,6 +199,7 @@ export function ArtistHeroSection({
               icon: <Radio size={CRATE_ICON_SIZE.lg} />,
               onClick: onArtistRadio,
               ariaLabel: t("artist.actions.radio"),
+              className: ARTIST_SECONDARY_ACTION_CLASS,
             },
             {
               key: "setlist",
@@ -205,6 +208,7 @@ export function ArtistHeroSection({
               onClick: onPlaySetlist,
               disabled: !hasSetlist,
               ariaLabel: t("artist.actions.setlist"),
+              className: ARTIST_SECONDARY_ACTION_CLASS,
             },
           ]}
           secondaryExtra={
@@ -212,6 +216,7 @@ export function ArtistHeroSection({
               <FollowHeartButton
                 className={cn(
                   HERO_SECONDARY_ACTION_CLASS,
+                  ARTIST_SECONDARY_ACTION_CLASS,
                   following && HERO_SECONDARY_ACTION_ACTIVE_CLASS,
                 )}
                 following={following}
@@ -227,7 +232,10 @@ export function ArtistHeroSection({
               </FollowHeartButton>
               <button
                 type="button"
-                className={HERO_SECONDARY_ACTION_CLASS}
+                className={cn(
+                  HERO_SECONDARY_ACTION_CLASS,
+                  ARTIST_SECONDARY_ACTION_CLASS,
+                )}
                 onClick={onShare}
                 aria-label={t("common.share")}
               >
@@ -238,6 +246,7 @@ export function ArtistHeroSection({
                 entityType="artist"
                 entityUid={artist.entity_uid}
                 presentation="secondary-action"
+                className={ARTIST_SECONDARY_ACTION_CLASS}
               />
             </>
           }

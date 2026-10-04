@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
 import type { Dispatch, MutableRefObject } from "react";
 import type { NavigateFunction } from "react-router";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import type { Track } from "@/contexts/PlayerContext";
 import {
@@ -102,12 +102,12 @@ export function handleJamWebSocketControlMessage(
   }
 
   if (payload.type === "warning") {
-    if (payload.detail) toast.info(payload.detail);
+    if (payload.detail) notify.info(payload.detail);
     return true;
   }
 
   if (payload.type === "error") {
-    if (payload.detail) toast.error(payload.detail);
+    if (payload.detail) notify.error(payload.detail);
     return true;
   }
 
@@ -142,13 +142,13 @@ export function handleJamWebSocketControlMessage(
 
   if (payload.type === "room_ended" && payload.room) {
     dispatch({ type: "ROOM_ENDED", payload: payload.room });
-    toast.info(t("jam.toasts.remoteRoomEnded"));
+    notify.info(t("jam.toasts.remoteRoomEnded"));
     return true;
   }
 
   if (payload.type === "room_deleted") {
     dispatch({ type: "ROOM_DELETED" });
-    toast.info(t("jam.toasts.remoteRoomDeleted"));
+    notify.info(t("jam.toasts.remoteRoomDeleted"));
     navigate("/jam", { replace: true });
     return true;
   }

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Users } from "@crate/ui/icons";
+import { EmptyState } from "@crate/ui/domain/states";
 import { Link } from "react-router";
 
 import type { StatsPageController } from "@/pages/use-stats-page-controller";
@@ -37,14 +38,13 @@ export function StatsRecapSection({
 
 export function StatsEmptyState({ t }: { t: StatsPageController["t"] }) {
   return (
-    <div className="stats-card-empty mt-8 rounded-[12px] border border-dashed p-8 text-center">
-      <h2 className="text-xl font-black text-text-primary">
-        {t("stats.empty.title")}
-      </h2>
-      <p className="mx-auto mt-2 max-w-xl text-sm text-text-muted">
-        {t("stats.empty.body")}
-      </p>
-    </div>
+    <EmptyState
+      variant="dashed"
+      titleAs="h2"
+      title={t("stats.empty.title")}
+      description={t("stats.empty.body")}
+      className="mt-8"
+    />
   );
 }
 

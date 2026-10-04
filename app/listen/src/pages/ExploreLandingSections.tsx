@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, CRATE_ICON_SIZE, Radio } from "@crate/ui/icons";
 import { MediaRail, SectionHeader } from "@crate/ui/domain/lists";
@@ -26,6 +27,22 @@ const MOOD_COLORS: Record<string, string> = {
   groovy: "bg-state-success/20 text-state-success border-state-success/30",
   acoustic: "bg-state-warning/20 text-state-warning border-state-warning/30",
 };
+
+const MOOD_LABEL_KEY: Record<string, string> = {
+  energetic: "explore.moods.names.energetic",
+  chill: "explore.moods.names.chill",
+  dark: "explore.moods.names.dark",
+  happy: "explore.moods.names.happy",
+  melancholy: "explore.moods.names.melancholy",
+  intense: "explore.moods.names.intense",
+  groovy: "explore.moods.names.groovy",
+  acoustic: "explore.moods.names.acoustic",
+};
+
+function moodLabel(mood: string, t: TFunction) {
+  const key = MOOD_LABEL_KEY[mood];
+  return key ? t(key) : mood.charAt(0).toUpperCase() + mood.slice(1);
+}
 
 export function ExploreFeatureCard({
   title,
@@ -225,9 +242,7 @@ export function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
           0,
           {
             type: "playlist",
-            name: t("explore.moods.mixName", {
-              mood: mood.charAt(0).toUpperCase() + mood.slice(1),
-            }),
+            name: t("explore.moods.mixName", { mood: moodLabel(mood, t) }),
           },
         );
       } else {
@@ -260,8 +275,10 @@ export function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
               "bg-text-primary/5 text-text-primary/70 border-border-quiet"
             } active:scale-[0.98]`}
           >
-            <span className="text-sm font-medium capitalize">
-              {loadingMood === mood.name ? t("common.loadingShort") : mood.name}
+            <span className="text-sm font-medium">
+              {loadingMood === mood.name
+                ? t("common.loadingShort")
+                : moodLabel(mood.name, t)}
             </span>
             <span className="mt-0.5 block text-xs opacity-60">
               {t("common.trackCount", { count: mood.track_count })}

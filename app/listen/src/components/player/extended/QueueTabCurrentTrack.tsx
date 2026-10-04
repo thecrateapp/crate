@@ -9,13 +9,11 @@ export function QueueTabCurrentTrack({
   currentTrack,
   currentIndex,
   isPlaying,
-  sourceName,
   onSave,
 }: {
   currentTrack: Track;
   currentIndex: number;
   isPlaying: boolean;
-  sourceName: string;
   onSave: () => void;
 }) {
   const { t } = useTranslation();
@@ -24,7 +22,7 @@ export function QueueTabCurrentTrack({
     <div className="mb-4">
       <div className="mb-2 flex items-center justify-between px-1">
         <p className="text-xs font-bold uppercase tracking-wider text-text-muted">
-          {t("player.queue.nowPlayingFrom", { source: sourceName })}
+          {t("player.queue.nowPlaying")}
         </p>
         <Button
           variant="ghost"

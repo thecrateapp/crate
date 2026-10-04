@@ -44,7 +44,7 @@ vi.mock("@/lib/radio", () => ({
   fetchTrackRadio: vi.fn(),
 }));
 
-vi.mock("sonner", () => ({ toast }));
+vi.mock("@crate/ui/lib/notify", () => ({ notify: toast }));
 
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { I18nProvider, type ListenLocale } from "@/i18n";

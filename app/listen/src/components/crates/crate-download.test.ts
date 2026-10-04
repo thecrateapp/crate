@@ -27,7 +27,7 @@ vi.mock("@/lib/library-routes", async () => {
   return { ...actual, downloadApiUrl: (path: string) => `https://api${path}` };
 });
 
-vi.mock("sonner", () => ({ toast: mocks.toast }));
+vi.mock("@crate/ui/lib/notify", () => ({ notify: mocks.toast }));
 
 import {
   CRATE_DOWNLOAD_TIMEOUT_MS,

@@ -210,7 +210,11 @@ export function LibraryPlaylistsTab() {
 
       {!playlists || playlists.length === 0 ? (
         !followedCurated || followedCurated.length === 0 ? (
-          <EmptyState variant="inline" message={t("library.playlists.empty")} />
+          <EmptyState
+            variant="dashed"
+            title={t("library.playlists.emptyTitle")}
+            description={t("library.playlists.empty")}
+          />
         ) : null
       ) : (
         <div className="space-y-1">

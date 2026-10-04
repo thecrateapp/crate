@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { action, type MenuActionConfig } from "@crate/ui/domain/actions";
 
@@ -176,7 +176,7 @@ export function sharePath(
     });
     if (!opened) {
       await navigator.clipboard.writeText(url);
-      toast.success(options.copiedToast);
+      notify.success(options.copiedToast);
     }
   };
 }

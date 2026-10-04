@@ -32,10 +32,6 @@ vi.mock("@crate/ui/lib/notify", () => ({
   notify: { success: mocks.toastSuccess, error: mocks.toastError },
 }));
 
-vi.mock("sonner", () => ({
-  toast: { success: mocks.toastSuccess, error: mocks.toastError },
-}));
-
 import { ShareSheetHost } from "@/components/share/ShareSheet";
 import { openShareSheet, type SharePayload } from "@/lib/social-share";
 import { openExternalUrl } from "@/lib/external-links";

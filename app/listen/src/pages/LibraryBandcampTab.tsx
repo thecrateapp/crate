@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 
 import { EmptyState, LoadingState } from "@crate/ui/domain/states";
+import { Button } from "@crate/ui/shadcn/button";
 import { notify } from "@crate/ui/lib/notify";
 import { useApi } from "@/hooks/use-api";
 import { api, apiAssetUrl } from "@/lib/api";
@@ -126,18 +127,16 @@ export function LibraryBandcampTab() {
       />
 
       {!purchases.length ? (
-        <div className="space-y-3">
-          <EmptyState
-            variant="inline"
-            message={t("library.bandcamp.emptyPurchases")}
-          />
-          <Link
-            to="/settings"
-            className="inline-flex min-h-11 items-center rounded-full bg-accent-action px-4 text-sm font-bold text-accent-action-foreground"
-          >
-            {t("library.bandcamp.openSettings")}
-          </Link>
-        </div>
+        <EmptyState
+          variant="dashed"
+          title={t("library.bandcamp.emptyTitle")}
+          description={t("library.bandcamp.emptyPurchases")}
+          action={
+            <Button asChild size="sm">
+              <Link to="/settings">{t("library.bandcamp.openSettings")}</Link>
+            </Button>
+          }
+        />
       ) : (
         <LibraryBandcampPurchases
           purchases={purchases}

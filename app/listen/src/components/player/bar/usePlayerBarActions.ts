@@ -1,6 +1,6 @@
 import { useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 import type { Track } from "@/contexts/player-types";
 import {
   preloadEqualizerPopover,
@@ -212,7 +212,7 @@ export function usePlayerBarActions({
       triggerHaptic("selection");
       void toggleLike().then((nextLiked) => {
         if (nextLiked === null) return;
-        toast.success(
+        notify.success(
           nextLiked ? "Added to liked tracks" : "Removed from liked tracks",
         );
       });
@@ -236,7 +236,7 @@ export function usePlayerBarActions({
         displayTrack.path || displayTrack.id,
         displayTrack.globalTrackUid ?? null,
       );
-      toast.success(t("player.toasts.addedToCollection"));
+      notify.success(t("player.toasts.addedToCollection"));
     } catch {
       // The collection action reports failures through its own UI.
     }

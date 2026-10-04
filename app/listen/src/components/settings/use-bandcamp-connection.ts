@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { api } from "@/lib/api";
 import { isTauriRuntime } from "@/lib/platform";
@@ -63,7 +63,7 @@ export function useBandcampConnection() {
     ) => {
       const trimmedCookie = cookie.trim();
       if (!trimmedCookie) {
-        toast.error(t("settings.bandcamp.toasts.cookieRequired"));
+        notify.error(t("settings.bandcamp.toasts.cookieRequired"));
         return;
       }
       setBusy(
@@ -76,11 +76,11 @@ export function useBandcampConnection() {
           cookie: trimmedCookie,
           connection_method: connectionMethod,
         });
-        toast.success(t("settings.bandcamp.toasts.connected"));
+        notify.success(t("settings.bandcamp.toasts.connected"));
         setBandcampCookie("");
         await loadBandcamp();
       } catch (error) {
-        toast.error(
+        notify.error(
           (error as Error).message ||
             t("settings.bandcamp.toasts.connectFailed"),
         );
@@ -112,13 +112,13 @@ export function useBandcampConnection() {
 
   const openTauriBandcampInterceptor = useCallback(async () => {
     if (!window.__crateTauriInvoke) {
-      toast.error(t("settings.bandcamp.toasts.desktopUnavailable"));
+      notify.error(t("settings.bandcamp.toasts.desktopUnavailable"));
       return;
     }
     setBusy("tauri-connect");
     try {
       await window.__crateTauriInvoke("open_bandcamp_cookie_interceptor");
-      toast.info(t("settings.bandcamp.toasts.finishLogin"));
+      notify.info(t("settings.bandcamp.toasts.finishLogin"));
       window.setTimeout(
         () => {
           setBusy((current) => (current === "tauri-connect" ? null : current));
@@ -126,7 +126,7 @@ export function useBandcampConnection() {
         5 * 60 * 1000,
       );
     } catch (error) {
-      toast.error(
+      notify.error(
         (error as Error).message ||
           t("settings.bandcamp.toasts.openLoginFailed"),
       );
@@ -141,7 +141,7 @@ export function useBandcampConnection() {
         "/api/bandcamp/me/sync",
         "POST",
       );
-      toast.success(t("settings.bandcamp.toasts.syncStarted"));
+      notify.success(t("settings.bandcamp.toasts.syncStarted"));
       const deadline = Date.now() + 5 * 60 * 1000;
       while (Date.now() < deadline) {
         await delay(1500);
@@ -170,7 +170,7 @@ export function useBandcampConnection() {
           ]
             .filter(Boolean)
             .join(", ");
-          toast.success(
+          notify.success(
             suffix
               ? t("settings.bandcamp.toasts.syncCompleteWithSummary", {
                   summary: suffix,
@@ -180,13 +180,13 @@ export function useBandcampConnection() {
           return;
         }
         if (task.status === "failed" || task.status === "cancelled") {
-          toast.error(task.error || t("settings.bandcamp.toasts.syncFailed"));
+          notify.error(task.error || t("settings.bandcamp.toasts.syncFailed"));
           return;
         }
       }
-      toast.info(t("settings.bandcamp.toasts.syncBackground"));
+      notify.info(t("settings.bandcamp.toasts.syncBackground"));
     } catch (error) {
-      toast.error(
+      notify.error(
         (error as Error).message || t("settings.bandcamp.toasts.syncFailed"),
       );
     } finally {
@@ -198,10 +198,10 @@ export function useBandcampConnection() {
     setBusy("disconnect");
     try {
       await api("/api/bandcamp/me/disconnect", "POST");
-      toast.success(t("settings.bandcamp.toasts.disconnected"));
+      notify.success(t("settings.bandcamp.toasts.disconnected"));
       await loadBandcamp();
     } catch (error) {
-      toast.error(
+      notify.error(
         (error as Error).message ||
           t("settings.bandcamp.toasts.disconnectFailed"),
       );

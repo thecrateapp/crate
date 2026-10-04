@@ -136,14 +136,6 @@ describe("Home", () => {
   beforeEach(() => {
     viewportState.isDesktop = false;
     vi.stubGlobal("EventSource", MockEventSource);
-    vi.stubGlobal(
-      "ResizeObserver",
-      class ResizeObserver {
-        observe() {}
-        unobserve() {}
-        disconnect() {}
-      },
-    );
     vi.mocked(useApi).mockReturnValue({
       data: homeDiscoveryPayload(),
       loading: false,

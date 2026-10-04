@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2, Plus } from "@crate/ui/icons";
 import { Button } from "@crate/ui/shadcn/button";
+import { EmptyState } from "@crate/ui/domain/states";
 import { notify } from "@crate/ui/lib/notify";
 
 import { CrateCard } from "@/components/CrateCard";
@@ -189,14 +190,11 @@ export function Crates({ onCrateChange }: CratesProps) {
             {crates.map((crate) => renderCrateCard(crate, true))}
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-border-quiet px-5 py-12 text-center">
-            <h3 className="text-base font-semibold text-text-primary">
-              {t("library.crates.emptyTitle")}
-            </h3>
-            <p className="mx-auto mt-2 max-w-sm text-sm text-text-muted">
-              {t("library.crates.emptyDescription")}
-            </p>
-          </div>
+          <EmptyState
+            variant="dashed"
+            title={t("library.crates.emptyTitle")}
+            description={t("library.crates.emptyDescription")}
+          />
         )}
       </section>
       <section
@@ -221,9 +219,10 @@ export function Crates({ onCrateChange }: CratesProps) {
             {followedCrates.map((crate) => renderCrateCard(crate, false))}
           </div>
         ) : (
-          <p className="rounded-xl border border-dashed border-border-quiet px-5 py-8 text-center text-sm text-text-muted">
-            {t("library.crates.followedEmpty")}
-          </p>
+          <EmptyState
+            variant="dashed"
+            message={t("library.crates.followedEmpty")}
+          />
         )}
       </section>
       <CrateCreateModal

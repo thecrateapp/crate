@@ -60,7 +60,7 @@ export function PlaylistIdentitySection({
 
   return (
     <div className="flex items-start gap-4">
-      <div className="relative shrink-0">
+      <div className="flex w-24 shrink-0 flex-col gap-2 sm:w-28">
         <PlaylistArtwork
           name={name || t("playlistComposer.newPlaylist")}
           coverDataUrl={coverDataUrl}
@@ -69,10 +69,10 @@ export function PlaylistIdentitySection({
         />
         <button
           type="button"
-          className="absolute inset-x-2 bottom-2 inline-flex items-center justify-center gap-1 rounded-full bg-surface-canvas/65 px-2.5 py-1.5 text-xs font-medium text-text-primary backdrop-blur-md transition-colors hover:bg-surface-canvas/80"
+          className="inline-flex w-full items-center justify-center gap-1 rounded-full bg-text-primary/5 px-2 py-1.5 text-center text-xs font-medium leading-4 text-text-primary outline-none transition-colors hover:bg-text-primary/10 focus-visible:shadow-focus"
           onClick={() => fileInputRef.current?.click()}
         >
-          <Upload size={CRATE_ICON_SIZE.micro} />
+          <Upload size={CRATE_ICON_SIZE.micro} className="shrink-0" />
           {t("playlistComposer.editCover")}
         </button>
         <input

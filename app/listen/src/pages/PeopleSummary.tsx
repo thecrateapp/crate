@@ -24,7 +24,7 @@ export function PeopleSummary({
     : "/people";
 
   return (
-    <div className="rounded-[12px] border border-border-quiet bg-text-primary/5 p-5 sm:p-6">
+    <div>
       <PageHeader title={t("people.title")} subtitle={t("people.subtitle")} />
 
       <div className="mt-5 grid gap-3 sm:grid-cols-4">
@@ -69,7 +69,7 @@ export function PeopleSummary({
             {data?.following_count ?? "—"}
           </div>
         </Link>
-        <div className="border-t border-border-quiet p-4">
+        <div className="rounded-xl border border-border-quiet bg-text-primary/[0.03] p-4">
           <div className="text-xs uppercase tracking-wide text-text-muted">
             {t("people.friends")}
           </div>

@@ -87,7 +87,7 @@ export function Paths() {
   };
 
   return (
-    <div className="animate-page-in space-y-6 px-4  sm:p-6">
+    <div className="animate-page-in space-y-6 sm:py-6">
       <div className="flex items-center gap-3">
         <Route size={22} className="text-accent-action" />
         <div>

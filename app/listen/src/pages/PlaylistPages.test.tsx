@@ -108,8 +108,8 @@ vi.mock("@/components/playlists/PlaylistHeroSection", () => ({
   ),
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
+vi.mock("@crate/ui/lib/notify", () => ({
+  notify: {
     error: vi.fn(),
     info: vi.fn(),
     success: vi.fn(),

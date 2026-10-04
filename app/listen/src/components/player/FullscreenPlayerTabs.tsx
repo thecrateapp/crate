@@ -128,7 +128,7 @@ export function FullscreenPlayerQueueTab({
     >
       <div className="px-4 py-3">
         <p className="mb-2 text-xs font-medium uppercase tracking-wider text-text-muted">
-          {t("player.queue.upNextTracks", {
+          {t("player.queue.nextUp", {
             count: player.upcomingTracks.length,
           })}
         </p>

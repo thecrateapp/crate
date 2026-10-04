@@ -162,11 +162,6 @@
   --artwork-text-shadow: 0 2px 18px var(--surface-glass-shadow);
   --artwork-kicker-shadow: 0 1px 10px var(--surface-glass-shadow);
   --artwork-compact-mark-shadow: 0 1px 6px var(--surface-glass-shadow);
-  --user-profile-badge-rose-border: color-mix(
-    in srgb,
-    var(--state-danger) 30%,
-    transparent
-  );
   --hero-artwork-gradient-mobile: linear-gradient(
     to bottom,
     transparent 0%,

@@ -119,8 +119,9 @@ export function LibraryContributionsTab() {
 
       {!contributions.length ? (
         <EmptyState
-          variant="inline"
-          message={t("library.contributions.empty")}
+          variant="dashed"
+          title={t("library.contributions.emptyTitle")}
+          description={t("library.contributions.empty")}
         />
       ) : (
         <div className="grid gap-3 md:grid-cols-2">

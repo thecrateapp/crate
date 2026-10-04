@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 import { Radio, Share2, Tag } from "@crate/ui/icons";
 
 import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
@@ -34,12 +34,12 @@ export async function startGenreRadio(
   try {
     const radio = await startShapedRadio("seeded", "genre", slug);
     if (!radio?.tracks.length) {
-      toast.info(t("genre.toasts.radioUnavailable"));
+      notify.info(t("genre.toasts.radioUnavailable"));
       return;
     }
     playAll(radio.tracks, 0, radio.source);
   } catch {
-    toast.error(t("genre.toasts.radioFailed"));
+    notify.error(t("genre.toasts.radioFailed"));
   }
 }
 

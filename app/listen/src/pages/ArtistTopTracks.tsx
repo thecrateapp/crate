@@ -127,7 +127,10 @@ export function ArtistTopTracks() {
           </div>
         </div>
 
-        <Button className="rounded-lg px-5" onClick={handlePlayAll}>
+        <Button
+          className="rounded-lg px-5 has-[>svg]:px-5"
+          onClick={handlePlayAll}
+        >
           <Play size={CRATE_ICON_SIZE.sm} fill="currentColor" />
           {t("player.play")}
         </Button>

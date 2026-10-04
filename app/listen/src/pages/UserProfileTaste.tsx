@@ -10,11 +10,11 @@ import {
 
 function ProfileMiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="user-profile-stat rounded-xl px-3 py-2">
+    <div className="user-profile-stat min-w-0 rounded-xl px-3 py-2">
       <div className="truncate text-lg font-black text-text-primary">
         {value}
       </div>
-      <div className="mt-0.5 truncate text-xs font-bold uppercase tracking-[0.14em] text-text-muted">
+      <div className="mt-0.5 break-words text-xs font-bold uppercase leading-4 tracking-[0.08em] text-text-muted">
         {label}
       </div>
     </div>

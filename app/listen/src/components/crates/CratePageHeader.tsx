@@ -18,7 +18,8 @@ import { UserProfileLink } from "@/components/social/UserProfileLink";
 import { UserProfileAvatar } from "@/pages/UserProfileAvatar";
 import type { CrateDetail } from "@/pages/crates-types";
 
-export const CRATE_SECONDARY_ACTION_CLASS = "min-w-0 px-0 md:px-1.5";
+export const CRATE_SECONDARY_ACTION_CLASS =
+  "min-w-0 px-0 text-[0.6875rem] md:px-1.5 md:text-xs";
 
 export function CrateHero({
   crate,

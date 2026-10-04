@@ -94,15 +94,8 @@ function crateDetail(name: string): CrateDetail {
   };
 }
 
-class ResizeObserverStub {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-}
-
 describe("CrateEditor", () => {
   beforeEach(() => {
-    vi.stubGlobal("ResizeObserver", ResizeObserverStub);
     mocks.crate = crateDetail("Original name");
     mocks.api.mockReset();
     mocks.dndOnDragEnd = null;

@@ -28,7 +28,7 @@ import {
   HERO_SECONDARY_ACTION_CLASS,
   type HeroSecondaryAction,
 } from "@crate/ui/domain/hero";
-import { ErrorState } from "@crate/ui/domain/states";
+import { EmptyState, ErrorState } from "@crate/ui/domain/states";
 import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import { Button } from "@crate/ui/shadcn/button";
 import { useTranslation } from "react-i18next";
@@ -571,9 +571,7 @@ function CrateAlbumList({
           ))}
         </ol>
       ) : (
-        <div className="rounded-xl border border-dashed border-border-quiet px-5 py-12 text-center text-sm text-text-muted">
-          {t("crate.page.noAlbums")}
-        </div>
+        <EmptyState variant="dashed" message={t("crate.page.noAlbums")} />
       )}
     </section>
   );
@@ -730,7 +728,6 @@ function CratePageActions({
       }
       secondaryActions={secondaryActions}
       menu={entries.length > 0 ? { actions: entries } : undefined}
-      mobileMenuPortal={false}
     />
   );
 }

@@ -381,7 +381,10 @@ describe("Crate page", () => {
       within(secondary)
         .getAllByRole("button")
         .map((button) => button.textContent),
-    ).toEqual(["Radio", "Offline", "Members", "Edit", "Share", "More"]);
+    ).toEqual(["Radio", "Offline", "Members", "Edit", "Share"]);
+    expect(screen.getByTestId("hero-mobile-menu-trigger")).toHaveAccessibleName(
+      "More",
+    );
     expect(
       screen.getByRole("group", { name: "Play Crate" }),
     ).toBeInTheDocument();

@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { apiWsUrl } from "@/lib/api";
 import type { JamRoom, JamSessionAction } from "@/pages/jam-reducer";
@@ -74,7 +74,7 @@ export function useJamWebSocket({
       if (!socket || socket.readyState !== WebSocket.OPEN) {
         const message = tRef.current("jam.connection.notOpen");
         dispatch({ type: "SEND_EVENT_FAIL", payload: message });
-        toast.error(message);
+        notify.error(message);
         return false;
       }
       socket.send(JSON.stringify(payload));
@@ -177,7 +177,7 @@ export function useJamWebSocket({
         if (cancelled) return;
 
         if (!shouldReconnectJamClose(event.code)) {
-          toast.error(jamCloseMessage(event.code, tRef.current));
+          notify.error(jamCloseMessage(event.code, tRef.current));
           return;
         }
 

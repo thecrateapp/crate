@@ -72,7 +72,6 @@ export function Shell({ children }: { children?: ReactNode }) {
           headerOffsetClass={headerOffsetClass}
           headerScrolled={headerScrolled}
           homeDesktopOverlay={homeDesktopOverlay}
-          overlayHeader={overlayHeader}
           sidebarLeft={sidebarExpanded ? "left-52" : "left-14"}
           sidebarW={sidebarExpanded ? "ml-52" : "ml-14"}
         />

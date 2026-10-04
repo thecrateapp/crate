@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
@@ -77,7 +77,7 @@ export function useRadioController() {
         stationSeedValue(station),
       );
       if (!result) {
-        toast.error(t("radio.toasts.startFailed"));
+        notify.error(t("radio.toasts.startFailed"));
         dispatch({ type: "start-failed" });
         return;
       }
@@ -99,7 +99,7 @@ export function useRadioController() {
       dispatch({ type: "search-cleared" });
       const result = await startShapedRadio("seeded", seed.type, seed.value);
       if (!result) {
-        toast.error(t("radio.toasts.startFailed"));
+        notify.error(t("radio.toasts.startFailed"));
         dispatch({ type: "start-failed" });
         return;
       }
@@ -118,7 +118,7 @@ export function useRadioController() {
     dispatch({ type: "start-request" });
     const result = await startShapedRadio("discovery");
     if (!result) {
-      toast.error(t("radio.toasts.discoveryUnavailable"));
+      notify.error(t("radio.toasts.discoveryUnavailable"));
       dispatch({ type: "start-failed" });
       return;
     }

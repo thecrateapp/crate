@@ -20,7 +20,7 @@ import {
   Shuffle,
   UserRound,
 } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
 import {
@@ -300,10 +300,10 @@ export function useAlbumActionEntries(
     async function loadTracks() {
       try {
         const tracks = await fetchAlbumTracks(input);
-        if (!tracks.length) toast.info(t("actions.album.toasts.noTracks"));
+        if (!tracks.length) notify.info(t("actions.album.toasts.noTracks"));
         return tracks;
       } catch {
-        toast.error(t("actions.album.toasts.loadFailed"));
+        notify.error(t("actions.album.toasts.loadFailed"));
         return [];
       }
     }
@@ -333,7 +333,7 @@ export function useAlbumActionEntries(
           const tracks = await loadTracks();
           if (!tracks.length) return;
           [...tracks].reverse().forEach((track) => playNext(track));
-          toast.success(t("album.toasts.queuedNext"));
+          notify.success(t("album.toasts.queuedNext"));
         },
         onShuffle: async () => {
           const tracks = await loadTracks();
@@ -359,7 +359,7 @@ export function useAlbumActionEntries(
               crate.albumUids.includes(input.globalAlbumUid),
           );
           if (alreadyInCrate) {
-            toast.info(t("album.toasts.alreadyInCrate", { name: crate.name }));
+            notify.info(t("album.toasts.alreadyInCrate", { name: crate.name }));
             return;
           }
           try {
@@ -367,15 +367,15 @@ export function useAlbumActionEntries(
               global_album_uid: input.globalAlbumUid,
             });
             setCratePickerOpen(false);
-            toast.success(t("album.toasts.addedToCrate"));
+            notify.success(t("album.toasts.addedToCrate"));
           } catch (error) {
             if ((error as { status?: number }).status === 409) {
-              toast.info(
+              notify.info(
                 t("album.toasts.alreadyInCrate", { name: crate.name }),
               );
               return;
             }
-            toast.error(t("album.toasts.addToCrateFailed"));
+            notify.error(t("album.toasts.addToCrateFailed"));
           }
         },
         onTogglePlaylistPicker: () => {
@@ -396,9 +396,9 @@ export function useAlbumActionEntries(
               tracks: tracks.map((track) => toTrackReferencePayload(track)),
             });
             setPlaylistPickerOpen(false);
-            toast.success(t("album.toasts.addedToPlaylist"));
+            notify.success(t("album.toasts.addedToPlaylist"));
           } catch {
-            toast.error(t("album.toasts.addToPlaylistFailed"));
+            notify.error(t("album.toasts.addToPlaylistFailed"));
           }
         },
         onToggleSaved: async () => {
@@ -416,12 +416,12 @@ export function useAlbumActionEntries(
               albumName: input.album,
             });
             if (!radio.tracks.length) {
-              toast.info(t("actions.album.toasts.radioUnavailable"));
+              notify.info(t("actions.album.toasts.radioUnavailable"));
               return;
             }
             playAll(radio.tracks, 0, radio.source);
           } catch {
-            toast.error(t("actions.album.toasts.radioFailed"));
+            notify.error(t("actions.album.toasts.radioFailed"));
           }
         },
         onToggleOffline: async () => {
@@ -430,13 +430,13 @@ export function useAlbumActionEntries(
               albumId: input.albumId,
               title: input.album,
             });
-            toast.success(
+            notify.success(
               result === "removed"
                 ? t("actions.offline.toasts.removed")
                 : t("actions.album.toasts.offlineReady"),
             );
           } catch (error) {
-            toast.error(
+            notify.error(
               (error as Error).message ||
                 t("actions.offline.toasts.updateFailed"),
             );

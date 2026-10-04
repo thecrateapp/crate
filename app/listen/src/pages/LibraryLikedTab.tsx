@@ -82,7 +82,13 @@ export function LibraryLikedTab() {
 
   if (loading) return <LoadingState label={t("common.loadingShort")} />;
   if (!tracks || tracks.length === 0) {
-    return <EmptyState variant="inline" message={t("library.liked.empty")} />;
+    return (
+      <EmptyState
+        variant="dashed"
+        title={t("library.liked.emptyTitle")}
+        description={t("library.liked.empty")}
+      />
+    );
   }
 
   function handlePlayAll() {

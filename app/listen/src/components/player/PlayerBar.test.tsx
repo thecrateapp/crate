@@ -71,8 +71,8 @@ vi.mock("@/lib/haptics", () => ({
   triggerHaptic: triggerHapticMock,
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
+vi.mock("@crate/ui/lib/notify", () => ({
+  notify: {
     success: toastSuccessMock,
     error: vi.fn(),
   },

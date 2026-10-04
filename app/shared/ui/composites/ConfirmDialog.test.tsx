@@ -307,6 +307,32 @@ describe("ConfirmDialog", () => {
     },
   );
 
+  it("logs the confirm error and keeps the dialog open when onError is absent", async () => {
+    const error = new Error("boom");
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const onOpenChange = vi.fn();
+    try {
+      render(
+        <ConfirmDialog
+          open
+          onOpenChange={onOpenChange}
+          title="Delete?"
+          onConfirm={() => Promise.reject(error)}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: "Confirm" }));
+
+      expect(consoleError).toHaveBeenCalledWith(error);
+      expect(onOpenChange).not.toHaveBeenCalled();
+      expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("forwards translatable aria and backdrop labels", () => {
     render(
       <ConfirmDialog

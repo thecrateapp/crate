@@ -9,7 +9,7 @@ import {
   Share2,
   Shuffle,
 } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
 import {
@@ -154,7 +154,7 @@ export function useArtistActionEntries(
       try {
         const tracks = await fetchArtistTopTracks(input);
         if (!tracks.length) {
-          toast.info(t("actions.artist.toasts.noTopTracks"));
+          notify.info(t("actions.artist.toasts.noTopTracks"));
           return;
         }
         playAll(shuffle ? shuffleArray(tracks) : tracks, 0, {
@@ -164,7 +164,7 @@ export function useArtistActionEntries(
           }),
         });
       } catch {
-        toast.error(t("actions.artist.toasts.loadTopTracksFailed"));
+        notify.error(t("actions.artist.toasts.loadTopTracksFailed"));
       }
     };
 
@@ -187,12 +187,12 @@ export function useArtistActionEntries(
         try {
           const radio = await fetchArtistRadio(radioSeed, input.name);
           if (!radio.tracks.length) {
-            toast.info(t("actions.artist.toasts.radioUnavailable"));
+            notify.info(t("actions.artist.toasts.radioUnavailable"));
             return;
           }
           playAll(radio.tracks, 0, radio.source);
         } catch {
-          toast.error(t("actions.artist.toasts.radioFailed"));
+          notify.error(t("actions.artist.toasts.radioFailed"));
         }
       },
       onShare: sharePath(artistShare || artistPath, input.name, {

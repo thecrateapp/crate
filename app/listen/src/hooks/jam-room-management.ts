@@ -1,6 +1,6 @@
 import type { NavigateFunction } from "react-router";
 import type { TFunction } from "i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import type { AuthUser } from "@/contexts/auth-context";
 import { api } from "@/lib/api";
@@ -86,7 +86,7 @@ export function createJamRoomManagement({
   async function handleCreateRoom() {
     const name = roomName.trim();
     if (!name) {
-      toast.error(t("jam.toasts.roomNameRequired"));
+      notify.error(t("jam.toasts.roomNameRequired"));
       return;
     }
     setCreating(true);
@@ -103,7 +103,7 @@ export function createJamRoomManagement({
       });
       navigate(`/jam/rooms/${created.id}`);
     } catch {
-      toast.error(t("jam.toasts.createRoomFailed"));
+      notify.error(t("jam.toasts.createRoomFailed"));
     } finally {
       setCreating(false);
     }
@@ -127,7 +127,7 @@ export function createJamRoomManagement({
       refetchRooms();
       navigate(`/jam/rooms/${joined.room.id}`);
     } catch {
-      toast.error(t("jam.toasts.joinRoomFailed"));
+      notify.error(t("jam.toasts.joinRoomFailed"));
     } finally {
       setJoiningRoomId(null);
     }
@@ -162,11 +162,11 @@ export function createJamRoomManagement({
       setRoom((current) =>
         current ? { ...current, ...updated, ...patch } : updated,
       );
-      toast.success(t("jam.toasts.roomSettingsUpdated"));
+      notify.success(t("jam.toasts.roomSettingsUpdated"));
       return true;
     } catch {
       setRoom(previousRoom);
-      toast.error(t("jam.toasts.roomSettingsUpdateFailed"));
+      notify.error(t("jam.toasts.roomSettingsUpdateFailed"));
       return false;
     } finally {
       setUpdatingRoomField(null);
@@ -203,7 +203,7 @@ export function createJamRoomManagement({
       setInviteData(invite);
       setInviteModalOpen(true);
     } catch {
-      toast.error(t("jam.toasts.createInviteFailed"));
+      notify.error(t("jam.toasts.createInviteFailed"));
     } finally {
       setCreatingInvite(false);
     }
@@ -220,9 +220,9 @@ export function createJamRoomManagement({
       );
       setRoom(updated);
       setSyncStatus("idle");
-      toast.success(t("jam.toasts.roomEnded"));
+      notify.success(t("jam.toasts.roomEnded"));
     } catch {
-      toast.error(t("jam.toasts.roomEndFailed"));
+      notify.error(t("jam.toasts.roomEndFailed"));
     } finally {
       setEndingRoom(false);
     }
@@ -242,12 +242,12 @@ export function createJamRoomManagement({
         `/api/jam/rooms/${targetRoom.id}`,
         "DELETE",
       );
-      toast.success(t("jam.toasts.roomDeleted"));
+      notify.success(t("jam.toasts.roomDeleted"));
       refetchRooms();
       setDeleteTargetRoom(null);
       if (roomId === targetRoom.id) navigate("/jam", { replace: true });
     } catch {
-      toast.error(t("jam.toasts.roomDeleteFailed"));
+      notify.error(t("jam.toasts.roomDeleteFailed"));
     } finally {
       setDeletingRoomId(null);
     }
@@ -256,9 +256,9 @@ export function createJamRoomManagement({
   async function copyInviteLink(link: string) {
     try {
       await navigator.clipboard.writeText(link);
-      toast.success(t("jam.toasts.inviteLinkCopied"));
+      notify.success(t("jam.toasts.inviteLinkCopied"));
     } catch {
-      toast.error(t("jam.toasts.inviteLinkCopyFailed"));
+      notify.error(t("jam.toasts.inviteLinkCopyFailed"));
     }
   }
 

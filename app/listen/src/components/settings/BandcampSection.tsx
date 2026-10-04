@@ -201,7 +201,7 @@ function BandcampConnectInstructions({
             {t("settings.bandcamp.cookieInstructionsPrefix")}{" "}
             <span className="font-mono text-state-warning">identity</span>{" "}
             {t("settings.bandcamp.cookieInstructionsFrom")}{" "}
-            <span className="font-mono text-state-warning">bandcamp.com</span>.
+            <span className="font-mono text-state-warning">bandcamp.com</span>.{" "}
             {t("settings.bandcamp.cookieInstructionsSuffix")}{" "}
             <span className="font-mono text-state-warning">Cookie</span>{" "}
             {t("settings.bandcamp.cookieInstructionsHeader")}{" "}

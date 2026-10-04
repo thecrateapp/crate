@@ -17,7 +17,7 @@ import {
   Share2,
   UserRound,
 } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
 import {
@@ -171,7 +171,7 @@ export function useTrackActionEntries(
             input.track.path,
             globalTrackUid,
           );
-          toast.success(
+          notify.success(
             liked
               ? t("actions.track.toasts.unliked")
               : t("actions.track.toasts.liked"),
@@ -193,12 +193,12 @@ export function useTrackActionEntries(
               title: input.track.title,
             });
             if (!radio.tracks.length) {
-              toast.info(t("actions.track.toasts.radioUnavailable"));
+              notify.info(t("actions.track.toasts.radioUnavailable"));
               return;
             }
             playAll(radio.tracks, 0, radio.source);
           } catch {
-            toast.error(t("actions.track.toasts.radioFailed"));
+            notify.error(t("actions.track.toasts.radioFailed"));
           }
         },
       }),
@@ -233,13 +233,13 @@ export function useTrackActionEntries(
               path: input.track.path ?? null,
               title: input.track.title,
             });
-            toast.success(
+            notify.success(
               result === "removed"
                 ? t("actions.offline.toasts.removed")
                 : t("actions.track.toasts.offlineReady"),
             );
           } catch (error) {
-            toast.error(
+            notify.error(
               (error as Error).message ||
                 t("actions.offline.toasts.updateFailed"),
             );
@@ -295,9 +295,9 @@ export function useTrackActionEntries(
               onSelect: async () => {
                 try {
                   await input.onAddToPlaylist?.(playlist.id, input.track);
-                  toast.success(t("actions.track.toasts.addedToPlaylist"));
+                  notify.success(t("actions.track.toasts.addedToPlaylist"));
                 } catch {
-                  toast.error(t("playlist.toasts.trackAddFailed"));
+                  notify.error(t("playlist.toasts.trackAddFailed"));
                 }
               },
             }),

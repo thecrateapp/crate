@@ -25,7 +25,7 @@ import {
   captureNativePlaybackRecoveryIntent,
   isNativePlaybackRecoveryIntentCurrent,
 } from "@/lib/native-playback-intent";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 type ValueRef<T> = { readonly current: T };
 type MutableValueRef<T> = { current: T };
@@ -289,7 +289,7 @@ export function useNativePlaybackEventBridge({
         void recovery
           .then((outcome) => {
             if (outcome !== "failed") return;
-            toast.error(tRef.current("player.native.resumeTitle"), {
+            notify.error(tRef.current("player.native.resumeTitle"), {
               description: tRef.current("player.native.resumeDescription"),
             });
           })
@@ -298,7 +298,7 @@ export function useNativePlaybackEventBridge({
               "[native-player] failed to authorize restored playback:",
               error,
             );
-            toast.error(tRef.current("player.native.resumeTitle"), {
+            notify.error(tRef.current("player.native.resumeTitle"), {
               description: tRef.current("player.native.resumeDescription"),
             });
           });
@@ -317,7 +317,7 @@ export function useNativePlaybackEventBridge({
         if (retryNativePlaybackAfterAuthError(nativeError)) {
           return;
         }
-        toast.error(tRef.current("player.native.playbackFailed"), {
+        notify.error(tRef.current("player.native.playbackFailed"), {
           description: summary,
           duration: 9000,
         });

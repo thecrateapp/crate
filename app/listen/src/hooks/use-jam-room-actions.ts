@@ -1,6 +1,6 @@
 import { type Dispatch, type RefObject } from "react";
 import type { TFunction } from "i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 import type { DragEndEvent } from "@dnd-kit/core";
 
 import type { Track } from "@/contexts/PlayerContext";
@@ -85,15 +85,15 @@ export function useJamRoomActions({
 }) {
   function shareCurrentTrack() {
     if (!canSuggestTrack) {
-      toast.error(t("jam.toasts.queuePermissionDenied"));
+      notify.error(t("jam.toasts.queuePermissionDenied"));
       return;
     }
     if (!currentTrack) {
-      toast.info(t("jam.toasts.playSomethingFirst"));
+      notify.info(t("jam.toasts.playSomethingFirst"));
       return;
     }
     if (currentTrackAlreadyQueued) {
-      toast.info(t("jam.toasts.trackAlreadyInQueue"));
+      notify.info(t("jam.toasts.trackAlreadyInQueue"));
       return;
     }
     const sent = sendEvent({
@@ -102,7 +102,7 @@ export function useJamRoomActions({
       source: "current_track",
     });
     if (sent) {
-      toast.success(
+      notify.success(
         t(
           canAddToQueue
             ? "jam.toasts.sharedTrack"
@@ -115,12 +115,12 @@ export function useJamRoomActions({
 
   function addSearchTrackToRoom(track: SearchTrack) {
     if (!canSuggestTrack) {
-      toast.error(t("jam.toasts.queuePermissionDenied"));
+      notify.error(t("jam.toasts.queuePermissionDenied"));
       return;
     }
     const playable = searchTrackToTrack(track);
     if (queueItems.some((item) => playerTracksMatch(item.track, playable))) {
-      toast.info(t("jam.toasts.trackAlreadyInQueue"));
+      notify.info(t("jam.toasts.trackAlreadyInQueue"));
       return;
     }
     const sent = sendEvent({
@@ -129,7 +129,7 @@ export function useJamRoomActions({
       source: "search",
     });
     if (sent) {
-      toast.success(
+      notify.success(
         t(
           canAddToQueue ? "jam.toasts.addedTrack" : "jam.toasts.requestedTrack",
           { title: playable.title },
@@ -143,7 +143,7 @@ export function useJamRoomActions({
   function syncPlaybackState() {
     const activeTrack = roomCurrentTrack || currentTrack;
     if (!activeTrack) {
-      toast.info(t("jam.toasts.noCurrentTrackToSync"));
+      notify.info(t("jam.toasts.noCurrentTrackToSync"));
       return;
     }
     if (
@@ -156,7 +156,7 @@ export function useJamRoomActions({
       })
     ) {
       setSyncStatus(isPlaying ? "synced" : "idle");
-      toast.success(
+      notify.success(
         isPlaying
           ? t("jam.toasts.syncedPlayback")
           : t("jam.toasts.syncedPause"),
@@ -168,11 +168,11 @@ export function useJamRoomActions({
     if (!isHost || !isConnected) return;
     const tracks = queueItems.map((item) => item.track);
     if (tracks.length === 0) {
-      toast.info(t("jam.toasts.roomQueueEmpty"));
+      notify.info(t("jam.toasts.roomQueueEmpty"));
       return;
     }
     if (sendEvent({ type: "queue_play" })) {
-      toast.success(t("jam.toasts.roomQueueLoaded"));
+      notify.success(t("jam.toasts.roomQueueLoaded"));
     }
   }
 
@@ -214,7 +214,7 @@ export function useJamRoomActions({
 
   function handleRemoveFromRoomQueue(queueItemId: string) {
     if (!canManageQueue) {
-      toast.error(t("jam.toasts.queuePermissionDenied"));
+      notify.error(t("jam.toasts.queuePermissionDenied"));
       return;
     }
     if (queueItemId.startsWith("legacy-")) {
@@ -244,7 +244,7 @@ export function useJamRoomActions({
     toIndex: number,
   ) {
     if (!canManageQueue) {
-      toast.error(t("jam.toasts.queuePermissionDenied"));
+      notify.error(t("jam.toasts.queuePermissionDenied"));
       return;
     }
     if (toIndex < 0 || toIndex >= queueItems.length) return;
