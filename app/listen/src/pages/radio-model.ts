@@ -1,4 +1,3 @@
-import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { albumCoverApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
 
 export type EndpointType = "artist" | "genre" | "album" | "track";
@@ -132,40 +131,12 @@ export function radioReducer(
   }
 }
 
-export function stationTypeLabelKey(station: PersonalizedRadioStation): string {
-  return station.seed_type === "genre"
-    ? "radio.stationType.genre"
-    : "radio.stationType.artist";
-}
-
 export function stationLabel(station: PersonalizedRadioStation): string {
   return (
     station.seed_label ||
     station.genre_name ||
     station.artist_name ||
     station.title.replace(/\s+Radio$/i, "")
-  );
-}
-
-export function stationArtwork(
-  station: PersonalizedRadioStation,
-): string | null {
-  if (station.type === "genre") {
-    return resolveMaybeApiAssetUrl(station.cover_url) || null;
-  }
-  const explicitCover = resolveMaybeApiAssetUrl(station.cover_url);
-  if (explicitCover) return explicitCover;
-  return (
-    artistPhotoApiUrl(
-      {
-        artistId: station.artist_id,
-        globalArtistUid: station.global_artist_uid,
-        artistEntityUid: station.artist_entity_uid,
-        artistSlug: station.artist_slug,
-        artistName: station.artist_name || station.seed_label,
-      },
-      { size: 320 },
-    ) || null
   );
 }
 

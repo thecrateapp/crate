@@ -3,30 +3,29 @@ import { Download, ExternalLink, Loader2 } from "@crate/ui/icons";
 
 import { openExternalUrl } from "@/lib/external-links";
 import { cn } from "@/lib/utils";
-import type { BandcampItem } from "./bandcamp-model";
+import { canImportBandcampItem, type BandcampItem } from "./bandcamp-model";
 
 export function BandcampItemActions({
   item,
   busyAction,
   onImport,
   compact = false,
+  canImport = canImportBandcampItem(item),
 }: {
   item: BandcampItem;
   busyAction: string | null;
   onImport: (item: BandcampItem) => void;
   compact?: boolean;
+  canImport?: boolean;
 }) {
   const { t } = useTranslation();
-  const canImport =
-    item.owned === true &&
-    item.downloadable === true &&
-    item.latest_import_status !== "completed";
 
   return (
     <div className={cn("flex gap-2", compact ? "shrink-0" : "flex-wrap")}>
       {canImport ? (
         <button
           type="button"
+          aria-label={compact ? t("common.import") : undefined}
           disabled={busyAction !== null}
           onClick={() => onImport(item)}
           className="inline-flex h-9 items-center gap-2 rounded-full bg-accent-action px-3 text-xs font-black text-accent-action-foreground transition hover:bg-accent-action/90 disabled:opacity-50"
@@ -42,6 +41,7 @@ export function BandcampItemActions({
       {item.item_url ? (
         <button
           type="button"
+          aria-label={compact ? t("actions.bandcamp.open") : undefined}
           onClick={() => void openExternalUrl(item.item_url ?? "")}
           className="inline-flex h-9 items-center gap-2 rounded-full border border-border-quiet bg-text-primary/5 px-3 text-xs font-black text-text-primary transition hover:bg-text-primary/10"
         >

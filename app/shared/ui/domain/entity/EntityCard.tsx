@@ -55,7 +55,7 @@ export interface EntityCardProps
 
 const SHAPE_RADIUS_CLASS_NAME: Record<EntityShape, string> = {
   square: "rounded-lg",
-  rounded: "rounded-2xl",
+  rounded: "rounded-xl",
   circle: "rounded-full",
 };
 

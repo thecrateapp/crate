@@ -20,13 +20,42 @@ interface ProfileHoverCardProps {
 }
 
 const profileCardCache = new Map<string, ProfileCardPayload>();
+const profileCardRequests = new Map<string, Promise<ProfileCardPayload>>();
 
 export function clearProfileCardCacheForTests() {
   profileCardCache.clear();
+  profileCardRequests.clear();
 }
 
-function cacheProfileCard(username: string, card: ProfileCardPayload) {
+export function cacheProfileCard(username: string, card: ProfileCardPayload) {
   profileCardCache.set(username, card);
+}
+
+export function getCachedProfileCard(
+  username: string,
+): ProfileCardPayload | null {
+  return profileCardCache.get(username) ?? null;
+}
+
+export function fetchProfileCard(
+  username: string,
+): Promise<ProfileCardPayload> {
+  const cached = profileCardCache.get(username);
+  if (cached) return Promise.resolve(cached);
+  const inFlight = profileCardRequests.get(username);
+  if (inFlight) return inFlight;
+  const request = api<ProfileCardPayload>(
+    `/api/users/${encodeURIComponent(username)}/card`,
+  )
+    .then((card) => {
+      cacheProfileCard(username, card);
+      return card;
+    })
+    .finally(() => {
+      profileCardRequests.delete(username);
+    });
+  profileCardRequests.set(username, request);
+  return request;
 }
 
 export function ProfileHoverCard({

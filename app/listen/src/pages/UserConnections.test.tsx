@@ -40,7 +40,13 @@ describe("UserConnections", () => {
     expect(screen.getByText("Volver al perfil")).toBeVisible();
     expect(screen.getByRole("heading", { name: "Seguidores" })).toBeVisible();
     expect(screen.getByText("Conexiones públicas de @diego.")).toBeVisible();
-    expect(screen.getByText("Ver perfil")).toBeVisible();
+    expect(screen.getByRole("link", { name: /Ana/ })).toHaveAttribute(
+      "href",
+      "/users/ana",
+    );
+    expect(
+      screen.getByRole("button", { name: "Más acciones" }),
+    ).toBeInTheDocument();
   });
 
   it("localizes empty following lists", () => {

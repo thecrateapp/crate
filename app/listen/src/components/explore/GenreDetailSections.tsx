@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { MediaGrid, SectionHeader } from "@crate/ui/domain/lists";
 
@@ -5,13 +6,52 @@ import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import {
   itemKey,
-  UpcomingShowCard,
+  ShowCard,
   type UpcomingItem,
 } from "@/components/upcoming/UpcomingRows";
 
-import { RelatedGenreCard, type RelatedGenre } from "./RelatedGenreCard";
 import type { GenreDetail } from "./explore-model";
+import { buildRelatedGenreImageCandidates } from "./genre-covers";
 import { GenreHero, type GenreActionBarProps } from "./GenreDetailHero";
+import { GenreTile } from "./GenreTile";
+
+type RelatedGenre = NonNullable<GenreDetail["related_genres"]>[number];
+
+function RelatedGenreTile({
+  genre,
+  onOpen,
+}: {
+  genre: RelatedGenre;
+  onOpen: (genre: RelatedGenre) => void;
+}) {
+  const { t } = useTranslation();
+  const imageCandidates = useMemo(
+    () => buildRelatedGenreImageCandidates(genre),
+    [genre],
+  );
+  const detail = [
+    genre.artist_count > 0
+      ? t("common.artistCountLabel", { count: genre.artist_count })
+      : null,
+    genre.album_count > 0
+      ? t("common.albumCountLabel", { count: genre.album_count })
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <GenreTile
+      variant="related"
+      slug={genre.slug}
+      name={genre.name}
+      kicker={genre.relation_label}
+      detail={detail}
+      imageCandidates={imageCandidates}
+      onOpen={() => onOpen(genre)}
+    />
+  );
+}
 
 function RelatedGenresSection({
   genres,
@@ -31,10 +71,10 @@ function RelatedGenresSection({
       />
       <MediaGrid>
         {genres.map((genre) => (
-          <RelatedGenreCard
+          <RelatedGenreTile
             key={`${genre.relation_type}-${genre.slug}`}
             genre={genre}
-            onOpen={() => onOpen(genre)}
+            onOpen={onOpen}
           />
         ))}
       </MediaGrid>
@@ -60,7 +100,7 @@ function ShowsSection({
         {shows.map((show, index) => {
           const key = itemKey(show, index);
           return (
-            <UpcomingShowCard
+            <ShowCard
               key={key}
               item={show}
               expanded={expandedShowId === key}

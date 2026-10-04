@@ -15,6 +15,7 @@ export interface CollapsedViewProps {
   savingAttendance: boolean;
   actionMenu: ActionMenuSlot;
   onToggleAttendance: () => void;
+  onToggle: () => void;
 }
 
 export interface ExpandedViewProps {

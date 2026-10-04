@@ -1,8 +1,6 @@
-import type { OfflineItemRecord, OfflineItemState } from "@/lib/offline";
 import type { Track } from "@/contexts/PlayerContext";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
-import { getOfflineStateLabel, isOfflineBusy } from "@/lib/offline";
 
 export interface PlaylistTrackResponse {
   track_id?: number;
@@ -29,11 +27,6 @@ export interface PlaylistTrackResponse {
 
 export interface PlaylistDetailResponse {
   tracks: PlaylistTrackResponse[];
-}
-
-export interface PlaylistOfflinePresentation {
-  meta: string | null;
-  toneClass: string;
 }
 
 export function toPlayerTracks(tracks: PlaylistTrackResponse[]): Track[] {
@@ -64,42 +57,4 @@ export function toPlayerTracks(tracks: PlaylistTrackResponse[]): Track[] {
       },
     ),
   );
-}
-
-export function getPlaylistOfflinePresentation(
-  state: OfflineItemState,
-  record?: OfflineItemRecord | null,
-): PlaylistOfflinePresentation {
-  if (state === "ready") {
-    return {
-      meta: record?.trackCount
-        ? `${record.trackCount} offline`
-        : getOfflineStateLabel(state),
-      toneClass: "text-text-accent/90",
-    };
-  }
-
-  if (isOfflineBusy(state) && record?.trackCount) {
-    return {
-      meta: `${Math.min(record.readyTrackCount || 0, record.trackCount)}/${
-        record.trackCount
-      } offline`,
-      toneClass: "text-accent-action",
-    };
-  }
-
-  return {
-    meta: getOfflineStateLabel(state),
-    toneClass: state === "error" ? "text-state-warning-text/90" : "",
-  };
-}
-
-export function getPlaylistBadgeLabel(
-  crateManaged: boolean,
-  badge?: "smart" | "curated" | "personal",
-): string | null {
-  if (crateManaged) return null;
-  if (badge === "smart") return "Smart";
-  if (badge === "curated") return "Curated";
-  return null;
 }

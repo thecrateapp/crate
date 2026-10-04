@@ -1761,6 +1761,7 @@
   "profileHover.stats.adds": "Ajouts",
   "profileHover.stats.lists": "Listes",
   "common.playItem": "Lire {name}",
+  "common.openItem": "Ouvrir {name}",
   "player.goToArtist": "Aller à {name}",
   "player.playingFrom": "Lecture depuis :",
   "player.likedTrack": "Titre aimé",
@@ -1780,5 +1781,12 @@
   "trackRow.resolvingLabel": "Résolution de {title}",
   "trackRow.unknownTitle": "Inconnu",
   "trackRow.soon": "Bientôt",
-  "trackRow.coverAlt": "Pochette de {title}"
+  "trackRow.coverAlt": "Pochette de {title}",
+  "actions.user.share": "Partager le profil",
+  "actions.user.toasts.followFailed": "Impossible de mettre à jour l'abonnement",
+  "actions.radio.start": "Lancer la radio",
+  "actions.genre.open": "Ouvrir le genre",
+  "actions.path.open": "Ouvrir le chemin",
+  "actions.jam.open": "Ouvrir le salon",
+  "actions.bandcamp.open": "Ouvrir sur Bandcamp"
 }

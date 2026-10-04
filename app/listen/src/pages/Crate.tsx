@@ -13,7 +13,6 @@ import {
   ArrowDownToLineBold,
   CRATE_ICON_SIZE,
   Disc3,
-  Download,
   Loader2,
   Pencil,
   Play,
@@ -35,6 +34,7 @@ import { Button } from "@crate/ui/shadcn/button";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
+import { buildCrateMenuItems } from "@/components/actions/crate-actions";
 import { action } from "@/components/actions/shared";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { useTransparentHeader } from "@/components/layout/transparent-header";
@@ -623,19 +623,9 @@ function CratePageActions({
   onDownload?: () => void;
 }) {
   const { t } = useTranslation();
-  const entries = useMemo<ItemActionMenuEntry[]>(
-    () =>
-      onDownload
-        ? [
-            action({
-              key: "download",
-              label: t("actions.crate.downloadZip"),
-              icon: Download,
-              onSelect: onDownload,
-            }),
-          ]
-        : [],
-    [onDownload, t],
+  const entries = useMemo(
+    () => buildCrateMenuItems({ crate, onDownload }, t),
+    [crate, onDownload, t],
   );
   const followLabel = followed ? t("common.following") : t("common.follow");
   const secondaryActions: HeroSecondaryAction[] = [];

@@ -126,7 +126,7 @@ export function PlaylistCollaboratorsModal({
                     <UserProfileLink
                       username={member.username}
                       hoverClassName="block"
-                      className="block truncate text-sm font-medium text-text-primary transition-colors hover:text-accent-action"
+                      className="link-meta block w-fit max-w-full truncate text-sm font-medium text-text-primary"
                     >
                       {label}
                     </UserProfileLink>

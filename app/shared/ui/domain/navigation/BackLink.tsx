@@ -16,8 +16,8 @@ export interface BackLinkProps {
 }
 
 const VARIANT_CLASS_NAME: Record<BackLinkVariant, string> = {
-  text: "inline-flex items-center gap-2 rounded-sm text-sm text-text-muted transition-colors hover:text-text-primary",
-  icon: "relative inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-border-quiet text-text-primary/70 transition-colors hover:bg-text-primary/5 hover:text-text-primary after:absolute after:top-1/2 after:left-1/2 after:size-11 after:-translate-x-1/2 after:-translate-y-1/2 pointer-fine:after:hidden",
+  text: "link-meta inline-flex items-center gap-2 text-sm",
+  icon: "relative inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-border-quiet text-text-primary/70 transition-colors hover:bg-text-primary/5 hover:text-text-primary focus-visible:shadow-focus after:absolute after:top-1/2 after:left-1/2 after:size-11 after:-translate-x-1/2 after:-translate-y-1/2 pointer-fine:after:hidden",
 };
 
 export function BackLink({
@@ -39,11 +39,7 @@ export function BackLink({
     "aria-label": isIcon ? label : undefined,
     title: isIcon ? label : undefined,
     "data-testid": "back-link",
-    className: cn(
-      "outline-none focus-visible:shadow-focus",
-      VARIANT_CLASS_NAME[variant],
-      className,
-    ),
+    className: cn("outline-none", VARIANT_CLASS_NAME[variant], className),
   };
 
   if (to !== undefined) {

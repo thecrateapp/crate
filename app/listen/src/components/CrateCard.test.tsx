@@ -359,7 +359,7 @@ describe("CrateCard", () => {
         <CrateCard crate={crate} onEdit={vi.fn()} />
       </I18nProvider>,
     );
-    fireEvent.contextMenu(screen.getByTestId("crate-card"));
+    fireEvent.contextMenu(screen.getByRole("article"));
     expect(
       await screen.findByRole("menuitem", { name: "Edit Crate" }),
     ).toBeVisible();
@@ -381,11 +381,64 @@ describe("CrateCard", () => {
         <CrateCard crate={crate} onEdit={vi.fn()} />
       </I18nProvider>,
     );
-    await longPress(screen.getByTestId("crate-card"));
+    await longPress(screen.getByRole("article"));
     expect(
       await screen.findByRole("dialog", { name: "Actions menu" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Crate detail page")).toBeNull();
+  });
+
+  it("renders a row variant with the same link and menu", () => {
+    const onEdit = vi.fn();
+    render(
+      <I18nProvider initialLocale="en">
+        <CrateCard
+          crate={{ ...crate, visibility: "private" }}
+          variant="row"
+          onEdit={onEdit}
+        />
+      </I18nProvider>,
+    );
+
+    expect(
+      screen.getByRole("link", { name: "Open Year-end records" }),
+    ).toHaveAttribute("href", expect.stringContaining("/crate/"));
+    expect(screen.getByRole("img", { name: "Private" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next album" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Edit Crate" }));
+    expect(onEdit).toHaveBeenCalledOnce();
+  });
+
+  it("keeps carousel arrows outside the primary link", () => {
+    render(
+      <I18nProvider initialLocale="en">
+        <CrateCard
+          crate={{
+            ...crate,
+            album_count: 2,
+            albums: [
+              ...crate.albums,
+              {
+                global_album_uid: "album-2",
+                artist_name: "Listener",
+                year: "2026",
+                has_cover: false,
+                name: "Second record",
+                position: 1,
+              },
+            ],
+          }}
+          onPlay={vi.fn()}
+        />
+      </I18nProvider>,
+    );
+
+    const link = screen.getByRole("link", { name: "Open Year-end records" });
+    for (const name of ["Next album", "Previous album", "More actions"]) {
+      expect(link.contains(screen.getByRole("button", { name }))).toBe(false);
+    }
   });
 
   it("reflects the menu state on the trigger", () => {

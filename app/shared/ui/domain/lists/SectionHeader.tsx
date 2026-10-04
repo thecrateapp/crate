@@ -50,7 +50,7 @@ export function SectionHeader({
       <button
         type="button"
         onClick={onAction}
-        className="inline-flex items-center gap-1 rounded-sm text-sm text-text-muted outline-none transition-colors hover:text-text-primary focus-visible:shadow-focus"
+        className="link-accent inline-flex items-center gap-1 text-sm outline-none"
       >
         {actionLabel}
         <ArrowRight size={CRATE_ICON_SIZE.sm} aria-hidden="true" />

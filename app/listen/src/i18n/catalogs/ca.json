@@ -1761,6 +1761,7 @@
   "profileHover.stats.adds": "Aportacions",
   "profileHover.stats.lists": "Llistes",
   "common.playItem": "Reprodueix {name}",
+  "common.openItem": "Obre {name}",
   "player.goToArtist": "Vés a {name}",
   "player.playingFrom": "Reproduint des de:",
   "player.likedTrack": "Cançó preferida",
@@ -1780,5 +1781,12 @@
   "trackRow.resolvingLabel": "Resolent {title}",
   "trackRow.unknownTitle": "Desconeguda",
   "trackRow.soon": "Aviat",
-  "trackRow.coverAlt": "Portada de {title}"
+  "trackRow.coverAlt": "Portada de {title}",
+  "actions.user.share": "Comparteix el perfil",
+  "actions.user.toasts.followFailed": "No s'ha pogut actualitzar el seguiment",
+  "actions.radio.start": "Inicia la ràdio",
+  "actions.genre.open": "Obre el gènere",
+  "actions.path.open": "Obre la ruta",
+  "actions.jam.open": "Obre la sala",
+  "actions.bandcamp.open": "Obre a Bandcamp"
 }

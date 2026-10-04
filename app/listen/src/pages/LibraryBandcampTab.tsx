@@ -142,9 +142,6 @@ export function LibraryBandcampTab() {
           purchases={purchases}
           busyItemId={busyItemId}
           importedLabel={t("library.bandcamp.imported.badge")}
-          itemFallback={t("bandcamp.itemFallback")}
-          titleLabel={t("bandcamp.titleLabel")}
-          importLabel={t("common.import")}
           onImport={importItem}
         />
       )}

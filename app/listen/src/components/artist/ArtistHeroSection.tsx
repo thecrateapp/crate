@@ -4,8 +4,6 @@ import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
   CRATE_ICON_SIZE,
-  Heart,
-  HeartBold,
   ListMusic,
   Play,
   Radio,
@@ -25,7 +23,7 @@ import {
 } from "@crate/ui/domain/hero";
 import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 
-import type { ContextMenuEntry } from "@/components/actions/ItemActionMenu";
+import { buildArtistMenuItems } from "@/components/actions/artist-actions";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import {
   type ArtistData,
@@ -56,75 +54,6 @@ function withHeroCacheBust(url: string) {
   return `${url}${url.includes("?") ? "&" : "?"}v=artist-hero-bg-v1`;
 }
 
-function buildArtistHeroMenuItems({
-  following,
-  hasSetlist,
-  onArtistRadio,
-  onPlay,
-  onPlaySetlist,
-  onShuffle,
-  onShare,
-  onToggleFollow,
-  t,
-}: Pick<
-  ArtistHeroSectionProps,
-  | "following"
-  | "hasSetlist"
-  | "onArtistRadio"
-  | "onPlay"
-  | "onPlaySetlist"
-  | "onShuffle"
-  | "onShare"
-  | "onToggleFollow"
-> & {
-  t: ReturnType<typeof useTranslation>["t"];
-}): ContextMenuEntry[] {
-  return [
-    {
-      key: "play",
-      label: t("artist.actions.playTopTracks"),
-      icon: Play,
-      onSelect: onPlay,
-    },
-    {
-      key: "shuffle",
-      label: t("player.shuffle"),
-      icon: Shuffle,
-      onSelect: onShuffle,
-    },
-    {
-      key: "radio",
-      label: t("artist.actions.radio"),
-      icon: Radio,
-      onSelect: onArtistRadio,
-    },
-    ...(onPlaySetlist
-      ? [
-          {
-            key: "setlist",
-            label: t("artist.actions.playSetlist"),
-            icon: ListMusic,
-            disabled: !hasSetlist,
-            onSelect: onPlaySetlist,
-          },
-        ]
-      : []),
-    {
-      key: "follow",
-      label: following ? t("common.unfollow") : t("common.follow"),
-      icon: following ? HeartBold : Heart,
-      active: following,
-      onSelect: onToggleFollow,
-    },
-    {
-      key: "share",
-      label: t("common.share"),
-      icon: Share2,
-      onSelect: onShare,
-    },
-  ];
-}
-
 export function ArtistHeroSection({
   artist,
   artistInfo,
@@ -149,15 +78,15 @@ export function ArtistHeroSection({
   const artworkClassName = `absolute inset-0 size-full scale-[1.02] ${artistHeroArtworkFitClassName()} object-[right_20%]`;
   const menuItems = useMemo(
     () =>
-      buildArtistHeroMenuItems({
+      buildArtistMenuItems({
         following,
         hasSetlist,
-        onArtistRadio,
         onPlay,
-        onPlaySetlist,
         onShuffle,
-        onShare,
+        onRadio: onArtistRadio,
+        onPlaySetlist,
         onToggleFollow,
+        onShare,
         t,
       }),
     [
@@ -339,7 +268,7 @@ export function ArtistHeroSection({
           {bio.length > 200 ? (
             <button
               type="button"
-              className="mt-2 flex items-center gap-1 text-xs text-accent-action hover:underline"
+              className="link-accent mt-2 flex w-fit max-w-full items-center gap-1 text-xs"
               onClick={onOpenBio}
             >
               {t("common.showMore")} <ChevronDown size={12} />

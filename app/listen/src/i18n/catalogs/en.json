@@ -1761,6 +1761,7 @@
   "profileHover.stats.adds": "Adds",
   "profileHover.stats.lists": "Lists",
   "common.playItem": "Play {name}",
+  "common.openItem": "Open {name}",
   "player.goToArtist": "Go to {name}",
   "player.playingFrom": "Playing from:",
   "player.likedTrack": "Liked track",
@@ -1780,5 +1781,12 @@
   "trackRow.resolvingLabel": "Resolving {title}",
   "trackRow.unknownTitle": "Unknown",
   "trackRow.soon": "Soon",
-  "trackRow.coverAlt": "{title} cover"
+  "trackRow.coverAlt": "{title} cover",
+  "actions.user.share": "Share profile",
+  "actions.user.toasts.followFailed": "Could not update follow",
+  "actions.radio.start": "Start radio",
+  "actions.genre.open": "Open genre",
+  "actions.path.open": "Open path",
+  "actions.jam.open": "Open room",
+  "actions.bandcamp.open": "Open on Bandcamp"
 }

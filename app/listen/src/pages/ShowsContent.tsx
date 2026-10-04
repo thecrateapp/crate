@@ -7,7 +7,7 @@ import { Calendar, Sparkles } from "@crate/ui/icons";
 import {
   groupByMonth,
   UpcomingMonthGroup,
-  UpcomingShowCard,
+  ShowCard,
 } from "@/components/upcoming/UpcomingRows";
 import { cn } from "@/lib/utils";
 import type { ShowsFilter } from "@/pages/shows-page-model";
@@ -112,13 +112,7 @@ function ShowsFeatured({ page }: ShowsSectionProps) {
           {page.t("radar.sections.nextShow")}
         </h2>
       </div>
-      <UpcomingShowCard
-        item={page.featuredShow}
-        expanded
-        featured
-        showClose={false}
-        onToggle={() => undefined}
-      />
+      <ShowCard item={page.featuredShow} variant="feature" />
     </section>
   );
 }

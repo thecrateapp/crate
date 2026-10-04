@@ -1,10 +1,17 @@
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
-import { CRATE_ICON_SIZE, Disc3, Loader2, Play } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Disc3 } from "@crate/ui/icons";
 
 import {
   ItemActionMenu,
-  useItemActionMenu,
   type ItemActionMenuEntry,
   type UseItemActionMenuReturn,
 } from "@/components/actions/ItemActionMenu";
@@ -15,7 +22,6 @@ import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { useOffline } from "@/contexts/OfflineContext";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
-import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import {
   albumCoverArtwork,
@@ -52,8 +58,6 @@ export interface AlbumCardProps {
   meta?: ReactNode;
   extraActions?: ItemActionMenuEntry[];
 }
-
-const NO_ACTIONS: ItemActionMenuEntry[] = [];
 
 interface AlbumData {
   artist: string;
@@ -115,7 +119,7 @@ export function useAlbumCardPlayback({
 }) {
   const [playing, setPlaying] = useState(false);
 
-  async function handlePlayOverlay(event: React.MouseEvent<HTMLButtonElement>) {
+  async function playOverlay(event: MouseEvent<HTMLButtonElement>) {
     event.stopPropagation();
     setPlaying(true);
     try {
@@ -167,23 +171,31 @@ export function useAlbumCardPlayback({
     }
   }
 
+  const playOverlayRef = useRef(playOverlay);
+  useEffect(() => {
+    playOverlayRef.current = playOverlay;
+  });
+  const handlePlayOverlay = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => playOverlayRef.current(event),
+    [],
+  );
+
   return { playing, handlePlayOverlay };
 }
 
-export function AlbumCardArtworkSurface({
+export function AlbumCardArtwork({
   coverArtwork,
   coverSizes,
   album,
-  offlineState,
-  isPreRelease,
+  className,
+  iconSize = CRATE_ICON_SIZE.xl,
 }: {
   coverArtwork: ArtworkSource;
   coverSizes: string;
   album: string;
-  offlineState: OfflineItemState;
-  isPreRelease: boolean;
+  className: string;
+  iconSize?: number;
 }) {
-  const { t } = useTranslation();
   return (
     <ArtworkSurface
       source={{
@@ -191,15 +203,28 @@ export function AlbumCardArtworkSurface({
         sizes: coverArtwork.srcSet ? coverSizes : undefined,
       }}
       alt={album}
-      className="relative mb-[var(--content-card-gap)] aspect-square overflow-hidden rounded-lg bg-text-primary/5"
+      className={className}
       fallback={
         <div className="grid size-full place-items-center bg-surface-elevated text-text-primary/35">
-          <Disc3 size={CRATE_ICON_SIZE.xl} />
+          <Disc3 size={iconSize} />
         </div>
       }
       imageProps={{ loading: "lazy", decoding: "async" }}
       imageClassName="object-cover"
-    >
+    />
+  );
+}
+
+export function AlbumCardArtworkBadges({
+  offlineState,
+  isPreRelease,
+}: {
+  offlineState: OfflineItemState;
+  isPreRelease: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
       <OfflineBadge
         state={offlineState}
         compact
@@ -210,71 +235,6 @@ export function AlbumCardArtworkSurface({
           {t("radar.release.preRelease")}
         </span>
       ) : null}
-    </ArtworkSurface>
-  );
-}
-
-export function AlbumCardArtworkControls({
-  album,
-  albumId,
-  globalAlbumUid,
-  saved,
-  savedLabel,
-  onToggleSaved,
-  playing,
-  onPlayOverlay,
-}: {
-  album: string;
-  albumId?: number;
-  globalAlbumUid?: string;
-  saved: boolean;
-  savedLabel: string;
-  onToggleSaved: () => Promise<void>;
-  playing: boolean;
-  onPlayOverlay: (event: React.MouseEvent<HTMLButtonElement>) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <>
-      {albumId != null || globalAlbumUid ? (
-        <FollowHeartButton
-          className={`absolute right-4 top-4 z-20 flex size-10 min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--idle-border)] bg-surface-canvas/55 shadow-icon-control backdrop-blur-md transition-[color,filter,transform] hover:-translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-action md:min-h-0 md:min-w-0 ${
-            saved ? "opacity-100" : "opacity-0 group-hover/card:opacity-100"
-          }`}
-          following={saved}
-          iconSize={CRATE_ICON_SIZE.md}
-          aria-label={savedLabel}
-          onClick={async (event) => {
-            event.stopPropagation();
-            try {
-              await onToggleSaved();
-            } catch {
-              // no-op; page-level toasts can be added later
-            }
-          }}
-        />
-      ) : null}
-      <div className="pointer-events-none absolute inset-x-2 top-2 z-10 flex aspect-square items-center justify-center bg-surface-canvas/0 transition-colors md:group-hover/card:bg-surface-canvas/40">
-        <button
-          type="button"
-          className="pointer-events-auto flex size-11 items-center justify-center rounded-full bg-accent-action opacity-0 shadow-lg transition-[transform,opacity] focus-visible:translate-y-0 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-action md:translate-y-2 md:group-focus-within/card:translate-y-0 md:group-focus-within/card:opacity-100 md:group-hover/card:translate-y-0 md:group-hover/card:opacity-100"
-          onClick={onPlayOverlay}
-          aria-label={t("common.playItem", { name: album })}
-        >
-          {playing ? (
-            <Loader2
-              size={CRATE_ICON_SIZE.lg}
-              className="animate-spin text-accent-action-foreground"
-            />
-          ) : (
-            <Play
-              size={CRATE_ICON_SIZE.lg}
-              fill="currentColor"
-              className="ml-0.5 text-accent-action-foreground"
-            />
-          )}
-        </button>
-      </div>
     </>
   );
 }
@@ -304,66 +264,47 @@ export function albumCardSubtitle({
   return year ? `${year} · ${artist}` : artist;
 }
 
-export function AlbumCardDetails({
-  album,
+export function AlbumCardSubtitle({
   artist,
   year,
   isPreRelease,
   releaseDate,
   offlineMeta,
   offlineState,
-  rank,
-  meta,
 }: {
-  album: string;
   artist: string;
   year?: string;
   isPreRelease: boolean;
   releaseDate?: string | null;
   offlineMeta: string;
   offlineState: OfflineItemState;
-  rank?: number;
-  meta?: ReactNode;
 }) {
   const { t, i18n } = useTranslation();
   return (
     <>
-      <div className="truncate text-sm font-medium text-text-primary">
-        {rank != null ? (
-          <span className="mr-1.5 tabular-nums text-text-muted">{rank}</span>
-        ) : null}
-        {album}
-      </div>
-      <div className="truncate text-xs text-text-muted">
-        {albumCardSubtitle({
-          artist,
-          year,
-          isPreRelease,
-          releaseDate,
-          language: i18n.language,
-          t,
-        })}
-        {offlineMeta ? (
-          <span
-            className={cn(
-              "ml-1.5",
-              offlineState === "ready"
-                ? "text-text-accent/90"
-                : isOfflineBusy(offlineState)
-                  ? "text-accent-action"
-                  : offlineState === "error"
-                    ? "text-state-warning-text/90"
-                    : undefined,
-            )}
-          >
-            · {offlineMeta}
-          </span>
-        ) : null}
-      </div>
-      {meta != null ? (
-        <div className="truncate text-xs tabular-nums text-text-muted">
-          {meta}
-        </div>
+      {albumCardSubtitle({
+        artist,
+        year,
+        isPreRelease,
+        releaseDate,
+        language: i18n.language,
+        t,
+      })}
+      {offlineMeta ? (
+        <span
+          className={cn(
+            "ml-1.5",
+            offlineState === "ready"
+              ? "text-text-accent/90"
+              : isOfflineBusy(offlineState)
+                ? "text-accent-action"
+                : offlineState === "error"
+                  ? "text-state-warning-text/90"
+                  : undefined,
+          )}
+        >
+          · {offlineMeta}
+        </span>
       ) : null}
     </>
   );
@@ -472,29 +413,41 @@ export function useAlbumCardModel({
   const offlineState = getAlbumState(albumId);
   const offlineRecord = getAlbumRecord(albumId);
   const offlineMeta = albumOfflineMeta(offlineState, offlineRecord, t);
-  const actionMenu = useItemActionMenu(NO_ACTIONS, { hasActions: true });
-  const menuInput: AlbumMenuData = {
-    artist,
-    album,
-    albumId,
-    albumEntityUid,
-    globalAlbumUid,
-    artistEntityUid,
-    albumSlug,
-    artistSlug,
-    cover: coverUrl,
-    isPreRelease,
-  };
+  const menuInput = useMemo<AlbumMenuData>(
+    () => ({
+      artist,
+      album,
+      albumId,
+      albumEntityUid,
+      globalAlbumUid,
+      artistEntityUid,
+      albumSlug,
+      artistSlug,
+      cover: coverUrl,
+      isPreRelease,
+    }),
+    [
+      artist,
+      album,
+      albumId,
+      albumEntityUid,
+      globalAlbumUid,
+      artistEntityUid,
+      albumSlug,
+      artistSlug,
+      coverUrl,
+      isPreRelease,
+    ],
+  );
   const savedLabel = saved
     ? t("album.actions.removeFromCollection")
     : t("album.actions.addToCollection");
 
-  async function handleToggleSaved() {
-    await toggleAlbumSaved(albumId, globalAlbumUid);
-  }
+  const handleToggleSaved = useCallback(() => {
+    toggleAlbumSaved(albumId, globalAlbumUid).catch(() => undefined);
+  }, [toggleAlbumSaved, albumId, globalAlbumUid]);
 
   return {
-    actionMenu,
     albumRouteInput,
     coverArtwork,
     coverSizes,

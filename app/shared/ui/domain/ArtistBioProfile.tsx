@@ -388,7 +388,7 @@ export function ArtistBioProfile({
               <button
                 type="button"
                 onClick={onBioToggle}
-                className="mt-2 flex items-center gap-1 text-xs text-accent-action hover:text-accent-action-hover"
+                className="link-accent mt-2 flex w-fit max-w-full items-center gap-1 text-xs"
               >
                 {bioExpanded ? (
                   <>

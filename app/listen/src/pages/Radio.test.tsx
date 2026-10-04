@@ -105,9 +105,9 @@ describe("RadioPage", () => {
     expect(await screen.findByText("Converge")).toBeInTheDocument();
     expect(container.firstElementChild).toHaveClass("radio-page");
     expect(container.querySelector(".radio-page-hero")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Converge/i })).toHaveClass(
-      "radio-station-card",
-    );
+    expect(
+      screen.getByRole("button", { name: /Converge/i }).closest("article"),
+    ).toHaveClass("home-radio-card");
     expect(screen.getByRole("textbox")).toHaveClass("radio-seed-input");
   });
 

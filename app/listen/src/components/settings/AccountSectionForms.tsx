@@ -194,7 +194,7 @@ export function PasswordChangeForm({
     return (
       <button
         onClick={() => setShowPassword(true)}
-        className="flex items-center gap-2 text-sm text-text-muted transition-colors hover:text-text-primary"
+        className="link-meta flex w-fit max-w-full items-center gap-2 text-sm"
       >
         <Lock size={14} /> {t("settings.account.changePassword")}
       </button>

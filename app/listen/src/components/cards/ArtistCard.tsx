@@ -1,24 +1,37 @@
-import { Link } from "react-router";
-import { UserRound } from "@crate/ui/icons";
+import { memo, useCallback, useMemo } from "react";
+import {
+  EntityCard,
+  EntityRow,
+  type EntityCardOverlay,
+  type EntityMenuRenderer,
+} from "@crate/ui/domain/entity";
 
 import {
+  ArtistCardArtwork,
+  ArtistCardMenu,
   useArtistCardFollow,
   useArtistCardModel,
   useArtistCardPlayback,
-  ArtistCardArtwork,
-  ArtistCardDetails,
-  ArtistCardInlineActions,
   type ArtistCardProps,
 } from "./ArtistCardParts";
-import {
-  ItemActionMenu,
-  useItemActionTarget,
-} from "@/components/actions/ItemActionMenu";
 import { usePlayerActions } from "@/contexts/PlayerContext";
+import { cn } from "@/lib/utils";
 
-export type { ArtistCardProps } from "./ArtistCardParts";
+export type { ArtistCardProps, ArtistCardVariant } from "./ArtistCardParts";
 
-export function ArtistCard({
+const RAIL_WIDTH_CLASS_NAME = {
+  compact: "w-[calc(100px+2*var(--content-card-padding))]",
+  tile: "w-[calc(140px+2*var(--content-card-padding))]",
+  editorial: "w-[calc(156px+2*var(--content-card-padding))]",
+} as const;
+
+const GRID_MAX_WIDTH_CLASS_NAME = {
+  compact: "mx-auto max-w-[calc(100px+2*var(--content-card-padding))]",
+  tile: "mx-auto max-w-[calc(140px+2*var(--content-card-padding))]",
+  editorial: "mx-auto max-w-[calc(156px+2*var(--content-card-padding))]",
+} as const;
+
+export const ArtistCard = memo(function ArtistCard({
   name,
   artistId,
   artistEntityUid,
@@ -27,14 +40,18 @@ export function ArtistCard({
   photo,
   hasPhoto,
   subtitle,
-  compact,
+  compact = false,
   href,
   external = false,
   imageTone = "normal",
   large = false,
   layout = "rail",
   fillGrid = false,
+  variant: variantProp = "tile",
+  rank,
+  meta,
 }: ArtistCardProps) {
+  const variant = variantProp === "tile" && large ? "editorial" : variantProp;
   const { playAll } = usePlayerActions();
   const model = useArtistCardModel({
     name,
@@ -44,106 +61,155 @@ export function ArtistCard({
     artistSlug,
     photo,
     hasPhoto,
-    subtitle,
-    compact: Boolean(compact),
+    compact,
     href,
     external,
-    imageTone,
-    large,
     layout,
-    fillGrid,
+    variant,
   });
-  const actionTarget = useItemActionTarget(model.actionMenu);
-  const playback = useArtistCardPlayback({
+  const { t } = model;
+  const { handlePlayTopTracks, playingTopTracks } = useArtistCardPlayback({
     artistId,
     artistEntityUid,
     globalArtistUid,
     artistSlug,
     name,
     playAll,
-    t: model.t,
+    t,
   });
-  const follow = useArtistCardFollow({
+  const { handleToggleFollow, togglingFollow } = useArtistCardFollow({
     artistId,
     globalArtistUid,
     name,
     toggleArtistFollow: model.toggleArtistFollow,
   });
-  const artwork = (inlineActions: boolean) => (
-    <ArtistCardArtwork
-      photoArtwork={model.photoArtwork}
-      name={name}
-      imageSize={model.imageSize}
-      artworkWidth={model.artworkWidth}
-      fillGrid={model.fillGrid}
-      imageTone={model.imageTone}
-      monogram={model.monogram}
-    >
-      {inlineActions && model.hasPlayableArtist ? (
-        <ArtistCardInlineActions
-          artistName={name}
-          following={model.following}
-          hasPlayableArtist={model.hasPlayableArtist}
-          canUseInlineHoverActions={model.canUseInlineHoverActions}
-          playingTopTracks={playback.playingTopTracks}
-          togglingFollow={follow.togglingFollow}
-          handlePlayTopTracks={playback.handlePlayTopTracks}
-          handleToggleFollow={follow.handleToggleFollow}
-          t={model.t}
-        />
-      ) : null}
-    </ArtistCardArtwork>
+  const { photoUrl } = model;
+  const renderMenu = useCallback<EntityMenuRenderer>(
+    (controller) => (
+      <ArtistCardMenu
+        actionMenu={controller}
+        name={name}
+        subtitle={subtitle}
+        artistId={artistId}
+        artistEntityUid={artistEntityUid}
+        globalArtistUid={globalArtistUid}
+        artistSlug={artistSlug}
+        photoUrl={photoUrl}
+      />
+    ),
+    [
+      name,
+      subtitle,
+      artistId,
+      artistEntityUid,
+      globalArtistUid,
+      artistSlug,
+      photoUrl,
+    ],
   );
-  const content = (
-    <>
-      {artwork(false)}
-      <ArtistCardDetails name={name} subtitle={subtitle} />
-    </>
+  const showOverlay =
+    variant !== "row" &&
+    !external &&
+    model.hasPlayableArtist &&
+    model.canUseInlineHoverActions;
+  const { following } = model;
+  const overlay = useMemo<EntityCardOverlay | undefined>(
+    () =>
+      showOverlay
+        ? {
+            onPlay: handlePlayTopTracks,
+            loading: playingTopTracks,
+            playLabel: t("actions.artist.playTopTracksFrom", { name }),
+            follow: {
+              following,
+              loading: togglingFollow,
+              label: t("actions.artist.followNamed", { name }),
+              labelActive: t("actions.artist.unfollowNamed", { name }),
+              onToggle: handleToggleFollow,
+            },
+          }
+        : undefined,
+    [
+      following,
+      handlePlayTopTracks,
+      handleToggleFollow,
+      name,
+      playingTopTracks,
+      showOverlay,
+      t,
+      togglingFollow,
+    ],
   );
+  const openLabel = t("actions.artist.openNamed", { name });
+  const menuLabel = t("actions.menu.more");
 
-  if (external) {
+  if (variant === "row") {
     return (
-      <a
+      <EntityRow
+        title={name}
+        subtitle={subtitle}
+        meta={meta}
+        rank={rank}
+        shape="circle"
+        leading={
+          <ArtistCardArtwork
+            photoArtwork={model.photoArtwork}
+            name={name}
+            imageTone={imageTone}
+            monogram={model.monogram}
+            className="relative size-12 shrink-0"
+          />
+        }
         href={model.targetHref}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={model.wrapperClassName}
-      >
-        {content}
-      </a>
+        external={external}
+        openLabel={openLabel}
+        renderMenu={renderMenu}
+        menuButton={external ? "none" : "hover"}
+        menuLabel={menuLabel}
+      />
     );
   }
 
+  const sizeKey =
+    variant === "editorial" ? "editorial" : compact ? "compact" : "tile";
+
   return (
-    <article
-      className={`item-action-target ${model.wrapperClassName} relative`}
-      {...actionTarget}
-    >
-      <Link
-        to={model.targetHref}
-        aria-label={model.t("actions.artist.openNamed", { name })}
-        className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-      />
-      <div className="pointer-events-none relative z-10">
-        {artwork(true)}
-        <ArtistCardDetails name={name} subtitle={subtitle} />
-      </div>
-      <ItemActionMenu
-        actions={model.actions}
-        header={{
-          type: "media",
-          title: name,
-          subtitle,
-          imageUrl: model.menuPhotoUrl,
-          imageAlt: name,
-          imageShape: "circle",
-          fallbackIcon: UserRound,
-        }}
-        open={model.actionMenu.open}
-        position={model.actionMenu.position}
-        menuRef={model.actionMenu.menuRef}
-        onClose={model.actionMenu.close}
-      />
-    </article>
+    <EntityCard
+      title={name}
+      subtitle={subtitle}
+      meta={meta}
+      rank={rank}
+      shape="circle"
+      layout={layout}
+      className={cn(
+        layout === "grid"
+          ? cn(
+              "listen-deferred-grid-item",
+              !fillGrid && GRID_MAX_WIDTH_CLASS_NAME[sizeKey],
+            )
+          : RAIL_WIDTH_CLASS_NAME[sizeKey],
+      )}
+      classNames={
+        variant === "editorial"
+          ? { title: "text-base font-semibold" }
+          : undefined
+      }
+      artwork={
+        <ArtistCardArtwork
+          photoArtwork={model.photoArtwork}
+          name={name}
+          imageTone={imageTone}
+          monogram={model.monogram}
+          className="size-full"
+        />
+      }
+      overlay={overlay}
+      href={model.targetHref}
+      external={external}
+      openLabel={openLabel}
+      renderMenu={renderMenu}
+      menuButton={external ? "none" : "hover"}
+      menuLabel={menuLabel}
+    />
   );
-}
+});

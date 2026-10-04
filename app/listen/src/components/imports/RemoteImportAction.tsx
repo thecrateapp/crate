@@ -88,7 +88,7 @@ function RemoteImportTerminalStatus({
       </span>
       <button
         type="button"
-        className="font-semibold text-accent-action hover:text-accent-action/80"
+        className="link-accent font-semibold"
         onClick={onRetry}
       >
         {t("album.remoteImport.retry")}

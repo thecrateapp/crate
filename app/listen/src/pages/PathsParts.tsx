@@ -1,12 +1,11 @@
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router";
-import { Loader2, MapPin, Music, Play, Route, Trash2 } from "@crate/ui/icons";
+import { Loader2, MapPin, Music } from "@crate/ui/icons";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { api } from "@/lib/api";
 import { albumCoverApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
-import type { PathSummary, SearchResult } from "./paths-model";
+import type { SearchResult } from "./paths-model";
 
 export function EndpointPanel({
   side,
@@ -187,7 +186,7 @@ export function EndpointPanel({
                 setQuery("");
                 setResults([]);
               }}
-              className="mt-3 text-xs text-text-primary/40 underline-offset-2 hover:text-text-primary/60 hover:underline"
+              className="link-meta mt-3 text-xs"
             >
               {t("common.change")}
             </button>
@@ -251,67 +250,6 @@ export function EndpointPanel({
             ) : null}
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-export function PathCard({
-  path,
-  onPlay,
-  onDelete,
-}: {
-  path: PathSummary;
-  onPlay: () => void;
-  onDelete: () => void;
-}) {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-
-  return (
-    <div className="group cursor-pointer rounded-xl border border-text-primary/6 bg-text-primary/[0.02] p-4 transition hover:border-accent-action/20 hover:bg-text-primary/[0.04]">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          aria-label={path.name}
-          onClick={() => navigate(`/paths/${path.id}`)}
-          className="flex min-w-0 flex-1 items-center gap-3 border-0 bg-transparent px-0 py-1 text-left"
-        >
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent-action/10 text-accent-action">
-            <Route size={16} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold text-text-primary">
-              {path.name}
-            </div>
-            <div className="mt-0.5 text-xs text-text-primary/40">
-              {t("common.trackCountLabel", { count: path.track_count })} ·{" "}
-              {new Date(path.created_at).toLocaleDateString()}
-            </div>
-          </div>
-        </button>
-        <button
-          type="button"
-          aria-label={t("player.play")}
-          onClick={(event) => {
-            event.stopPropagation();
-            onPlay();
-          }}
-          className="flex size-9 items-center justify-center rounded-full bg-accent-action/15 text-accent-action transition hover:bg-accent-action/25"
-        >
-          <Play size={14} className="ml-0.5 fill-current" />
-        </button>
-        <button
-          type="button"
-          aria-label={t("common.delete")}
-          onClick={(event) => {
-            event.stopPropagation();
-            onDelete();
-          }}
-          className="flex size-9 items-center justify-center rounded-full text-text-primary/15 transition hover:bg-text-primary/5 hover:text-text-primary/40"
-        >
-          <Trash2 size={13} />
-        </button>
       </div>
     </div>
   );

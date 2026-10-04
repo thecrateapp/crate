@@ -133,7 +133,7 @@ export function AlbumHero({
       subtitle={
         <button
           type="button"
-          className="inline-flex items-center gap-2 self-start text-sm text-text-muted transition-colors hover:text-accent-action"
+          className="link-meta inline-flex items-center gap-2 self-start text-sm"
           onClick={onArtistNavigate}
         >
           <span className="size-6 shrink-0 overflow-hidden rounded-full bg-text-primary/5">

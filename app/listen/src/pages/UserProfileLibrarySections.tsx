@@ -4,8 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { AlbumCard } from "@/components/cards/AlbumCard";
+import { PlaylistCard } from "@/components/playlists/PlaylistCard";
 import { CrateFollowButton } from "@/components/crates/CrateFollowButton";
-import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { contributionSourceLabel } from "@/lib/contributions";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { formatTotalDuration } from "@/lib/utils";
@@ -211,49 +211,30 @@ function UserProfilePlaylists({ data }: { data: PublicProfile }) {
             {t("userProfile.playlists.empty")}
           </div>
         ) : (
-          data.public_playlists.map((playlist) => {
-            const coverUrl = resolveMaybeApiAssetUrl(playlist.cover_data_url);
-            return (
-              <Link
-                key={playlist.id}
-                to={"/playlist/" + playlist.id}
-                className="user-profile-item flex items-center gap-4 rounded-lg px-4 py-3"
-              >
-                {coverUrl ? (
-                  <CrateImage
-                    src={coverUrl}
-                    alt={playlist.name}
-                    className=" size-14 rounded-xl object-cover"
-                  />
-                ) : (
-                  <div className="user-profile-placeholder flex size-14 items-center justify-center rounded-xl text-lg font-semibold">
-                    {playlist.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-text-primary">
-                    {playlist.name}
-                  </div>
-                  <div className="mt-1 text-xs text-text-muted">
-                    {t("common.trackCountLabel", {
-                      count: playlist.track_count,
-                    })}
-                    {playlist.total_duration > 0
-                      ? " · " + formatTotalDuration(playlist.total_duration)
-                      : ""}
-                    {playlist.is_collaborative
-                      ? " · " + t("userProfile.playlists.collaborative")
-                      : ""}
-                  </div>
-                  {playlist.description ? (
-                    <div className="mt-1 truncate text-xs text-text-muted">
-                      {playlist.description}
-                    </div>
-                  ) : null}
-                </div>
-              </Link>
-            );
-          })
+          data.public_playlists.map((playlist) => (
+            <PlaylistCard
+              key={playlist.id}
+              variant="row"
+              playlistId={playlist.id}
+              name={playlist.name}
+              description={playlist.description ?? undefined}
+              coverDataUrl={playlist.cover_data_url}
+              trackCount={playlist.track_count}
+              meta={[
+                playlist.total_duration > 0
+                  ? formatTotalDuration(playlist.total_duration)
+                  : null,
+                playlist.is_collaborative
+                  ? t("userProfile.playlists.collaborative")
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+              href={`/playlist/${playlist.id}`}
+              detailEndpoint={`/api/playlists/${playlist.id}`}
+              className="user-profile-item"
+            />
+          ))
         )}
       </div>
     </div>

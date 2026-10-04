@@ -1,15 +1,33 @@
-import { useState } from "react";
-import { useTranslation } from "react-i18next";
-import { Heart, HeartBold, Loader2, Play, Sparkles } from "@crate/ui/icons";
-
 import {
-  ItemActionMenu,
-  useItemActionMenu,
-  useItemActionTarget,
-} from "@/components/actions/ItemActionMenu";
-import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useTranslation } from "react-i18next";
+import {
+  Heart,
+  HeartBold,
+  Loader2,
+  Play,
+  Shuffle,
+  Sparkles,
+  type LucideIcon,
+} from "@crate/ui/icons";
+
+import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
+import {
+  EntityCard,
+  EntityRow,
+  type EntityCardOverlay,
+} from "@crate/ui/domain/entity";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
-import { useOffline } from "@/contexts/OfflineContext";
+import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
+import { action } from "@/components/actions/shared";
+import { usePlaylistActionMenu } from "@/components/actions/playlist-actions";
 import {
   PlaylistArtwork,
   type PlaylistArtworkTrack,
@@ -19,23 +37,66 @@ import {
   EditorialPlaylistArtwork,
   editorialPlaylistLabel,
 } from "@/components/playlists/EditorialPlaylistArtwork";
-import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
+import { usePlaylistListRowPlayback } from "@/components/playlists/use-playlist-list-row-playback";
+import { useOffline } from "@/contexts/OfflineContext";
 import {
   getOfflineStateLabel,
   isOfflineBusy,
+  type OfflineItemRecord,
   type OfflineItemState,
 } from "@/lib/offline";
 import { cn } from "@/lib/utils";
 
-interface PlaylistOfflineRecord {
-  trackCount?: number;
-  readyTrackCount?: number;
+type Handler = () => Promise<void> | void;
+type TFn = ReturnType<typeof useTranslation>["t"];
+
+export type PlaylistCardVariant = "tile" | "featured" | "row";
+
+export interface PlaylistCardExtraAction {
+  key: string;
+  icon: LucideIcon;
+  title: string;
+  onClick: Handler;
+  loading?: boolean;
+  tone?: "default" | "danger" | "primary";
 }
 
-function getPlaylistOfflineMeta(
+export interface PlaylistCardProps {
+  variant?: PlaylistCardVariant;
+  playlistId?: number;
+  name: string;
+  isSmart?: boolean;
+  description?: string;
+  tracks?: PlaylistArtworkTrack[];
+  coverDataUrl?: string | null;
+  meta?: string;
+  badge?: string;
+  systemPlaylist?: boolean;
+  crateManaged?: boolean;
+  isFollowed?: boolean;
+  href?: string;
+  layout?: "rail" | "grid";
+  renderArtwork?: (className: string) => ReactNode;
+  summary?: string;
+  artworkOnly?: boolean;
+  trackCount?: number;
+  detailEndpoint?: string;
+  extraActions?: PlaylistCardExtraAction[];
+  className?: string;
+  onClick?: () => void;
+  onPlay?: Handler;
+  onShuffle?: Handler;
+  onStartRadio?: Handler;
+  onToggleFollow?: Handler;
+}
+
+export function getPlaylistOfflineMeta(
   state: OfflineItemState,
-  record: PlaylistOfflineRecord | null | undefined,
-  t: ReturnType<typeof useTranslation>["t"],
+  record:
+    | Pick<OfflineItemRecord, "trackCount" | "readyTrackCount">
+    | null
+    | undefined,
+  t: TFn,
 ): string | null {
   if (state === "ready") {
     return record?.trackCount
@@ -53,286 +114,500 @@ function getPlaylistOfflineMeta(
   return getOfflineStateLabel(state);
 }
 
-function getPlaylistOfflineSurfaceClass(state: OfflineItemState): string {
-  if (state === "ready") return "bg-accent-action/[0.04]";
-  if (isOfflineBusy(state)) return "bg-accent-action/[0.05]";
-  if (state === "error") return "bg-state-warning/[0.05]";
-  return "hover:bg-text-primary/5";
-}
-
-function getPlaylistOfflineMetaClass(
-  state: OfflineItemState,
-): string | undefined {
+function offlineMetaClass(state: OfflineItemState): string | undefined {
   if (state === "ready") return "text-text-accent/90";
   if (isOfflineBusy(state)) return "text-accent-action";
   if (state === "error") return "text-state-warning-text/90";
   return undefined;
 }
 
-function getPlaylistBadgePositionClass(
-  badge: string | undefined,
-  crateManaged: boolean,
-): string {
-  return badge && !crateManaged
-    ? "absolute left-2 top-8"
-    : "absolute left-2 top-2";
+function tileSurfaceClass(state: OfflineItemState): string | undefined {
+  if (state === "ready") return "bg-accent-action/[0.04]";
+  if (isOfflineBusy(state)) return "bg-accent-action/[0.05]";
+  if (state === "error") return "bg-state-warning/[0.05]";
+  return undefined;
 }
 
-interface PlaylistCardArtworkProps {
-  crateManaged: boolean;
-  editorialLabel: ReturnType<typeof editorialPlaylistLabel>;
-  coverDataUrl: string | null | undefined;
-  tracks: PlaylistArtworkTrack[] | undefined;
-  name: string;
+function rowSurfaceClass(state: OfflineItemState): string | undefined {
+  if (state === "ready") {
+    return "bg-accent-action/[0.04] hover:bg-accent-action/[0.08] focus-within:bg-accent-action/[0.08]";
+  }
+  if (isOfflineBusy(state)) {
+    return "bg-accent-action/[0.05] hover:bg-accent-action/[0.09] focus-within:bg-accent-action/[0.09]";
+  }
+  if (state === "error") {
+    return "bg-state-warning/[0.05] hover:bg-state-warning/[0.09] focus-within:bg-state-warning/[0.09]";
+  }
+  return "focus-within:bg-text-primary/5";
 }
 
-function PlaylistCardArtwork({
+function OfflineMeta({
+  meta,
+  state,
+}: {
+  meta: string | null;
+  state: OfflineItemState;
+}) {
+  if (!meta) return null;
+  return (
+    <span className={cn("ml-1.5", offlineMetaClass(state))}>· {meta}</span>
+  );
+}
+
+function useLatest<T>(value: T) {
+  const ref = useRef(value);
+  useEffect(() => {
+    ref.current = value;
+  });
+  return ref;
+}
+
+function usePendingHandler(getHandler: () => Handler | undefined) {
+  const [pending, setPending] = useState(false);
+  const getHandlerRef = useLatest(getHandler);
+  const run = useCallback(async () => {
+    const handler = getHandlerRef.current();
+    if (!handler) return;
+    setPending(true);
+    try {
+      await handler();
+    } finally {
+      setPending(false);
+    }
+  }, [getHandlerRef]);
+  return [pending, run] as const;
+}
+
+function usePlaylistCardBase(props: PlaylistCardProps) {
+  const { t } = useTranslation();
+  const { getPlaylistState, getPlaylistRecord } = useOffline();
+  const offlineState = getPlaylistState(props.playlistId);
+  const offlineMeta = getPlaylistOfflineMeta(
+    offlineState,
+    getPlaylistRecord(props.playlistId),
+    t,
+  );
+  const latest = useLatest(props);
+  const handleOpen = useCallback(() => latest.current.onClick?.(), [latest]);
+  const [playing, runPlay] = usePendingHandler(() => latest.current.onPlay);
+  const [togglingFollow, runToggleFollow] = usePendingHandler(
+    () => latest.current.onToggleFollow,
+  );
+  const canFollow = Boolean(props.systemPlaylist && props.onToggleFollow);
+
+  return {
+    t,
+    offlineState,
+    offlineMeta,
+    canFollow,
+    handleOpen: props.onClick ? handleOpen : undefined,
+    href: props.onClick ? undefined : props.href,
+    playing,
+    runPlay,
+    togglingFollow,
+    runToggleFollow,
+  };
+}
+
+function useCardOverlay(
+  props: PlaylistCardProps,
+  base: ReturnType<typeof usePlaylistCardBase>,
+): EntityCardOverlay | undefined {
+  const { t, canFollow, playing, runPlay, togglingFollow, runToggleFollow } =
+    base;
+  const hasPlay = Boolean(props.onPlay);
+  const isFollowed = Boolean(props.isFollowed);
+  const playLabel = t("common.playItem", { name: props.name });
+  const followLabel = t("actions.playlist.addToLibrary");
+  const unfollowLabel = t("actions.playlist.removeFromLibrary");
+
+  return useMemo(() => {
+    if (!hasPlay && !canFollow) return undefined;
+    return {
+      onPlay: hasPlay ? () => void runPlay() : undefined,
+      loading: playing,
+      playLabel,
+      follow: canFollow
+        ? {
+            following: isFollowed,
+            loading: togglingFollow,
+            label: followLabel,
+            labelActive: unfollowLabel,
+            onToggle: () => void runToggleFollow(),
+          }
+        : undefined,
+    };
+  }, [
+    canFollow,
+    followLabel,
+    hasPlay,
+    isFollowed,
+    playLabel,
+    playing,
+    runPlay,
+    runToggleFollow,
+    togglingFollow,
+    unfollowLabel,
+  ]);
+}
+
+function PlaylistTileArtwork({
   crateManaged,
-  editorialLabel,
+  isSmart,
+  name,
   coverDataUrl,
   tracks,
-  name,
-}: PlaylistCardArtworkProps) {
+  badge,
+}: Pick<
+  PlaylistCardProps,
+  "crateManaged" | "isSmart" | "name" | "coverDataUrl" | "tracks" | "badge"
+>) {
   const { t } = useTranslation();
+  const className =
+    "size-full rounded-lg transition-transform group-hover:scale-[1.02]";
+
   if (crateManaged) {
+    const label = editorialPlaylistLabel(name, isSmart ? "core" : "crate");
     return (
       <EditorialPlaylistArtwork
-        title={editorialLabel.title}
-        kicker={t(EDITORIAL_PLAYLIST_KICKER_KEYS[editorialLabel.kind])}
+        title={label.title}
+        kicker={t(EDITORIAL_PLAYLIST_KICKER_KEYS[label.kind])}
         coverDataUrl={coverDataUrl}
         tracks={tracks}
         variant="core"
-        className="aspect-square rounded-lg transition-transform group-hover:scale-[1.02]"
+        className={className}
       />
     );
   }
 
   return (
-    <PlaylistArtwork
-      name={name}
-      coverDataUrl={coverDataUrl}
-      tracks={tracks}
-      showCrateMark={false}
-      className="aspect-square rounded-lg transition-transform group-hover:scale-[1.02]"
+    <>
+      <PlaylistArtwork
+        name={name}
+        coverDataUrl={coverDataUrl}
+        tracks={tracks}
+        showCrateMark={false}
+        className={className}
+      />
+      {badge ? (
+        <span className="absolute bottom-2 left-2 rounded-full border border-accent-action/20 bg-surface-canvas/85 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-accent-action backdrop-blur-md">
+          {badge}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+function PlaylistTile(props: PlaylistCardProps) {
+  const { name, description, meta, badge, layout = "rail" } = props;
+  const base = usePlaylistCardBase(props);
+  const { t, offlineState, offlineMeta } = base;
+  const overlay = useCardOverlay(props, base);
+  const actionMenu = usePlaylistActionMenu(
+    {
+      playlistId: props.playlistId,
+      name,
+      isSmart: props.isSmart,
+      href: props.href,
+      canFollow: base.canFollow,
+      isFollowed: props.isFollowed,
+      onToggleFollow: props.onToggleFollow,
+      onPlay: props.onPlay,
+      onShuffle: props.onShuffle,
+      onStartRadio: props.onStartRadio,
+    },
+    { title: name, subtitle: description || meta, detail: badge },
+  );
+
+  return (
+    <EntityCard
+      title={name}
+      subtitle={
+        <>
+          {description || meta}
+          <OfflineMeta meta={offlineMeta} state={offlineState} />
+        </>
+      }
+      titleAccessory={<OfflineBadge state={offlineState} compact />}
+      artwork={<PlaylistTileArtwork {...props} />}
+      layout={layout}
+      overlay={overlay}
+      onOpen={base.handleOpen}
+      href={base.href}
+      openLabel={t("common.openItem", { name })}
+      menuLabel={t("actions.menu.more")}
+      actionMenu={actionMenu}
+      className={cn(tileSurfaceClass(offlineState), props.className)}
     />
   );
 }
 
-function PlaylistCardFollowButton({
-  isFollowed,
-  onToggleFollow,
-}: {
-  isFollowed: boolean;
-  onToggleFollow: () => Promise<void> | void;
-}) {
-  const [togglingFollow, setTogglingFollow] = useState(false);
+const FEATURED_ARTWORK_CLASS_NAME =
+  "size-full rounded-xl transition-transform group-hover:scale-[1.02]";
+
+function PlaylistFeatured(props: PlaylistCardProps) {
+  const { name, summary, meta, artworkOnly = false } = props;
+  const base = usePlaylistCardBase(props);
+  const overlay = useCardOverlay(props, base);
+  const actionMenu = usePlaylistActionMenu(
+    {
+      playlistId: props.playlistId,
+      name,
+      isSmart: props.isSmart,
+      href: props.href,
+      onPlay: props.onPlay,
+      onShuffle: props.onShuffle,
+      onStartRadio: props.onStartRadio,
+    },
+    {
+      title: name,
+      subtitle: summary ?? meta,
+      detail: summary ? meta : undefined,
+    },
+  );
 
   return (
-    <ActionIconButton
-      variant="card"
-      active={isFollowed}
-      className="pointer-events-auto absolute top-2 right-2 z-10 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-action"
-      onClick={async (event) => {
-        event.stopPropagation();
-        setTogglingFollow(true);
-        try {
-          await onToggleFollow();
-        } finally {
-          setTogglingFollow(false);
-        }
+    <EntityCard
+      title={name}
+      subtitle={
+        summary && !artworkOnly ? (
+          <span className="mt-1 line-clamp-2 min-h-[2.5rem] whitespace-normal leading-5">
+            {summary}
+          </span>
+        ) : undefined
+      }
+      meta={
+        meta && !artworkOnly ? (
+          <span className="home-discovery-meta mt-2 block uppercase tracking-[0.18em]">
+            {meta}
+          </span>
+        ) : undefined
+      }
+      artwork={props.renderArtwork?.(FEATURED_ARTWORK_CLASS_NAME)}
+      shape="rounded"
+      layout="grid"
+      overlay={overlay}
+      onOpen={base.handleOpen}
+      href={base.href}
+      openLabel={base.t("common.openItem", { name })}
+      menuLabel={base.t("actions.menu.more")}
+      actionMenu={actionMenu}
+      className={props.className}
+      classNames={{
+        artwork: cn("home-discovery-artwork", artworkOnly && "mb-0"),
+        title: artworkOnly ? "sr-only" : "font-semibold",
       }}
-    >
-      {togglingFollow ? (
-        <Loader2 size={16} className="animate-spin" />
-      ) : isFollowed ? (
-        <HeartBold size={16} />
-      ) : (
-        <Heart size={16} />
-      )}
-    </ActionIconButton>
+    />
   );
 }
 
-function PlaylistCardPlayButton({
-  onPlay,
-}: {
-  onPlay: () => Promise<void> | void;
-}) {
-  const [playing, setPlaying] = useState(false);
-
-  return (
-    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-surface-canvas/0 transition-colors group-hover:bg-surface-canvas/40">
-      <button
-        type="button"
-        className="pointer-events-auto flex size-10 translate-y-2 items-center justify-center rounded-full bg-accent-action opacity-0 shadow-lg transition-[transform,opacity] focus-visible:translate-y-0 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-action group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:translate-y-0 group-hover:opacity-100"
-        onClick={async (event) => {
-          event.stopPropagation();
-          setPlaying(true);
-          try {
-            await onPlay();
-          } finally {
-            setPlaying(false);
-          }
-        }}
-      >
-        {playing ? (
-          <Loader2
-            size={18}
-            className="animate-spin text-accent-action-foreground"
-          />
-        ) : (
-          <Play
-            size={18}
-            fill="currentColor"
-            className="ml-0.5 text-accent-action-foreground"
-          />
-        )}
-      </button>
-    </div>
-  );
-}
-
-interface PlaylistCardProps {
-  playlistId?: number;
-  name: string;
-  isSmart?: boolean;
-  description?: string;
-  tracks?: PlaylistArtworkTrack[];
-  coverDataUrl?: string | null;
-  meta: string;
-  badge?: string;
-  systemPlaylist?: boolean;
-  crateManaged?: boolean;
-  isFollowed?: boolean;
-  href?: string;
-  layout?: "rail" | "grid";
-  onClick: () => void;
-  onPlay?: () => Promise<void> | void;
-  onShuffle?: () => Promise<void> | void;
-  onStartRadio?: () => Promise<void> | void;
-  onToggleFollow?: () => Promise<void> | void;
-}
-
-export function PlaylistCard({
-  playlistId,
-  name,
-  isSmart = false,
-  description,
-  tracks,
-  coverDataUrl,
-  meta,
-  badge,
-  systemPlaylist = false,
-  crateManaged = false,
-  isFollowed = false,
-  href,
-  layout = "rail",
-  onClick,
+function PlaylistRowActions({
   onPlay,
   onShuffle,
-  onStartRadio,
+  playingMode,
+  canFollow,
+  isFollowed,
+  togglingFollow,
   onToggleFollow,
-}: PlaylistCardProps) {
+  extraActions,
+}: {
+  onPlay?: () => void;
+  onShuffle?: () => void;
+  playingMode: "play" | "shuffle" | null;
+  canFollow: boolean;
+  isFollowed: boolean;
+  togglingFollow: boolean;
+  onToggleFollow: () => void;
+  extraActions?: PlaylistCardExtraAction[];
+}) {
   const { t } = useTranslation();
-  const { getPlaylistState, getPlaylistRecord } = useOffline();
-  const offlineState = getPlaylistState(playlistId);
-  const offlineRecord = getPlaylistRecord(playlistId);
-  const offlineMeta = getPlaylistOfflineMeta(offlineState, offlineRecord, t);
-  const actions = usePlaylistActionEntries({
+  const followLabel = t(isFollowed ? "common.following" : "common.follow");
+  return (
+    <>
+      {onPlay ? (
+        <ActionIconButton
+          onClick={onPlay}
+          title={t("player.play")}
+          aria-label={t("player.play")}
+        >
+          {playingMode === "play" ? (
+            <Loader2 size={15} className="animate-spin" />
+          ) : (
+            <Play size={15} fill="currentColor" className="ml-0.5" />
+          )}
+        </ActionIconButton>
+      ) : null}
+      {onShuffle ? (
+        <ActionIconButton
+          onClick={onShuffle}
+          title={t("player.shuffle")}
+          aria-label={t("player.shuffle")}
+        >
+          {playingMode === "shuffle" ? (
+            <Loader2 size={15} className="animate-spin" />
+          ) : (
+            <Shuffle size={15} />
+          )}
+        </ActionIconButton>
+      ) : null}
+      {canFollow ? (
+        <ActionIconButton
+          onClick={onToggleFollow}
+          active={isFollowed}
+          title={followLabel}
+          aria-label={followLabel}
+        >
+          {togglingFollow ? (
+            <Loader2 size={15} className="animate-spin" />
+          ) : isFollowed ? (
+            <HeartBold size={15} />
+          ) : (
+            <Heart size={15} />
+          )}
+        </ActionIconButton>
+      ) : null}
+      {extraActions?.map((item) => {
+        const Icon = item.icon;
+        return (
+          <ActionIconButton
+            key={item.key}
+            onClick={() => void item.onClick()}
+            tone={item.tone}
+            title={item.title}
+            aria-label={item.title}
+          >
+            {item.loading ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <Icon size={15} />
+            )}
+          </ActionIconButton>
+        );
+      })}
+    </>
+  );
+}
+
+function PlaylistRow(props: PlaylistCardProps) {
+  const {
     playlistId,
     name,
-    isSmart,
-    href,
-    canFollow: systemPlaylist && Boolean(onToggleFollow),
-    isFollowed,
-    onToggleFollow,
-    onPlay,
-    onShuffle,
-    onStartRadio,
-  });
-  const actionMenu = useItemActionMenu(actions);
-  const actionTarget = useItemActionTarget(actionMenu);
-  const editorialLabel = editorialPlaylistLabel(
+    description,
+    meta,
+    badge,
+    trackCount = 0,
+    detailEndpoint,
+    extraActions,
+  } = props;
+  const base = usePlaylistCardBase(props);
+  const { t, offlineState, offlineMeta } = base;
+  const { loadAndPlay, playingMode } = usePlaylistListRowPlayback({
+    detailEndpoint: detailEndpoint ?? "",
     name,
-    isSmart ? "core" : "crate",
+    playlistId,
+  });
+  const playHandlers = detailEndpoint
+    ? {
+        onPlay: () => loadAndPlay("play"),
+        onShuffle: () => loadAndPlay("shuffle"),
+      }
+    : {};
+  const extraEntries = useMemo<ItemActionMenuEntry[] | undefined>(
+    () =>
+      extraActions?.map((item) =>
+        action({
+          key: `extra-${item.key}`,
+          label: item.title,
+          icon: item.icon,
+          danger: item.tone === "danger",
+          onSelect: item.onClick,
+        }),
+      ),
+    [extraActions],
+  );
+  const trackCountLabel = t("common.trackCountLabel", { count: trackCount });
+  const subtitleText = meta ? `${trackCountLabel} · ${meta}` : trackCountLabel;
+  const actionMenu = usePlaylistActionMenu(
+    {
+      playlistId,
+      name,
+      isSmart: props.isSmart,
+      href: props.href,
+      canFollow: base.canFollow,
+      isFollowed: props.isFollowed,
+      onToggleFollow: props.onToggleFollow,
+      onStartRadio: props.onStartRadio,
+      extraEntries,
+      ...playHandlers,
+    },
+    { title: name, subtitle: subtitleText, detail: description },
   );
 
   return (
-    <article
-      className={cn(
-        "item-action-target group relative rounded-xl text-left transition-colors",
-        layout === "grid" ? "w-full min-w-0" : "w-[160px] shrink-0",
-        getPlaylistOfflineSurfaceClass(offlineState),
-      )}
-      {...actionTarget}
-    >
-      <button
-        type="button"
-        onClick={onClick}
-        className="block w-full cursor-pointer rounded-xl p-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-      >
-        <span className="relative mb-2 block overflow-hidden rounded-lg bg-text-primary/5">
-          <PlaylistCardArtwork
-            crateManaged={crateManaged}
-            editorialLabel={editorialLabel}
-            coverDataUrl={coverDataUrl}
-            tracks={tracks}
-            name={name}
-          />
-          {badge && !crateManaged ? (
-            <span className="absolute left-2 top-2 rounded-full border border-accent-action/20 bg-surface-canvas/85 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-accent-action backdrop-blur-md">
+    <EntityRow
+      title={name}
+      titleAccessory={
+        <>
+          {badge ? (
+            <span className="inline-flex shrink-0 items-center rounded-md border border-accent-action/30 px-1.5 py-0 text-xs font-medium text-accent-action">
+              <Sparkles size={10} className="mr-0.5" />
               {badge}
             </span>
           ) : null}
-          <OfflineBadge
-            state={offlineState}
-            compact
-            className={getPlaylistBadgePositionClass(badge, crateManaged)}
-          />
-        </span>
-        <span className="block truncate text-sm font-medium text-text-primary">
-          {name}
-        </span>
-        <span className="block truncate text-xs text-text-muted">
-          {description || meta}
-          {offlineMeta ? (
-            <span
-              className={cn(
-                "ml-1.5",
-                getPlaylistOfflineMetaClass(offlineState),
-              )}
-            >
-              · {offlineMeta}
-            </span>
-          ) : null}
-        </span>
-      </button>
-      {(systemPlaylist && onToggleFollow) || onPlay ? (
-        <div className="pointer-events-none absolute inset-x-2 top-2 z-10 aspect-square">
-          {systemPlaylist && onToggleFollow ? (
-            <PlaylistCardFollowButton
-              isFollowed={isFollowed}
-              onToggleFollow={onToggleFollow}
-            />
-          ) : null}
-          {onPlay ? <PlaylistCardPlayButton onPlay={onPlay} /> : null}
-        </div>
-      ) : null}
-      <ItemActionMenu
-        actions={actions}
-        header={{
-          type: "media",
-          title: name,
-          subtitle: description || meta,
-          detail: badge,
-          imageShape: "square",
-          fallbackIcon: Sparkles,
-        }}
-        open={actionMenu.open}
-        position={actionMenu.position}
-        menuRef={actionMenu.menuRef}
-        onClose={actionMenu.close}
-      />
-    </article>
+          <OfflineBadge state={offlineState} compact />
+        </>
+      }
+      subtitle={
+        <>
+          {subtitleText}
+          <OfflineMeta meta={offlineMeta} state={offlineState} />
+        </>
+      }
+      meta={description || undefined}
+      leading={
+        <PlaylistArtwork
+          name={name}
+          coverDataUrl={props.coverDataUrl}
+          tracks={props.tracks}
+          showCrateMark={props.crateManaged}
+          className="size-12 shrink-0 rounded-md"
+        />
+      }
+      trailing={
+        <PlaylistRowActions
+          onPlay={detailEndpoint ? () => void loadAndPlay("play") : undefined}
+          onShuffle={
+            detailEndpoint ? () => void loadAndPlay("shuffle") : undefined
+          }
+          playingMode={playingMode}
+          canFollow={base.canFollow}
+          isFollowed={Boolean(props.isFollowed)}
+          togglingFollow={base.togglingFollow}
+          onToggleFollow={() => void base.runToggleFollow()}
+          extraActions={extraActions}
+        />
+      }
+      onOpen={base.handleOpen}
+      href={base.href}
+      openLabel={t("common.openItem", { name })}
+      menuLabel={t("actions.menu.more")}
+      menuButton="always"
+      actionMenu={actionMenu}
+      className={cn(rowSurfaceClass(offlineState), props.className)}
+      classNames={{
+        meta: "mt-1 text-text-primary/40",
+        trailing: "gap-1",
+        menuButton: "opacity-80 transition-opacity hover:opacity-100",
+      }}
+    />
   );
 }
+
+export const PlaylistCard = memo(function PlaylistCard({
+  variant = "tile",
+  ...props
+}: PlaylistCardProps) {
+  if (variant === "row") return <PlaylistRow {...props} />;
+  if (variant === "featured") return <PlaylistFeatured {...props} />;
+  return <PlaylistTile {...props} />;
+});

@@ -4,8 +4,7 @@ import { Link } from "react-router";
 import { Loader2, UserPlus, UserRoundCheck } from "@crate/ui/icons";
 
 import { cn } from "@crate/ui/lib/cn";
-import { CrateImage } from "@/components/artwork/CrateImage";
-import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
+import { UserAvatar } from "@/components/social/UserAvatar";
 import { formatMinutes } from "@/pages/user-profile-model";
 
 export type AffinityBand = "low" | "medium" | "high" | "very_high" | string;
@@ -76,27 +75,16 @@ function cardLabel(card: ProfileCardPayload, t: TFunction) {
 
 function ProfileAvatar({ card }: { card: ProfileCardPayload }) {
   const { t } = useTranslation();
-  const label = cardLabel(card, t);
-  const { avatarUrl, handleAvatarError } = useUserAvatarUrl(
-    card.avatar,
-    card.id,
-  );
-
-  if (avatarUrl) {
-    return (
-      <CrateImage
-        src={avatarUrl}
-        alt=""
-        onError={handleAvatarError}
-        className="profile-hover-avatar size-16 rounded-xl object-cover"
-      />
-    );
-  }
 
   return (
-    <div className="profile-hover-avatar-placeholder flex size-16 items-center justify-center rounded-xl border text-2xl font-black">
-      {label.trim().charAt(0).toUpperCase() || "U"}
-    </div>
+    <UserAvatar
+      name={cardLabel(card, t)}
+      avatar={card.avatar}
+      userId={card.id}
+      alt=""
+      shape="rounded"
+      className="profile-hover-avatar profile-hover-avatar-placeholder size-16 rounded-xl border text-2xl font-black"
+    />
   );
 }
 

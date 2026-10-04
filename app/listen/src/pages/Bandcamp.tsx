@@ -10,8 +10,7 @@ import { MediaGrid } from "@crate/ui/domain/lists";
 import { EmptyState } from "@crate/ui/domain/states";
 import { api } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
-import { BandcampCard } from "./BandcampCard";
-import { BandcampListItem } from "./BandcampListItem";
+import { BandcampItem as BandcampItemView } from "@/components/bandcamp/BandcampItem";
 import type {
   BandcampCollectionResponse,
   BandcampConnectionStatus,
@@ -321,8 +320,9 @@ function ItemGrid({
   return (
     <MediaGrid density="wide">
       {items.map((item) => (
-        <BandcampCard
+        <BandcampItemView
           key={`${item.id}-${item.item_url}`}
+          variant="tile"
           item={item}
           busyAction={busyAction}
           onImport={onImport}
@@ -348,8 +348,9 @@ function ItemList({
   return (
     <div className="space-y-3">
       {items.map((item) => (
-        <BandcampListItem
+        <BandcampItemView
           key={`${item.id}-${item.item_url}`}
+          variant="row"
           item={item}
           busyAction={busyAction}
           onImport={onImport}

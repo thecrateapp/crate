@@ -86,7 +86,7 @@ export function CrateHero({
           crate.owner_username ? (
             <UserProfileLink
               username={crate.owner_username}
-              className="inline-flex items-center gap-2 self-start text-sm text-text-muted transition-colors hover:text-accent-action"
+              className="link-meta inline-flex items-center gap-2 self-start text-sm"
             >
               {ownerLine}
             </UserProfileLink>

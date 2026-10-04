@@ -1,8 +1,7 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router";
-import { Play, Radio, Share2, Shuffle, Sparkles } from "@crate/ui/icons";
-import type { ContextMenuEntry } from "@crate/ui/domain/actions";
+import { Sparkles } from "@crate/ui/icons";
 import { EmptyState, ErrorState } from "@crate/ui/domain/states";
 import { toast } from "sonner";
 
@@ -11,10 +10,7 @@ import { CoreTracksArtwork } from "@/components/home/CoreTracksArtwork";
 import { MixArtwork } from "@/components/home/MixArtwork";
 import type { HomeGeneratedPlaylistDetail } from "@/components/home/home-model";
 import { PlaylistArtwork } from "@/components/playlists/PlaylistArtwork";
-import {
-  PlaylistHeroSection,
-  type PlaylistHeroSecondaryAction,
-} from "@/components/playlists/PlaylistHeroSection";
+import { PlaylistHeroSection } from "@/components/playlists/PlaylistHeroSection";
 import {
   PlaylistTrackFilterBar,
   filterPlaylistTracks,
@@ -35,6 +31,7 @@ import { fetchHomePlaylistRadio } from "@/lib/radio";
 import { publicShareUrl } from "@/lib/share-url";
 import { openShareSheet } from "@/lib/social-share";
 import { formatTotalDuration, shuffleArray } from "@/lib/utils";
+import { buildPlaylistPageActions } from "@/pages/playlist-action-menus";
 
 export function newArrivalsWindowLabel(
   data: HomeGeneratedPlaylistDetail | null,
@@ -212,56 +209,14 @@ export function HomePlaylist() {
     );
   }
 
-  const secondaryActions: PlaylistHeroSecondaryAction[] = [
-    {
-      key: "radio",
-      label: t("radio.title"),
-      ariaLabel: t("playlist.actions.radio"),
-      icon: Radio,
-      disabled: playerTracks.length === 0,
-      onClick: () => void handleRadio(),
-    },
-    {
-      key: "share",
-      label: t("common.share"),
-      ariaLabel: t("common.share"),
-      icon: Share2,
-      onClick: () => void handleShare(),
-    },
-  ];
-  const playlistMenuItems: ContextMenuEntry[] = [
-    {
-      key: "play",
-      label: t("playlist.actions.playPlaylist"),
-      icon: Play,
-      disabled: playerTracks.length === 0,
-      onSelect: handlePlay,
-    },
-    {
-      key: "shuffle",
-      label: t("playlist.actions.shufflePlaylist"),
-      icon: Shuffle,
-      disabled: playerTracks.length === 0,
-      onSelect: handleShuffle,
-    },
-    {
-      key: "radio",
-      label: t("playlist.actions.startRadio"),
-      icon: Radio,
-      disabled: playerTracks.length === 0,
-      onSelect: handleRadio,
-    },
-    {
-      type: "divider",
-      key: "home-playlist-share-divider",
-    },
-    {
-      key: "share",
-      label: t("playlist.actions.sharePlaylist"),
-      icon: Share2,
-      onSelect: handleShare,
-    },
-  ];
+  const { secondaryActions, playlistMenuItems } = buildPlaylistPageActions({
+    t,
+    playDisabled: playerTracks.length === 0,
+    onPlay: handlePlay,
+    onShuffle: handleShuffle,
+    onRadio: handleRadio,
+    onShare: handleShare,
+  });
   const playlistMetaItems = [
     t("common.trackCountLabel", { count: data.track_count }),
     data.total_duration > 0 ? formatTotalDuration(data.total_duration) : null,

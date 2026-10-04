@@ -24,19 +24,13 @@ function PreloadBackground({ item }: { item: CollapsedViewProps["item"] }) {
   return <CrateImage src={url} alt="" className="hidden" />;
 }
 
-function CollapsedShowArtwork({
-  item,
-  artistImageUrl,
-}: {
-  item: CollapsedViewProps["item"];
-  artistImageUrl?: string;
-}) {
+function CollapsedShowArtwork({ artistImageUrl }: { artistImageUrl?: string }) {
   return (
-    <div className="h-full w-[88px] shrink-0 bg-text-primary/5">
+    <span className="block h-full w-[88px] shrink-0 bg-text-primary/5">
       {artistImageUrl && (
         <CrateImage
           src={artistImageUrl}
-          alt={item.artist}
+          alt=""
           loading="lazy"
           className=" size-full object-cover"
           onError={(e) => {
@@ -44,7 +38,7 @@ function CollapsedShowArtwork({
           }}
         />
       )}
-    </div>
+    </span>
   );
 }
 
@@ -59,8 +53,8 @@ function CollapsedShowDetails({
   const support = (item.lineup || []).slice(1);
 
   return (
-    <div className="min-w-0 flex-1 px-3 py-2.5">
-      <div className="flex items-center gap-1.5">
+    <span className="block min-w-0 flex-1 px-3 py-2.5">
+      <span className="flex items-center gap-1.5">
         <span className="truncate text-[0.8125rem] font-semibold text-text-primary">
           {item.artist}
         </span>
@@ -70,8 +64,8 @@ function CollapsedShowDetails({
             title={t("radar.show.attending")}
           />
         )}
-      </div>
-      <div className="mt-1 flex items-center gap-1 text-xs text-text-primary/40">
+      </span>
+      <span className="mt-1 flex items-center gap-1 text-xs text-text-primary/40">
         <MapPin size={10} className="shrink-0 text-accent-action/60" />
         <span className="truncate">{item.venue}</span>
         {item.city && (
@@ -80,14 +74,14 @@ function CollapsedShowDetails({
             <span className="shrink-0">{item.city}</span>
           </>
         )}
-      </div>
+      </span>
       {support.length > 0 && (
-        <div className="mt-0.5 truncate text-xs text-text-primary/40">
+        <span className="mt-0.5 block truncate text-xs text-text-primary/40">
           {t("radar.show.withSupportPrefix")} {support.slice(0, 3).join(", ")}
           {support.length > 3 && ` +${support.length - 3}`}
-        </div>
+        </span>
       )}
-    </div>
+    </span>
   );
 }
 
@@ -108,7 +102,7 @@ function CollapsedShowDate({
     : "";
 
   return (
-    <div className="flex shrink-0 flex-col items-center justify-center px-2">
+    <span className="flex shrink-0 flex-col items-center justify-center px-2">
       <span className="text-xs font-bold leading-none tracking-[0.12em] text-accent-action/55">
         {month}
       </span>
@@ -118,7 +112,7 @@ function CollapsedShowDate({
       <span className="text-xs font-medium leading-none text-text-primary/40">
         {weekday}
       </span>
-    </div>
+    </span>
   );
 }
 
@@ -128,14 +122,14 @@ function CollapsedShowActions({
   savingAttendance,
   actionMenu,
   onToggleAttendance,
-}: CollapsedViewProps) {
+}: Omit<CollapsedViewProps, "onToggle">) {
   const { t } = useTranslation();
 
   return (
     <div className="flex shrink-0 flex-col items-center gap-1 pr-2">
       <button
-        onClick={(e) => {
-          e.stopPropagation();
+        type="button"
+        onClick={() => {
           void onToggleAttendance();
         }}
         disabled={!item.id || savingAttendance}
@@ -172,6 +166,7 @@ export function UpcomingShowCollapsedView({
   savingAttendance,
   actionMenu,
   onToggleAttendance,
+  onToggle,
 }: CollapsedViewProps) {
   const { i18n } = useTranslation();
   const artistImageUrl =
@@ -189,9 +184,16 @@ export function UpcomingShowCollapsedView({
   return (
     <div className="absolute inset-x-0 top-0 z-10 flex h-full items-center gap-0">
       <PreloadBackground item={item} />
-      <CollapsedShowArtwork item={item} artistImageUrl={artistImageUrl} />
-      <CollapsedShowDetails item={item} attending={attending} />
-      <CollapsedShowDate item={item} locale={i18n.language} />
+      <button
+        type="button"
+        aria-expanded={false}
+        onClick={onToggle}
+        className="flex h-full min-w-0 flex-1 items-center rounded-l-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
+      >
+        <CollapsedShowArtwork artistImageUrl={artistImageUrl} />
+        <CollapsedShowDetails item={item} attending={attending} />
+        <CollapsedShowDate item={item} locale={i18n.language} />
+      </button>
       <CollapsedShowActions
         item={item}
         attending={attending}

@@ -1,8 +1,5 @@
-import { CrateImage } from "@/components/artwork/CrateImage";
-import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
+import { UserAvatar } from "@/components/social/UserAvatar";
 import { cn } from "@/lib/utils";
-
-import { initials } from "@/pages/jam-session-utils";
 
 export function JamAvatarBubble({
   name,
@@ -17,31 +14,17 @@ export function JamAvatarBubble({
   size?: "sm" | "md";
   className?: string;
 }) {
-  const sizeClass = size === "sm" ? "h-9 w-9 text-xs" : "h-11 w-11 text-xs";
-  const { avatarUrl, handleAvatarError } = useUserAvatarUrl(avatar, userId);
-  if (avatarUrl) {
-    return (
-      <CrateImage
-        src={avatarUrl}
-        alt=""
-        onError={handleAvatarError}
-        className={cn(
-          sizeClass,
-          "jam-avatar shrink-0 rounded-full object-cover",
-          className,
-        )}
-      />
-    );
-  }
   return (
-    <div
+    <UserAvatar
+      name={name}
+      avatar={avatar}
+      userId={userId}
+      alt=""
       className={cn(
-        sizeClass,
-        "jam-avatar-fallback flex shrink-0 items-center justify-center rounded-full font-semibold",
+        size === "sm" ? "size-9" : "size-11",
+        "jam-avatar-fallback text-xs",
         className,
       )}
-    >
-      {initials(name)}
-    </div>
+    />
   );
 }

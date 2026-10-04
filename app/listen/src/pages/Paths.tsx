@@ -9,7 +9,9 @@ import { api } from "@/lib/api";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
-import { EndpointPanel, PathCard } from "./PathsParts";
+import { PathRow } from "@/components/paths/PathRow";
+
+import { EndpointPanel } from "./PathsParts";
 import type { PathDetail, PathSummary, SearchResult } from "./paths-model";
 
 export function Paths() {
@@ -150,7 +152,7 @@ export function Paths() {
             {t("paths.saved")}
           </div>
           {paths.map((path) => (
-            <PathCard
+            <PathRow
               key={path.id}
               path={path}
               onPlay={() => void playPath(path.id)}

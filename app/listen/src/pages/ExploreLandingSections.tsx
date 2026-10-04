@@ -9,7 +9,7 @@ import {
   type MoodPreset,
   type SystemPlaylist,
 } from "@/components/explore/explore-model";
-import { CrateImage } from "@/components/artwork/CrateImage";
+import { GenreTile } from "@/components/explore/GenreTile";
 import { PlaylistCard } from "@/components/playlists/PlaylistCard";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
@@ -148,60 +148,25 @@ export function GenreExplorer({
       />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {topGenres.slice(0, 8).map((genre, index) => {
-          const resolvedCoverUrl = resolveMaybeApiAssetUrl(genre.cover_url);
-          const detail =
-            genre.description ||
-            (genre.top_artists?.length
-              ? genre.top_artists.slice(0, 3).join(", ")
-              : null);
-
+          const slug = getGenreSlug(genre);
+          const coverUrl = resolveMaybeApiAssetUrl(genre.cover_url);
           return (
-            <button
+            <GenreTile
               key={genre.slug || genre.name}
-              type="button"
-              onClick={() => onOpen(getGenreSlug(genre))}
-              className="explore-genre-card group relative min-h-36 overflow-hidden rounded-[12px] p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/60"
-            >
-              {resolvedCoverUrl ? (
-                <CrateImage
-                  src={resolvedCoverUrl}
-                  alt=""
-                  aria-hidden="true"
-                  loading="lazy"
-                  className="absolute inset-0 size-full object-cover opacity-60 blur-[1px] saturate-125 transition duration-300 group-hover:scale-[1.04] group-hover:opacity-70"
-                />
-              ) : null}
-              <div
-                className={`explore-genre-card-overlay absolute inset-0 opacity-80 ${
-                  resolvedCoverUrl
-                    ? "explore-genre-card-overlay-image"
-                    : `explore-genre-card-overlay-placeholder explore-genre-card-overlay-position-${
-                        index % 4
-                      }`
-                }`}
-              />
-              <div className="relative flex h-full flex-col justify-between gap-5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-[0.18em] text-accent-action/90">
-                    {t("explore.genreRooms.badge")}
-                  </span>
-                  <Radio
-                    size={15}
-                    className="text-text-primary/30 transition group-hover:text-accent-action"
-                  />
-                </div>
-                <div>
-                  <div className="text-lg font-black leading-none tracking-[-0.04em] text-text-primary">
-                    {genre.name}
-                  </div>
-                  {detail ? (
-                    <div className="mt-2 line-clamp-2 text-xs leading-5 text-text-primary/62">
-                      {detail}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </button>
+              variant="room"
+              slug={slug}
+              name={genre.name}
+              kicker={t("explore.genreRooms.badge")}
+              detail={
+                genre.description ||
+                (genre.top_artists?.length
+                  ? genre.top_artists.slice(0, 3).join(", ")
+                  : null)
+              }
+              imageCandidates={coverUrl ? [coverUrl] : []}
+              placeholderIndex={index}
+              onOpen={() => onOpen(slug)}
+            />
           );
         })}
       </div>

@@ -49,7 +49,7 @@ export function AlbumHeroContributor({
               <UserProfileLink
                 username={visibleContributor.user_username}
                 to={primaryContributorPath}
-                className="font-medium text-text-primary/85 transition-colors hover:text-accent-action"
+                className="link-meta font-medium text-text-primary/85"
               >
                 {primaryContributorName}
               </UserProfileLink>

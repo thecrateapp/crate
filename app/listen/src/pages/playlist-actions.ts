@@ -22,9 +22,9 @@ import { publicShareUrl } from "@/lib/share-url";
 import { openShareSheet } from "@/lib/social-share";
 import { shuffleArray } from "@/lib/utils";
 import {
-  buildPlaylistMenuItems,
-  buildPlaylistSecondaryActions,
+  buildPlaylistPageActions,
   getPlaylistOfflineIcon,
+  type PlaylistPageActions,
 } from "@/pages/playlist-action-menus";
 import type { PlaylistOfflinePresentation } from "@/pages/playlist-page-model";
 import type {
@@ -32,6 +32,12 @@ import type {
   PlaylistInvite,
   PlaylistSavePayload,
 } from "@/pages/playlist-types";
+
+const EMPTY_PAGE_ACTIONS: PlaylistPageActions = {
+  offlineIcon: getPlaylistOfflineIcon("idle", { busy: false }),
+  playlistMenuItems: [],
+  secondaryActions: [],
+};
 
 type OpenCreatePlaylist = ReturnType<
   typeof usePlaylistComposer
@@ -347,27 +353,29 @@ export function buildPlaylistActions({
     }
   }
 
-  const offlineIcon = getPlaylistOfflineIcon(offlineState, offlinePresentation);
-  const menuInput = {
-    data,
-    offlinePresentation,
-    offlineState,
-    offlineSupported,
-    playerTracks,
-    offlineIcon,
-    handlePlay,
-    handleShuffle,
-    handlePlaylistRadio,
-    handleRegenerate,
-    handleShare,
-    handleToggleOffline,
-    setDeleteOpen,
-    setEditorOpen,
-    setMembersOpen,
-    t,
-  };
-  const secondaryActions = buildPlaylistSecondaryActions(menuInput);
-  const playlistMenuItems = buildPlaylistMenuItems(menuInput);
+  const { offlineIcon, playlistMenuItems, secondaryActions } = data
+    ? buildPlaylistPageActions({
+        t,
+        playDisabled: playerTracks.length === 0,
+        onPlay: handlePlay,
+        onShuffle: handleShuffle,
+        onRadio: handlePlaylistRadio,
+        onShare: handleShare,
+        offline: {
+          state: offlineState,
+          presentation: offlinePresentation,
+          supported: offlineSupported,
+          isSmart: data.is_smart,
+          onToggle: handleToggleOffline,
+        },
+        onCollaborators: data.is_collaborative
+          ? () => setMembersOpen(true)
+          : undefined,
+        onEdit: () => setEditorOpen(true),
+        onRegenerate: data.is_smart ? handleRegenerate : undefined,
+        onDelete: () => setDeleteOpen(true),
+      })
+    : EMPTY_PAGE_ACTIONS;
 
   return {
     handleAddTrackToPlaylist,

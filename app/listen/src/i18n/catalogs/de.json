@@ -1761,6 +1761,7 @@
   "profileHover.stats.adds": "Beiträge",
   "profileHover.stats.lists": "Listen",
   "common.playItem": "{name} abspielen",
+  "common.openItem": "{name} öffnen",
   "player.goToArtist": "Zu {name}",
   "player.playingFrom": "Wiedergabe aus:",
   "player.likedTrack": "Gelikter Titel",
@@ -1780,5 +1781,12 @@
   "trackRow.resolvingLabel": "{title} wird aufgelöst",
   "trackRow.unknownTitle": "Unbekannt",
   "trackRow.soon": "Bald",
-  "trackRow.coverAlt": "Cover von {title}"
+  "trackRow.coverAlt": "Cover von {title}",
+  "actions.user.share": "Profil teilen",
+  "actions.user.toasts.followFailed": "Folgen konnte nicht aktualisiert werden",
+  "actions.radio.start": "Radio starten",
+  "actions.genre.open": "Genre öffnen",
+  "actions.path.open": "Pfad öffnen",
+  "actions.jam.open": "Raum öffnen",
+  "actions.bandcamp.open": "Auf Bandcamp öffnen"
 }

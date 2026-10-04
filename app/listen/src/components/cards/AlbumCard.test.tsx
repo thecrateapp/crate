@@ -1,4 +1,6 @@
 import { fireEvent, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { useLocation } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAlbumActionEntries } from "@/components/actions/album-actions";
@@ -35,6 +37,10 @@ vi.mock("@/contexts/SavedAlbumsContext", () => ({
     toggleAlbumSaved: vi.fn(async () => false),
   }),
 }));
+
+function LocationProbe() {
+  return <output data-testid="location-probe">{useLocation().pathname}</output>;
+}
 
 function mockMobilePointer() {
   Object.defineProperty(window, "matchMedia", {
@@ -142,7 +148,46 @@ describe("AlbumCard", () => {
 
     expect(
       screen.getByRole("button", { name: "Add to collection" }),
-    ).toHaveClass("size-10", "rounded-full", "right-4", "top-4");
+    ).toHaveClass("size-10", "rounded-full", "right-2", "top-2");
+    expect(
+      screen
+        .getByRole("button", { name: "Add to collection" })
+        .closest("[data-slot='entity-overlay']"),
+    ).not.toBeNull();
+  });
+
+  it("keeps the canonical top-left menu trigger and does not navigate on Enter", async () => {
+    const user = userEvent.setup();
+    renderWithListenProviders(
+      <>
+        <AlbumCard artist="Hum" album="Inlet" albumId={42} />
+        <LocationProbe />
+      </>,
+    );
+
+    const menuButton = screen.getByRole("button", { name: "More actions" });
+    expect(menuButton).toHaveClass("left-4", "top-4");
+    menuButton.focus();
+    await user.keyboard("{Enter}");
+
+    expect(
+      await screen.findByRole("menuitem", { name: "Play album" }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("location-probe")).toHaveTextContent("/");
+  });
+
+  it("navigates to the album from the primary card button", async () => {
+    const user = userEvent.setup();
+    renderWithListenProviders(
+      <>
+        <AlbumCard artist="Hum" album="Inlet" albumId={42} />
+        <LocationProbe />
+      </>,
+    );
+
+    await user.click(screen.getByText("Inlet").closest("button")!);
+
+    expect(screen.getByTestId("location-probe")).not.toHaveTextContent(/^\/$/);
   });
 
   it("opens the desktop action menu when the album only has stable route identifiers", async () => {
@@ -230,7 +275,7 @@ describe("AlbumCard", () => {
     );
 
     const row = screen.getByText("Inlet").closest("article")!;
-    expect(row).toHaveAttribute("data-variant", "row");
+    expect(row).toHaveAttribute("data-density", "default");
     expect(within(row).getByText("2")).toBeInTheDocument();
     expect(within(row).getByText("via Bandcamp")).toBeInTheDocument();
     expect(within(row).getByText("2020 · Hum")).toBeInTheDocument();

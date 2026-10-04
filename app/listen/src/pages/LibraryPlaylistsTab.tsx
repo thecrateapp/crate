@@ -13,7 +13,7 @@ import {
 import { EmptyState, LoadingState } from "@crate/ui/domain/states";
 import { useApi } from "@/hooks/use-api";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
-import { PlaylistListRow } from "@/components/playlists/PlaylistListRow";
+import { PlaylistCard } from "@/components/playlists/PlaylistCard";
 import {
   PlaylistCreateModal,
   type PlaylistComposerTrack,
@@ -182,14 +182,15 @@ export function LibraryPlaylistsTab() {
             {t("explore.fromCrate.title")}
           </div>
           {followedCurated.map((playlist) => (
-            <PlaylistListRow
+            <PlaylistCard
+              variant="row"
               key={`curated-${playlist.id}`}
               playlistId={playlist.id}
               name={playlist.name}
               isSmart={playlist.is_smart}
               description={playlist.description}
               coverDataUrl={playlist.cover_data_url}
-              artworkTracks={playlist.artwork_tracks}
+              tracks={playlist.artwork_tracks}
               trackCount={playlist.track_count}
               meta={[
                 playlist.category,
@@ -204,10 +205,9 @@ export function LibraryPlaylistsTab() {
               href={`/curation/playlist/${playlist.id}`}
               detailEndpoint={`/api/curation/playlists/${playlist.id}`}
               crateManaged
-              followState={{
-                isFollowed: true,
-                onToggle: async () => toggleSystemPlaylistFollow(playlist),
-              }}
+              systemPlaylist
+              isFollowed
+              onToggleFollow={() => toggleSystemPlaylistFollow(playlist)}
             />
           ))}
         </div>
@@ -223,14 +223,15 @@ export function LibraryPlaylistsTab() {
             {t("library.playlists.yours")}
           </div>
           {playlists.map((pl) => (
-            <PlaylistListRow
+            <PlaylistCard
+              variant="row"
               key={pl.id}
               playlistId={pl.id}
               name={pl.name}
               isSmart={pl.is_smart}
               description={pl.description}
               coverDataUrl={pl.cover_data_url}
-              artworkTracks={pl.artwork_tracks}
+              tracks={pl.artwork_tracks}
               trackCount={pl.track_count}
               meta={
                 pl.total_duration > 0
@@ -239,7 +240,7 @@ export function LibraryPlaylistsTab() {
               }
               href={`/playlist/${pl.id}`}
               detailEndpoint={`/api/playlists/${pl.id}`}
-              badge={pl.is_smart ? "smart" : "personal"}
+              badge={pl.is_smart ? t("playlist.badges.smart") : undefined}
               extraActions={[
                 {
                   key: "edit",

@@ -188,10 +188,9 @@ describe("Shows page", () => {
     renderWithListenProviders(<Shows />);
 
     expect(screen.queryByText("announced")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open" })).toHaveAttribute(
-      "href",
-      expect.stringContaining("future-lp"),
-    );
+    expect(
+      screen.getByRole("link", { name: "Open Future LP" }),
+    ).toHaveAttribute("href", expect.stringContaining("future-lp"));
     expect(
       screen.queryByRole("link", { name: "Source" }),
     ).not.toBeInTheDocument();

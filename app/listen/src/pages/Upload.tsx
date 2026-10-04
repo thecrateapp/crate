@@ -217,7 +217,7 @@ export function Upload() {
                   </div>
                   <button
                     onClick={() => setFiles([])}
-                    className="text-xs text-text-muted transition-colors hover:text-text-primary/70"
+                    className="link-meta text-xs"
                   >
                     {t("common.clear")}
                   </button>

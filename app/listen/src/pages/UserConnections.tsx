@@ -1,13 +1,11 @@
 import { useLocation, useParams } from "react-router";
 import { BackLink } from "@crate/ui/domain/navigation";
 import { LoadingState } from "@crate/ui/domain/states";
-import { UserPlus, Users } from "@crate/ui/icons";
+import { Users } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { useApi } from "@/hooks/use-api";
-import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
-import { UserProfileLink } from "@/components/social/UserProfileLink";
-import { CrateImage } from "@/components/artwork/CrateImage";
+import { UserRow } from "@/components/social/UserRow";
 
 interface UserListItem {
   id: number;
@@ -15,38 +13,6 @@ interface UserListItem {
   display_name: string | null;
   avatar: string | null;
   followed_at: string;
-}
-
-function UserAvatar({
-  name,
-  avatar,
-  userId,
-  className = " size-11",
-}: {
-  name: string;
-  avatar?: string | null;
-  userId?: number | null;
-  className?: string;
-}) {
-  const { avatarUrl, handleAvatarError } = useUserAvatarUrl(avatar, userId);
-  if (avatarUrl) {
-    return (
-      <CrateImage
-        src={avatarUrl}
-        alt={name}
-        onError={handleAvatarError}
-        className={`${className} rounded-full object-cover`}
-      />
-    );
-  }
-  const initial = name.trim().charAt(0).toUpperCase() || "U";
-  return (
-    <div
-      className={`${className} rounded-full bg-accent-action/15 text-text-accent flex items-center justify-center font-semibold`}
-    >
-      {initial}
-    </div>
-  );
 }
 
 export function UserConnections() {
@@ -87,38 +53,13 @@ export function UserConnections() {
           <LoadingState label={t("common.loadingShort")} className="py-12" />
         ) : data && data.length > 0 ? (
           <div className="space-y-3">
-            {data.map((item) => {
-              const label =
-                item.display_name || item.username || t("people.unknownUser");
-              return (
-                <UserProfileLink
-                  key={`${mode}-${item.id}`}
-                  username={item.username}
-                  hoverClassName="block"
-                  className="flex items-center gap-4 rounded-lg border border-border-quiet bg-text-primary/[0.02] px-4 py-3 hover:bg-text-primary/[0.05] transition-colors"
-                >
-                  <UserAvatar
-                    name={label}
-                    avatar={item.avatar}
-                    userId={item.id}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-text-primary">
-                      {label}
-                    </div>
-                    <div className="truncate text-xs text-text-muted">
-                      {item.username
-                        ? `@${item.username}`
-                        : t("people.noUsername")}
-                    </div>
-                  </div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-border-quiet px-3 py-1.5 text-xs text-text-primary/65">
-                    <UserPlus size={13} />
-                    {t("people.viewProfile")}
-                  </div>
-                </UserProfileLink>
-              );
-            })}
+            {data.map((item) => (
+              <UserRow
+                key={`${mode}-${item.id}`}
+                user={item}
+                className="border border-border-quiet bg-text-primary/[0.02]"
+              />
+            ))}
           </div>
         ) : (
           <div className="border-y border-dashed border-border-quiet px-4 py-10 text-center text-sm text-text-muted">

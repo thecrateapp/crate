@@ -108,7 +108,7 @@ function ExpandedShowHeader({
                 artistId: item.artist_id,
                 artistSlug: item.artist_slug,
               })}
-              className="block truncate text-sm font-bold text-text-primary transition-colors hover:text-accent-action"
+              className="link-meta block w-fit max-w-full truncate text-sm font-bold text-text-primary"
             >
               {item.artist}
             </Link>

@@ -1761,6 +1761,7 @@
   "profileHover.stats.adds": "Ekarpenak",
   "profileHover.stats.lists": "Zerrendak",
   "common.playItem": "Erreproduzitu {name}",
+  "common.openItem": "Ireki {name}",
   "player.goToArtist": "Joan {name}-ra",
   "player.playingFrom": "Hemendik erreproduzitzen:",
   "player.likedTrack": "Gogoko abestia",
@@ -1780,5 +1781,12 @@
   "trackRow.resolvingLabel": "{title} ebazten",
   "trackRow.unknownTitle": "Ezezaguna",
   "trackRow.soon": "Laster",
-  "trackRow.coverAlt": "{title} azala"
+  "trackRow.coverAlt": "{title} azala",
+  "actions.user.share": "Partekatu profila",
+  "actions.user.toasts.followFailed": "Ezin izan da jarraipena eguneratu",
+  "actions.radio.start": "Hasi irratia",
+  "actions.genre.open": "Ireki generoa",
+  "actions.path.open": "Ireki ibilbidea",
+  "actions.jam.open": "Ireki gela",
+  "actions.bandcamp.open": "Ireki Bandcamp-en"
 }
