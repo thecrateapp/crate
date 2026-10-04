@@ -284,6 +284,8 @@ function safeErrorCategory(error: unknown): string {
 
 async function handleDeepLinkUrls(urls: string[]): Promise<void> {
   for (const url of urls) {
+    // OAuth callbacks share pending exchange state, so consume them in delivery order.
+    // react-doctor-disable-next-line async-await-in-loop
     const result = await consumeOAuthCallbackUrl(url);
     if (!result.handled) {
       recordTauriAuthDiagnostic(

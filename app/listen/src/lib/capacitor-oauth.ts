@@ -275,6 +275,8 @@ export async function migrateLegacyTauriOAuthRecords(): Promise<void> {
     for (const key of keys) {
       const legacyValue = localStorage.getItem(key);
       if (legacyValue === null) continue;
+      // Migrate one keychain record at a time so a failure stops before removing later legacy copies.
+      // react-doctor-disable-next-line async-await-in-loop
       const secureValue = await getSecureSessionValue(key);
       if (secureValue !== null) {
         JSON.parse(secureValue);

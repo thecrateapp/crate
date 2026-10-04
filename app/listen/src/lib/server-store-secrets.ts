@@ -317,6 +317,8 @@ export async function loadNativeServerSecrets(
       nextSecrets.set(server.id, emptySecret());
       continue;
     }
+    // Keychain reads stay ordered with the per-server migration below.
+    // react-doctor-disable-next-line async-await-in-loop
     const secureRaw = await getSecureSessionValue(secureSessionKey(server.id));
     const secureRecord = parseSecureServerSecret(secureRaw);
     observeSecretGeneration(server.id, secureRecord.generation);
