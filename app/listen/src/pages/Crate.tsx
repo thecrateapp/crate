@@ -37,6 +37,7 @@ import { toast } from "sonner";
 
 import { action } from "@/components/actions/shared";
 import { CrateImage } from "@/components/artwork/CrateImage";
+import { useTransparentHeader } from "@/components/layout/transparent-header";
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import {
   authenticatedCrateCoverUrl,
@@ -92,6 +93,7 @@ const CrateMembersModal = lazy(() =>
 );
 
 export function Crate() {
+  useTransparentHeader();
   const { t } = useTranslation();
   const { user, loading } = useAuth();
 

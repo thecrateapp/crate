@@ -9,6 +9,7 @@ interface MobileShellProps {
   children?: ReactNode;
   collectionActive: boolean;
   hasTrack: boolean;
+  headerScrolled: boolean;
   homeMobileOverlay: boolean;
   homePage: boolean;
   mobileContentPadClass: string;
@@ -20,21 +21,24 @@ export function MobileShell({
   children,
   collectionActive,
   hasTrack,
+  headerScrolled,
   homeMobileOverlay,
   homePage,
   mobileContentPadClass,
   overlayHeader,
   headerChromeClass,
 }: MobileShellProps) {
+  const transparentHeader =
+    (overlayHeader || homeMobileOverlay) && !headerScrolled;
+
   return (
     <div className="flex min-h-dvh flex-col bg-surface-canvas">
       <div
         data-testid="listen-header"
         data-home-overlay={String(homeMobileOverlay)}
-        className={`z-app-header fixed top-0 left-0 right-0 ${
-          overlayHeader || homeMobileOverlay
-            ? "bg-transparent"
-            : headerChromeClass
+        data-transparent={String(transparentHeader)}
+        className={`z-app-header fixed top-0 left-0 right-0 transition-[background-color,border-color,box-shadow] duration-200 ${
+          transparentHeader ? "bg-transparent" : headerChromeClass
         }`}
         style={{ paddingTop: "var(--listen-safe-top)" }}
       >

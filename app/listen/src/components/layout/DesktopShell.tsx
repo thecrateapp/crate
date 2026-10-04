@@ -11,6 +11,7 @@ interface DesktopShellProps {
   desktopOverlayHeader: boolean;
   hasTrack: boolean;
   headerOffsetClass: string;
+  headerScrolled: boolean;
   homeDesktopOverlay: boolean;
   overlayHeader: boolean;
   sidebarLeft: string;
@@ -23,24 +24,28 @@ export function DesktopShell({
   desktopOverlayHeader,
   hasTrack,
   headerOffsetClass,
+  headerScrolled,
   homeDesktopOverlay,
   overlayHeader,
   sidebarLeft,
   sidebarW,
 }: DesktopShellProps) {
+  const transparentHeader = desktopOverlayHeader && !headerScrolled;
+
   return (
     <div className="flex min-h-dvh bg-surface-canvas">
       <Sidebar />
       <div
         data-testid="listen-header"
         data-home-overlay={String(homeDesktopOverlay)}
+        data-transparent={String(transparentHeader)}
         className={`z-app-header fixed top-0 ${sidebarLeft} right-0 transition-[left,background-color,border-color,box-shadow] duration-200 ${
-          desktopOverlayHeader
+          transparentHeader
             ? "bg-transparent"
             : "border-b border-border-quiet bg-surface-chrome shadow-chrome backdrop-blur-xl"
         }`}
       >
-        {desktopOverlayHeader && (
+        {transparentHeader && (
           <div
             aria-hidden="true"
             className="listen-home-top-scrim pointer-events-none absolute inset-x-0 top-0 h-24"

@@ -26,6 +26,7 @@ import { JustLandedSection } from "@/components/home/HomeLibrarySections";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
 import { usePlayerActions } from "@/contexts/PlayerContext";
+import { useTransparentHeader } from "@/components/layout/transparent-header";
 
 export function Explore() {
   const { t } = useTranslation();
@@ -33,6 +34,7 @@ export function Explore() {
   const { playAll } = usePlayerActions();
   const [searchParams, setSearchParams] = useSearchParams();
   const genreSlug = searchParams.get("genre");
+  useTransparentHeader(searchParams.has("genre"));
   const playlistCategory = searchParams.get("playlistCategory");
 
   const {

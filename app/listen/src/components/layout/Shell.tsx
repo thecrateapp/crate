@@ -10,27 +10,14 @@ import {
   SIDEBAR_KEY,
   getStoredExpanded,
 } from "@/components/layout/sidebar/sidebar-model";
-import { isReservedArtistChildSlug } from "@/lib/library-routes";
-
-function hasOverlayHeader(pathname: string, search = "") {
-  if (pathname === "/explore" && new URLSearchParams(search).has("genre")) {
-    return true;
-  }
-  if (
-    /^\/artists\/[^/]+$/.test(pathname) ||
-    /^\/albums\/[^/]+\/[^/]+$/.test(pathname) ||
-    /^\/playlist\/[^/]+$/.test(pathname) ||
-    /^\/crate\/[^/]+$/.test(pathname) ||
-    /^\/curation\/playlist\/[^/]+$/.test(pathname) ||
-    /^\/home\/playlist\/[^/]+$/.test(pathname)
-  ) {
-    return true;
-  }
-  const artistChildMatch = pathname.match(/^\/artists\/([^/]+)\/([^/]+)$/);
-  if (!artistChildMatch) return false;
-  const childSlug = artistChildMatch[2];
-  return !isReservedArtistChildSlug(childSlug);
-}
+import {
+  TransparentHeaderProvider,
+  useTransparentHeaderRegistry,
+} from "@/components/layout/transparent-header";
+import {
+  HEADER_SOLID_SCROLL_THRESHOLD,
+  useScrolledPast,
+} from "@/components/layout/use-scrolled-past";
 
 export function Shell({ children }: { children?: ReactNode }) {
   const isDesktop = useIsDesktop();
@@ -38,7 +25,8 @@ export function Shell({ children }: { children?: ReactNode }) {
   const { currentTrack } = usePlayerActions();
   const hasTrack = !!currentTrack;
   const [sidebarExpanded, setSidebarExpanded] = useState(getStoredExpanded);
-  const overlayHeader = hasOverlayHeader(location.pathname, location.search);
+  const { transparent: overlayHeader, register } =
+    useTransparentHeaderRegistry();
   const homePage = location.pathname === "/";
   const homeDesktopOverlay = isDesktop && homePage;
   const homeMobileOverlay = !isDesktop && homePage;
@@ -46,6 +34,11 @@ export function Shell({ children }: { children?: ReactNode }) {
   const collectionActive =
     location.pathname === "/library" ||
     location.pathname.startsWith("/collection");
+  const headerScrolled = useScrolledPast(
+    HEADER_SOLID_SCROLL_THRESHOLD,
+    isDesktop ? desktopOverlayHeader : overlayHeader || homeMobileOverlay,
+    location.key,
+  );
   const headerOffsetClass = desktopOverlayHeader ? "" : "pt-24";
   const desktopContentPadClass = desktopOverlayHeader ? "pt-0 pb-6" : "py-6";
   const mobileContentPadClass =
@@ -68,32 +61,34 @@ export function Shell({ children }: { children?: ReactNode }) {
     };
   }, []);
 
-  if (isDesktop) {
-    return (
-      <DesktopShell
-        children={children}
-        desktopContentPadClass={desktopContentPadClass}
-        desktopOverlayHeader={desktopOverlayHeader}
-        hasTrack={hasTrack}
-        headerOffsetClass={headerOffsetClass}
-        homeDesktopOverlay={homeDesktopOverlay}
-        overlayHeader={overlayHeader}
-        sidebarLeft={sidebarExpanded ? "left-52" : "left-14"}
-        sidebarW={sidebarExpanded ? "ml-52" : "ml-14"}
-      />
-    );
-  }
-
   return (
-    <MobileShell
-      children={children}
-      collectionActive={collectionActive}
-      hasTrack={hasTrack}
-      headerChromeClass={headerChromeClass}
-      homeMobileOverlay={homeMobileOverlay}
-      homePage={homePage}
-      mobileContentPadClass={mobileContentPadClass}
-      overlayHeader={overlayHeader}
-    />
+    <TransparentHeaderProvider value={register}>
+      {isDesktop ? (
+        <DesktopShell
+          children={children}
+          desktopContentPadClass={desktopContentPadClass}
+          desktopOverlayHeader={desktopOverlayHeader}
+          hasTrack={hasTrack}
+          headerOffsetClass={headerOffsetClass}
+          headerScrolled={headerScrolled}
+          homeDesktopOverlay={homeDesktopOverlay}
+          overlayHeader={overlayHeader}
+          sidebarLeft={sidebarExpanded ? "left-52" : "left-14"}
+          sidebarW={sidebarExpanded ? "ml-52" : "ml-14"}
+        />
+      ) : (
+        <MobileShell
+          children={children}
+          collectionActive={collectionActive}
+          hasTrack={hasTrack}
+          headerChromeClass={headerChromeClass}
+          headerScrolled={headerScrolled}
+          homeMobileOverlay={homeMobileOverlay}
+          homePage={homePage}
+          mobileContentPadClass={mobileContentPadClass}
+          overlayHeader={overlayHeader}
+        />
+      )}
+    </TransparentHeaderProvider>
   );
 }

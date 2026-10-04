@@ -1,9 +1,12 @@
-import { fireEvent, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { Link, Route, Routes } from "react-router";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 import { Shell } from "./Shell";
+import { useTransparentHeader } from "./transparent-header";
+import { HEADER_SOLID_SCROLL_THRESHOLD } from "./use-scrolled-past";
 
 const viewportState = vi.hoisted(() => ({ isDesktop: false }));
 
@@ -28,9 +31,28 @@ vi.mock("@/hooks/use-audio-visualizer", () => ({
   useAudioVisualizer: () => ({ frequenciesDb: [] }),
 }));
 
+function HeroPage({ enabled = true }: { enabled?: boolean }) {
+  useTransparentHeader(enabled);
+  return <div data-testid="hero-page" />;
+}
+
+function setWindowScroll(y: number) {
+  Object.defineProperty(window, "scrollY", { configurable: true, value: y });
+}
+
+function scrollWindowTo(y: number) {
+  setWindowScroll(y);
+  fireEvent.scroll(window);
+}
+
 describe("Shell", () => {
   beforeEach(() => {
     viewportState.isDesktop = false;
+    setWindowScroll(0);
+  });
+
+  afterEach(() => {
+    setWindowScroll(0);
   });
 
   it("uses Collection as the mobile library destination label", () => {
@@ -118,33 +140,140 @@ describe("Shell", () => {
     expect(screen.getByRole("button", { name: /Crates/i })).toBeVisible();
   });
 
-  it("uses the overlay mobile header on public genre pages", () => {
-    renderWithListenProviders(<Shell />, { route: "/explore?genre=hardcore" });
+  it("uses a transparent mobile header when the page declares a hero", () => {
+    renderWithListenProviders(
+      <Shell>
+        <HeroPage />
+      </Shell>,
+      { route: "/playlist/42" },
+    );
 
+    const header = screen.getByTestId("listen-header");
+    expect(header).toHaveClass("bg-transparent");
+    expect(header).toHaveAttribute("data-transparent", "true");
     expect(screen.getByTestId("topbar")).toHaveAttribute(
       "data-hide-mobile-actions",
       "true",
     );
+    expect(screen.getByTestId("listen-content")).toHaveClass("pt-0");
   });
 
-  it("uses the overlay mobile header on playlist detail pages", () => {
-    renderWithListenProviders(<Shell />, { route: "/playlist/42" });
-
-    expect(screen.getByTestId("topbar")).toHaveAttribute(
-      "data-hide-mobile-actions",
-      "true",
-    );
-  });
-
-  it("hides topbar actions on desktop overlay pages", () => {
+  it("uses a transparent desktop header with scrim when the page declares a hero", () => {
     viewportState.isDesktop = true;
 
-    renderWithListenProviders(<Shell />, { route: "/explore?genre=hardcore" });
+    const { container } = renderWithListenProviders(
+      <Shell>
+        <HeroPage />
+      </Shell>,
+      { route: "/explore?genre=hardcore" },
+    );
 
+    expect(screen.getByTestId("listen-header")).toHaveClass("bg-transparent");
     expect(screen.getByTestId("topbar")).toHaveAttribute(
       "data-hide-mobile-actions",
       "true",
     );
+    expect(
+      container.querySelector(".listen-home-top-scrim"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("listen-content")).toHaveClass("pt-0");
+  });
+
+  it("keeps a solid header on hero-like routes when the page does not declare it", () => {
+    viewportState.isDesktop = true;
+
+    const { container } = renderWithListenProviders(
+      <Shell>
+        <HeroPage enabled={false} />
+      </Shell>,
+      { route: "/playlist/42" },
+    );
+
+    const header = screen.getByTestId("listen-header");
+    expect(header).toHaveAttribute("data-transparent", "false");
+    expect(header).toHaveClass("bg-surface-chrome", "shadow-chrome");
+    expect(header).not.toHaveClass("bg-transparent");
+    expect(screen.getByTestId("topbar")).toHaveAttribute(
+      "data-hide-mobile-actions",
+      "false",
+    );
+    expect(container.querySelector(".listen-home-top-scrim")).toBeNull();
+    expect(screen.getByTestId("listen-content")).toHaveClass("pt-24");
+  });
+
+  it("solidifies the transparent header after scrolling past the threshold", async () => {
+    viewportState.isDesktop = true;
+
+    const { container } = renderWithListenProviders(
+      <Shell>
+        <HeroPage />
+      </Shell>,
+      { route: "/playlist/42" },
+    );
+    const header = screen.getByTestId("listen-header");
+
+    scrollWindowTo(HEADER_SOLID_SCROLL_THRESHOLD - 1);
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(header).toHaveAttribute("data-transparent", "true");
+
+    scrollWindowTo(HEADER_SOLID_SCROLL_THRESHOLD + 1);
+    await waitFor(() =>
+      expect(header).toHaveAttribute("data-transparent", "false"),
+    );
+    expect(header).toHaveClass("bg-surface-chrome");
+    expect(container.querySelector(".listen-home-top-scrim")).toBeNull();
+    expect(screen.getByTestId("listen-content")).toHaveClass("pt-0");
+
+    scrollWindowTo(0);
+    await waitFor(() =>
+      expect(header).toHaveAttribute("data-transparent", "true"),
+    );
+  });
+
+  it("resets the header when navigating away from a hero page", async () => {
+    renderWithListenProviders(
+      <Shell>
+        <Routes>
+          <Route
+            path="/playlist/:id"
+            element={
+              <>
+                <HeroPage />
+                <Link to="/stats">Go to plain page</Link>
+                <Link to="/playlist/7">Go to next hero</Link>
+              </>
+            }
+          />
+          <Route
+            path="/stats"
+            element={<Link to="/playlist/9">Back to hero</Link>}
+          />
+        </Routes>
+      </Shell>,
+      { route: "/playlist/42" },
+    );
+    const header = () => screen.getByTestId("listen-header");
+
+    scrollWindowTo(HEADER_SOLID_SCROLL_THRESHOLD + 50);
+    await waitFor(() =>
+      expect(header()).toHaveAttribute("data-transparent", "false"),
+    );
+
+    setWindowScroll(0);
+    fireEvent.click(screen.getByRole("link", { name: "Go to next hero" }));
+    expect(header()).toHaveAttribute("data-transparent", "true");
+
+    fireEvent.click(screen.getByRole("link", { name: "Go to plain page" }));
+    expect(header()).toHaveAttribute("data-transparent", "false");
+    expect(header()).toHaveClass("bg-surface-chrome");
+    expect(screen.getByTestId("topbar")).toHaveAttribute(
+      "data-hide-mobile-actions",
+      "false",
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: "Back to hero" }));
+    expect(header()).toHaveAttribute("data-transparent", "true");
+    expect(header()).toHaveClass("bg-transparent");
   });
 
   it("overlays a transparent scrim header on desktop Home without hiding actions", () => {

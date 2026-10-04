@@ -8,6 +8,7 @@ import {
   ArtistChildRoute,
   LegacyArtistTopTracksRedirect,
 } from "@/app-shell/LibraryRouteCompat";
+import { TransparentHeader } from "@/components/layout/transparent-header";
 
 const Home = React.lazy(() =>
   import("@/pages/Home").then((m) => ({ default: m.Home })),
@@ -119,6 +120,10 @@ function deferred(element: ReactNode) {
   return <DeferredRoute>{element}</DeferredRoute>;
 }
 
+function heroRoute(element: ReactNode) {
+  return <TransparentHeader>{deferred(element)}</TransparentHeader>;
+}
+
 export const publicAppRoutes: AppRouteDefinition[] = [
   { path: "/crate/:crateRef", element: deferred(<PublicCrate />) },
   { path: "/server-setup", element: deferred(<ServerSetup />) },
@@ -174,12 +179,12 @@ export const protectedAppRoutes: AppRouteDefinition[] = [
   },
   {
     path: "artists/:artistSlug/:albumSlug",
-    element: deferred(<ArtistChildRoute />),
+    element: deferred(<ArtistChildRoute transparentHeader />),
   },
-  { path: "artists/:artistSlug", element: deferred(<Artist />) },
-  { path: "albums/:albumId/:slug", element: deferred(<Album />) },
-  { path: "playlist/:id", element: deferred(<Playlist />) },
-  { path: "home/playlist/:playlistId", element: deferred(<HomePlaylist />) },
+  { path: "artists/:artistSlug", element: heroRoute(<Artist />) },
+  { path: "albums/:albumId/:slug", element: heroRoute(<Album />) },
+  { path: "playlist/:id", element: heroRoute(<Playlist />) },
+  { path: "home/playlist/:playlistId", element: heroRoute(<HomePlaylist />) },
   { path: "home/section/:sectionId", element: deferred(<HomeSection />) },
-  { path: "curation/playlist/:id", element: deferred(<CuratedPlaylist />) },
+  { path: "curation/playlist/:id", element: heroRoute(<CuratedPlaylist />) },
 ];
