@@ -221,8 +221,14 @@ describe("ConfirmDialog", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it("closes immediately on confirm when pending is not controlled", async () => {
-    const onConfirm = vi.fn(() => new Promise<void>(() => {}));
+  it("disables confirm while an uncontrolled async confirm runs and closes after it resolves", async () => {
+    let resolve: () => void = () => {};
+    const onConfirm = vi.fn(
+      () =>
+        new Promise<void>((done) => {
+          resolve = done;
+        }),
+    );
     const onOpenChange = vi.fn();
     render(
       <ConfirmDialog
@@ -235,52 +241,71 @@ describe("ConfirmDialog", () => {
 
     const confirm = screen.getByRole("button", { name: "Confirm" });
     await userEvent.click(confirm);
+    expect(confirm).toBeDisabled();
+    expect(confirm).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
     await userEvent.click(confirm);
     expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolve();
+    });
     expect(onOpenChange).toHaveBeenCalledTimes(1);
     expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(confirm).not.toBeDisabled();
   });
 
-  it("propagates async confirm rejections and stays open when pending is controlled", async () => {
-    const vitestListeners = process.listeners("unhandledRejection");
-    process.removeAllListeners("unhandledRejection");
-    const unhandled = vi.fn();
-    process.on("unhandledRejection", unhandled);
-    try {
-      const error = new Error("boom");
-      const onConfirm = vi
-        .fn<() => Promise<void>>()
-        .mockRejectedValueOnce(error)
-        .mockResolvedValueOnce(undefined);
-      const onOpenChange = vi.fn();
-      render(
-        <ConfirmDialog
-          open
-          pending={false}
-          onOpenChange={onOpenChange}
-          title="Delete?"
-          onConfirm={onConfirm}
-        />,
-      );
-
-      const confirm = screen.getByRole("button", { name: "Confirm" });
-      await userEvent.click(confirm);
-      await act(async () => {
-        await new Promise((done) => setTimeout(done, 0));
-      });
-      expect(onOpenChange).not.toHaveBeenCalled();
-      expect(unhandled).toHaveBeenCalledWith(error, expect.anything());
-
-      await userEvent.click(confirm);
-      expect(onConfirm).toHaveBeenCalledTimes(2);
-      expect(onOpenChange).toHaveBeenCalledWith(false);
-    } finally {
+  it.each([
+    ["controlled", false],
+    ["uncontrolled", undefined],
+  ])(
+    "stays open and allows retry when a %s async confirm rejects",
+    async (_mode, pending) => {
+      const vitestListeners = process.listeners("unhandledRejection");
       process.removeAllListeners("unhandledRejection");
-      for (const listener of vitestListeners) {
-        process.on("unhandledRejection", listener);
+      const unhandled = vi.fn();
+      process.on("unhandledRejection", unhandled);
+      try {
+        const error = new Error("boom");
+        const onConfirm = vi
+          .fn<() => Promise<void>>()
+          .mockRejectedValueOnce(error)
+          .mockResolvedValueOnce(undefined);
+        const onOpenChange = vi.fn();
+        const onError = vi.fn();
+        render(
+          <ConfirmDialog
+            open
+            pending={pending}
+            onOpenChange={onOpenChange}
+            onError={onError}
+            title="Delete?"
+            onConfirm={onConfirm}
+          />,
+        );
+
+        const confirm = screen.getByRole("button", { name: "Confirm" });
+        await userEvent.click(confirm);
+        await act(async () => {
+          await new Promise((done) => setTimeout(done, 0));
+        });
+        expect(onOpenChange).not.toHaveBeenCalled();
+        expect(onError).toHaveBeenCalledWith(error);
+        expect(unhandled).not.toHaveBeenCalled();
+        expect(confirm).not.toBeDisabled();
+
+        await userEvent.click(confirm);
+        expect(onConfirm).toHaveBeenCalledTimes(2);
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+      } finally {
+        process.removeAllListeners("unhandledRejection");
+        for (const listener of vitestListeners) {
+          process.on("unhandledRejection", listener);
+        }
       }
-    }
-  });
+    },
+  );
 
   it("forwards translatable aria and backdrop labels", () => {
     render(

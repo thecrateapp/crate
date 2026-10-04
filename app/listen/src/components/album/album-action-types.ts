@@ -22,6 +22,7 @@ export interface AlbumActionHandlers {
   onShare: () => void;
   onPlay: () => void;
   onShuffle: () => void;
+  onMenuClose: () => void;
 }
 
 export interface AlbumActionData {

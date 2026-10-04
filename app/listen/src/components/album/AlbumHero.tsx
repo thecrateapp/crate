@@ -1,4 +1,5 @@
 import type { ReactNode, RefObject } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Clock, Disc } from "@crate/ui/icons";
 import { PageHero } from "@crate/ui/domain/hero";
@@ -61,6 +62,7 @@ export function AlbumHero({
   onGenreSelect: (item: GenreProfileItem) => void;
   t: (key: string, options?: Record<string, unknown>) => string;
 }) {
+  const { i18n } = useTranslation();
   const hasCover = Boolean(data.has_cover || data.cover_url);
 
   return (
@@ -120,7 +122,7 @@ export function AlbumHero({
           <>
             {isPreRelease ? (
               <span className="rounded-full border border-accent-action/20 bg-accent-action/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-accent-action">
-                Pre-release
+                {t("radar.release.preRelease")}
               </span>
             ) : null}
             {canPersistAlbum ? <OfflineBadge state={offlineState} /> : null}
@@ -149,11 +151,15 @@ export function AlbumHero({
         year ? <span key="year">{year}</span> : null,
         isPreRelease && data.release_date ? (
           <span key="release">
-            Releases{" "}
-            {new Date(data.release_date + "T12:00:00").toLocaleDateString(
-              "en-US",
-              { month: "long", day: "numeric", year: "numeric" },
-            )}
+            {t("album.card.releasesOn", {
+              date: new Date(
+                `${data.release_date}T12:00:00`,
+              ).toLocaleDateString(i18n.language, {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              }),
+            })}
           </span>
         ) : null,
         !data.genre_profile?.length && genre ? (
@@ -164,7 +170,9 @@ export function AlbumHero({
         data.track_count > 0
           ? t("common.trackCountLabel", { count: data.track_count })
           : null,
-        isPreRelease ? `${playerTrackCount} available now` : null,
+        isPreRelease
+          ? t("album.hero.availableNow", { count: playerTrackCount })
+          : null,
         data.total_length_sec > 0 ? (
           <span key="duration" className="flex items-center gap-1">
             <Clock size={11} />

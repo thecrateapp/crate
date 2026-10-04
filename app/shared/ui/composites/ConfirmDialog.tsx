@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
 import {
@@ -16,6 +16,7 @@ export interface ConfirmDialogProps {
   onOpenChange?: (open: boolean) => void;
   onCancel?: () => void;
   onConfirm: () => void | Promise<void>;
+  onError?: (error: unknown) => void;
   title: ReactNode;
   description?: ReactNode;
   body?: ReactNode;
@@ -36,6 +37,7 @@ export function ConfirmDialog({
   onOpenChange,
   onCancel,
   onConfirm,
+  onError,
   title,
   description,
   body,
@@ -53,8 +55,9 @@ export function ConfirmDialog({
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
   const submittingRef = useRef(false);
+  const [internalPending, setInternalPending] = useState(false);
   const isPendingControlled = controlledPending !== undefined;
-  const pending = controlledPending ?? false;
+  const pending = isPendingControlled ? controlledPending : internalPending;
   const resolvedTone: ConfirmDialogTone =
     tone ?? (variant === "destructive" ? "danger" : "default");
   const resolvedInitialFocus =
@@ -78,16 +81,15 @@ export function ConfirmDialog({
   const handleConfirm = async () => {
     if (pending || submittingRef.current) return;
     submittingRef.current = true;
+    if (!isPendingControlled) setInternalPending(true);
     try {
-      if (!isPendingControlled) {
-        onOpenChange?.(false);
-        await onConfirm();
-        return;
-      }
       await onConfirm();
       onOpenChange?.(false);
+    } catch (error) {
+      onError?.(error);
     } finally {
       submittingRef.current = false;
+      if (!isPendingControlled) setInternalPending(false);
     }
   };
 

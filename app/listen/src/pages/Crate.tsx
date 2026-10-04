@@ -719,8 +719,7 @@ function CratePageActions({
         },
       ]}
       secondaryLayout="fill"
-      secondaryActions={secondaryActions}
-      secondaryExtra={
+      secondaryLeading={
         canFollow ? (
           <FollowHeartButton
             className={cn(
@@ -739,6 +738,7 @@ function CratePageActions({
           </FollowHeartButton>
         ) : null
       }
+      secondaryActions={secondaryActions}
       menu={entries.length > 0 ? { actions: entries } : undefined}
       mobileMenuPortal={false}
     />

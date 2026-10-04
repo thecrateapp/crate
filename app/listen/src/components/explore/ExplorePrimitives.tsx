@@ -9,6 +9,7 @@ export function ExplorePill({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className="inline-flex items-center gap-2 rounded-full border border-border-quiet px-4 py-2 transition-colors hover:border-accent-action/40 hover:bg-accent-action/5"
     >

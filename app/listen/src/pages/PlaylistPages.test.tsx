@@ -268,7 +268,7 @@ describe("playlist pages", () => {
     expect(
       screen.getByText("No se pudo cargar la playlist"),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Retry/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 

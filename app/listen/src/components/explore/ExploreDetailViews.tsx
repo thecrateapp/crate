@@ -43,7 +43,14 @@ export function GenreDetailView({
     return <CrateLoader label={t("genre.loading")} />;
   }
   if (!model.data) {
-    return <ErrorState kind="notFound" message={t("genre.notFound")} />;
+    return (
+      <ErrorState
+        kind="notFound"
+        title={t("genre.notFound")}
+        backTo="/explore"
+        backLabel={t("common.back")}
+      />
+    );
   }
 
   return (

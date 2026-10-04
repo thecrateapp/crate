@@ -216,6 +216,45 @@ describe("HeroActionBar", () => {
     expect(onShare).toHaveBeenCalledTimes(1);
   });
 
+  it("reports menu open state changes so consumers can reset disclosure state", async () => {
+    const onOpenChange = vi.fn();
+    render(
+      <HeroActionBar
+        menu={{
+          actions: [{ key: "share", label: "Share", onSelect: vi.fn() }],
+          onOpenChange,
+        }}
+      />,
+    );
+
+    await userEvent.click(screen.getByTestId("hero-menu-trigger"));
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
+    await userEvent.keyboard("{Escape}");
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+    expect(screen.getByTestId("hero-menu-trigger")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+
+  it("renders the secondary leading slot before secondary actions", () => {
+    render(
+      <HeroActionBar
+        secondaryLabel="Secondary actions"
+        secondaryLeading={<button type="button">Follow</button>}
+        secondaryActions={[{ key: "share", label: "Share" }]}
+        secondaryExtra={<button type="button">Extra</button>}
+      />,
+    );
+
+    const names = within(
+      screen.getByRole("group", { name: "Secondary actions" }),
+    )
+      .getAllByRole("button")
+      .map((button) => button.textContent);
+    expect(names).toEqual(["Follow", "Share", "Extra"]);
+  });
+
   it("portals a single fixed more trigger to the body on mobile", () => {
     isDesktop = false;
     const { container } = render(

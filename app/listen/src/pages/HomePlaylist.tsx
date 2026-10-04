@@ -202,7 +202,14 @@ export function HomePlaylist() {
   }
 
   if (!data) {
-    return <ErrorState kind="notFound" message={t("playlist.notFound")} />;
+    return (
+      <ErrorState
+        kind="notFound"
+        title={t("playlist.notFound")}
+        backTo="/"
+        backLabel={t("common.back")}
+      />
+    );
   }
 
   const secondaryActions: PlaylistHeroSecondaryAction[] = [

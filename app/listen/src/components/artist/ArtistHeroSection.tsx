@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -146,6 +147,31 @@ export function ArtistHeroSection({
     : undefined;
   const mobileArtwork = photoUrl ? photoUrl : heroBackgroundSrc;
   const artworkClassName = `absolute inset-0 size-full scale-[1.02] ${artistHeroArtworkFitClassName()} object-[right_20%]`;
+  const menuItems = useMemo(
+    () =>
+      buildArtistHeroMenuItems({
+        following,
+        hasSetlist,
+        onArtistRadio,
+        onPlay,
+        onPlaySetlist,
+        onShuffle,
+        onShare,
+        onToggleFollow,
+        t,
+      }),
+    [
+      following,
+      hasSetlist,
+      onArtistRadio,
+      onPlay,
+      onPlaySetlist,
+      onShuffle,
+      onShare,
+      onToggleFollow,
+      t,
+    ],
+  );
 
   return (
     <PageHero
@@ -287,17 +313,7 @@ export function ArtistHeroSection({
             </>
           }
           menu={{
-            actions: buildArtistHeroMenuItems({
-              following,
-              hasSetlist,
-              onArtistRadio,
-              onPlay,
-              onPlaySetlist,
-              onShuffle,
-              onShare,
-              onToggleFollow,
-              t,
-            }),
+            actions: menuItems,
             header: {
               type: "media",
               title: artist.name,

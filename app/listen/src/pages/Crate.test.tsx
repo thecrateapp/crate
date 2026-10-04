@@ -305,6 +305,17 @@ describe("Crate page", () => {
     expect(screen.getByText(/3 followers/)).toBeVisible();
   });
 
+  it("renders follow ahead of the other Crate secondary actions", () => {
+    mocks.detail = { ...crate(), is_followed: false };
+    renderCrate();
+
+    const labels = within(screen.getByRole("group", { name: "Crate actions" }))
+      .getAllByRole("button")
+      .map((button) => button.textContent);
+    expect(labels[0]).toBe("Follow");
+    expect(labels.indexOf("Follow")).toBeLessThan(labels.indexOf("Share"));
+  });
+
   it("rolls back a failed follow without throwing", async () => {
     const user = userEvent.setup();
     mocks.api.mockRejectedValueOnce(new Error("boom"));

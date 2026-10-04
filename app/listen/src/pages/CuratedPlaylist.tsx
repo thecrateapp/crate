@@ -16,6 +16,7 @@ export function CuratedPlaylist() {
       <ErrorState
         message={page.t("playlist.toasts.loadFailed")}
         onRetry={page.refetch}
+        retryLabel={page.t("common.retry")}
       />
     );
   }

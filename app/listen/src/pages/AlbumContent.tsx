@@ -9,6 +9,7 @@ export function AlbumContent({ page }: { page: LoadedAlbumPageController }) {
   const {
     albumHeroInfoRef,
     albumPrimaryActionsRef,
+    closeAlbumMenu,
     data,
     displayName,
     globalAlbumUid,
@@ -88,6 +89,7 @@ export function AlbumContent({ page }: { page: LoadedAlbumPageController }) {
               onShare: presentation.handleShare,
               onPlay: handlePlay,
               onShuffle: handleShuffle,
+              onMenuClose: closeAlbumMenu,
             }}
             t={t}
           />

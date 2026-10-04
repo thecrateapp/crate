@@ -158,6 +158,9 @@ export function AlbumActions({
         }
         menu={{
           actions: menuItems,
+          onOpenChange: (open) => {
+            if (!open) actions.onMenuClose();
+          },
           header: {
             type: "media",
             title: displayName,

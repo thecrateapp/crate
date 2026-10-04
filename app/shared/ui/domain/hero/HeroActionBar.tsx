@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { CRATE_ICON_SIZE, Loader2, MoreHorizontal } from "@crate/ui/icons";
@@ -68,11 +68,13 @@ export interface HeroActionMenu {
   sheetLabel?: string;
   surfaceClassName?: string;
   renderMediaImage?: ContextMenuMediaImageRenderer;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export interface HeroActionBarProps {
   primaryActions?: HeroPrimaryAction[];
   primaryExtra?: ReactNode;
+  secondaryLeading?: ReactNode;
   secondaryActions?: HeroSecondaryAction[];
   secondaryExtra?: ReactNode;
   secondaryLayout?: HeroSecondaryLayout;
@@ -93,8 +95,16 @@ function HeroActionMenuControl({
   moreLabel: string;
   mobileMenuPortal: boolean;
 }) {
+  const onOpenChangeRef = useRef(menu.onOpenChange);
+  useEffect(() => {
+    onOpenChangeRef.current = menu.onOpenChange;
+  });
+  const handleOpenChange = useCallback((open: boolean) => {
+    onOpenChangeRef.current?.(open);
+  }, []);
   const controller = useItemActionMenu(menu.actions, {
     placement: "bottom-end",
+    onOpenChange: handleOpenChange,
   });
   if (!controller.hasActions) return null;
 
@@ -169,6 +179,7 @@ function HeroActionMenuControl({
 export function HeroActionBar({
   primaryActions = [],
   primaryExtra,
+  secondaryLeading,
   secondaryActions = [],
   secondaryExtra,
   secondaryLayout = "fixed",
@@ -181,7 +192,10 @@ export function HeroActionBar({
 }: HeroActionBarProps) {
   const hasPrimary = primaryActions.length > 0 || Boolean(primaryExtra);
   const hasSecondary =
-    secondaryActions.length > 0 || Boolean(secondaryExtra) || Boolean(menu);
+    secondaryActions.length > 0 ||
+    Boolean(secondaryLeading) ||
+    Boolean(secondaryExtra) ||
+    Boolean(menu);
 
   return (
     <div
@@ -233,6 +247,7 @@ export function HeroActionBar({
           role={secondaryLabel ? "group" : undefined}
           aria-label={secondaryLabel}
         >
+          {secondaryLeading}
           {secondaryActions.map((action) => (
             <button
               key={action.key}

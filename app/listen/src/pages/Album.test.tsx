@@ -653,6 +653,30 @@ describe("Album page", () => {
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
+  it("collapses the playlist picker when the album menu is dismissed", async () => {
+    renderWithListenProviders(<Album />, {
+      route: "/artists/crossed/morir",
+      path: "/artists/:artistSlug/:albumSlug",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    const disclosure = await screen.findByRole("menuitem", {
+      name: "Add to playlist",
+    });
+    fireEvent.click(disclosure);
+    expect(
+      await screen.findByRole("menuitem", { name: "Add to playlist" }),
+    ).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(
+      await screen.findByRole("menuitem", { name: "Add to playlist" }),
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("uses frameless labelled secondary actions on mobile album pages", async () => {
     mockMobilePointer();
 
