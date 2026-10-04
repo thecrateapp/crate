@@ -151,7 +151,7 @@ export function FixedCityPicker({
           type="button"
           onClick={() => detectFromIp()}
           disabled={detecting}
-          className="flex items-center gap-1 text-xs text-accent-action hover:underline disabled:opacity-50"
+          className="flex items-center gap-1 text-xs link-accent disabled:opacity-50"
         >
           {detecting ? (
             <Loader2 size={10} className="animate-spin" />

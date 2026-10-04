@@ -158,7 +158,7 @@ describe("Crate page", () => {
     renderCrate();
 
     const row = albumRow("Blending");
-    expect(row).toHaveAttribute("data-variant", "row");
+    expect(row).toHaveAttribute("data-density", "default");
     fireEvent.contextMenu(row);
 
     const sheet = await screen.findByRole("dialog", { name: "Actions menu" });

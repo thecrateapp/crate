@@ -200,7 +200,7 @@ export function ServerSetup() {
           {t("serverSetup.docsPrefix")}{" "}
           <a
             href="https://docs.cratemusic.app/technical/development-deployment-and-operations"
-            className="text-text-accent underline-offset-2 hover:underline"
+            className="link-accent"
             target="_blank"
             rel="noreferrer"
           >

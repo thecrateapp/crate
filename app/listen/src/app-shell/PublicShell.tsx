@@ -45,10 +45,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
             <span aria-hidden="true">·</span>
             <span>{t("auth.tagline")}</span>
           </span>
-          <Link
-            to={loginPath}
-            className="font-semibold text-accent-action hover:underline"
-          >
+          <Link to={loginPath} className="font-semibold link-accent">
             {t("auth.login")}
           </Link>
         </div>

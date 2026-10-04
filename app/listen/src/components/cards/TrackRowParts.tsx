@@ -209,7 +209,7 @@ function TrackRowArtistLink({
   return (
     <button
       type="button"
-      className="border-0 bg-transparent p-0 text-left text-text-muted hover:text-text-primary cursor-pointer transition-colors hover:underline"
+      className="border-0 bg-transparent p-0 text-left link-meta"
       onClick={(event) => {
         event.stopPropagation();
         navigate(
@@ -244,7 +244,7 @@ function TrackRowAlbumLink({
   return (
     <button
       type="button"
-      className="border-0 bg-transparent p-0 text-left text-text-muted hover:text-text-primary cursor-pointer transition-colors hover:underline"
+      className="border-0 bg-transparent p-0 text-left link-meta"
       onClick={(event) => {
         event.stopPropagation();
         navigate(

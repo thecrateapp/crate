@@ -8,7 +8,7 @@ import type {
   ItemActionMenuEntry,
   UseItemActionMenuReturn,
 } from "@crate/ui/domain/actions/useItemActionMenu";
-import type { ContextMenuPlacement } from "@crate/ui/domain/actions/useContextMenuController";
+import type { ContextMenuPlacement } from "@crate/ui/domain/actions";
 import type { MediaCoverProps } from "@crate/ui/domain/media/MediaCover";
 import type { MediaImageShape } from "@crate/ui/domain/media/MediaEntity";
 

@@ -182,7 +182,7 @@ export function Register() {
           {t("auth.register.hasAccount")}{" "}
           <Link
             to={`/login?return_to=${encodeURIComponent(returnTo)}`}
-            className="text-accent-action hover:underline"
+            className="link-accent"
           >
             {t("auth.login.submit")}
           </Link>

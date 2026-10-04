@@ -63,7 +63,7 @@ export function PlayerBarTrackCopy({
             {isDesktop && hasAlbum ? (
               <button
                 type="button"
-                className="block w-full cursor-pointer truncate text-left text-[0.8125rem] font-semibold leading-tight text-text-primary hover:underline"
+                className="link-meta block w-fit max-w-full truncate text-left text-[0.8125rem] font-semibold leading-tight text-text-primary"
                 onClick={(event) => {
                   event.stopPropagation();
                   onOpenAlbum();
@@ -79,7 +79,7 @@ export function PlayerBarTrackCopy({
             {isDesktop && hasArtist ? (
               <button
                 type="button"
-                className="mt-0.5 block w-full cursor-pointer truncate text-left text-xs leading-tight text-text-muted transition-colors hover:text-text-primary hover:underline"
+                className="link-meta mt-0.5 block w-fit max-w-full truncate text-left text-xs leading-tight"
                 onClick={(event) => {
                   event.stopPropagation();
                   onOpenArtist();
@@ -105,7 +105,7 @@ export function PlayerBarTrackCopy({
             {displayPlaySource?.href && sourceLabel !== "Discovery Radio" ? (
               <button
                 type="button"
-                className="cursor-pointer transition-colors hover:text-text-primary hover:underline"
+                className="link-meta"
                 onClick={onOpenSource}
               >
                 {sourceLabel}

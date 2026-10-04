@@ -76,10 +76,7 @@ export function VisualizerSettingsPanel({
         <span className="text-xs font-bold uppercase tracking-wider text-text-muted">
           Visualizer settings
         </span>
-        <button
-          onClick={resetConfig}
-          className="text-xs text-accent-action hover:underline"
-        >
+        <button onClick={resetConfig} className="text-xs link-accent">
           Reset
         </button>
       </div>

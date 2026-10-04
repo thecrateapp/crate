@@ -177,7 +177,7 @@ export function Login() {
           {t("auth.login.noAccount")}{" "}
           <Link
             to={`/register?return_to=${encodeURIComponent(returnTo)}`}
-            className="text-accent-action hover:underline"
+            className="link-accent"
           >
             {t("auth.login.createOne")}
           </Link>
