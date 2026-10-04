@@ -158,6 +158,10 @@
       "types": "./domain/hero/HeroActionBar.tsx",
       "default": "./domain/hero/HeroActionBar.tsx"
     },
+    "./domain/entity": {
+      "types": "./domain/entity/index.ts",
+      "default": "./domain/entity/index.ts"
+    },
     "./domain/tracks": {
       "types": "./domain/tracks/index.ts",
       "default": "./domain/tracks/index.ts"
@@ -325,6 +329,10 @@
       "./domain/hero/HeroActionBar": {
         "types": "./dist/domain/hero/HeroActionBar.d.ts",
         "default": "./dist/domain/hero/HeroActionBar.js"
+      },
+      "./domain/entity": {
+        "types": "./dist/domain/entity/index.d.ts",
+        "default": "./dist/domain/entity/index.js"
       },
       "./domain/tracks": {
         "types": "./dist/domain/tracks/index.d.ts",
