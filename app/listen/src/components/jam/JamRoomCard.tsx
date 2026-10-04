@@ -113,7 +113,7 @@ export const JamRoomCard = memo(function JamRoomCard({
           onClick={controller.openFromTrigger}
           expanded={controller.open}
           title={t("actions.menu.more")}
-          className="size-9 rounded-full opacity-75 transition-opacity hover:opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
+          className="size-9 rounded-full opacity-75 transition-opacity hover:opacity-100 pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100"
         />
         {isHostRoom ? (
           <RoomCardDeleteButton

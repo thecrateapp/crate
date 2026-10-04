@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { MemoryRouter } from "react-router";
+import { useTranslation } from "react-i18next";
+import { MemoryRouter, useNavigate } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const openCreateCrate = vi.hoisted(() => vi.fn());
@@ -79,7 +80,7 @@ vi.mock("@/hooks/use-api", () => ({
 import { useAlbumActionEntries } from "@/components/actions/album-actions";
 import { useArtistActionEntries } from "@/components/actions/artist-actions";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
-import { useShowActionEntries } from "@/components/actions/show-actions";
+import { buildShowActions } from "@/components/actions/show-actions";
 import { I18nProvider, type ListenLocale } from "@/i18n";
 import { fetchAlbumRadio, fetchArtistRadio } from "@/lib/radio";
 import { api } from "@/lib/api";
@@ -99,7 +100,7 @@ function labels(
     | typeof useAlbumActionEntries
     | typeof useArtistActionEntries
     | typeof usePlaylistActionEntries
-    | typeof useShowActionEntries
+    | typeof buildShowActions
   >,
 ) {
   return entries
@@ -144,24 +145,27 @@ describe("action hooks i18n", () => {
           }),
         ),
         show: labels(
-          useShowActionEntries({
-            item: {
-              id: 1,
-              type: "show",
-              date: "2030-04-12",
-              artist: "High Vis",
-              artist_id: 12,
-              title: "Sala Radar",
-              subtitle: "Madrid, Spain",
-              cover_url: null,
-              status: "onsale",
-              is_upcoming: true,
-              url: "https://tickets.example.test",
+          buildShowActions(
+            {
+              item: {
+                id: 1,
+                type: "show",
+                date: "2030-04-12",
+                artist: "High Vis",
+                artist_id: 12,
+                title: "Sala Radar",
+                subtitle: "Madrid, Spain",
+                cover_url: null,
+                status: "onsale",
+                is_upcoming: true,
+                url: "https://tickets.example.test",
+              },
+              attending: false,
+              toggleAttendance: vi.fn(),
+              playProbableSetlist: vi.fn(),
             },
-            attending: false,
-            toggleAttendance: vi.fn(),
-            playProbableSetlist: vi.fn(),
-          }),
+            { t: useTranslation().t, navigate: useNavigate() },
+          ),
         ),
       }),
       { wrapper: i18nWrapper("es") },

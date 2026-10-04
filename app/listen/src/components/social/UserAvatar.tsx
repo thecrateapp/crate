@@ -1,8 +1,13 @@
-import type { ReactNode } from "react";
+import { useCallback, type ReactNode } from "react";
 
 import { EntityAvatar, type EntityAvatarRing } from "@crate/ui/domain/entity";
-import type { AvatarShape, AvatarSize } from "@crate/ui/primitives/Avatar";
+import type {
+  AvatarImageRenderProps,
+  AvatarShape,
+  AvatarSize,
+} from "@crate/ui/primitives/Avatar";
 
+import { CrateImage } from "@/components/artwork/CrateImage";
 import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
 
 export interface UserAvatarProps {
@@ -31,6 +36,22 @@ export function UserAvatar({
   className,
 }: UserAvatarProps) {
   const { avatarUrl, handleAvatarError } = useUserAvatarUrl(avatar, userId);
+  const renderImage = useCallback(
+    (image: AvatarImageRenderProps) => (
+      <CrateImage
+        src={image.src}
+        alt={image.alt}
+        loading="lazy"
+        decoding="async"
+        className={image.className}
+        onError={() => {
+          image.onError();
+          handleAvatarError();
+        }}
+      />
+    ),
+    [handleAvatarError],
+  );
 
   return (
     <EntityAvatar
@@ -43,7 +64,7 @@ export function UserAvatar({
       badge={badge}
       badgeLabel={badgeLabel}
       className={className}
-      onError={handleAvatarError}
+      renderImage={renderImage}
     />
   );
 }

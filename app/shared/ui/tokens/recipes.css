@@ -1816,8 +1816,7 @@
 }
 
 .user-profile-accent-label,
-.user-profile-accent-icon,
-.user-profile-accent-link {
+.user-profile-accent-icon {
   color: var(--text-accent);
 }
 
@@ -2411,7 +2410,7 @@
   .link-meta::before,
   .link-accent::before {
     position: absolute;
-    bottom: -1px;
+    bottom: 0;
     left: 0;
     width: 6%;
     height: 2px;
@@ -2428,7 +2427,7 @@
   .link-meta::after,
   .link-accent::after {
     position: absolute;
-    bottom: -1px;
+    bottom: 0;
     left: 0;
     width: 40%;
     height: 2px;
@@ -2463,59 +2462,62 @@
     color: var(--text-primary);
   }
 
+  .link-meta:focus-visible,
+  .link-accent:focus-visible {
+    border-radius: 2px;
+    clip-path: none;
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+
   .link-meta:hover::before,
-  .link-meta:focus-visible::before,
-  .link-accent:hover::before,
-  .link-accent:focus-visible::before {
+  .link-accent:hover::before {
     animation: crateLinkBeamCore 2.4s infinite;
     opacity: 1;
   }
 
   .link-meta:hover::after,
-  .link-meta:focus-visible::after,
-  .link-accent:hover::after,
-  .link-accent:focus-visible::after {
+  .link-accent:hover::after {
     animation: crateLinkBeam 2.4s infinite;
     opacity: 1;
   }
 
+  .link-meta:focus-visible::before,
+  .link-meta:focus-visible::after,
+  .link-accent:focus-visible::before,
+  .link-accent:focus-visible::after {
+    display: none;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .link-meta:hover::before,
-    .link-meta:focus-visible::before,
-    .link-accent:hover::before,
-    .link-accent:focus-visible::before {
+    .link-accent:hover::before {
       display: none;
     }
 
     .link-meta:hover::after,
-    .link-meta:focus-visible::after,
-    .link-accent:hover::after,
-    .link-accent:focus-visible::after {
+    .link-accent:hover::after {
       width: 100%;
       animation: none;
       background: currentColor;
       filter: none;
-      opacity: 0.5;
+      opacity: 1;
       transform: none;
     }
   }
 
   [data-crate-motion="reduced"] .link-meta:hover::before,
-  [data-crate-motion="reduced"] .link-meta:focus-visible::before,
-  [data-crate-motion="reduced"] .link-accent:hover::before,
-  [data-crate-motion="reduced"] .link-accent:focus-visible::before {
+  [data-crate-motion="reduced"] .link-accent:hover::before {
     display: none;
   }
 
   [data-crate-motion="reduced"] .link-meta:hover::after,
-  [data-crate-motion="reduced"] .link-meta:focus-visible::after,
-  [data-crate-motion="reduced"] .link-accent:hover::after,
-  [data-crate-motion="reduced"] .link-accent:focus-visible::after {
+  [data-crate-motion="reduced"] .link-accent:hover::after {
     width: 100%;
     animation: none;
     background: currentColor;
     filter: none;
-    opacity: 0.5;
+    opacity: 1;
     transform: none;
   }
 }

@@ -1,8 +1,6 @@
-import { useMemo } from "react";
 import type { TFunction } from "i18next";
-import { useTranslation } from "react-i18next";
 import { Check, Disc3, Mic2, Music2, Ticket } from "@crate/ui/icons";
-import { useNavigate, type NavigateFunction } from "react-router";
+import type { NavigateFunction } from "react-router";
 
 import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
 import { action } from "@/components/actions/shared";
@@ -66,23 +64,6 @@ export function buildShowActions(
       },
     }),
   ];
-}
-
-export function useShowActionEntries(
-  input: ShowActionInput,
-): ItemActionMenuEntry[] {
-  const navigate = useNavigate();
-  const { t } = useTranslation();
-  const { item, attending, toggleAttendance, playProbableSetlist } = input;
-
-  return useMemo(
-    () =>
-      buildShowActions(
-        { item, attending, toggleAttendance, playProbableSetlist },
-        { t, navigate },
-      ),
-    [attending, item, navigate, playProbableSetlist, t, toggleAttendance],
-  );
 }
 
 export interface ReleaseActionInput {

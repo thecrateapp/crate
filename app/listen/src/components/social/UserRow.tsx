@@ -98,7 +98,11 @@ export const UserRow = memo(function UserRow({
     }),
     [name, user.avatar, user.id, username],
   );
-  const baseMenu = useListenEntityMenu(getActions, header);
+  const hasMenuActions = !isSelf || Boolean(username);
+  const baseMenu = useListenEntityMenu(
+    hasMenuActions ? getActions : null,
+    header,
+  );
   const actionMenu = useMemo(
     () =>
       baseMenu

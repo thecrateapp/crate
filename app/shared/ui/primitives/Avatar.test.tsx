@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 
 import { Avatar, getInitials } from "./Avatar";
@@ -46,6 +46,51 @@ describe("Avatar", () => {
     fireEvent.error(container.querySelector("img")!);
     expect(container.querySelector("img")).not.toBeInTheDocument();
     expect(screen.getByText("BR")).toBeInTheDocument();
+  });
+
+  it("renders a custom image and falls back to initials when it errors", () => {
+    const onImageError = vi.fn();
+    const { container } = render(
+      <Avatar
+        src="/custom.jpg"
+        name="Birds In Row"
+        imageClassName="extra"
+        renderImage={(image) => (
+          <img
+            data-testid="custom-image"
+            src={image.src}
+            alt={image.alt}
+            className={image.className}
+            onError={() => {
+              image.onError();
+              onImageError();
+            }}
+          />
+        )}
+      />,
+    );
+    const image = screen.getByTestId("custom-image");
+    expect(image).toHaveAttribute("src", "/custom.jpg");
+    expect(image).toHaveAttribute("alt", "Birds In Row");
+    expect(image).toHaveClass("size-full", "object-cover", "extra");
+
+    fireEvent.error(image);
+
+    expect(onImageError).toHaveBeenCalledTimes(1);
+    expect(container.querySelector("img")).not.toBeInTheDocument();
+    expect(screen.getByText("BR")).toBeInTheDocument();
+  });
+
+  it("shows a new src after the previous one errored", () => {
+    const { container, rerender } = render(
+      <Avatar src="/broken.jpg" name="Birds In Row" />,
+    );
+    fireEvent.error(container.querySelector("img")!);
+    rerender(<Avatar src="/fallback.jpg" name="Birds In Row" />);
+    expect(container.querySelector("img")).toHaveAttribute(
+      "src",
+      "/fallback.jpg",
+    );
   });
 
   it("hides decorative fallbacks", () => {

@@ -439,10 +439,6 @@
     "sourceHash": "sha256:b054faab8d295878274399387b5d96a649f1b0a0bb3b8449474016d7ab5501bf",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
-  "artist.actions.playTopTracks": {
-    "sourceHash": "sha256:bdb6eb6e8bbaa2bae0b78c77b3e42fe028b3a8d0f730c5df701791cf303394d1",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
   "artist.actions.primaryGroup": {
     "sourceHash": "sha256:7f2a13139ace11739b62b791fb85041f704481a23d0e8bfca16046a848938dbc",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -825,10 +821,6 @@
   },
   "bandcamp.title": {
     "sourceHash": "sha256:a63b834c92f701f48f4dac758f193c8f5c91f1f62b13e1327d489aea71bc2547",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "bandcamp.titleLabel": {
-    "sourceHash": "sha256:5d29b4670050ee9ed00e7309be4e30b69fee276c326acd228314983027df4198",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
   "bandcamp.toasts.importFailed": {
@@ -3067,10 +3059,6 @@
     "sourceHash": "sha256:8058eaf6a83ac4a9a37c53e72fab2a28a753158417da3b8196e9e05c0eb8367f",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
-  "playlist.actions.addToLibrary": {
-    "sourceHash": "sha256:d0a2a5040be58eb5d8afb78b7aacfb570cd9566c50a6c97c8f515ca32ad1ef97",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
   "playlist.actions.addToPlaylist": {
     "sourceHash": "sha256:f64137b1fd59483327f4dfefc92d7eb369afc88764cd7b6a6e604f760c9c58f4",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -3095,10 +3083,6 @@
     "sourceHash": "sha256:7827be30003e4066ba25de10dc5cc5bfd84a4fd895b40ece5a3d77fd98cba26e",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
-  "playlist.actions.playPlaylist": {
-    "sourceHash": "sha256:d22bfcb1feb95a0cbec4f6d1bb89ac1ed6c072a80769dbd06e165d541aefdea0",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
   "playlist.actions.primaryGroup": {
     "sourceHash": "sha256:b6cf65ebea3d98519b6da4fd930a5c27b917241733baae48711c2c63e822e761",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -3117,18 +3101,6 @@
   },
   "playlist.actions.secondaryGroup": {
     "sourceHash": "sha256:40f432f021076c4d8546b9f02a3cefb48cd459a2cd28fa5509af3c9fe83fab3b",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "playlist.actions.sharePlaylist": {
-    "sourceHash": "sha256:2076780cda1c72a975404fa73ebb95e5e100850d9e0e65f25559bc7ce031ff73",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "playlist.actions.shufflePlaylist": {
-    "sourceHash": "sha256:ea928672bcc4b2f015751eb8b80d3a94d3804cf88b353e2bc491d86b0e527092",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "playlist.actions.startRadio": {
-    "sourceHash": "sha256:7c113e603a7d0ca2aa768522982e04fe070d33ed8d0037c481aff108cbcc7e49",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
   "playlist.badges.collaborative": {
@@ -3761,14 +3733,6 @@
   },
   "radio.station.startAria": {
     "sourceHash": "sha256:480bb6cca030fd088300906e9480621895e795bc9a7f1e253e3da69bc2d399f1",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "radio.stationType.artist": {
-    "sourceHash": "sha256:80be21a4db77e86033671225f12a41d61664956955ede30fd684393601b1ee9f",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "radio.stationType.genre": {
-    "sourceHash": "sha256:8794c94ab8822889e8f277b5a50cff7c1fd1888857e22609c51ec5d08df7ed8e",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
   "radio.title": {

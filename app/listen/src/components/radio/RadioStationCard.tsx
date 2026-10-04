@@ -78,6 +78,7 @@ export const RadioStationCard = memo(function RadioStationCard({
   const actionMenu = useListenEntityMenu(getActions, header);
   const { controller, targetProps, menu } = useEntityMenu({
     actionMenu,
+    disabled,
     getFallbackHeader: () => header,
   });
 
@@ -140,7 +141,7 @@ export const RadioStationCard = memo(function RadioStationCard({
         onClick={controller.openFromTrigger}
         expanded={controller.open}
         title={t("actions.menu.more")}
-        className="absolute right-2 top-2 z-20 size-9 rounded-full bg-surface-canvas/40 backdrop-blur-md opacity-90 transition-opacity hover:opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
+        className="absolute right-2 top-2 z-20 size-9 rounded-full bg-surface-canvas/40 backdrop-blur-md opacity-90 transition-opacity hover:opacity-100 pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100"
       />
       {menu}
     </article>

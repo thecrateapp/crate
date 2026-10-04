@@ -399,5 +399,5 @@ export function usePlaylistActionMenu(
     [detail, subtitle, title],
   );
 
-  return useListenEntityMenu(getActions, header) as EntityActionMenu;
+  return useListenEntityMenu(getActions, header);
 }

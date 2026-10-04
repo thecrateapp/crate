@@ -102,7 +102,7 @@ export function ErrorState({
           {backTo !== undefined ? (
             <Link
               to={backTo}
-              className="link-accent inline-flex items-center gap-2 text-sm outline-none"
+              className="link-accent inline-flex items-center gap-2 text-sm"
             >
               <ArrowLeft size={CRATE_ICON_SIZE.sm} aria-hidden="true" />
               {backLabel}

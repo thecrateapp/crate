@@ -65,7 +65,11 @@ export function useEntityMenu({
   disableItemActionTarget = false,
   getFallbackHeader,
 }: UseEntityMenuOptions): UseEntityMenuReturn {
-  const enabled = !disabled && Boolean(renderMenu || actionMenu?.getActions);
+  const enabled =
+    !disabled &&
+    Boolean(
+      renderMenu || (actionMenu?.getActions && actionMenu.hasActions !== false),
+    );
   const onOpenChangeRef = useRef(actionMenu?.onOpenChange);
   useEffect(() => {
     onOpenChangeRef.current = actionMenu?.onOpenChange;
@@ -87,7 +91,7 @@ export function useEntityMenu({
   if (controller.open) {
     if (renderMenu) {
       menu = renderMenu(controller);
-    } else if (actionMenu?.getActions) {
+    } else if (enabled && actionMenu?.getActions) {
       menu = (
         <EntityActionMenuContent
           actionMenu={actionMenu}

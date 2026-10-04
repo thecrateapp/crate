@@ -18,6 +18,14 @@ export function renderListenMenuImage({
 }
 
 export function useListenEntityMenu(
+  getActions: () => ItemActionMenuEntry[],
+  header?: ContextMenuHeader,
+): EntityActionMenu;
+export function useListenEntityMenu(
+  getActions: (() => ItemActionMenuEntry[]) | null | undefined,
+  header?: ContextMenuHeader,
+): EntityActionMenu | undefined;
+export function useListenEntityMenu(
   getActions: (() => ItemActionMenuEntry[]) | null | undefined,
   header?: ContextMenuHeader,
 ): EntityActionMenu | undefined {

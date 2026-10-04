@@ -162,5 +162,5 @@ export function useCrateActionMenu(
     () => buildCrateMenuItems(latest.current.input, latest.current.t),
     [],
   );
-  return useListenEntityMenu(getActions, header) as EntityActionMenu;
+  return useListenEntityMenu(getActions, header);
 }

@@ -191,7 +191,7 @@ describe("EntityCard", () => {
       <EntityCard title="Discovery" actionMenu={{ getActions }} />,
     );
     expect(screen.getByRole("button", { name: "More actions" })).toHaveClass(
-      "md:opacity-0",
+      "pointer-fine:opacity-0",
     );
 
     rerender(
@@ -202,7 +202,7 @@ describe("EntityCard", () => {
       />,
     );
     const always = screen.getByRole("button", { name: "More actions" });
-    expect(always).not.toHaveClass("md:opacity-0");
+    expect(always).not.toHaveClass("pointer-fine:opacity-0");
     expect(always).toHaveClass("opacity-100");
 
     rerender(
@@ -224,6 +224,23 @@ describe("EntityCard", () => {
     expect(
       screen.queryByRole("button", { name: "More actions" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("hides the more button and context menu when hasActions is false", () => {
+    const getActions = makeGetActions();
+    render(
+      <EntityCard
+        title="Discovery"
+        onOpen={vi.fn()}
+        actionMenu={{ getActions, hasActions: false }}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "More actions" }),
+    ).not.toBeInTheDocument();
+    fireEvent.contextMenu(article());
+    expect(menuItem()).not.toBeInTheDocument();
+    expect(getActions).not.toHaveBeenCalled();
   });
 
   it("renders the rank before the title", () => {
@@ -431,6 +448,30 @@ describe("EntityAvatar", () => {
     expect(avatar).toHaveAttribute("data-size", "lg");
     expect(avatar).toHaveAttribute("data-ring", "accent");
     expect(avatar).toHaveClass("ring-2");
+  });
+
+  it("forwards renderImage to the avatar and keeps the initials fallback", () => {
+    render(
+      <EntityAvatar
+        name="Ada Lovelace"
+        src="/ada.jpg"
+        renderImage={(image) => (
+          <img
+            data-testid="entity-avatar-image"
+            src={image.src}
+            alt={image.alt}
+            onError={image.onError}
+          />
+        )}
+      />,
+    );
+    const image = screen.getByTestId("entity-avatar-image");
+    expect(image).toHaveAttribute("src", "/ada.jpg");
+    fireEvent.error(image);
+    expect(screen.queryByTestId("entity-avatar-image")).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Ada Lovelace" })).toHaveTextContent(
+      "AL",
+    );
   });
 
   it("renders a labelled badge", () => {

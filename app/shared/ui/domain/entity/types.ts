@@ -17,6 +17,7 @@ export type EntityMenuButtonMode = "hover" | "always" | "none";
 
 export interface EntityActionMenu {
   getActions?: () => ItemActionMenuEntry[];
+  hasActions?: boolean;
   header?: ContextMenuHeader;
   sheetLabel?: string;
   surfaceClassName?: string;

@@ -218,7 +218,7 @@ function TopArtistCard({ item, index }: { item: StatsArtist; index: number }) {
         onClick={actionMenu.openFromTrigger}
         expanded={actionMenu.open}
         title={t("actions.menu.more")}
-        className="absolute right-2 top-2 z-20 size-9 opacity-75 transition-opacity hover:opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
+        className="absolute right-2 top-2 z-20 size-9 opacity-75 transition-opacity hover:opacity-100 pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100"
       />
       {actionMenu.open ? (
         <TopArtistCardMenu actionMenu={actionMenu} item={item} photo={photo} />

@@ -1,4 +1,4 @@
-import { useEffect, useState, type HTMLAttributes } from "react";
+import { useState, type HTMLAttributes, type ReactNode } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
 
@@ -23,6 +23,13 @@ export function getInitials(name?: string | null): string {
   return `${first}${last}`.toUpperCase();
 }
 
+export interface AvatarImageRenderProps {
+  src: string;
+  alt: string;
+  className: string;
+  onError: () => void;
+}
+
 export interface AvatarProps
   extends Omit<HTMLAttributes<HTMLSpanElement>, "children"> {
   src?: string | null;
@@ -31,6 +38,7 @@ export interface AvatarProps
   size?: AvatarSize;
   shape?: AvatarShape;
   imageClassName?: string;
+  renderImage?: (props: AvatarImageRenderProps) => ReactNode;
 }
 
 export function Avatar({
@@ -41,16 +49,15 @@ export function Avatar({
   shape = "circle",
   className,
   imageClassName,
+  renderImage,
   ...props
 }: AvatarProps) {
-  const [errored, setErrored] = useState(false);
-
-  useEffect(() => {
-    setErrored(false);
-  }, [src]);
+  const [erroredSrc, setErroredSrc] = useState<string | null>(null);
 
   const accessibleName = alt ?? name ?? "";
-  const showImage = Boolean(src) && !errored;
+  const imageSrc = src && src !== erroredSrc ? src : null;
+  const handleImageError = () => setErroredSrc(imageSrc);
+  const resolvedImageClassName = cn("size-full object-cover", imageClassName);
 
   return (
     <span
@@ -65,15 +72,24 @@ export function Avatar({
       )}
       {...props}
     >
-      {showImage ? (
-        <img
-          src={src ?? undefined}
-          alt={accessibleName}
-          loading="lazy"
-          decoding="async"
-          className={cn("size-full object-cover", imageClassName)}
-          onError={() => setErrored(true)}
-        />
+      {imageSrc ? (
+        renderImage ? (
+          renderImage({
+            src: imageSrc,
+            alt: accessibleName,
+            className: resolvedImageClassName,
+            onError: handleImageError,
+          })
+        ) : (
+          <img
+            src={imageSrc}
+            alt={accessibleName}
+            loading="lazy"
+            decoding="async"
+            className={resolvedImageClassName}
+            onError={handleImageError}
+          />
+        )
       ) : (
         <span
           data-slot="avatar-fallback"

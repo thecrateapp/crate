@@ -73,7 +73,11 @@ export const BandcampItem = memo(function BandcampItem({
     }),
     [item.artist_name, item.cover_url, title],
   );
-  const actionMenu = useListenEntityMenu(getActions, header);
+  const hasMenuActions = canImport || Boolean(item.item_url);
+  const actionMenu = useListenEntityMenu(
+    hasMenuActions ? getActions : null,
+    header,
+  );
   const { controller, targetProps, menu } = useEntityMenu({
     actionMenu,
     getFallbackHeader: () => header,
@@ -87,7 +91,7 @@ export const BandcampItem = memo(function BandcampItem({
       expanded={controller.open}
       title={t("actions.menu.more")}
       className={cn(
-        "size-9 rounded-full opacity-75 transition-opacity hover:opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100",
+        "size-9 rounded-full opacity-75 transition-opacity hover:opacity-100 pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100",
         tile &&
           "absolute right-2 top-2 z-20 bg-surface-canvas/40 backdrop-blur-md",
       )}

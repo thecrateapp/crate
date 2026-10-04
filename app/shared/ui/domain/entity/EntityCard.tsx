@@ -64,7 +64,7 @@ const MENU_BUTTON_CLASS_NAME: Record<
   string
 > = {
   hover:
-    "opacity-75 transition-opacity hover:opacity-100 md:opacity-0 md:group-focus-within/card:opacity-100 md:group-hover/card:opacity-100",
+    "opacity-75 transition-opacity hover:opacity-100 pointer-fine:opacity-0 pointer-fine:group-hover/card:opacity-100 pointer-fine:group-focus-within/card:opacity-100",
   always: "opacity-100",
 };
 

@@ -83,7 +83,10 @@ function ProfileAvatar({ card }: { card: ProfileCardPayload }) {
       userId={card.id}
       alt=""
       shape="rounded"
-      className="profile-hover-avatar profile-hover-avatar-placeholder size-16 rounded-xl border text-2xl font-black"
+      className={cn(
+        "profile-hover-avatar size-16 rounded-xl border text-2xl font-black",
+        !card.avatar && "profile-hover-avatar-placeholder",
+      )}
     />
   );
 }
