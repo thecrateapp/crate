@@ -32,7 +32,7 @@ export function UserProfileHero({
   locale: string;
 }) {
   return (
-    <div className="user-profile-hero rounded-[12px] p-5 sm:p-6">
+    <div className="user-profile-hero rounded-panel p-5 sm:p-6">
       <UserProfileHeader
         data={data}
         displayName={displayName}
@@ -136,7 +136,7 @@ function UserProfileActions({
         }
         className="inline-flex items-center gap-2 rounded-lg border border-accent-action/25 bg-accent-action/10 px-4 py-2.5 text-sm font-semibold text-accent-action transition-colors hover:bg-accent-action/15"
       >
-        <BarChart3 size={15} />
+        <BarChart3 size={CRATE_ICON_SIZE.sm} />
         {t("userProfile.actions.viewListeningDna")}
       </Link>
       {!isOwnProfile ? (

@@ -478,6 +478,41 @@ describe("ContextMenu", () => {
     );
   });
 
+  it("wraps long labels to two lines and exposes the full label when clamped", () => {
+    const longLabel = "Reproducir álbum aleatoriamente desde el principio";
+    render(
+      <ContextMenu
+        items={[
+          { key: "long", label: longLabel, icon: Play, onSelect: vi.fn() },
+          { key: "short", label: "Play now", icon: Play, onSelect: vi.fn() },
+        ]}
+        menuRef={createRef<HTMLDivElement>()}
+        onClose={vi.fn()}
+        open
+        position={{ x: 12, y: 12 }}
+      />,
+    );
+
+    const longText = screen.getByText(longLabel);
+    expect(longText).toHaveClass("line-clamp-2", "break-words");
+    expect(longText).not.toHaveClass("truncate");
+    Object.defineProperty(longText, "scrollHeight", { value: 60 });
+    Object.defineProperty(longText, "clientHeight", { value: 40 });
+    fireEvent.pointerEnter(longText);
+    expect(longText).toHaveAttribute("title", longLabel);
+
+    const shortText = screen.getByText("Play now");
+    fireEvent.pointerEnter(shortText);
+    expect(shortText).not.toHaveAttribute("title");
+
+    const menu = screen.getByRole("menu");
+    const [longItem, shortItem] = screen.getAllByRole("menuitem");
+    expect(longItem).toHaveAccessibleName(longLabel);
+    expect(longItem).toHaveFocus();
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(shortItem).toHaveFocus();
+  });
+
   it("restores focus to the trigger when the menu closes", () => {
     const trigger = document.createElement("button");
     trigger.textContent = "Open menu";

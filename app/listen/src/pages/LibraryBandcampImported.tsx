@@ -35,7 +35,7 @@ export function LibraryBandcampImported({
   return (
     <section className="space-y-3">
       <div>
-        <h3 className="text-sm font-black uppercase tracking-[0.18em] text-accent-action">
+        <h3 className="text-sm font-black uppercase tracking-eyebrow text-accent-action">
           {title}
         </h3>
         <p className="mt-1 text-sm text-text-muted">{description}</p>

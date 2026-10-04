@@ -63,7 +63,7 @@ function CollapsedView({
       </div>
 
       <div className="min-w-0 flex-1 px-3 py-2.5">
-        <div className="truncate text-[0.8125rem] font-semibold text-text-primary">
+        <div className="truncate text-caption font-semibold text-text-primary">
           {show.primaryArtist?.name ?? show.title}
         </div>
         <div className="mt-1 flex items-center gap-1 text-xs text-text-primary/40">
@@ -89,7 +89,7 @@ function CollapsedView({
       </div>
 
       <div className="flex shrink-0 flex-col items-center justify-center px-2">
-        <span className="text-xs font-bold leading-none tracking-[0.12em] text-accent-action/55">
+        <span className="text-xs font-bold leading-none tracking-label text-accent-action/55">
           {monthLabel}
         </span>
         <span className="text-[20px] font-black leading-tight text-accent-action">

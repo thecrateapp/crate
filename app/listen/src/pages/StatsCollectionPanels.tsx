@@ -198,14 +198,14 @@ function TopArtistCard({ item, index }: { item: StatsArtist; index: number }) {
           {String(index + 1).padStart(2, "0")}
         </div>
         <div className="relative z-10 flex min-h-32 flex-col justify-between">
-          <div className="text-xs font-black uppercase tracking-[0.22em] text-accent-action">
+          <div className="text-xs font-black uppercase tracking-overline text-accent-action">
             {t("stats.rank", { rank: index + 1 })}
           </div>
           <div>
-            <div className="stats-artist-title line-clamp-2 text-3xl font-black uppercase leading-[0.86] tracking-[-0.08em]">
+            <div className="stats-artist-title line-clamp-2 text-3xl font-black uppercase leading-[0.86] tracking-display-tighter">
               {item.artist_name}
             </div>
-            <div className="stats-artist-meta mt-3 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[0.12em]">
+            <div className="stats-artist-meta mt-3 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-label">
               <span>{t("common.playCount", { count: item.play_count })}</span>
               <span>{formatStatsMinutes(item.minutes_listened)}</span>
             </div>
@@ -332,10 +332,10 @@ function StatsPanel({
   className?: string;
 }) {
   return (
-    <section className={cn("stats-card min-w-0 rounded-[12px] p-5", className)}>
+    <section className={cn("stats-card min-w-0 rounded-panel p-5", className)}>
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-black tracking-[-0.04em] text-text-primary">
+          <h2 className="text-xl font-black tracking-display text-text-primary">
             {title}
           </h2>
           <p className="mt-1 text-sm text-text-muted">{subtitle}</p>

@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { X } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, X } from "@crate/ui/icons";
 
 import { cn } from "@crate/ui/lib/cn";
 import { useSheetDrag } from "@crate/ui/lib/use-sheet-drag";
@@ -438,7 +438,7 @@ export function ModalCloseButton({
       onClick={onClick}
       disabled={disabled}
     >
-      <X size={24} />
+      <X size={CRATE_ICON_SIZE.xl} />
     </button>
   );
 }

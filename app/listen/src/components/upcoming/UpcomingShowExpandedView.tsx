@@ -82,7 +82,7 @@ function ExpandedShowHeader({
 
       <div className="absolute top-2.5 right-3 z-10 text-right">
         {timeRemaining ? (
-          <div className="mb-1 text-xs font-bold uppercase tracking-[0.14em] text-accent-action">
+          <div className="mb-1 text-xs font-bold uppercase tracking-caps text-accent-action">
             {timeRemaining}
           </div>
         ) : null}
@@ -205,7 +205,7 @@ function ExpandedShowActions({
           rel="noopener noreferrer"
           className="flex items-center justify-center gap-1.5 rounded-lg border border-border-quiet py-2.5 text-xs font-semibold text-text-muted transition-colors hover:border-accent-action/20 hover:text-accent-action"
         >
-          <MapPin size={13} />
+          <MapPin size={CRATE_ICON_SIZE.xs} />
           {t("radar.show.directions")}
         </a>
       ) : null}
@@ -218,7 +218,7 @@ function ExpandedShowActions({
         }}
         className="flex items-center justify-center gap-1.5 rounded-lg bg-accent-action/10 py-2.5 text-xs font-semibold text-accent-action transition-colors hover:bg-accent-action/18"
       >
-        <ExternalLink size={13} />
+        <ExternalLink size={CRATE_ICON_SIZE.xs} />
         {t("radar.show.getTickets")}
         {item.status === "onsale" && (
           <span className="size-[5px] rounded-full bg-state-success" />
@@ -241,7 +241,10 @@ function ExpandedShowDetails(props: ExpandedShowActionProps) {
   return (
     <div className="relative flex-1 px-3 pt-2.5 pb-3">
       <div className="flex items-start gap-2 text-xs text-text-muted">
-        <MapPin size={11} className="mt-0.5 shrink-0 text-accent-action/60" />
+        <MapPin
+          size={CRATE_ICON_SIZE.micro}
+          className="mt-0.5 shrink-0 text-accent-action/60"
+        />
         <div className="min-w-0">
           <span className="font-medium text-text-primary/70">{item.venue}</span>
           {addressLabel && (

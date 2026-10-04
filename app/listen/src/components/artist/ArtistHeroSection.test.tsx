@@ -188,7 +188,7 @@ describe("ArtistHeroSection", () => {
 
     const actionRail = primary.parentElement;
     expect(actionRail).not.toBeNull();
-    expect(actionRail!).toHaveClass("max-w-[1480px]");
+    expect(actionRail!).toHaveClass("max-w-content");
     expect(actionRail!.parentElement).toHaveClass("sm:px-6");
 
     const secondary = heroActionGroup(1);

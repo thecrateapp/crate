@@ -1,7 +1,7 @@
 import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Clock, Disc } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Clock, Disc } from "@crate/ui/icons";
 import { CratePill } from "@crate/ui/primitives/CrateBadge";
 import { PageHero } from "@crate/ui/domain/hero";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
@@ -65,7 +65,7 @@ export function AlbumHero({
   return (
     <PageHero
       variant="media"
-      className="h-auto min-h-[520px] sm:h-[430px] sm:min-h-0 lg:h-[460px]"
+      className="h-auto min-h-hero-2xl sm:h-hero-lg sm:min-h-0 lg:h-hero-xl"
       contentClassName="translate-y-[var(--album-mobile-info-y)] pb-[calc(var(--album-mobile-action-overlap)+var(--album-mobile-info-action-gap))] pt-[var(--listen-mobile-page-top)] sm:translate-y-0 sm:pb-6"
       artworkClassName="block w-[200px] self-center bg-transparent shadow-none ring-0 sm:w-[240px] sm:self-auto sm:bg-text-primary/5 sm:shadow-2xl sm:ring-1 lg:w-[280px]"
       titleClassName="max-w-4xl text-2xl"
@@ -120,7 +120,7 @@ export function AlbumHero({
             {isPreRelease ? (
               <CratePill
                 tone="accent"
-                className="px-3 font-semibold uppercase tracking-[0.18em]"
+                className="px-3 font-semibold uppercase tracking-eyebrow"
               >
                 {t("radar.release.preRelease")}
               </CratePill>
@@ -174,7 +174,7 @@ export function AlbumHero({
           : null,
         data.total_length_sec > 0 ? (
           <span key="duration" className="flex items-center gap-1">
-            <Clock size={11} />
+            <Clock size={CRATE_ICON_SIZE.micro} />
             {formatTotalDuration(data.total_length_sec)}
           </span>
         ) : null,

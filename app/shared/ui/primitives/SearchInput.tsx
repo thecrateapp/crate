@@ -8,7 +8,7 @@ import {
   type ComponentProps,
 } from "react";
 
-import { Search, X } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Search, X } from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
 import { useDebouncedValue } from "@crate/ui/lib/use-debounced-value";
 import { Input } from "@crate/ui/shadcn/input";
@@ -96,7 +96,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
       >
         <Search
           aria-hidden="true"
-          size={16}
+          size={CRATE_ICON_SIZE.sm}
           className="pointer-events-none absolute top-1/2 left-3.5 z-10 -translate-y-1/2 text-text-muted"
         />
         <Input
@@ -125,7 +125,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             onClick={handleClear}
             className="absolute top-1/2 right-2 z-10 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-text-muted outline-none transition-colors hover:text-text-primary focus-visible:shadow-focus"
           >
-            <X aria-hidden="true" size={16} />
+            <X aria-hidden="true" size={CRATE_ICON_SIZE.sm} />
           </button>
         ) : null}
       </div>

@@ -1,5 +1,11 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Disc3, Lock } from "@crate/ui/icons";
+import {
+  CRATE_ICON_SIZE,
+  ChevronLeft,
+  ChevronRight,
+  Disc3,
+  Lock,
+} from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import type { ContextMenuHeader } from "@crate/ui/domain/actions";
@@ -42,7 +48,7 @@ interface CrateCardProps {
 }
 
 const ARROW_CLASS_NAME =
-  "pointer-events-auto absolute top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white opacity-0 transition hover:bg-black/65 focus-visible:opacity-100 disabled:opacity-0 group-hover/card:opacity-100 group-hover/card:disabled:opacity-30 pointer-coarse:hidden";
+  "pointer-events-auto absolute top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-artwork-foreground/20 bg-artwork-scrim/40 text-artwork-foreground opacity-0 transition hover:bg-artwork-scrim/65 focus-visible:opacity-100 disabled:opacity-0 group-hover/card:opacity-100 group-hover/card:disabled:opacity-30 pointer-coarse:hidden";
 
 function crateAccessLabelKey(crate: CrateSummary) {
   if (crate.access === "collaborator") return "library.crates.sharedWithYou";
@@ -239,19 +245,19 @@ function CrateTile(props: CrateCardProps) {
         }
         artworkOverlay={
           <>
-            <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
+            <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-artwork-scrim/70 via-transparent to-artwork-scrim/10" />
             {crate.visibility === "private" ? (
               <span
                 data-testid="crate-visibility"
                 role="img"
                 aria-label={t("library.crates.private")}
-                className="pointer-events-none absolute right-2 top-2 z-10 flex items-center rounded-full border border-white/15 bg-black/45 p-2 text-white backdrop-blur-md"
+                className="pointer-events-none absolute right-2 top-2 z-10 flex items-center rounded-full border border-artwork-foreground/15 bg-artwork-scrim/45 p-2 text-artwork-foreground backdrop-blur-md"
               >
-                <Lock size={12} aria-hidden="true" />
+                <Lock size={CRATE_ICON_SIZE.micro} aria-hidden="true" />
               </span>
             ) : null}
             {crate.is_ordered && activeAlbum ? (
-              <span className="pointer-events-none absolute bottom-1 right-2 text-5xl font-black leading-none tracking-[-0.08em] text-white/25">
+              <span className="pointer-events-none absolute bottom-1 right-2 text-5xl font-black leading-none tracking-display-tighter text-artwork-foreground/25">
                 <span className="sr-only">
                   {t("stats.rank", { rank: activeAlbum.displayNumber })}
                 </span>
@@ -270,7 +276,7 @@ function CrateTile(props: CrateCardProps) {
             onClick={() => moveActiveAlbum(-1)}
             className={cn(ARROW_CLASS_NAME, "left-2")}
           >
-            <ChevronLeft size={16} />
+            <ChevronLeft size={CRATE_ICON_SIZE.sm} />
           </button>
           <button
             type="button"
@@ -279,7 +285,7 @@ function CrateTile(props: CrateCardProps) {
             onClick={() => moveActiveAlbum(1)}
             className={cn(ARROW_CLASS_NAME, "right-2")}
           >
-            <ChevronRight size={16} />
+            <ChevronRight size={CRATE_ICON_SIZE.sm} />
           </button>
         </div>
       ) : null}
@@ -304,7 +310,7 @@ function CrateRow(props: CrateCardProps) {
       titleAccessory={
         crate.visibility === "private" ? (
           <Lock
-            size={12}
+            size={CRATE_ICON_SIZE.micro}
             role="img"
             aria-label={model.t("library.crates.private")}
             className="shrink-0 text-text-muted"

@@ -207,7 +207,7 @@ function ContinuePlaybackBanner({
     <div className="listen-glass-panel fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+7.25rem)] z-app-modal mx-auto max-w-xl rounded-xl p-3 sm:bottom-24">
       <div className="flex items-start gap-3">
         <div className="mt-0.5 rounded-lg border border-accent-action/25 bg-accent-action/10 p-2 text-text-accent">
-          <MonitorSpeaker size={18} />
+          <MonitorSpeaker size={CRATE_ICON_SIZE.md} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-text-primary">

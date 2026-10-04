@@ -22,7 +22,7 @@ function HomeUpcomingEmpty({
         actionLabel={t("home.radar.open")}
         onAction={onOpenUpcoming}
       />
-      <div className="home-upcoming-empty-card rounded-[12px] p-5">
+      <div className="home-upcoming-empty-card rounded-panel p-5">
         <h2 className="text-lg font-bold text-text-primary">
           {t(
             hasFollowedArtists

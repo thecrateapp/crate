@@ -291,6 +291,8 @@
   --color-text-quiet: var(--text-quiet);
   --color-text-hero: var(--text-hero);
   --color-text-accent: var(--text-accent);
+  --color-artwork-scrim: var(--artwork-scrim);
+  --color-artwork-foreground: var(--artwork-foreground);
   --color-surface-canvas: var(--surface-canvas);
   --color-surface-container: var(--surface-container);
   --color-surface-elevated: var(--surface-elevated);

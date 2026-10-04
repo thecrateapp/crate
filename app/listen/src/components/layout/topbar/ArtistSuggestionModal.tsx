@@ -18,7 +18,7 @@ import {
 import type { useArtistSuggestionController } from "./use-artist-suggestion-controller";
 
 const FIELD_LABEL_CLASS_NAME =
-  "text-xs font-semibold uppercase tracking-[0.12em] text-text-primary/45";
+  "text-xs font-semibold uppercase tracking-label text-text-primary/45";
 const FIELD_CONTROL_CLASS_NAME =
   "bg-text-primary/[0.04] px-3 shadow-none backdrop-blur-none placeholder:text-text-primary/25 md:text-base";
 
@@ -47,7 +47,7 @@ export function ArtistSuggestionModal({
         <ModalHeader className="px-5 py-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent-action">
+              <p className="text-xs font-bold uppercase tracking-eyebrow text-accent-action">
                 {t("userMenu.suggest.badge")}
               </p>
               <h2

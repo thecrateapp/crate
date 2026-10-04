@@ -1,5 +1,5 @@
 import { useMemo, type RefObject } from "react";
-import { MapPin } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, MapPin } from "@crate/ui/icons";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
@@ -24,12 +24,12 @@ export function PathRouteVisualization({
 
   return (
     <div className="mb-6 rounded-xl border border-text-primary/8 bg-surface-canvas/20 p-4">
-      <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-[0.14em]">
+      <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-caps">
         <span className="flex items-center gap-1 text-accent-action/60">
-          <MapPin size={9} /> {path.origin.label}
+          <MapPin size={CRATE_ICON_SIZE.micro} /> {path.origin.label}
         </span>
         <span className="flex items-center gap-1 text-accent-action/60">
-          {path.destination.label} <MapPin size={9} />
+          {path.destination.label} <MapPin size={CRATE_ICON_SIZE.micro} />
         </span>
       </div>
 

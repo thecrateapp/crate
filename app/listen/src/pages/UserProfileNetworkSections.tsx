@@ -45,7 +45,7 @@ function UserProfilePeopleList({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="user-profile-card rounded-[12px] p-5 sm:p-6">
+    <div className="user-profile-card rounded-panel p-5 sm:p-6">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-text-primary">
           {t(titleKey)}

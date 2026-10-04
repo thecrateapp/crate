@@ -79,9 +79,9 @@ describe("CrateBadge tones", () => {
   });
 
   it("lets className override defaults", () => {
-    render(<CrateChip className="text-[10px]">Small</CrateChip>);
+    render(<CrateChip className="text-micro">Small</CrateChip>);
     const chip = screen.getByText("Small");
-    expect(chip).toHaveClass("text-[10px]");
+    expect(chip).toHaveClass("text-micro");
     expect(chip).not.toHaveClass("text-badge");
   });
 

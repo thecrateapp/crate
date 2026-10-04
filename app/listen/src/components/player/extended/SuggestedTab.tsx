@@ -65,7 +65,10 @@ export function SuggestedTab() {
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Loader2 size={20} className="animate-spin text-accent-action" />
+        <Loader2
+          size={CRATE_ICON_SIZE.lg}
+          className="animate-spin text-accent-action"
+        />
       </div>
     );
   }

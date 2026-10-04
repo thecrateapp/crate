@@ -293,7 +293,7 @@ describe("Shell", () => {
       container.querySelector(".listen-home-top-scrim"),
     ).toBeInTheDocument();
     expect(screen.getByTestId("listen-content")).toHaveClass(
-      "max-w-[1480px]",
+      "max-w-content",
       "px-0",
       "pt-0",
     );
@@ -305,7 +305,7 @@ describe("Shell", () => {
     renderWithListenProviders(<Shell />, { route: "/artists/7/converge" });
 
     expect(screen.getByTestId("listen-content")).toHaveClass(
-      "max-w-[1480px]",
+      "max-w-content",
       "px-6",
     );
     expect(screen.getByTestId("listen-content")).not.toHaveClass(

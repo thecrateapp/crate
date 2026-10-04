@@ -74,7 +74,7 @@ export const PathRow = memo(function PathRow({
       meta={route || undefined}
       leading={
         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent-action/10 text-accent-action">
-          <Route size={16} />
+          <Route size={CRATE_ICON_SIZE.sm} />
         </span>
       }
       href={href}

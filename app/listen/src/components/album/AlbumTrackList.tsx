@@ -127,7 +127,7 @@ export function AlbumTrackList({
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1480px] px-4 pb-8 sm:px-6">
+    <div className="mx-auto w-full max-w-content px-4 pb-8 sm:px-6">
       {isDesktop && selectedAlbumTracks.length > 0 ? (
         <div
           ref={selectionBarRef}
@@ -153,7 +153,7 @@ export function AlbumTrackList({
               {t("playlist.actions.addToPlaylist")}
             </Button>
             {selectionPlaylistPickerOpen ? (
-              <AppPopover className="absolute top-full right-0 z-app-popover mt-2 w-64 overflow-hidden rounded-[12px]">
+              <AppPopover className="absolute top-full right-0 z-app-popover mt-2 w-64 overflow-hidden rounded-panel">
                 <div className="p-1.5">
                   <button
                     type="button"
@@ -213,7 +213,7 @@ export function AlbumTrackList({
             .map(([disc, tracks]) => (
               <div key={disc} className="mb-4">
                 <div className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-text-muted">
-                  <Disc size={12} />
+                  <Disc size={CRATE_ICON_SIZE.micro} />
                   {t("album.disc", { disc })}
                 </div>
                 {tracks.map(renderTrack)}

@@ -231,7 +231,7 @@ export function AlbumCardArtworkBadges({
         className="absolute left-2 top-2 z-10"
       />
       {isPreRelease ? (
-        <span className="absolute bottom-2 left-2 z-10 rounded-full border border-accent-action/25 bg-surface-canvas/55 px-2 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-accent-action backdrop-blur-sm">
+        <span className="absolute bottom-2 left-2 z-10 rounded-full border border-accent-action/25 bg-surface-canvas/55 px-2 py-1 text-xs font-semibold uppercase tracking-caps text-accent-action backdrop-blur-sm">
           {t("radar.release.preRelease")}
         </span>
       ) : null}

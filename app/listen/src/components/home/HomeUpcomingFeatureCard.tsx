@@ -32,7 +32,7 @@ function UpcomingFeatureMeta({
     <div className="mb-4 flex flex-wrap gap-2">
       {date ? (
         <div className="home-upcoming-meta-card rounded-lg px-3 py-2 backdrop-blur">
-          <div className="home-upcoming-meta-label text-xs uppercase tracking-[0.16em]">
+          <div className="home-upcoming-meta-label text-xs uppercase tracking-kicker">
             {t("home.radar.meta.date")}
           </div>
           <div className="mt-1 text-sm font-semibold text-text-primary">
@@ -42,11 +42,14 @@ function UpcomingFeatureMeta({
       ) : null}
       {isShow && item.venue ? (
         <div className="home-upcoming-meta-card rounded-lg px-3 py-2 backdrop-blur">
-          <div className="home-upcoming-meta-label text-xs uppercase tracking-[0.16em]">
+          <div className="home-upcoming-meta-label text-xs uppercase tracking-kicker">
             {t("home.radar.meta.venue")}
           </div>
           <div className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-text-primary">
-            <MapPin size={12} className="text-accent-action" />
+            <MapPin
+              size={CRATE_ICON_SIZE.micro}
+              className="text-accent-action"
+            />
             {item.venue}
           </div>
         </div>
@@ -142,7 +145,7 @@ export function HomeUpcomingFeature({
   const presentation = buildUpcomingPresentation(item, i18n.language);
 
   return (
-    <div className="home-upcoming-feature relative min-h-[270px] overflow-hidden rounded-[12px] p-5 sm:p-6">
+    <div className="home-upcoming-feature relative min-h-[270px] overflow-hidden rounded-panel p-5 sm:p-6">
       <div className="home-upcoming-feature-glow absolute inset-0" />
       {presentation.artistImage ? (
         <ArtworkSurface
@@ -158,11 +161,11 @@ export function HomeUpcomingFeature({
 
       <div className="relative flex min-h-[222px] flex-col justify-between">
         <div>
-          <div className="home-upcoming-badge mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.18em]">
+          <div className="home-upcoming-badge mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium uppercase tracking-eyebrow">
             {presentation.isShow ? (
-              <RadioTower size={12} />
+              <RadioTower size={CRATE_ICON_SIZE.micro} />
             ) : (
-              <Disc3 size={12} />
+              <Disc3 size={CRATE_ICON_SIZE.micro} />
             )}
             {presentation.isShow
               ? t("home.radar.badge.nextShow")

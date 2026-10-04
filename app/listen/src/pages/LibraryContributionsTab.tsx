@@ -58,7 +58,7 @@ function ContributionArtwork({
           {contribution.source === "bandcamp" ? (
             <BandcampLogo size={20} />
           ) : (
-            <Plus size={20} />
+            <Plus size={CRATE_ICON_SIZE.lg} />
           )}
         </div>
       )}
@@ -108,7 +108,7 @@ export function LibraryContributionsTab() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-[12px] border border-border-quiet bg-text-primary/[0.04] p-5">
+      <div className="rounded-panel border border-border-quiet bg-text-primary/[0.04] p-5">
         <h2 className="text-xl font-black text-text-primary">
           {t("library.contributions.title")}
         </h2>
@@ -138,7 +138,7 @@ export function LibraryContributionsTab() {
                 <p className="truncate text-xs text-text-muted">
                   {contribution.artist_name}
                 </p>
-                <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-accent-action/80">
+                <p className="mt-1 text-xs font-bold uppercase tracking-eyebrow text-accent-action/80">
                   {contributionSourceLabel(contribution.source)}
                 </p>
               </div>

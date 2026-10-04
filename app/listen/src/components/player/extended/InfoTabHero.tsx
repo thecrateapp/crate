@@ -31,7 +31,7 @@ export function InfoTabHero({
 
   return (
     <section
-      className="info-tab-hero relative overflow-hidden rounded-[12px] p-4 sm:px-5"
+      className="info-tab-hero relative overflow-hidden rounded-panel p-4 sm:px-5"
       style={
         {
           "--info-tab-palette-primary": cssColor(palette.primary),

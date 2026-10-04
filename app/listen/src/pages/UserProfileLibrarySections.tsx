@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { Disc3, Music4, PackagePlus } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Disc3, Music4, PackagePlus } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
@@ -56,9 +56,12 @@ export function UserProfileLibrary({ data }: { data: PublicProfile }) {
   const contributions = data.contributions_preview || [];
   return (
     <section className="space-y-6">
-      <div className="user-profile-card rounded-[12px] p-5 sm:p-6">
+      <div className="user-profile-card rounded-panel p-5 sm:p-6">
         <div className="flex items-center gap-2">
-          <PackagePlus size={16} className="user-profile-accent-icon" />
+          <PackagePlus
+            size={CRATE_ICON_SIZE.sm}
+            className="user-profile-accent-icon"
+          />
           <h2 className="text-lg font-semibold text-text-primary">
             {t("userProfile.contributions.title")}
           </h2>
@@ -94,9 +97,9 @@ function UserProfileCrates({ data }: { data: PublicProfile }) {
   const crates = data.public_crates || [];
 
   return (
-    <div className="user-profile-card rounded-[12px] p-5 sm:p-6">
+    <div className="user-profile-card rounded-panel p-5 sm:p-6">
       <div className="flex items-center gap-2">
-        <Disc3 size={16} className="user-profile-accent-icon" />
+        <Disc3 size={CRATE_ICON_SIZE.sm} className="user-profile-accent-icon" />
         <h2 className="text-lg font-semibold text-text-primary">
           {t("userProfile.crates.title")}
         </h2>
@@ -151,7 +154,7 @@ function UserProfileCrateRow({ crate }: { crate: PublicCrate }) {
           />
         ) : (
           <div className="user-profile-accent-panel user-profile-accent-icon flex size-14 items-center justify-center rounded-xl">
-            <Disc3 size={20} />
+            <Disc3 size={CRATE_ICON_SIZE.lg} />
           </div>
         )}
         <div className="min-w-0 flex-1">
@@ -198,9 +201,12 @@ function UserProfileCrateRow({ crate }: { crate: PublicCrate }) {
 function UserProfilePlaylists({ data }: { data: PublicProfile }) {
   const { t } = useTranslation();
   return (
-    <div className="user-profile-card rounded-[12px] p-5 sm:p-6">
+    <div className="user-profile-card rounded-panel p-5 sm:p-6">
       <div className="flex items-center gap-2">
-        <Music4 size={16} className="user-profile-accent-icon" />
+        <Music4
+          size={CRATE_ICON_SIZE.sm}
+          className="user-profile-accent-icon"
+        />
         <h2 className="text-lg font-semibold text-text-primary">
           {t("userProfile.playlists.title")}
         </h2>

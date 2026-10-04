@@ -90,7 +90,7 @@ export function PlaylistHeroSection({
             {
               key: "play",
               label: t("player.play"),
-              icon: <Play size={17} fill="currentColor" />,
+              icon: <Play size={CRATE_ICON_SIZE.md} fill="currentColor" />,
               onClick: onPlay,
               disabled: playDisabled,
               ariaLabel: t("player.play"),
@@ -98,7 +98,7 @@ export function PlaylistHeroSection({
             {
               key: "shuffle",
               label: t("player.shuffle"),
-              icon: <Shuffle size={17} />,
+              icon: <Shuffle size={CRATE_ICON_SIZE.md} />,
               tone: "neutral",
               onClick: onShuffle,
               disabled: shuffleDisabled,

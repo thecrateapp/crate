@@ -158,6 +158,8 @@
     var(--surface-canvas) 25%,
     transparent
   );
+  --artwork-scrim: #000;
+  --artwork-foreground: #fff;
   --artwork-mark-shadow: 0 1px 8px var(--surface-glass-shadow);
   --artwork-text-shadow: 0 2px 18px var(--surface-glass-shadow);
   --artwork-kicker-shadow: 0 1px 10px var(--surface-glass-shadow);

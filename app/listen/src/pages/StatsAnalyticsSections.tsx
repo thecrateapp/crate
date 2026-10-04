@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import { useTranslation } from "react-i18next";
-import { Activity } from "@crate/ui/icons";
+import { Activity, CRATE_ICON_SIZE } from "@crate/ui/icons";
 
 import type { SoundProfile } from "@/pages/stats-page-model";
 import {
@@ -24,12 +24,12 @@ export function SignalCard({
   body: string;
 }) {
   return (
-    <div className="stats-card rounded-[12px] p-5">
-      <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-accent-action">
-        <Icon size={13} />
+    <div className="stats-card rounded-panel p-5">
+      <div className="flex items-center gap-2 text-xs font-black uppercase tracking-eyebrow-wide text-accent-action">
+        <Icon size={CRATE_ICON_SIZE.xs} />
         {label}
       </div>
-      <div className="mt-3 text-xl font-black tracking-[-0.05em] text-text-primary">
+      <div className="mt-3 text-xl font-black tracking-tighter text-text-primary">
         {title}
       </div>
       <p className="mt-2 text-sm leading-6 text-text-muted">{body}</p>
@@ -50,10 +50,10 @@ export function SoundProfileCard({
   const genreLabels = normalizeGenreLabels(genres);
 
   return (
-    <div className="stats-card rounded-[12px] p-5">
+    <div className="stats-card rounded-panel p-5">
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-black tracking-[-0.04em] text-text-primary">
+          <h2 className="text-xl font-black tracking-display text-text-primary">
             {t("stats.soundProfile.title")}
           </h2>
           <p className="mt-1 text-sm text-text-muted">
@@ -113,7 +113,7 @@ function ProfileBar({ label, value }: { label: string; value: number }) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between text-xs">
-        <span className="stats-profile-label font-bold uppercase tracking-[0.16em]">
+        <span className="stats-profile-label font-bold uppercase tracking-kicker">
           {label}
         </span>
         <span className="font-black text-text-primary">{percent}%</span>

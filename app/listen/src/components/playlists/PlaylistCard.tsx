@@ -378,7 +378,7 @@ function PlaylistFeatured(props: PlaylistCardProps) {
       }
       meta={
         meta && !artworkOnly ? (
-          <span className="home-discovery-meta mt-2 block uppercase tracking-[0.18em]">
+          <span className="home-discovery-meta mt-2 block uppercase tracking-eyebrow">
             {meta}
           </span>
         ) : undefined

@@ -15,7 +15,7 @@ import type {
 import { cn } from "@/lib/utils";
 
 const FIELD_LABEL_CLASS_NAME =
-  "text-xs font-medium uppercase tracking-[0.18em] text-text-primary/40";
+  "text-xs font-medium uppercase tracking-eyebrow text-text-primary/40";
 
 type PlaylistIdentityState = Pick<
   PlaylistComposerState,

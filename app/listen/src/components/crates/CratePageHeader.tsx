@@ -19,7 +19,7 @@ import { UserProfileAvatar } from "@/pages/UserProfileAvatar";
 import type { CrateDetail } from "@/pages/crates-types";
 
 export const CRATE_SECONDARY_ACTION_CLASS =
-  "min-w-0 px-0 text-[0.6875rem] md:px-1.5 md:text-xs";
+  "min-w-0 px-0 text-2xs md:px-1.5 md:text-xs";
 
 export function CrateHero({
   crate,

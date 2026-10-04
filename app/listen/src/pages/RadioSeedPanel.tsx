@@ -29,7 +29,7 @@ export function RadioSeedPanel({
   const { t } = useTranslation();
 
   return (
-    <div className="radio-seed-panel rounded-[12px] p-5">
+    <div className="radio-seed-panel rounded-panel p-5">
       <div className="radio-seed-heading mb-4 flex items-center gap-2 text-sm font-semibold">
         <RadioIcon
           size={CRATE_ICON_SIZE.sm}
@@ -74,7 +74,7 @@ export function RadioSeedPanel({
                 />
               ) : (
                 <div className="radio-seed-result-placeholder flex size-9 shrink-0 items-center justify-center rounded-md">
-                  <Music size={16} />
+                  <Music size={CRATE_ICON_SIZE.sm} />
                 </div>
               )}
               <div className="min-w-0 flex-1">
@@ -84,7 +84,7 @@ export function RadioSeedPanel({
                 </div>
               </div>
               <RadioIcon
-                size={14}
+                size={CRATE_ICON_SIZE.xs}
                 className="radio-seed-result-icon shrink-0"
               />
             </button>

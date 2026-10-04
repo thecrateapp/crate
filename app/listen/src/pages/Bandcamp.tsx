@@ -116,12 +116,12 @@ export function Bandcamp() {
     t("bandcamp.connection.accountFallback");
 
   return (
-    <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-8 py-6">
-      <section className="bandcamp-page-surface relative overflow-hidden rounded-[12px] border border-text-primary/8 p-6 md:p-8">
+    <div className="mx-auto flex w-full max-w-content flex-col gap-8 py-6">
+      <section className="bandcamp-page-surface relative overflow-hidden rounded-panel border border-text-primary/8 p-6 md:p-8">
         <div className="bandcamp-page-sheen pointer-events-none absolute inset-y-0 right-0 w-1/2" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full bg-accent-action/10 px-3 py-2 text-xs font-black uppercase tracking-[0.24em] text-accent-action">
+            <div className="inline-flex items-center gap-2 rounded-full bg-accent-action/10 px-3 py-2 text-xs font-black uppercase tracking-overline-wide text-accent-action">
               <BandcampLogo className=" size-3.5" />
               Bandcamp
             </div>
@@ -274,9 +274,9 @@ function StatCard({
   icon: LucideIcon | typeof BandcampLogo;
 }) {
   return (
-    <div className="rounded-[12px] border border-text-primary/8 bg-text-primary/[0.035] p-5">
+    <div className="rounded-panel border border-text-primary/8 bg-text-primary/[0.035] p-5">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-black uppercase tracking-[0.24em] text-text-muted">
+        <span className="text-xs font-black uppercase tracking-overline-wide text-text-muted">
           {label}
         </span>
         <Icon className=" size-4 text-accent-action" />
@@ -298,7 +298,7 @@ function Rail({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[12px] border border-text-primary/8 bg-surface-elevated/90 p-5">
+    <section className="rounded-panel border border-text-primary/8 bg-surface-elevated/90 p-5">
       <div className="mb-5">
         <h2 className="text-2xl font-black text-text-primary">{title}</h2>
         <p className="mt-1 text-sm text-text-muted">{subtitle}</p>

@@ -63,7 +63,7 @@ export function PlaylistTrackFilterBar({
           placeholder={t("playlist.filter.placeholder")}
           className="rounded-lg bg-surface-canvas/10 pr-28 placeholder:text-text-muted sm:pr-36 md:text-base"
         />
-        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium uppercase tracking-[0.18em] text-accent-action/85">
+        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium uppercase tracking-eyebrow text-accent-action/85">
           {countLabel}
           <span className="ml-1 text-accent-action/65">
             {t("playlist.filter.tracks")}

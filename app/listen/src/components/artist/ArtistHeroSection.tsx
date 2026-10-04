@@ -50,7 +50,7 @@ interface ArtistHeroSectionProps {
   onOpenBio: () => void;
 }
 
-const ARTIST_SECONDARY_ACTION_CLASS = "text-[0.6875rem] md:text-xs";
+const ARTIST_SECONDARY_ACTION_CLASS = "text-2xs md:text-xs";
 
 function withHeroCacheBust(url: string) {
   return `${url}${url.includes("?") ? "&" : "?"}v=artist-hero-bg-v1`;
@@ -158,7 +158,7 @@ export function ArtistHeroSection({
       meta={[
         artistInfo?.listeners ? (
           <span key="listeners" className="flex items-center gap-1">
-            <Users size={14} />
+            <Users size={CRATE_ICON_SIZE.xs} />
             {t("artist.meta.listeners", {
               count: formatCompact(artistInfo.listeners),
             })}
@@ -179,14 +179,14 @@ export function ArtistHeroSection({
             {
               key: "play",
               label: t("player.play"),
-              icon: <Play size={17} fill="currentColor" />,
+              icon: <Play size={CRATE_ICON_SIZE.md} fill="currentColor" />,
               onClick: onPlay,
               ariaLabel: t("player.play"),
             },
             {
               key: "shuffle",
               label: t("player.shuffle"),
-              icon: <Shuffle size={17} />,
+              icon: <Shuffle size={CRATE_ICON_SIZE.md} />,
               tone: "neutral",
               onClick: onShuffle,
               ariaLabel: t("player.shuffle"),
@@ -280,7 +280,8 @@ export function ArtistHeroSection({
               className="link-accent mt-2 flex w-fit max-w-full items-center gap-1 text-xs"
               onClick={onOpenBio}
             >
-              {t("common.showMore")} <ChevronDown size={12} />
+              {t("common.showMore")}{" "}
+              <ChevronDown size={CRATE_ICON_SIZE.micro} />
             </button>
           ) : null}
         </div>

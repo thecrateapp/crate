@@ -71,7 +71,7 @@ export function UpcomingPreviewRow({
       </div>
       <CratePill
         tone="accent"
-        className="relative shrink-0 px-2 py-1 text-xs font-medium uppercase tracking-[0.14em]"
+        className="relative shrink-0 px-2 py-1 text-xs font-medium uppercase tracking-caps"
       >
         {item.type === "show"
           ? t("home.radar.itemType.show")

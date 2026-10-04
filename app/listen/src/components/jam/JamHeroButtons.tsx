@@ -1,5 +1,5 @@
 import { type ButtonHTMLAttributes, type ReactNode } from "react";
-import { Loader2 } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
 
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { Button } from "@crate/ui/shadcn/button";
@@ -27,7 +27,11 @@ export function HeroActionButton({
       className={`jam-hero-action size-11 text-text-muted disabled:opacity-35 ${className}`}
       {...props}
     >
-      {loading ? <Loader2 size={16} className="animate-spin" /> : children}
+      {loading ? (
+        <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
+      ) : (
+        children
+      )}
     </ActionIconButton>
   );
 }
@@ -57,7 +61,11 @@ export function HeroPrimaryButton({
       className={`h-11 px-3.5 has-[>svg]:px-3.5 disabled:opacity-35 ${className}`}
       {...props}
     >
-      {loading ? <Loader2 size={16} className="animate-spin" /> : children}
+      {loading ? (
+        <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
+      ) : (
+        children
+      )}
       <span>{label}</span>
     </Button>
   );

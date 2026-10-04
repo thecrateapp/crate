@@ -214,7 +214,7 @@ describe("Home", () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getByTestId("home-discovery-content")).toHaveClass(
-      "max-w-[1480px]",
+      "max-w-content",
       "relative",
       "z-30",
       "mt-0",

@@ -18,7 +18,7 @@ export function JamInvitePanel({
   const navigate = useNavigate();
 
   return (
-    <section className="jam-panel rounded-[12px] p-5 sm:p-6">
+    <section className="jam-panel rounded-panel p-5 sm:p-6">
       <h2 className="text-lg font-semibold text-text-primary">
         {t("jam.lobby.joinInviteTitle")}
       </h2>

@@ -88,7 +88,7 @@ export function MobileBottomNav({
     <>
       <nav
         className={`z-app-player fixed isolate flex items-center justify-around overflow-visible bg-transparent px-1.5 ${
-          hasTrack ? "rounded-b-[12px] border-t-0" : "rounded-[12px]"
+          hasTrack ? "rounded-b-panel border-t-0" : "rounded-panel"
         }`}
         style={{
           bottom:

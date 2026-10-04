@@ -165,9 +165,12 @@ function RoomCardHeader({
       <span className="flex shrink-0 flex-col items-end gap-2 pr-20">
         <span className="jam-chip flex size-9 items-center justify-center rounded-full text-text-muted">
           {joining ? (
-            <Loader2 size={15} className="jam-accent-text animate-spin" />
+            <Loader2
+              size={CRATE_ICON_SIZE.sm}
+              className="jam-accent-text animate-spin"
+            />
           ) : (
-            <Users size={15} />
+            <Users size={CRATE_ICON_SIZE.sm} />
           )}
         </span>
       </span>
@@ -188,9 +191,9 @@ function RoomCardBadges({
     <span className="mt-2 flex flex-wrap gap-1.5 text-xs">
       <span className="jam-chip inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-text-muted">
         {room.visibility === "public" ? (
-          <Globe2 size={11} />
+          <Globe2 size={CRATE_ICON_SIZE.micro} />
         ) : (
-          <Lock size={11} />
+          <Lock size={CRATE_ICON_SIZE.micro} />
         )}
         {mode === "member"
           ? t("jam.roomCard.yourRoom")
@@ -198,7 +201,7 @@ function RoomCardBadges({
       </span>
       {room.is_permanent ? (
         <span className="jam-accent-chip inline-flex items-center gap-1 rounded-full px-2 py-0.5">
-          <Pin size={11} />
+          <Pin size={CRATE_ICON_SIZE.micro} />
           {t("jam.roomCard.permanent")}
         </span>
       ) : null}

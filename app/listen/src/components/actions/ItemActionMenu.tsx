@@ -48,7 +48,7 @@ export function ContextMenu(props: ContextMenuProps) {
   return (
     <SharedContextMenu
       {...props}
-      className={cn("rounded-[12px]", props.className)}
+      className={cn("rounded-panel", props.className)}
       renderMediaImage={renderMediaImage}
     />
   );

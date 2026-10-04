@@ -1,4 +1,9 @@
-import { Loader2, Radio as RadioIcon, Sparkles } from "@crate/ui/icons";
+import {
+  CRATE_ICON_SIZE,
+  Loader2,
+  Radio as RadioIcon,
+  Sparkles,
+} from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
 export function RadioHero({
@@ -13,12 +18,12 @@ export function RadioHero({
   const { t } = useTranslation();
 
   return (
-    <div className="radio-page-hero relative overflow-hidden rounded-[12px] p-5 sm:p-6">
+    <div className="radio-page-hero relative overflow-hidden rounded-panel p-5 sm:p-6">
       <div className="radio-page-hero-glow pointer-events-none absolute inset-0" />
       <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex min-w-0 items-start gap-4">
           <div className="radio-page-icon flex size-14 shrink-0 items-center justify-center rounded-xl">
-            <RadioIcon size={24} />
+            <RadioIcon size={CRATE_ICON_SIZE.xl} />
           </div>
           <div className="min-w-0">
             <h1 className="text-text-primary text-3xl font-bold leading-tight">
@@ -37,9 +42,9 @@ export function RadioHero({
           className="radio-discovery-button group inline-flex min-h-12 items-center justify-center gap-3 rounded-full px-5 text-sm font-semibold transition duration-300"
         >
           {starting ? (
-            <Loader2 size={19} className="animate-spin" />
+            <Loader2 size={CRATE_ICON_SIZE.md} className="animate-spin" />
           ) : (
-            <Sparkles size={19} />
+            <Sparkles size={CRATE_ICON_SIZE.md} />
           )}
           {t("radio.discovery")}
         </button>

@@ -23,7 +23,7 @@ export function JamMembersPanel({
   handleResolveRequest,
 }: JamMembersPanelProps) {
   return (
-    <section className="jam-members-panel min-h-0 min-w-0 overflow-hidden rounded-[12px] p-5 sm:p-6">
+    <section className="jam-members-panel min-h-0 min-w-0 overflow-hidden rounded-panel p-5 sm:p-6">
       <h2 className="text-lg font-semibold text-text-primary">
         {t("jam.room.members")}
       </h2>

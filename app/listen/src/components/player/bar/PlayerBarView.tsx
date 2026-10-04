@@ -214,7 +214,7 @@ export function PlayerBarView({
             className={cn(
               "pointer-events-none absolute inset-0 z-0",
               isDesktop
-                ? "listen-player-shell md:rounded-[12px] md:backdrop-blur-xl"
+                ? "listen-player-shell md:rounded-panel md:backdrop-blur-xl"
                 : "rounded-t-[2rem] rounded-b-none",
             )}
           />

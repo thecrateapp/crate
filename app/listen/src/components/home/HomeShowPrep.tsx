@@ -39,12 +39,12 @@ export function HomeShowPrepSection({
         {insights.map((insight) => (
           <div
             key={`${insight.type}:${insight.show_id}`}
-            className="home-upcoming-show-prep-card rounded-[12px] p-5"
+            className="home-upcoming-show-prep-card rounded-panel p-5"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="home-upcoming-show-prep-badge inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.16em]">
-                  <Sparkles size={12} />
+                <div className="home-upcoming-show-prep-badge inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium uppercase tracking-kicker">
+                  <Sparkles size={CRATE_ICON_SIZE.micro} />
                   {insightLabel(insight.type, t)}
                 </div>
                 <h3 className="mt-3 text-lg font-bold text-text-primary">
@@ -55,7 +55,7 @@ export function HomeShowPrepSection({
                 </p>
               </div>
               {insight.weight === "high" ? (
-                <div className="home-upcoming-show-prep-heavy rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">
+                <div className="home-upcoming-show-prep-heavy rounded-full px-3 py-1 text-xs uppercase tracking-kicker">
                   {t("home.radar.showPrep.heavyRotation")}
                 </div>
               ) : null}

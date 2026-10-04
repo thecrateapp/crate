@@ -378,7 +378,7 @@ describe("HomeTasteHero", () => {
     expect(screen.getByTestId("desktop-hero-content")).toHaveClass(
       "mx-auto",
       "w-full",
-      "max-w-[1480px]",
+      "max-w-content",
       "px-6",
     );
     expect(screen.getByTestId("desktop-hero-artwork")).toHaveClass(
@@ -467,7 +467,7 @@ describe("HomeTasteHero", () => {
     expect(hero).toHaveClass(
       "mx-auto",
       "w-full",
-      "max-w-[1480px]",
+      "max-w-content",
       "aspect-[1480/600]",
       "min-h-[clamp(480px,38dvh,600px)]",
     );
@@ -535,7 +535,7 @@ describe("HomeTasteHero", () => {
       "w-full",
     );
     expect(screen.getByTestId("desktop-hero-artwork")).not.toHaveClass(
-      "max-w-[1480px]",
+      "max-w-content",
       "w-auto",
       "max-w-none",
       "aspect-[21/9]",
@@ -1063,7 +1063,7 @@ describe("RecentEntityRow", () => {
     });
 
     const menu = await screen.findByRole("menu");
-    expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-[12px]");
+    expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-panel");
     expect(within(menu).getByText("El Cielo")).toBeInTheDocument();
     expect(within(menu).getByText("Dredg")).toBeInTheDocument();
     expect(

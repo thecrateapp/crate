@@ -1,3 +1,4 @@
+import { CRATE_ICON_SIZE } from "@crate/ui/icons";
 import { Loader2, X } from "@crate/ui/icons/translation";
 
 import { Button } from "@crate/ui/shadcn/button";
@@ -24,7 +25,7 @@ export function TranslationOverlay() {
   return (
     <div
       data-translation-overlay
-      className="pointer-events-none fixed inset-0 z-[9999]"
+      className="pointer-events-none fixed inset-0 z-app-debug-overlay"
     >
       <div className="pointer-events-none absolute inset-0">
         {hoveredRect ? (
@@ -70,7 +71,7 @@ export function TranslationOverlay() {
               onClick={closeEditor}
               className="text-text-primary/45 transition-[color,filter] hover:text-text-accent hover:drop-shadow-accent-action"
             >
-              <X size={18} />
+              <X size={CRATE_ICON_SIZE.md} />
             </button>
           </div>
 
@@ -80,7 +81,7 @@ export function TranslationOverlay() {
             <Field label="Quality status" value="Not checked locally" />
 
             <label className="block">
-              <span className="mb-1 block text-xs font-bold uppercase tracking-[0.12em] text-text-primary/35">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-label text-text-primary/35">
                 Current value
               </span>
               <textarea
@@ -111,7 +112,7 @@ export function TranslationOverlay() {
                 disabled={saveStatus === "saving"}
               >
                 {saveStatus === "saving" ? (
-                  <Loader2 size={15} className="animate-spin" />
+                  <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
                 ) : null}
                 Save translation
               </Button>
@@ -126,7 +127,7 @@ export function TranslationOverlay() {
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-text-primary/35">
+      <div className="mb-1 text-xs font-bold uppercase tracking-label text-text-primary/35">
         {label}
       </div>
       <div className="rounded-md border border-text-primary/8 bg-text-primary/[0.04] px-3 py-2 text-sm text-text-primary/80">

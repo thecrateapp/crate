@@ -82,7 +82,7 @@ export function ServersSection() {
   };
 
   return (
-    <section className="rounded-[12px] border border-border-quiet bg-text-primary/[0.03] p-5 sm:p-6">
+    <section className="rounded-panel border border-border-quiet bg-text-primary/[0.03] p-5 sm:p-6">
       <div className="mb-1 flex items-center gap-2">
         <Server size={CRATE_ICON_SIZE.sm} className="text-accent-action" />
         <h2 className="text-sm font-semibold text-text-primary">
@@ -120,7 +120,7 @@ export function ServersSection() {
                     {server.label}
                   </span>
                   {isCurrent ? (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-text-accent">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-caps text-text-accent">
                       <CheckCircle2 size={CRATE_ICON_SIZE.micro} />
                       {t("settings.servers.current")}
                     </span>

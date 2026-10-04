@@ -122,7 +122,7 @@ function EqualizerModePicker({ eq, t }: { eq: EqualizerState; t: TFunction }) {
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border-quiet bg-surface-control px-2.5 py-2">
-      <span className="mr-1 text-xs uppercase tracking-[0.18em] text-text-subtle">
+      <span className="mr-1 text-xs uppercase tracking-eyebrow text-text-subtle">
         {t("player.equalizer.manualHelpers")}
       </span>
       <CratePill

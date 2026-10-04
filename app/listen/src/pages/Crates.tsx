@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, Plus } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Loader2, Plus } from "@crate/ui/icons";
 import { Button } from "@crate/ui/shadcn/button";
 import { EmptyState } from "@crate/ui/domain/states";
 import { notify } from "@crate/ui/lib/notify";
@@ -166,14 +166,17 @@ export function Crates({ onCrateChange }: CratesProps) {
             onClick={() => setCreating(true)}
             className="shrink-0"
           >
-            <Plus size={17} />
+            <Plus size={CRATE_ICON_SIZE.md} />
             {t("library.crates.new")}
           </Button>
         </div>
 
         {loading && !crates ? (
           <div className="flex justify-center py-12">
-            <Loader2 size={24} className="animate-spin text-accent-action" />
+            <Loader2
+              size={CRATE_ICON_SIZE.xl}
+              className="animate-spin text-accent-action"
+            />
           </div>
         ) : error ? (
           <p
@@ -209,7 +212,10 @@ export function Crates({ onCrateChange }: CratesProps) {
         </h2>
         {followedLoading && !followedCrates ? (
           <div className="flex justify-center py-8">
-            <Loader2 size={20} className="animate-spin text-accent-action" />
+            <Loader2
+              size={CRATE_ICON_SIZE.lg}
+              className="animate-spin text-accent-action"
+            />
           </div>
         ) : followedCrates?.length ? (
           <div

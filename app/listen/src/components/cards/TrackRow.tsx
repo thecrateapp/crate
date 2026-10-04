@@ -165,7 +165,7 @@ export const TrackRow = memo(function TrackRow({
             />
           ) : null}
           {model.disabled ? (
-            <span className="track-row-disabled-badge shrink-0 rounded-full px-2 py-0.5 text-xs uppercase tracking-[0.14em]">
+            <span className="track-row-disabled-badge shrink-0 rounded-full px-2 py-0.5 text-xs uppercase tracking-caps">
               {t("trackRow.soon")}
             </span>
           ) : null}

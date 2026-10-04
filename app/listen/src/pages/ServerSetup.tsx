@@ -129,13 +129,13 @@ export function ServerSetup() {
       <div className="server-setup-atmosphere pointer-events-none absolute inset-0" />
       <form
         onSubmit={handleSubmit}
-        className="relative w-full max-w-[560px] rounded-[12px] border border-border-quiet bg-surface-elevated/90 p-8 shadow-card backdrop-blur-xl sm:p-10"
+        className="relative w-full max-w-[560px] rounded-panel border border-border-quiet bg-surface-elevated/90 p-8 shadow-card backdrop-blur-xl sm:p-10"
       >
         <div className="flex flex-col items-center text-center">
           <div className="mb-5 flex size-20 items-center justify-center rounded-xl border border-accent-action/20 bg-accent-action/10 shadow-accent-action-strong">
             <CrateLogo title="Crate" className="size-14" />
           </div>
-          <h1 className="text-balance text-3xl font-bold tracking-[-0.04em] text-text-primary sm:text-4xl">
+          <h1 className="text-balance text-3xl font-bold tracking-display text-text-primary sm:text-4xl">
             {t("serverSetup.title")}
           </h1>
           <p className="mt-3 max-w-md text-sm leading-6 text-text-secondary">
@@ -146,7 +146,7 @@ export function ServerSetup() {
         <FormField
           label={t("serverSetup.urlLabel")}
           className="mt-8 gap-2"
-          labelClassName="text-xs font-semibold uppercase tracking-[0.22em] text-text-muted"
+          labelClassName="text-xs font-semibold uppercase tracking-overline text-text-muted"
         >
           {(control) => (
             <div className="relative">
@@ -231,8 +231,8 @@ function StatusLine({ state }: { state: ProbeState }) {
   }
   if (state.status === "ok") {
     return (
-      <div className="flex items-center gap-2 text-[0.8125rem] text-state-success-text">
-        <CheckCircle2 size={14} />
+      <div className="flex items-center gap-2 text-caption text-state-success-text">
+        <CheckCircle2 size={CRATE_ICON_SIZE.xs} />
         {t("serverSetup.status.detected")}
         {state.inviteOnly ? ` ${t("serverSetup.status.inviteOnly")}` : ""}
       </div>
@@ -240,15 +240,15 @@ function StatusLine({ state }: { state: ProbeState }) {
   }
   if (state.status === "not-crate") {
     return (
-      <div className="flex items-center gap-2 text-[0.8125rem] text-state-warning-text">
-        <AlertCircle size={14} />
+      <div className="flex items-center gap-2 text-caption text-state-warning-text">
+        <AlertCircle size={CRATE_ICON_SIZE.xs} />
         {t("serverSetup.status.notCrate")}
       </div>
     );
   }
   return (
-    <div className="flex items-center gap-2 text-[0.8125rem] text-state-danger-text">
-      <AlertCircle size={14} />
+    <div className="flex items-center gap-2 text-caption text-state-danger-text">
+      <AlertCircle size={CRATE_ICON_SIZE.xs} />
       {state.messageKey ? t(state.messageKey) : state.message}
     </div>
   );

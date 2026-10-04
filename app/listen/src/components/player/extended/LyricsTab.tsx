@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2 } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
 
 import { usePlayerActions, usePlayerProgress } from "@/contexts/PlayerContext";
 
@@ -30,7 +30,10 @@ export function LyricsTab({ useAlbumPalette }: { useAlbumPalette: boolean }) {
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Loader2 size={20} className="animate-spin text-accent-action" />
+        <Loader2
+          size={CRATE_ICON_SIZE.lg}
+          className="animate-spin text-accent-action"
+        />
       </div>
     );
   }

@@ -61,7 +61,7 @@ export function DesktopShell({
         <div
           data-testid="listen-content"
           className={`mx-auto w-full ${desktopContentPadClass} ${
-            homeDesktopOverlay ? "max-w-[1480px] px-0" : "max-w-[1480px] px-6"
+            homeDesktopOverlay ? "max-w-content px-0" : "max-w-content px-6"
           } transition-[padding-top,padding-right,padding-left] duration-200 ${headerOffsetClass}`}
         >
           {children ?? <Outlet />}

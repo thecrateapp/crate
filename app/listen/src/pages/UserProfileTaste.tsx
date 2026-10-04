@@ -33,7 +33,7 @@ export function ProfileTasteSummary({ data }: { data: PublicProfile }) {
   return (
     <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_1fr]">
       <div className="user-profile-accent-panel rounded-xl p-4">
-        <div className="user-profile-accent-label text-xs font-bold uppercase tracking-[0.18em]">
+        <div className="user-profile-accent-label text-xs font-bold uppercase tracking-eyebrow">
           {t("userProfile.topSound")}
         </div>
         <div className="mt-2 truncate text-lg font-black text-text-primary">
@@ -73,7 +73,7 @@ function ProfileBadges({ badges }: { badges: PublicProfile["badges"] }) {
   const { t } = useTranslation();
   return (
     <div className="user-profile-card rounded-xl p-4">
-      <div className="text-xs font-bold uppercase tracking-[0.18em] text-text-muted">
+      <div className="text-xs font-bold uppercase tracking-eyebrow text-text-muted">
         {t("userProfile.badges.title")}
       </div>
       {badges.length ? (
@@ -82,7 +82,7 @@ function ProfileBadges({ badges }: { badges: PublicProfile["badges"] }) {
             <CratePill
               key={badge.key}
               tone={badgeTone(badge.tone)}
-              className="gap-0 text-xs leading-4 font-bold uppercase tracking-[0.12em]"
+              className="gap-0 text-xs leading-4 font-bold uppercase tracking-label"
             >
               {badge.label}
             </CratePill>

@@ -18,6 +18,7 @@ import {
 import {
   buildCrateStoryByline,
   buildCrateStoryMetadata,
+  buildInstagramStorySubtitle,
   formatShareDisplayUrl,
 } from "@/lib/social-share-story-canvas";
 
@@ -144,5 +145,30 @@ describe("Crate story text", () => {
     expect(formatShareDisplayUrl(payload.url)).toBe(
       "listen.example/share/crate/2",
     );
+  });
+});
+
+describe("Instagram story subtitle", () => {
+  const album = {
+    kind: "album" as const,
+    title: "El Cielo",
+    subtitle: "Dredg",
+    url: "https://listen.example/share/album/1",
+  };
+
+  it("renders the localized subtitle passed by the caller", () => {
+    expect(
+      buildInstagramStorySubtitle(album, { subtitle: "Álbum de Dredg" }),
+    ).toBe("Álbum de Dredg");
+  });
+
+  it("never falls back to hard-coded English connectors", () => {
+    expect(buildInstagramStorySubtitle(album)).toBe("Dredg");
+    expect(buildInstagramStorySubtitle({ ...album, kind: "track" }, {})).toBe(
+      "Dredg",
+    );
+    expect(
+      buildInstagramStorySubtitle({ ...album, kind: "artist", subtitle: "" }),
+    ).toBe("Crate");
   });
 });

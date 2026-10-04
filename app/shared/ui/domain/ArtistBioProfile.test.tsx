@@ -54,4 +54,62 @@ describe("ArtistBioProfile", () => {
     );
     expect(screen.queryByText("1994-10")).not.toBeInTheDocument();
   });
+
+  it("renders consumer-provided labels and keeps English defaults for the rest", () => {
+    render(
+      <ArtistBioProfile
+        artistName="Example Band"
+        bio="Band biography."
+        stats={{ listeners: 1200 }}
+        libraryStats={{ albums: 2, tracks: 20, sizeMb: 64 }}
+        labels={{
+          biography: "Biografía",
+          currentMembers: "Miembros actuales",
+          formerMembers: "Antiguos miembros",
+          member: "Miembro",
+          role: "Rol",
+          since: "Desde",
+          from: "Inicio",
+          to: "Fin",
+          unknown: "Desconocido",
+          listeners: "oyentes",
+          albums: "álbumes",
+        }}
+        members={[
+          { name: "Current Member", roles: ["vocals"] },
+          { name: "Former Member", begin: "2015", end: "2019" },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Biografía")).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: "Miembros actuales" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: "Antiguos miembros" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("columnheader", { name: "Miembro" }),
+    ).toHaveLength(2);
+    expect(screen.getAllByRole("columnheader", { name: "Rol" })).toHaveLength(
+      2,
+    );
+    expect(
+      screen.getByRole("columnheader", { name: "Desde" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Inicio" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Fin" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("cell", { name: "Desconocido" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("oyentes")).toBeInTheDocument();
+    expect(screen.getByText(/álbumes/)).toBeInTheDocument();
+    expect(screen.getByText(/tracks/)).toBeInTheDocument();
+    expect(screen.queryByText("Current members")).not.toBeInTheDocument();
+  });
 });

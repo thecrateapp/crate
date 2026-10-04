@@ -107,9 +107,7 @@ export function SidebarNavigation({
         <NavLink to="/" end title={t("nav.music")} className={navLinkClass}>
           <Music size={CRATE_ICON_SIZE.nav} />
           {expanded && (
-            <span className="text-[0.8125rem] font-medium">
-              {t("nav.music")}
-            </span>
+            <span className="text-caption font-medium">{t("nav.music")}</span>
           )}
         </NavLink>
         <NavLink
@@ -119,25 +117,19 @@ export function SidebarNavigation({
         >
           <Search size={CRATE_ICON_SIZE.nav} />
           {expanded && (
-            <span className="text-[0.8125rem] font-medium">
-              {t("nav.explore")}
-            </span>
+            <span className="text-caption font-medium">{t("nav.explore")}</span>
           )}
         </NavLink>
         <NavLink to="/upcoming" title={t("nav.radar")} className={navLinkClass}>
           <Radar size={CRATE_ICON_SIZE.nav} />
           {expanded && (
-            <span className="text-[0.8125rem] font-medium">
-              {t("nav.radar")}
-            </span>
+            <span className="text-caption font-medium">{t("nav.radar")}</span>
           )}
         </NavLink>
         <NavLink to="/stats" title={t("nav.stats")} className={navLinkClass}>
           <Activity size={CRATE_ICON_SIZE.nav} />
           {expanded && (
-            <span className="text-[0.8125rem] font-medium">
-              {t("nav.stats")}
-            </span>
+            <span className="text-caption font-medium">{t("nav.stats")}</span>
           )}
         </NavLink>
 
@@ -158,7 +150,7 @@ export function SidebarNavigation({
             <Collection size={CRATE_ICON_SIZE.nav} />
             {expanded && (
               <>
-                <span className="flex-1 text-left text-[0.8125rem] font-medium">
+                <span className="flex-1 text-left text-caption font-medium">
                   {t("nav.collection")}
                 </span>
                 <ChevronRight

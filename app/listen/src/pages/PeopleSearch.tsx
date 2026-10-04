@@ -24,7 +24,7 @@ export function PeopleSearch({
   const trimmedQuery = query.trim();
 
   return (
-    <section className="rounded-[12px] border border-border-quiet bg-text-primary/[0.03] p-5 sm:p-6">
+    <section className="rounded-panel border border-border-quiet bg-text-primary/[0.03] p-5 sm:p-6">
       <SearchInput
         value={query}
         onValueChange={onQueryChange}

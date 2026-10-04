@@ -22,7 +22,7 @@ export function SearchEmptyState({
   }
 
   return (
-    <div className="mx-auto max-w-2xl rounded-[12px] border border-border-quiet bg-text-primary/[0.035] p-6 shadow-card sm:p-8">
+    <div className="mx-auto max-w-2xl rounded-panel border border-border-quiet bg-text-primary/[0.035] p-6 shadow-card sm:p-8">
       <div className="flex items-start gap-3">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-accent-action/15 bg-accent-action/8 text-text-accent">
           <Search size={CRATE_ICON_SIZE.md} />

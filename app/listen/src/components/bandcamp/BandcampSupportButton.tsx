@@ -305,7 +305,7 @@ function BandcampDefaultAction({
       }
     >
       {busy ? (
-        <Loader2 size={15} className="animate-spin" />
+        <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
       ) : (
         <BandcampLogo size={15} />
       )}

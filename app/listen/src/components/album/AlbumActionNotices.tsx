@@ -20,7 +20,7 @@ export function AlbumActionNotices({
     <>
       {state.remoteOnly && globalAlbumUid ? (
         <div className="px-4 pb-4 sm:px-6">
-          <div className="mx-auto w-full max-w-[1480px]">
+          <div className="mx-auto w-full max-w-content">
             <RemoteImportAction
               globalAlbumUid={globalAlbumUid}
               estimatedBytes={
@@ -34,7 +34,7 @@ export function AlbumActionNotices({
 
       {state.offlineStatusDetail ? (
         <div className="px-4 pb-4 sm:px-6">
-          <div className="mx-auto w-full max-w-[1480px]">
+          <div className="mx-auto w-full max-w-content">
             <p className="text-xs text-text-muted">
               {state.offlineStatusDetail}
             </p>
@@ -44,7 +44,7 @@ export function AlbumActionNotices({
 
       {state.isPreRelease ? (
         <div className="px-4 pb-4 sm:px-6">
-          <div className="mx-auto w-full max-w-[1480px] rounded-lg border border-accent-action/15 bg-accent-action/5 px-4 py-3 text-sm text-accent-action/90">
+          <div className="mx-auto w-full max-w-content rounded-lg border border-accent-action/15 bg-accent-action/5 px-4 py-3 text-sm text-accent-action/90">
             {t("album.prereleaseNotice")}
           </div>
         </div>

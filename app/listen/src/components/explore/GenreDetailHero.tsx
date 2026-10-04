@@ -67,7 +67,7 @@ function GenreActionBar({
         {
           key: "radio",
           label: t("player.play"),
-          icon: <Play size={17} fill="currentColor" />,
+          icon: <Play size={CRATE_ICON_SIZE.md} fill="currentColor" />,
           onClick: onPlayGenreRadio,
           loading: startingRadio,
           ariaLabel: t("genre.actions.playRadio"),
@@ -78,7 +78,7 @@ function GenreActionBar({
               {
                 key: "next-show",
                 label: t("genre.actions.nextShow"),
-                icon: <Calendar size={17} />,
+                icon: <Calendar size={CRATE_ICON_SIZE.md} />,
                 tone: "neutral" as const,
                 onClick: () => onOpenGenreRadar(nextShow),
                 ariaLabel: t("genre.actions.openNextGenreShow"),

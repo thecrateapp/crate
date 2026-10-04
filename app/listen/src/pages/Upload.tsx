@@ -170,7 +170,7 @@ export function Upload() {
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="space-y-2">
         <div className="inline-flex items-center gap-2 rounded-full border border-border-quiet bg-text-primary/[0.04] px-3 py-1 text-xs uppercase tracking-wider text-text-muted">
-          <UploadIcon size={12} />
+          <UploadIcon size={CRATE_ICON_SIZE.micro} />
           {t("upload.badge")}
         </div>
         <h1 className="text-3xl font-bold text-text-primary">
@@ -181,12 +181,12 @@ export function Upload() {
         </p>
       </div>
 
-      <div className="rounded-[12px] border border-border-quiet bg-text-primary/[0.04] p-6">
+      <div className="rounded-panel border border-border-quiet bg-text-primary/[0.04] p-6">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div className="space-y-4">
             <label className="flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-text-primary/15 bg-text-primary/[0.03] px-6 py-10 text-center transition-colors hover:border-accent-action/40 hover:bg-text-primary/[0.05]">
               <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-accent-action/15 text-accent-action">
-                <UploadIcon size={24} />
+                <UploadIcon size={CRATE_ICON_SIZE.xl} />
               </div>
               <div className="text-base font-semibold text-text-primary">
                 {t("upload.dropzone.title")}
@@ -233,12 +233,12 @@ export function Upload() {
                     >
                       {file.name.toLowerCase().endsWith(".zip") ? (
                         <Archive
-                          size={14}
+                          size={CRATE_ICON_SIZE.xs}
                           className="shrink-0 text-accent-action"
                         />
                       ) : (
                         <Music
-                          size={14}
+                          size={CRATE_ICON_SIZE.xs}
                           className="shrink-0 text-accent-action"
                         />
                       )}
@@ -287,7 +287,7 @@ export function Upload() {
             {lastUpload ? (
               <div className="border-l-2 border-state-success/40 bg-state-success/10 px-4 py-3 text-sm text-state-success-text">
                 <div className="flex items-center gap-2 font-medium">
-                  <CheckCircle2 size={15} />
+                  <CheckCircle2 size={CRATE_ICON_SIZE.sm} />
                   {t("upload.status.queued")}
                 </div>
                 <div className="mt-1 text-xs text-state-success-text/80">

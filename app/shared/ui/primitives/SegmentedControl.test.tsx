@@ -91,11 +91,21 @@ describe("SegmentedControl", () => {
   it("applies variants and sizes", () => {
     render(<Harness variant="tonal" size="sm" />);
     const selected = screen.getByRole("tab", { name: "Albums" });
-    expect(selected).toHaveClass(
-      "bg-accent-action/12",
-      "h-7",
-      "focus-visible:shadow-focus",
-    );
+    expect(selected).toHaveClass("bg-accent-action/12", "h-7");
+  });
+
+  it("draws an offset 2px focus ring that stays visible on the selected pill", () => {
+    render(<Harness />);
+    for (const tab of screen.getAllByRole("tab")) {
+      expect(tab).toHaveClass(
+        "outline-none",
+        "focus-visible:outline-solid",
+        "focus-visible:outline-2",
+        "focus-visible:outline-offset-2",
+        "focus-visible:outline-focus-ring",
+      );
+      expect(tab).not.toHaveClass("focus-visible:shadow-focus");
+    }
   });
 
   it("extends the hit area to 44px on coarse pointers without changing visual size", () => {

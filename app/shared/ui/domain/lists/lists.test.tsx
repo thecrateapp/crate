@@ -97,6 +97,20 @@ describe("lists", () => {
       expect(rail).not.toHaveClass("flex");
     });
 
+    it("snaps cards flush with the section header start", () => {
+      const { getByTestId } = render(
+        <MediaRail fit="columns">
+          <div>Item</div>
+        </MediaRail>,
+      );
+
+      const rail = getByTestId("media-rail");
+      expect(rail).toHaveClass("snap-x", "snap-mandatory");
+      expect(rail.className).not.toMatch(
+        /(^|\s)(scroll-px|scroll-pl|px|pl|-mx|-ml)-/,
+      );
+    });
+
     it("exposes a labelled region when labelledBy is set", () => {
       const { getByRole } = render(
         <>

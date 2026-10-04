@@ -173,7 +173,7 @@ function BandcampConnectInstructions({
         <div className="space-y-3">
           <div className="flex items-start gap-3 text-xs leading-5 text-state-warning/80">
             <Smartphone
-              size={16}
+              size={CRATE_ICON_SIZE.sm}
               className="mt-0.5 shrink-0 text-state-warning"
             />
             <p>{t("settings.bandcamp.desktopConnectorDescription")}</p>
@@ -196,7 +196,10 @@ function BandcampConnectInstructions({
 
       <div className="space-y-3">
         <div className="flex items-start gap-3 text-xs leading-5 text-state-warning/80">
-          <Lock size={16} className="mt-0.5 shrink-0 text-state-warning" />
+          <Lock
+            size={CRATE_ICON_SIZE.sm}
+            className="mt-0.5 shrink-0 text-state-warning"
+          />
           <p>
             {t("settings.bandcamp.cookieInstructionsPrefix")}{" "}
             <span className="font-mono text-state-warning">identity</span>{" "}

@@ -799,7 +799,7 @@ describe("Album page", () => {
 
     const actionRow = screen.getByTestId("album-action-row");
     expect(actionRow.parentElement).toHaveClass("sm:px-6");
-    expect(actionRow.firstElementChild).toHaveClass("max-w-[1480px]");
+    expect(actionRow.firstElementChild).toHaveClass("max-w-content");
   });
 
   it("anchors mobile album metadata above the measured primary action buttons", async () => {

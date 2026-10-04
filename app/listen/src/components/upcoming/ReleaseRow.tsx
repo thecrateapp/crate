@@ -62,8 +62,8 @@ export const ReleaseRow = memo(function ReleaseRow({
       title={item.title}
       subtitle={[item.artist, item.subtitle].filter(Boolean).join(" · ")}
       meta={
-        <span className="inline-flex items-center gap-1.5 font-medium uppercase tracking-[0.16em] text-accent-action">
-          <Disc3 size={11} />
+        <span className="inline-flex items-center gap-1.5 font-medium uppercase tracking-kicker text-accent-action">
+          <Disc3 size={CRATE_ICON_SIZE.micro} />
           {model.badgeLabel}
         </span>
       }
@@ -74,7 +74,7 @@ export const ReleaseRow = memo(function ReleaseRow({
         <>
           {model.dateLabel ? (
             <span className="hidden items-center gap-2 rounded-lg border border-border-quiet bg-text-primary/[0.06] px-3 py-2 text-sm font-semibold text-accent-action sm:inline-flex">
-              <Calendar size={14} />
+              <Calendar size={CRATE_ICON_SIZE.xs} />
               {model.dateLabel}
             </span>
           ) : null}
@@ -90,7 +90,7 @@ export const ReleaseRow = memo(function ReleaseRow({
       actionMenu={actionMenu}
       menuLabel={t("actions.menu.more")}
       classNames={{ title: "text-base font-extrabold" }}
-      className="upcoming-event-row-atmosphere rounded-[12px] border border-accent-action/10 p-4 hover:border-accent-action/25"
+      className="upcoming-event-row-atmosphere rounded-panel border border-accent-action/10 p-4 hover:border-accent-action/25"
     />
   );
 });

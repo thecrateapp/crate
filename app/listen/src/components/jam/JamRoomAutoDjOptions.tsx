@@ -1,4 +1,4 @@
-import { Search } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Search } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
@@ -49,7 +49,10 @@ export function AutoDjOptions({
                 })}
               />
             ))}
-            <Search size={16} className="ml-1 shrink-0 text-text-muted" />
+            <Search
+              size={CRATE_ICON_SIZE.sm}
+              className="ml-1 shrink-0 text-text-muted"
+            />
             <input
               role="combobox"
               aria-label={t("jam.lobby.genreFiltersPlaceholder")}

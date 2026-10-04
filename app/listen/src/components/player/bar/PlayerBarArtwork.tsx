@@ -6,7 +6,7 @@ import type {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import { HeartBold } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, HeartBold } from "@crate/ui/icons";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import type { CrossfadeTransition } from "@/contexts/player-context";
@@ -124,7 +124,10 @@ function PlayerBarLikedIndicator({ liked }: { liked: boolean }) {
       aria-label={t("player.likedTrack")}
       className="listen-player-liked-indicator absolute -bottom-1 -right-1 flex size-4 items-center justify-center rounded-full backdrop-blur-md"
     >
-      <HeartBold size={10} className="animate-crate-icon-active-pulse" />
+      <HeartBold
+        size={CRATE_ICON_SIZE.micro}
+        className="animate-crate-icon-active-pulse"
+      />
     </span>
   );
 }

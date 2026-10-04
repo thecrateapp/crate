@@ -27,7 +27,10 @@ export function PlayerSurfaceFallback({
   }
   return (
     <div className="listen-player-fullscreen-scrim fixed inset-0 z-fullscreen-player flex items-center justify-center backdrop-blur-xl">
-      <Loader2 size={24} className="animate-spin text-accent-action" />
+      <Loader2
+        size={CRATE_ICON_SIZE.xl}
+        className="animate-spin text-accent-action"
+      />
     </div>
   );
 }

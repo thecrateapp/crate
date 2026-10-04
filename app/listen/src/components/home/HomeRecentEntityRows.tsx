@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Disc3, Sparkles, UserRound } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Disc3, Sparkles, UserRound } from "@crate/ui/icons";
 import { EntityRow, type EntityMenuRenderer } from "@crate/ui/domain/entity";
 
 import {
@@ -92,9 +92,15 @@ function RecentEntityArtwork({ item }: { item: HomeRecentItem }) {
       ) : (
         <div className="home-discovery-artwork flex size-full items-center justify-center">
           {item.type === "artist" ? (
-            <UserRound size={18} className="home-discovery-placeholder-icon" />
+            <UserRound
+              size={CRATE_ICON_SIZE.md}
+              className="home-discovery-placeholder-icon"
+            />
           ) : (
-            <Disc3 size={18} className="home-discovery-placeholder-icon" />
+            <Disc3
+              size={CRATE_ICON_SIZE.md}
+              className="home-discovery-placeholder-icon"
+            />
           )}
         </div>
       )}

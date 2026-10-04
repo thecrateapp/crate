@@ -1,4 +1,5 @@
 import {
+  CRATE_ICON_SIZE,
   Globe2,
   ListMusic,
   Loader2,
@@ -76,7 +77,7 @@ function JamRoomMetaBadges({ t, room, queueMode }: JamRoomMetaBadgesProps) {
     <div className="mt-1 flex flex-wrap items-center gap-2.5">
       <h1 className="text-3xl font-bold text-text-primary">{room.name}</h1>
       <div className="jam-accent-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium">
-        <Zap size={12} />
+        <Zap size={CRATE_ICON_SIZE.micro} />
         {queueMode === "auto_dj"
           ? t("jam.room.autoDjMode")
           : queueMode === "auto"
@@ -85,9 +86,9 @@ function JamRoomMetaBadges({ t, room, queueMode }: JamRoomMetaBadgesProps) {
       </div>
       <div className="jam-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-text-muted">
         {room.visibility === "public" ? (
-          <Globe2 size={12} />
+          <Globe2 size={CRATE_ICON_SIZE.micro} />
         ) : (
-          <Lock size={12} />
+          <Lock size={CRATE_ICON_SIZE.micro} />
         )}
         {room.visibility === "public"
           ? t("jam.room.publicRoom")
@@ -95,7 +96,7 @@ function JamRoomMetaBadges({ t, room, queueMode }: JamRoomMetaBadgesProps) {
       </div>
       {room.is_permanent ? (
         <div className="jam-accent-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium">
-          <Pin size={12} />
+          <Pin size={CRATE_ICON_SIZE.micro} />
           {t("jam.roomCard.permanent")}
         </div>
       ) : null}
@@ -111,15 +112,15 @@ function JamRoomConnectionBadges(props: JamRoomConnectionBadgesProps) {
     <div className="mt-3 flex flex-wrap items-center gap-2">
       {isConnected ? (
         <div className="jam-success-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium">
-          <Radio size={12} className="jam-success-text" />
+          <Radio size={CRATE_ICON_SIZE.micro} className="jam-success-text" />
           {t("jam.room.connected")}
         </div>
       ) : (
         <div className="jam-warning-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium">
           {connectionProblem && !connectionProblem.includes("Retrying") ? (
-            <Radio size={12} />
+            <Radio size={CRATE_ICON_SIZE.micro} />
           ) : (
-            <Loader2 size={12} className="animate-spin" />
+            <Loader2 size={CRATE_ICON_SIZE.micro} className="animate-spin" />
           )}
           {connectionProblem || t("jam.room.connecting")}
         </div>
@@ -196,14 +197,14 @@ function JamRoomHeaderActions(props: JamRoomHeaderActionsProps) {
         }
         className="jam-accent-chip"
       >
-        <Plus size={17} />
+        <Plus size={CRATE_ICON_SIZE.md} />
       </HeroPrimaryButton>
       <HeroPrimaryButton
         label={t("jam.room.actions.playRoomQueue")}
         onClick={handlePlayRoomQueue}
         disabled={queueItems.length === 0 || !isHost || !isConnected}
       >
-        <ListMusic size={17} />
+        <ListMusic size={CRATE_ICON_SIZE.md} />
       </HeroPrimaryButton>
       {isHost ? (
         <HeroActionButton
@@ -212,7 +213,7 @@ function JamRoomHeaderActions(props: JamRoomHeaderActionsProps) {
           onClick={() => setRoomActionsOpen((open) => !open)}
           className={roomActionsOpen ? "jam-accent-chip" : ""}
         >
-          <MoreHorizontal size={18} />
+          <MoreHorizontal size={CRATE_ICON_SIZE.md} />
         </HeroActionButton>
       ) : null}
     </div>

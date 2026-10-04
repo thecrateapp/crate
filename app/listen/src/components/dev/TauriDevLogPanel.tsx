@@ -31,7 +31,7 @@ export function TauriDevLogPanel() {
   if (!isTauriRuntime || !import.meta.env.DEV) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 z-[9999] max-w-[calc(100vw-2rem)] font-mono text-xs text-text-primary">
+    <div className="fixed bottom-4 left-4 z-app-debug-overlay max-w-[calc(100vw-2rem)] font-mono text-xs text-text-primary">
       {open ? (
         <div className="w-[min(46rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-accent-action/25 bg-surface-canvas/95">
           <div className="flex items-center justify-between border-b border-border-quiet px-3 py-2">
@@ -39,7 +39,7 @@ export function TauriDevLogPanel() {
               <div className="font-sans text-sm font-semibold text-text-primary">
                 Tauri playback logs
               </div>
-              <div className="text-[0.65rem] uppercase tracking-[0.18em] text-text-accent/80">
+              <div className="text-[0.65rem] uppercase tracking-eyebrow text-text-accent/80">
                 {logs.length} events
               </div>
             </div>

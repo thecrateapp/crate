@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { PageHeader } from "@crate/ui/domain/navigation";
 import { EmptyState, LoadingState } from "@crate/ui/domain/states";
-import { Calendar, Sparkles } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Calendar, Sparkles } from "@crate/ui/icons";
 import { SearchInput } from "@crate/ui/primitives/SearchInput";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 
@@ -95,7 +95,7 @@ function SummaryPill({
         accentClass,
       )}
     >
-      <div className="text-xs uppercase tracking-[0.16em] opacity-70">
+      <div className="text-xs uppercase tracking-kicker opacity-70">
         {label}
       </div>
       <div className="mt-1 text-sm font-semibold">{value}</div>
@@ -109,8 +109,8 @@ function ShowsFeatured({ page }: ShowsSectionProps) {
   return (
     <section className="space-y-4">
       <div className="flex items-center gap-2">
-        <Calendar size={15} className="text-accent-action" />
-        <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-accent-action">
+        <Calendar size={CRATE_ICON_SIZE.sm} className="text-accent-action" />
+        <h2 className="text-sm font-semibold uppercase tracking-eyebrow text-accent-action">
           {page.t("radar.sections.nextShow")}
         </h2>
       </div>
@@ -123,7 +123,7 @@ const SHOW_FILTERS: ShowsFilter[] = ["all", "shows", "releases"];
 
 function ShowsFilters({ page }: ShowsSectionProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-[12px] border border-text-primary/5 bg-text-primary/[0.02] p-4 md:flex-row md:items-center md:justify-between">
+    <div className="flex flex-col gap-3 rounded-panel border border-text-primary/5 bg-text-primary/[0.02] p-4 md:flex-row md:items-center md:justify-between">
       <SegmentedControl
         as="radio"
         variant="tonal"
@@ -222,13 +222,17 @@ function ShowsResults({ page }: ShowsSectionProps) {
   return (
     <div className="space-y-10">
       <ShowsMonthSection
-        icon={<Sparkles size={15} className="text-accent-action" />}
+        icon={
+          <Sparkles size={CRATE_ICON_SIZE.sm} className="text-accent-action" />
+        }
         items={page.comingUp}
         monthTitle={page.t("radar.sections.comingUp")}
         page={page}
       />
       <ShowsMonthSection
-        icon={<Calendar size={15} className="text-text-muted" />}
+        icon={
+          <Calendar size={CRATE_ICON_SIZE.sm} className="text-text-muted" />
+        }
         items={page.recentlyReleased}
         muted
         monthTitle={page.t("radar.sections.recentlyReleased")}
@@ -258,7 +262,7 @@ function ShowsMonthSection({
         {icon}
         <h2
           className={cn(
-            "text-sm font-semibold uppercase tracking-[0.18em]",
+            "text-sm font-semibold uppercase tracking-eyebrow",
             muted ? "text-text-muted" : "text-accent-action",
           )}
         >

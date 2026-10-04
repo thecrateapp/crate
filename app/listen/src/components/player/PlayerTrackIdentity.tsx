@@ -50,7 +50,7 @@ export function PlayerTrackIdentity({
       {sourceLabel ? (
         <p
           className={cn(
-            "mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-text-subtle",
+            "mb-2 text-xs font-semibold uppercase tracking-eyebrow text-text-subtle",
             sourceClassName,
           )}
         >

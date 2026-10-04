@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowRight, Tag } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, ArrowRight, Tag } from "@crate/ui/icons";
 
 import type { ContextMenuHeader } from "@crate/ui/domain/actions";
 import { useEntityMenu } from "@crate/ui/domain/entity/useEntityMenu";
@@ -99,7 +99,7 @@ export const GenreTile = memo(function GenreTile({
       className={cn(
         "item-action-target group relative isolate overflow-hidden text-left",
         room
-          ? "explore-genre-card min-h-36 rounded-[12px]"
+          ? "explore-genre-card min-h-36 rounded-panel"
           : "explore-related-genre-card min-h-[132px] rounded-lg transition-[border-color,filter,transform] hover:-translate-y-px",
       )}
       data-variant={variant}
@@ -142,7 +142,7 @@ export const GenreTile = memo(function GenreTile({
         className={cn(
           "flex size-full flex-col justify-between text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-action/60",
           room
-            ? "min-h-36 gap-5 rounded-[12px] p-4"
+            ? "min-h-36 gap-5 rounded-panel p-4"
             : "min-h-[132px] gap-4 rounded-lg p-3",
         )}
       >
@@ -151,8 +151,8 @@ export const GenreTile = memo(function GenreTile({
             className={cn(
               "block text-xs uppercase",
               room
-                ? "font-bold tracking-[0.18em] text-accent-action/90"
-                : "font-semibold tracking-[0.16em] text-accent-action/85",
+                ? "font-bold tracking-eyebrow text-accent-action/90"
+                : "font-semibold tracking-kicker text-accent-action/85",
             )}
           >
             {kicker}
@@ -165,7 +165,7 @@ export const GenreTile = memo(function GenreTile({
         </span>
         {room ? (
           <span className="block">
-            <span className="block text-lg font-black leading-none tracking-[-0.04em] text-text-primary">
+            <span className="block text-lg font-black leading-none tracking-display text-text-primary">
               {name}
             </span>
             {detail ? (
@@ -178,7 +178,7 @@ export const GenreTile = memo(function GenreTile({
           <span className="flex items-center justify-between gap-2">
             <span className="truncate text-xs text-text-muted">{detail}</span>
             <ArrowRight
-              size={14}
+              size={CRATE_ICON_SIZE.xs}
               className="shrink-0 text-text-primary/35 transition group-hover:translate-x-0.5 group-hover:text-accent-action"
             />
           </span>

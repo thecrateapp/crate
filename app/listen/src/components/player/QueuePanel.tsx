@@ -70,7 +70,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
               <div className=" size-10 shrink-0 rounded bg-surface-control-hover" />
             )}
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[0.8125rem] font-medium text-accent-action">
+              <p className="truncate text-caption font-medium text-accent-action">
                 {currentTrack.title}
               </p>
               <p className="truncate text-xs text-text-muted">

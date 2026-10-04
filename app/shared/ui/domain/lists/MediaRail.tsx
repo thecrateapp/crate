@@ -32,7 +32,7 @@ export function MediaRail({
       data-testid="media-rail"
       data-rail-fit={fit}
       className={cn(
-        "hide-rail-scrollbar snap-x snap-mandatory scroll-px-4 gap-[var(--content-rail-gap)] overflow-x-auto overflow-y-hidden pb-2 transform-gpu will-change-scroll [&>*]:shrink-0",
+        "hide-rail-scrollbar snap-x snap-mandatory gap-[var(--content-rail-gap)] overflow-x-auto overflow-y-hidden pb-2 transform-gpu will-change-scroll [&>*]:shrink-0",
         fit === "columns" ? COLUMNS_CLASS_NAME : "flex",
         className,
       )}

@@ -1,4 +1,4 @@
-import { Loader2 } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
 import { SearchInput } from "@crate/ui/primitives/SearchInput";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
@@ -24,7 +24,7 @@ export function JamOpenRoomsPanel({
   const { t } = useTranslation();
 
   return (
-    <section className="jam-panel rounded-[12px] p-5 sm:p-6">
+    <section className="jam-panel rounded-panel p-5 sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-text-primary">
@@ -35,7 +35,10 @@ export function JamOpenRoomsPanel({
           </p>
         </div>
         {roomsLoading ? (
-          <Loader2 size={18} className="animate-spin text-accent-action" />
+          <Loader2
+            size={CRATE_ICON_SIZE.md}
+            className="animate-spin text-accent-action"
+          />
         ) : null}
       </div>
 

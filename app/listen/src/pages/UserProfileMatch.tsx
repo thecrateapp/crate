@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-import { Users } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Users } from "@crate/ui/icons";
 
 import type { PublicProfile } from "./user-profile-model";
 
@@ -13,9 +13,9 @@ export function UserProfileMatch({
 }) {
   const { t } = useTranslation();
   return (
-    <section className="user-profile-card rounded-[12px] p-5 sm:p-6">
+    <section className="user-profile-card rounded-panel p-5 sm:p-6">
       <div className="flex items-center gap-2">
-        <Users size={16} className="user-profile-accent-icon" />
+        <Users size={CRATE_ICON_SIZE.sm} className="user-profile-accent-icon" />
         <h2 className="text-lg font-semibold text-text-primary">
           {t("userProfile.match.title")}
         </h2>

@@ -262,7 +262,7 @@ export function HomePlaylist() {
         menuItems={playlistMenuItems}
       />
 
-      <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 pb-8 sm:px-6">
+      <div className="mx-auto w-full max-w-content space-y-6 px-4 pb-8 sm:px-6">
         <PlaylistTrackFilterBar
           query={filterQuery}
           onQueryChange={setFilterQuery}

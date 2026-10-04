@@ -358,7 +358,7 @@ export function ThemeSkinSection() {
           data-testid="appearance-preview"
           className="rounded-xl border border-border-quiet/20 bg-surface-container p-4"
         >
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent-action">
+          <p className="text-micro font-bold uppercase tracking-eyebrow text-accent-action">
             {t("settings.appearance.previewLabel")}
           </p>
           <p className="mt-2 text-base font-semibold text-text-primary">

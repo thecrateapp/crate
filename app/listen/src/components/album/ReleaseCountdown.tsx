@@ -78,14 +78,14 @@ export function ReleaseCountdown({ releaseDate }: { releaseDate: string }) {
       aria-label={t("album.releaseCountdown.ariaLabel", {
         date: formattedDate,
       })}
-      className="release-countdown-surface relative mt-5 w-full max-w-[34rem] overflow-hidden rounded-[12px] border border-text-primary/20 px-4 pb-4 pt-3 shadow-card backdrop-blur-2xl backdrop-saturate-150 sm:mt-4 sm:border-border-quiet sm:px-5 sm:backdrop-blur-none sm:backdrop-saturate-100"
+      className="release-countdown-surface relative mt-5 w-full max-w-[34rem] overflow-hidden rounded-panel border border-text-primary/20 px-4 pb-4 pt-3 shadow-card backdrop-blur-2xl backdrop-saturate-150 sm:mt-4 sm:border-border-quiet sm:px-5 sm:backdrop-blur-none sm:backdrop-saturate-100"
     >
       <div
         data-testid="release-countdown-glass-sheen"
         aria-hidden="true"
         className="release-countdown-sheen pointer-events-none absolute inset-0 sm:hidden"
       />
-      <div className="relative flex items-baseline justify-between gap-3 font-mono text-xs font-medium uppercase tracking-[0.16em] text-accent-action">
+      <div className="relative flex items-baseline justify-between gap-3 font-mono text-xs font-medium uppercase tracking-kicker text-accent-action">
         <span>{t("album.releaseCountdown.title")}</span>
         <time dateTime={releaseDate} className="shrink-0 text-text-primary/55">
           {formattedDate}

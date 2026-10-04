@@ -1158,16 +1158,7 @@ export function buildInstagramStorySubtitle(
   payload: SharePayload,
   labels?: ShareCardLabels,
 ): string {
-  if (labels?.subtitle) return labels.subtitle;
-  const subtitle = payload.subtitle?.trim();
-  if (!subtitle) {
-    if (payload.kind === "artist") return "Artist";
-    return "From Crate";
-  }
-  if (payload.kind === "track") return `Track by ${subtitle}`;
-  if (payload.kind === "album") return `Album by ${subtitle}`;
-  if (payload.kind === "playlist") return `Playlist by ${subtitle}`;
-  return subtitle;
+  return labels?.subtitle || payload.subtitle?.trim() || "Crate";
 }
 
 function getStoryInitials(value: string): string {

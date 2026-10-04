@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Users } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Users } from "@crate/ui/icons";
 import { EmptyState } from "@crate/ui/domain/states";
 import { Link } from "react-router";
 
@@ -28,7 +28,7 @@ export function StatsRecapSection({
           <NarrativeTile key={item.title} index={index} {...item} />
         ))
       ) : (
-        <div className="stats-card-empty rounded-[12px] border border-dashed p-6 text-sm lg:col-span-3">
+        <div className="stats-card-empty rounded-panel border border-dashed p-6 text-sm lg:col-span-3">
           {t("stats.empty.recap")}
         </div>
       )}
@@ -61,7 +61,7 @@ export function ScopeLink({
     <Link
       to={to}
       className={cn(
-        "rounded-full border px-3 py-1.5 text-xs font-black uppercase tracking-[0.16em] transition-colors",
+        "rounded-full border px-3 py-1.5 text-xs font-black uppercase tracking-kicker transition-colors",
         active
           ? "border-accent-action/30 bg-accent-action/15 text-accent-action"
           : "stats-scope-link-inactive",
@@ -86,17 +86,17 @@ export function AffinityCard({
   const bandKey = "stats.affinity.band." + affinity.affinity_band;
   const bandFallback = affinity.affinity_band.replace("_", " ");
   return (
-    <section className="stats-affinity-card mt-8 overflow-hidden rounded-[12px] p-5 sm:p-6">
+    <section className="stats-affinity-card mt-8 overflow-hidden rounded-panel p-5 sm:p-6">
       <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
         <div className="flex items-start gap-4">
           <div className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-accent-action/25 bg-accent-action/15 text-accent-action">
-            <Users size={20} />
+            <Users size={CRATE_ICON_SIZE.lg} />
           </div>
           <div>
-            <div className="text-xs font-black uppercase tracking-[0.22em] text-accent-action">
+            <div className="text-xs font-black uppercase tracking-overline text-accent-action">
               {t("stats.affinity.title")}
             </div>
-            <h2 className="mt-2 text-3xl font-black uppercase leading-none tracking-[-0.06em] text-text-primary">
+            <h2 className="mt-2 text-3xl font-black uppercase leading-none tracking-display-tight text-text-primary">
               {t("stats.affinity.score", {
                 score: affinity.affinity_score,
               })}
@@ -108,7 +108,7 @@ export function AffinityCard({
             </p>
           </div>
         </div>
-        <div className="stats-muted-pill rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.18em]">
+        <div className="stats-muted-pill rounded-full px-4 py-2 text-xs font-black uppercase tracking-eyebrow">
           {t(bandKey, { defaultValue: bandFallback })}
         </div>
       </div>
@@ -142,16 +142,16 @@ function NarrativeTile({
   return (
     <div
       className={cn(
-        "stats-narrative-tile rounded-[12px] p-5",
+        "stats-narrative-tile rounded-panel p-5",
         NARRATIVE_TONES[index % NARRATIVE_TONES.length],
       )}
     >
-      <div className="stats-muted-label text-xs font-black uppercase tracking-[0.22em]">
+      <div className="stats-muted-label text-xs font-black uppercase tracking-overline">
         {t("stats.narrative.signal", {
           number: String(index + 1).padStart(2, "0"),
         })}
       </div>
-      <div className="mt-3 text-xl font-black tracking-[-0.05em] text-text-primary">
+      <div className="mt-3 text-xl font-black tracking-tighter text-text-primary">
         {title}
       </div>
       <p className="mt-2 text-sm leading-6 text-text-muted">{body}</p>

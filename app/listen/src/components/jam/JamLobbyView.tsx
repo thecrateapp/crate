@@ -56,7 +56,7 @@ export function JamLobbyView({
     <>
       <div className="space-y-6">
         <PageHeader
-          className="jam-lobby-header rounded-[12px] p-5 sm:p-6"
+          className="jam-lobby-header rounded-panel p-5 sm:p-6"
           title={t("jam.lobby.title")}
           subtitle={t("jam.lobby.subtitle")}
         />

@@ -103,7 +103,7 @@ export const BandcampItem = memo(function BandcampItem({
       className={cn(
         "item-action-target group relative border border-text-primary/8 bg-surface-canvas/18",
         tile
-          ? "overflow-hidden rounded-[12px]"
+          ? "overflow-hidden rounded-panel"
           : "flex items-center gap-3 rounded-xl p-3",
       )}
       data-variant={variant}

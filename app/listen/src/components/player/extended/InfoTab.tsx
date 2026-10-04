@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2 } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
 
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { useTrackInfo } from "@/hooks/use-track-info";
@@ -95,7 +95,10 @@ export function InfoTab({ className }: { className?: string }) {
           className,
         )}
       >
-        <Loader2 size={20} className="animate-spin text-accent-action" />
+        <Loader2
+          size={CRATE_ICON_SIZE.lg}
+          className="animate-spin text-accent-action"
+        />
       </div>
     );
   }

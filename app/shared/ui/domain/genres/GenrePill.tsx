@@ -1,5 +1,5 @@
 import { cn } from "@crate/ui/lib/cn";
-import { X } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, X } from "@crate/ui/icons";
 
 export interface GenreProfileItem {
   name: string;
@@ -72,7 +72,7 @@ export function GenrePill({
           onClick={onRemove}
           className="shrink-0 rounded-full p-0.5 text-[var(--active-text)]/70 transition-colors hover:bg-[var(--pill-active-bg)] hover:text-[var(--active-text)]"
         >
-          <X size={12} />
+          <X size={CRATE_ICON_SIZE.micro} />
         </button>
       </span>
     );

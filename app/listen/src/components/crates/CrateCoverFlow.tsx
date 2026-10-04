@@ -45,7 +45,7 @@ function RankOverlay({ number }: { number: number }) {
   return (
     <span
       data-testid="crate-rank-badge"
-      className="pointer-events-none absolute bottom-3 right-3 rounded-lg bg-black/60 px-2.5 py-1 text-3xl font-black leading-none tabular-nums tracking-tight text-white shadow-lg backdrop-blur-sm sm:bottom-4 sm:right-4 sm:text-4xl"
+      className="pointer-events-none absolute bottom-3 right-3 rounded-lg bg-artwork-scrim/60 px-2.5 py-1 text-3xl font-black leading-none tabular-nums tracking-tight text-artwork-foreground shadow-lg backdrop-blur-sm sm:bottom-4 sm:right-4 sm:text-4xl"
     >
       <span className="sr-only">{t("stats.rank", { rank: number })}</span>
       {String(number).padStart(2, "0")}

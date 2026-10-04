@@ -18,7 +18,7 @@ export const HERO_PRIMARY_ACTIONS_GROUP_CLASS =
   "grid grid-cols-2 gap-3 md:flex md:shrink-0 md:items-center md:gap-3";
 
 export const HERO_PRIMARY_ACTION_CLASS =
-  "flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-accent-action px-5 text-sm font-semibold text-accent-action-foreground shadow-action-solid outline-none transition-[background-color,box-shadow] hover:bg-accent-action/90 hover:shadow-action-solid-hover focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-45 md:px-7 md:text-[0.9375rem]";
+  "flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-accent-action px-5 text-sm font-semibold text-accent-action-foreground shadow-action-solid outline-none transition-[background-color,box-shadow] hover:bg-accent-action/90 hover:shadow-action-solid-hover focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-45 md:px-7 md:text-body";
 
 export const HERO_NEUTRAL_ACTION_CLASS =
   "flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-text-primary/[0.08] px-5 text-sm font-semibold text-text-primary shadow-control-inset outline-none transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-accent-action hover:drop-shadow-accent-action focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-45 md:w-auto md:px-7";
@@ -200,7 +200,7 @@ export function HeroActionBar({
   return (
     <div
       className={cn(
-        "mx-auto flex w-full max-w-[1480px] flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-6",
+        "mx-auto flex w-full max-w-content flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-6",
         className,
       )}
       data-testid="hero-action-bar"

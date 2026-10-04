@@ -32,7 +32,7 @@ export function PlayerVolumeSlider({
   return (
     <AppPopover
       ref={volumeRef}
-      className="fixed z-[1600] w-10 rounded-[12px] px-0 py-3"
+      className="fixed z-app-player-popover w-10 rounded-panel px-0 py-3"
       style={{
         left: popoverPosition.left,
         bottom: popoverPosition.bottom,

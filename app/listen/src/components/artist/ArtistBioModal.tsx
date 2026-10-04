@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
@@ -26,6 +26,28 @@ export function ArtistBioModal({
   onClose,
 }: ArtistBioModalProps) {
   const { t } = useTranslation();
+  const bioLabels = useMemo(
+    () => ({
+      biography: t("artist.bio.biography"),
+      more: t("common.more"),
+      less: t("artist.bio.less"),
+      currentMembers: t("artist.bio.currentMembers"),
+      formerMembers: t("artist.bio.formerMembers"),
+      member: t("artist.bio.member"),
+      role: t("artist.bio.role"),
+      since: t("artist.bio.memberSince"),
+      from: t("artist.bio.memberFrom"),
+      to: t("artist.bio.memberTo"),
+      unknown: t("common.unknown"),
+      listeners: t("artist.bio.listeners"),
+      scrobbles: t("artist.bio.scrobbles"),
+      followers: t("artist.bio.followers"),
+      popularity: t("artist.bio.popularity"),
+      albums: t("artist.bio.albums"),
+      tracks: t("artist.bio.tracks"),
+    }),
+    [t],
+  );
   const navigate = useNavigate();
   const bio = artistInfo?.bio ?? "";
   const [bioExpanded, setBioExpanded] = useState(true);
@@ -64,6 +86,7 @@ export function ArtistBioModal({
       mobileSafeArea
     >
       <ArtistBioProfile
+        labels={bioLabels}
         artistName={artist.name}
         photoUrl={photoUrl}
         photoContent={

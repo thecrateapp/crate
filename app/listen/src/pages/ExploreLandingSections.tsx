@@ -59,7 +59,7 @@ export function ExploreFeatureCard({
     <button
       type="button"
       onClick={onClick}
-      className="explore-feature-card group relative min-h-36 overflow-hidden rounded-[12px] p-5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/60"
+      className="explore-feature-card group relative min-h-36 overflow-hidden rounded-panel p-5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/60"
     >
       <div className="explore-feature-card-aura absolute inset-0 opacity-80 transition group-hover:opacity-100" />
       <div className="relative flex h-full flex-col justify-between gap-8">

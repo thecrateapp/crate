@@ -104,7 +104,7 @@ export function PlaylistContent({
         menuItems={page.playlistMenuItems}
       />
 
-      <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 pb-8 sm:px-6">
+      <div className="mx-auto w-full max-w-content space-y-6 px-4 pb-8 sm:px-6">
         {page.offlineStatusDetail ? (
           <p className="text-xs text-text-muted">{page.offlineStatusDetail}</p>
         ) : null}

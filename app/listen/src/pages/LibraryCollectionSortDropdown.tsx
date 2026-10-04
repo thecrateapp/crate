@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronDown } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Check, ChevronDown } from "@crate/ui/icons";
 
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 
@@ -50,7 +50,7 @@ export function CollectionSortDropdown<T extends string>({
       >
         <span className="truncate">{selectedLabel}</span>
         <ChevronDown
-          size={16}
+          size={CRATE_ICON_SIZE.sm}
           className={[
             "shrink-0 text-text-primary/55 transition-transform",
             open ? "rotate-180 text-accent-action" : "",
@@ -62,7 +62,7 @@ export function CollectionSortDropdown<T extends string>({
         <div
           role="listbox"
           aria-label={label}
-          className="listen-glass-panel absolute right-0 top-full z-app-dropdown mt-2 w-48 overflow-hidden rounded-[12px] border border-border-quiet/10 p-1 shadow-menu animate-pop-in"
+          className="listen-glass-panel absolute right-0 top-full z-app-dropdown mt-2 w-48 overflow-hidden rounded-panel border border-border-quiet/10 p-1 shadow-menu animate-pop-in"
         >
           {options.map((option) => {
             const isSelected = option.value === value;
@@ -84,7 +84,9 @@ export function CollectionSortDropdown<T extends string>({
                 ].join(" ")}
               >
                 <span>{t(option.labelKey)}</span>
-                {isSelected ? <Check size={16} className="shrink-0" /> : null}
+                {isSelected ? (
+                  <Check size={CRATE_ICON_SIZE.sm} className="shrink-0" />
+                ) : null}
               </button>
             );
           })}

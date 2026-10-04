@@ -58,7 +58,7 @@ function affinityTone(band: AffinityBand) {
 }
 
 const PROFILE_BADGE_CLASS_NAME =
-  "gap-0 px-2 text-xs leading-4 font-bold uppercase tracking-[0.12em]";
+  "gap-0 px-2 text-xs leading-4 font-bold uppercase tracking-label";
 
 function mainBadge(card: ProfileCardPayload, t: TFunction) {
   return card.badges[0]?.label || t("profileHover.defaultBadge");
@@ -107,7 +107,7 @@ export function ProfileCardBody({
   const following = card.relationship_state.following;
 
   return (
-    <div className="profile-hover-card relative overflow-hidden rounded-[12px] border p-4">
+    <div className="profile-hover-card relative overflow-hidden rounded-panel border p-4">
       <div className="profile-hover-glow pointer-events-none absolute inset-0" />
       <div className="profile-hover-watermark pointer-events-none absolute -right-8 -top-8 text-[8rem] font-black leading-none">
         {card.affinity_score}
@@ -128,14 +128,14 @@ export function ProfileCardBody({
             {card.relationship_state.is_friend ? (
               <CratePill
                 tone="accent"
-                className="gap-0 px-2 py-0.5 text-xs leading-4 font-bold uppercase tracking-[0.16em]"
+                className="gap-0 px-2 py-0.5 text-xs leading-4 font-bold uppercase tracking-kicker"
               >
                 {t("profileHover.friend")}
               </CratePill>
             ) : null}
           </div>
 
-          <div className="profile-hover-main-badge mt-3 inline-flex rounded-full border px-2.5 py-1 text-xs font-black uppercase tracking-[0.18em]">
+          <div className="profile-hover-main-badge mt-3 inline-flex rounded-full border px-2.5 py-1 text-xs font-black uppercase tracking-eyebrow">
             {mainBadge(card, t)}
           </div>
         </div>
@@ -149,14 +149,14 @@ export function ProfileCardBody({
           >
             {card.affinity_score}
           </div>
-          <div className="profile-hover-score-label text-xs font-bold uppercase tracking-[0.18em]">
+          <div className="profile-hover-score-label text-xs font-bold uppercase tracking-eyebrow">
             {t("profileHover.match")}
           </div>
         </div>
       </div>
 
       <div className="profile-hover-top-panel relative mt-4 border-t border-border-quiet pt-3">
-        <div className="profile-hover-top-label text-xs font-bold uppercase tracking-[0.18em]">
+        <div className="profile-hover-top-label text-xs font-bold uppercase tracking-eyebrow">
           {t("profileHover.topSound")}
         </div>
         <div className="profile-hover-top-genre mt-1 truncate text-sm font-bold">
@@ -244,7 +244,7 @@ function MiniStat({ label, value }: { label: string; value: string }) {
       <div className="profile-hover-stat-value truncate text-sm font-black">
         {value}
       </div>
-      <div className="profile-hover-stat-label mt-0.5 truncate text-xs font-bold uppercase tracking-[0.14em]">
+      <div className="profile-hover-stat-label mt-0.5 truncate text-xs font-bold uppercase tracking-caps">
         {label}
       </div>
     </div>
@@ -257,9 +257,12 @@ export function LoadingCard() {
     <div
       role="status"
       aria-label={t("profileHover.loading")}
-      className="profile-hover-loading flex h-40 w-[360px] items-center justify-center rounded-[12px] border"
+      className="profile-hover-loading flex h-40 w-[360px] items-center justify-center rounded-panel border"
     >
-      <Loader2 size={18} className="profile-hover-loading-icon animate-spin" />
+      <Loader2
+        size={CRATE_ICON_SIZE.md}
+        className="profile-hover-loading-icon animate-spin"
+      />
     </div>
   );
 }
@@ -267,7 +270,7 @@ export function LoadingCard() {
 export function ErrorCard() {
   const { t } = useTranslation();
   return (
-    <div className="profile-hover-error w-[320px] rounded-[12px] border p-4 text-sm">
+    <div className="profile-hover-error w-[320px] rounded-panel border p-4 text-sm">
       {t("profileHover.loadFailed")}
     </div>
   );

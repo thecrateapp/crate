@@ -120,7 +120,7 @@ function JamQueueModeControls(props: JamQueueModeControlsProps) {
                   : t("jam.room.djModeHelp")}
               </span>
             </span>
-            <Zap size={16} />
+            <Zap size={CRATE_ICON_SIZE.sm} />
           </button>
           {queueMode !== "auto_dj" ? (
             <button
@@ -137,7 +137,7 @@ function JamQueueModeControls(props: JamQueueModeControlsProps) {
                   {t("jam.room.autoDjModeHelp")}
                 </span>
               </span>
-              <Zap size={16} />
+              <Zap size={CRATE_ICON_SIZE.sm} />
             </button>
           ) : null}
         </div>
@@ -164,7 +164,7 @@ function JamAutoDjSuggestions({
                 {t("jam.room.autoDjSuggestionsHelp")}
               </p>
             </div>
-            <Zap size={15} className="jam-info-text shrink-0" />
+            <Zap size={CRATE_ICON_SIZE.sm} className="jam-info-text shrink-0" />
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {autoDjSuggestions.slice(0, 4).map((track) => (
@@ -180,7 +180,7 @@ function JamAutoDjSuggestions({
                   />
                 ) : (
                   <div className="jam-artwork-placeholder flex size-9 shrink-0 items-center justify-center rounded-md">
-                    <ListMusic size={14} />
+                    <ListMusic size={CRATE_ICON_SIZE.xs} />
                   </div>
                 )}
                 <div className="min-w-0">
@@ -269,7 +269,7 @@ function JamQueueSearch(props: JamQueueSearchProps) {
                   />
                 ) : (
                   <div className="jam-artwork-placeholder flex size-10 items-center justify-center rounded-lg">
-                    <ListMusic size={15} />
+                    <ListMusic size={CRATE_ICON_SIZE.sm} />
                   </div>
                 )}
                 <div className="min-w-0 flex-1">

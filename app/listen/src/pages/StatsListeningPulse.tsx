@@ -43,10 +43,10 @@ export function ListeningPulseCard({
   const rhythm = story?.rhythm;
 
   return (
-    <div className="stats-card rounded-[12px] p-5">
+    <div className="stats-card rounded-panel p-5">
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-black tracking-[-0.04em] text-text-primary">
+          <h2 className="text-xl font-black tracking-display text-text-primary">
             {t("stats.rhythm.title")}
           </h2>
           <p className="mt-1 text-sm text-text-muted">
@@ -82,7 +82,7 @@ export function ListeningPulseCard({
           <PulseConstellation points={points} />
 
           <div className="stats-dark-card mt-4 rounded-xl p-4">
-            <div className="text-xs font-black uppercase tracking-[0.22em] text-accent-action">
+            <div className="text-xs font-black uppercase tracking-overline text-accent-action">
               {t("stats.rhythm.cadence")}
             </div>
             <p className="mt-2 text-sm leading-6 text-text-muted">
@@ -125,17 +125,17 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
     .join(" ");
 
   return (
-    <div className="stats-pulse-surface mt-5 rounded-[12px] p-4">
+    <div className="stats-pulse-surface mt-5 rounded-panel p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <div className="text-xs font-black uppercase tracking-[0.22em] text-accent-action">
+          <div className="text-xs font-black uppercase tracking-overline text-accent-action">
             {t("stats.rhythm.dailySignalMap")}
           </div>
           <p className="mt-1 text-xs text-text-muted">
             {t("stats.rhythm.dailySignalDescription")}
           </p>
         </div>
-        <div className="stats-muted-pill rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.14em]">
+        <div className="stats-muted-pill rounded-full px-3 py-1 text-xs font-black uppercase tracking-caps">
           {t("stats.rhythm.dayCount", { count: visible.length })}
         </div>
       </div>
@@ -216,7 +216,7 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
 
               <div
                 className={cn(
-                  "stats-pulse-tooltip pointer-events-none absolute bottom-full z-app-popover mb-3 w-64 -translate-x-1/2 rounded-[12px] p-3 text-left opacity-0 backdrop-blur transition group-hover:opacity-100 group-focus-within:opacity-100",
+                  "stats-pulse-tooltip pointer-events-none absolute bottom-full z-app-popover mb-3 w-64 -translate-x-1/2 rounded-panel p-3 text-left opacity-0 backdrop-blur transition group-hover:opacity-100 group-focus-within:opacity-100",
                   index < 2
                     ? "left-0 translate-x-0"
                     : index > coordinates.length - 3
@@ -229,7 +229,7 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
                     <div className="stats-pulse-tooltip-title text-sm font-black">
                       {formatTrendDay(point.day, i18n.language)}
                     </div>
-                    <div className="mt-0.5 text-xs font-black uppercase tracking-[0.18em] text-accent-action">
+                    <div className="mt-0.5 text-xs font-black uppercase tracking-eyebrow text-accent-action">
                       {formatShortWeekday(point.day, i18n.language)}
                     </div>
                   </div>
@@ -281,7 +281,7 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
 function TooltipMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="stats-tooltip-metric rounded-xl px-2.5 py-2">
-      <div className="stats-tooltip-label text-xs font-black uppercase tracking-[0.16em]">
+      <div className="stats-tooltip-label text-xs font-black uppercase tracking-kicker">
         {label}
       </div>
       <div className="stats-tooltip-value mt-1 text-sm font-black">{value}</div>
@@ -293,7 +293,7 @@ function TooltipMeter({ label, value }: { label: string; value: number }) {
   const percent = Math.max(0, Math.min(100, Math.round(value * 100)));
   return (
     <div>
-      <div className="stats-tooltip-meter-label mb-1 flex items-center justify-between text-xs font-bold uppercase tracking-[0.12em]">
+      <div className="stats-tooltip-meter-label mb-1 flex items-center justify-between text-xs font-bold uppercase tracking-label">
         <span>{label}</span>
         <span>{percent}%</span>
       </div>

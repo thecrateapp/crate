@@ -1,4 +1,4 @@
-import { BarChart3 } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, BarChart3 } from "@crate/ui/icons";
 
 import {
   useStatsPageController,
@@ -38,7 +38,7 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
   return (
     <div className="relative -mx-4 -mt-2 overflow-hidden px-4 pb-12 pt-3 sm:-mx-6 sm:px-6">
       <div className="stats-page-atmosphere pointer-events-none absolute inset-0 -z-10" />
-      <div className="stats-page-grid pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] opacity-30" />
+      <div className="stats-page-grid pointer-events-none absolute inset-x-0 top-0 -z-10 h-hero-2xl opacity-30" />
       <StatsHeader page={page} />
       {!dashboardLoading && !hasStats ? (
         <StatsEmptyState t={page.t} />
@@ -70,8 +70,8 @@ function StatsHeader({ page }: { page: StatsPageController }) {
   return (
     <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <div className="stats-hero-badge inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.24em]">
-          <BarChart3 size={12} />
+        <div className="stats-hero-badge inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black uppercase tracking-overline-wide">
+          <BarChart3 size={CRATE_ICON_SIZE.micro} />
           {t("stats.hero.badge")}
         </div>
         <h1 className="stats-hero-title mt-4 max-w-4xl text-[clamp(2.65rem,8vw,7.5rem)] font-black uppercase leading-[0.82] tracking-[-0.085em]">

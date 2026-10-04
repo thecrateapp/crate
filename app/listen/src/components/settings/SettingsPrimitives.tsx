@@ -12,7 +12,7 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="settings-section rounded-[12px] p-5 sm:p-6">
+    <section className="settings-section rounded-panel p-5 sm:p-6">
       <div className="mb-5">
         <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
         {description ? (

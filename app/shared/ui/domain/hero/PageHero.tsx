@@ -36,9 +36,9 @@ export interface PageHeroProps {
 }
 
 const ROOT_CLASS_NAME: Record<PageHeroVariant, string> = {
-  media: "relative h-[420px] overflow-hidden lg:h-[460px]",
-  artist: "relative h-[420px] overflow-hidden sm:h-[400px]",
-  editorial: "relative h-[420px] overflow-hidden sm:h-[400px]",
+  media: "relative h-hero-md overflow-hidden lg:h-hero-xl",
+  artist: "relative h-hero-md overflow-hidden sm:h-hero-sm",
+  editorial: "relative h-hero-md overflow-hidden sm:h-hero-sm",
   card: "relative overflow-hidden rounded-xl p-5 sm:p-6",
 };
 
@@ -73,7 +73,7 @@ const META_CLASS_NAME: Record<PageHeroVariant, string> = {
   artist:
     "mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-muted",
   editorial:
-    "mt-5 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-text-primary/56",
+    "mt-5 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-kicker text-text-primary/56",
   card: "mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-muted",
 };
 
@@ -284,7 +284,7 @@ export function PageHero({
         {background ? <HeroBackground background={background} /> : null}
         <div
           className={cn(
-            "relative mx-auto flex size-full max-w-[1480px] items-end px-4 pb-6 pt-[var(--listen-mobile-page-top,0px)] sm:px-6 sm:pt-0",
+            "relative mx-auto flex size-full max-w-content items-end px-4 pb-6 pt-[var(--listen-mobile-page-top,0px)] sm:px-6 sm:pt-0",
             contentClassName,
           )}
         >

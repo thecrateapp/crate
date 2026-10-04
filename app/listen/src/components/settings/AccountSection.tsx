@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { notify } from "@crate/ui/lib/notify";
 
-import { Shield } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Shield } from "@crate/ui/icons";
 
 import { ConnectDevicesSection } from "@/components/settings/ConnectDevicesSection";
 import {
@@ -182,7 +182,7 @@ export function AccountSection() {
         <ConnectDevicesSection />
         {authConfig.invite_only ? (
           <div className="flex items-start gap-3 rounded-xl border border-accent-action/20 bg-accent-action/10 px-4 py-3 text-sm text-accent-action">
-            <Shield size={16} className="mt-0.5 shrink-0" />
+            <Shield size={CRATE_ICON_SIZE.sm} className="mt-0.5 shrink-0" />
             <div>{t("settings.account.inviteOnlyNotice")}</div>
           </div>
         ) : null}

@@ -144,11 +144,11 @@ function FullscreenPlayerUtilityControls({
       >
         {state.liked ? (
           <HeartBold
-            size={19}
+            size={CRATE_ICON_SIZE.md}
             className="animate-crate-icon-active-pulse text-accent-action drop-shadow-accent-action"
           />
         ) : (
-          <Heart size={19} />
+          <Heart size={CRATE_ICON_SIZE.md} />
         )}
       </button>
       {state.allowMobileEqualizer ? (

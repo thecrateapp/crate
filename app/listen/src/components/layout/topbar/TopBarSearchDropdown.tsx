@@ -79,7 +79,7 @@ export function TopBarSearchDropdown({
     <AppPopover
       ref={dropdownRef}
       className={cn(
-        "listen-glass-panel fixed max-h-80 overflow-y-auto rounded-[12px] py-1",
+        "listen-glass-panel fixed max-h-80 overflow-y-auto rounded-panel py-1",
         showRecents ? "max-h-none" : undefined,
       )}
       style={dropdownStyle}
@@ -105,7 +105,7 @@ export function TopBarSearchDropdown({
             >
               <SearchResultThumb item={item} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[0.8125rem] text-text-primary/80">
+                <p className="truncate text-caption text-text-primary/80">
                   {item.label}
                 </p>
                 {item.sublabel ? (
@@ -176,7 +176,7 @@ export function TopBarSearchDropdown({
                 size={CRATE_ICON_SIZE.xs}
                 className="shrink-0 text-text-primary/20"
               />
-              <span className="truncate text-[0.8125rem] text-text-primary/60">
+              <span className="truncate text-caption text-text-primary/60">
                 {recent.label}
               </span>
             </button>

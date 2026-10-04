@@ -95,6 +95,28 @@ const MENU_ITEM_FOCUS_CLASS_NAME =
   "focus-visible:shadow-focus focus-visible:outline-none";
 const MENU_ITEM_SELECTOR = '[role="menuitem"]:not([disabled])';
 
+function syncClampedLabelTitle(element: HTMLElement, label: string) {
+  const clamped =
+    element.scrollHeight > element.clientHeight ||
+    element.scrollWidth > element.clientWidth;
+  if (clamped) element.title = label;
+  else element.removeAttribute("title");
+}
+
+function ContextMenuItemLabel({ label }: { label: string }) {
+  return (
+    <span
+      data-slot="context-menu-item-label"
+      className="line-clamp-2 min-w-0 break-words"
+      onPointerEnter={(event) =>
+        syncClampedLabelTitle(event.currentTarget, label)
+      }
+    >
+      {label}
+    </span>
+  );
+}
+
 function getMenuItems(container: HTMLElement | null): HTMLElement[] {
   if (!container) return [];
   return Array.from(
@@ -443,7 +465,7 @@ function ContextMenuDisclosure({
           ) : (
             <span className="w-[18px] shrink-0" />
           )}
-          <span className="truncate">{entry.label}</span>
+          <ContextMenuItemLabel label={entry.label} />
         </span>
         <Indicator size={17} className="shrink-0 text-text-primary/45" />
       </AppMenuButton>
@@ -547,7 +569,7 @@ function ContextMenuItems({
               ) : (
                 <span className="w-[18px] shrink-0" />
               )}
-              <span className="truncate">{entry.label}</span>
+              <ContextMenuItemLabel label={entry.label} />
             </span>
             {entry.active ? (
               <Check size={17} className="shrink-0 text-accent-action" />

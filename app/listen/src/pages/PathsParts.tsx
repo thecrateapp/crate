@@ -159,7 +159,7 @@ export function EndpointPanel({
       ) : null}
 
       <div className="relative p-5">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-accent-action/60">
+        <div className="mb-3 text-xs font-semibold uppercase tracking-kicker text-accent-action/60">
           <MapPin size={CRATE_ICON_SIZE.micro} className="mr-1 inline" />
           {label}
         </div>
@@ -237,11 +237,11 @@ export function EndpointPanel({
                       />
                     ) : (
                       <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-accent-action/10 text-accent-action">
-                        <Music size={14} />
+                        <Music size={CRATE_ICON_SIZE.xs} />
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[0.8125rem]">
+                      <div className="truncate text-caption">
                         {result.label}
                       </div>
                       <div className="text-xs text-text-primary/30">

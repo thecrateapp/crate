@@ -55,7 +55,7 @@ export function MobileShell({
         <div
           data-testid="listen-content"
           className={`mx-auto w-full ${
-            homePage ? "max-w-none" : "max-w-[1480px]"
+            homePage ? "max-w-none" : "max-w-content"
           } ${mobileContentPadClass}`}
           style={{
             paddingLeft: homePage ? 0 : "max(1rem, var(--listen-safe-left))",
@@ -67,7 +67,7 @@ export function MobileShell({
       </main>
       <div
         aria-hidden="true"
-        className="listen-glass-panel listen-mobile-dock-glass pointer-events-none fixed z-20 rounded-[12px]"
+        className="listen-glass-panel listen-mobile-dock-glass pointer-events-none fixed z-20 rounded-panel"
         style={{
           height: hasTrack
             ? "calc(var(--listen-mobile-player-height) + var(--listen-mobile-bottom-nav-content-height))"

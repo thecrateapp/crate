@@ -81,7 +81,7 @@ export function CrateLoader({
         />
       </div>
       {phrase ? (
-        <p className="font-sans text-[0.9375rem] font-semibold tracking-[0.055em] text-text-accent/80">
+        <p className="font-sans text-body font-semibold tracking-[0.055em] text-text-accent/80">
           {phrase}
           <span
             className="inline-flex w-[1.35em] justify-start"

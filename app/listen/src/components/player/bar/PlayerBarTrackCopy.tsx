@@ -42,7 +42,7 @@ export function PlayerBarTrackCopy({
               className="absolute inset-0"
               style={{ opacity: 1 - crossfadeProgress }}
             >
-              <p className="truncate text-[0.8125rem] font-semibold leading-tight text-text-primary">
+              <p className="truncate text-caption font-semibold leading-tight text-text-primary">
                 {displayCrossfadeTransition.outgoing.title}
               </p>
               <p className="mt-0.5 truncate text-xs leading-tight text-text-muted">
@@ -50,7 +50,7 @@ export function PlayerBarTrackCopy({
               </p>
             </div>
             <div style={{ opacity: crossfadeProgress }}>
-              <p className="truncate text-[0.8125rem] font-semibold leading-tight text-text-primary">
+              <p className="truncate text-caption font-semibold leading-tight text-text-primary">
                 {displayCrossfadeTransition.incoming.title}
               </p>
               <p className="mt-0.5 truncate text-xs leading-tight text-text-muted">
@@ -63,7 +63,7 @@ export function PlayerBarTrackCopy({
             {isDesktop && hasAlbum ? (
               <button
                 type="button"
-                className="link-meta block w-fit max-w-full truncate text-left text-[0.8125rem] font-semibold leading-tight text-text-primary"
+                className="link-meta block w-fit max-w-full truncate text-left text-caption font-semibold leading-tight text-text-primary"
                 onClick={(event) => {
                   event.stopPropagation();
                   onOpenAlbum();
@@ -72,7 +72,7 @@ export function PlayerBarTrackCopy({
                 {displayTrack.title}
               </button>
             ) : (
-              <p className="truncate text-[0.8125rem] font-semibold leading-tight text-text-primary">
+              <p className="truncate text-caption font-semibold leading-tight text-text-primary">
                 {displayTrack.title}
               </p>
             )}

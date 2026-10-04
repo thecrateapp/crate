@@ -103,7 +103,7 @@ export function AlbumActions({
           {
             key: "play",
             label: t("player.play"),
-            icon: <Play size={17} fill="currentColor" />,
+            icon: <Play size={CRATE_ICON_SIZE.md} fill="currentColor" />,
             onClick: actions.onPlay,
             disabled: !state.playerTracksAvailable,
             ariaLabel: t("player.play"),
@@ -111,7 +111,7 @@ export function AlbumActions({
           {
             key: "shuffle",
             label: t("player.shuffle"),
-            icon: <Shuffle size={17} />,
+            icon: <Shuffle size={CRATE_ICON_SIZE.md} />,
             tone: "neutral",
             onClick: actions.onShuffle,
             disabled: !state.playerTracksAvailable,

@@ -27,7 +27,7 @@ export function MobileFeaturedArtist({
 }) {
   const { t } = useTranslation();
   return (
-    <section className="relative h-[55dvh] min-h-[430px] max-h-[620px] w-full overflow-hidden bg-surface-canvas">
+    <section className="relative h-[55dvh] min-h-hero-lg max-h-hero-3xl w-full overflow-hidden bg-surface-canvas">
       <ArtistHeroFrame
         composition="mobile"
         artworkBounds={heroArtworkBounds(hero, "mobile")}

@@ -109,7 +109,7 @@ export function LyricsPanel({ open, onClose }: LyricsPanelProps) {
       {/* Track info */}
       {currentTrack && (
         <div className="relative border-b border-border-quiet px-4 py-3">
-          <p className="truncate text-[0.8125rem] font-medium text-text-primary">
+          <p className="truncate text-caption font-medium text-text-primary">
             {currentTrack.title}
           </p>
           <p className="truncate text-xs text-text-muted">
@@ -125,7 +125,10 @@ export function LyricsPanel({ open, onClose }: LyricsPanelProps) {
       >
         {loading && (
           <div className="flex items-center justify-center py-16">
-            <Loader2 size={20} className="animate-spin text-accent-action" />
+            <Loader2
+              size={CRATE_ICON_SIZE.lg}
+              className="animate-spin text-accent-action"
+            />
           </div>
         )}
 

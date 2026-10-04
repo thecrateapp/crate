@@ -156,7 +156,7 @@ export function ShareSheetHost() {
       onClose={close}
       ariaLabel={t("share.title", { kind: t(`share.kind.${payload.kind}`) })}
       maxWidthClassName="sm:max-w-[420px]"
-      panelClassName="listen-glass-panel overflow-hidden rounded-[12px]"
+      panelClassName="listen-glass-panel overflow-hidden rounded-panel"
       overlayClassName="bg-surface-canvas/58"
       mobileSafeArea
     >
@@ -164,7 +164,7 @@ export function ShareSheetHost() {
         <div className="relative flex items-start gap-3 border-b border-text-primary/8 bg-surface-canvas/[0.08] p-4 ">
           <SharePreviewImage payload={payload} />
           <div className="min-w-0 flex-1 pt-0.5">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent-action">
+            <p className="text-xs font-bold uppercase tracking-eyebrow text-accent-action">
               {t("share.title", {
                 kind: t(`share.kind.${payload.kind}`),
               })}
@@ -280,7 +280,10 @@ function ShareAction({
       )}
     >
       <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border-quiet bg-text-primary/[0.06] text-accent-action shadow-share-action-icon backdrop-blur">
-        <Icon size={19} className={busy ? "animate-spin" : ""} />
+        <Icon
+          size={CRATE_ICON_SIZE.md}
+          className={busy ? "animate-spin" : ""}
+        />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-bold text-text-primary">

@@ -58,7 +58,7 @@ function CollapsedShowDetails({
   return (
     <span className="block min-w-0 flex-1 px-3 py-2.5">
       <span className="flex items-center gap-1.5">
-        <span className="truncate text-[0.8125rem] font-semibold text-text-primary">
+        <span className="truncate text-caption font-semibold text-text-primary">
           {item.artist}
         </span>
         {attending && (
@@ -69,7 +69,10 @@ function CollapsedShowDetails({
         )}
       </span>
       <span className="mt-1 flex items-center gap-1 text-xs text-text-primary/40">
-        <MapPin size={10} className="shrink-0 text-accent-action/60" />
+        <MapPin
+          size={CRATE_ICON_SIZE.micro}
+          className="shrink-0 text-accent-action/60"
+        />
         <span className="truncate">{item.venue}</span>
         {item.city && (
           <>
@@ -106,7 +109,7 @@ function CollapsedShowDate({
 
   return (
     <span className="flex shrink-0 flex-col items-center justify-center px-2">
-      <span className="text-xs font-bold leading-none tracking-[0.12em] text-accent-action/55">
+      <span className="text-xs font-bold leading-none tracking-label text-accent-action/55">
         {month}
       </span>
       <span className="text-[1.25rem] font-black leading-tight text-accent-action">

@@ -10,7 +10,7 @@ const WINDOW_PICKER_CLASS_NAME =
   "max-w-full overflow-x-auto border-border-quiet bg-surface-canvas/25 backdrop-blur";
 
 const WINDOW_PICKER_ITEM_CLASS_NAME =
-  "h-auto px-3.5 py-2 text-xs font-black uppercase tracking-[0.12em] text-text-muted data-[state=inactive]:hover:bg-text-primary/5 data-[state=inactive]:hover:text-text-primary data-[state=active]:text-accent-action-foreground data-[state=active]:shadow-accent-action";
+  "h-auto px-3.5 py-2 text-xs font-black uppercase tracking-label text-text-muted data-[state=inactive]:hover:bg-text-primary/5 data-[state=inactive]:hover:text-text-primary data-[state=active]:text-accent-action-foreground data-[state=active]:shadow-accent-action";
 
 export function WindowPicker({
   value,

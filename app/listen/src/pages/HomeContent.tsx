@@ -143,7 +143,7 @@ function HomeDiscoveryRails({ page }: HomeSectionProps) {
   return (
     <div
       data-testid="home-discovery-content"
-      className={`mx-auto w-full max-w-[1480px] space-y-10 px-6 pb-10 ${
+      className={`mx-auto w-full max-w-content space-y-10 px-6 pb-10 ${
         page.isDesktop ? "relative z-30 mt-0 pt-8 2xl:-mt-16 2xl:pt-0" : "pt-8"
       }`}
       style={{

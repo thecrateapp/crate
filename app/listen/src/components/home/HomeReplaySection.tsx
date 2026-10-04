@@ -77,9 +77,9 @@ export function HomeReplaySection({
       />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
-        <div className="home-replay-card overflow-hidden rounded-[12px] p-5">
-          <div className="home-replay-badge inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.18em]">
-            <Sparkles size={12} />
+        <div className="home-replay-card overflow-hidden rounded-panel p-5">
+          <div className="home-replay-badge inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium uppercase tracking-eyebrow">
+            <Sparkles size={CRATE_ICON_SIZE.micro} />
             {t("home.sections.listeningDna.title")}
           </div>
           <h2 className="mt-4 text-2xl font-bold text-text-primary">
@@ -90,7 +90,7 @@ export function HomeReplaySection({
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <div className="home-replay-metric-card rounded-lg px-3 py-2">
-              <div className="home-replay-metric-label text-xs uppercase tracking-[0.16em]">
+              <div className="home-replay-metric-label text-xs uppercase tracking-kicker">
                 {t("home.replay.tracks")}
               </div>
               <div className="mt-1 text-sm font-semibold text-text-primary">
@@ -98,7 +98,7 @@ export function HomeReplaySection({
               </div>
             </div>
             <div className="home-replay-metric-card rounded-lg px-3 py-2">
-              <div className="home-replay-metric-label text-xs uppercase tracking-[0.16em]">
+              <div className="home-replay-metric-label text-xs uppercase tracking-kicker">
                 {t("home.replay.timeListened")}
               </div>
               <div className="mt-1 text-sm font-semibold text-text-primary">
@@ -117,9 +117,9 @@ export function HomeReplaySection({
           </Button>
         </div>
 
-        <div className="home-replay-panel overflow-hidden rounded-[12px] p-4">
+        <div className="home-replay-panel overflow-hidden rounded-panel p-4">
           <div className="home-replay-panel-kicker mb-3 flex items-center gap-2 text-xs uppercase tracking-wider">
-            <Clock3 size={12} />
+            <Clock3 size={CRATE_ICON_SIZE.micro} />
             {t("home.replay.title")}
           </div>
           <div className="space-y-1">

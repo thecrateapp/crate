@@ -1,4 +1,4 @@
-import { Loader2 } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
 
 import { CrateLoader } from "../brand/CrateLoader";
@@ -28,7 +28,7 @@ export function LoadingState({
         className={cn("flex items-center justify-center py-16", className)}
       >
         <Loader2
-          size={24}
+          size={CRATE_ICON_SIZE.xl}
           aria-hidden="true"
           className="animate-spin text-accent-action"
         />

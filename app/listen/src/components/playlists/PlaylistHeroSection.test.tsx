@@ -131,8 +131,8 @@ describe("PlaylistHeroSection", () => {
     );
 
     const hero = container.querySelector("section") as HTMLElement;
-    expect(hero).toHaveClass("h-[420px]");
-    expect(hero).not.toHaveClass("min-h-[430px]");
+    expect(hero).toHaveClass("h-hero-md");
+    expect(hero).not.toHaveClass("min-h-hero-lg");
   });
 
   it("uses artist/album-style primary pills and secondary icon labels", () => {

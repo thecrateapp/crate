@@ -62,7 +62,7 @@ function SortableJamQueueItem({
         {...attributes}
         {...listeners}
       >
-        <GripVertical size={16} />
+        <GripVertical size={CRATE_ICON_SIZE.sm} />
       </button>
       {children}
     </div>
@@ -160,7 +160,7 @@ export function JamQueueList(props: JamQueueListProps) {
                   />
                 ) : (
                   <div className="jam-artwork-placeholder flex size-10 items-center justify-center rounded-lg">
-                    <ListMusic size={15} />
+                    <ListMusic size={CRATE_ICON_SIZE.sm} />
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
@@ -270,7 +270,7 @@ export function JamQueueList(props: JamQueueListProps) {
             onClick={focusQueueSearch}
             className="jam-secondary-action inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-text-primary transition-colors has-[>svg]:px-4"
           >
-            <Search size={15} />
+            <Search size={CRATE_ICON_SIZE.sm} />
             {t("jam.room.browseLibrary")}
           </Button>
         </div>

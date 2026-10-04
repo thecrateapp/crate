@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { Radio } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Radio } from "@crate/ui/icons";
 
 import type { ContextMenuHeader } from "@crate/ui/domain/actions";
 import { useEntityMenu } from "@crate/ui/domain/entity/useEntityMenu";
@@ -85,7 +85,7 @@ export const RadioStationCard = memo(function RadioStationCard({
   return (
     <article
       className={cn(
-        "item-action-target home-radio-card group relative w-full min-w-0 overflow-hidden rounded-[12px] text-left",
+        "item-action-target home-radio-card group relative w-full min-w-0 overflow-hidden rounded-panel text-left",
         layout === "rail" && "snap-start",
         disabled && "opacity-60",
       )}
@@ -116,8 +116,8 @@ export const RadioStationCard = memo(function RadioStationCard({
           />
         )}
         <span className="home-radio-overlay absolute inset-0" />
-        <span className="home-radio-badge absolute left-2.5 top-2.5 inline-flex max-w-[calc(100%-1.25rem)] items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.06em] backdrop-blur-md">
-          <Radio size={12} className="shrink-0" />
+        <span className="home-radio-badge absolute left-2.5 top-2.5 inline-flex max-w-[calc(100%-1.25rem)] items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-micro font-semibold uppercase tracking-[0.06em] backdrop-blur-md">
+          <Radio size={CRATE_ICON_SIZE.micro} className="shrink-0" />
           <span className="min-w-0 truncate">{typeLabel}</span>
         </span>
         <span className="absolute inset-x-0 bottom-0 block p-4">

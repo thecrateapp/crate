@@ -94,7 +94,7 @@ export function Paths() {
           <h1 className="text-2xl font-bold text-text-primary">
             {t("paths.title")}
           </h1>
-          <p className="text-[0.8125rem] text-text-primary/40">
+          <p className="text-caption text-text-primary/40">
             {t("paths.subtitle")}
           </p>
         </div>
@@ -104,7 +104,7 @@ export function Paths() {
         <EndpointPanel side="origin" selected={origin} onSelect={setOrigin} />
         <div className="flex items-center justify-center sm:py-8">
           <ArrowRight
-            size={20}
+            size={CRATE_ICON_SIZE.lg}
             className="rotate-90 text-accent-action/40 sm:rotate-0"
           />
         </div>

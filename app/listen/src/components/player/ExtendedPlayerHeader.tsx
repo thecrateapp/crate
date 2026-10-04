@@ -66,7 +66,7 @@ export function ExtendedPlayerHeader({
                   : "bg-surface-control text-text-secondary hover:bg-surface-control-hover hover:text-text-primary",
               )}
             >
-              <SlidersHorizontal size={18} />
+              <SlidersHorizontal size={CRATE_ICON_SIZE.md} />
             </button>
           ) : null}
           <button
@@ -84,7 +84,7 @@ export function ExtendedPlayerHeader({
                   : "bg-surface-control text-text-secondary hover:bg-surface-control-hover hover:text-text-primary",
             )}
           >
-            <Settings size={18} />
+            <Settings size={CRATE_ICON_SIZE.md} />
           </button>
         </div>
       </div>

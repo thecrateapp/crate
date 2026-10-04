@@ -2931,16 +2931,8 @@
     "sourceHash": "sha256:b9eeced81f695582374d48e06a377f5bab1b3f6ccf759358a1996db6482cd7eb",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
-  "player.queue.history": {
-    "sourceHash": "sha256:d0b8d91b82cadfdb4143e2348f93fe000d7304f720d682a9264390eebdf40cff",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
   "player.queue.nextUp": {
     "sourceHash": "sha256:cda1dc358f43c66961d8e3c3819b01d3649760ca476add74afdc125588468378",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "player.queue.nextUpFrom": {
-    "sourceHash": "sha256:d3644e48a8652f917f2a9e0bc01c65a16f20bf82d1a7f0461128060a32ff60cc",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
   "player.queue.nothingQueued": {
@@ -2949,10 +2941,6 @@
   },
   "player.queue.nowPlaying": {
     "sourceHash": "sha256:41cb88542592923f45da7c6f9bd752f7001a154a281c35b397eec0718b697078",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "player.queue.nowPlayingFrom": {
-    "sourceHash": "sha256:fdee727f64d7023d297869b23ad73ab7568053a345b49d032e649c59121af0de",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
   "player.queue.previous": {
@@ -2985,10 +2973,6 @@
   },
   "player.queue.trackCoverAlt": {
     "sourceHash": "sha256:2c083dfd11d36eceafb90bc5fd3e565ee517bc9524d2fe91cf552e64c9eacf03",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "player.queue.upNextTracks": {
-    "sourceHash": "sha256:66106c71b112bb9478f5ee25ff4b05f29b8162002c33c6c13ff17a18b9a3e760",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
   "player.radio.lessLikeThis": {

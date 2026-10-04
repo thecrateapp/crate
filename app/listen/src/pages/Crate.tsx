@@ -197,7 +197,7 @@ function AnonymousCrate() {
                   to={loginPath}
                   className={cn(HERO_PRIMARY_ACTION_CLASS, "col-span-2")}
                 >
-                  <Play size={17} fill="currentColor" />
+                  <Play size={CRATE_ICON_SIZE.md} fill="currentColor" />
                   <span>{t("crate.page.signInToListen")}</span>
                 </Link>
               }
@@ -206,7 +206,7 @@ function AnonymousCrate() {
                 crateShareAction(data, () => shareCrate(data, albums), t),
               ]}
             />
-            <p className="mx-auto mt-3 w-full max-w-[1480px] text-sm text-text-muted">
+            <p className="mx-auto mt-3 w-full max-w-content text-sm text-text-muted">
               {t("crate.page.signInHint")}
             </p>
           </>
@@ -545,7 +545,7 @@ function CrateAlbumList({
 }) {
   const { t } = useTranslation();
   return (
-    <section className="mx-auto max-w-[1480px] space-y-4 px-4 sm:px-6">
+    <section className="mx-auto max-w-content space-y-4 px-4 sm:px-6">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-xl font-bold text-text-primary">
           {t("crate.page.albums")}
@@ -691,7 +691,7 @@ function CratePageActions({
         {
           key: "play",
           label: t("player.play"),
-          icon: <Play size={17} fill="currentColor" />,
+          icon: <Play size={CRATE_ICON_SIZE.md} fill="currentColor" />,
           onClick: onPlay,
           disabled: !canPlay,
           ariaLabel: t("player.play"),
@@ -699,7 +699,7 @@ function CratePageActions({
         {
           key: "shuffle",
           label: t("player.shuffle"),
-          icon: <Shuffle size={17} />,
+          icon: <Shuffle size={CRATE_ICON_SIZE.md} />,
           tone: "neutral",
           onClick: onShuffle,
           disabled: !canPlay,
