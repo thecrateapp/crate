@@ -440,6 +440,47 @@ describe("TrackRow playback behavior", () => {
     expect(container.innerHTML).toContain("stroke-dashoffset");
   });
 
+  it("hides the track number on the active row and keeps it on the others", () => {
+    const playerActions = {
+      currentTrack: {
+        id: "entity-1",
+        entityUid: "entity-1",
+        title: "Track One",
+        artist: "Artist",
+      },
+    };
+
+    renderWithListenProviders(
+      <>
+        <TrackRow
+          track={{
+            id: 1,
+            entity_uid: "entity-1",
+            title: "Track One",
+            artist: "Artist",
+          }}
+          index={1}
+        />
+        <TrackRow
+          track={{
+            id: 2,
+            entity_uid: "entity-2",
+            title: "Track Two",
+            artist: "Artist",
+          }}
+          index={2}
+        />
+      </>,
+      { playerActions, playerState: { isPlaying: true } },
+    );
+
+    expect(
+      screen.getByTestId("track-row-playback-progress"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("1")).not.toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+  });
+
   it("consumes semantic classes for row states and playback progress", () => {
     const track: TrackRowData = {
       id: 1,

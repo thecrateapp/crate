@@ -181,6 +181,8 @@ export function TrackRowLeadingControl({
         </>
       ) : disabled ? (
         <span className="text-text-muted text-xs">{trackIndex}</span>
+      ) : isActive ? (
+        playIcon
       ) : (
         <>
           <span className="text-text-muted text-xs md:group-hover:hidden">
