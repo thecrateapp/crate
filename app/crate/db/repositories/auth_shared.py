@@ -4,6 +4,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
+from device_detector import DeviceDetector
+
 log = logging.getLogger(__name__)
 
 ACTIVE_SESSION_WINDOW = timedelta(minutes=3)
@@ -50,8 +52,6 @@ _EMPTY_DEVICE_DETAILS: dict[str, str | None] = {
 
 @lru_cache(maxsize=1024)
 def _detect_device_details(user_agent: str) -> dict[str, str | None]:
-    from device_detector import DeviceDetector
-
     device = DeviceDetector(user_agent).parse()
     return {
         "client_name": _clean_device_part(device.client_name()),
