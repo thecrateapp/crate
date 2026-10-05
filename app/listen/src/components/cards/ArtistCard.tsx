@@ -208,7 +208,7 @@ export const ArtistCard = memo(function ArtistCard({
       external={external}
       openLabel={openLabel}
       renderMenu={renderMenu}
-      menuButton={external ? "none" : "hover"}
+      menuButton="none"
       menuLabel={menuLabel}
     />
   );

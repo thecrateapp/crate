@@ -80,9 +80,11 @@ function followRevealClassName(following: boolean) {
 function EntityCardFollowButton({
   follow,
   className,
+  revealWithGroup = false,
 }: {
   follow: EntityFollowOverlay;
   className?: string;
+  revealWithGroup?: boolean;
 }) {
   return (
     <FollowHeartButton
@@ -93,7 +95,7 @@ function EntityCardFollowButton({
       iconSize={CRATE_ICON_SIZE.md}
       className={cn(
         FOLLOW_BUTTON_CLASS_NAME,
-        followRevealClassName(follow.following),
+        !revealWithGroup && followRevealClassName(follow.following),
         className,
       )}
       onClick={(event: MouseEvent<HTMLButtonElement>) => {
@@ -116,10 +118,11 @@ function EntityCardOverlayControls({
   const { onPlay, follow } = overlay;
   if (!onPlay && !follow) return null;
 
+  const circle = shape === "circle";
   const playButton = onPlay ? (
     <PlayButton
       size="md"
-      reveal="hover"
+      reveal={circle ? "always" : "hover"}
       playing={overlay.playing}
       loading={overlay.loading}
       label={overlay.playLabel}
@@ -137,15 +140,23 @@ function EntityCardOverlayControls({
     <div
       data-slot="entity-overlay"
       className={cn(
-        "pointer-events-none absolute inset-x-[var(--content-card-padding)] top-[var(--content-card-padding)] z-10 flex aspect-square items-center justify-center transition-colors",
+        "pointer-events-none absolute z-10 flex aspect-square items-center justify-center transition-colors",
+        shape === "circle"
+          ? "inset-x-0 top-0"
+          : "inset-x-[var(--content-card-padding)] top-[var(--content-card-padding)]",
         SHAPE_RADIUS_CLASS_NAME[shape],
         onPlay && "md:group-hover/card:bg-surface-canvas/40",
       )}
     >
-      {shape === "circle" ? (
-        <div className="flex items-center justify-center gap-2">
+      {circle ? (
+        <div
+          data-slot="entity-overlay-controls"
+          className="flex items-center justify-center gap-2 transition-[transform,opacity] pointer-fine:translate-y-2 pointer-fine:opacity-0 pointer-fine:group-hover/card:translate-y-0 pointer-fine:group-hover/card:opacity-100 pointer-fine:group-focus-within/card:translate-y-0 pointer-fine:group-focus-within/card:opacity-100"
+        >
           {playButton}
-          {follow ? <EntityCardFollowButton follow={follow} /> : null}
+          {follow ? (
+            <EntityCardFollowButton follow={follow} revealWithGroup />
+          ) : null}
         </div>
       ) : (
         <>
@@ -232,7 +243,10 @@ export const EntityCard = memo(function EntityCard({
         disabled={disabled}
         current={selected}
         className={cn(
-          "group block w-full rounded-xl p-[var(--content-card-padding)] text-left transition-colors hover:bg-text-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:hover:bg-transparent",
+          "group block w-full rounded-xl text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:hover:bg-transparent",
+          centered
+            ? "p-0"
+            : "p-[var(--content-card-padding)] hover:bg-text-primary/5",
           classNames?.action,
         )}
       >

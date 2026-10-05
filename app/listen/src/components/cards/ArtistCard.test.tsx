@@ -236,17 +236,20 @@ describe("ArtistCard", () => {
     expect(overlay?.closest("article")).toHaveAttribute("data-shape", "circle");
   });
 
-  it("shows the action menu trigger on touch and opens the menu lazily", async () => {
+  it("renders artist tiles without a more-actions button and builds the menu lazily on right click", async () => {
     vi.mocked(useArtistActionEntries).mockClear();
     renderWithListenProviders(
       <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />,
     );
 
-    const menuButton = screen.getByRole("button", { name: "More actions" });
-    expect(menuButton).toHaveClass("left-4", "top-4", "opacity-75");
+    expect(
+      screen.queryByRole("button", { name: "More actions" }),
+    ).not.toBeInTheDocument();
     expect(useArtistActionEntries).not.toHaveBeenCalled();
 
-    fireEvent.click(menuButton);
+    fireEvent.contextMenu(
+      screen.getByRole("link", { name: "Open Dredg" }).closest("article")!,
+    );
 
     expect(
       await screen.findByRole("menuitem", { name: "Share artist" }),
@@ -254,11 +257,26 @@ describe("ArtistCard", () => {
     expect(useArtistActionEntries).toHaveBeenCalled();
   });
 
-  it("opens the menu with Enter on the menu trigger without navigating", async () => {
+  it("keeps the circle tile flush without a card backdrop", () => {
+    renderWithListenProviders(
+      <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />,
+    );
+
+    const link = screen.getByRole("link", { name: "Open Dredg" });
+    expect(link).toHaveClass("p-0");
+    expect(link.className).not.toContain("hover:bg-text-primary/5");
+  });
+
+  it("keeps the more-actions button on artist rows", async () => {
     const user = userEvent.setup();
     renderWithListenProviders(
       <>
-        <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />
+        <ArtistCard
+          variant="row"
+          name="Dredg"
+          artistId={1}
+          artistSlug="dredg"
+        />
         <LocationProbe />
       </>,
     );
