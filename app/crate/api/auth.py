@@ -6,7 +6,7 @@ import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from threading import RLock
-from typing import Literal, overload
+from typing import Literal, TypedDict, overload
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import jwt
@@ -550,7 +550,7 @@ def _is_secure() -> bool:
     return domain != "localhost"
 
 
-def _cookie_samesite() -> Literal["lax", "strict", "none"]:
+def _cookie_samesite(secure: bool | None = None) -> Literal["lax", "strict", "none"]:
     override = os.environ.get("CRATE_AUTH_COOKIE_SAMESITE")
     if override:
         normalized = override.strip().lower()
@@ -560,7 +560,58 @@ def _cookie_samesite() -> Literal["lax", "strict", "none"]:
             return "strict"
         if normalized == "none":
             return "none"
-    return "none" if _is_secure() else "lax"
+    return "none" if (_is_secure() if secure is None else secure) else "lax"
+
+
+_LOCAL_COOKIE_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+class _CookieAttributes(TypedDict):
+    secure: bool
+    samesite: Literal["lax", "strict", "none"]
+    domain: str | None
+
+
+def _request_hostname(request: Request) -> str:
+    forwarded_host = (
+        (request.headers.get("x-forwarded-host") or "").split(",")[0].strip()
+    )
+    host = forwarded_host or request.headers.get("host") or request.url.netloc
+    return (urlparse(f"//{host}").hostname or "").lower()
+
+
+def _request_is_https(request: Request) -> bool:
+    forwarded_proto = (
+        (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
+    )
+    return (forwarded_proto or request.url.scheme) == "https"
+
+
+def _host_matches_cookie_domain(hostname: str, domain: str | None) -> bool:
+    if not hostname or hostname in _LOCAL_COOKIE_HOSTS:
+        return False
+    if domain is None:
+        return True
+    bare_domain = domain.lstrip(".").lower()
+    return hostname == bare_domain or hostname.endswith(f".{bare_domain}")
+
+
+def _cookie_attributes(request: Request | None) -> _CookieAttributes:
+    domain = _cookie_domain()
+    if request is None or _host_matches_cookie_domain(
+        _request_hostname(request), domain
+    ):
+        return {
+            "secure": _is_secure(),
+            "samesite": _cookie_samesite(),
+            "domain": domain,
+        }
+
+    secure = _request_is_https(request)
+    samesite = _cookie_samesite(secure)
+    if samesite == "none" and not secure:
+        samesite = "lax"
+    return {"secure": secure, "samesite": samesite, "domain": None}
 
 
 def _set_auth_cookie(
@@ -569,51 +620,55 @@ def _set_auth_cookie(
     cookie_name: str = COOKIE_NAME,
     *,
     max_age: int | None = None,
+    request: Request | None = None,
 ):
     response.set_cookie(
         key=cookie_name,
         value=token,
         httponly=True,
-        secure=_is_secure(),
-        samesite=_cookie_samesite(),
-        domain=_cookie_domain(),
         max_age=max_age or JWT_EXPIRY_HOURS * 3600,
         path="/",
+        **_cookie_attributes(request),
     )
 
 
-def _set_refresh_cookie(response: Response, refresh_token: str, *, max_age: int):
+def _set_refresh_cookie(
+    response: Response,
+    refresh_token: str,
+    *,
+    max_age: int,
+    request: Request | None = None,
+):
     response.set_cookie(
         key=COOKIE_NAME_LISTEN_REFRESH,
         value=refresh_token,
         httponly=True,
-        secure=_is_secure(),
-        samesite=_cookie_samesite(),
-        domain=_cookie_domain(),
         max_age=max_age,
         path="/api/auth",
+        **_cookie_attributes(request),
     )
 
 
-def _clear_auth_cookie(response: Response, cookie_name: str = COOKIE_NAME):
+def _clear_auth_cookie(
+    response: Response,
+    cookie_name: str = COOKIE_NAME,
+    *,
+    request: Request | None = None,
+):
     response.delete_cookie(
         key=cookie_name,
         httponly=True,
-        secure=_is_secure(),
-        samesite=_cookie_samesite(),
-        domain=_cookie_domain(),
         path="/",
+        **_cookie_attributes(request),
     )
 
 
-def _clear_refresh_cookie(response: Response):
+def _clear_refresh_cookie(response: Response, *, request: Request | None = None):
     response.delete_cookie(
         key=COOKIE_NAME_LISTEN_REFRESH,
         httponly=True,
-        secure=_is_secure(),
-        samesite=_cookie_samesite(),
-        domain=_cookie_domain(),
         path="/api/auth",
+        **_cookie_attributes(request),
     )
 
 
@@ -629,10 +684,10 @@ def _clear_cookies_for_context(
         app_id=app_id,
         return_to=return_to,
     )
-    _clear_auth_cookie(response, cookie_name)
+    _clear_auth_cookie(response, cookie_name, request=request)
     if cookie_name == COOKIE_NAME_LISTEN:
-        _clear_auth_cookie(response, COOKIE_NAME)
-        _clear_refresh_cookie(response)
+        _clear_auth_cookie(response, COOKIE_NAME, request=request)
+        _clear_refresh_cookie(response, request=request)
 
 
 def _clean_header_value(value: str | None, *, max_length: int = 160) -> str | None:
@@ -1298,6 +1353,7 @@ def _set_login_cookies(
         token,
         _cookie_name_for_context(request, app_id=app_id, return_to=return_to),
         max_age=_access_max_age_seconds(request, app_id=app_id, return_to=return_to),
+        request=request,
     )
     if refresh_token:
         _set_refresh_cookie(
@@ -1306,6 +1362,7 @@ def _set_login_cookies(
             max_age=_session_max_age_seconds(
                 request, app_id=app_id, return_to=return_to
             ),
+            request=request,
         )
 
 
@@ -1720,12 +1777,14 @@ def refresh_auth(request: Request, body: RefreshTokenRequest | None = None):
         access_token,
         _cookie_name_for_context(request, app_id=session_app_id),
         max_age=_access_max_age_seconds(request, app_id=session_app_id),
+        request=request,
     )
     if _is_listen_request(request, app_id=session_app_id):
         _set_refresh_cookie(
             response,
             next_refresh_token,
             max_age=max(1, int((expires_at - now).total_seconds())),
+            request=request,
         )
     return response
 
@@ -1925,8 +1984,8 @@ def auth_revoke_session(request: Request, session_id: str):
     revoke_session(session_id)
     response = JSONResponse({"ok": True})
     if user.get("session_id") == session_id:
-        _clear_auth_cookie(response, _cookie_name_for_request(request))
-        _clear_refresh_cookie(response)
+        _clear_auth_cookie(response, _cookie_name_for_request(request), request=request)
+        _clear_refresh_cookie(response, request=request)
     return response
 
 
@@ -1985,7 +2044,11 @@ def update_profile(request: Request, body: UpdateProfileRequest):
     )
     response = JSONResponse(content=_user_public(updated))
     _set_auth_cookie(
-        response, token, _cookie_name_for_request(request), max_age=expiry_hours * 3600
+        response,
+        token,
+        _cookie_name_for_request(request),
+        max_age=expiry_hours * 3600,
+        request=request,
     )
     return response
 
