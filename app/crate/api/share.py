@@ -925,7 +925,7 @@ def _crate_og_cache_key(
         ],
         separators=(",", ":"),
     )
-    return f"share:crate-og:{hashlib.sha1(fingerprint.encode()).hexdigest()}"
+    return f"share:crate-og:{hashlib.sha1(fingerprint.encode(), usedforsecurity=False).hexdigest()}"
 
 
 def _cached_og_image(cache_key: str) -> bytes | None:
