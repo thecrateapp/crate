@@ -293,13 +293,13 @@ def _dominant_color(image: Image.Image) -> tuple[int, int, int]:
     palette_image = image.resize((64, 64)).quantize(colors=5)
     palette = palette_image.getpalette() or []
     counts = sorted(palette_image.getcolors() or [], reverse=True)
-    for _, index in counts:
+    indexes = [index for _, index in counts if isinstance(index, int)]
+    for index in indexes:
         red, green, blue = palette[index * 3 : index * 3 + 3]
         if max(red, green, blue) - min(red, green, blue) > 24:
             return red, green, blue
-    if counts:
-        index = counts[0][1]
-        red, green, blue = palette[index * 3 : index * 3 + 3]
+    if indexes:
+        red, green, blue = palette[indexes[0] * 3 : indexes[0] * 3 + 3]
         return red, green, blue
     return ACCENT_RGB
 
@@ -363,13 +363,17 @@ def _paste_cover(
     tile = _perspective(tile, squeeze, outer_right)
     if depth:
         dim = Image.new("RGBA", tile.size, (*BACKGROUND_RGB, 0))
-        dim.putalpha(tile.getchannel("A").point(lambda value: value * depth // 6))
+        dim.putalpha(
+            tile.getchannel("A").point([value * depth // 6 for value in range(256)])
+        )
         tile = Image.alpha_composite(tile, dim)
     left = center_x - tile.width // 2
     top = center_y - tile.height // 2
 
     shadow = Image.new("RGBA", (tile.width + 80, tile.height + 80), (0, 0, 0, 0))
-    shadow_alpha = tile.getchannel("A").point(lambda value: value * 150 // 255)
+    shadow_alpha = tile.getchannel("A").point(
+        [value * 150 // 255 for value in range(256)]
+    )
     shadow.paste((0, 0, 0, 255), (40, 52), shadow_alpha)
     shadow = shadow.filter(ImageFilter.GaussianBlur(22))
     canvas.alpha_composite(shadow, (left - 40, top - 40))
