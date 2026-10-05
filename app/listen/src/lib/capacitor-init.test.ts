@@ -6,65 +6,97 @@ const {
   consumeOAuthCallbackUrl,
   networkAddListener,
   retryPendingNativeOAuthCallback,
+  storePendingOAuthProviderError,
   statusBarSetStyle,
+  pluginImports,
+  runtime,
 } = vi.hoisted(() => ({
   appAddListener: vi.fn(),
   appGetLaunchUrl: vi.fn(),
   consumeOAuthCallbackUrl: vi.fn(),
   networkAddListener: vi.fn(),
   retryPendingNativeOAuthCallback: vi.fn(),
+  storePendingOAuthProviderError: vi.fn(),
   statusBarSetStyle: vi.fn(),
+  pluginImports: { app: 0, keyboard: 0, network: 0, statusBar: 0 },
+  runtime: { isIosRuntime: false, isNative: true, platform: "android" },
 }));
 
-vi.mock("@capacitor/app", () => ({
-  App: {
-    addListener: appAddListener,
-    getLaunchUrl: appGetLaunchUrl,
-    exitApp: vi.fn(),
-  },
-}));
+vi.mock("@capacitor/app", () => {
+  pluginImports.app += 1;
+  return {
+    App: {
+      addListener: appAddListener,
+      getLaunchUrl: appGetLaunchUrl,
+      exitApp: vi.fn(),
+    },
+  };
+});
 
-vi.mock("@capacitor/keyboard", () => ({
-  Keyboard: {
-    setStyle: vi.fn(),
-    setResizeMode: vi.fn(),
-    setAccessoryBarVisible: vi.fn(),
-    setScroll: vi.fn(),
-    addListener: vi.fn(),
-  },
-  KeyboardResize: { Body: "body" },
-  KeyboardStyle: { Dark: "dark" },
-}));
+vi.mock("@capacitor/keyboard", () => {
+  pluginImports.keyboard += 1;
+  return {
+    Keyboard: {
+      setStyle: vi.fn(),
+      setResizeMode: vi.fn(),
+      setAccessoryBarVisible: vi.fn(),
+      setScroll: vi.fn(),
+      addListener: vi.fn(),
+    },
+    KeyboardResize: { Body: "body" },
+    KeyboardStyle: { Dark: "dark" },
+  };
+});
 
-vi.mock("@capacitor/network", () => ({
-  Network: {
-    addListener: networkAddListener,
-  },
-}));
+vi.mock("@capacitor/network", () => {
+  pluginImports.network += 1;
+  return {
+    Network: {
+      addListener: networkAddListener,
+    },
+  };
+});
 
-vi.mock("@capacitor/status-bar", () => ({
-  StatusBar: {
-    setStyle: statusBarSetStyle,
-    setOverlaysWebView: vi.fn(),
-    setBackgroundColor: vi.fn(),
-  },
-  Style: { Dark: "dark", Light: "light" },
-}));
+vi.mock("@capacitor/status-bar", () => {
+  pluginImports.statusBar += 1;
+  return {
+    StatusBar: {
+      setStyle: statusBarSetStyle,
+      setOverlaysWebView: vi.fn(),
+      setBackgroundColor: vi.fn(),
+    },
+    Style: { Dark: "dark", Light: "light" },
+  };
+});
 
 vi.mock("@/lib/capacitor-oauth", () => ({
   consumeOAuthCallbackUrl,
   retryPendingNativeOAuthCallback,
+  storePendingOAuthProviderError,
 }));
 
 vi.mock("@/lib/capacitor-runtime", () => ({
-  isIosRuntime: false,
-  isNative: true,
-  platform: "android",
+  get isIosRuntime() {
+    return runtime.isIosRuntime;
+  },
+  get isNative() {
+    return runtime.isNative;
+  },
+  get platform() {
+    return runtime.platform;
+  },
 }));
 
 describe("Capacitor initialization", () => {
   beforeEach(() => {
     vi.resetModules();
+    runtime.isIosRuntime = false;
+    runtime.isNative = true;
+    runtime.platform = "android";
+    pluginImports.app = 0;
+    pluginImports.keyboard = 0;
+    pluginImports.network = 0;
+    pluginImports.statusBar = 0;
     appAddListener.mockReset();
     appGetLaunchUrl.mockReset().mockResolvedValue(null);
     consumeOAuthCallbackUrl
@@ -75,6 +107,7 @@ describe("Capacitor initialization", () => {
     retryPendingNativeOAuthCallback
       .mockReset()
       .mockResolvedValue({ handled: false, next: "/" });
+    storePendingOAuthProviderError.mockReset();
     appAddListener.mockResolvedValue({ remove: vi.fn() });
     networkAddListener.mockResolvedValue({ remove: vi.fn() });
   });
@@ -111,11 +144,79 @@ describe("Capacitor initialization", () => {
     await expect(initialized).resolves.toBeNull();
   });
 
+  it("does not announce an auth token after native OAuth cancellation", async () => {
+    consumeOAuthCallbackUrl.mockResolvedValue({
+      handled: true,
+      next: "/",
+      cancelled: true,
+    });
+    const authReceived = vi.fn();
+    window.addEventListener("crate:auth-token-received", authReceived);
+    const { initCapacitor } = await import("./capacitor-init");
+    await initCapacitor();
+
+    const urlOpen = appAddListener.mock.calls.find(
+      ([eventName]) => eventName === "appUrlOpen",
+    )?.[1];
+    urlOpen?.({ url: "cratemusic://oauth/callback?state=s&error=cancelled" });
+
+    await vi.waitFor(() =>
+      expect(consumeOAuthCallbackUrl).toHaveBeenCalledOnce(),
+    );
+    await Promise.resolve();
+    expect(authReceived).not.toHaveBeenCalled();
+    window.removeEventListener("crate:auth-token-received", authReceived);
+  });
+
+  it("surfaces native OAuth provider failures without announcing login success", async () => {
+    consumeOAuthCallbackUrl.mockResolvedValue({
+      handled: true,
+      next: "/",
+      providerError: true,
+    });
+    const authReceived = vi.fn();
+    const providerError = vi.fn();
+    window.addEventListener("crate:auth-token-received", authReceived);
+    window.addEventListener("crate:oauth-provider-error", providerError);
+    const { initCapacitor } = await import("./capacitor-init");
+    await initCapacitor();
+
+    const urlOpen = appAddListener.mock.calls.find(
+      ([eventName]) => eventName === "appUrlOpen",
+    )?.[1];
+    urlOpen?.({
+      url: "cratemusic://oauth/callback?state=s&error=provider_error",
+    });
+
+    await vi.waitFor(() => expect(providerError).toHaveBeenCalledOnce());
+    expect(storePendingOAuthProviderError).toHaveBeenCalledOnce();
+    expect(authReceived).not.toHaveBeenCalled();
+    window.removeEventListener("crate:auth-token-received", authReceived);
+    window.removeEventListener("crate:oauth-provider-error", providerError);
+  });
+
   it("maps the resolved appearance mode to the native status bar", async () => {
     const { applyNativeColorMode } = await import("./capacitor-init");
 
     await applyNativeColorMode("light");
 
     expect(statusBarSetStyle).toHaveBeenCalledWith({ style: "light" });
+  });
+
+  it("does not load Capacitor plugins in Tauri", async () => {
+    runtime.isNative = false;
+    runtime.platform = "web";
+    const { initCapacitor } = await import("./capacitor-init");
+
+    await initCapacitor();
+
+    expect(pluginImports).toEqual({
+      app: 0,
+      keyboard: 0,
+      network: 0,
+      statusBar: 0,
+    });
+    expect(appAddListener).not.toHaveBeenCalled();
+    expect(networkAddListener).not.toHaveBeenCalled();
   });
 });

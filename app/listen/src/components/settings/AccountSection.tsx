@@ -13,6 +13,8 @@ import {
 import { Section } from "@/components/settings/SettingsPrimitives";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
+import { beginNativeOAuthLink } from "@/lib/capacitor-oauth";
+import { isTauriRuntime } from "@/lib/platform";
 
 interface AuthProviderState {
   enabled: boolean;
@@ -58,6 +60,82 @@ export function AccountSection() {
       .then(setAuthConfig)
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const handleLinkCompleted = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{
+          provider?: string;
+          userId?: number;
+        }>
+      ).detail;
+      if (!detail || detail.userId !== user?.id || !detail.provider) return;
+      const provider =
+        detail.provider === "google"
+          ? "Google"
+          : detail.provider === "apple"
+            ? "Apple"
+            : detail.provider;
+      if (linkingProvider === detail.provider) setLinkingProvider(null);
+      toast.success(
+        t("settings.account.toasts.linkSucceeded", {
+          provider,
+        }),
+      );
+      void refetch().catch(() => {});
+    };
+    const handleLinkFailed = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{
+          provider?: string;
+          userId?: number;
+        }>
+      ).detail;
+      if (!detail || detail.userId !== user?.id || !detail.provider) return;
+      const provider =
+        detail.provider === "google"
+          ? "Google"
+          : detail.provider === "apple"
+            ? "Apple"
+            : detail.provider;
+      if (linkingProvider === detail.provider) setLinkingProvider(null);
+      toast.error(
+        t("settings.account.toasts.linkCompletionFailed", {
+          provider,
+        }),
+      );
+    };
+    window.addEventListener("crate:oauth-link-completed", handleLinkCompleted);
+    window.addEventListener("crate:oauth-link-failed", handleLinkFailed);
+    return () => {
+      window.removeEventListener(
+        "crate:oauth-link-completed",
+        handleLinkCompleted,
+      );
+      window.removeEventListener("crate:oauth-link-failed", handleLinkFailed);
+    };
+  }, [linkingProvider, refetch, t, user?.id]);
+
+  useEffect(() => {
+    if (!isTauriRuntime || !linkingProvider) return;
+    let lostFocus = false;
+    const handleBlur = () => {
+      lostFocus = true;
+    };
+    const handleFocus = () => {
+      if (!lostFocus) return;
+      lostFocus = false;
+      setLinkingProvider((current) =>
+        current === linkingProvider ? null : current,
+      );
+    };
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [linkingProvider]);
 
   async function handleSaveName() {
     if (!name.trim()) return;
@@ -112,6 +190,13 @@ export function AccountSection() {
   async function handleLinkProvider(provider: string) {
     setLinkingProvider(provider);
     try {
+      if (isTauriRuntime) {
+        if (!user || (provider !== "google" && provider !== "apple")) {
+          throw new Error("The active account cannot link this provider");
+        }
+        await beginNativeOAuthLink(provider, user.id);
+        return;
+      }
       const response = await api<{ login_url: string }>(
         `/api/auth/oauth/${provider}/link`,
         "POST",
@@ -122,7 +207,7 @@ export function AccountSection() {
       window.location.href = response.login_url;
     } catch {
       toast.error(t("settings.account.toasts.linkFailed", { provider }));
-      setLinkingProvider(null);
+      if (linkingProvider === provider) setLinkingProvider(null);
     }
   }
 

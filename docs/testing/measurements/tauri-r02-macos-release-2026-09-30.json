@@ -1,0 +1,387 @@
+{
+  "sourceRevision": "856de16c",
+  "host": {
+    "model": "Mac17,2",
+    "os": "macOS 27.0.1 (26A434)",
+    "architecture": "arm64",
+    "ramGiB": 16
+  },
+  "bundle": {
+    "name": "Crate HTTP Resource Soak.app",
+    "identifier": "app.cratemusic.crate.desktop.http-resource-soak20260930",
+    "version": "2.7.4",
+    "minimumMacOS": "11.0",
+    "binarySha256": "adc11bcdeec9801f8b604d038ec560721682a432e184e3c29a29cbf03758969b",
+    "signedOrNotarized": false
+  },
+  "httpPlugin": "tauri-plugin-http 2.5.9, Crate vendored patch",
+  "fixture": "Node HTTP server on loopback 127.0.0.1:18769",
+  "resourceTable": {
+    "measurement": "webview.resources_table().names().count()",
+    "scenarios": [
+      "consumed HTTP 200",
+      "consumed HTTP 500",
+      "connection refused",
+      "bodyless HTTP 204",
+      "abort while request is pending",
+      "cancel after the first streamed body chunk"
+    ],
+    "cyclesPerScenario": 25,
+    "requests": 150,
+    "baseline": 0,
+    "minimumAfterSettling": 0,
+    "maximumAfterSettling": 0,
+    "final": 0,
+    "failures": [],
+    "completedAt": "2026-09-30T15:01:17.715Z"
+  },
+  "mainAppProcessRssMiB": {
+    "samplingTargetIntervalSeconds": 0.1,
+    "sampleCount": 83,
+    "captureDurationSeconds": 14.37,
+    "minimum": 15.4,
+    "median": 63.0,
+    "p95": 101.4,
+    "maximum": 105.9,
+    "lastSample": 47.7,
+    "samples": [
+      {
+        "elapsedSeconds": 6.723,
+        "rssMiB": 15.4
+      },
+      {
+        "elapsedSeconds": 6.904,
+        "rssMiB": 40.9
+      },
+      {
+        "elapsedSeconds": 7.088,
+        "rssMiB": 61.8
+      },
+      {
+        "elapsedSeconds": 7.547,
+        "rssMiB": 73.3
+      },
+      {
+        "elapsedSeconds": 7.89,
+        "rssMiB": 99.4
+      },
+      {
+        "elapsedSeconds": 8.132,
+        "rssMiB": 104.6
+      },
+      {
+        "elapsedSeconds": 8.369,
+        "rssMiB": 102.8
+      },
+      {
+        "elapsedSeconds": 8.658,
+        "rssMiB": 105.9
+      },
+      {
+        "elapsedSeconds": 8.853,
+        "rssMiB": 103.1
+      },
+      {
+        "elapsedSeconds": 9.019,
+        "rssMiB": 103.2
+      },
+      {
+        "elapsedSeconds": 9.192,
+        "rssMiB": 101.4
+      },
+      {
+        "elapsedSeconds": 9.364,
+        "rssMiB": 99.2
+      },
+      {
+        "elapsedSeconds": 9.512,
+        "rssMiB": 96.4
+      },
+      {
+        "elapsedSeconds": 9.682,
+        "rssMiB": 95.1
+      },
+      {
+        "elapsedSeconds": 9.856,
+        "rssMiB": 89.9
+      },
+      {
+        "elapsedSeconds": 10.044,
+        "rssMiB": 89.4
+      },
+      {
+        "elapsedSeconds": 10.193,
+        "rssMiB": 87.2
+      },
+      {
+        "elapsedSeconds": 10.355,
+        "rssMiB": 86.5
+      },
+      {
+        "elapsedSeconds": 10.528,
+        "rssMiB": 86.5
+      },
+      {
+        "elapsedSeconds": 10.685,
+        "rssMiB": 86.2
+      },
+      {
+        "elapsedSeconds": 10.875,
+        "rssMiB": 86.3
+      },
+      {
+        "elapsedSeconds": 11.026,
+        "rssMiB": 86.2
+      },
+      {
+        "elapsedSeconds": 11.221,
+        "rssMiB": 86.2
+      },
+      {
+        "elapsedSeconds": 11.37,
+        "rssMiB": 86.2
+      },
+      {
+        "elapsedSeconds": 11.538,
+        "rssMiB": 86.1
+      },
+      {
+        "elapsedSeconds": 11.703,
+        "rssMiB": 85.9
+      },
+      {
+        "elapsedSeconds": 11.861,
+        "rssMiB": 85.7
+      },
+      {
+        "elapsedSeconds": 12.024,
+        "rssMiB": 86.1
+      },
+      {
+        "elapsedSeconds": 12.178,
+        "rssMiB": 86.5
+      },
+      {
+        "elapsedSeconds": 12.348,
+        "rssMiB": 86.4
+      },
+      {
+        "elapsedSeconds": 12.559,
+        "rssMiB": 85.8
+      },
+      {
+        "elapsedSeconds": 12.707,
+        "rssMiB": 86.1
+      },
+      {
+        "elapsedSeconds": 12.862,
+        "rssMiB": 86.0
+      },
+      {
+        "elapsedSeconds": 13.022,
+        "rssMiB": 86.1
+      },
+      {
+        "elapsedSeconds": 13.196,
+        "rssMiB": 85.5
+      },
+      {
+        "elapsedSeconds": 13.375,
+        "rssMiB": 83.0
+      },
+      {
+        "elapsedSeconds": 13.552,
+        "rssMiB": 79.0
+      },
+      {
+        "elapsedSeconds": 13.733,
+        "rssMiB": 79.0
+      },
+      {
+        "elapsedSeconds": 13.909,
+        "rssMiB": 78.8
+      },
+      {
+        "elapsedSeconds": 14.076,
+        "rssMiB": 79.0
+      },
+      {
+        "elapsedSeconds": 14.238,
+        "rssMiB": 74.5
+      },
+      {
+        "elapsedSeconds": 14.399,
+        "rssMiB": 64.8
+      },
+      {
+        "elapsedSeconds": 14.596,
+        "rssMiB": 63.9
+      },
+      {
+        "elapsedSeconds": 14.738,
+        "rssMiB": 62.9
+      },
+      {
+        "elapsedSeconds": 14.892,
+        "rssMiB": 63.0
+      },
+      {
+        "elapsedSeconds": 15.044,
+        "rssMiB": 63.0
+      },
+      {
+        "elapsedSeconds": 15.19,
+        "rssMiB": 62.5
+      },
+      {
+        "elapsedSeconds": 15.337,
+        "rssMiB": 62.5
+      },
+      {
+        "elapsedSeconds": 15.487,
+        "rssMiB": 62.7
+      },
+      {
+        "elapsedSeconds": 15.641,
+        "rssMiB": 62.8
+      },
+      {
+        "elapsedSeconds": 15.792,
+        "rssMiB": 62.5
+      },
+      {
+        "elapsedSeconds": 15.943,
+        "rssMiB": 62.1
+      },
+      {
+        "elapsedSeconds": 16.097,
+        "rssMiB": 61.7
+      },
+      {
+        "elapsedSeconds": 16.244,
+        "rssMiB": 62.0
+      },
+      {
+        "elapsedSeconds": 16.414,
+        "rssMiB": 62.0
+      },
+      {
+        "elapsedSeconds": 16.571,
+        "rssMiB": 62.0
+      },
+      {
+        "elapsedSeconds": 16.798,
+        "rssMiB": 61.8
+      },
+      {
+        "elapsedSeconds": 16.943,
+        "rssMiB": 62.0
+      },
+      {
+        "elapsedSeconds": 17.094,
+        "rssMiB": 58.4
+      },
+      {
+        "elapsedSeconds": 17.244,
+        "rssMiB": 58.3
+      },
+      {
+        "elapsedSeconds": 17.384,
+        "rssMiB": 58.3
+      },
+      {
+        "elapsedSeconds": 17.528,
+        "rssMiB": 58.0
+      },
+      {
+        "elapsedSeconds": 17.7,
+        "rssMiB": 57.9
+      },
+      {
+        "elapsedSeconds": 17.9,
+        "rssMiB": 57.7
+      },
+      {
+        "elapsedSeconds": 18.08,
+        "rssMiB": 57.7
+      },
+      {
+        "elapsedSeconds": 18.263,
+        "rssMiB": 58.0
+      },
+      {
+        "elapsedSeconds": 18.41,
+        "rssMiB": 57.7
+      },
+      {
+        "elapsedSeconds": 18.588,
+        "rssMiB": 57.3
+      },
+      {
+        "elapsedSeconds": 18.752,
+        "rssMiB": 55.5
+      },
+      {
+        "elapsedSeconds": 18.905,
+        "rssMiB": 55.5
+      },
+      {
+        "elapsedSeconds": 19.057,
+        "rssMiB": 55.5
+      },
+      {
+        "elapsedSeconds": 19.243,
+        "rssMiB": 55.4
+      },
+      {
+        "elapsedSeconds": 19.421,
+        "rssMiB": 55.4
+      },
+      {
+        "elapsedSeconds": 19.584,
+        "rssMiB": 51.7
+      },
+      {
+        "elapsedSeconds": 19.766,
+        "rssMiB": 48.8
+      },
+      {
+        "elapsedSeconds": 19.954,
+        "rssMiB": 47.8
+      },
+      {
+        "elapsedSeconds": 20.127,
+        "rssMiB": 47.6
+      },
+      {
+        "elapsedSeconds": 20.28,
+        "rssMiB": 47.6
+      },
+      {
+        "elapsedSeconds": 20.443,
+        "rssMiB": 47.7
+      },
+      {
+        "elapsedSeconds": 20.604,
+        "rssMiB": 47.9
+      },
+      {
+        "elapsedSeconds": 20.759,
+        "rssMiB": 47.9
+      },
+      {
+        "elapsedSeconds": 20.935,
+        "rssMiB": 47.9
+      },
+      {
+        "elapsedSeconds": 21.092,
+        "rssMiB": 47.7
+      }
+    ]
+  },
+  "limitations": [
+    "RSS sampling covers only the main Tauri process, not WebKit subprocesses.",
+    "This isolated release bundle uses a temporary probe page and is not signed or notarized.",
+    "No API login, real playback, or external network request was part of the soak."
+  ]
+}

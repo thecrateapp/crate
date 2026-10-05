@@ -1,3 +1,9 @@
+import {
+  ensureMediaAccessUrl,
+  requiresMediaAccessTicket,
+  resolveMaybeApiAssetUrl,
+} from "@/lib/api";
+
 /**
  * Extract dominant colors from an image URL using canvas sampling.
  * Returns 3 colors: primary, secondary, accent — each as [r, g, b] normalized 0-1.
@@ -26,7 +32,7 @@ export async function extractPalette(
   ];
 
   try {
-    const img = await loadImage(imageUrl);
+    const img = await loadImage(await resolvePaletteImageUrl(imageUrl));
     const colors = sampleColors(img);
     if (colors.length < 3) return DEFAULT;
 
@@ -41,10 +47,30 @@ export async function extractPalette(
   }
 }
 
-function loadImage(url: string): Promise<HTMLImageElement> {
+async function resolvePaletteImageUrl(url: string): Promise<string> {
+  const resolved = resolveMaybeApiAssetUrl(url) ?? url;
+  return requiresMediaAccessTicket(resolved)
+    ? ensureMediaAccessUrl(resolved, "artwork")
+    : resolved;
+}
+
+async function loadImage(url: string): Promise<HTMLImageElement> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Palette image request failed: HTTP ${response.status}`);
+  }
+
+  const imageUrl = URL.createObjectURL(await response.blob());
+  try {
+    return await loadBlobImage(imageUrl);
+  } finally {
+    URL.revokeObjectURL(imageUrl);
+  }
+}
+
+function loadBlobImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = reject;
     img.src = url;

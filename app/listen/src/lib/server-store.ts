@@ -11,10 +11,9 @@
  *   - a "current server" concept for the whole app
  *   - live reactivity when the current server changes
  *
- * Public server descriptors live in localStorage. Capacitor credentials live
- * in the platform keystore/keychain and are loaded into memory before React
- * renders. Tauri keeps the existing storage contract until its native store
- * migration is implemented separately.
+ * Public server descriptors live in localStorage. Capacitor and Tauri
+ * credentials live in OS-backed secure storage and are loaded into memory
+ * before React renders.
  */
 import {
   clearRuntimeServerSecrets,
@@ -26,7 +25,8 @@ import {
   setRuntimeServerSecret,
   type ServerSecret,
 } from "@/lib/server-store-secrets";
-import { isCapacitorRuntime, usesConfigurableServer } from "@/lib/platform";
+import { revokeOfflineIdentityForServer } from "@/lib/offline-identity";
+import { usesConfigurableServer, usesSecureSessionStore } from "@/lib/platform";
 
 export { waitForPendingSecureSessionWrites } from "@/lib/server-store-secrets";
 
@@ -130,11 +130,11 @@ export function getServers(): ServerConfig[] {
       [],
     ).map((server) => ({
       ...server,
-      token: isCapacitorRuntime
+      token: usesSecureSessionStore
         ? getRuntimeServerSecret(server.id).token
         : server.token ?? null,
       tokenExpiresAt: server.tokenExpiresAt ?? null,
-      refreshToken: isCapacitorRuntime
+      refreshToken: usesSecureSessionStore
         ? getRuntimeServerSecret(server.id).refreshToken
         : server.refreshToken ?? null,
     }));
@@ -162,14 +162,17 @@ export function getServerById(id: string): ServerConfig | null {
   return getServers().find((server) => server.id === id) ?? null;
 }
 
-function writeServers(servers: ServerConfig[]): void {
+function writeServers(
+  servers: ServerConfig[],
+  options: { throwOnError?: boolean } = {},
+): void {
   try {
     const persisted: StoredServerConfig[] = servers.map((server) => ({
       id: server.id,
       label: server.label,
       url: server.url,
       tokenExpiresAt: server.tokenExpiresAt,
-      ...(isCapacitorRuntime
+      ...(usesSecureSessionStore
         ? {}
         : {
             token: server.token,
@@ -177,13 +180,18 @@ function writeServers(servers: ServerConfig[]): void {
           }),
     }));
     localStorage.setItem(SERVERS_KEY, JSON.stringify(persisted));
-  } catch {
+  } catch (error) {
+    if (options.throwOnError) {
+      const wrapped = new Error("Server registry persistence failed");
+      (wrapped as Error & { cause?: unknown }).cause = error;
+      throw wrapped;
+    }
     /* ignore */
   }
 }
 
 export async function bootstrapNativeSessionStore(): Promise<void> {
-  if (!isCapacitorRuntime) return;
+  if (!usesSecureSessionStore) return;
   const records = safeJsonParse<StoredServerConfig[]>(
     localStorage.getItem(SERVERS_KEY),
     [],
@@ -191,24 +199,27 @@ export async function bootstrapNativeSessionStore(): Promise<void> {
   let nextSecrets: Map<string, ServerSecret>;
   try {
     nextSecrets = await loadNativeServerSecrets(records);
-  } catch {
-    throw new Error("Native session migration failed");
+    writeServers(
+      records.map((server) => ({
+        id: server.id,
+        label: server.label,
+        url: server.url,
+        token: nextSecrets.get(server.id)?.token ?? null,
+        tokenExpiresAt: server.tokenExpiresAt ?? null,
+        refreshToken: nextSecrets.get(server.id)?.refreshToken ?? null,
+      })),
+      { throwOnError: true },
+    );
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
+  } catch (error) {
+    const wrapped = new Error("Native session migration failed");
+    (wrapped as Error & { cause?: unknown }).cause = error;
+    throw wrapped;
   }
   clearRuntimeServerSecrets();
   for (const [serverId, secret] of nextSecrets) {
     setRuntimeServerSecret(serverId, secret);
   }
-  writeServers(
-    records.map((server) => ({
-      id: server.id,
-      label: server.label,
-      url: server.url,
-      token: nextSecrets.get(server.id)?.token ?? null,
-      tokenExpiresAt: server.tokenExpiresAt ?? null,
-      refreshToken: nextSecrets.get(server.id)?.refreshToken ?? null,
-    })),
-  );
-  localStorage.removeItem(LEGACY_TOKEN_KEY);
 }
 
 function dispatchChange(): void {
@@ -246,6 +257,7 @@ export function addServer(url: string, label?: string): ServerConfig {
 }
 
 export function removeServer(id: string): void {
+  revokeOfflineIdentityForServer(id);
   const servers = getServers().filter((s) => s.id !== id);
   writeServers(servers);
   if (getCurrentServerId() === id) {
@@ -278,7 +290,7 @@ export function setCurrentServerToken(
 ): void {
   const id = getCurrentServerId();
   if (!id) return;
-  if (isCapacitorRuntime) {
+  if (usesSecureSessionStore) {
     const current = getRuntimeServerSecret(id);
     const nextSecret = { ...current, token };
     setRuntimeServerSecret(id, nextSecret);
@@ -303,7 +315,7 @@ export function setCurrentServerRefreshToken(
 ): void {
   const id = getCurrentServerId();
   if (!id) return;
-  if (isCapacitorRuntime) {
+  if (usesSecureSessionStore) {
     const current = getRuntimeServerSecret(id);
     const nextSecret = { ...current, refreshToken };
     setRuntimeServerSecret(id, nextSecret);
@@ -334,7 +346,7 @@ export function setServerAuthTokens(
 ): boolean {
   const currentServer = getServerById(id);
   if (!currentServer) return false;
-  if (isCapacitorRuntime) {
+  if (usesSecureSessionStore) {
     const current = getRuntimeServerSecret(id);
     const nextSecret = {
       token,
@@ -384,7 +396,7 @@ export function migrateLegacyToken(defaultUrl: string): void {
     const legacyToken = localStorage.getItem(LEGACY_TOKEN_KEY);
     if (!legacyToken || !defaultUrl) return;
     const seeded = addServer(defaultUrl);
-    if (isCapacitorRuntime) {
+    if (usesSecureSessionStore) {
       const migrationRecord: StoredServerConfig = {
         id: seeded.id,
         label: seeded.label,

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tauri audio memory probe</title>
+  </head>
+  <body>
+    <main>
+      <h1>Tauri audio memory probe</h1>
+      <pre id="results" aria-live="polite">Starting…</pre>
+      <button id="release" type="button" disabled>
+        Release decoded buffers
+      </button>
+    </main>
+    <script type="module" src="./probe.js"></script>
+  </body>
+</html>

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { useApi } from "@/hooks/use-api";
 import { api, apiAssetUrl } from "@/lib/api";
+import { openExternalUrl } from "@/lib/external-links";
 
 import { EmptyState, Spinner } from "./LibraryPrimitives";
 import { LibraryBandcampHeader } from "./LibraryBandcampHeader";
@@ -18,14 +19,6 @@ import type {
   ContributionsResponse,
   LibraryContribution,
 } from "./library-model";
-
-function exportContribution(contribution: LibraryContribution) {
-  window.open(
-    apiAssetUrl(`/api/me/contributions/${contribution.id}/export`),
-    "_blank",
-    "noopener,noreferrer",
-  );
-}
 
 export function LibraryBandcampTab() {
   const { t } = useTranslation();
@@ -45,6 +38,18 @@ export function LibraryBandcampTab() {
   const [withdrawTarget, setWithdrawTarget] =
     useState<LibraryContribution | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
+
+  function openExternalLink(url: string) {
+    void openExternalUrl(url).catch(() =>
+      toast.error(t("common.toasts.openExternalFailed")),
+    );
+  }
+
+  function exportContribution(contribution: LibraryContribution) {
+    openExternalLink(
+      apiAssetUrl(`/api/me/contributions/${contribution.id}/export`),
+    );
+  }
 
   async function importItem(item: BandcampItem) {
     const itemId = item.bandcamp_item_id ?? item.id;
@@ -144,6 +149,7 @@ export function LibraryBandcampTab() {
           titleLabel={t("bandcamp.titleLabel")}
           importLabel={t("common.import")}
           onImport={importItem}
+          onOpenExternal={openExternalLink}
         />
       )}
 

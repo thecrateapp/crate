@@ -24,6 +24,22 @@ on:
       - "package-lock.json"
       - ".github/workflows/build-desktop.yml"
   workflow_dispatch:
+    inputs:
+      measure_windows_audio_rss:
+        description: "Measure decoded-audio RSS in a Windows WebView2 process group"
+        type: boolean
+        required: false
+        default: false
+      measure_r01_api:
+        description: "Run a low-volume R01 HTTPS sample against the read-only Crate API"
+        type: boolean
+        required: false
+        default: false
+      measure_windows_offline_perf:
+        description: "Measure offline index hydration, verification, and writes on Windows"
+        type: boolean
+        required: false
+        default: false
 
 defaults:
   run:
@@ -45,7 +61,7 @@ jobs:
             artifact_suffix: macos
             build_script: tauri:build:macos
           - name: Linux
-            runner: ubuntu-24.04
+            runner: ubuntu-22.04
             artifact_suffix: linux
             build_script: tauri:build:linux
           - name: Windows
@@ -77,6 +93,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: app/listen-desktop/src-tauri -> target
+          # Keep native build-script artifacts isolated by runner image/ABI.
+          shared-key: ${{ matrix.runner }}
 
       - name: Install Linux system dependencies
         if: runner.os == 'Linux'
@@ -232,12 +250,86 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Resolve desktop version
+        run: node app/listen-desktop/scripts/desktop-version.mjs
+
+      - name: Test desktop version resolver
+        run: npm run --workspace=app/listen-desktop test:version
+
+      - name: Test Linux glibc compatibility verifier
+        if: runner.os == 'Linux'
+        run: npm run --workspace=app/listen-desktop test:glibc
+
+      - name: Build HTTP resource probe frontend
+        run: npm run --workspace=app/listen-desktop build:http-resource-probe
+
       - name: Test desktop native layer
         run: cargo test --locked --manifest-path app/listen-desktop/src-tauri/Cargo.toml
+
+      - name: Test native performance write telemetry
+        run: node --test app/listen-desktop/scripts/native-perf/telemetry.node-test.mjs
+
+      - name: Measure pooled HTTP reuse (diagnostic)
+        run: cargo run --locked --release --manifest-path app/listen-desktop/src-tauri/Cargo.toml --example http_pool_bench
+
+      - name: Measure pooled HTTP reuse against API (diagnostic)
+        if: github.event_name == 'workflow_dispatch' && inputs.measure_r01_api
+        env:
+          CRATE_R01_API_URL: https://api.lespedants.org/api/setup/status
+        run: cargo run --locked --release --manifest-path app/listen-desktop/src-tauri/Cargo.toml --example http_pool_bench
+
+      - name: Clear stale desktop bundles
+        if: runner.os != 'macOS'
+        run: rm -rf app/listen-desktop/src-tauri/target/release/bundle
+
+      - name: Import macOS Developer ID certificate for release
+        if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -Eeuo pipefail
+          : "${APPLE_CERTIFICATE:?Missing APPLE_CERTIFICATE repository secret}"
+          : "${APPLE_CERTIFICATE_PASSWORD:?Missing APPLE_CERTIFICATE_PASSWORD repository secret}"
+          : "${APPLE_SIGNING_IDENTITY:?Missing APPLE_SIGNING_IDENTITY repository variable}"
+          : "${APPLE_ID:?Missing APPLE_ID repository secret}"
+          : "${APPLE_PASSWORD:?Missing APPLE_PASSWORD repository secret}"
+          : "${APPLE_TEAM_ID:?Missing APPLE_TEAM_ID repository secret}"
+          : "${KEYCHAIN_PASSWORD:?Missing KEYCHAIN_PASSWORD repository secret}"
+          case "$APPLE_SIGNING_IDENTITY" in
+            "Developer ID Application:"*) ;;
+            *) echo 'APPLE_SIGNING_IDENTITY must name a Developer ID Application certificate' >&2; exit 1 ;;
+          esac
+
+          keychain_path="$RUNNER_TEMP/crate-signing.keychain-db"
+          certificate_path="$RUNNER_TEMP/crate-signing.p12"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$certificate_path"
+          test -s "$certificate_path"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security import "$certificate_path" -k "$keychain_path" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          security list-keychains -d user -s \
+            "$keychain_path" "$HOME/Library/Keychains/login.keychain-db"
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
+          identities="$(security find-identity -v -p codesigning "$keychain_path")"
+          printf '%s\n' "$identities" | grep -F "$APPLE_SIGNING_IDENTITY" >/dev/null
 
       - name: Build macOS tester bundles
         if: runner.os == 'macOS'
         env:
+          APPLE_SIGNING_IDENTITY: ${{ startsWith(github.ref, 'refs/tags/v') && vars.APPLE_SIGNING_IDENTITY || '-' }}
+          APPLE_ID: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.APPLE_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.APPLE_TEAM_ID || '' }}
           SENTRY_AUTH_TOKEN: ${{ github.event_name == 'push' && secrets.SENTRY_AUTH_TOKEN || '' }}
           SENTRY_ORG: ninja-development
           SENTRY_PROJECT: crate-listen
@@ -251,13 +343,29 @@ jobs:
           VITE_CRATE_CONNECT_FEATURE_ENABLED: ${{ vars.CRATE_CONNECT_FEATURE_ENABLED || 'false' }}
           VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: ${{ vars.LISTEN_APPEARANCE_SETTINGS_ENABLED || 'false' }}
         run: |
-          version="$(node -p "require('./app/listen-desktop/src-tauri/tauri.conf.json').version")"
-          if [[ "${GITHUB_REF_TYPE:-}" == "tag" && -n "${GITHUB_REF_NAME:-}" ]]; then
-            version="${GITHUB_REF_NAME}"
+          version="$CRATE_DESKTOP_VERSION"
+          if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
+            unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
           fi
           make tauri-build-macos-testers \
             TAURI_RELEASE_VERSION="$version" \
             TAURI_MACOS_OUTPUT_DIR=desktop-artifacts
+
+      - name: Verify macOS release signature and notarization
+        if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -Eeuo pipefail
+          for app in \
+            app/listen-desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Crate.app \
+            app/listen-desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Crate.app; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+            signature="$(codesign -dv --verbose=2 "$app" 2>&1)"
+            printf '%s\n' "$signature" | grep -F "Authority=$APPLE_SIGNING_IDENTITY" >/dev/null
+            xcrun stapler validate "$app"
+            spctl --assess --type execute --verbose=2 "$app"
+          done
 
       - name: Build desktop bundles
         if: runner.os != 'macOS'
@@ -274,7 +382,503 @@ jobs:
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
           VITE_CRATE_CONNECT_FEATURE_ENABLED: ${{ vars.CRATE_CONNECT_FEATURE_ENABLED || 'false' }}
           VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: ${{ vars.LISTEN_APPEARANCE_SETTINGS_ENABLED || 'false' }}
-        run: npm run --workspace=app/listen-desktop ${{ matrix.build_script }}
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" && "$CRATE_DESKTOP_MSI_COMPATIBLE" != "true" ]]; then
+            npm run --workspace=app/listen-desktop tauri:build:windows:nsis
+          else
+            npm run --workspace=app/listen-desktop ${{ matrix.build_script }}
+          fi
+
+      - name: Setup Python for Windows RSS capture
+        if: runner.os == 'Windows' && (inputs.measure_windows_audio_rss || inputs.measure_windows_offline_perf)
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install Windows offline performance test dependency
+        if: runner.os == 'Windows' && inputs.measure_windows_offline_perf
+        shell: pwsh
+        run: python -m pip install --disable-pip-version-check pytest
+
+      - name: Test Windows offline performance capture
+        if: runner.os == 'Windows' && inputs.measure_windows_offline_perf
+        shell: pwsh
+        run: python -m pytest app/listen-desktop/scripts/native-perf/test_capture_windows_offline_perf.py
+
+      - name: Measure Windows offline performance
+        if: runner.os == 'Windows' && inputs.measure_windows_offline_perf
+        shell: pwsh
+        timeout-minutes: 40
+        run: |
+          $results = Join-Path $env:RUNNER_TEMP 'crate-native-offline-perf-windows'
+          python app/listen-desktop/scripts/native-perf/capture_windows_offline_perf.py `
+            --output-dir $results `
+            --revision $env:GITHUB_SHA
+
+      - name: Upload Windows offline performance capture
+        if: always() && runner.os == 'Windows' && inputs.measure_windows_offline_perf
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-native-offline-performance-windows-${{ github.run_id }}
+          path: ${{ runner.temp }}/crate-native-offline-perf-windows
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Install Windows RSS capture dependency
+        if: runner.os == 'Windows' && inputs.measure_windows_audio_rss
+        shell: pwsh
+        run: python -m pip install --disable-pip-version-check psutil==7.2.2
+
+      - name: Measure Windows WebView2 audio RSS
+        if: runner.os == 'Windows' && inputs.measure_windows_audio_rss
+        shell: pwsh
+        run: |
+          $results = Join-Path $env:RUNNER_TEMP 'crate-audio-rss-results'
+          $fixtures = Join-Path $env:RUNNER_TEMP 'crate-audio-rss-fixtures'
+          python app/listen-desktop/scripts/audio-rss/capture_windows_audio_rss.py `
+            --output-dir $results `
+            --fixture-dir $fixtures `
+            --runs 3
+
+      - name: Upload Windows WebView2 audio RSS capture
+        if: always() && runner.os == 'Windows' && inputs.measure_windows_audio_rss
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-audio-rss-windows-${{ github.run_id }}
+          path: ${{ runner.temp }}/crate-audio-rss-results
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Verify Linux glibc compatibility
+        if: runner.os == 'Linux'
+        run: node app/listen-desktop/scripts/verify-linux-glibc.mjs app/listen-desktop/src-tauri/target/release/crate-desktop 2.36
+
+      - name: Verify Linux WebKitGTK 2.40 symbol compatibility
+        if: runner.os == 'Linux'
+        run: |
+          binary=app/listen-desktop/src-tauri/target/release/crate-desktop
+          if nm -D --undefined-only "$binary" | grep -E ' U[[:space:]]+webkit_cookie_manager_get_all_cookies(_finish)?(@|$)'; then
+            echo 'The desktop binary imports a WebKitGTK cookie API newer than the 2.40 support floor' >&2
+            exit 1
+          fi
+
+      - name: Verify desktop artifact versions
+        if: runner.os != 'macOS'
+        run: >-
+          node app/listen-desktop/scripts/verify-desktop-artifact-version.mjs
+          app/listen-desktop/src-tauri/target/release/bundle
+          "$CRATE_DESKTOP_VERSION"
+          "$CRATE_DESKTOP_MSI_COMPATIBLE"
+
+      - name: Install and launch Windows bundle smoke
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Get-ChildItem `
+            'app/listen-desktop/src-tauri/target/release/bundle/nsis' `
+            -Filter '*-setup.exe' -File |
+            Select-Object -First 1
+          if ($null -eq $installer) {
+            throw 'Windows NSIS installer was not produced'
+          }
+
+          $install = Start-Process `
+            -FilePath $installer.FullName `
+            -ArgumentList '/S' `
+            -Wait `
+            -PassThru
+          if ($install.ExitCode -ne 0) {
+            throw "Windows NSIS installer exited with $($install.ExitCode)"
+          }
+
+          $installDirectory = Join-Path $env:LOCALAPPDATA 'Crate'
+          $application = Join-Path $installDirectory 'crate-desktop.exe'
+          $uninstaller = Join-Path $installDirectory 'uninstall.exe'
+          if (-not (Test-Path -LiteralPath $application -PathType Leaf)) {
+            throw "Installed desktop executable is missing: $application"
+          }
+          if (-not (Test-Path -LiteralPath $uninstaller -PathType Leaf)) {
+            throw "NSIS uninstaller is missing: $uninstaller"
+          }
+
+          $app = $null
+          try {
+            $app = Start-Process `
+              -FilePath $application `
+              -WorkingDirectory $PWD.Path `
+              -PassThru
+            $deadline = [DateTime]::UtcNow.AddSeconds(20)
+            do {
+              Start-Sleep -Milliseconds 500
+              $app.Refresh()
+              if ($app.HasExited) {
+                throw "Installed app exited with $($app.ExitCode)"
+              }
+            } while ($app.MainWindowHandle -eq 0 -and [DateTime]::UtcNow -lt $deadline)
+
+            if ($app.MainWindowHandle -eq 0) {
+              throw 'Installed app did not create its main window within 20 seconds'
+            }
+            Write-Output "Installed app created its main window (HWND $($app.MainWindowHandle))"
+          }
+          finally {
+            if ($null -ne $app -and -not $app.HasExited) {
+              $app.CloseMainWindow() | Out-Null
+              if (-not $app.WaitForExit(5000)) {
+                Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+                if (-not $app.WaitForExit(5000)) {
+                  throw 'Installed app could not be stopped before uninstall'
+                }
+              }
+            }
+
+            Write-Output 'Windows silent install and launch smoke passed'
+          }
+
+      - name: Setup Python for Windows HTTP resource probe
+        if: runner.os == 'Windows'
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Test Windows HTTP probe environment isolation
+        if: runner.os == 'Windows'
+        run: python app/listen-desktop/scripts/http-resource-probe/test_run_windows_probe.py
+
+      - name: Setup Windows loader trace
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'ProcessMonitor.zip'
+          $directory = Join-Path $env:RUNNER_TEMP 'ProcessMonitor'
+          Invoke-WebRequest `
+            -Uri 'https://download.sysinternals.com/files/ProcessMonitor.zip' `
+            -OutFile $archive
+          Expand-Archive -LiteralPath $archive -DestinationPath $directory -Force
+          $procmon = Join-Path $directory 'Procmon64.exe'
+          if (-not (Test-Path -LiteralPath $procmon -PathType Leaf)) {
+            throw 'Microsoft Process Monitor x64 was missing from the official archive'
+          }
+          $signature = Get-AuthenticodeSignature -FilePath $procmon
+          if ($signature.Status -ne 'Valid' -or
+              $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
+            throw "Process Monitor signature was not valid Microsoft code: $($signature.Status)"
+          }
+          "CRATE_PROCMON_PATH=$procmon" | Add-Content -LiteralPath $env:GITHUB_ENV
+
+      - name: Build Windows HTTP resource probe app
+        if: runner.os == 'Windows'
+        run: >-
+          cargo build --locked --release --features tauri/custom-protocol
+          --manifest-path app/listen-desktop/src-tauri/Cargo.toml
+          --example http_resource_probe
+
+      - name: Run Windows HTTP resource probe
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $results = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-resource.json'
+          $recording = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-loader.pml'
+          $csv = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-loader.csv'
+          $filteredCsv = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-loader-apps.csv'
+          $loaderSnaps = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-loader-snaps.txt'
+          $filteredLoaderSnaps = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-loader-snaps-filtered.txt'
+          $example = 'app/listen-desktop/src-tauri/target/release/examples/http_resource_probe.exe'
+          # Run beside the installed app so the probe resolves the same bundled runtime DLLs.
+          $installDirectory = Join-Path $env:LOCALAPPDATA 'Crate'
+          $application = Join-Path $installDirectory 'http_resource_probe.exe'
+          $bundledApplication = Join-Path $installDirectory 'crate-desktop.exe'
+          Copy-Item -LiteralPath $example -Destination $application -Force
+
+          $manifestTool = Get-ChildItem `
+            -LiteralPath (Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin') `
+            -Filter mt.exe `
+            -Recurse `
+            -File `
+            -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\x64\\mt\.exe$' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $manifestTool) {
+            throw 'Windows SDK manifest tool (mt.exe) was not found'
+          }
+
+          $manifest = Join-Path $env:RUNNER_TEMP 'crate-desktop.manifest'
+          $manifestSidecar = "$bundledApplication.manifest"
+          if (Test-Path -LiteralPath $manifestSidecar -PathType Leaf) {
+            Copy-Item `
+              -LiteralPath $manifestSidecar `
+              -Destination "$application.manifest" `
+              -Force
+          } else {
+            & $manifestTool `
+              "-inputresource:$bundledApplication;#1" `
+              "-out:$manifest"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not extract the installed app manifest (mt.exe exited with $LASTEXITCODE)"
+            }
+            & $manifestTool `
+              -manifest $manifest `
+              "-outputresource:$application;#1"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not apply the installed app manifest to the probe (mt.exe exited with $LASTEXITCODE)"
+            }
+          }
+          Write-Output 'Applied the installed Crate app manifest to the HTTP resource probe'
+
+          $procmon = $env:CRATE_PROCMON_PATH
+          $traceStarted = $false
+          if ($procmon -and (Test-Path -LiteralPath $procmon -PathType Leaf)) {
+            try {
+              $monitor = Start-Process `
+                -FilePath $procmon `
+                -ArgumentList @(
+                  '/AcceptEula',
+                  '/BackingFile',
+                  $recording,
+                  '/Quiet',
+                  '/Minimized'
+                ) `
+                -PassThru
+              Start-Sleep -Seconds 2
+              $traceStarted = -not $monitor.HasExited -or
+                (Test-Path -LiteralPath $recording -PathType Leaf)
+              if (-not $traceStarted) {
+                Write-Warning 'Process Monitor exited without starting a trace; running probe without capture'
+              }
+            } catch {
+              Write-Warning "Process Monitor could not start: $($_.Exception.Message)"
+            }
+          } else {
+            Write-Warning 'Process Monitor was unavailable; running probe without a loader trace'
+          }
+
+          python app/listen-desktop/scripts/http-resource-probe/run_windows_probe.py `
+            --executable $application `
+            --output $results
+          $probeExitCode = $LASTEXITCODE
+
+          if ($traceStarted) {
+            try {
+              Start-Process `
+                -FilePath $procmon `
+                -ArgumentList @('/Terminate', '/Quiet') `
+                -Wait
+            } catch {
+              Write-Warning "Process Monitor could not terminate cleanly: $($_.Exception.Message)"
+            }
+            Wait-Process -Name Procmon64 -Timeout 10 -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 500
+
+            if (Test-Path -LiteralPath $recording -PathType Leaf) {
+              Start-Process `
+                -FilePath $procmon `
+                -ArgumentList @('/NoConnect', '/OpenLog', $recording, '/SaveAs', $csv) `
+                -Wait `
+                -NoNewWindow
+              if (Test-Path -LiteralPath $csv -PathType Leaf) {
+                $events = Import-Csv -LiteralPath $csv |
+                  Where-Object {
+                    $_.'Process Name' -in @('crate-desktop.exe', 'http_resource_probe.exe')
+                  } |
+                  Select-Object 'Time of Day', 'Process Name', PID, Operation, Path, Result
+                $events | Export-Csv -LiteralPath $filteredCsv -NoTypeInformation
+                Write-Output "Captured $($events.Count) app events in the Windows loader trace"
+                Remove-Item -LiteralPath $recording -Force
+              } else {
+                Write-Warning 'Process Monitor trace export did not produce a CSV file'
+              }
+            } else {
+              Write-Warning 'Process Monitor did not produce a loader trace file'
+            }
+          }
+
+          if ($probeExitCode -ne 0) {
+            $debuggerDirectory = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\Debuggers\x64'
+            $cdb = Join-Path $debuggerDirectory 'cdb.exe'
+            $gflags = Join-Path $debuggerDirectory 'gflags.exe'
+            $imageName = Split-Path -Leaf $application
+
+            if ((Test-Path -LiteralPath $cdb -PathType Leaf) -and
+                (Test-Path -LiteralPath $gflags -PathType Leaf)) {
+              $loaderSnapsEnabled = $false
+              try {
+                & $gflags /i $imageName +sls | Out-Null
+                if ($LASTEXITCODE -ne 0) {
+                  throw "GFlags exited with $LASTEXITCODE while enabling loader snaps"
+                }
+                $loaderSnapsEnabled = $true
+
+                $debugger = Start-Process `
+                  -FilePath $cdb `
+                  -ArgumentList @('-g', '-G', '-logo', $loaderSnaps, $application) `
+                  -PassThru
+                if (-not $debugger.WaitForExit(30000)) {
+                  Stop-Process -Id $debugger.Id -Force -ErrorAction SilentlyContinue
+                  Write-Warning 'CDB did not finish the loader trace within 30 seconds'
+                }
+              } catch {
+                Write-Warning "Windows loader snaps could not be captured: $($_.Exception.Message)"
+              } finally {
+                if ($loaderSnapsEnabled) {
+                  & $gflags /i $imageName -sls | Out-Null
+                }
+              }
+
+              if (Test-Path -LiteralPath $loaderSnaps -PathType Leaf) {
+                Select-String `
+                  -Path $loaderSnaps `
+                  -Pattern 'STATUS_ENTRYPOINT_NOT_FOUND|0xc0000139|ERROR:|WARNING: Procedure|could not be located' `
+                  -Context 2, 2 |
+                  ForEach-Object { $_.ToString() } |
+                  Set-Content -LiteralPath $filteredLoaderSnaps
+              }
+            } else {
+              Write-Warning 'CDB or GFlags was unavailable; skipping Windows loader snaps'
+            }
+
+            exit $probeExitCode
+          }
+
+      - name: Uninstall Windows bundle smoke app
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installDirectory = Join-Path $env:LOCALAPPDATA 'Crate'
+          $application = Join-Path $installDirectory 'crate-desktop.exe'
+          $uninstaller = Join-Path $installDirectory 'uninstall.exe'
+          if (Test-Path -LiteralPath $uninstaller -PathType Leaf) {
+            $remove = Start-Process `
+              -FilePath $uninstaller `
+              -ArgumentList '/S' `
+              -Wait `
+              -PassThru
+            if ($remove.ExitCode -ne 0) {
+              throw "Windows NSIS uninstaller exited with $($remove.ExitCode)"
+            }
+            if (Test-Path -LiteralPath $application -PathType Leaf) {
+              throw "NSIS uninstaller left the application executable behind: $application"
+            }
+            Write-Output 'Windows NSIS uninstall smoke passed'
+          } else {
+            Write-Output 'No installed Windows bundle remained to uninstall'
+          }
+
+      - name: Capture Windows HTTP resource probe application events
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $diagnostics = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-events.txt'
+          $events = Get-WinEvent -FilterHashtable @{
+            LogName = 'Application'
+            StartTime = [DateTime]::UtcNow.AddMinutes(-30)
+          } -ErrorAction SilentlyContinue |
+            Where-Object {
+              $_.ProviderName -in @('Application Error', 'Windows Error Reporting', 'SideBySide') -and
+              $_.Message -match 'http_resource_probe|crate-desktop'
+            } |
+            Select-Object -First 20 TimeCreated, Id, ProviderName, Message
+          if ($null -eq $events) {
+            'No matching Windows Application events were recorded.' |
+              Set-Content -LiteralPath $diagnostics
+          } else {
+            $events | Format-List * | Out-String |
+              Set-Content -LiteralPath $diagnostics
+            $events | Format-List TimeCreated, Id, ProviderName, Message
+          }
+
+      - name: Capture Windows HTTP resource probe PE imports
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $diagnostics = Join-Path $env:RUNNER_TEMP 'tauri-r02-windows-pe-imports.txt'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (Test-Path -LiteralPath $vswhere -PathType Leaf) {
+            $visualStudio = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          } else {
+            $visualStudio = $null
+          }
+
+          $dumpbin = $null
+          if ($visualStudio) {
+            $dumpbin = Get-ChildItem `
+              -LiteralPath (Join-Path $visualStudio 'VC\Tools\MSVC') `
+              -Filter 'dumpbin.exe' `
+              -Recurse `
+              -File `
+              -ErrorAction SilentlyContinue |
+              Sort-Object -Property FullName -Descending |
+              Select-Object -First 1
+          }
+
+          if ($null -eq $dumpbin) {
+            'dumpbin.exe was not available on this runner.' |
+              Set-Content -LiteralPath $diagnostics
+          } else {
+            $probe = 'app/listen-desktop/src-tauri/target/release/examples/http_resource_probe.exe'
+            $applications = @(
+              'app/listen-desktop/src-tauri/target/release/crate-desktop.exe',
+              $probe
+            )
+            foreach ($application in $applications) {
+              "===== $application =====" | Add-Content -LiteralPath $diagnostics
+              if (Test-Path -LiteralPath $application -PathType Leaf) {
+                & $dumpbin.FullName /headers $application 2>&1 |
+                  Add-Content -LiteralPath $diagnostics
+                & $dumpbin.FullName /imports $application 2>&1 |
+                  Add-Content -LiteralPath $diagnostics
+              } else {
+                'Executable was not built; PE diagnostics are unavailable.' |
+                  Add-Content -LiteralPath $diagnostics
+              }
+            }
+
+            $winsock = Join-Path $env:WINDIR 'System32\ws2_32.dll'
+            "===== $winsock exports (ordinals 115-116) =====" |
+              Add-Content -LiteralPath $diagnostics
+            if (Test-Path -LiteralPath $winsock -PathType Leaf) {
+              & $dumpbin.FullName /exports $winsock 2>&1 |
+                Where-Object {
+                  $_ -match 'Ordinal|WSAStartup|WSACleanup|^\s*115\s|^\s*116\s'
+                } |
+                Add-Content -LiteralPath $diagnostics
+            } else {
+              'System ws2_32.dll was not present.' |
+                Add-Content -LiteralPath $diagnostics
+            }
+
+            '===== Windows loader debugger tools =====' |
+              Add-Content -LiteralPath $diagnostics
+            $debuggerDirectory = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\Debuggers\x64'
+            foreach ($toolName in @('cdb.exe', 'gflags.exe')) {
+              $toolPath = Join-Path $debuggerDirectory $toolName
+              if (Test-Path -LiteralPath $toolPath -PathType Leaf) {
+                $toolPath | Add-Content -LiteralPath $diagnostics
+              } else {
+                "$toolName was not installed at the Windows SDK debugger path." |
+                  Add-Content -LiteralPath $diagnostics
+              }
+            }
+          }
+
+          Get-Content -LiteralPath $diagnostics
+
+      - name: Upload Windows HTTP resource probe
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: tauri-r02-windows-resource-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/tauri-r02-windows-resource.json
+            ${{ runner.temp }}/tauri-r02-windows-events.txt
+            ${{ runner.temp }}/tauri-r02-windows-pe-imports.txt
+            ${{ runner.temp }}/tauri-r02-windows-loader-apps.csv
+            ${{ runner.temp }}/tauri-r02-windows-loader-snaps-filtered.txt
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Generate macOS dSYMs
         if: runner.os == 'macOS' && github.event_name == 'push'
@@ -314,6 +918,12 @@ jobs:
           path: desktop-artifacts/*
           if-no-files-found: error
           retention-days: 30
+
+      - name: Remove macOS release signing material
+        if: always() && runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/v')
+        run: |
+          security delete-keychain "$RUNNER_TEMP/crate-signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/crate-signing.p12"
 
       - name: Attach desktop artifacts to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')

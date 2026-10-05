@@ -293,7 +293,12 @@ def get_home_playlist_seed_context(
 ) -> tuple[list[list[float]], str, dict] | None:
     from crate.db.home import get_home_playlist
 
-    playlist = get_home_playlist(user_id, playlist_id, limit=max(limit, 40))
+    playlist = get_home_playlist(
+        user_id,
+        playlist_id,
+        limit=max(limit, 40),
+        session=session,
+    )
     if not playlist:
         return None
 

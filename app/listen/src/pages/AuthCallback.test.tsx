@@ -140,6 +140,25 @@ describe("AuthCallback", () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
+  it("reads one-time Tauri callback data from the URL fragment", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/auth/callback#desktop=tauri&code=one-time-code&state=oauth-state",
+    );
+
+    renderWithI18n();
+
+    const link = await screen.findByRole("link", { name: "Open Crate" });
+    expect(link.getAttribute("href")).toBe(
+      "cratemusic://oauth/callback?code=one-time-code&state=oauth-state",
+    );
+    expect(window.location.search).toBe("");
+    expect(window.location.hash).toBe("");
+    expect(mockSetAuthTokens).not.toHaveBeenCalled();
+    expect(mockRefetch).not.toHaveBeenCalled();
+  });
+
   it("renders the desktop callback handoff in the active locale", async () => {
     window.history.replaceState(
       {},

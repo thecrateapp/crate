@@ -1,4 +1,5 @@
 import { createContext } from "react";
+import type { LocalOfflineIdentity } from "@/lib/offline-identity";
 
 export interface AuthUser {
   id: number;
@@ -18,6 +19,8 @@ export interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   sessionUnavailable?: boolean;
+  accessMode: "loading" | "authenticated" | "offline" | "unauthenticated";
+  offlineIdentity: LocalOfflineIdentity | null;
   refetch: () => Promise<AuthUser | null>;
   logout: () => Promise<void>;
 }

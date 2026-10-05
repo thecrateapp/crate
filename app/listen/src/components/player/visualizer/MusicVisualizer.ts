@@ -1,4 +1,5 @@
 import { vec3 } from "gl-matrix";
+import { recordDevLog } from "@/lib/dev-logs";
 import { type VisualizerMode } from "@/lib/player-visualizer-prefs";
 import {
   DEFAULT_VISUALIZER_COLORS,
@@ -10,6 +11,12 @@ import {
 } from "./visualizer-audio-analyzer";
 import { renderVisualizerSpheres } from "./visualizer-spheres-renderer";
 import { VisualizerWebGLResources } from "./visualizer-webgl-resources";
+import {
+  VISUALIZER_QUALITY_PROFILES,
+  getVisualizerRenderSize,
+  type VisualizerQualityProfile,
+  type VisualizerQualityProfileName,
+} from "./visualizer-quality";
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -22,6 +29,7 @@ function lerp(a: number, b: number, t: number) {
 export class MusicVisualizer {
   private audioAnalyzer: VisualizerAudioAnalyzer;
   private resources: VisualizerWebGLResources;
+  private quality: VisualizerQualityProfile;
 
   private time = 0;
   private rafId = 0;
@@ -92,6 +100,7 @@ export class MusicVisualizer {
     analyser: AnalyserNode,
     getPlaybackState: () => { volume: number; isPlaying: boolean },
     mode: VisualizerMode = "spheres",
+    qualityProfile: VisualizerQualityProfileName = "default",
   ) {
     this.canvas = canvas;
     this.audioAnalyzer = new VisualizerAudioAnalyzer(
@@ -99,11 +108,16 @@ export class MusicVisualizer {
       getPlaybackState,
     );
     this.mode = mode;
+    this.quality = VISUALIZER_QUALITY_PROFILES[qualityProfile];
 
-    const MAX_DIM = 1024;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.width = Math.min(Math.floor(canvas.clientWidth * dpr), MAX_DIM);
-    this.height = Math.min(Math.floor(canvas.clientHeight * dpr), MAX_DIM);
+    const initialSize = getVisualizerRenderSize(
+      canvas.clientWidth,
+      canvas.clientHeight,
+      window.devicePixelRatio,
+      this.quality.maxRenderDimension,
+    );
+    this.width = initialSize.width;
+    this.height = initialSize.height;
     canvas.width = this.width;
     canvas.height = this.height;
     this.updateViewportScaleCompensation();
@@ -111,7 +125,26 @@ export class MusicVisualizer {
       canvas,
       this.width,
       this.height,
+      this.quality,
     );
+
+    if (import.meta.env.DEV && qualityProfile === "tauri-linux") {
+      const gl = this.resources.glCtx;
+      const rendererInfo = gl.getExtension("WEBGL_debug_renderer_info") as {
+        UNMASKED_RENDERER_WEBGL: number;
+        UNMASKED_VENDOR_WEBGL: number;
+      } | null;
+      recordDevLog("visualizer", "WebGL renderer", {
+        renderer: rendererInfo
+          ? gl.getParameter(rendererInfo.UNMASKED_RENDERER_WEBGL)
+          : gl.getParameter(gl.RENDERER),
+        vendor: rendererInfo
+          ? gl.getParameter(rendererInfo.UNMASKED_VENDOR_WEBGL)
+          : gl.getParameter(gl.VENDOR),
+        context: gl.getContextAttributes(),
+        qualityProfile,
+      });
+    }
   }
 
   private updateViewportScaleCompensation() {
@@ -302,14 +335,21 @@ export class MusicVisualizer {
     });
   }
 
-  setSize(w: number, h: number) {
-    if (w === this.width && h === this.height) return;
-    this.width = w;
-    this.height = h;
-    this.canvas.width = w;
-    this.canvas.height = h;
+  setSize(cssWidth: number, cssHeight: number) {
+    if (cssWidth <= 0 || cssHeight <= 0) return;
+    const { width, height } = getVisualizerRenderSize(
+      cssWidth,
+      cssHeight,
+      window.devicePixelRatio,
+      this.quality.maxRenderDimension,
+    );
+    if (width === this.width && height === this.height) return;
+    this.width = width;
+    this.height = height;
+    this.canvas.width = width;
+    this.canvas.height = height;
     this.updateViewportScaleCompensation();
-    this.resources.resize(w, h);
+    this.resources.resize(width, height);
   }
 
   start() {
@@ -332,13 +372,19 @@ export class MusicVisualizer {
     const g = this.resources.glCtx;
     this.time++;
 
-    const MAX_DIM = 1024;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.min(Math.floor(this.canvas.clientWidth * dpr), MAX_DIM);
-    const h = Math.min(Math.floor(this.canvas.clientHeight * dpr), MAX_DIM);
+    if (this.canvas.clientWidth <= 0 || this.canvas.clientHeight <= 0) {
+      this.stop();
+      return;
+    }
+    const { width, height } = getVisualizerRenderSize(
+      this.canvas.clientWidth,
+      this.canvas.clientHeight,
+      window.devicePixelRatio,
+      this.quality.maxRenderDimension,
+    );
     this.updateViewportScaleCompensation();
-    if (w > 0 && h > 0 && (w !== this.width || h !== this.height)) {
-      this.setSize(w, h);
+    if (width !== this.width || height !== this.height) {
+      this.setSize(this.canvas.clientWidth, this.canvas.clientHeight);
     }
 
     this.updateTrackMorph();
@@ -355,17 +401,13 @@ export class MusicVisualizer {
 
     let horizontal = true;
     let firstIteration = true;
+    g.viewport(0, 0, this.resources.blurWidth, this.resources.blurHeight);
     this.resources.blur.use();
-    this.resources.renderer.clear();
 
-    const horizontalLoc = g.getUniformLocation(
-      this.resources.blur.prog,
-      "u_Horizontal",
-    );
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < this.quality.bloomBlurPasses; i++) {
       const idx = Number(horizontal);
       g.bindFramebuffer(g.FRAMEBUFFER, this.resources.blurFBOs[idx]!);
-      g.uniform1i(horizontalLoc, idx);
+      g.uniform1i(this.resources.blurHorizontalLocation, idx);
       g.bindTexture(
         g.TEXTURE_2D,
         firstIteration
@@ -382,6 +424,7 @@ export class MusicVisualizer {
     }
 
     g.bindFramebuffer(g.FRAMEBUFFER, null);
+    g.viewport(0, 0, this.width, this.height);
     this.resources.renderer.clear();
     this.resources.quad.use();
     g.activeTexture(g.TEXTURE0);

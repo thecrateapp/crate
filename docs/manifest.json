@@ -324,6 +324,15 @@
     "order": 0
   },
   {
+    "sourcePath": "docs/technical/tauri-desktop-support.md",
+    "route": "/reference/desktop-support",
+    "section": "reference",
+    "title": "Crate Desktop support",
+    "summary": "Minimum operating system and webview versions supported by Crate Desktop.",
+    "keywords": ["tauri", "desktop", "macos", "windows", "linux"],
+    "order": 25
+  },
+  {
     "sourcePath": "docs/architecture.md",
     "route": "/reference/architecture-summary",
     "section": "reference",

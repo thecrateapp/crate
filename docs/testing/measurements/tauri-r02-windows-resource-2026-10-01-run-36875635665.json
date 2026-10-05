@@ -1,0 +1,191 @@
+{
+  "status": "failed",
+  "headSha": "bbc6a6b65ba18b070d687084c664f80b400faa33",
+  "platform": "Windows-2025Server-10.0.26100-SP0",
+  "python": "3.13.15 (tags/v3.13.15:4061bc4, Aug  5 2026, 13:05:39) [MSC v.1944 64 bit (AMD64)]",
+  "executable": "C:\\Users\\runneradmin\\AppData\\Local\\Crate\\http_resource_probe.exe",
+  "executableSha256": "d728001112aa37be042188bdf575fa404b0b9eff9b2383def871a54898982ee7",
+  "workingDirectory": "D:\\a\\crate\\crate",
+  "fixtureOrigin": "http://127.0.0.1:54723",
+  "refusedOrigin": "http://127.0.0.1:54724",
+  "iterationsPerScenario": 25,
+  "scenarios": [
+    "consumed-200",
+    "consumed-500",
+    "connection-refused",
+    "bodyless-204",
+    "abort-before-headers",
+    "cancel-after-first-chunk"
+  ],
+  "pythonPathEntriesRemoved": [
+    "C:\\hostedtoolcache\\windows\\Python\\3.13.15\\x64\\Scripts",
+    "C:\\hostedtoolcache\\windows\\Python\\3.13.15\\x64"
+  ],
+  "report": {
+    "passed": false,
+    "iterationsPerScenario": 25,
+    "resourceBaseline": 0,
+    "failures": [
+      {
+        "scenario": "connection-refused",
+        "iteration": 1,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 2,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 3,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 4,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 5,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 6,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 7,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 8,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 9,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 10,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 11,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 12,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 13,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 14,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 15,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 16,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 17,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 18,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 19,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 20,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 21,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 22,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 23,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 24,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      },
+      {
+        "scenario": "connection-refused",
+        "iteration": 25,
+        "error": "error sending request for url (http://127.0.0.1:54724/)"
+      }
+    ],
+    "completedScenarioCounts": {
+      "consumed-200": 25,
+      "consumed-500": 25,
+      "connection-refused": 25,
+      "bodyless-204": 25,
+      "abort-before-headers": 25,
+      "cancel-after-first-chunk": 25
+    },
+    "scenarios": [
+      "consumed-200",
+      "consumed-500",
+      "connection-refused",
+      "bodyless-204",
+      "abort-before-headers",
+      "cancel-after-first-chunk"
+    ]
+  },
+  "returnCode": 1,
+  "requestHits": {
+    "/ok": 25,
+    "/release/consumed-200": 1,
+    "/error": 25,
+    "/release/consumed-500": 1,
+    "/release/connection-refused": 1,
+    "/empty": 25,
+    "/release/bodyless-204": 1,
+    "/wait/delayed-started": 25,
+    "/delayed": 25,
+    "/release/abort-before-headers": 1,
+    "/stream": 25,
+    "/release/cancel-after-first-chunk": 1,
+    "/result": 1
+  },
+  "pathFailures": {},
+  "error": "Windows resource probe failed: {'status': 'failed', 'headSha': 'bbc6a6b65ba18b070d687084c664f80b400faa33', 'platform': 'Windows-2025Server-10.0.26100-SP0', 'python': '3.13.15 (tags/v3.13.15:4061bc4, Aug  5 2026, 13:05:39) [MSC v.1944 64 bit (AMD64)]', 'executable': 'C:\\\\Users\\\\runneradmin\\\\AppData\\\\Local\\\\Crate\\\\http_resource_probe.exe', 'executableSha256': 'd728001112aa37be042188bdf575fa404b0b9eff9b2383def871a54898982ee7', 'workingDirectory': 'D:\\\\a\\\\crate\\\\crate', 'fixtureOrigin': 'http://127.0.0.1:54723', 'refusedOrigin': 'http://127.0.0.1:54724', 'iterationsPerScenario': 25, 'scenarios': ['consumed-200', 'consumed-500', 'connection-refused', 'bodyless-204', 'abort-before-headers', 'cancel-after-first-chunk'], 'pythonPathEntriesRemoved': ['C:\\\\hostedtoolcache\\\\windows\\\\Python\\\\3.13.15\\\\x64\\\\Scripts', 'C:\\\\hostedtoolcache\\\\windows\\\\Python\\\\3.13.15\\\\x64'], 'report': {'passed': False, 'iterationsPerScenario': 25, 'resourceBaseline': 0, 'failures': [{'scenario': 'connection-refused', 'iteration': 1, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 2, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 3, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 4, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 5, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 6, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 7, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 8, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 9, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 10, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 11, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 12, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 13, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 14, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 15, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 16, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 17, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 18, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 19, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 20, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 21, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 22, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 23, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 24, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}, {'scenario': 'connection-refused', 'iteration': 25, 'error': 'error sending request for url (http://127.0.0.1:54724/)'}], 'completedScenarioCounts': {'consumed-200': 25, 'consumed-500': 25, 'connection-refused': 25, 'bodyless-204': 25, 'abort-before-headers': 25, 'cancel-after-first-chunk': 25}, 'scenarios': ['consumed-200', 'consumed-500', 'connection-refused', 'bodyless-204', 'abort-before-headers', 'cancel-after-first-chunk']}, 'returnCode': 1, 'requestHits': {'/ok': 25, '/release/consumed-200': 1, '/error': 25, '/release/consumed-500': 1, '/release/connection-refused': 1, '/empty': 25, '/release/bodyless-204': 1, '/wait/delayed-started': 25, '/delayed': 25, '/release/abort-before-headers': 1, '/stream': 25, '/release/cancel-after-first-chunk': 1, '/result': 1}, 'pathFailures': {}}",
+  "frontendDiagnostics": "page-load:Started:http://tauri.localhost/\npage-load:Finished:http://tauri.localhost/\nnative-eval-submitted\nnative-early-diagnostics-installed\nfrontend-bootstrap-loaded\nfrontend-module-loaded\nprobe-run-started\nmodule-script-loaded:http://tauri.localhost/assets/index-CSKn0mvN.js\ndocument-state:{\"href\":\"http://tauri.localhost/\",\"readyState\":\"complete\",\"title\":\"Crate HTTP resource probe\",\"hasStatusElement\":true,\"status\":\"Running HTTP resource probe\u2026\",\"scripts\":[{\"src\":\"http://tauri.localhost/assets/index-CSKn0mvN.js\",\"type\":\"module\",\"readyState\":null},{\"src\":\"http://tauri.localhost/probe-diagnostics.js\",\"type\":\"\",\"readyState\":null}],\"resources\":[\"http://tauri.localhost/assets/index-CSKn0mvN.js\",\"http://tauri.localhost/probe-diagnostics.js\"]}\nnative-eval-bridge-available\nscript-fetch:{\"src\":\"http://tauri.localhost/assets/index-CSKn0mvN.js\",\"status\":200,\"contentType\":\"text/javascript\",\"bytes\":6322,\"preview\":\"(function(){let e=document.createElement(`link`).relList;if(e&&e.supports&&e.supports(`modulepreload`))return;for(let e \"}\nscript-fetch:{\"src\":\"http://tauri.localhost/probe-diagnostics.js\",\"status\":200,\"contentType\":\"text/javascript\",\"bytes\":1021,\"preview\":\"(() => {\\r\\n  const invoke = window.__TAURI_INTERNALS__?.invoke;\\r\\n  const record = (message) => {\\r\\n    if (typeof invoke !\"}\nfixture-origin-received\n"
+}

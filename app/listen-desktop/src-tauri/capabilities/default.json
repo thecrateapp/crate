@@ -5,7 +5,30 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-close",
+    "core:window:allow-center",
+    "core:window:allow-maximize",
+    "core:window:allow-minimize",
+    "core:window:allow-set-size",
+    "core:window:allow-start-dragging",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-unmaximize",
     "deep-link:default",
+    "fs:allow-mkdir",
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file",
+    "fs:allow-stat",
+    "fs:allow-remove",
+    "fs:allow-rename",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        "$APPLOCALDATA/offline-meta",
+        "$APPLOCALDATA/offline-meta/**",
+        "$APPLOCALDATA/offline-media",
+        "$APPLOCALDATA/offline-media/**"
+      ]
+    },
     "opener:default",
     {
       "identifier": "http:default",
@@ -13,7 +36,7 @@
         { "url": "https://*:*" },
         { "url": "http://localhost:*" },
         { "url": "http://127.0.0.1:*" },
-        { "url": "http://[::1]:*" }
+        { "url": "http://[\\:\\:1]:*" }
       ]
     }
   ]

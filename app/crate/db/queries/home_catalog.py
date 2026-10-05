@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
+
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from crate.db.tx import read_scope
 
@@ -339,12 +342,15 @@ def get_library_artist_by_id(artist_id: int) -> dict | None:
     return dict(row) if row else None
 
 
-def get_followed_artist_genre_names(names: list[str], limit: int) -> list[str]:
+def get_followed_artist_genre_names(
+    names: list[str], limit: int, *, session: Session | None = None
+) -> list[str]:
     if not names:
         return []
-    with read_scope() as session:
+    scope = read_scope() if session is None else nullcontext(session)
+    with scope as s:
         rows = (
-            session.execute(
+            s.execute(
                 text(
                     """
                 SELECT g.name, COUNT(*) AS cnt
@@ -365,8 +371,8 @@ def get_followed_artist_genre_names(names: list[str], limit: int) -> list[str]:
 
 
 __all__ = [
-    "get_artist_genres_map",
     "get_artist_genre_profiles_map",
+    "get_artist_genres_map",
     "get_followed_artist_genre_names",
     "get_home_hero_rows",
     "get_library_artist_by_id",

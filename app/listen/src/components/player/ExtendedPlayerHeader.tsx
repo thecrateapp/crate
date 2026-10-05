@@ -42,6 +42,7 @@ export function ExtendedPlayerHeader({
         </button>
         <div className="flex items-center gap-2">
           <PlayerSurfaceModeSwitch
+            allowVisualizer={state.visualizerAllowed}
             mode={state.vizCfg.surfaceMode}
             onChange={actions.onSurfaceModeChange}
           />
@@ -64,23 +65,25 @@ export function ExtendedPlayerHeader({
               <SlidersHorizontal size={18} />
             </button>
           ) : null}
-          <button
-            type="button"
-            ref={refs.vizSettingsButtonRef}
-            onClick={() => actions.setShowVizSettings((value) => !value)}
-            aria-label={t("player.visualizerSettings")}
-            disabled={state.vizCfg.surfaceMode !== "visualizer"}
-            className={cn(
-              "rounded-full p-2 backdrop-blur-sm transition-colors",
-              state.vizCfg.surfaceMode !== "visualizer"
-                ? "bg-surface-icon-control text-text-faint"
-                : state.showVizSettings
-                  ? "bg-accent-action/18 text-accent-action drop-shadow-accent-action"
-                  : "bg-surface-control text-text-secondary hover:bg-surface-control-hover hover:text-text-primary",
-            )}
-          >
-            <Settings size={18} />
-          </button>
+          {state.visualizerAllowed ? (
+            <button
+              type="button"
+              ref={refs.vizSettingsButtonRef}
+              onClick={() => actions.setShowVizSettings((value) => !value)}
+              aria-label={t("player.visualizerSettings")}
+              disabled={state.vizCfg.surfaceMode !== "visualizer"}
+              className={cn(
+                "rounded-full p-2 backdrop-blur-sm transition-colors",
+                state.vizCfg.surfaceMode !== "visualizer"
+                  ? "bg-surface-icon-control text-text-faint"
+                  : state.showVizSettings
+                    ? "bg-accent-action/18 text-accent-action drop-shadow-accent-action"
+                    : "bg-surface-control text-text-secondary hover:bg-surface-control-hover hover:text-text-primary",
+              )}
+            >
+              <Settings size={18} />
+            </button>
+          ) : null}
         </div>
       </div>
       {showVizSettings ? (

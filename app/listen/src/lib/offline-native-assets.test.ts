@@ -5,6 +5,7 @@ const {
   statMock,
   deleteFileMock,
   downloadFileMock,
+  renameFileMock,
   ensureAssetIndexMock,
   updateAssetIndexMock,
   verifyNativeOfflineAssetsMock,
@@ -13,6 +14,7 @@ const {
   statMock: vi.fn(),
   deleteFileMock: vi.fn().mockResolvedValue(undefined),
   downloadFileMock: vi.fn(),
+  renameFileMock: vi.fn(),
   ensureAssetIndexMock: vi.fn(),
   updateAssetIndexMock: vi.fn(),
   verifyNativeOfflineAssetsMock: vi.fn(),
@@ -37,6 +39,7 @@ vi.mock("@capacitor/filesystem", () => ({
     stat: statMock,
     deleteFile: deleteFileMock,
     downloadFile: downloadFileMock,
+    rename: renameFileMock,
     mkdir: vi.fn(async () => undefined),
   },
 }));
@@ -62,6 +65,8 @@ vi.mock("@/lib/offline-native", () => ({
 import {
   assertNativeTrackIntegrity,
   cacheNativeTrackAsset,
+  estimateNativeOfflineBytes,
+  getNativeOfflineAssetsNeedingRefresh,
   hasCachedNativeTrackAssets,
 } from "@/lib/offline-native-assets";
 import { getOfflineTrackAssetAliases } from "@/lib/offline-track-identity";
@@ -70,6 +75,7 @@ describe("assertNativeTrackIntegrity", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     deleteFileMock.mockResolvedValue(undefined);
+    renameFileMock.mockResolvedValue(undefined);
     ensureAssetIndexMock.mockResolvedValue({});
     apiMock.mockRejectedValue(new Error("playback resolution unavailable"));
   });
@@ -160,6 +166,163 @@ describe("assertNativeTrackIntegrity", () => {
     ).resolves.toEqual({ uri: "file:///track.flac", size: 4096 });
   });
 
+  it("uses the delivered byte length for transformed Android offline assets", async () => {
+    const track = {
+      entity_uid: "track-transcoded",
+      title: "Track",
+      artist: "Artist",
+      format: "flac",
+      byte_length: 1000,
+      updated_at: "2026-09-29T12:00:00Z",
+      stream_url: "/stream/track-transcoded",
+      download_url: "/download/track-transcoded",
+    };
+    const aliases = getOfflineTrackAssetAliases(track);
+    const entry = {
+      assetKey: aliases[0],
+      path: "offline-media/profile/track-transcoded.aac",
+      state: "ready" as const,
+      byteLength: 128,
+      originFingerprint: JSON.stringify({
+        updatedAt: track.updated_at,
+        byteLength: track.byte_length,
+        format: "flac",
+        bitrate: null,
+        sampleRate: null,
+      }),
+      requestedDeliveryPolicy: "balanced",
+      deliveryPolicy: "original",
+    };
+    ensureAssetIndexMock.mockResolvedValue(
+      Object.fromEntries(aliases.map((alias) => [alias, entry])),
+    );
+    verifyNativeOfflineAssetsMock.mockResolvedValue([
+      { exists: true, valid: true },
+    ]);
+
+    await expect(
+      hasCachedNativeTrackAssets("profile", [track]),
+    ).resolves.toEqual(new Set([aliases[0]]));
+    expect(verifyNativeOfflineAssetsMock).toHaveBeenCalledWith([
+      { path: entry.path, expectedBytes: 128 },
+    ]);
+    await expect(
+      getNativeOfflineAssetsNeedingRefresh("profile", [track]),
+    ).resolves.toEqual(new Set());
+  });
+
+  it("counts aliased offline index records only once against the storage budget", async () => {
+    ensureAssetIndexMock.mockResolvedValue({
+      "entity:track-1": {
+        path: "offline-media/profile/track-1.m4a",
+        byteLength: 128,
+      },
+      "storage:track-1": {
+        path: "offline-media/profile/track-1.m4a",
+        byteLength: 128,
+      },
+      "entity:track-2": {
+        path: "offline-media/profile/track-2.m4a",
+        deliveryByteLength: 256,
+        byteLength: 300,
+      },
+    });
+
+    await expect(estimateNativeOfflineBytes("profile")).resolves.toBe(384);
+  });
+
+  it("replaces a valid cached copy when the source fingerprint changes", async () => {
+    const track = {
+      entity_uid: "track-refresh",
+      title: "Track",
+      artist: "Artist",
+      format: "mp3",
+      bitrate: 128,
+      byte_length: 100,
+      updated_at: "2026-09-29T12:00:00Z",
+      stream_url: "/stream/track-refresh",
+      download_url: "/download/track-refresh",
+    };
+    const aliases = getOfflineTrackAssetAliases(track);
+    const oldEntry = {
+      assetKey: aliases[0],
+      entityUid: track.entity_uid,
+      path: "offline-media/profile/track-refresh.previous.mp3",
+      state: "ready" as const,
+      byteLength: 100,
+      originFingerprint: "older-source",
+      updatedAt: "2026-01-01T00:00:00Z",
+    };
+    let persistedAssets = Object.fromEntries(
+      aliases.map((alias) => [alias, oldEntry]),
+    );
+    ensureAssetIndexMock.mockImplementation(async () => persistedAssets);
+    statMock.mockResolvedValue({
+      uri: "file:///offline-media/profile/track-refresh.new.mp3",
+      size: 100,
+    });
+    updateAssetIndexMock.mockImplementation(async (_profileKey, mutate) => {
+      persistedAssets = await mutate(persistedAssets);
+    });
+
+    await cacheNativeTrackAsset("profile", track);
+
+    expect(downloadFileMock).toHaveBeenCalledOnce();
+    expect(renameFileMock).toHaveBeenCalledOnce();
+    expect(persistedAssets[aliases[0]!]).toMatchObject({
+      state: "ready",
+      updatedAt: track.updated_at,
+    });
+    expect(persistedAssets[aliases[0]!]?.path).not.toBe(oldEntry.path);
+    expect(deleteFileMock).toHaveBeenCalledWith({
+      path: oldEntry.path,
+      directory: "DATA",
+    });
+  });
+
+  it("keeps the old asset when persisting its replacement fails", async () => {
+    const track = {
+      entity_uid: "track-refresh-failure",
+      title: "Track",
+      artist: "Artist",
+      format: "mp3",
+      bitrate: 128,
+      byte_length: 100,
+      updated_at: "2026-09-29T12:00:00Z",
+      stream_url: "/stream/track-refresh-failure",
+      download_url: "/download/track-refresh-failure",
+    };
+    const aliases = getOfflineTrackAssetAliases(track);
+    const oldEntry = {
+      assetKey: aliases[0],
+      entityUid: track.entity_uid,
+      path: "offline-media/profile/track-refresh-failure.previous.mp3",
+      state: "ready" as const,
+      byteLength: 100,
+      originFingerprint: "older-source",
+    };
+    const persistedAssets = Object.fromEntries(
+      aliases.map((alias) => [alias, oldEntry]),
+    );
+    ensureAssetIndexMock.mockResolvedValue(persistedAssets);
+    statMock.mockResolvedValue({
+      uri: "file:///offline-media/profile/track-refresh-failure.new.mp3",
+      size: 100,
+    });
+    updateAssetIndexMock.mockRejectedValueOnce(new Error("disk full"));
+
+    await expect(cacheNativeTrackAsset("profile", track)).rejects.toThrow(
+      "disk full",
+    );
+
+    expect(persistedAssets[aliases[0]!]).toEqual(oldEntry);
+    expect(deleteFileMock).not.toHaveBeenCalledWith({
+      path: oldEntry.path,
+      directory: "DATA",
+    });
+    expect(deleteFileMock).toHaveBeenCalled();
+  });
+
   it("removes a completed native download when its profile was cancelled", async () => {
     let finishDownload: (() => void) | undefined;
     let reportStarted: (() => void) | undefined;
@@ -198,7 +361,7 @@ describe("assertNativeTrackIntegrity", () => {
 
     await expect(pending).rejects.toMatchObject({ name: "AbortError" });
     expect(deleteFileMock).toHaveBeenCalledWith({
-      path: "offline-media/profile/track-1.mp3",
+      path: downloadFileMock.mock.calls[0]?.[0].path,
       directory: "DATA",
     });
     expect(updateAssetIndexMock).not.toHaveBeenCalled();

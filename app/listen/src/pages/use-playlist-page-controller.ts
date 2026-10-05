@@ -10,6 +10,7 @@ import { usePlayerActions } from "@/contexts/PlayerContext";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
 import { useApi } from "@/hooks/use-api";
 import { isOfflineBusy } from "@/lib/offline";
+import { inviteShareUrl } from "@/lib/share-url";
 import {
   buildPlaylistEditableTracks,
   buildPlaylistMetaItems,
@@ -120,9 +121,7 @@ export function usePlaylistPageController(): PlaylistPageController {
         (member) => member.user_id === user.id && member.role === "owner",
       ),
   );
-  const inviteLink = inviteData
-    ? `${window.location.origin}${inviteData.join_url}`
-    : null;
+  const inviteLink = inviteData ? inviteShareUrl(inviteData) : null;
   const offlineState = getPlaylistState(resolvedData?.id);
   const offlineRecord = getPlaylistRecord(resolvedData?.id);
   const offlinePresentation = buildPlaylistOfflinePresentation(

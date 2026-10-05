@@ -27,7 +27,15 @@ export function toEngineTrack(
   options: StreamUrlOptions = {},
 ): EngineTrack {
   const artwork = resolveMaybeApiAssetUrl(track.albumCover) || undefined;
-  const resolvedUrl = streamUrl ?? getStreamUrl(track, options);
+  const offlineUrl = track.offlineOnly
+    ? getOfflineStreamUrl(track, options)
+    : null;
+  const resolvedUrl = track.offlineOnly
+    ? offlineUrl
+    : streamUrl ?? getStreamUrl(track, options);
+  if (!resolvedUrl) {
+    throw new Error("Offline track is not available on this device");
+  }
   const androidNativeHttp =
     options.target === "android-native" &&
     isTrustedNativeApiUrl(resolvedUrl, getApiBase());
@@ -118,7 +126,7 @@ export async function toFreshEngineTrack(
   eqGains?: number[],
   options: StreamUrlOptions = {},
 ): Promise<EngineTrack> {
-  await ensureFreshAuthToken();
+  if (!track.offlineOnly) await ensureFreshAuthToken();
   return toEngineTrack(
     track,
     eqGains,
@@ -132,7 +140,9 @@ export async function toFreshEngineTracks(
   eqGainsByTrackId?: Map<string, number[]>,
   options: StreamUrlOptions = {},
 ): Promise<EngineTrack[]> {
-  await ensureFreshAuthToken();
+  if (tracks.some((track) => !track.offlineOnly)) {
+    await ensureFreshAuthToken();
+  }
   return Promise.all(
     tracks.map(async (track) =>
       toEngineTrack(
@@ -151,8 +161,6 @@ export async function toStartupEngineTracks(
   eqGainsByTrackId?: Map<string, number[]>,
   options: StreamUrlOptions = {},
 ): Promise<EngineTrack[]> {
-  await ensureFreshAuthToken();
-  const engineTracks = toEngineTracks(tracks, eqGainsByTrackId, options);
   const normalizedIndex = Math.max(
     0,
     Math.min(Math.trunc(activeIndex), tracks.length - 1),
@@ -161,6 +169,15 @@ export async function toStartupEngineTracks(
     normalizedIndex,
     Math.min(normalizedIndex + 1, tracks.length - 1),
   ]);
+  if (
+    Array.from(startupIndices).some((index) => {
+      const track = tracks[index];
+      return track && !track.offlineOnly;
+    })
+  ) {
+    await ensureFreshAuthToken();
+  }
+  const engineTracks = toEngineTracks(tracks, eqGainsByTrackId, options);
   await Promise.all(
     Array.from(startupIndices).map(async (index) => {
       const track = tracks[index];
@@ -187,6 +204,12 @@ async function resolveFreshEngineStreamUrl(
   options: StreamUrlOptions,
 ): Promise<string> {
   const offlineUrl = getOfflineStreamUrl(track, options);
+  if (track.offlineOnly) {
+    if (!offlineUrl) {
+      throw new Error("Offline track is not available on this device");
+    }
+    return offlineUrl;
+  }
   if (offlineUrl) return offlineUrl;
   let resolvedUrl: string;
   if (hasFreshRemoteStream(track) || !track.globalTrackUid) {

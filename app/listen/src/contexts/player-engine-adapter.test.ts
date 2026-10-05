@@ -222,6 +222,47 @@ describe("player engine adapter", () => {
     );
   });
 
+  it("starts offline-only queues without refreshing auth or resolving remote URLs", async () => {
+    offlineUrlState.url = "asset://localhost/offline/song.m4a";
+
+    const [track] = await toStartupEngineTracks(
+      [
+        {
+          id: "offline-track",
+          entityUid: "entity-offline",
+          title: "Offline Song",
+          artist: "Offline Band",
+          offlineOnly: true,
+        },
+      ],
+      0,
+    );
+
+    expect(track?.url).toBe("asset://localhost/offline/song.m4a");
+    expect(ensureFreshAuthTokenMock).not.toHaveBeenCalled();
+    expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it("does not fall back to a network stream when an offline-only asset is missing", async () => {
+    await expect(
+      toStartupEngineTracks(
+        [
+          {
+            id: "offline-track",
+            entityUid: "entity-offline",
+            title: "Offline Song",
+            artist: "Offline Band",
+            offlineOnly: true,
+          },
+        ],
+        0,
+      ),
+    ).rejects.toThrow("Offline track is not available on this device");
+
+    expect(ensureFreshAuthTokenMock).not.toHaveBeenCalled();
+    expect(apiMock).not.toHaveBeenCalled();
+  });
+
   it("reuses fresh remote stream tickets before resolving global catalog playback again", async () => {
     const track = await toFreshEngineTrack({
       id: "global-track-1",

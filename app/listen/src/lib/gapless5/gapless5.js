@@ -89,6 +89,28 @@ function getLoadableTrackIndices(trackNumber, totalTracks, loadLimit) {
   return Array.from({ length: limit }, (_value, index) => start + index);
 }
 
+function getStartOffsetMs(
+  syncPosition,
+  audioCurrentTime,
+  audioIsPlaying,
+  position,
+  syncLatencySec,
+  avgTickMs,
+) {
+  // Only use the HTML5 clock while it is actively driving playback. During
+  // resume/recovery the element can be paused (and often stays at 0 for FLAC
+  // on WebKitGTK), while `position` contains the restored WebAudio offset.
+  if (
+    syncPosition &&
+    audioIsPlaying &&
+    Number.isFinite(audioCurrentTime) &&
+    audioCurrentTime > 0
+  ) {
+    return (audioCurrentTime + syncLatencySec) * 1000 + avgTickMs;
+  }
+  return position;
+}
+
 const devLog = (scope, message, detail, level = "info") => {
   try {
     globalThis.__crateDevLog?.(scope, message, detail, level);
@@ -125,6 +147,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
   let source = null;
   let buffer = null;
   let request = null;
+  let loadGeneration = 0;
   let gainNode = null;
 
   // states
@@ -291,9 +314,10 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
   this.unload = (isError) => {
     this.stop();
     setState(isError ? Gapless5State.Error : Gapless5State.None);
-    if (request) {
-      request.abort();
-    }
+    loadGeneration += 1;
+    const requestToAbort = request;
+    request = null;
+    requestToAbort?.abort();
     if (audio) {
       const audioObj = audio;
       detachHtml5Listeners(audioObj);
@@ -350,8 +374,8 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
 
   const isErrorStatus = (status) => status / 100 >= 4;
 
-  const onLoadedWebAudio = (inBuffer) => {
-    if (!request) {
+  const onLoadedWebAudio = (inBuffer, generation) => {
+    if (!request || generation !== loadGeneration) {
       return;
     }
     request = null;
@@ -462,13 +486,14 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
   };
 
   const getStartOffsetMS = (syncPosition, syncLatencySec) => {
-    if (syncPosition && audio) {
-      // offset will fall behind by a tick, factor this in when syncing position
-      return audio.currentTime
-        ? (audio.currentTime + syncLatencySec) * 1000 + player.avgTickMS
-        : 0;
-    }
-    return position;
+    return getStartOffsetMs(
+      syncPosition,
+      audio?.currentTime ?? 0,
+      audio !== null && !audio.paused,
+      position,
+      syncLatencySec,
+      player.avgTickMS,
+    );
   };
 
   const playAudioFile = (syncPosition, webAudioSwitched) => {
@@ -507,8 +532,26 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
             source.connect(gainNode);
           }
 
-          const offsetSec =
-            getStartOffsetMS(syncPosition, player.context.baseLatency) / 1000;
+          const startOffsetMs = getStartOffsetMS(
+            syncPosition,
+            player.context.baseLatency,
+          );
+          if (syncPosition || position > 0) {
+            devLog(
+              "gapless5",
+              "webaudio start offset",
+              {
+                trackIndex: player.getIndex(),
+                syncPosition,
+                internalPositionMs: position,
+                html5CurrentTimeMs: audio ? audio.currentTime * 1000 : null,
+                html5Paused: audio ? audio.paused : null,
+                startOffsetMs,
+              },
+              "info",
+            );
+          }
+          const offsetSec = startOffsetMs / 1000;
           log.debug(
             `Playing WebAudio${looped ? " (looped)" : ""}: ${
               this.audioPath
@@ -708,18 +751,26 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
     if (state !== Gapless5State.None) {
       return;
     }
+    const generation = ++loadGeneration;
     const { audioPath } = this;
     player.onloadstart(audioPath);
     state = Gapless5State.Loading;
     if (player.useWebAudio) {
+      const isCurrentLoad = () => generation === loadGeneration;
       const onLoadWebAudio = (data) => {
+        if (!isCurrentLoad() || !request) {
+          return;
+        }
         if (data) {
           player.context
             .decodeAudioData(data)
             .then((incomingBuffer) => {
-              onLoadedWebAudio(incomingBuffer);
+              onLoadedWebAudio(incomingBuffer, generation);
             })
             .catch((error) => {
+              if (!isCurrentLoad() || !request) {
+                return;
+              }
               log.warn(
                 `WebAudio decode failed for ${audioPath}: ${
                   error?.message || error
@@ -753,19 +804,24 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
       };
       if (audioPath.startsWith("blob:")) {
         fetchBlob(audioPath, (blob) => {
-          request = new FileReader();
-          request.onload = () => {
-            if (request) {
-              onLoadWebAudio(request.result);
+          if (!isCurrentLoad()) {
+            return;
+          }
+          const fileReader = new FileReader();
+          request = fileReader;
+          fileReader.onload = () => {
+            if (request === fileReader && isCurrentLoad()) {
+              onLoadWebAudio(fileReader.result);
             }
           };
-          request.readAsArrayBuffer(blob);
-          if (request.error) {
-            onError(request.error);
+          fileReader.readAsArrayBuffer(blob);
+          if (fileReader.error && isCurrentLoad()) {
+            onError(fileReader.error);
           }
         });
       } else {
-        request = new AbortController();
+        const controller = new AbortController();
+        request = controller;
         // [vendored patch] Losing the WebAudio fetch mid-load should NOT
         // kill playback when the HTML5 <audio> element is already
         // playing this track — we'd just miss the "upgrade" to
@@ -773,7 +829,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
         // buffer. The user keeps hearing audio; if the HTML5 buffer
         // later runs out, its own 'error' event will escalate then.
         const xhrFailSafe = (reason) => {
-          if (!request) return;
+          if (!isCurrentLoad() || request !== controller) return;
           devLog(
             "gapless5",
             "webaudio fetch failed",
@@ -795,9 +851,9 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
           }
           onError("Failed to load audio track");
         };
-        fetch(audioPath, { signal: request.signal })
+        fetch(audioPath, { signal: controller.signal })
           .then((response) => {
-            if (!request) return null;
+            if (!isCurrentLoad() || request !== controller) return null;
             if (!response.ok) {
               xhrFailSafe(`HTTP ${response.status}`);
               return null;
@@ -805,7 +861,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
             return response.arrayBuffer().then((data) => ({ response, data }));
           })
           .then((loaded) => {
-            if (!request || !loaded) return;
+            if (!isCurrentLoad() || request !== controller || !loaded) return;
             devLog(
               "gapless5",
               "webaudio fetch loaded",
@@ -1199,6 +1255,16 @@ function Gapless5FileList(
       loadableSet.has(curSourceIndex) &&
       curSource.getState() === Gapless5State.None
     ) {
+      for (const [index, source] of this.sources.entries()) {
+        const playlistIndex = this.getPlaylistIndex(index);
+        if (
+          !loadableSet.has(playlistIndex) &&
+          source.getState() !== Gapless5State.None
+        ) {
+          source.unload();
+          log.debug(`Unloaded track ${playlistIndex}: ${source.audioPath}`);
+        }
+      }
       log.debug(`Loading track ${curSourceIndex}: ${curSource.audioPath}`);
       curSource.load();
     } else {
@@ -2491,4 +2557,5 @@ export {
   CrossfadeShape,
   getBufferedAheadSeconds,
   getLoadableTrackIndices,
+  getStartOffsetMs,
 };

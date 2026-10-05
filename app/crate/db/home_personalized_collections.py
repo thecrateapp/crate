@@ -44,9 +44,15 @@ def _global_home_track_rows(context: dict, *, limit: int) -> list[dict]:
     )
 
 
-def get_home_mix(user_id: int, mix_id: str, limit: int = 40) -> dict | None:
+def get_home_mix(
+    user_id: int, mix_id: str, limit: int = 40, *, session=None
+) -> dict | None:
     context = get_cached_home_context(
-        user_id, top_artist_limit=28, top_album_limit=12, top_genre_limit=8
+        user_id,
+        top_artist_limit=28,
+        top_album_limit=12,
+        top_genre_limit=8,
+        session=session,
     )
     recent_releases = recent_releases_from_context(context)
 
@@ -88,7 +94,9 @@ def get_home_mix(user_id: int, mix_id: str, limit: int = 40) -> dict | None:
     }
 
 
-def get_home_playlist(user_id: int, playlist_id: str, limit: int = 40) -> dict | None:
+def get_home_playlist(
+    user_id: int, playlist_id: str, limit: int = 40, *, session=None
+) -> dict | None:
     core_prefix = "core-tracks-artist-"
     if not playlist_id.startswith(
         (
@@ -97,7 +105,7 @@ def get_home_playlist(user_id: int, playlist_id: str, limit: int = 40) -> dict |
             core_prefix,
         )
     ):
-        mix = get_home_mix(user_id, playlist_id, limit=limit)
+        mix = get_home_mix(user_id, playlist_id, limit=limit, session=session)
         if mix:
             return mix
 
@@ -108,12 +116,12 @@ def get_home_playlist(user_id: int, playlist_id: str, limit: int = 40) -> dict |
             )
         except ValueError:
             return None
-        playlist = get_playlist(system_playlist_id)
+        playlist = get_playlist(system_playlist_id, session=session)
         if not playlist or playlist.get("scope") != "system":
             return None
         if not playlist.get("is_active", False):
             return None
-        tracks = get_playlist_tracks(system_playlist_id)[:limit]
+        tracks = get_playlist_tracks(system_playlist_id, session=session)[:limit]
         return {
             "id": playlist_id,
             "playlist_id": system_playlist_id,

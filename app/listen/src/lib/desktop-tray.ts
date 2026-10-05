@@ -20,14 +20,20 @@ export interface DesktopNowPlayingPayload {
 export interface DesktopMediaSessionPayload extends DesktopNowPlayingPayload {
   album: string | null;
   artwork: string | null;
+  mediaId: string | null;
   position: number;
   duration: number;
+  playbackRate?: number;
 }
 
 const MAX_DESKTOP_ARTWORK_BYTES = 8 * 1024 * 1024;
 const MAX_CACHED_DESKTOP_ARTWORK = 24;
 
 let desktopMediaSessionSequence = 0;
+let desktopMediaSessionInvoker: typeof window.__crateTauriInvoke | undefined;
+let lastDesktopMediaSessionPayload: DesktopMediaSessionPayload | undefined;
+let lastDesktopMediaMetadataKey: string | undefined;
+let lastPublishedDesktopArtwork: string | null = null;
 let desktopArtworkPreparationSequence = 0;
 const preparedDesktopArtwork = new Map<string, string>();
 const pendingDesktopArtwork = new Map<
@@ -68,50 +74,105 @@ export function syncDesktopMediaSession(
 ): void {
   if (typeof window === "undefined" || !window.__crateTauriInvoke) return;
 
-  const sequence = ++desktopMediaSessionSequence;
-  const cachedArtwork =
-    payload.artwork && shouldMaterializeDesktopArtwork(payload.artwork)
-      ? preparedDesktopArtwork.get(payload.artwork)
+  resetDesktopMediaSessionWhenInvokerChanges();
+
+  const metadataKey = desktopMediaMetadataKey(payload);
+  const previous = lastDesktopMediaSessionPayload;
+  const metadataChanged = metadataKey !== lastDesktopMediaMetadataKey;
+  const playbackChanged = !previous || payload.isPlaying !== previous.isPlaying;
+  const positionChanged =
+    !previous ||
+    payload.position !== previous.position ||
+    payload.duration !== previous.duration ||
+    (payload.playbackRate ?? 1) !== (previous.playbackRate ?? 1);
+  lastDesktopMediaSessionPayload = payload;
+
+  if (metadataChanged) {
+    lastDesktopMediaMetadataKey = metadataKey;
+    const sequence = ++desktopMediaSessionSequence;
+    const artworkSource = payload.artwork;
+    const materializeArtwork = Boolean(
+      artworkSource && shouldMaterializeDesktopArtwork(artworkSource),
+    );
+    const cachedArtwork = materializeArtwork
+      ? preparedDesktopArtwork.get(artworkSource!)
       : undefined;
+    publishDesktopMediaMetadata(
+      payload,
+      materializeArtwork ? cachedArtwork ?? null : artworkSource,
+    );
 
-  if (cachedArtwork !== undefined) {
-    invokeDesktopMediaSession({
-      ...payload,
-      artwork: cachedArtwork,
-    });
+    if (materializeArtwork && cachedArtwork === undefined) {
+      void prepareDesktopArtwork(artworkSource!)
+        .then(async (result) => {
+          if (sequence !== desktopMediaSessionSequence) return;
+          const currentResult = result.invalidated
+            ? await prepareDesktopArtwork(artworkSource!)
+            : result;
+          if (sequence !== desktopMediaSessionSequence) return;
+          const latestPayload = lastDesktopMediaSessionPayload;
+          if (!latestPayload) return;
+          publishDesktopMediaMetadata(latestPayload, currentResult.url);
+        })
+        .catch(() => undefined);
+    }
     return;
   }
 
-  invokeDesktopMediaSession({
-    ...payload,
-    artwork: shouldMaterializeDesktopArtwork(payload.artwork)
-      ? null
-      : payload.artwork,
-  });
+  if (playbackChanged) invokeDesktopPlaybackState(payload.isPlaying);
+  if (positionChanged) invokeDesktopMediaPosition(payload);
+}
 
-  if (!payload.artwork || !shouldMaterializeDesktopArtwork(payload.artwork)) {
-    return;
-  }
+function resetDesktopMediaSessionWhenInvokerChanges(): void {
+  if (desktopMediaSessionInvoker === window.__crateTauriInvoke) return;
+  desktopMediaSessionInvoker = window.__crateTauriInvoke;
+  desktopMediaSessionSequence += 1;
+  lastDesktopMediaSessionPayload = undefined;
+  lastDesktopMediaMetadataKey = undefined;
+  lastPublishedDesktopArtwork = null;
+}
 
-  const artworkSource = payload.artwork;
-  void prepareDesktopArtwork(artworkSource)
-    .then(async (result) => {
-      if (sequence !== desktopMediaSessionSequence) return;
-      const currentResult = result.invalidated
-        ? await prepareDesktopArtwork(artworkSource)
-        : result;
-      if (sequence !== desktopMediaSessionSequence) return;
-      invokeDesktopMediaSession({
-        ...payload,
-        artwork: currentResult.url,
-      });
-    })
-    .catch(() => undefined);
+function desktopMediaMetadataKey(payload: DesktopMediaSessionPayload): string {
+  return JSON.stringify([
+    payload.mediaId,
+    payload.title,
+    payload.artist,
+    payload.album,
+    payload.artwork,
+  ]);
+}
+
+function publishDesktopMediaMetadata(
+  payload: DesktopMediaSessionPayload,
+  artwork: string | null,
+): void {
+  lastPublishedDesktopArtwork = artwork;
+  invokeDesktopMediaSession({ ...payload, artwork });
 }
 
 function invokeDesktopMediaSession(payload: DesktopMediaSessionPayload): void {
   void window
     .__crateTauriInvoke?.("update_desktop_media_session", { payload })
+    .catch(() => undefined);
+}
+
+function invokeDesktopPlaybackState(isPlaying: boolean): void {
+  void window
+    .__crateTauriInvoke?.("update_desktop_media_playback_state", {
+      payload: { isPlaying },
+    })
+    .catch(() => undefined);
+}
+
+function invokeDesktopMediaPosition(payload: DesktopMediaSessionPayload): void {
+  void window
+    .__crateTauriInvoke?.("update_desktop_media_position", {
+      payload: {
+        position: payload.position,
+        duration: payload.duration,
+        playbackRate: payload.isPlaying ? payload.playbackRate ?? 1 : 0,
+      },
+    })
     .catch(() => undefined);
 }
 
@@ -212,6 +273,9 @@ function forgetEvictedPreparedArtwork(
   }
   for (const [artwork, fileUrl] of preparedDesktopArtwork) {
     if (evicted.has(fileUrl)) preparedDesktopArtwork.delete(artwork);
+  }
+  if (lastPublishedDesktopArtwork && evicted.has(lastPublishedDesktopArtwork)) {
+    lastDesktopMediaMetadataKey = undefined;
   }
 }
 

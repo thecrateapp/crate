@@ -24,6 +24,11 @@ const Login = React.lazy(() =>
 const Register = React.lazy(() =>
   import("@/pages/Register").then((m) => ({ default: m.Register })),
 );
+const OfflineAccessRoute = React.lazy(() =>
+  import("@/app-shell/OfflineAccessRoute").then((m) => ({
+    default: m.OfflineAccessRoute,
+  })),
+);
 const Explore = React.lazy(() =>
   import("@/pages/Explore").then((m) => ({ default: m.Explore })),
 );
@@ -121,6 +126,7 @@ function deferred(element: ReactNode) {
 
 export const publicAppRoutes: AppRouteDefinition[] = [
   { path: "/server-setup", element: deferred(<ServerSetup />) },
+  { path: "/offline", element: deferred(<OfflineAccessRoute />) },
   { path: "/auth/callback", element: deferred(<AuthCallback />) },
   { path: "/login", element: deferred(<Login />) },
   { path: "/register", element: deferred(<Register />) },

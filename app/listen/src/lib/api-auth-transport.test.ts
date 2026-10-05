@@ -28,6 +28,50 @@ function refreshResponse(token: string, refreshToken: string): Response {
 }
 
 describe("createApiAuthTransport configurable-server refresh", () => {
+  it("keeps unauthorized redirects inside the Tauri hash router", async () => {
+    const originalHash = window.location.hash;
+    const originalRuntime = document.documentElement.dataset.listenRuntime;
+    document.documentElement.dataset.listenRuntime = "tauri";
+    window.location.hash = "#/library";
+
+    const apiClient = vi.fn().mockRejectedValue(new ApiError(401, "expired"));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: false,
+      status: 401,
+    } as Response);
+
+    const transport = createApiAuthTransport({
+      apiBase: () => "https://a.example.com",
+      apiClient,
+      apiCredentials: () => "omit",
+      getApiAuthHeaders: () => ({ Authorization: "Bearer access-a" }),
+      getAuthToken: () => "access-a",
+      getAuthTokenExpiresAt: () => null,
+      getCurrentServerId: () => "server-a",
+      getRefreshToken: () => "refresh-a",
+      getServerAuthTokens: () => ({
+        token: "access-a",
+        refreshToken: "refresh-a",
+      }),
+      setAuthToken: vi.fn(),
+      setAuthTokens: vi.fn(),
+      setAuthTokensForServer: vi.fn(() => true),
+      usesConfigurableServer: true,
+    });
+
+    try {
+      await expect(transport.api("/api/library")).rejects.toThrow("expired");
+      expect(window.location.hash).toBe("#/login");
+    } finally {
+      window.location.hash = originalHash;
+      if (originalRuntime === undefined) {
+        delete document.documentElement.dataset.listenRuntime;
+      } else {
+        document.documentElement.dataset.listenRuntime = originalRuntime;
+      }
+    }
+  });
+
   it("does not let a stale refresh overwrite a newer session on the same server", async () => {
     const session = {
       token: "access-a",
@@ -103,6 +147,44 @@ describe("createApiAuthTransport configurable-server refresh", () => {
 
     await expect(refresh).resolves.toBe(false);
     expect(setAuthTokensForServer).not.toHaveBeenCalled();
+  });
+
+  it("reports authoritative refresh rejection for the server whose token was rejected", async () => {
+    const onSessionRejected = vi.fn();
+    const setAuthTokensForServer = vi.fn(() => true);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: false,
+      status: 403,
+    } as Response);
+    const transport = createApiAuthTransport({
+      apiBase: () => "https://a.example.com",
+      apiClient: vi.fn(),
+      apiCredentials: () => "omit",
+      getApiAuthHeaders: () => ({ Authorization: "Bearer access-a" }),
+      getAuthToken: () => "access-a",
+      getAuthTokenExpiresAt: () => null,
+      getCurrentServerId: () => "server-a",
+      getRefreshToken: () => "refresh-a",
+      getServerAuthTokens: () => ({
+        token: "access-a",
+        refreshToken: "refresh-a",
+      }),
+      setAuthToken: vi.fn(),
+      setAuthTokens: vi.fn(),
+      setAuthTokensForServer,
+      onSessionRejected,
+      usesConfigurableServer: true,
+    });
+
+    await expect(transport.refreshAuthToken()).resolves.toBe(false);
+
+    expect(setAuthTokensForServer).toHaveBeenCalledWith(
+      "server-a",
+      null,
+      null,
+      null,
+    );
+    expect(onSessionRejected).toHaveBeenCalledWith("server-a");
   });
 
   it("isolates concurrent refreshes when the active server changes", async () => {

@@ -5,8 +5,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOfflineRuntime } from "@/contexts/use-offline-runtime";
 
 export function OfflineProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
-  const value = useOfflineRuntime(user);
+  const { user, accessMode, offlineIdentity } = useAuth();
+  const value = useOfflineRuntime(
+    user,
+    accessMode === "offline" ? offlineIdentity : null,
+  );
 
   return (
     <OfflineContext.Provider value={value}>{children}</OfflineContext.Provider>

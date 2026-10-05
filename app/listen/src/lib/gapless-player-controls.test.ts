@@ -183,4 +183,61 @@ describe("gapless player controls", () => {
       expect(player.play).toHaveBeenCalledTimes(1);
     },
   );
+
+  it.each(["play", "fadeInAndPlay", "next", "gotoTrack"] as const)(
+    "does not apply a pending %s after pause invalidates it",
+    async (command) => {
+      const recovery = createDeferred();
+      const { controls, host, player } = createControls({
+        prepare: () => recovery.promise,
+        recoveryRequired: true,
+      });
+      const operation =
+        command === "play"
+          ? controls.play()
+          : command === "fadeInAndPlay"
+            ? controls.fadeInAndPlay(0)
+            : command === "next"
+              ? controls.next()
+              : controls.gotoTrack(0, true);
+
+      controls.pause();
+      recovery.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(player.play).not.toHaveBeenCalled();
+      expect(player.next).not.toHaveBeenCalled();
+      expect(player.gotoTrack).not.toHaveBeenCalled();
+      expect(host.setPlaybackActive).toHaveBeenLastCalledWith(false);
+      await expect(operation).resolves.toBe("cancelled");
+    },
+  );
+
+  it.each(["play", "next", "gotoTrack"] as const)(
+    "does not apply a pending %s after stop invalidates it",
+    async (command) => {
+      const recovery = createDeferred();
+      const { controls, player } = createControls({
+        prepare: () => recovery.promise,
+        recoveryRequired: true,
+      });
+      const operation =
+        command === "play"
+          ? controls.play()
+          : command === "next"
+            ? controls.next()
+            : controls.gotoTrack(0, true);
+
+      controls.stop();
+      recovery.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(player.play).not.toHaveBeenCalled();
+      expect(player.next).not.toHaveBeenCalled();
+      expect(player.gotoTrack).not.toHaveBeenCalled();
+      await expect(operation).resolves.toBe("cancelled");
+    },
+  );
 });

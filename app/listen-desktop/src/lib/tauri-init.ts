@@ -1,6 +1,8 @@
 import {
   consumeOAuthCallbackUrl,
+  retryPendingNativeOAuthLinkCallback,
   retryPendingNativeOAuthCallback,
+  storePendingOAuthProviderError,
 } from "@/lib/capacitor-oauth";
 import { recordDevLog } from "@/lib/dev-logs";
 import {
@@ -13,6 +15,7 @@ import { initLinuxScrollBehavior } from "./linux-scroll";
 import { initLinuxDesktopTheme } from "./linux-theme";
 
 let tauriRuntimeInitialized = false;
+let tauriOAuthRuntimeStarted = false;
 
 export function initTauriRuntime(): void {
   if (typeof document === "undefined") return;
@@ -23,12 +26,18 @@ export function initTauriRuntime(): void {
   recordTauriAuthDiagnostic("OAuth bridge initializing");
   recordDevLog("tauri", "runtime init");
   installTauriInvokeBridge();
+  installTauriExternalOpenerBridge();
   initLinuxScrollBehavior();
   initLinuxDesktopTheme();
   ensureDesktopWindowSize();
   installNativeHttpFetch();
   void initTrayBridge();
   void initBandcampCookieBridge();
+}
+
+export function startTauriOAuthRuntime(): void {
+  if (typeof window === "undefined" || tauriOAuthRuntimeStarted) return;
+  tauriOAuthRuntimeStarted = true;
   void initDeepLinks();
   window.addEventListener("online", () => {
     void retryDeferredOAuth();
@@ -50,6 +59,17 @@ function installTauriInvokeBridge(): void {
   window.__crateTauriInvoke = async (command, args) => {
     const { invoke } = await import("@tauri-apps/api/core");
     return invoke(command, args);
+  };
+}
+
+export function installTauriExternalOpenerBridge(): void {
+  if (typeof window === "undefined") return;
+  const tauriWindow = window as Window & {
+    __crateOpenExternalUrl?: (url: string) => Promise<void>;
+  };
+  tauriWindow.__crateOpenExternalUrl = async (url) => {
+    const { openUrl } = await import("@tauri-apps/plugin-opener");
+    await openUrl(url);
   };
 }
 
@@ -77,6 +97,11 @@ export function shouldUseTauriHttpPlugin(input: RequestInfo | URL): boolean {
           ? input.href
           : input.url;
     const url = new URL(value);
+    // Packaged Tauri origins are allowed by the API's CORS policy. Use
+    // WebKit's native streaming fetch there; the HTTP plugin proxies large
+    // audio response bodies through Tauri resource IDs. The Vite dev origin
+    // is not in production CORS, so it must keep using the privileged client.
+    if (isMediaStreamPath(url.pathname) && isAllowedTauriOrigin()) return false;
     if (url.protocol === "https:") return true;
     return (
       url.protocol === "http:" &&
@@ -87,6 +112,31 @@ export function shouldUseTauriHttpPlugin(input: RequestInfo | URL): boolean {
   } catch {
     return false;
   }
+}
+
+function isAllowedTauriOrigin(): boolean {
+  if (typeof window === "undefined") return false;
+  return [
+    "tauri://localhost",
+    "http://tauri.localhost",
+    "https://tauri.localhost",
+  ].includes(window.location.origin);
+}
+
+function isMediaStreamPath(pathname: string): boolean {
+  return (
+    pathname === "/rest/stream" ||
+    pathname === "/rest/stream.view" ||
+    /^\/api\/(?:tracks\/(?:by-(?:entity|storage)\/)?[^/]+\/stream|catalog\/tracks\/[^/]+\/stream|playback\/variants\/[^/]+\/stream|stream\/.+)$/.test(
+      pathname,
+    ) ||
+    /^\/api\/federation\/(?:remote\/streams|v1\/streams)\/[^/]+$/.test(
+      pathname,
+    ) ||
+    /^\/api\/cast\/(?:sessions\/[^/]+\/items\/[^/]+\/stream|stream\/[^/]+)$/.test(
+      pathname,
+    )
+  );
 }
 
 function isHttpRequest(
@@ -128,12 +178,9 @@ async function initDeepLinks(): Promise<void> {
       recordTauriAuthDiagnostic("OAuth bridge ready");
     }
     await retryDeferredOAuth();
-  } catch (err) {
-    recordTauriAuthDiagnostic(
-      "OAuth bridge failed",
-      err instanceof Error ? err.message : String(err),
-    );
-    console.warn("[tauri] deep-link init failed", err);
+  } catch {
+    recordTauriAuthDiagnostic("OAuth bridge failed");
+    console.warn("[tauri] deep-link init failed");
   }
 }
 
@@ -145,9 +192,53 @@ export function mergeInitialDeepLinkUrls(
 }
 
 async function retryDeferredOAuth(): Promise<void> {
-  const result = await retryPendingNativeOAuthCallback();
+  const loginResult = await retryPendingNativeOAuthCallback();
+  dispatchOAuthCallbackResult(loginResult);
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const linkResult = await retryPendingNativeOAuthLinkCallback();
+    if (!linkResult.handled) return;
+    dispatchOAuthCallbackResult(linkResult);
+  }
+}
+
+export function dispatchOAuthCallbackResult(result: {
+  handled: boolean;
+  next: string;
+  operation?: "link";
+  provider?: string;
+  userId?: number;
+  cancelled?: true;
+  providerError?: true;
+  error?: true;
+}): void {
   if (!result.handled) return;
-  recordTauriAuthDiagnostic("OAuth token stored", result.next);
+  if (result.cancelled) {
+    recordTauriAuthDiagnostic("Native OAuth login cancelled");
+    return;
+  }
+  if (result.providerError) {
+    recordTauriAuthDiagnostic("Native OAuth provider error");
+    storePendingOAuthProviderError();
+    window.dispatchEvent(new CustomEvent("crate:oauth-provider-error"));
+    return;
+  }
+  if (result.operation === "link") {
+    const eventName = result.error
+      ? "crate:oauth-link-failed"
+      : "crate:oauth-link-completed";
+    recordTauriAuthDiagnostic(
+      result.error
+        ? "Native OAuth account link failed"
+        : "Native OAuth account linked",
+    );
+    window.dispatchEvent(
+      new CustomEvent(eventName, {
+        detail: { provider: result.provider, userId: result.userId },
+      }),
+    );
+    return;
+  }
+  recordTauriAuthDiagnostic("OAuth token stored");
   window.dispatchEvent(new CustomEvent("crate:auth-token-received"));
 }
 
@@ -159,12 +250,7 @@ async function initTrayBridge(): Promise<void> {
       dispatchDesktopTrayCommand(event.payload);
     });
   } catch (err) {
-    recordDevLog(
-      "tauri",
-      "tray bridge failed",
-      err instanceof Error ? err.message : String(err),
-      "warn",
-    );
+    recordDevLog("tauri", "tray bridge failed", safeErrorCategory(err), "warn");
   }
 }
 
@@ -180,14 +266,26 @@ async function initBandcampCookieBridge(): Promise<void> {
     recordDevLog(
       "tauri",
       "Bandcamp cookie bridge failed",
-      err instanceof Error ? err.message : String(err),
+      safeErrorCategory(err),
       "warn",
     );
   }
 }
 
+function safeErrorCategory(error: unknown): string {
+  const name =
+    error instanceof Error
+      ? error.name
+      : error instanceof DOMException
+        ? error.name
+        : "UnknownError";
+  return /^[A-Za-z][A-Za-z0-9_.-]{0,39}$/.test(name) ? name : "Error";
+}
+
 async function handleDeepLinkUrls(urls: string[]): Promise<void> {
   for (const url of urls) {
+    // OAuth callbacks share pending exchange state, so consume them in delivery order.
+    // react-doctor-disable-next-line async-await-in-loop
     const result = await consumeOAuthCallbackUrl(url);
     if (!result.handled) {
       recordTauriAuthDiagnostic(
@@ -196,9 +294,7 @@ async function handleDeepLinkUrls(urls: string[]): Promise<void> {
       );
       continue;
     }
-    recordTauriAuthDiagnostic("OAuth token stored", result.next);
-    window.dispatchEvent(new CustomEvent("crate:auth-token-received"));
-    return;
+    dispatchOAuthCallbackResult(result);
   }
 }
 
