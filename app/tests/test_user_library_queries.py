@@ -1622,6 +1622,94 @@ class TestStatsTops:
         # At minimum we should have some genre data since tracks have genres
         assert isinstance(top, list)
 
+    def test_get_top_genres_splits_multi_label_rows_and_computes_share(self, lib_db):
+        rows = [
+            ("post-punk, Punk Rock", 6, 4, 30.0),
+            ("Punk Rock", 3, 3, 9.0),
+            ("shoegaze", 2, 1, 6.0),
+            ("ambient", 1, 0, 3.0),
+        ]
+        with transaction_scope() as session:
+            for genre_name, plays, complete, minutes in rows:
+                session.execute(
+                    text(
+                        """
+                        INSERT INTO user_genre_stats (
+                            user_id, stat_window, genre_name, play_count,
+                            complete_play_count, minutes_listened,
+                            first_played_at, last_played_at
+                        ) VALUES (
+                            :user_id, 'all_time', :genre_name, :plays,
+                            :complete, :minutes, NOW(), NOW()
+                        )
+                        """
+                    ),
+                    {
+                        "user_id": TEST_USER_ID,
+                        "genre_name": genre_name,
+                        "plays": plays,
+                        "complete": complete,
+                        "minutes": minutes,
+                    },
+                )
+
+        from crate.db.queries.user_library_stats_tops import get_top_genres
+
+        top = get_top_genres(TEST_USER_ID, window="all_time", limit=2)
+
+        assert [item["genre_name"].lower() for item in top] == [
+            "punk rock",
+            "post-punk",
+        ]
+        punk, post_punk = top
+        assert punk["weight"] == pytest.approx(6.0)
+        assert punk["play_count"] == 6
+        assert punk["minutes_listened"] == pytest.approx(24.0)
+        assert punk["share"] == pytest.approx(6 / 12)
+        assert post_punk["weight"] == pytest.approx(3.0)
+        assert post_punk["complete_play_count"] == 2
+        assert post_punk["share"] == pytest.approx(3 / 12)
+        assert punk["slug"]
+        assert post_punk["slug"] == "post-punk"
+
+    def test_get_month_top_genres_splits_labels_and_uses_full_month_total(self, lib_db):
+        _pg_db, data = lib_db
+        tracks = data["tracks"]
+        genres = {
+            "Concubine": "metalcore, Hardcore",
+            "Fault and Fracture": "hardcore",
+            "Dream House": "blackgaze",
+        }
+        with transaction_scope() as session:
+            for title, genre in genres.items():
+                session.execute(
+                    text("UPDATE library_tracks SET genre = :genre WHERE id = :id"),
+                    {"genre": genre, "id": tracks[title]["id"]},
+                )
+        now = datetime.now(timezone.utc).replace(day=1, hour=12, minute=0)
+        plays = [("Concubine", 4), ("Fault and Fracture", 1), ("Dream House", 1)]
+        for title, count in plays:
+            for index in range(count):
+                started = now + timedelta(hours=index)
+                _insert_play_event(
+                    TEST_USER_ID,
+                    track_id=tracks[title]["id"],
+                    track_path=tracks[title]["path"],
+                    title=title,
+                    started_at=started,
+                    ended_at=started + timedelta(minutes=3),
+                )
+
+        from crate.db.queries.user_library_stats_month import get_month_top_genres
+
+        top = get_month_top_genres(TEST_USER_ID, now.strftime("%Y-%m"), limit=1)
+
+        assert len(top) == 1
+        assert top[0]["genre_name"].lower() == "hardcore"
+        assert top[0]["weight"] == pytest.approx(3.0)
+        assert top[0]["share"] == pytest.approx(3 / 6)
+        assert top[0]["slug"]
+
     def test_get_top_genres_empty(self, lib_db):
         from crate.db.queries.user_library_stats_tops import get_top_genres
 

@@ -6,6 +6,10 @@ from datetime import date, datetime
 from sqlalchemy import text
 
 from crate.db.queries.user_library_shared import normalize_stats_window
+from crate.db.queries.user_library_stats_genres import (
+    format_weighted_genre_rows,
+    weighted_genre_split_sql,
+)
 from crate.db.tx import read_scope
 
 
@@ -244,26 +248,26 @@ def get_top_genres(user_id: int, window: str = "30d", limit: int = 20) -> list[d
         rows = (
             session.execute(
                 text(
-                    """
-                SELECT
-                    genre_name,
-                    play_count,
-                    complete_play_count,
-                    minutes_listened,
-                    first_played_at,
-                    last_played_at
-                FROM user_genre_stats
-                WHERE user_id = :user_id AND stat_window = :window
-                ORDER BY play_count DESC, minutes_listened DESC, last_played_at DESC
-                LIMIT :lim
-                """
+                    weighted_genre_split_sql(
+                        """
+                        SELECT
+                            genre_name,
+                            play_count,
+                            complete_play_count,
+                            minutes_listened,
+                            first_played_at,
+                            last_played_at
+                        FROM user_genre_stats
+                        WHERE user_id = :user_id AND stat_window = :window
+                        """
+                    )
                 ),
                 {"user_id": user_id, "window": normalized, "lim": limit},
             )
             .mappings()
             .all()
         )
-    return [dict(row) for row in rows]
+    return format_weighted_genre_rows(rows)
 
 
 def get_replay_mix(user_id: int, window: str = "30d", limit: int = 30) -> dict:

@@ -5,6 +5,10 @@ from datetime import date, datetime, timezone
 
 from sqlalchemy import text
 
+from crate.db.queries.user_library_stats_genres import (
+    format_weighted_genre_rows,
+    weighted_genre_split_sql,
+)
 from crate.db.tx import read_scope
 
 
@@ -475,40 +479,42 @@ def get_month_top_genres(user_id: int, month: str, limit: int = 20) -> list[dict
         rows = (
             session.execute(
                 text(
-                    """
-                    SELECT
-                        lt.genre AS genre_name,
-                        COUNT(*)::integer AS play_count,
-                        SUM(CASE WHEN upe.was_completed THEN 1 ELSE 0 END)::integer AS complete_play_count,
-                        COALESCE(SUM(upe.played_seconds), 0) / 60.0 AS minutes_listened
-                    FROM user_play_events upe
-                    LEFT JOIN library_tracks lt
-                      ON lt.id = upe.track_id
-                      OR (
-                        upe.track_id IS NULL
-                        AND upe.track_entity_uid IS NOT NULL
-                        AND lt.entity_uid = upe.track_entity_uid
-                      )
-                      OR (
-                        upe.track_id IS NULL
-                        AND COALESCE(upe.track_path, '') <> ''
-                        AND lt.path = upe.track_path
-                      )
-                    WHERE upe.user_id = :user_id
-                      AND upe.ended_at >= CAST(:start AS TIMESTAMPTZ)
-                      AND upe.ended_at < CAST(:end AS TIMESTAMPTZ)
-                      AND COALESCE(NULLIF(TRIM(lt.genre), ''), '') <> ''
-                    GROUP BY lt.genre
-                    ORDER BY play_count DESC, minutes_listened DESC, genre_name
-                    LIMIT :limit
-                    """
+                    weighted_genre_split_sql(
+                        """
+                        SELECT
+                            lt.genre AS genre_name,
+                            COUNT(*)::integer AS play_count,
+                            SUM(CASE WHEN upe.was_completed THEN 1 ELSE 0 END)::integer AS complete_play_count,
+                            COALESCE(SUM(upe.played_seconds), 0) / 60.0 AS minutes_listened,
+                            MIN(upe.started_at) AS first_played_at,
+                            MAX(upe.ended_at) AS last_played_at
+                        FROM user_play_events upe
+                        LEFT JOIN library_tracks lt
+                          ON lt.id = upe.track_id
+                          OR (
+                            upe.track_id IS NULL
+                            AND upe.track_entity_uid IS NOT NULL
+                            AND lt.entity_uid = upe.track_entity_uid
+                          )
+                          OR (
+                            upe.track_id IS NULL
+                            AND COALESCE(upe.track_path, '') <> ''
+                            AND lt.path = upe.track_path
+                          )
+                        WHERE upe.user_id = :user_id
+                          AND upe.ended_at >= CAST(:start AS TIMESTAMPTZ)
+                          AND upe.ended_at < CAST(:end AS TIMESTAMPTZ)
+                          AND COALESCE(NULLIF(TRIM(lt.genre), ''), '') <> ''
+                        GROUP BY lt.genre
+                        """
+                    )
                 ),
-                {"user_id": user_id, "start": start, "end": end, "limit": limit},
+                {"user_id": user_id, "start": start, "end": end, "lim": limit},
             )
             .mappings()
             .all()
         )
-    return [dict(row) for row in rows]
+    return format_weighted_genre_rows(rows)
 
 
 def get_month_replay_mix(user_id: int, month: str, limit: int = 30) -> dict:

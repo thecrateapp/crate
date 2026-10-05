@@ -479,9 +479,12 @@ class StatsAlbumResponse(BaseModel):
 
 class StatsGenreResponse(BaseModel):
     genre_name: str
+    slug: str | None = None
     play_count: int
     complete_play_count: int
     minutes_listened: float | int
+    weight: float | None = None
+    share: float | None = None
     first_played_at: datetime | str | None = None
     last_played_at: datetime | str | None = None
 
