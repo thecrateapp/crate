@@ -1,6 +1,4 @@
-import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
-
-import { isNative } from "@/lib/capacitor-runtime";
+import { supportsHaptics } from "@/lib/platform";
 
 type HapticFeedback =
   | "light"
@@ -11,9 +9,13 @@ type HapticFeedback =
   | "error";
 
 export function triggerHaptic(feedback: HapticFeedback = "light"): void {
-  if (!isNative) return;
+  if (!supportsHaptics) return;
 
   const run = async () => {
+    const { Haptics, ImpactStyle, NotificationType } = await import(
+      "@capacitor/haptics"
+    );
+
     switch (feedback) {
       case "selection":
         await Haptics.selectionStart();

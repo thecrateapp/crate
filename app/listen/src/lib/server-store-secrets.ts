@@ -3,7 +3,7 @@ import {
   removeSecureSessionValue,
   setSecureSessionValue,
 } from "@/lib/native-secure-session";
-import { isCapacitorRuntime } from "@/lib/platform";
+import { usesSecureSessionStore } from "@/lib/platform";
 
 export interface ServerSecret {
   token: string | null;
@@ -142,28 +142,28 @@ function clearPendingSecretRemoval(serverId: string, generation: number): void {
 }
 
 async function retryPendingSecretRemovals(): Promise<void> {
-  await Promise.all(
+  const results = await Promise.allSettled(
     [...readPendingSecretRemovals()].map(async ([serverId, generation]) => {
-      try {
-        // A login that completed after this logout carries a newer generation.
-        // Keep it even if the process crashed before clearing the old tombstone.
-        const current = parseSecureServerSecret(
-          await getSecureSessionValue(secureSessionKey(serverId)),
-        );
-        observeSecretGeneration(serverId, current.generation);
-        if (current.generation > generation) {
-          clearPendingSecretRemoval(serverId, generation);
-          return;
-        }
-        // Each tombstone is independent; one unavailable Keychain entry must not
-        // prevent the remaining active sessions from loading at startup.
-        await removeSecureSessionValue(secureSessionKey(serverId));
+      // A login that completed after this logout carries a newer generation.
+      // Keep it even if the process crashed before clearing the old tombstone.
+      const current = parseSecureServerSecret(
+        await getSecureSessionValue(secureSessionKey(serverId)),
+      );
+      observeSecretGeneration(serverId, current.generation);
+      if (current.generation > generation) {
         clearPendingSecretRemoval(serverId, generation);
-      } catch {
-        // Keep the tombstone durable so the next bootstrap retries it again.
+        return;
       }
+      await removeSecureSessionValue(secureSessionKey(serverId));
+      clearPendingSecretRemoval(serverId, generation);
     }),
   );
+  const failure = results.find((result) => result.status === "rejected");
+  if (failure?.status === "rejected") {
+    const wrapped = new Error("Pending session cleanup failed");
+    (wrapped as Error & { cause?: unknown }).cause = failure.reason;
+    throw wrapped;
+  }
 }
 
 export function parseServerSecret(value: string | null): ServerSecret {
@@ -174,25 +174,43 @@ function parseSecureServerSecret(value: string | null): {
   secret: ServerSecret;
   generation: number;
 } {
-  if (!value) return { secret: emptySecret(), generation: 0 };
+  if (value === null) return { secret: emptySecret(), generation: 0 };
+  if (!value) throw new Error("Secure session record is invalid");
+  let decoded: unknown;
   try {
-    const parsed = JSON.parse(value) as Partial<SecureServerSecretRecord>;
-    return {
-      secret: {
-        token: typeof parsed.token === "string" ? parsed.token : null,
-        refreshToken:
-          typeof parsed.refreshToken === "string" ? parsed.refreshToken : null,
-      },
-      generation:
-        typeof parsed.generation === "number" &&
-        Number.isSafeInteger(parsed.generation) &&
-        parsed.generation >= 0
-          ? parsed.generation
-          : 0,
-    };
+    decoded = JSON.parse(value);
   } catch {
-    return { secret: emptySecret(), generation: 0 };
+    throw new Error("Secure session record is corrupt");
   }
+  if (!decoded || typeof decoded !== "object" || Array.isArray(decoded)) {
+    throw new Error("Secure session record is invalid");
+  }
+  const parsed = decoded as Partial<SecureServerSecretRecord>;
+  if (!("token" in parsed || "refreshToken" in parsed)) {
+    throw new Error("Secure session record is invalid");
+  }
+  if (
+    (parsed.token !== undefined &&
+      parsed.token !== null &&
+      typeof parsed.token !== "string") ||
+    (parsed.refreshToken !== undefined &&
+      parsed.refreshToken !== null &&
+      typeof parsed.refreshToken !== "string") ||
+    (parsed.generation !== undefined &&
+      (typeof parsed.generation !== "number" ||
+        !Number.isSafeInteger(parsed.generation) ||
+        parsed.generation < 0))
+  ) {
+    throw new Error("Secure session record is invalid");
+  }
+  return {
+    secret: {
+      token: typeof parsed.token === "string" ? parsed.token : null,
+      refreshToken:
+        typeof parsed.refreshToken === "string" ? parsed.refreshToken : null,
+    },
+    generation: parsed.generation ?? 0,
+  };
 }
 
 function serializeSecret(secret: ServerSecret, generation: number): string {
@@ -245,7 +263,7 @@ function enqueueSecretWrite(
 }
 
 export function queueSecretWrite(serverId: string, secret: ServerSecret): void {
-  if (!isCapacitorRuntime) return;
+  if (!usesSecureSessionStore) return;
   if (!secret.token && !secret.refreshToken) {
     queueSecretRemoval(serverId);
     return;
@@ -276,7 +294,7 @@ function queueSecretRemoval(serverId: string): void {
 }
 
 export function removeQueuedSecret(serverId: string): void {
-  if (!isCapacitorRuntime) return;
+  if (!usesSecureSessionStore) return;
   queueSecretRemoval(serverId);
 }
 
@@ -299,6 +317,21 @@ export async function loadNativeServerSecrets(
       nextSecrets.set(server.id, emptySecret());
       continue;
     }
+    // Keychain reads stay ordered with the per-server migration below.
+    // react-doctor-disable-next-line async-await-in-loop
+    const secureRaw = await getSecureSessionValue(secureSessionKey(server.id));
+    const secureRecord = parseSecureServerSecret(secureRaw);
+    observeSecretGeneration(server.id, secureRecord.generation);
+    if (
+      secureRaw !== null &&
+      (secureRecord.generation > 0 ||
+        secureRecord.secret.token ||
+        secureRecord.secret.refreshToken)
+    ) {
+      nextSecrets.set(server.id, secureRecord.secret);
+      continue;
+    }
+
     const legacySecret: ServerSecret = {
       token: server.token ?? null,
       refreshToken: server.refreshToken ?? null,
@@ -316,10 +349,6 @@ export async function loadNativeServerSecrets(
       nextSecrets.set(server.id, legacySecret);
       continue;
     }
-    const secureRecord = parseSecureServerSecret(
-      await getSecureSessionValue(secureSessionKey(server.id)),
-    );
-    observeSecretGeneration(server.id, secureRecord.generation);
     nextSecrets.set(server.id, secureRecord.secret);
   }
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
 
 from crate.api.auth import _require_auth
@@ -8,6 +8,7 @@ from crate.api.openapi_responses import (
     merge_responses,
 )
 from crate.api.playlist_utils import apply_playlist_cover_payload
+from crate.api.public_urls import public_share_url
 from crate.api.schemas.common import OkResponse
 from crate.api.schemas.playlists import (
     AddTracksRequest,
@@ -27,30 +28,30 @@ from crate.api.schemas.playlists import (
     ReorderRequest,
     UpdatePlaylistRequest,
 )
-from crate.playlist_covers import delete_playlist_cover, playlist_cover_abspath
 from crate.db.genres import get_all_genres
 from crate.db.repositories.playlists import (
-    consume_playlist_invite,
-    create_playlist_invite,
-    execute_smart_rules,
-    get_playlist_filter_options,
     add_playlist_member,
     add_playlist_tracks,
     can_edit_playlist,
     can_view_playlist,
+    consume_playlist_invite,
     create_playlist,
+    create_playlist_invite,
     delete_playlist,
+    execute_smart_rules,
     get_playlist,
+    get_playlist_filter_options,
     get_playlist_members,
     get_playlist_tracks,
     get_playlists,
     is_playlist_owner,
     regenerate_playlist_tracks,
-    reorder_playlist,
     remove_playlist_member,
     remove_playlist_track,
+    reorder_playlist,
     update_playlist,
 )
+from crate.playlist_covers import delete_playlist_cover, playlist_cover_abspath
 
 router = APIRouter(prefix="/api/playlists", tags=["playlists"])
 
@@ -421,10 +422,12 @@ def invite(request: Request, playlist_id: int, body: PlaylistInviteRequest):
         expires_in_hours=body.expires_in_hours,
         max_uses=body.max_uses,
     )
+    invite_path = f"/playlist/invite/{invite_row['token']}"
     return {
         **invite_row,
-        "join_url": f"/playlist/invite/{invite_row['token']}",
-        "qr_value": f"/playlist/invite/{invite_row['token']}",
+        "join_url": invite_path,
+        "qr_value": invite_path,
+        "public_url": public_share_url(invite_path),
     }
 
 

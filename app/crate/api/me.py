@@ -2,18 +2,31 @@
 
 import asyncio
 import logging
+import re
 import time
 from datetime import date, datetime, timedelta, timezone
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from starlette.responses import StreamingResponse
 
+from crate.api import native_oauth_auth
+from crate.api.auth_dependencies import require_auth as _require_auth
 from crate.api._deps import (
     artist_name_from_id,
     coerce_date as _coerce_date,
     json_dumps,
 )
-from crate.api.auth import _require_auth
+from crate.api.native_lastfm_link import (
+    InvalidNativeLastfmLink,
+    NativeLastfmLinkUnavailable,
+    claim_link_handoff as claim_native_lastfm_link_handoff,
+    complete_link_handoff as complete_native_lastfm_link_handoff,
+    discard_link_handoff as discard_native_lastfm_link_handoff,
+    issue_link_handoff as issue_native_lastfm_link_handoff,
+    restore_link_handoff as restore_native_lastfm_link_handoff,
+    save_resolved_session as save_native_lastfm_session,
+)
 from crate.api.cache_events import (
     broadcast_invalidation,
     get_invalidation_events_since,
@@ -46,6 +59,10 @@ from crate.api.schemas.me import (
     HomeSectionResponse,
     LastfmAuthUrlResponse,
     LastfmCallbackRequest,
+    NativeLastfmLinkCompleteRequest,
+    NativeLastfmLinkCompleteResponse,
+    NativeLastfmLinkStartRequest,
+    NativeLastfmLinkStartResponse,
     LibraryPlaylistsPageResponse,
     LikedTrackResponse,
     LikeMutationResponse,
@@ -128,7 +145,9 @@ from crate.db.repositories.artist_suggestions import (
     list_user_artist_suggestions,
 )
 from crate.db.repositories.auth import (
+    get_user_by_external_identity,
     get_user_by_id,
+    get_user_external_identity,
     unlink_user_external_identity,
     update_user,
     update_user_location,
@@ -173,6 +192,7 @@ _ME_RESPONSES = merge_responses(
 )
 
 _STATS_DASHBOARD_CACHE_TTL_SECONDS = 90
+_NATIVE_LASTFM_FLOW_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 
 
 def _listen_global_cache_mode() -> str:
@@ -1750,6 +1770,343 @@ def lastfm_auth_url(request: Request):
     if not api_key:
         raise HTTPException(status_code=501, detail="Last.fm API key not configured")
     return {"api_key": api_key}
+
+
+@router.post(
+    "/scrobble/lastfm/native/start",
+    response_model=NativeLastfmLinkStartResponse,
+    responses=_ME_RESPONSES,
+    summary="Start a session-bound native Last.fm connection",
+)
+def native_lastfm_link_start(request: Request, body: NativeLastfmLinkStartRequest):
+    import os
+
+    user, session_id = native_oauth_auth.require_native_oauth_link_auth(request)
+    if not native_oauth_auth.native_oauth_exchange_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="Native OAuth exchange is not enabled",
+        )
+    if not native_oauth_auth.NATIVE_OAUTH_STATE_RE.fullmatch(body.state):
+        raise HTTPException(status_code=400, detail="Invalid native Last.fm state")
+    if not native_oauth_auth.NATIVE_OAUTH_CHALLENGE_RE.fullmatch(body.code_challenge):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid native Last.fm code challenge",
+        )
+
+    api_key = os.environ.get("LASTFM_APIKEY", "")
+    api_secret = os.environ.get("LASTFM_API_SECRET", "")
+    if not api_key or not api_secret:
+        raise HTTPException(status_code=501, detail="Last.fm API not fully configured")
+
+    from crate.scrobble import lastfm_get_auth_token
+
+    provider_token = lastfm_get_auth_token(api_key, api_secret)
+    if not provider_token:
+        raise HTTPException(
+            status_code=502,
+            detail="Could not start Last.fm authorization",
+        )
+
+    current_user, current_session_id = native_oauth_auth.require_native_oauth_link_auth(
+        request
+    )
+    if int(current_user["id"]) != int(user["id"]) or current_session_id != session_id:
+        raise HTTPException(status_code=401, detail="Native Last.fm session expired")
+
+    try:
+        flow_id = issue_native_lastfm_link_handoff(
+            user_id=int(user["id"]),
+            session_id=session_id,
+            state=body.state,
+            challenge=body.code_challenge,
+            provider_token=provider_token,
+        )
+    except NativeLastfmLinkUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Native Last.fm link is temporarily unavailable",
+        ) from exc
+
+    authorization_url = "https://www.last.fm/api/auth/?" + urlencode(
+        {"api_key": api_key, "token": provider_token}
+    )
+    return {"flow_id": flow_id, "authorization_url": authorization_url}
+
+
+def _apply_native_lastfm_link(*, user_id: int, session_id: str, handoff) -> None:
+    if not native_oauth_auth.native_oauth_link_session_is_valid(user_id, session_id):
+        raise HTTPException(status_code=401, detail="Native Last.fm session expired")
+    username = (handoff.username or "").strip()
+    if not handoff.session_key or not username:
+        raise HTTPException(
+            status_code=400,
+            detail="Last.fm did not return a valid session",
+        )
+
+    linked_user = get_user_by_external_identity("lastfm", username)
+    if linked_user and int(linked_user["id"]) != user_id:
+        raise HTTPException(
+            status_code=409,
+            detail="This Last.fm account is already linked to another Crate user",
+        )
+
+    existing = get_user_external_identity(user_id, "lastfm")
+    if (
+        existing
+        and existing.get("status") != "unlinked"
+        and existing.get("external_user_id") != username
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="A different Last.fm account is already linked",
+        )
+
+    metadata: dict[str, object] = {"session_key": handoff.session_key}
+    metadata["username"] = username
+    if handoff.subscriber is not None:
+        metadata["subscriber"] = handoff.subscriber
+    try:
+        upsert_user_external_identity(
+            user_id=user_id,
+            provider="lastfm",
+            external_user_id=username,
+            external_username=username,
+            status="linked",
+            last_error=None,
+            metadata=metadata,
+        )
+    except Exception as exc:
+        from sqlalchemy.exc import IntegrityError
+
+        if isinstance(exc, IntegrityError):
+            raise HTTPException(
+                status_code=409,
+                detail="This Last.fm account is already linked to another Crate user",
+            ) from None
+        log.warning("Failed to store native Last.fm identity for user %s", user_id)
+        raise HTTPException(
+            status_code=500,
+            detail="Could not store Last.fm connection",
+        ) from None
+
+
+def _discard_native_lastfm_link_or_503(flow_id: str) -> None:
+    try:
+        discard_native_lastfm_link_handoff(flow_id)
+    except NativeLastfmLinkUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Native Last.fm link is temporarily unavailable",
+        ) from exc
+
+
+def _restore_native_lastfm_link_or_503(flow_id: str, handoff) -> None:
+    try:
+        restore_native_lastfm_link_handoff(code=flow_id, handoff=handoff)
+    except NativeLastfmLinkUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Native Last.fm link is temporarily unavailable",
+        ) from exc
+
+
+@router.post(
+    "/scrobble/lastfm/native/cancel",
+    response_model=OkResponse,
+    responses=_ME_RESPONSES,
+    summary="Cancel a session-bound native Last.fm connection",
+)
+def native_lastfm_link_cancel(request: Request, body: NativeLastfmLinkCompleteRequest):
+    user, session_id = native_oauth_auth.require_native_oauth_link_auth(request)
+    if (
+        not _NATIVE_LASTFM_FLOW_RE.fullmatch(body.flow_id)
+        or not native_oauth_auth.NATIVE_OAUTH_STATE_RE.fullmatch(body.state)
+        or not native_oauth_auth.NATIVE_OAUTH_VERIFIER_RE.fullmatch(body.code_verifier)
+    ):
+        raise HTTPException(status_code=400, detail="Invalid native Last.fm flow")
+
+    try:
+        claim_status, _handoff = claim_native_lastfm_link_handoff(
+            code=body.flow_id,
+            state=body.state,
+            verifier=body.code_verifier,
+            user_id=int(user["id"]),
+            session_id=session_id,
+        )
+    except InvalidNativeLastfmLink as exc:
+        raise HTTPException(
+            status_code=401,
+            detail="Native Last.fm link is invalid or expired",
+        ) from exc
+    except NativeLastfmLinkUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Native Last.fm link is temporarily unavailable",
+        ) from exc
+    if claim_status == "in_progress":
+        raise HTTPException(
+            status_code=503,
+            detail="Native Last.fm connection is already being completed",
+        )
+    if claim_status == "completed":
+        return {"ok": True}
+    try:
+        discard_native_lastfm_link_handoff(body.flow_id)
+    except NativeLastfmLinkUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Native Last.fm link is temporarily unavailable",
+        ) from exc
+    return {"ok": True}
+
+
+@router.post(
+    "/scrobble/lastfm/native/complete",
+    response_model=NativeLastfmLinkCompleteResponse,
+    responses=_ME_RESPONSES,
+    summary="Complete a session-bound native Last.fm connection",
+)
+def native_lastfm_link_complete(
+    request: Request, body: NativeLastfmLinkCompleteRequest
+):
+    import os
+
+    user, session_id = native_oauth_auth.require_native_oauth_link_auth(request)
+    if not native_oauth_auth.native_oauth_exchange_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="Native OAuth exchange is not enabled",
+        )
+    if (
+        not _NATIVE_LASTFM_FLOW_RE.fullmatch(body.flow_id)
+        or not native_oauth_auth.NATIVE_OAUTH_STATE_RE.fullmatch(body.state)
+        or not native_oauth_auth.NATIVE_OAUTH_VERIFIER_RE.fullmatch(body.code_verifier)
+    ):
+        raise HTTPException(status_code=400, detail="Invalid native Last.fm flow")
+
+    try:
+        claim_status, handoff = claim_native_lastfm_link_handoff(
+            code=body.flow_id,
+            state=body.state,
+            verifier=body.code_verifier,
+            user_id=int(user["id"]),
+            session_id=session_id,
+        )
+    except InvalidNativeLastfmLink as exc:
+        raise HTTPException(
+            status_code=401,
+            detail="Native Last.fm link is invalid or expired",
+        ) from exc
+    except NativeLastfmLinkUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Native Last.fm link is temporarily unavailable",
+        ) from exc
+
+    if claim_status == "completed":
+        return {"ok": True, "username": handoff.username}
+    if claim_status == "in_progress":
+        raise HTTPException(
+            status_code=503,
+            detail="Native Last.fm connection is already being completed",
+        )
+
+    resolved_handoff = handoff
+    if not handoff.session_key:
+        api_key = os.environ.get("LASTFM_APIKEY", "")
+        api_secret = os.environ.get("LASTFM_API_SECRET", "")
+        if not api_key or not api_secret or not handoff.provider_token:
+            _discard_native_lastfm_link_or_503(body.flow_id)
+            raise HTTPException(
+                status_code=501,
+                detail="Last.fm API not fully configured",
+            )
+        from crate.scrobble import (
+            LastfmAuthenticationError,
+            lastfm_get_session_strict,
+        )
+
+        try:
+            lastfm_session = lastfm_get_session_strict(
+                api_key,
+                api_secret,
+                handoff.provider_token,
+            )
+        except LastfmAuthenticationError as exc:
+            if exc.retryable:
+                _restore_native_lastfm_link_or_503(body.flow_id, handoff)
+                raise HTTPException(
+                    status_code=503,
+                    detail="Last.fm authorization is not ready yet; retry shortly",
+                ) from exc
+            _discard_native_lastfm_link_or_503(body.flow_id)
+            raise HTTPException(
+                status_code=400,
+                detail="Last.fm authorization was denied or expired",
+            ) from exc
+        if not lastfm_session.key or not lastfm_session.username:
+            _discard_native_lastfm_link_or_503(body.flow_id)
+            raise HTTPException(
+                status_code=400,
+                detail="Last.fm authorization did not include a valid account",
+            )
+        try:
+            resolved_handoff = save_native_lastfm_session(
+                code=body.flow_id,
+                handoff=handoff,
+                session_key=lastfm_session.key,
+                username=lastfm_session.username,
+                subscriber=lastfm_session.subscriber,
+            )
+        except NativeLastfmLinkUnavailable as exc:
+            raise HTTPException(
+                status_code=503,
+                detail="Native Last.fm link is temporarily unavailable",
+            ) from exc
+
+    try:
+        if resolved_handoff.expires_at <= datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=401,
+                detail="Native Last.fm link is invalid or expired",
+            )
+        current_user, current_session_id = (
+            native_oauth_auth.require_native_oauth_link_auth(request)
+        )
+        if (
+            int(current_user["id"]) != resolved_handoff.user_id
+            or current_session_id != resolved_handoff.session_id
+        ):
+            raise HTTPException(
+                status_code=401, detail="Native Last.fm session expired"
+            )
+        _apply_native_lastfm_link(
+            user_id=resolved_handoff.user_id,
+            session_id=resolved_handoff.session_id,
+            handoff=resolved_handoff,
+        )
+        completed = complete_native_lastfm_link_handoff(
+            code=body.flow_id,
+            handoff=resolved_handoff,
+        )
+    except HTTPException as exc:
+        if exc.status_code in {400, 401, 403, 404, 409}:
+            _discard_native_lastfm_link_or_503(body.flow_id)
+        else:
+            _restore_native_lastfm_link_or_503(body.flow_id, resolved_handoff)
+        raise
+    except NativeLastfmLinkUnavailable as exc:
+        _restore_native_lastfm_link_or_503(body.flow_id, resolved_handoff)
+        raise HTTPException(
+            status_code=503,
+            detail="Native Last.fm link is temporarily unavailable",
+        ) from exc
+    except Exception:
+        _restore_native_lastfm_link_or_503(body.flow_id, resolved_handoff)
+        raise
+    return {"ok": True, "username": completed.username}
 
 
 @router.post(

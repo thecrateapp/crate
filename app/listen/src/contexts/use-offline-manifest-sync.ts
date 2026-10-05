@@ -12,6 +12,7 @@ import {
   cacheTrackAsset,
   deleteCachedTrackAsset,
   ensureOfflineStorageBudget,
+  getOfflineAssetsNeedingRefresh,
   getOfflineItemKey,
   getOfflineTrackAssetKey,
   hasCachedTrackAssets,
@@ -116,8 +117,8 @@ export function useOfflineManifestSync({
             : "error",
         trackCount: manifest.track_count || manifestTracks.length,
         readyTrackCount: readyCount,
-        contentVersion: manifest.content_version,
-        updatedAt: manifest.updated_at ?? null,
+        contentVersion: existing?.contentVersion || null,
+        updatedAt: existing?.updatedAt || null,
         totalBytes: manifest.total_bytes ?? 0,
         tracks: manifestTracks,
         readyAssetKeys,
@@ -132,6 +133,10 @@ export function useOfflineManifestSync({
         },
       });
 
+      const staleAssetKeys = await getOfflineAssetsNeedingRefresh(
+        profileKey,
+        manifestTracks,
+      );
       const readyKeys = new Set(midItem.readyAssetKeys || []);
       const pendingTracks = manifestTracks.filter((track) => {
         const assetKey = getOfflineTrackAssetKey(track);
@@ -140,7 +145,7 @@ export function useOfflineManifestSync({
           failureMessage = "One or more tracks are missing entity identifiers";
           return false;
         }
-        return !readyKeys.has(assetKey);
+        return !readyKeys.has(assetKey) || staleAssetKeys.has(assetKey);
       });
       transferAbortRef.current?.abort();
       const transferController = new AbortController();
@@ -211,6 +216,14 @@ export function useOfflineManifestSync({
             ? "ready"
             : "error",
         readyTrackCount: readyCount,
+        contentVersion:
+          readyCount === manifestTracks.length && failureCount === 0
+            ? manifest.content_version
+            : existing?.contentVersion || null,
+        updatedAt:
+          readyCount === manifestTracks.length && failureCount === 0
+            ? manifest.updated_at ?? null
+            : existing?.updatedAt || null,
         lastSyncedAt: new Date().toISOString(),
         totalBytes: manifest.total_bytes ?? 0,
         errorMessage:

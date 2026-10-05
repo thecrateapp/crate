@@ -82,6 +82,11 @@ export interface OfflineNativeAssetRecord {
   uri?: string;
   playbackUrl?: string;
   state?: "ready" | "deleting";
+  originFingerprint?: string | null;
+  requestedDeliveryPolicy?: string | null;
+  deliveryPolicy?: string | null;
+  deliveryFormat?: string | null;
+  deliveryByteLength?: number | null;
   byteLength?: number | null;
   updatedAt?: string | null;
 }

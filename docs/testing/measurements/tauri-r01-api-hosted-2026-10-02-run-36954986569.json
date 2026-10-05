@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "measurement": "Tauri R01 pooled HTTP client against read-only HTTPS API",
+  "captured_at": "2026-10-02",
+  "source_sha": "eb3e478162f343756358088d45a2b73ceff24698",
+  "workflow_run_id": 36954986569,
+  "workflow_run_url": "https://github.com/thecrateapp/crate/actions/runs/36954986569",
+  "endpoint": "https://api.lespedants.org/api/setup/status",
+  "endpoint_behavior": "Unauthenticated read-only GET that counts users",
+  "http_status_validation": "Every response passed reqwest error_for_status",
+  "requests_per_runner": 104,
+  "measured_requests_per_mode_and_concurrency": 25,
+  "warmups_per_mode_and_concurrency": 1,
+  "preflight_requests_per_runner": 0,
+  "runners": {
+    "linux": {
+      "runner_image": "ubuntu-22.04",
+      "measurements": [
+        {
+          "concurrency": 1,
+          "fresh_client": {
+            "cold_request_us": 406692,
+            "elapsed_ms": 6454,
+            "p50_us": 238257,
+            "p95_us": 329249
+          },
+          "shared_client": {
+            "cold_request_us": 231311,
+            "elapsed_ms": 4642,
+            "p50_us": 186427,
+            "p95_us": 189853
+          }
+        },
+        {
+          "concurrency": 8,
+          "fresh_client": {
+            "cold_request_us": 235613,
+            "elapsed_ms": 1062,
+            "p50_us": 246365,
+            "p95_us": 297626
+          },
+          "shared_client": {
+            "cold_request_us": 235032,
+            "elapsed_ms": 1219,
+            "p50_us": 196209,
+            "p95_us": 339024
+          }
+        }
+      ]
+    },
+    "windows": {
+      "runner_image": "windows-latest",
+      "measurements": [
+        {
+          "concurrency": 1,
+          "fresh_client": {
+            "cold_request_us": 552902,
+            "elapsed_ms": 8328,
+            "p50_us": 189945,
+            "p95_us": 553817
+          },
+          "shared_client": {
+            "cold_request_us": 531106,
+            "elapsed_ms": 3417,
+            "p50_us": 137501,
+            "p95_us": 140757
+          }
+        },
+        {
+          "concurrency": 8,
+          "fresh_client": {
+            "cold_request_us": 166699,
+            "elapsed_ms": 1420,
+            "p50_us": 165525,
+            "p95_us": 565863
+          },
+          "shared_client": {
+            "cold_request_us": 152276,
+            "elapsed_ms": 1211,
+            "p50_us": 167150,
+            "p95_us": 278945
+          }
+        }
+      ]
+    },
+    "macos": {
+      "runner_image": "macos-latest",
+      "measurements": [
+        {
+          "concurrency": 1,
+          "fresh_client": {
+            "cold_request_us": 779787,
+            "elapsed_ms": 9666,
+            "p50_us": 220191,
+            "p95_us": 715683
+          },
+          "shared_client": {
+            "cold_request_us": 232438,
+            "elapsed_ms": 4375,
+            "p50_us": 174786,
+            "p95_us": 182166
+          }
+        },
+        {
+          "concurrency": 8,
+          "fresh_client": {
+            "cold_request_us": 251876,
+            "elapsed_ms": 1547,
+            "p50_us": 244825,
+            "p95_us": 326058
+          },
+          "shared_client": {
+            "cold_request_us": 219446,
+            "elapsed_ms": 1277,
+            "p50_us": 200820,
+            "p95_us": 321985
+          }
+        }
+      ]
+    }
+  }
+}

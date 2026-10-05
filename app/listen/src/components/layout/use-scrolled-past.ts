@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
+import {
+  getListenViewportScrollElement,
+  getListenViewportScrollTop,
+} from "@/lib/viewport-scroll";
+
 export const HEADER_SOLID_SCROLL_THRESHOLD = 96;
 
 interface ScrollState {
@@ -21,9 +26,11 @@ export function useScrolledPast(
   useEffect(() => {
     if (!enabled) return;
     let frame = 0;
+    const scrollTarget: HTMLElement | Window =
+      getListenViewportScrollElement() ?? window;
     const measure = () => {
       frame = 0;
-      const scrolled = window.scrollY > threshold;
+      const scrolled = getListenViewportScrollTop() > threshold;
       const last = lastRef.current;
       if (last.key === resetKey && last.scrolled === scrolled) return;
       const next = { key: resetKey, scrolled };
@@ -34,9 +41,9 @@ export function useScrolledPast(
       if (!frame) frame = window.requestAnimationFrame(measure);
     };
     measure();
-    window.addEventListener("scroll", schedule, { passive: true });
+    scrollTarget.addEventListener("scroll", schedule, { passive: true });
     return () => {
-      window.removeEventListener("scroll", schedule);
+      scrollTarget.removeEventListener("scroll", schedule);
       if (frame) window.cancelAnimationFrame(frame);
     };
   }, [enabled, threshold, resetKey]);

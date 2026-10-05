@@ -10,13 +10,17 @@ import { getCurrentServer, SERVER_STORE_EVENT } from "@/lib/server-store";
 import { AuthSpinner } from "@/app-shell/AppFallbacks";
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { user, loading, sessionUnavailable = false } = useAuth();
+  const { user, loading, sessionUnavailable = false, accessMode } = useAuth();
   const location = useLocation();
 
   useEffect(() => {
     if (!user) return;
     return connectCacheEvents();
   }, [user]);
+
+  if (accessMode === "offline") {
+    return <Navigate to="/offline" replace />;
+  }
 
   if (loading || (!user && sessionUnavailable)) {
     return <AuthSpinner />;

@@ -3,6 +3,7 @@ import { Check, Disc3, Mic2, Music2, Ticket } from "@crate/ui/icons";
 import type { NavigateFunction } from "react-router";
 
 import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
+import { notify } from "@crate/ui/lib/notify";
 import { action } from "@/components/actions/shared";
 import { openExternalUrl } from "@/lib/external-links";
 import { artistPagePath } from "@/lib/library-routes";
@@ -60,7 +61,9 @@ export function buildShowActions(
       disabled: !input.item.url,
       onSelect: () => {
         if (!input.item.url) return;
-        void openExternalUrl(input.item.url);
+        void openExternalUrl(input.item.url).catch(() =>
+          notify.error(t("common.toasts.openExternalFailed")),
+        );
       },
     }),
   ];

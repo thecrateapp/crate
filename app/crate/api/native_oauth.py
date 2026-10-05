@@ -12,6 +12,11 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from threading import RLock
 
+from crate.api.native_auth_store import (
+    local_memory_allowed as _local_memory_allowed,
+    purge_expired_memory_records,
+)
+
 NATIVE_OAUTH_HANDOFF_TTL_SECONDS = 15 * 60
 NATIVE_OAUTH_RESULT_TTL_SECONDS = NATIVE_OAUTH_HANDOFF_TTL_SECONDS
 _HANDOFF_PREFIX = "crate:auth:native_oauth"
@@ -91,15 +96,6 @@ def _redis_client():
         return None
 
 
-def _local_memory_allowed() -> bool:
-    environment = os.environ.get("CRATE_ENV", "").strip().lower()
-    domain = os.environ.get("DOMAIN", "localhost").strip().lower()
-    return environment in {"dev", "development", "test"} or domain in {
-        "localhost",
-        "127.0.0.1",
-    }
-
-
 def _serialize(handoff: NativeOAuthHandoff) -> str:
     payload = asdict(handoff)
     payload["expires_at"] = handoff.expires_at.isoformat()
@@ -158,6 +154,7 @@ def issue_handoff(*, user_id: int, app_id: str, state: str, challenge: str) -> s
     if not _local_memory_allowed():
         raise NativeOAuthUnavailable("Native OAuth handoff store is unavailable")
     with _memory_lock:
+        purge_expired_memory_records(_memory_handoffs)
         _memory_handoffs[key] = serialized
     return code
 
@@ -185,6 +182,7 @@ def _claim_handoff(code: str) -> tuple[int, bytes | str | None]:
     if not _local_memory_allowed():
         raise NativeOAuthUnavailable("Native OAuth handoff store is unavailable")
     with _memory_lock:
+        purge_expired_memory_records(_memory_handoffs)
         if pending_key in _memory_handoffs:
             return 2, None
         raw = _memory_handoffs.pop(key, None)
@@ -208,6 +206,7 @@ def _clear_pending_handoff(code: str) -> None:
     if not _local_memory_allowed():
         raise NativeOAuthUnavailable("Native OAuth handoff store is unavailable")
     with _memory_lock:
+        purge_expired_memory_records(_memory_handoffs)
         _memory_handoffs.pop(key, None)
 
 
@@ -255,6 +254,7 @@ def restore_handoff(*, code: str, handoff: NativeOAuthHandoff) -> None:
     if not _local_memory_allowed():
         raise NativeOAuthUnavailable("Native OAuth handoff store is unavailable")
     with _memory_lock:
+        purge_expired_memory_records(_memory_handoffs)
         _memory_handoffs.setdefault(key, serialized)
         _memory_handoffs.pop(exchange_pending_key(code), None)
 
@@ -312,6 +312,7 @@ def complete_exchange(
     if not _local_memory_allowed():
         raise NativeOAuthUnavailable("Native OAuth handoff store is unavailable")
     with _memory_lock:
+        purge_expired_memory_records(_memory_handoffs)
         _memory_handoffs[key] = serialized
         _memory_handoffs.pop(exchange_pending_key(code), None)
 
@@ -332,6 +333,7 @@ def get_completed_exchange(
         if not _local_memory_allowed():
             raise NativeOAuthUnavailable("Native OAuth handoff store is unavailable")
         with _memory_lock:
+            purge_expired_memory_records(_memory_handoffs)
             raw = _memory_handoffs.get(key)
     if raw is None:
         return None

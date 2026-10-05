@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import type { AuthUser } from "@/contexts/auth-context";
+import type { LocalOfflineIdentity } from "@/lib/offline-identity";
 import type {
   OfflineAlbumInput,
   OfflineContextValue,
@@ -15,8 +16,8 @@ import type {
   OfflinePlaylistInput,
   OfflineTrackInput,
 } from "@/contexts/offline-context";
-import { isNative } from "@/lib/capacitor";
 import { getCurrentServer } from "@/lib/server-store";
+import { isOfflineNativeRuntime } from "@/lib/offline-runtime";
 import {
   type OfflineItemKind,
   type OfflineItemRecord,
@@ -112,8 +113,12 @@ function findTrackOfflineItem(
   );
 }
 
-export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
+export function useOfflineRuntime(
+  user: AuthUser | null,
+  localIdentity: LocalOfflineIdentity | null = null,
+): OfflineContextValue {
   const supported = isOfflineSupported();
+  const readOnly = Boolean(localIdentity && !user);
   const [snapshot, setSnapshot] = useState<OfflineSnapshot>(EMPTY_SNAPSHOT);
   const snapshotRef = useRef<OfflineSnapshot>(EMPTY_SNAPSHOT);
   const queue = useMemo(() => Promise.resolve(), []);
@@ -125,12 +130,14 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
   const transferAbortRef = useRef<AbortController | null>(null);
 
   const profileKey = useMemo(() => {
-    if (!user?.id || !supported) return null;
-    const origin = isNative
+    if (!supported) return null;
+    if (localIdentity?.profileKey) return localIdentity.profileKey;
+    if (!user?.id) return null;
+    const origin = isOfflineNativeRuntime
       ? getCurrentServer()?.url || window.location.origin
       : window.location.origin;
     return deriveOfflineProfileKey(user.id, origin);
-  }, [supported, user?.id]);
+  }, [localIdentity?.profileKey, supported, user?.id]);
   const activeProfileRef = useRef(profileKey);
   useLayoutEffect(() => {
     activeProfileRef.current = profileKey;
@@ -202,6 +209,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
   });
 
   const { syncing, syncAll } = useOfflineSynchronization({
+    enabled: !readOnly,
     enqueue,
     profileKey,
     snapshot,
@@ -210,6 +218,10 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
     syncManifestIntoItem,
     transferAbortRef,
   });
+
+  const assertWritable = useCallback(() => {
+    if (readOnly) throw new Error("Offline mode is read-only");
+  }, [readOnly]);
 
   const removeOfflineItem = useCallback(
     async (kind: OfflineItemKind, entityId: string | number) => {
@@ -240,6 +252,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
   const toggleTrackOffline = useCallback(
     (input: OfflineTrackInput) =>
       enqueue(async () => {
+        assertWritable();
         const trackRef = {
           entityUid: input.entityUid?.trim() || null,
           storageId: input.storageId?.trim() || null,
@@ -280,12 +293,13 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
         }
         return "enabled" as const;
       }),
-    [enqueue, removeOfflineItem, syncManifestIntoItem],
+    [assertWritable, enqueue, removeOfflineItem, syncManifestIntoItem],
   );
 
   const toggleAlbumOffline = useCallback(
     (input: OfflineAlbumInput) =>
       enqueue(async () => {
+        assertWritable();
         const albumId = input.albumId;
         if (albumId == null) {
           throw new Error("Album offline requires album ID");
@@ -301,12 +315,13 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
         );
         return "enabled" as const;
       }),
-    [enqueue, removeOfflineItem, syncManifestIntoItem],
+    [assertWritable, enqueue, removeOfflineItem, syncManifestIntoItem],
   );
 
   const togglePlaylistOffline = useCallback(
     (input: OfflinePlaylistInput) =>
       enqueue(async () => {
+        assertWritable();
         const playlistId = input.playlistId;
         if (playlistId == null) {
           throw new Error("Playlist offline requires playlist ID");
@@ -327,7 +342,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
         );
         return "enabled" as const;
       }),
-    [enqueue, removeOfflineItem, syncManifestIntoItem],
+    [assertWritable, enqueue, removeOfflineItem, syncManifestIntoItem],
   );
 
   const toggleCrateOffline = useCallback(
@@ -352,6 +367,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
   );
 
   const clearActiveProfile = useCallback(async () => {
+    assertWritable();
     if (!profileKey || !supported) return;
     transferAbortRef.current?.abort();
     await enqueue(async () => {
@@ -359,7 +375,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
       await commitSnapshot(EMPTY_SNAPSHOT, true);
       await clearOfflineAssets(profileKey);
     });
-  }, [commitSnapshot, enqueue, profileKey, supported]);
+  }, [assertWritable, commitSnapshot, enqueue, profileKey, supported]);
 
   const items = useMemo(() => Object.values(snapshot.items), [snapshot.items]);
   const summary = useMemo(
@@ -370,7 +386,9 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
   return useMemo<OfflineContextValue>(
     () => ({
       supported,
+      readOnly,
       syncing,
+      items,
       summary,
       getTrackState: (ref) => aggregateTrackState(items, ref),
       getAlbumState: (albumId) =>
@@ -408,6 +426,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
     [
       clearActiveProfile,
       items,
+      readOnly,
       snapshot.items,
       summary,
       supported,

@@ -37,7 +37,7 @@ export function DesktopShell({
         data-testid="listen-header"
         data-home-overlay={String(homeDesktopOverlay)}
         data-transparent={String(transparentHeader)}
-        className={`z-app-header fixed top-0 ${sidebarLeft} right-0 transition-[left,background-color,border-color,box-shadow] duration-200 ${
+        className={`listen-desktop-header z-app-header fixed top-0 ${sidebarLeft} right-0 transition-[left,background-color,border-color,box-shadow] duration-200 ${
           transparentHeader
             ? "bg-transparent"
             : "border-b border-border-quiet bg-surface-chrome shadow-chrome backdrop-blur-xl"

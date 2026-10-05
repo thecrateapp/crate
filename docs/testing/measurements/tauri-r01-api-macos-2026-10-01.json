@@ -1,0 +1,69 @@
+{
+  "capturedDate": "2026-10-01",
+  "sourceRevision": "3570c6c41492a6ee70a38e824ae70e8d73baca3b",
+  "host": {
+    "model": "Mac17,2",
+    "os": "macOS 27.0.1 (26A434)",
+    "architecture": "arm64",
+    "memoryBytes": 17179869184
+  },
+  "client": "tauri-plugin-http reqwest ClientBuilder, release profile",
+  "endpoint": {
+    "method": "GET",
+    "url": "https://api.lespedants.org/api/setup/status",
+    "behavior": "Read-only setup status; handler counts users in PostgreSQL",
+    "preflight": {
+      "status": 200,
+      "tlsSeconds": 0.055244,
+      "timeToFirstByteSeconds": 0.129186,
+      "totalSeconds": 0.129581,
+      "bytes": 22
+    }
+  },
+  "run": {
+    "measuredRequestsPerModeAndConcurrency": 25,
+    "warmupRequests": 4,
+    "preflightRequests": 1,
+    "totalRequests": 105,
+    "status": "All benchmark requests passed reqwest error_for_status; preflight returned 200",
+    "results": [
+      {
+        "concurrency": 1,
+        "client": "fresh",
+        "coldRequestMicros": 95356,
+        "totalMillis": 2287,
+        "p50Micros": 88695,
+        "p95Micros": 108093
+      },
+      {
+        "concurrency": 1,
+        "client": "shared",
+        "coldRequestMicros": 94898,
+        "totalMillis": 1719,
+        "p50Micros": 68847,
+        "p95Micros": 72836
+      },
+      {
+        "concurrency": 8,
+        "client": "fresh",
+        "coldRequestMicros": 84560,
+        "totalMillis": 470,
+        "p50Micros": 114681,
+        "p95Micros": 132298
+      },
+      {
+        "concurrency": 8,
+        "client": "shared",
+        "coldRequestMicros": 93922,
+        "totalMillis": 360,
+        "p50Micros": 83813,
+        "p95Micros": 104420
+      }
+    ]
+  },
+  "limitations": [
+    "Single 25-request sample per mode and concurrency; diagnostic, not an SLA",
+    "The endpoint is unauthenticated and does not represent authenticated Listen payload sizes",
+    "Remote accepted-connection counts, cancellation, CPU/RSS, and installed-app traffic were not measured"
+  ]
+}

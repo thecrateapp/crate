@@ -43,11 +43,9 @@ import {
 
 describe("updateOfflineNativeAssetIndex (native)", () => {
   let writtenFiles: Map<string, string>;
-  let writeDelays: number[];
 
   beforeEach(() => {
     writtenFiles = new Map();
-    writeDelays = [];
     readFileMock.mockImplementation(async ({ path }: { path: string }) => ({
       data: writtenFiles.get(path) ?? null,
     }));
@@ -64,14 +62,6 @@ describe("updateOfflineNativeAssetIndex (native)", () => {
     );
     writeFileMock.mockImplementation(
       async ({ path, data }: { path: string; data: string }) => {
-        // Simulate slow disk I/O: whichever write is issued first can
-        // still take longer than one issued after it. Without reading
-        // fresh from inside the serialized write slot, that lets an
-        // earlier-issued write finish last and silently revert whatever
-        // a later, faster mutation for a different key already wrote.
-        const delay = writeDelays.shift() ?? 0;
-        if (delay > 0)
-          await new Promise((resolve) => setTimeout(resolve, delay));
         writtenFiles.set(path, data);
       },
     );
@@ -80,9 +70,7 @@ describe("updateOfflineNativeAssetIndex (native)", () => {
     }));
   });
 
-  it("keeps both mutations even when the first-issued write finishes last", async () => {
-    writeDelays = [20, 0];
-
+  it("coalesces concurrent durable mutations into one index write", async () => {
     const trackA = updateOfflineNativeAssetIndex("profile-1", (current) => ({
       ...current,
       trackA: { assetKey: "trackA" } as never,
@@ -100,6 +88,48 @@ describe("updateOfflineNativeAssetIndex (native)", () => {
     const final = JSON.parse(finalRaw ?? "{}");
     expect(final).toHaveProperty("trackA");
     expect(final).toHaveProperty("trackB");
+    expect(
+      writeFileMock.mock.calls.filter(([options]) =>
+        options.path.endsWith("offline-assets-profile-1.json.next"),
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("resolves mutation waiters only after the coalesced index is durable", async () => {
+    let finishWrite: (() => void) | undefined;
+    writeFileMock.mockImplementationOnce(
+      ({ path, data }: { path: string; data: string }) =>
+        new Promise<void>((resolve) => {
+          finishWrite = () => {
+            writtenFiles.set(path, data);
+            resolve();
+          };
+        }),
+    );
+    let firstFinished = false;
+    const first = updateOfflineNativeAssetIndex(
+      "durable-profile",
+      (current) => ({
+        ...current,
+        trackA: { assetKey: "trackA" } as never,
+      }),
+    ).then(() => {
+      firstFinished = true;
+    });
+    const second = updateOfflineNativeAssetIndex(
+      "durable-profile",
+      (current) => ({
+        ...current,
+        trackB: { assetKey: "trackB" } as never,
+      }),
+    );
+
+    await vi.waitFor(() => expect(finishWrite).toBeTypeOf("function"));
+    expect(firstFinished).toBe(false);
+    finishWrite!();
+    await Promise.all([first, second]);
+
+    expect(firstFinished).toBe(true);
   });
 
   it("promotes a verified temporary file instead of overwriting metadata in place", async () => {
@@ -228,6 +258,16 @@ describe("updateOfflineNativeAssetIndex (native)", () => {
         }),
       }),
     );
+  });
+
+  it("treats Tauri no-such-file errors as missing metadata", async () => {
+    readFileMock.mockRejectedValueOnce(
+      new Error("failed to open file: No such file or directory (os error 2)"),
+    );
+
+    await expect(
+      ensureOfflineNativeAssetIndexLoaded("tauri-missing-profile"),
+    ).resolves.toEqual({});
   });
 
   it("rebuilds runtime locators when the native container path changes", async () => {

@@ -1,4 +1,5 @@
 import { useRef, useCallback, useState } from "react";
+import { getListenViewportScrollTop } from "@/lib/viewport-scroll";
 
 export function usePullToRefresh(onRefresh: () => Promise<void>) {
   const gestureRef = useRef<{
@@ -22,7 +23,7 @@ export function usePullToRefresh(onRefresh: () => Promise<void>) {
   const handlers = {
     onTouchStart: useCallback((e: React.TouchEvent) => {
       const el = e.currentTarget;
-      if (el.scrollTop > 0 || window.scrollY > 0) return;
+      if (el.scrollTop > 0 || getListenViewportScrollTop() > 0) return;
       const touch = e.touches[0];
       if (!touch) return;
       gestureRef.current = {

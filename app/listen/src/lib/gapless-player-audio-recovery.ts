@@ -15,6 +15,8 @@ export interface AudioRecoveryDependencies {
   isTauriDesktopRuntime: () => boolean;
   isPlaybackActive: () => boolean;
   isOutputStale: () => boolean;
+  canReuseCurrentTrackBuffer: () => boolean;
+  restoreBufferedPlaybackPosition: () => number | null;
   markOutputStale: () => void;
   clearOutputStale: () => void;
   rebuildPlayer: (reason: string) => void;
@@ -98,11 +100,22 @@ export function createAudioRecoveryController(
     let ctx = dependencies.getAudioContext();
     if (!ctx) return;
 
+    const staleTauriOutput =
+      dependencies.isTauriDesktopRuntime() && dependencies.isOutputStale();
     if (
-      options.rebuildIfTauriOutputMayBeStale &&
-      dependencies.isTauriDesktopRuntime() &&
-      dependencies.isOutputStale()
+      staleTauriOutput &&
+      ctx.state !== "closed" &&
+      dependencies.canReuseCurrentTrackBuffer()
     ) {
+      const restoredPosition = dependencies.restoreBufferedPlaybackPosition();
+      dependencies.clearOutputStale();
+      recordDevLog(
+        "audio",
+        "reusing decoded track after Tauri output wake",
+        { reason, restoredPosition },
+        "info",
+      );
+    } else if (options.rebuildIfTauriOutputMayBeStale && staleTauriOutput) {
       dependencies.rebuildPlayer(`${reason}:tauri-output-stale`);
       dependencies.clearOutputStale();
       ctx = dependencies.getAudioContext();

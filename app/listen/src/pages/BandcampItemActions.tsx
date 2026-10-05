@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Download, ExternalLink, Loader2 } from "@crate/ui/icons";
+import { notify } from "@crate/ui/lib/notify";
 import { Button } from "@crate/ui/shadcn/button";
 
 import { openExternalUrl } from "@/lib/external-links";
@@ -44,7 +45,11 @@ export function BandcampItemActions({
           variant="ghost"
           shape="pill"
           aria-label={compact ? t("actions.bandcamp.open") : undefined}
-          onClick={() => void openExternalUrl(item.item_url ?? "")}
+          onClick={() =>
+            void openExternalUrl(item.item_url ?? "").catch(() =>
+              notify.error(t("common.toasts.openExternalFailed")),
+            )
+          }
           className="h-9 border border-border-quiet bg-text-primary/5 px-3 text-xs font-black text-text-primary hover:bg-text-primary/10 hover:text-text-primary has-[>svg]:px-3"
         >
           <ExternalLink className=" size-3.5" />

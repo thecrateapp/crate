@@ -230,6 +230,44 @@ describe("Shell", () => {
     );
   });
 
+  it("solidifies the transparent header when the root scroll container scrolls", async () => {
+    viewportState.isDesktop = true;
+    const root = document.createElement("div");
+    root.id = "root";
+    document.body.appendChild(root);
+    document.documentElement.dataset.crateLinuxWindowChrome = "true";
+
+    try {
+      renderWithListenProviders(
+        <Shell>
+          <HeroPage />
+        </Shell>,
+        { route: "/playlist/42" },
+      );
+      const header = screen.getByTestId("listen-header");
+      expect(header).toHaveAttribute("data-transparent", "true");
+
+      scrollWindowTo(HEADER_SOLID_SCROLL_THRESHOLD + 50);
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      expect(header).toHaveAttribute("data-transparent", "true");
+
+      root.scrollTop = HEADER_SOLID_SCROLL_THRESHOLD + 1;
+      fireEvent.scroll(root);
+      await waitFor(() =>
+        expect(header).toHaveAttribute("data-transparent", "false"),
+      );
+
+      root.scrollTop = 0;
+      fireEvent.scroll(root);
+      await waitFor(() =>
+        expect(header).toHaveAttribute("data-transparent", "true"),
+      );
+    } finally {
+      delete document.documentElement.dataset.crateLinuxWindowChrome;
+      root.remove();
+    }
+  });
+
   it("resets the header when navigating away from a hero page", async () => {
     renderWithListenProviders(
       <Shell>

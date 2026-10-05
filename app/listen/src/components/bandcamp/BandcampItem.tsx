@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ContextMenuHeader } from "@crate/ui/domain/actions";
+import { notify } from "@crate/ui/lib/notify";
 import { useEntityMenu } from "@crate/ui/domain/entity/useEntityMenu";
 import { ItemActionMenuButton } from "@/components/actions/ItemActionMenu";
 import { buildBandcampActions } from "@/components/actions/bandcamp-actions";
@@ -56,7 +57,9 @@ export const BandcampItem = memo(function BandcampItem({
           itemUrl: item.item_url,
           onImport: () => latest.current.onImport(latest.current.item),
           onOpen: () =>
-            void openExternalUrl(latest.current.item.item_url ?? ""),
+            void openExternalUrl(latest.current.item.item_url ?? "").catch(() =>
+              notify.error(t("common.toasts.openExternalFailed")),
+            ),
         },
         t,
       ),

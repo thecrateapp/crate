@@ -25,12 +25,6 @@ import {
   ContributionWithdrawDialog,
 } from "./LibraryPrimitives";
 
-function exportContribution(contribution: LibraryContribution) {
-  void openExternalUrl(
-    apiAssetUrl(`/api/me/contributions/${contribution.id}/export`),
-  );
-}
-
 function ContributionArtwork({
   contribution,
 }: {
@@ -76,6 +70,12 @@ export function LibraryContributionsTab() {
   const [withdrawTarget, setWithdrawTarget] =
     useState<LibraryContribution | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
+
+  function exportContribution(contribution: LibraryContribution) {
+    void openExternalUrl(
+      apiAssetUrl(`/api/me/contributions/${contribution.id}/export`),
+    ).catch(() => notify.error(t("common.toasts.openExternalFailed")));
+  }
 
   if (loading) return <LoadingState label={t("common.loadingShort")} />;
 

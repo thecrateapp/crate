@@ -6,6 +6,11 @@ import pytest
 from fastapi import HTTPException, Request
 
 
+@pytest.fixture(autouse=True)
+def _native_oauth_test_environment(monkeypatch):
+    monkeypatch.setenv("CRATE_ENV", "test")
+
+
 class _AtomicRedis:
     def __init__(self) -> None:
         self.values: dict[str, bytes] = {}

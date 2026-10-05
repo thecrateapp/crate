@@ -203,6 +203,26 @@ describe("CrateMembersModal", () => {
     );
   });
 
+  it("preserves an absolute collaboration invite URL returned by the API", async () => {
+    const user = userEvent.setup();
+    const inviteUrl = "https://listen.example.test/crate/invite/invite-token";
+    mocks.api.mockResolvedValue({
+      token: "invite-token",
+      crate_id: crateId,
+      join_url: inviteUrl,
+      use_count: 0,
+    });
+    renderModal(crate());
+
+    await user.click(
+      screen.getByRole("button", { name: "Create collaboration invite" }),
+    );
+
+    expect(
+      await screen.findByRole("textbox", { name: "Collaboration invite link" }),
+    ).toHaveValue(inviteUrl);
+  });
+
   it("creates a non-expiring unlimited invite", async () => {
     const user = userEvent.setup();
     mocks.api.mockResolvedValue({

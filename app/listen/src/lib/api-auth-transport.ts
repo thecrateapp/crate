@@ -34,6 +34,7 @@ export interface ApiAuthTransportDependencies {
     refreshToken?: string | null,
     accessExpiresAt?: string | null,
   ) => boolean;
+  onSessionRejected?: (serverId: string | null) => void;
   usesConfigurableServer: boolean;
 }
 
@@ -110,9 +111,29 @@ export function createApiAuthTransport(
     !path.includes("/api/auth/refresh") &&
     !path.includes("/api/auth/logout");
 
+  const currentRoutePathname = (): string => {
+    const hash =
+      typeof window.location.hash === "string" ? window.location.hash : "";
+    if (!hash.startsWith("#/")) return window.location.pathname;
+    try {
+      return new URL(hash.slice(1), window.location.origin).pathname;
+    } catch {
+      return window.location.pathname;
+    }
+  };
+
   const redirectAfterUnauthorized = (): void => {
-    redirectToLoginOnUnauthorized(window.location.pathname, (path) => {
-      window.location.href = path;
+    redirectToLoginOnUnauthorized(currentRoutePathname(), (path) => {
+      const isTauri =
+        document.documentElement.dataset.listenRuntime === "tauri";
+      const hasHashRoute =
+        typeof window.location.hash === "string" &&
+        window.location.hash.startsWith("#/");
+      if (isTauri || hasHashRoute) {
+        window.location.hash = path;
+      } else {
+        window.location.href = path;
+      }
     });
   };
 
@@ -130,10 +151,17 @@ export function createApiAuthTransport(
   const clearRejectedSession = async (scope: AuthScope): Promise<void> => {
     if (!hasCurrentCredentials(scope)) return;
     if (scope.serverId) {
-      dependencies.setAuthTokensForServer(scope.serverId, null, null, null);
+      const cleared = dependencies.setAuthTokensForServer(
+        scope.serverId,
+        null,
+        null,
+        null,
+      );
+      if (cleared) dependencies.onSessionRejected?.(scope.serverId);
       return;
     }
     dependencies.setAuthToken(null);
+    dependencies.onSessionRejected?.(null);
     await clearRejectedWebSession();
   };
 

@@ -1,0 +1,343 @@
+{
+  "errors": [],
+  "generated_at": "2026-09-30T14:35:27Z",
+  "metrics": {
+    "./app/crate/api/auth.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 3,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 3,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 2914,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "./app/crate/api/jam.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 1325,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "./app/crate/api/me.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 1992,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "./app/crate/api/native_lastfm_link.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 401,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "./app/crate/api/native_oauth_link.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 285,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "./app/crate/api/playlists.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 404,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "./app/crate/api/public_urls.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 34,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "./app/crate/api/schemas/auth.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 217,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "./app/crate/api/schemas/me.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 574,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "./app/crate/db/home_context.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 337,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "./app/crate/db/home_personalized_collections.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 258,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "./app/crate/db/queries/home_catalog.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 353,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "./app/crate/db/queries/radio_seed_queries.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 4,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 4,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 331,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "./app/crate/scrobble.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 334,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "_totals": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 4,
+      "CONFIDENCE.MEDIUM": 3,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 3,
+      "SEVERITY.MEDIUM": 4,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 9759,
+      "nosec": 0,
+      "skipped_tests": 0
+    }
+  },
+  "results": [
+    {
+      "code": "169 COOKIE_NAME_LISTEN_REFRESH = \"crate_refresh_listen\"\n170 FORWARD_AUTH_SECRET_HEADER = \"X-Forward-Auth-Secret\"\n171 _LOGIN_FAILURE_PREFIX = \"crate:auth:login_failures\"\n",
+      "col_offset": 29,
+      "end_col_offset": 52,
+      "filename": "./app/crate/api/auth.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 259,
+        "link": "https://cwe.mitre.org/data/definitions/259.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Possible hardcoded password: 'X-Forward-Auth-Secret'",
+      "line_number": 170,
+      "line_range": [170],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html",
+      "test_id": "B105",
+      "test_name": "hardcoded_password_string"
+    },
+    {
+      "code": "608 GOOGLE_AUTH_URL = \"https://accounts.google.com/o/oauth2/v2/auth\"\n609 GOOGLE_TOKEN_URL = \"https://oauth2.googleapis.com/token\"\n610 GOOGLE_USERINFO_URL = \"https://www.googleapis.com/oauth2/v2/userinfo\"\n",
+      "col_offset": 19,
+      "end_col_offset": 56,
+      "filename": "./app/crate/api/auth.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 259,
+        "link": "https://cwe.mitre.org/data/definitions/259.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Possible hardcoded password: 'https://oauth2.googleapis.com/token'",
+      "line_number": 609,
+      "line_range": [609],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html",
+      "test_id": "B105",
+      "test_name": "hardcoded_password_string"
+    },
+    {
+      "code": "611 APPLE_AUTH_URL = \"https://appleid.apple.com/auth/authorize\"\n612 APPLE_TOKEN_URL = \"https://appleid.apple.com/auth/token\"\n613 APPLE_KEYS_URL = \"https://appleid.apple.com/auth/keys\"\n",
+      "col_offset": 18,
+      "end_col_offset": 56,
+      "filename": "./app/crate/api/auth.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 259,
+        "link": "https://cwe.mitre.org/data/definitions/259.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Possible hardcoded password: 'https://appleid.apple.com/auth/token'",
+      "line_number": 612,
+      "line_range": [612],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b105_hardcoded_password_string.html",
+      "test_id": "B105",
+      "test_name": "hardcoded_password_string"
+    },
+    {
+      "code": "56                 text(\n57                     f\"\"\"\n58                 SELECT\n59                     t.id AS track_id,\n60                     t.bliss_vector,\n61                     t.title,\n62                     t.artist\n63                 FROM library_tracks t\n64                 LEFT JOIN library_albums a ON a.id = t.album_id\n65                 WHERE t.bliss_vector IS NOT NULL\n66                   AND {playable_track_clause(\"t\", \"a\")}\n67                   AND (\n68                     CAST(t.id AS text) = :track_ref\n69                     OR (t.entity_uid IS NOT NULL AND CAST(t.entity_uid AS text) = :track_ref)\n70                     OR (t.storage_id IS NOT NULL AND CAST(t.storage_id AS text) = :track_ref)\n71                     OR t.path = :track_ref\n72                   )\n73                 ORDER BY\n74                   CASE\n75                     WHEN CAST(t.id AS text) = :track_ref THEN 0\n76                     WHEN t.entity_uid IS NOT NULL AND CAST(t.entity_uid AS text) = :track_ref THEN 1\n77                     WHEN t.storage_id IS NOT NULL AND CAST(t.storage_id AS text) = :track_ref THEN 2\n78                     WHEN t.path = :track_ref THEN 3\n79                     ELSE 4\n80                   END\n81                 LIMIT 1\n82                 \"\"\"\n83                 ),\n",
+      "col_offset": 24,
+      "end_col_offset": 22,
+      "filename": "./app/crate/db/queries/radio_seed_queries.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 57,
+      "line_range": [
+        57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
+        75, 76, 77, 78, 79, 80, 81, 82
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "112                 text(\n113                     f\"\"\"\n114                 SELECT\n115                     t.id AS track_id,\n116                     t.artist,\n117                     t.title,\n118                     t.bliss_vector,\n119                     a.name AS album,\n120                     a.artist AS album_artist\n121                 FROM library_tracks t\n122                 JOIN library_albums a ON a.id = t.album_id\n123                 WHERE t.bliss_vector IS NOT NULL\n124                   AND {playable_track_clause(\"t\", \"a\")}\n125                   AND (\n126                     CAST(a.id AS text) = :album_ref\n127                     OR (a.entity_uid IS NOT NULL AND CAST(a.entity_uid AS text) = :album_ref)\n128                   )\n129                 ORDER BY t.disc_number, t.track_number, t.id\n130                 \"\"\"\n131                 ),\n",
+      "col_offset": 24,
+      "end_col_offset": 22,
+      "filename": "./app/crate/db/queries/radio_seed_queries.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 113,
+      "line_range": [
+        113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126,
+        127, 128, 129, 130
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "170                 text(\n171                     f\"\"\"\n172                 SELECT lt.id AS track_id, lt.artist, lt.title, lt.bliss_vector\n173                 FROM (\n174                     SELECT\n175                         pt.*,\n176                         COALESCE(lt_id.id, lt_entity.id, lt_storage.id, lt_path.id) AS resolved_track_id\n177                     FROM playlist_tracks pt\n178                     LEFT JOIN library_tracks lt_id\n179                       ON lt_id.id = pt.track_id\n180                     LEFT JOIN library_tracks lt_entity\n181                       ON lt_id.id IS NULL\n182                      AND pt.track_entity_uid IS NOT NULL\n183                      AND lt_entity.entity_uid = pt.track_entity_uid\n184                     LEFT JOIN library_tracks lt_storage\n185                       ON lt_id.id IS NULL\n186                      AND lt_entity.id IS NULL\n187                      AND pt.track_storage_id IS NOT NULL\n188                      AND lt_storage.storage_id = pt.track_storage_id\n189                     LEFT JOIN library_tracks lt_path\n190                       ON lt_id.id IS NULL\n191                      AND lt_entity.id IS NULL\n192                      AND lt_storage.id IS NULL\n193                      AND pt.track_path IS NOT NULL\n194                      AND lt_path.path = pt.track_path\n195                     WHERE pt.playlist_id = :playlist_id\n196                 ) pt\n197                 JOIN library_tracks lt\n198                   ON lt.id = pt.resolved_track_id\n199                  AND (lt.entity_uid IS NOT NULL OR lt.storage_id IS NOT NULL)\n200                 LEFT JOIN library_albums la ON la.id = lt.album_id\n201                 WHERE lt.bliss_vector IS NOT NULL\n202                   AND {playable_track_clause(\"lt\", \"la\")}\n203                 ORDER BY pt.position\n204                 LIMIT :limit\n205                 \"\"\"\n206                 ),\n",
+      "col_offset": 24,
+      "end_col_offset": 22,
+      "filename": "./app/crate/db/queries/radio_seed_queries.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 171,
+      "line_range": [
+        171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184,
+        185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198,
+        199, 200, 201, 202, 203, 204, 205
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "243                 text(\n244                     f\"\"\"\n245                 SELECT ranked.id AS track_id, ranked.bliss_vector, ranked.title, ranked.artist\n246                 FROM (\n247                     SELECT\n248                         lt.id, lt.bliss_vector, lt.title, lt.artist,\n249                         refs.match_ref,\n250                         refs.ordinal,\n251                         ROW_NUMBER() OVER (\n252                             PARTITION BY refs.ordinal\n253                             ORDER BY\n254                                 CASE\n255                                     WHEN CAST(lt.id AS text) = refs.match_ref THEN 0\n256                                     WHEN lt.entity_uid IS NOT NULL AND CAST(lt.entity_uid AS text) = refs.match_ref THEN 1\n257                                     WHEN lt.storage_id IS NOT NULL AND CAST(lt.storage_id AS text) = refs.match_ref THEN 2\n258                                     WHEN lt.path = refs.match_ref THEN 3\n259                                     ELSE 4\n260                                 END\n261                         ) AS rn\n262                     FROM library_tracks lt\n263                     LEFT JOIN library_albums la ON la.id = lt.album_id\n264                     JOIN unnest(:track_refs) WITH ORDINALITY AS refs(match_ref, ordinal) ON (\n265                         CAST(lt.id AS text) = refs.match_ref\n266                         OR (lt.entity_uid IS NOT NULL AND CAST(lt.entity_uid AS text) = refs.match_ref)\n267                         OR (lt.storage_id IS NOT NULL AND CAST(lt.storage_id AS text) = refs.match_ref)\n268                         OR lt.path = refs.match_ref\n269                     )\n270                     WHERE lt.bliss_vector IS NOT NULL\n271                       AND {playable_track_clause(\"lt\", \"la\")}\n272                       AND refs.match_ref IS NOT NULL\n273                       AND refs.match_ref != ''\n274                 ) ranked\n275                 WHERE rn = 1\n276                 ORDER BY ordinal\n277                 \"\"\"\n278                 ),\n",
+      "col_offset": 24,
+      "end_col_offset": 26,
+      "filename": "./app/crate/db/queries/radio_seed_queries.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 89,
+        "link": "https://cwe.mitre.org/data/definitions/89.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Possible SQL injection vector through string-based query construction.",
+      "line_number": 244,
+      "line_range": [
+        244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257,
+        258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271,
+        272, 273, 274, 275, 276, 277
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.9.4/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    }
+  ]
+}

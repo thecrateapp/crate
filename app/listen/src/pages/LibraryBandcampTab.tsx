@@ -21,12 +21,6 @@ import type {
   LibraryContribution,
 } from "./library-model";
 
-function exportContribution(contribution: LibraryContribution) {
-  void openExternalUrl(
-    apiAssetUrl(`/api/me/contributions/${contribution.id}/export`),
-  );
-}
-
 export function LibraryBandcampTab() {
   const { t } = useTranslation();
   const {
@@ -45,6 +39,18 @@ export function LibraryBandcampTab() {
   const [withdrawTarget, setWithdrawTarget] =
     useState<LibraryContribution | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
+
+  function openExternalLink(url: string) {
+    void openExternalUrl(url).catch(() =>
+      notify.error(t("common.toasts.openExternalFailed")),
+    );
+  }
+
+  function exportContribution(contribution: LibraryContribution) {
+    openExternalLink(
+      apiAssetUrl(`/api/me/contributions/${contribution.id}/export`),
+    );
+  }
 
   async function importItem(item: BandcampItem) {
     const itemId = item.bandcamp_item_id ?? item.id;

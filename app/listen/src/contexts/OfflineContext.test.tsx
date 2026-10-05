@@ -112,15 +112,18 @@ vi.mock("@/lib/offline", () => ({
 
 vi.mock("@/contexts/use-offline-synchronization", () => ({
   useOfflineSynchronization: ({
+    enabled,
     enqueue,
     transferAbortRef,
   }: {
+    enabled: boolean;
     enqueue: <T>(fn: () => Promise<T>) => Promise<T>;
     transferAbortRef: { current: AbortController | null };
   }) => ({
     syncing: false,
-    syncAll: () =>
-      enqueue(async () => {
+    syncAll: () => {
+      if (!enabled) return Promise.resolve();
+      return enqueue(async () => {
         const controller = {
           abort: abortOfflineTransferMock,
         } as unknown as AbortController;
@@ -132,7 +135,8 @@ vi.mock("@/contexts/use-offline-synchronization", () => ({
             transferAbortRef.current = null;
           }
         }
-      }),
+      });
+    },
   }),
 }));
 
@@ -150,6 +154,8 @@ function createAuthValue(
       role: "user",
     },
     loading: false,
+    accessMode: "authenticated",
+    offlineIdentity: null,
     refetch: vi.fn(async () => ({
       id: 7,
       email: "listener@example.test",
@@ -166,15 +172,21 @@ function OfflineProbe() {
   return (
     <div>
       <div>{offline.summary.itemCount}</div>
+      <div>{offline.readOnly ? "read-only" : "writable"}</div>
+      <div>records:{offline.items.length}</div>
       <div>{offline.getTrackState("entity-1")}</div>
       <button onClick={() => void offline.syncAll()}>sync</button>
       <button onClick={() => void offline.clearActiveProfile()}>clear</button>
       <button
         onClick={() =>
-          void offline.toggleTrackOffline({
-            entityUid: "entity-1",
-            storageId: "storage-1",
-          })
+          void offline
+            .toggleTrackOffline({
+              entityUid: "entity-1",
+              storageId: "storage-1",
+            })
+            .catch(() =>
+              window.dispatchEvent(new Event("offline-write-rejected")),
+            )
         }
       >
         toggle track
@@ -217,6 +229,47 @@ describe("OfflineProvider", () => {
     expect(syncOfflineProfileToServiceWorkerMock).toHaveBeenCalledWith(
       "profile-1",
     );
+  });
+
+  it("hydrates an offline identity as read-only without starting synchronization", async () => {
+    const offlineIdentity = {
+      schemaVersion: 1 as const,
+      serverId: "server-a",
+      serverUrl: "https://a.example.test",
+      userId: 7,
+      profileKey: "profile-a-7",
+      generation: 4,
+    };
+    render(
+      <AuthContext.Provider
+        value={createAuthValue({
+          user: null,
+          accessMode: "offline",
+          offlineIdentity,
+        })}
+      >
+        <OfflineProvider>
+          <OfflineProbe />
+        </OfflineProvider>
+      </AuthContext.Provider>,
+    );
+
+    expect(await screen.findByText("read-only")).toBeInTheDocument();
+    expect(screen.getByText("records:1")).toBeInTheDocument();
+    expect(setActiveOfflineProfileKeyMock).toHaveBeenCalledWith(
+      offlineIdentity.profileKey,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "sync" }));
+    expect(offlineSyncOperationMock).not.toHaveBeenCalled();
+
+    const writeRejected = vi.fn();
+    window.addEventListener("offline-write-rejected", writeRejected, {
+      once: true,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "toggle track" }));
+    await waitFor(() => expect(writeRejected).toHaveBeenCalledOnce());
+    expect(saveOfflineSnapshotMock).not.toHaveBeenCalled();
   });
 
   it("clears assets for the active profile when asked", async () => {

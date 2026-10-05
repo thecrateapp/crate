@@ -2,17 +2,16 @@ import { Capacitor } from "@capacitor/core";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 
 import { api, apiUrl, getApiAuthHeaders } from "@/lib/api";
-import {
-  isAndroidNative,
-  isIosNative,
-  isNative,
-} from "@/lib/capacitor-runtime";
+import { isAndroidNative, isIosNative } from "@/lib/capacitor-runtime";
 import { recordDevLog } from "@/lib/dev-logs";
+import { isOfflineNativeRuntime } from "@/lib/offline-runtime";
+import { isTauriRuntime } from "@/lib/platform";
 import {
   excludeNativeOfflineAssetFromBackup,
   verifyNativeOfflineAssets,
 } from "@/lib/offline-native";
 import type { PlaybackResolution } from "@/lib/track-playback";
+import { downloadTauriOfflineAsset } from "@/lib/offline-tauri-transfer";
 import {
   getOfflineTrackAssetAliases,
   getOfflineTrackAssetKey,
@@ -32,6 +31,7 @@ import type { OfflineTrackIdentityInput } from "./offline-track-identity";
 
 const ANDROID_OFFLINE_DELIVERY_POLICY = "balanced";
 const FILESYSTEM_NOT_FOUND_CODE = "OS-PLUG-FILE-0008";
+let offlineAssetVersion = 0;
 
 function isMissingNativeFileError(error: unknown): boolean {
   if (
@@ -43,7 +43,9 @@ function isMissingNativeFileError(error: unknown): boolean {
     return true;
   }
   const message = error instanceof Error ? error.message : String(error);
-  return /(?:does not exist|file not found)/i.test(message);
+  return /(?:does not exist|file not found|no such file or directory)/i.test(
+    message,
+  );
 }
 
 function throwIfOfflineTransferAborted(signal?: AbortSignal): void {
@@ -78,7 +80,7 @@ export async function hasCachedNativeTrackAssets(
       aliases,
       entry,
       path: entry.path,
-      expectedBytes: entry.byteLength ?? track.byte_length ?? null,
+      expectedBytes: entry.deliveryByteLength ?? entry.byteLength ?? null,
     });
   }
 
@@ -128,14 +130,79 @@ export async function estimateNativeOfflineBytes(
   profileKey: string,
 ): Promise<number> {
   const assets = await ensureOfflineNativeAssetIndexLoaded(profileKey);
-  return Object.values(assets).reduce(
+  const byPath = new Map<string, OfflineNativeAssetRecord>();
+  for (const asset of Object.values(assets)) {
+    if (asset.state === "deleting") continue;
+    byPath.set(asset.path, asset);
+  }
+  return [...byPath.values()].reduce(
     (total, asset) =>
       total +
-      (asset.state === "deleting"
-        ? 0
-        : Math.max(0, Number(asset.byteLength || 0))),
+      Math.max(0, Number(asset.deliveryByteLength ?? asset.byteLength ?? 0)),
     0,
   );
+}
+
+function offlineSourceFingerprint(track: OfflineManifestTrack): string {
+  return JSON.stringify({
+    updatedAt: track.updated_at ?? null,
+    byteLength: Number(track.byte_length || 0) || null,
+    format: normalizeAudioExtension(track.format),
+    bitrate: Number(track.bitrate || 0) || null,
+    sampleRate: Number(track.sample_rate || 0) || null,
+  });
+}
+
+function requestedDeliveryPolicy(): string {
+  return isAndroidNative ? ANDROID_OFFLINE_DELIVERY_POLICY : "original";
+}
+
+function nextOfflineAssetVersion(): string {
+  const random =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID().slice(0, 8)
+      : "local";
+  offlineAssetVersion += 1;
+  return `${Date.now().toString(36)}-${offlineAssetVersion}-${random}`;
+}
+
+async function deleteNativeAssetQuietly(path: string): Promise<void> {
+  try {
+    await Filesystem.deleteFile({ path, directory: Directory.Data });
+  } catch (error) {
+    if (!isMissingNativeFileError(error)) {
+      recordDevLog(
+        "offline",
+        "failed to clean up a replaced native asset",
+        { path, error: String(error) },
+        "warn",
+      );
+    }
+  }
+}
+
+export async function getNativeOfflineAssetsNeedingRefresh(
+  profileKey: string,
+  tracks: OfflineManifestTrack[],
+): Promise<Set<string>> {
+  const assets = await ensureOfflineNativeAssetIndexLoaded(profileKey);
+  const stale = new Set<string>();
+  for (const track of tracks) {
+    const assetKey = getOfflineTrackAssetKey(track);
+    if (!assetKey) continue;
+    const entry = getOfflineTrackAssetAliases(track)
+      .map((alias) => assets[alias])
+      .find((candidate) => candidate?.state !== "deleting");
+    if (
+      entry?.path &&
+      (entry.originFingerprint !== offlineSourceFingerprint(track) ||
+        (entry.requestedDeliveryPolicy ?? entry.deliveryPolicy) !==
+          requestedDeliveryPolicy())
+    ) {
+      stale.add(assetKey);
+    }
+  }
+  return stale;
 }
 
 function normalizeAudioExtension(value?: string | null): string | null {
@@ -286,7 +353,7 @@ export async function cacheNativeTrackAsset(
   track: OfflineManifestTrack,
   signal?: AbortSignal,
 ): Promise<void> {
-  if (!isNative) return;
+  if (!isOfflineNativeRuntime) return;
   throwIfOfflineTransferAborted(signal);
   const assetKey = getOfflineTrackAssetKey(track);
   if (!assetKey) {
@@ -294,94 +361,166 @@ export async function cacheNativeTrackAsset(
   }
   const existingAssets = await ensureOfflineNativeAssetIndexLoaded(profileKey);
   throwIfOfflineTransferAborted(signal);
-  const existing = getOfflineTrackAssetAliases(track)
-    .map((alias) => existingAssets[alias])
-    .find(Boolean);
+  const aliases = getOfflineTrackAssetAliases(track);
+  const existing = aliases.map((alias) => existingAssets[alias]).find(Boolean);
   if (existing?.state === "deleting") {
     await deleteNativeCachedTrackAsset(profileKey, track);
-  } else if (existing) {
+  } else if (
+    existing?.path &&
+    existing.originFingerprint === offlineSourceFingerprint(track) &&
+    existing.deliveryPolicy === requestedDeliveryPolicy()
+  ) {
     return;
   }
 
   const downloadTarget = await resolveNativeOfflineDownloadTarget(track);
   throwIfOfflineTransferAborted(signal);
   const dirPath = `offline-media/${profileKey}`;
-  const filePath = `${dirPath}/${safeOfflineFileStem(assetKey)}.${
-    downloadTarget.extension
-  }`;
+  const version = nextOfflineAssetVersion();
+  const fileStem = safeOfflineFileStem(assetKey);
+  const stagePath = `${dirPath}/.${fileStem}.${version}.part.${downloadTarget.extension}`;
+  const filePath = `${dirPath}/${fileStem}.${version}.${downloadTarget.extension}`;
 
-  await Filesystem.mkdir({
-    path: dirPath,
-    directory: Directory.Data,
-    recursive: true,
-  }).catch(() => {
-    // mkdir may fail if the directory already exists
-  });
-
-  await Filesystem.downloadFile({
-    url: apiUrl(downloadTarget.streamUrl),
-    path: filePath,
-    directory: Directory.Data,
-    recursive: true,
-    headers: getApiAuthHeaders(),
-  });
-  if (signal?.aborted) {
-    await Filesystem.deleteFile({
-      path: filePath,
-      directory: Directory.Data,
-    }).catch(() => undefined);
-    throwIfOfflineTransferAborted(signal);
-  }
-
-  const { uri, size } = await assertNativeTrackIntegrity(
-    filePath,
-    downloadTarget.expectedBytes,
-  );
-  if (isIosNative) {
-    try {
-      await excludeNativeOfflineAssetFromBackup(filePath);
-    } catch (error) {
-      await Filesystem.deleteFile({
-        path: filePath,
-        directory: Directory.Data,
-      }).catch(() => undefined);
-      throw error;
-    }
-  }
-  if (signal?.aborted) {
-    await Filesystem.deleteFile({
-      path: filePath,
-      directory: Directory.Data,
-    }).catch(() => undefined);
-    throwIfOfflineTransferAborted(signal);
-  }
-
+  let published = false;
+  let committed = false;
+  let indexUpdateStarted = false;
+  let previousEntries: Record<string, OfflineNativeAssetRecord | undefined> =
+    {};
   try {
+    await Filesystem.mkdir({
+      path: dirPath,
+      directory: Directory.Data,
+      recursive: true,
+    }).catch(() => {
+      // mkdir may fail if the directory already exists
+    });
+    throwIfOfflineTransferAborted(signal);
+
+    if (isTauriRuntime) {
+      await downloadTauriOfflineAsset({
+        profileKey,
+        assetKey,
+        url: apiUrl(downloadTarget.streamUrl),
+        path: stagePath,
+        headers: getApiAuthHeaders(),
+        signal,
+      });
+    } else {
+      await Filesystem.downloadFile({
+        url: apiUrl(downloadTarget.streamUrl),
+        path: stagePath,
+        directory: Directory.Data,
+        recursive: true,
+        headers: getApiAuthHeaders(),
+      });
+    }
+    throwIfOfflineTransferAborted(signal);
+
+    const staged = await assertNativeTrackIntegrity(
+      stagePath,
+      downloadTarget.expectedBytes,
+    );
+    throwIfOfflineTransferAborted(signal);
+    if (isIosNative) await excludeNativeOfflineAssetFromBackup(stagePath);
+    throwIfOfflineTransferAborted(signal);
+
+    await Filesystem.rename({
+      from: stagePath,
+      to: filePath,
+      directory: Directory.Data,
+      toDirectory: Directory.Data,
+    });
+    published = true;
+    throwIfOfflineTransferAborted(signal);
+
+    const { uri, size } = await assertNativeTrackIntegrity(
+      filePath,
+      staged.size,
+    );
+    throwIfOfflineTransferAborted(signal);
+    const nextEntry: OfflineNativeAssetRecord = {
+      assetKey,
+      entityUid: track.entity_uid ?? null,
+      storageId: track.storage_id,
+      path: filePath,
+      uri,
+      playbackUrl: Capacitor.convertFileSrc(uri),
+      state: "ready",
+      originFingerprint: offlineSourceFingerprint(track),
+      requestedDeliveryPolicy: requestedDeliveryPolicy(),
+      deliveryPolicy: downloadTarget.effectivePolicy,
+      deliveryFormat: downloadTarget.extension,
+      deliveryByteLength: size,
+      byteLength: size,
+      updatedAt: track.updated_at ?? null,
+    };
+
+    indexUpdateStarted = true;
     await updateOfflineNativeAssetIndex(profileKey, (current) => {
       throwIfOfflineTransferAborted(signal);
-      return {
-        ...current,
-        [assetKey]: {
-          assetKey,
-          entityUid: track.entity_uid ?? null,
-          storageId: track.storage_id,
-          path: filePath,
-          uri,
-          playbackUrl: Capacitor.convertFileSrc(uri),
-          state: "ready",
-          byteLength: downloadTarget.expectedBytes || size,
-          updatedAt: track.updated_at ?? null,
-        },
-      };
+      previousEntries = Object.fromEntries(
+        aliases.map((alias) => [alias, current[alias]]),
+      );
+      const next = { ...current };
+      for (const alias of aliases) next[alias] = nextEntry;
+      return next;
     });
+    committed = true;
+    throwIfOfflineTransferAborted(signal);
   } catch (error) {
-    if (signal?.aborted) {
-      await Filesystem.deleteFile({
-        path: filePath,
-        directory: Directory.Data,
-      }).catch(() => undefined);
+    if (committed && signal?.aborted) {
+      try {
+        await updateOfflineNativeAssetIndex(profileKey, (current) => {
+          const next = { ...current };
+          for (const alias of aliases) {
+            if (next[alias]?.path !== filePath) continue;
+            const previous = previousEntries[alias];
+            if (previous) next[alias] = previous;
+            else delete next[alias];
+          }
+          return next;
+        });
+      } catch (rollbackError) {
+        recordDevLog(
+          "offline",
+          "failed to roll back a cancelled native asset replacement",
+          { path: filePath, error: String(rollbackError) },
+          "error",
+        );
+        throw error;
+      }
+    }
+    await deleteNativeAssetQuietly(stagePath);
+    if (published && (!indexUpdateStarted || committed)) {
+      await deleteNativeAssetQuietly(filePath);
     }
     throw error;
+  }
+
+  const previousPaths = new Set(
+    Object.values(previousEntries)
+      .map((entry) => entry?.path)
+      .filter((path): path is string => Boolean(path) && path !== filePath),
+  );
+  if (previousPaths.size) {
+    try {
+      const current = await ensureOfflineNativeAssetIndexLoaded(profileKey);
+      const stillReferenced = new Set(
+        Object.values(current).map((entry) => entry.path),
+      );
+      await Promise.all(
+        [...previousPaths]
+          .filter((path) => !stillReferenced.has(path))
+          .map(deleteNativeAssetQuietly),
+      );
+    } catch (error) {
+      recordDevLog(
+        "offline",
+        "failed to inspect replaced native assets for cleanup",
+        { paths: [...previousPaths], error: String(error) },
+        "warn",
+      );
+    }
   }
 }
 
@@ -390,7 +529,7 @@ export async function deleteNativeCachedTrackAsset(
   track: OfflineTrackIdentityInput,
   storageId?: string | null,
 ): Promise<void> {
-  if (!isNative) return;
+  if (!isOfflineNativeRuntime) return;
   const aliases = getOfflineTrackAssetAliases(track, storageId);
   if (!aliases.length) return;
   let entry: OfflineNativeAssetRecord | undefined;
@@ -440,7 +579,7 @@ export async function deleteNativeCachedTrackAsset(
 export async function clearNativeOfflineAssets(
   profileKey: string,
 ): Promise<void> {
-  if (!isNative) return;
+  if (!isOfflineNativeRuntime) return;
   const failures: unknown[] = [];
   let markedAssets: Record<string, OfflineNativeAssetRecord> = {};
   await updateOfflineNativeAssetIndex(profileKey, (assets) => {
@@ -453,8 +592,12 @@ export async function clearNativeOfflineAssets(
     return markedAssets;
   });
   const deletedPaths = new Set<string>();
+  const uniqueAssets = new Map<string, OfflineNativeAssetRecord>();
+  for (const asset of Object.values(markedAssets)) {
+    uniqueAssets.set(asset.path, asset);
+  }
   await Promise.all(
-    Object.values(markedAssets).map(async (asset) => {
+    [...uniqueAssets.values()].map(async (asset) => {
       try {
         await Filesystem.deleteFile({
           path: asset.path,
@@ -493,7 +636,7 @@ export function getNativeOfflinePlaybackUrl(
   storageId?: string | null,
   options: { target?: "webview" | "android-native" } = {},
 ): string | null {
-  if (!isNative) return null;
+  if (!isOfflineNativeRuntime) return null;
   const profileKey = getActiveOfflineProfileKey();
   if (!profileKey) return null;
   const assets = loadOfflineNativeAssetIndex(profileKey);

@@ -268,6 +268,18 @@ describe("usePlayEventTracker — explicit lifecycle", () => {
     );
   });
 
+  it("does not send play events for offline-only tracks", () => {
+    const { result } = setup();
+    const offlineTrack: Track = { ...TRACK_A, offlineOnly: true };
+
+    act(() => {
+      result.current.startSession(offlineTrack, SRC);
+      result.current.flushCurrentPlayEvent("completed", offlineTrack);
+    });
+
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
   it("skipped flush with <2s listened is dropped", () => {
     const { result } = setup();
     act(() => {

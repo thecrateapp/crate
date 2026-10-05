@@ -34,3 +34,10 @@ export function publicCrateAlbumCoverUrl(
 export function publicCrateShareImageUrl(crateId: string) {
   return `${getApiBase()}/share/image/crate/${encodeURIComponent(crateId)}`;
 }
+
+export function inviteShareUrl(invite: {
+  join_url: string;
+  public_url?: string | null;
+}) {
+  return publicShareUrl(invite.public_url ?? invite.join_url);
+}

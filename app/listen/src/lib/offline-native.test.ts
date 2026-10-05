@@ -158,6 +158,33 @@ describe("native offline playback bootstrap", () => {
     expect(filesystemMock.stat).not.toHaveBeenCalled();
   });
 
+  it("keeps filesystem verification concurrency at eight across callers", async () => {
+    let active = 0;
+    let maximumActive = 0;
+    verifyAssetsMock.mockRejectedValue(new Error("native batch unavailable"));
+    filesystemMock.stat.mockImplementation(async () => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      active -= 1;
+      return { size: 128, uri: "file:///offline.m4a" };
+    });
+    const { verifyNativeOfflineAssets } = await import("@/lib/offline-native");
+    const makeAssets = (prefix: string) =>
+      Array.from({ length: 600 }, (_, index) => ({
+        path: `offline-media/${prefix}-${index}.m4a`,
+        expectedBytes: 128,
+      }));
+
+    await Promise.all([
+      verifyNativeOfflineAssets(makeAssets("first")),
+      verifyNativeOfflineAssets(makeAssets("second")),
+    ]);
+
+    expect(maximumActive).toBeLessThanOrEqual(8);
+    expect(filesystemMock.stat).toHaveBeenCalledTimes(1200);
+  });
+
   it("protects iOS offline media from device backups", async () => {
     excludeFromBackupMock.mockResolvedValue({ excluded: true });
     const { excludeNativeOfflineAssetFromBackup } = await import(

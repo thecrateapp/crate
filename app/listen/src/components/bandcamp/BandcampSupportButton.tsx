@@ -184,7 +184,11 @@ function useBandcampActivation(
   const activate = useCallback(async () => {
     if (!state) return;
     if (!state.canImport || !state.link.bandcamp_item_id) {
-      await openExternalUrl(state.url);
+      try {
+        await openExternalUrl(state.url);
+      } catch {
+        notify.error(t("common.toasts.openExternalFailed"));
+      }
       return;
     }
 

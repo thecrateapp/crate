@@ -13,6 +13,7 @@ import { IconButton } from "@crate/ui/primitives/IconButton";
 import { Button } from "@crate/ui/shadcn/button";
 
 import { usesConfigurableServer } from "@/lib/platform";
+import { revokeServerSession } from "@/lib/api";
 import {
   getCurrentServerId,
   getServers,
@@ -21,21 +22,18 @@ import {
   setCurrentServerId,
   type ServerConfig,
 } from "@/lib/server-store";
-import { useAuth } from "@/contexts/AuthContext";
 
 /**
  * Settings panel listing configured Crate servers. Only rendered in
  * configurable shells — on web, there's always a single implicit server
  * (the one that served the app) so this UI would be confusing.
  *
- * Switching server drops the app back to the login screen for that
- * instance. Removing the active server clears its token and bounces
- * back to the setup screen if it was the only one.
+ * Switching server resets the session and authenticates against the
+ * selected instance. Removing a server revokes its session best-effort.
  */
 export function ServersSection() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
   const [servers, setServers] = useState<ServerConfig[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
 
@@ -51,34 +49,24 @@ export function ServersSection() {
 
   if (!usesConfigurableServer) return null;
 
-  const handleSwitch = async (server: ServerConfig) => {
+  const handleSwitch = (server: ServerConfig) => {
     if (server.id === currentId) return;
     setCurrentServerId(server.id);
-    // Force a full re-auth against the new server. If the stored token
-    // is still valid we land back in the app; if not, login screen.
     notify.success(
       t("settings.servers.toasts.switched", { name: server.label }),
     );
-    if (server.token) {
-      // Reload so all in-flight queries drop and re-hit the new host.
-      window.location.href = "/";
-    } else {
-      navigate("/login", { replace: true });
-    }
   };
 
-  const handleRemove = async (server: ServerConfig) => {
-    const wasCurrent = server.id === currentId;
+  const handleRemove = (server: ServerConfig) => {
+    if (server.token) {
+      void revokeServerSession(server).catch(() => {
+        // Local removal must work when this server is offline.
+      });
+    }
     removeServer(server.id);
     notify.success(
       t("settings.servers.toasts.removed", { name: server.label }),
     );
-    if (wasCurrent) {
-      // Currently-logged-in server was removed. Logout flushes local
-      // state and navigates to /login; ServerGate then bounces to
-      // /server-setup if there are no remaining servers.
-      await logout().catch(() => {});
-    }
   };
 
   return (

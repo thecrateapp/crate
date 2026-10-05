@@ -5,6 +5,7 @@ import { useNavigate } from "react-router";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import type { ArtistData } from "@/components/artist/artist-model";
 import { AppModal } from "@crate/ui/primitives/AppModal";
+import { notify } from "@crate/ui/lib/notify";
 import {
   ArtistBioProfile,
   type ArtistBioMember,
@@ -130,7 +131,11 @@ export function ArtistBioModal({
           );
           onClose();
         }}
-        onExternalLink={(url) => void openExternalUrl(url)}
+        onExternalLink={(url) =>
+          void openExternalUrl(url).catch(() =>
+            notify.error(t("common.toasts.openExternalFailed")),
+          )
+        }
       />
     </AppModal>
   );

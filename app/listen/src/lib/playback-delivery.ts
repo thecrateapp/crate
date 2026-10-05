@@ -86,7 +86,7 @@ export function preparePlaybackDelivery(
 
   const localRefs = tracks.reduce<ReturnType<typeof trackRef>[]>(
     (refs, track) => {
-      if (track.origin === "remote") return refs;
+      if (track.offlineOnly || track.origin === "remote") return refs;
       const ref = trackRef(track);
       if (ref.global_track_uid || ref.entity_uid || ref.track_id || ref.path) {
         refs.push(ref);
@@ -95,9 +95,9 @@ export function preparePlaybackDelivery(
     },
     [],
   );
-  const remoteRefs = upcomingRemoteDeliveryTracks(queue, currentIndex).map(
-    trackRef,
-  );
+  const remoteRefs = upcomingRemoteDeliveryTracks(queue, currentIndex)
+    .filter((track) => !track.offlineOnly)
+    .map(trackRef);
   const refs = [...localRefs, ...remoteRefs];
   if (refs.length === 0) return;
 

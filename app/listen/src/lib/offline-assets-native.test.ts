@@ -7,6 +7,14 @@ vi.mock("@/lib/capacitor-runtime", () => ({
   isNative: true,
 }));
 
+vi.mock("@/lib/platform", () => ({
+  getListenAppId: () => "listen-android",
+  isCapacitorRuntime: true,
+  isTauriRuntime: false,
+  usesConfigurableServer: true,
+  usesNativeFilesystem: true,
+}));
+
 vi.mock("@/lib/offline-native-assets", () => ({
   cacheNativeTrackAsset: cacheNativeTrackAssetMock,
   clearNativeOfflineAssets: vi.fn(),

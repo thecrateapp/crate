@@ -1,0 +1,6 @@
+{
+  "identifier": "app.cratemusic.crate.desktop.native-perf-bench20260930",
+  "build": {
+    "devUrl": "http://127.0.0.1:5178/scripts/native-perf/probe.html?port=18766&revision=df72643d229ad7b47908f183690f5a35294a8ddf"
+  }
+}

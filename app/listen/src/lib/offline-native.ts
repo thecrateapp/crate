@@ -1,5 +1,6 @@
 import { registerPlugin } from "@capacitor/core";
 import { Directory, Filesystem } from "@capacitor/filesystem";
+import { isTauriRuntime } from "@/lib/platform";
 
 export interface NativeOfflineAssetExpectation {
   path: string;
@@ -32,6 +33,33 @@ export async function excludeNativeOfflineAssetFromBackup(
 let nativeOfflineIntegrity: NativeOfflineIntegrityPlugin | null = null;
 const NATIVE_INTEGRITY_BATCH_SIZE = 500;
 const FILESYSTEM_VERIFY_CONCURRENCY = 8;
+const FILESYSTEM_VERIFICATION_SLOTS = createSemaphore(
+  FILESYSTEM_VERIFY_CONCURRENCY,
+);
+const NATIVE_BATCH_VERIFICATION_SLOTS = createSemaphore(2);
+
+function createSemaphore(limit: number): {
+  run<T>(operation: () => Promise<T>): Promise<T>;
+} {
+  let active = 0;
+  const waiters: Array<() => void> = [];
+  return {
+    async run<T>(operation: () => Promise<T>): Promise<T> {
+      if (active >= limit) {
+        await new Promise<void>((resolve) => waiters.push(resolve));
+      } else {
+        active += 1;
+      }
+      try {
+        return await operation();
+      } finally {
+        const next = waiters.shift();
+        if (next) next();
+        else active -= 1;
+      }
+    },
+  };
+}
 
 function getNativeOfflineIntegrity(): NativeOfflineIntegrityPlugin {
   nativeOfflineIntegrity ??= registerPlugin<NativeOfflineIntegrityPlugin>(
@@ -50,29 +78,28 @@ async function verifyWithFilesystem(
       const index = nextIndex;
       nextIndex += 1;
       const { path, expectedBytes } = assets[index]!;
-      try {
-        const stat = await Filesystem.stat({
-          path,
-          directory: Directory.Data,
-        });
-        const size = Math.max(0, Number(stat.size || 0));
-        const expected = Math.max(0, Number(expectedBytes || 0));
-        // A 0-byte file is never a legitimately cached track — it means an
-        // interrupted/truncated write, not one with no content. Matches the
-        // same rule assertNativeTrackIntegrity applies right after a
-        // download; without it, a corrupted cache entry would keep passing
-        // this check forever and only fail once actual playback is attempted.
-        const valid = size > 0 && (expected === 0 || size === expected);
-        if (!valid) {
-          await Filesystem.deleteFile({
+      results[index] = await FILESYSTEM_VERIFICATION_SLOTS.run(async () => {
+        try {
+          const stat = await Filesystem.stat({
             path,
             directory: Directory.Data,
-          }).catch(() => undefined);
+          });
+          const size = Math.max(0, Number(stat.size || 0));
+          const expected = Math.max(0, Number(expectedBytes || 0));
+          // A 0-byte file is never a legitimately cached asset. A size
+          // mismatch means the transfer stopped before its durable commit.
+          const valid = size > 0 && (expected === 0 || size === expected);
+          if (!valid) {
+            await Filesystem.deleteFile({
+              path,
+              directory: Directory.Data,
+            }).catch(() => undefined);
+          }
+          return { path, exists: true, size, valid };
+        } catch {
+          return { path, exists: false, size: 0, valid: false };
         }
-        results[index] = { path, exists: true, size, valid };
-      } catch {
-        results[index] = { path, exists: false, size: 0, valid: false };
-      }
+      });
     }
   };
   await Promise.all(
@@ -89,8 +116,29 @@ async function verifyWithFilesystem(
 async function verifyNativeOfflineAssetBatch(
   assets: NativeOfflineAssetExpectation[],
 ): Promise<NativeOfflineAssetVerification[]> {
+  if (isTauriRuntime) {
+    if (window.__crateTauriInvoke) {
+      const profileKeys = new Set(
+        assets.map(({ path }) => path.split("/")[1]).filter(Boolean),
+      );
+      if (profileKeys.size === 1) {
+        const profileKey = [...profileKeys][0]!;
+        try {
+          const response = await window.__crateTauriInvoke<
+            NativeOfflineAssetVerification[]
+          >("verify_offline_media_assets", { profileKey, assets });
+          if (response.length === assets.length) return response;
+        } catch {
+          // Older desktop shells fall back to the scoped filesystem adapter.
+        }
+      }
+    }
+    return verifyWithFilesystem(assets);
+  }
   try {
-    const response = await getNativeOfflineIntegrity().verifyAssets({ assets });
+    const response = await NATIVE_BATCH_VERIFICATION_SLOTS.run(() =>
+      getNativeOfflineIntegrity().verifyAssets({ assets }),
+    );
     if (response.assets.length === assets.length) return response.assets;
   } catch {
     // Older native shells fall back until the bridge upgrade is installed.

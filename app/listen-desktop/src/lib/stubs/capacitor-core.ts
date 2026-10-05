@@ -1,3 +1,5 @@
+import { convertFileSrc } from "@tauri-apps/api/core";
+
 export type PermissionState =
   | "prompt"
   | "prompt-with-rationale"
@@ -11,7 +13,7 @@ export interface PluginListenerHandle {
 export const Capacitor = {
   isNativePlatform: () => false,
   getPlatform: () => "web",
-  convertFileSrc: (filePath: string) => filePath,
+  convertFileSrc,
 };
 
 export function registerPlugin<T extends object = object>(

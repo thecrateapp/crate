@@ -1,0 +1,14 @@
+branch_revision=e8c8530d08862f992ead217eab21b9e3e3c650fb
+rust_source_revision=489a69097e17b32a38ab47e0b47d941fba4962bb
+host=Mac17,2
+os=macOS 27.0.1
+architecture=arm64
+command=CRATE_R01_API_URL=https://api.lespedants.org/api/setup/status cargo run --locked --release --example http_pool_bench
+endpoint=GET https://api.lespedants.org/api/setup/status (read-only)
+requests=25 measured per client mode and concurrency; one warmup per mode and concurrency
+total_requests=104 (no preflight request)
+
+remote_get requests=25 concurrency=1 fresh_client: cold=113000us total=2345ms p50=88740us p95=103932us
+remote_get requests=25 concurrency=1 shared_client: cold=83049us total=1565ms p50=63610us p95=66243us
+remote_get requests=25 concurrency=8 fresh_client: cold=85245us total=581ms p50=115072us p95=129606us
+remote_get requests=25 concurrency=8 shared_client: cold=92481us total=395ms p50=95549us p95=106776us

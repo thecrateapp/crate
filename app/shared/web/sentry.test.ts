@@ -93,4 +93,55 @@ describe("shared Sentry helpers", () => {
   it("keeps only the path when URL parsing is unavailable", () => {
     expect(safeRequestPath("/api/search?q=secret")).toBe("/api/search");
   });
+
+  it("redacts credentials, signed queries, local paths, and OAuth callbacks in error text", () => {
+    const event = scrubSentryEvent({
+      message:
+        "Authorization: Bearer private https://api.example.test/stream?token=signed /Users/diego/music",
+      exception: {
+        values: [
+          {
+            value:
+              "OAuth failed at cratemusic://callback?code=private with session_key=private",
+            stacktrace: {
+              frames: [
+                {
+                  filename: "/Users/diego/music/app.ts",
+                  abs_path: "file:///Users/diego/music/app.ts",
+                },
+              ],
+            },
+          },
+        ],
+      },
+      breadcrumbs: [
+        {
+          message: "GET /api/callback?state=private",
+          data: {
+            authorization: "Bearer private",
+            cookie: "private-cookie",
+          },
+        },
+      ],
+      contexts: {
+        auth: {
+          refresh_token: "private-refresh",
+          verifier: "private-verifier",
+          sessionKey: "private-session",
+        },
+      },
+      extra: {
+        error: "refresh_token=private-refresh code=private-code",
+        password: "private-password",
+      },
+    });
+
+    const serialized = JSON.stringify(event);
+    expect(serialized).not.toContain("private");
+    expect(serialized).not.toContain("signed");
+    expect(serialized).not.toContain("/Users/diego");
+    expect(serialized).not.toContain("private-session");
+    expect(serialized).toContain("Authorization: [Filtered]");
+    expect(serialized).toContain("[Filtered deep link]");
+  });
 });

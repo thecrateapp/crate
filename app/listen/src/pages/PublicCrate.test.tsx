@@ -56,6 +56,8 @@ function anonymousAuth(
   return {
     user: null,
     loading: false,
+    accessMode: "unauthenticated",
+    offlineIdentity: null,
     refetch: vi.fn(async () => null),
     logout: vi.fn(async () => {}),
     ...overrides,

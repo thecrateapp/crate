@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { secureGet, secureRemove, secureSet } = vi.hoisted(() => ({
+const { runtime, secureGet, secureRemove, secureSet } = vi.hoisted(() => ({
+  runtime: { isCapacitorRuntime: true, isTauriRuntime: false },
   secureGet: vi.fn(),
   secureRemove: vi.fn(),
   secureSet: vi.fn(),
@@ -8,7 +9,9 @@ const { secureGet, secureRemove, secureSet } = vi.hoisted(() => ({
 
 vi.mock("@/lib/platform", () => ({
   usesConfigurableServer: true,
-  isCapacitorRuntime: true,
+  isCapacitorRuntime: runtime.isCapacitorRuntime,
+  isTauriRuntime: runtime.isTauriRuntime,
+  usesSecureSessionStore: true,
 }));
 
 vi.mock("@/lib/native-secure-session", () => ({
@@ -20,8 +23,13 @@ vi.mock("@/lib/native-secure-session", () => ({
 describe("native server credential migration", () => {
   beforeEach(() => {
     vi.resetModules();
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
+    secureGet.mockResolvedValue(null);
+    secureSet.mockResolvedValue(undefined);
+    secureRemove.mockResolvedValue(undefined);
+    runtime.isCapacitorRuntime = true;
+    runtime.isTauriRuntime = false;
   });
 
   it("preserves the pre-upgrade server registry during native bootstrap", async () => {
@@ -40,7 +48,7 @@ describe("native server credential migration", () => {
     );
     localStorage.setItem("crate-current-server", "server-1");
     secureSet.mockResolvedValue(undefined);
-    secureGet.mockResolvedValue(
+    secureGet.mockResolvedValueOnce(null).mockResolvedValue(
       JSON.stringify({
         token: "access-secret",
         refreshToken: "refresh-secret",
@@ -77,7 +85,7 @@ describe("native server credential migration", () => {
       ]),
     );
     secureSet.mockResolvedValue(undefined);
-    secureGet.mockResolvedValue(
+    secureGet.mockResolvedValueOnce(null).mockResolvedValue(
       JSON.stringify({
         token: "access-secret",
         refreshToken: "refresh-secret",
@@ -127,6 +135,39 @@ describe("native server credential migration", () => {
       "Native session migration failed",
     );
 
+    expect(localStorage.getItem("crate-servers")).toBe(legacy);
+  });
+
+  it("keeps plaintext credentials if the registry cannot be sanitized after secure verification", async () => {
+    const legacy = JSON.stringify([
+      {
+        id: "server-1",
+        label: "Crate",
+        url: "https://api.example.com",
+        token: "access-secret",
+        tokenExpiresAt: null,
+        refreshToken: "refresh-secret",
+      },
+    ]);
+    localStorage.setItem("crate-servers", legacy);
+    const verified = JSON.stringify({
+      token: "access-secret",
+      refreshToken: "refresh-secret",
+      generation: 1,
+    });
+    secureGet.mockResolvedValueOnce(null).mockResolvedValue(verified);
+    const originalSetItem = localStorage.setItem.bind(localStorage);
+    vi.spyOn(localStorage, "setItem").mockImplementation((key, value) => {
+      if (key === "crate-servers") throw new Error("storage unavailable");
+      originalSetItem(key, value);
+    });
+    const store = await import("./server-store");
+
+    await expect(store.bootstrapNativeSessionStore()).rejects.toThrow(
+      "Native session migration failed",
+    );
+
+    expect(secureSet).toHaveBeenCalledOnce();
     expect(localStorage.getItem("crate-servers")).toBe(legacy);
   });
 
@@ -315,7 +356,9 @@ describe("native server credential migration", () => {
     );
     const store = await import("./server-store");
 
-    await store.bootstrapNativeSessionStore();
+    await expect(store.bootstrapNativeSessionStore()).rejects.toThrow(
+      "Native session migration failed",
+    );
 
     expect(store.getServers()[0]).toMatchObject({
       token: null,
@@ -510,5 +553,91 @@ describe("native server credential migration", () => {
     expect(localStorage.getItem("crate-pending-session-removals:v1")).toContain(
       "server-1",
     );
+  });
+
+  it("uses the newer secure session instead of stale plaintext during Tauri migration", async () => {
+    runtime.isCapacitorRuntime = false;
+    runtime.isTauriRuntime = true;
+    localStorage.setItem(
+      "crate-servers",
+      JSON.stringify([
+        {
+          id: "server-1",
+          label: "Crate",
+          url: "https://api.example.com",
+          token: "stale-access",
+          tokenExpiresAt: null,
+          refreshToken: "stale-refresh",
+        },
+      ]),
+    );
+    secureGet.mockResolvedValue(
+      JSON.stringify({
+        token: "current-access",
+        refreshToken: "current-refresh",
+        generation: 5,
+      }),
+    );
+    const store = await import("./server-store");
+
+    await store.bootstrapNativeSessionStore();
+
+    expect(secureSet).not.toHaveBeenCalled();
+    expect(store.getServers()[0]).toMatchObject({
+      token: "current-access",
+      refreshToken: "current-refresh",
+    });
+    expect(localStorage.getItem("crate-servers")).not.toContain("stale-access");
+    expect(localStorage.getItem("crate-servers")).not.toContain(
+      "current-access",
+    );
+  });
+
+  it("fails closed on a corrupt secure session instead of overwriting it with plaintext", async () => {
+    const legacy = JSON.stringify([
+      {
+        id: "server-1",
+        label: "Crate",
+        url: "https://api.example.com",
+        token: "stale-access",
+        tokenExpiresAt: null,
+        refreshToken: "stale-refresh",
+      },
+    ]);
+    localStorage.setItem("crate-servers", legacy);
+    secureGet.mockResolvedValue("{corrupt vault data");
+    const store = await import("./server-store");
+
+    await expect(store.bootstrapNativeSessionStore()).rejects.toThrow(
+      "Native session migration failed",
+    );
+
+    expect(secureSet).not.toHaveBeenCalled();
+    expect(localStorage.getItem("crate-servers")).toBe(legacy);
+  });
+
+  it("rejects structurally invalid secure session JSON instead of migrating plaintext over it", async () => {
+    localStorage.setItem(
+      "crate-servers",
+      JSON.stringify([
+        {
+          id: "server-1",
+          label: "Crate",
+          url: "https://api.example.com",
+          token: "stale-access",
+          tokenExpiresAt: null,
+          refreshToken: null,
+        },
+      ]),
+    );
+    secureGet.mockResolvedValue("[]");
+    const store = await import("./server-store");
+
+    await expect(store.bootstrapNativeSessionStore()).rejects.toThrow(
+      "Native session migration failed",
+    );
+
+    expect(secureSet).not.toHaveBeenCalled();
+    expect(localStorage.getItem("crate-servers")).toContain("stale-access");
   });
 });

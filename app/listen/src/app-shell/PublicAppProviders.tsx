@@ -20,7 +20,9 @@ const unavailable = async (): Promise<never> => {
 
 const publicOfflineValue: OfflineContextValue = {
   supported: false,
+  readOnly: true,
   syncing: false,
+  items: [],
   summary: {
     itemCount: 0,
     readyItemCount: 0,
