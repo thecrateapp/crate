@@ -1642,6 +1642,8 @@ class TestStatsTops:
         assert mix["track_count"] == len(mix["items"])
         # For 30d = "Replay this month"
         assert mix["title"] == "Replay this month"
+        assert mix["title_key"] == "stats.replay.thisMonth.title"
+        assert mix["subtitle_key"] == "stats.replay.thisMonth.subtitle"
 
     def test_get_replay_mix_resolves_global_catalog_identity(self, lib_db):
         catalog = _seed_global_catalog_track()
@@ -1912,24 +1914,32 @@ class TestStatsTops:
 
         mix = get_replay_mix(TEST_USER_ID, window="7d")
         assert mix["title"] == "Your last 7 days"
+        assert mix["title_key"] == "stats.replay.lastWeek.title"
+        assert mix["subtitle_key"] == "stats.replay.lastWeek.subtitle"
 
     def test_get_replay_mix_90d_title(self, lib_db):
         from crate.db.queries.user_library_stats_tops import get_replay_mix
 
         mix = get_replay_mix(TEST_USER_ID, window="90d")
         assert mix["title"] == "Replay this season"
+        assert mix["title_key"] == "stats.replay.thisSeason.title"
+        assert mix["subtitle_key"] == "stats.replay.thisSeason.subtitle"
 
     def test_get_replay_mix_365d_title(self, lib_db):
         from crate.db.queries.user_library_stats_tops import get_replay_mix
 
         mix = get_replay_mix(TEST_USER_ID, window="365d")
         assert mix["title"] == "Replay this year"
+        assert mix["title_key"] == "stats.replay.thisYear.title"
+        assert mix["subtitle_key"] == "stats.replay.thisYear.subtitle"
 
     def test_get_replay_mix_all_time_title(self, lib_db):
         from crate.db.queries.user_library_stats_tops import get_replay_mix
 
         mix = get_replay_mix(TEST_USER_ID, window="all_time")
         assert mix["title"] == "All-time replay"
+        assert mix["title_key"] == "stats.replay.allTime.title"
+        assert mix["subtitle_key"] == "stats.replay.allTime.subtitle"
 
     def test_get_replay_mix_empty(self, lib_db):
         from crate.db.queries.user_library_stats_tops import get_replay_mix

@@ -275,8 +275,10 @@ describe("Stats page", () => {
       },
       replay: {
         window: "30d",
-        title: "Replay",
-        subtitle: "Snapshot",
+        title: "Replay this month",
+        subtitle: "The tracks that defined your last 30 days.",
+        title_key: "stats.replay.thisMonth.title",
+        subtitle_key: "stats.replay.thisMonth.subtitle",
         track_count: 0,
         minutes_listened: 0,
         items: [],
@@ -318,6 +320,11 @@ describe("Stats page", () => {
     expect(
       screen.getByText("Tu replay aparecerá cuando escuches un poco más."),
     ).toBeInTheDocument();
+    expect(screen.getByText("Replay de este mes")).toBeInTheDocument();
+    expect(
+      screen.getByText("Las canciones que definieron tus últimos 30 días."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Replay this month")).not.toBeInTheDocument();
   });
 
   it("uses global album artwork for remote replay tracks", () => {

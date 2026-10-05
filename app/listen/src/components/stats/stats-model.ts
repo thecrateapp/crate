@@ -102,6 +102,8 @@ export interface ReplayMix {
   window: StatsPeriodKey;
   title: string;
   subtitle: string;
+  title_key?: string | null;
+  subtitle_key?: string | null;
   track_count: number;
   minutes_listened: number;
   items: StatsTrack[];
@@ -281,6 +283,26 @@ export function statsTrackRowData(item: StatsTrack): TrackRowData {
     valence: item.valence,
     bliss_vector: item.bliss_vector,
   };
+}
+
+export function localizedReplayTitle(
+  replay: ReplayMix | undefined,
+  t: RecapTranslate,
+): string | undefined {
+  if (replay?.title_key) {
+    return t(replay.title_key, { defaultValue: replay.title });
+  }
+  return replay?.title || undefined;
+}
+
+export function localizedReplaySubtitle(
+  replay: ReplayMix | undefined,
+  t: RecapTranslate,
+): string | undefined {
+  if (replay?.subtitle_key) {
+    return t(replay.subtitle_key, { defaultValue: replay.subtitle });
+  }
+  return replay?.subtitle || undefined;
 }
 
 export function buildRecapHighlights(

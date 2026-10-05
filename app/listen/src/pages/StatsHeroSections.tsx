@@ -8,6 +8,8 @@ import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import type { PlaySource } from "@/contexts/PlayerContext";
 import {
   formatStatsMinutes,
+  localizedReplaySubtitle,
+  localizedReplayTitle,
   type ReplayMix,
   type StatsTrack,
 } from "@/components/stats/stats-model";
@@ -209,6 +211,7 @@ function ReplayCard({
   onPlay: () => void;
 }) {
   const { t } = useTranslation();
+  const title = localizedReplayTitle(replay, t) || t("stats.replay.title");
   return (
     <div className="stats-replay-card rounded-panel p-5">
       <div className="flex items-start justify-between gap-4">
@@ -218,17 +221,18 @@ function ReplayCard({
             {t("stats.replay.title")}
           </div>
           <h2 className="mt-3 text-2xl font-black tracking-display-tight text-text-primary">
-            {replay?.title || t("stats.replay.title")}
+            {title}
           </h2>
           <p className="mt-1 text-sm leading-6 text-text-muted">
-            {replay?.subtitle || t("stats.replay.defaultSubtitle")}
+            {localizedReplaySubtitle(replay, t) ||
+              t("stats.replay.defaultSubtitle")}
           </p>
         </div>
         <PlayButton
           onClick={onPlay}
           disabled={!items.length}
           label={t("common.playItem", {
-            name: replay?.title || t("stats.replay.title"),
+            name: title,
           })}
           className="size-12"
         />

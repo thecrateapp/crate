@@ -52,6 +52,8 @@ def test_cold_stats_dashboard_returns_minimal_payload_and_queues_projection(
     assert payload["window"] == "30d"
     assert payload["overview"]["play_count"] == 0
     assert payload["top_tracks"]["items"] == []
+    assert payload["replay"]["title_key"] == "stats.replay.title"
+    assert payload["replay"]["subtitle_key"] == "stats.replay.pending.subtitle"
     assert payload["snapshot"]["pending"] is True
     assert queued == [
         {

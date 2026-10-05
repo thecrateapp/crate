@@ -510,6 +510,8 @@ class ReplayMixResponse(BaseModel):
     window: str
     title: str
     subtitle: str
+    title_key: str | None = None
+    subtitle_key: str | None = None
     track_count: int
     minutes_listened: float | int
     items: list[StatsTrackResponse] = Field(default_factory=list)

@@ -5,6 +5,7 @@ import type { TFunction } from "i18next";
 
 import {
   buildRecapHighlights,
+  localizedReplayTitle,
   statsTrackRowData,
   toPlayerTrack,
   type ReplayMix,
@@ -197,7 +198,8 @@ export function useStatsPageController(): StatsPageController {
   const replay = dashboard?.replay as ReplayMix | undefined;
   const story = dashboard?.story;
   const replayItems = replay?.items ?? EMPTY_REPLAY_ITEMS;
-  const replayTitle = replay?.title || t("stats.replay.title");
+  const replayTitle =
+    localizedReplayTitle(replay, t) || t("stats.replay.title");
   const topTrackRows = useMemo(
     () => topTrackItems.map(statsTrackRowData),
     [topTrackItems],
