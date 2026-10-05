@@ -21,6 +21,20 @@ export function publicShareUrl(path: string) {
   return `${publicShareOrigin()}${normalizedPath}`;
 }
 
+export function publicCrateAlbumCoverUrl(
+  crateId: string,
+  globalAlbumUid: string,
+  size = 512,
+) {
+  return `${getApiBase()}/share/image/crate/${encodeURIComponent(
+    crateId,
+  )}/album/${encodeURIComponent(globalAlbumUid)}?size=${size}`;
+}
+
+export function publicCrateShareImageUrl(crateId: string) {
+  return `${getApiBase()}/share/image/crate/${encodeURIComponent(crateId)}`;
+}
+
 export function inviteShareUrl(invite: {
   join_url: string;
   public_url?: string | null;

@@ -1,12 +1,15 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router";
 
+import { MediaGrid } from "@crate/ui/domain/lists";
+import { EmptyState, LoadingState } from "@crate/ui/domain/states";
+import { Button } from "@crate/ui/shadcn/button";
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { useApi } from "@/hooks/use-api";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
 import { CollectionSortDropdown } from "./LibraryCollectionSortDropdown";
-import { EmptyState, Spinner } from "./LibraryPrimitives";
 import {
   albumSortOptions,
   type AlbumSort,
@@ -40,16 +43,27 @@ export function LibraryAlbumsTab() {
     });
   }, [albums, sort]);
 
-  if (loading) return <Spinner />;
+  if (loading) return <LoadingState label={t("common.loadingShort")} />;
   if (!albums || albums.length === 0) {
-    return <EmptyState message={t("library.albums.empty")} />;
+    return (
+      <EmptyState
+        variant="dashed"
+        title={t("library.albums.emptyTitle")}
+        description={t("library.albums.emptyDescription")}
+        action={
+          <Button asChild size="sm">
+            <Link to="/explore">{t("nav.explore")}</Link>
+          </Button>
+        }
+      />
+    );
   }
 
   return (
     <div className="space-y-4">
       {!isDesktop ? (
         <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-bold uppercase tracking-[0.16em] text-text-primary/40">
+          <span className="text-xs font-bold uppercase tracking-kicker text-text-primary/40">
             {t("library.sort.label")}
           </span>
           <CollectionSortDropdown
@@ -60,7 +74,7 @@ export function LibraryAlbumsTab() {
           />
         </div>
       ) : null}
-      <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6">
+      <MediaGrid>
         {sortedAlbums.map((album) => (
           <AlbumCard
             key={album.global_album_uid ?? album.id}
@@ -76,7 +90,7 @@ export function LibraryAlbumsTab() {
             layout="grid"
           />
         ))}
-      </div>
+      </MediaGrid>
     </div>
   );
 }

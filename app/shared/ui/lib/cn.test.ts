@@ -26,6 +26,22 @@ describe("cn", () => {
     );
   });
 
+  it("keeps token font sizes when merged with a text color", () => {
+    expect(cn("text-caption", "text-text-muted")).toBe(
+      "text-caption text-text-muted",
+    );
+    expect(cn("text-micro", "text-accent-action")).toBe(
+      "text-micro text-accent-action",
+    );
+  });
+
+  it("resolves conflicts with layout and typography tokens", () => {
+    expect(cn("rounded-xl", "rounded-panel")).toBe("rounded-panel");
+    expect(cn("max-w-md", "max-w-content")).toBe("max-w-content");
+    expect(cn("h-10", "h-hero-md")).toBe("h-hero-md");
+    expect(cn("tracking-wide", "tracking-eyebrow")).toBe("tracking-eyebrow");
+  });
+
   it("handles arrays and objects", () => {
     expect(cn(["a", "b"], { c: true, d: false })).toBe("a b c");
   });

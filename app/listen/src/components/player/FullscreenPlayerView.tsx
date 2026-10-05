@@ -81,6 +81,7 @@ export function FullscreenPlayerView({
           player={player}
           t={t}
           jumpTo={actions.jumpTo}
+          locked={state.jamQueueLocked}
           scrollTabBottomClearance={scrollTabBottomClearance}
         />
       ) : null}

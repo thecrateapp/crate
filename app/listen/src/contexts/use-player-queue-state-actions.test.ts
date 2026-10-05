@@ -140,4 +140,16 @@ describe("usePlayerQueueStateActions", () => {
       expect.objectContaining({ repeatMode: "all" }),
     );
   });
+
+  it("sets an explicit repeat mode for Crate playback", () => {
+    const { params } = createParams();
+    params.jamQueueLockedRef.current = false;
+    const setRepeatState = vi.fn((updater) => updater("off"));
+    params.setRepeatState = setRepeatState;
+    const { result } = renderHook(() => usePlayerQueueStateActions(params));
+
+    act(() => result.current.setRepeatMode("all"));
+
+    expect(setRepeatState).toHaveBeenCalledOnce();
+  });
 });

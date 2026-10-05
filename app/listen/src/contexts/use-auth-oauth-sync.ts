@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import type { NavigateFunction } from "react-router";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import type { AuthUser } from "@/contexts/auth-context";
 import {
@@ -50,12 +50,12 @@ export function useAuthOAuthSync({
   useEffect(() => {
     function handleProviderError() {
       consumePendingOAuthProviderError();
-      toast.error(t("auth.login.connectionError"));
+      notify.error(t("auth.login.connectionError"));
     }
 
     window.addEventListener("crate:oauth-provider-error", handleProviderError);
     if (consumePendingOAuthProviderError()) {
-      toast.error(t("auth.login.connectionError"));
+      notify.error(t("auth.login.connectionError"));
     }
     return () => {
       window.removeEventListener(

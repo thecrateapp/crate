@@ -104,3 +104,12 @@ pointerCapturePrototype.hasPointerCapture ??= () => false;
 pointerCapturePrototype.setPointerCapture ??= () => undefined;
 pointerCapturePrototype.releasePointerCapture ??= () => undefined;
 HTMLElement.prototype.scrollIntoView ??= () => undefined;
+
+if (typeof globalThis.ResizeObserver === "undefined") {
+  class TestResizeObserver implements ResizeObserver {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+  globalThis.ResizeObserver = TestResizeObserver;
+}

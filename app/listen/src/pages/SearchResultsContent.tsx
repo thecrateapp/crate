@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { PageHeader } from "@crate/ui/domain/navigation/PageHeader";
 
 import type { TrackRowData } from "@/components/cards/TrackRow";
 import type { PlayerActionsValue } from "@/contexts/player-context";
@@ -28,9 +29,7 @@ export function SearchResultsContent({
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold">
-        {t("search.resultsFor", { query })}
-      </h1>
+      <PageHeader size="md" title={t("search.resultsFor", { query })} />
       {data.artists.length > 0 ? (
         <SearchArtistResults artists={data.artists} />
       ) : null}

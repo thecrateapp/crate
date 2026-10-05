@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { Section } from "@/components/settings/SettingsPrimitives";
 import {
@@ -112,7 +112,7 @@ export function ShowsLocationSection() {
         setCity(geo.city);
         setLocation((prev) => (prev ? { ...prev, ...geo } : null));
         if (!silent) {
-          toast.success(
+          notify.success(
             t("settings.shows.toasts.detected", {
               city: geo.city,
               country: geo.country,
@@ -120,7 +120,7 @@ export function ShowsLocationSection() {
           );
         }
       } catch {
-        if (!silent) toast.error(t("settings.shows.toasts.detectFailed"));
+        if (!silent) notify.error(t("settings.shows.toasts.detectFailed"));
       } finally {
         setDetecting(false);
       }
@@ -153,11 +153,11 @@ export function ShowsLocationSection() {
               }
             : null,
         );
-        toast.success(
+        notify.success(
           t("settings.shows.toasts.citySet", { city: result.display_name }),
         );
       })
-      .catch(() => toast.error(t("settings.shows.toasts.saveCityFailed")));
+      .catch(() => notify.error(t("settings.shows.toasts.saveCityFailed")));
   }
 
   async function saveMode(newMode: "fixed" | "near_me") {
@@ -165,7 +165,7 @@ export function ShowsLocationSection() {
     try {
       await api("/api/me/location", "PUT", { show_location_mode: newMode });
     } catch {
-      toast.error(t("common.toasts.saveFailed"));
+      notify.error(t("common.toasts.saveFailed"));
     }
   }
 
@@ -174,7 +174,7 @@ export function ShowsLocationSection() {
     try {
       await api("/api/me/location", "PUT", { show_radius_km: newRadius });
     } catch {
-      toast.error(t("common.toasts.saveFailed"));
+      notify.error(t("common.toasts.saveFailed"));
     }
   }
 

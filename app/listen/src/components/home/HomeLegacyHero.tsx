@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { ChevronLeft, ChevronRight } from "@crate/ui/icons";
+import { ChevronLeft, ChevronRight, CRATE_ICON_SIZE } from "@crate/ui/icons";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import {
   ArtistHeroFrame,
   artistHeroArtworkFitClassName,
@@ -30,7 +31,7 @@ export function LegacyMobileFeaturedArtist({
   return (
     <section
       data-testid="mobile-legacy-hero"
-      className="home-legacy-hero relative h-[55dvh] min-h-[430px] max-h-[620px] w-full overflow-hidden rounded-none border-y border-border-quiet"
+      className="home-legacy-hero relative h-[55dvh] min-h-hero-lg max-h-hero-3xl w-full overflow-hidden rounded-none border-y border-border-quiet"
     >
       <LegacyHeroArtwork backgroundSrc={backgroundSrc} composition="mobile" />
       <button
@@ -74,7 +75,7 @@ export function LegacyDesktopFeaturedArtist({
       data-testid="desktop-legacy-hero"
       aria-hidden={!active}
       className={cn(
-        "home-legacy-hero absolute inset-0 overflow-hidden rounded-[12px] border border-border-quiet transition-opacity duration-500 ease-out",
+        "home-legacy-hero absolute inset-0 overflow-hidden rounded-panel border border-border-quiet transition-opacity duration-500 ease-out",
         active ? "z-10 opacity-100" : "pointer-events-none z-0 opacity-0",
       )}
     >
@@ -146,7 +147,7 @@ function LegacyHeroCopy({
   const { t } = useTranslation();
   return (
     <div className="pointer-events-auto">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent-action">
+      <p className="text-xs font-semibold uppercase tracking-overline-wide text-accent-action">
         {t("home.library.justLanded.title")}
       </p>
       <h1 className="home-hero-title mt-2 truncate text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">
@@ -179,14 +180,13 @@ export function LegacyDesktopHeroNavigation({
   const { t } = useTranslation();
   return (
     <div className="absolute inset-x-0 bottom-5 z-30 flex items-center justify-center gap-3">
-      <button
-        type="button"
-        aria-label={t("home.hero.previousArtist")}
-        className="home-hero-nav-control flex size-9 items-center justify-center rounded-full backdrop-blur-sm"
+      <IconButton
+        label={t("home.hero.previousArtist")}
+        className="home-hero-nav-control size-9 backdrop-blur-sm"
         onClick={onPrevious}
       >
-        <ChevronLeft size={18} />
-      </button>
+        <ChevronLeft size={CRATE_ICON_SIZE.md} />
+      </IconButton>
       <div className="flex items-center gap-1.5">
         {heroes.map((hero, index) => (
           <button
@@ -208,14 +208,13 @@ export function LegacyDesktopHeroNavigation({
           </button>
         ))}
       </div>
-      <button
-        type="button"
-        aria-label={t("home.hero.nextArtist")}
-        className="home-hero-nav-control flex size-9 items-center justify-center rounded-full backdrop-blur-sm"
+      <IconButton
+        label={t("home.hero.nextArtist")}
+        className="home-hero-nav-control size-9 backdrop-blur-sm"
         onClick={onNext}
       >
-        <ChevronRight size={18} />
-      </button>
+        <ChevronRight size={CRATE_ICON_SIZE.md} />
+      </IconButton>
     </div>
   );
 }

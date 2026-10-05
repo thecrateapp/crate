@@ -177,6 +177,10 @@ export function getOfflineCacheName(profileKey: string): string {
   return `${OFFLINE_CACHE_PREFIX}${profileKey}`;
 }
 
+export function isOfflineMediaCacheName(cacheName: string): boolean {
+  return cacheName.startsWith(OFFLINE_CACHE_PREFIX);
+}
+
 export function getActiveOfflineProfileKey(): string | null {
   return readOfflineStoreItem(OFFLINE_ACTIVE_PROFILE_KEY);
 }

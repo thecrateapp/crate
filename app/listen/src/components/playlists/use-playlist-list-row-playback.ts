@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { api } from "@/lib/api";
@@ -32,7 +32,7 @@ export function usePlaylistListRowPlayback({
         const response = await api<PlaylistDetailResponse>(detailEndpoint);
         const tracks = toPlayerTracks(response.tracks || []);
         if (tracks.length === 0) {
-          toast.message(t("playlist.toasts.noPlayableTracks"));
+          notify.info(t("playlist.toasts.noPlayableTracks"));
           return;
         }
         const queue = mode === "shuffle" ? shuffleArray(tracks) : tracks;
@@ -45,7 +45,7 @@ export function usePlaylistListRowPlayback({
               : undefined,
         });
       } catch {
-        toast.error(t("home.playlists.loadFailed"));
+        notify.error(t("home.playlists.loadFailed"));
       } finally {
         setPlayingMode(null);
       }

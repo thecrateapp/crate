@@ -11,6 +11,34 @@ vi.mock("@/hooks/use-api", () => ({
   useApi: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-lazy-crate-options", () => ({
+  useLazyCrateOptions: () => ({
+    crateOptions: [],
+    ensureCrateOptionsLoaded: vi.fn(),
+  }),
+}));
+
+vi.mock("@/contexts/LikedTracksContext", () => ({
+  useLikedTracks: () => ({
+    isLiked: () => false,
+    toggleTrackLike: vi.fn(),
+  }),
+}));
+
+vi.mock("@/contexts/SavedAlbumsContext", () => ({
+  useSavedAlbums: () => ({
+    isSaved: () => false,
+    toggleAlbumSaved: vi.fn(),
+  }),
+}));
+
+vi.mock("@/contexts/ArtistFollowsContext", () => ({
+  useArtistFollows: () => ({
+    isFollowing: () => false,
+    toggleArtistFollow: vi.fn(),
+  }),
+}));
+
 const mockUseApi = vi.mocked(useApi);
 
 describe("Stats page", () => {
@@ -93,7 +121,56 @@ describe("Stats page", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a single global empty state without per-section empties", () => {
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "es",
+    });
+
+    expect(screen.getAllByTestId("empty-state")).toHaveLength(1);
+    expect(
+      screen.queryByText(
+        "Sigue escuchando y esta página empezará a escribir tu recap.",
+      ),
+    ).not.toBeInTheDocument();
+  });
+
   it("uses semantic tokens for the stats shell and hero", () => {
+    const period = "30d";
+    const dashboard: StatsDashboard = {
+      window: period,
+      overview: {
+        window: period,
+        play_count: 1,
+        complete_play_count: 1,
+        skip_count: 0,
+        minutes_listened: 3,
+        active_days: 1,
+        skip_rate: 0,
+        top_artist: null,
+      },
+      trends: { window: period, points: [] },
+      top_tracks: { window: period, items: [] },
+      top_artists: { window: period, items: [] },
+      top_albums: { window: period, items: [] },
+      top_genres: { window: period, items: [] },
+      replay: {
+        window: period,
+        title: "Replay",
+        subtitle: "Snapshot",
+        track_count: 0,
+        minutes_listened: 0,
+        items: [],
+      },
+    };
+    mockUseApi.mockReturnValue({
+      data: dashboard,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
     const { container } = renderWithListenProviders(<Stats />, {
       route: "/stats",
       path: "/stats",
@@ -198,8 +275,10 @@ describe("Stats page", () => {
       },
       replay: {
         window: "30d",
-        title: "Replay",
-        subtitle: "Snapshot",
+        title: "Replay this month",
+        subtitle: "The tracks that defined your last 30 days.",
+        title_key: "stats.replay.thisMonth.title",
+        subtitle_key: "stats.replay.thisMonth.subtitle",
         track_count: 0,
         minutes_listened: 0,
         items: [],
@@ -241,6 +320,11 @@ describe("Stats page", () => {
     expect(
       screen.getByText("Tu replay aparecerá cuando escuches un poco más."),
     ).toBeInTheDocument();
+    expect(screen.getByText("Replay de este mes")).toBeInTheDocument();
+    expect(
+      screen.getByText("Las canciones que definieron tus últimos 30 días."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Replay this month")).not.toBeInTheDocument();
   });
 
   it("uses global album artwork for remote replay tracks", () => {

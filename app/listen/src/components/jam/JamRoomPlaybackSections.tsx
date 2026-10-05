@@ -1,4 +1,11 @@
-import { ListMusic, Pause, Play, SkipForward, Zap } from "@crate/ui/icons";
+import {
+  CRATE_ICON_SIZE,
+  ListMusic,
+  Pause,
+  Play,
+  SkipForward,
+  Zap,
+} from "@crate/ui/icons";
 import type { CSSProperties } from "react";
 import type { TFunction } from "i18next";
 
@@ -62,7 +69,7 @@ function JamNowPlayingTrack(props: JamNowPlayingTrackProps) {
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <div className="jam-accent-text text-xs uppercase tracking-[0.16em]">
+        <div className="jam-accent-text text-xs uppercase tracking-kicker">
           {t("jam.room.nowPlaying")}
         </div>
         {roomNowPlaying ? (
@@ -141,7 +148,11 @@ function JamHostPlaybackControls({
         disabled={!roomIsActive || !isConnected}
         className=" size-12 jam-accent-chip"
       >
-        {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+        {isPlaying ? (
+          <Pause size={CRATE_ICON_SIZE.lg} />
+        ) : (
+          <Play size={CRATE_ICON_SIZE.lg} />
+        )}
       </HeroActionButton>
       <HeroActionButton
         label={t("jam.room.actions.playNextTrack")}
@@ -149,7 +160,7 @@ function JamHostPlaybackControls({
         disabled={!roomIsActive || !isConnected || queueItems.length === 0}
         className=" size-12"
       >
-        <SkipForward size={19} />
+        <SkipForward size={CRATE_ICON_SIZE.md} />
       </HeroActionButton>
       <HeroActionButton
         label={
@@ -163,7 +174,7 @@ function JamHostPlaybackControls({
           syncStatus === "synced" ? "jam-success-chip" : ""
         }`}
       >
-        <Zap size={19} />
+        <Zap size={CRATE_ICON_SIZE.md} />
       </HeroActionButton>
     </>
   );
@@ -184,7 +195,7 @@ function JamGuestPlaybackStatus({
       }
       className="jam-chip inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs text-text-muted"
     >
-      <Zap size={15} className="jam-accent-text" />
+      <Zap size={CRATE_ICON_SIZE.sm} className="jam-accent-text" />
       {syncStatus === "synced"
         ? t("jam.room.synced")
         : t("jam.room.waitingForHost")}

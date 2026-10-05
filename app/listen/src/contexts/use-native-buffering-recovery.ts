@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { Track } from "@/contexts/player-types";
 import { clampIndex } from "@/contexts/player-queue-helpers";
@@ -18,7 +19,7 @@ import {
   nativePlaybackRecoveryCancellationSince,
   subscribeNativePlaybackIntentChanges,
 } from "@/lib/native-playback-intent";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 const NATIVE_BUFFERING_WATCHDOG_MS = 12000;
 const NATIVE_PLAYBACK_DIAGNOSTIC_KEY = "listen-native-playback-diagnostic:v1";
@@ -104,6 +105,11 @@ export function useNativeBufferingRecovery({
   queueRef,
   repeatRef,
 }: UseNativeBufferingRecoveryParams) {
+  const { t } = useTranslation();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
   const nativeBufferingWatchdogRef = useRef<number | null>(null);
   const nativeBufferingProbeIdRef = useRef(0);
   const nativeAuthRetryKeyRef = useRef<string | null>(null);
@@ -323,8 +329,10 @@ export function useNativeBufferingRecovery({
         });
       }
     }
-    toast.error("Native playback is stuck buffering", {
-      description: `Stream probe: ${status}${detail ? ` · ${detail}` : ""}`,
+    notify.error(tRef.current("player.native.stuckBuffering"), {
+      description: tRef.current("player.native.streamProbe", {
+        status: detail ? `${status} · ${detail}` : status,
+      }),
       duration: 9000,
     });
   }, [currentTrackRef, recoverNativeBuffering]);
@@ -404,7 +412,7 @@ export function useNativeBufferingRecovery({
           url: redactDiagnosticUrl(nativeError.url),
           retryError: error instanceof Error ? error.message : String(error),
         });
-        toast.error("Native playback failed", {
+        notify.error(tRef.current("player.native.playbackFailed"), {
           description: summary,
           duration: 9000,
         });

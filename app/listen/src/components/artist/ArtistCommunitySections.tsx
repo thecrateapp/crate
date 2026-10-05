@@ -1,4 +1,5 @@
-import { Calendar, Play } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Calendar, Play } from "@crate/ui/icons";
+import { Button } from "@crate/ui/shadcn/button";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
@@ -43,18 +44,18 @@ export function ArtistShowsSection({
             {t("artist.sections.shows")}
           </h2>
           {artistHotNow ? (
-            <div className="rounded-full border border-accent-action/20 bg-accent-action/10 px-3 py-1 text-xs uppercase tracking-[0.16em] text-accent-action">
+            <div className="rounded-full border border-accent-action/20 bg-accent-action/10 px-3 py-1 text-xs uppercase tracking-kicker text-accent-action">
               {t("artist.sections.heavyRotation")}
             </div>
           ) : null}
         </div>
 
         {nextAttendingShow ? (
-          <div className="artist-show-prep-surface rounded-[12px] border border-accent-action/15 p-5">
+          <div className="artist-show-prep-surface rounded-panel border border-accent-action/15 p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-accent-action/20 bg-accent-action/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-accent-action">
-                  <Calendar size={12} />
+                <div className="inline-flex items-center gap-2 rounded-full border border-accent-action/20 bg-accent-action/10 px-3 py-1 text-xs font-medium uppercase tracking-kicker text-accent-action">
+                  <Calendar size={CRATE_ICON_SIZE.micro} />
                   {t("artist.sections.showPrep")}
                 </div>
                 <h3 className="mt-3 text-xl font-bold text-text-primary">
@@ -79,20 +80,21 @@ export function ArtistShowsSection({
 
               <div className="flex flex-wrap gap-2">
                 {nextAttendingShow.probable_setlist?.length ? (
-                  <button
+                  <Button
                     onClick={onPlayProbableSetlist}
-                    className="inline-flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90"
+                    className="rounded-lg"
                   >
-                    <Play size={14} fill="currentColor" />
+                    <Play size={CRATE_ICON_SIZE.xs} fill="currentColor" />
                     {t("artist.sections.playProbableSetlist")}
-                  </button>
+                  </Button>
                 ) : null}
-                <button
+                <Button
+                  variant="outline"
                   onClick={() => onToggleExpand(itemKey(nextAttendingShow, 0))}
-                  className="inline-flex items-center gap-2 rounded-lg border border-border-quiet px-4 py-2 text-sm text-text-primary/65 transition-colors hover:border-text-primary/20 hover:text-text-primary"
+                  className="rounded-lg"
                 >
                   {t("artist.sections.viewShowDetails")}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

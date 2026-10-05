@@ -1,4 +1,5 @@
 import {
+  CRATE_ICON_SIZE,
   Globe2,
   ListMusic,
   Lock,
@@ -79,9 +80,9 @@ export function JamRoomActions(props: JamRoomActionsProps) {
               loading={updatingRoomField === "visibility"}
             >
               {room.visibility === "public" ? (
-                <Lock size={16} />
+                <Lock size={CRATE_ICON_SIZE.sm} />
               ) : (
-                <Globe2 size={16} />
+                <Globe2 size={CRATE_ICON_SIZE.sm} />
               )}
             </HeroActionButton>
             <HeroActionButton
@@ -99,7 +100,7 @@ export function JamRoomActions(props: JamRoomActionsProps) {
               disabled={updatingRoomField !== null || !roomIsActive}
               loading={updatingRoomField === "permanent"}
             >
-              <Pin size={16} />
+              <Pin size={CRATE_ICON_SIZE.sm} />
             </HeroActionButton>
             <HeroActionButton
               label={t("jam.room.actions.editProfile")}
@@ -107,7 +108,7 @@ export function JamRoomActions(props: JamRoomActionsProps) {
               disabled={updatingRoomField !== null}
               loading={updatingRoomField === "metadata"}
             >
-              <ListMusic size={16} />
+              <ListMusic size={CRATE_ICON_SIZE.sm} />
             </HeroActionButton>
             <HeroActionButton
               label={t("jam.room.actions.invitePeople")}
@@ -115,7 +116,7 @@ export function JamRoomActions(props: JamRoomActionsProps) {
               disabled={!roomIsActive}
               loading={creatingInvite}
             >
-              <Share2 size={16} />
+              <Share2 size={CRATE_ICON_SIZE.sm} />
             </HeroActionButton>
             <HeroActionButton
               label={t("jam.room.actions.endRoom")}
@@ -124,7 +125,7 @@ export function JamRoomActions(props: JamRoomActionsProps) {
               loading={endingRoom}
               className="jam-danger-control"
             >
-              <Power size={16} />
+              <Power size={CRATE_ICON_SIZE.sm} />
             </HeroActionButton>
             <HeroActionButton
               label={t("jam.delete.title")}
@@ -133,7 +134,7 @@ export function JamRoomActions(props: JamRoomActionsProps) {
               loading={deletingRoomId === room.id}
               className="jam-danger-control"
             >
-              <Trash2 size={16} />
+              <Trash2 size={CRATE_ICON_SIZE.sm} />
             </HeroActionButton>
           </div>
         </div>

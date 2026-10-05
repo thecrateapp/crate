@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import {
+  CRATE_ICON_SIZE,
   HardDrive,
   Music2,
   Pause,
@@ -7,7 +8,10 @@ import {
   SkipBack,
   SkipForward,
 } from "@crate/ui/icons";
+import { IconButton } from "@crate/ui/primitives/IconButton";
+import { Button } from "@crate/ui/shadcn/button";
 
+import { PlayerSeekBar } from "@/components/player/bar/PlayerSeekBar";
 import {
   usePlayerActions,
   usePlayerProgress,
@@ -47,7 +51,7 @@ export function OfflineLibrary() {
     <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-8 px-5 py-8 text-text-primary sm:px-8">
       <header className="space-y-3">
         <div className="inline-flex items-center gap-2 rounded-full border border-accent-action/25 bg-accent-action/10 px-3 py-1.5 text-xs font-semibold text-accent-action">
-          <HardDrive size={14} aria-hidden="true" />
+          <HardDrive size={CRATE_ICON_SIZE.xs} aria-hidden="true" />
           {t("offline.access.status")}
         </div>
         <div>
@@ -68,7 +72,7 @@ export function OfflineLibrary() {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex min-w-0 items-start gap-3">
                   <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-text-primary/[0.06] text-text-muted">
-                    <Music2 size={18} aria-hidden="true" />
+                    <Music2 size={CRATE_ICON_SIZE.md} aria-hidden="true" />
                   </div>
                   <div className="min-w-0">
                     <h2 className="truncate text-base font-semibold">
@@ -79,26 +83,26 @@ export function OfflineLibrary() {
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
+                <Button
+                  shape="pill"
                   onClick={() =>
                     playAll(group.tracks, 0, sourceForGroup(group))
                   }
-                  className="inline-flex shrink-0 items-center gap-2 rounded-full bg-accent-action px-4 py-2 text-sm font-semibold text-accent-action-foreground transition hover:brightness-110"
+                  className="font-semibold"
                 >
-                  <Play size={15} aria-hidden="true" />
+                  <Play size={CRATE_ICON_SIZE.sm} aria-hidden="true" />
                   {t("offline.access.playAll")}
-                </button>
+                </Button>
               </div>
               <ol className="mt-4 divide-y divide-border-quiet/70">
                 {group.tracks.map((track, index) => (
                   <li key={track.id}>
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
                       onClick={() =>
                         playAll(group.tracks, index, sourceForGroup(group))
                       }
-                      className="flex w-full items-center gap-3 py-3 text-left transition hover:text-text-accent"
+                      className="h-auto w-full justify-start gap-3 rounded-none px-0 py-3 text-left font-normal text-text-primary hover:bg-transparent hover:text-text-accent dark:hover:bg-transparent"
                     >
                       <span className="w-6 shrink-0 text-right text-xs text-text-muted">
                         {index + 1}
@@ -109,7 +113,7 @@ export function OfflineLibrary() {
                       <span className="max-w-[40%] truncate text-xs text-text-muted">
                         {track.artist}
                       </span>
-                    </button>
+                    </Button>
                   </li>
                 ))}
               </ol>
@@ -136,52 +140,42 @@ export function OfflineLibrary() {
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              aria-label={t("offline.access.previous")}
+            <IconButton
+              label={t("offline.access.previous")}
               onClick={prev}
-              className="rounded-full p-2 text-text-primary hover:bg-text-primary/10"
+              className="rounded-full text-text-primary"
             >
-              <SkipBack size={17} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              aria-label={isPlaying ? t("player.pause") : t("player.play")}
+              <SkipBack size={CRATE_ICON_SIZE.md} aria-hidden="true" />
+            </IconButton>
+            <IconButton
+              label={isPlaying ? t("player.pause") : t("player.play")}
               onClick={() => (isPlaying ? pause() : resume())}
-              className="rounded-full bg-accent-action p-2.5 text-accent-action-foreground"
+              className="rounded-full bg-accent-action text-accent-action-foreground hover:text-accent-action-foreground"
             >
               {isPlaying ? (
-                <Pause size={18} aria-hidden="true" />
+                <Pause size={CRATE_ICON_SIZE.md} aria-hidden="true" />
               ) : (
-                <Play size={18} aria-hidden="true" />
+                <Play size={CRATE_ICON_SIZE.md} aria-hidden="true" />
               )}
-            </button>
-            <button
-              type="button"
-              aria-label={t("offline.access.next")}
+            </IconButton>
+            <IconButton
+              label={t("offline.access.next")}
               onClick={next}
-              className="rounded-full p-2 text-text-primary hover:bg-text-primary/10"
+              className="rounded-full text-text-primary"
             >
-              <SkipForward size={17} aria-hidden="true" />
-            </button>
+              <SkipForward size={CRATE_ICON_SIZE.md} aria-hidden="true" />
+            </IconButton>
           </div>
         </div>
-        <label className="mt-3 flex items-center gap-3 text-xs text-text-muted">
-          <span className="sr-only">{t("offline.access.seek")}</span>
-          <input
-            type="range"
-            min={0}
-            max={Math.max(duration, currentTrack?.duration ?? 0)}
-            value={Math.min(currentTime, duration || currentTime)}
-            disabled={!currentTrack || state.isBuffering}
-            onChange={(event) => seek(Number(event.currentTarget.value))}
-            className="h-1.5 min-w-0 flex-1 accent-[var(--color-accent-action)]"
-          />
-          <span className="w-12 text-right tabular-nums">
-            {Math.floor(currentTime / 60)}:
-            {String(Math.floor(currentTime % 60)).padStart(2, "0")}
-          </span>
-        </label>
+        <PlayerSeekBar
+          className="mt-3"
+          currentTime={currentTime}
+          duration={Math.max(duration, currentTrack?.duration ?? 0)}
+          onSeek={seek}
+          disabled={!currentTrack || state.isBuffering}
+          compact
+          showTimes
+        />
       </section>
     </main>
   );

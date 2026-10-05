@@ -15,8 +15,8 @@ vi.mock("@/lib/haptics", () => ({
   triggerHaptic: vi.fn(),
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
+vi.mock("@crate/ui/lib/notify", () => ({
+  notify: {
     success: vi.fn(),
     error: vi.fn(),
     info: vi.fn(),
@@ -187,6 +187,15 @@ vi.mock("@/components/actions/ItemActionMenu", () => ({
     openFromTrigger: vi.fn(),
     close: vi.fn(),
     handleContextMenu: vi.fn(),
+  }),
+  useItemActionTarget: () => ({
+    onContextMenu: vi.fn(),
+    onKeyDown: vi.fn(),
+    onPointerDown: vi.fn(),
+    onPointerUp: vi.fn(),
+    onPointerCancel: vi.fn(),
+    onPointerLeave: vi.fn(),
+    onClickCapture: vi.fn(),
   }),
 }));
 
@@ -1159,7 +1168,7 @@ describe("FullscreenPlayer", () => {
       await user.click(screen.getByText("Queue"));
 
       await waitFor(() => {
-        expect(screen.getByText(/Up Next · 5 tracks/)).toBeInTheDocument();
+        expect(screen.getByText("Next up (5)")).toBeInTheDocument();
       });
     });
 
@@ -1266,13 +1275,10 @@ describe("FullscreenPlayer", () => {
       await user.click(screen.getByText("Queue"));
 
       const queueRow = await screen.findByText("Queue One");
-      const row = queueRow.closest('[role="button"]');
+      const row = queueRow.closest('[role="row"]');
 
-      expect(row).toHaveClass(
-        "active:bg-surface-control",
-        "focus-visible:bg-surface-control",
-        "focus-visible:ring-focus-ring/40",
-      );
+      expect(row).toHaveClass("track-row");
+      expect(row).toHaveAttribute("data-density", "compact");
       expect(queueRow).toHaveClass("text-text-primary");
       expect(row?.className).not.toContain("white/");
     });
@@ -1468,8 +1474,16 @@ describe("FullscreenPlayer", () => {
         expect(screen.getByLabelText("Like track")).toBeInTheDocument();
       });
 
+      const like = screen.getByLabelText("Like track");
+      expect(like).toHaveClass(
+        "border-border-subtle",
+        "bg-surface-control",
+        "active:bg-surface-control-hover",
+      );
+      expect(like).toHaveAttribute("aria-pressed", "false");
+      expect(screen.getByTestId("fullscreen-like-heart")).toBeInTheDocument();
+
       for (const button of [
-        screen.getByLabelText("Like track"),
         screen.getByLabelText("Equalizer"),
         screen.getByLabelText("Show album cover"),
       ]) {

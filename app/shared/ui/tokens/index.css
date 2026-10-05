@@ -1,5 +1,7 @@
 /* crate-ui — Design tokens barrel */
 
+@layer theme, base, components, utilities;
+
 @import "./colors.css";
 @import "./surfaces.css";
 @import "./interactive.css";

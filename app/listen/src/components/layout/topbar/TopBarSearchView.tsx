@@ -1,4 +1,5 @@
 import { CRATE_ICON_SIZE, Loader2, Search, X } from "@crate/ui/icons";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ type TopBarSearchInputProps = {
     openSearch: (withDropdown?: boolean) => void;
     focusInputSoon: () => void;
     scheduleCollapseIfIdle: (nextShowDropdown?: boolean) => void;
+    collapseOnFocusExit: (nextFocus: EventTarget | null) => void;
     setQuery: (value: string) => void;
     setResults: (value: TopBarSearchItem[]) => void;
     setCompletedQuery: (value: string | null) => void;
@@ -241,7 +243,7 @@ function TopBarSearchControls({
   const {
     openSearch,
     focusInputSoon,
-    scheduleCollapseIfIdle,
+    collapseOnFocusExit,
     setQuery,
     setResults,
     setCompletedQuery,
@@ -253,7 +255,7 @@ function TopBarSearchControls({
     <div
       data-state={searchOpen ? "open" : "closed"}
       className={cn(
-        "relative overflow-visible rounded-xl transition-[background-color,border-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
+        "relative overflow-visible rounded-xl focus-within:shadow-focus transition-[background-color,border-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
         isDesktop
           ? searchOpen
             ? "border border-text-primary/8 bg-surface-canvas/68 shadow-glass-hover"
@@ -269,6 +271,7 @@ function TopBarSearchControls({
           aria-expanded={searchOpen}
           data-state={searchOpen ? "open" : "closed"}
           onFocus={() => openSearch(true)}
+          onBlur={(event) => collapseOnFocusExit(event.relatedTarget)}
           onClick={() => {
             openSearch(true);
             focusInputSoon();
@@ -299,8 +302,9 @@ function TopBarSearchControls({
           />
         ) : null}
         {!loading && query && searchOpen ? (
-          <button
-            type="button"
+          <IconButton
+            label={t("search.clear")}
+            size="lg"
             onClick={() => {
               setQuery("");
               setResults([]);
@@ -309,11 +313,10 @@ function TopBarSearchControls({
               setShowDropdown(true);
               focusInputSoon();
             }}
-            className="absolute right-3 z-20 flex size-9 touch-manipulation items-center justify-center text-text-primary/30 hover:text-text-primary/65"
-            aria-label={t("search.clear")}
+            className="absolute right-3 z-20 size-9 touch-manipulation text-text-primary/30 hover:text-text-primary/65"
           >
             <X size={CRATE_ICON_SIZE.lg} />
-          </button>
+          </IconButton>
         ) : null}
         <input
           ref={inputRef}
@@ -328,13 +331,13 @@ function TopBarSearchControls({
           onFocus={() => {
             openSearch(true);
           }}
-          onBlur={() => {
-            scheduleCollapseIfIdle();
+          onBlur={(event) => {
+            collapseOnFocusExit(event.relatedTarget);
           }}
           onKeyDown={handlers.handleKeyDown}
           placeholder={t("search.placeholder")}
           className={cn(
-            "h-12 w-full rounded-xl border-0 bg-transparent pl-12 text-[16px] text-text-primary outline-none md:h-11 md:pl-11 md:text-[0.9375rem]",
+            "h-12 w-full rounded-xl border-0 bg-transparent pl-12 text-[16px] text-text-primary outline-none md:h-11 md:pl-11 md:text-body",
             "transition-[opacity,transform,box-shadow,padding] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
             "placeholder:text-text-primary/40",
             searchOpen

@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import { Link } from "react-router";
+import { PageHeader } from "@crate/ui/domain/navigation";
 
 import type { AuthUser } from "@/contexts/auth-context";
 import type { SocialSummary } from "@/pages/people-types";
@@ -23,15 +24,8 @@ export function PeopleSummary({
     : "/people";
 
   return (
-    <div className="rounded-[12px] border border-border-quiet bg-text-primary/5 p-5 sm:p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-text-primary">
-            {t("people.title")}
-          </h1>
-          <p className="mt-1 text-sm text-text-muted">{t("people.subtitle")}</p>
-        </div>
-      </div>
+    <div>
+      <PageHeader title={t("people.title")} subtitle={t("people.subtitle")} />
 
       <div className="mt-5 grid gap-3 sm:grid-cols-4">
         <Link
@@ -75,7 +69,7 @@ export function PeopleSummary({
             {data?.following_count ?? "—"}
           </div>
         </Link>
-        <div className="border-t border-border-quiet p-4">
+        <div className="rounded-xl border border-border-quiet bg-text-primary/[0.03] p-4">
           <div className="text-xs uppercase tracking-wide text-text-muted">
             {t("people.friends")}
           </div>

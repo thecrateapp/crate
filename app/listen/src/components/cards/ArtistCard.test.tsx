@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useLocation } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useArtistActionEntries } from "@/components/actions/artist-actions";
+import { longPress, pressMenuKey } from "@/test/item-action-gestures";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 import { ArtistCard } from "./ArtistCard";
@@ -19,6 +21,17 @@ vi.mock("@/lib/api", async (importOriginal) => {
   return {
     ...actual,
     resolveMaybeApiAssetUrl: resolveMaybeApiAssetUrlMock,
+  };
+});
+
+vi.mock("@/components/actions/artist-actions", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("@/components/actions/artist-actions")
+    >();
+  return {
+    ...actual,
+    useArtistActionEntries: vi.fn(actual.useArtistActionEntries),
   };
 });
 
@@ -216,8 +229,138 @@ describe("ArtistCard", () => {
     );
 
     const followButton = screen.getByRole("button", { name: "Follow Dredg" });
+    const overlay = followButton.closest("[data-slot='entity-overlay']");
 
-    expect(followButton.closest("[data-artwork-state]")).toBeInTheDocument();
+    expect(overlay).toBeInTheDocument();
+    expect(overlay).toHaveClass("aspect-square", "rounded-full");
+    expect(overlay?.closest("article")).toHaveAttribute("data-shape", "circle");
+  });
+
+  it("renders artist tiles without a more-actions button and builds the menu lazily on right click", async () => {
+    vi.mocked(useArtistActionEntries).mockClear();
+    renderWithListenProviders(
+      <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "More actions" }),
+    ).not.toBeInTheDocument();
+    expect(useArtistActionEntries).not.toHaveBeenCalled();
+
+    fireEvent.contextMenu(
+      screen.getByRole("link", { name: "Open Dredg" }).closest("article")!,
+    );
+
+    expect(
+      await screen.findByRole("menuitem", { name: "Share artist" }),
+    ).toBeInTheDocument();
+    expect(useArtistActionEntries).toHaveBeenCalled();
+  });
+
+  it("keeps the circle tile flush without a card backdrop", () => {
+    renderWithListenProviders(
+      <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />,
+    );
+
+    const link = screen.getByRole("link", { name: "Open Dredg" });
+    expect(link).toHaveClass("p-0");
+    expect(link.className).not.toContain("hover:bg-text-primary/5");
+  });
+
+  it("keeps the more-actions button on artist rows", async () => {
+    const user = userEvent.setup();
+    renderWithListenProviders(
+      <>
+        <ArtistCard
+          variant="row"
+          name="Dredg"
+          artistId={1}
+          artistSlug="dredg"
+        />
+        <LocationProbe />
+      </>,
+    );
+
+    const menuButton = screen.getByRole("button", { name: "More actions" });
+    menuButton.focus();
+    await user.keyboard("{Enter}");
+
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+    expect(menuButton).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("location-probe")).toHaveTextContent("/");
+  });
+
+  it("opens the artist menu with the ContextMenu key and touch long-press", async () => {
+    const first = renderWithListenProviders(
+      <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />,
+    );
+    pressMenuKey(screen.getByRole("link", { name: "Open Dredg" }));
+    expect(
+      await screen.findByRole("menuitem", { name: "Play top tracks" }),
+    ).toBeInTheDocument();
+    first.unmount();
+
+    renderWithListenProviders(
+      <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />,
+    );
+    await longPress(screen.getByText("Dredg").closest("article")!);
+    const sheet = await screen.findByRole("dialog", { name: "Actions menu" });
+    expect(
+      within(sheet).getByRole("menuitem", { name: "Follow artist" }),
+    ).toBeInTheDocument();
+  });
+
+  it("hides the action menu trigger for external artists", () => {
+    renderWithListenProviders(
+      <ArtistCard
+        name="Chelsea Wolfe"
+        href="https://www.last.fm/music/Chelsea+Wolfe"
+        external
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "More actions" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders the row variant with rank, meta and the artist menu", async () => {
+    renderWithListenProviders(
+      <ArtistCard
+        variant="row"
+        rank={3}
+        meta="12 plays"
+        name="Dredg"
+        artistId={1}
+        artistSlug="dredg"
+      />,
+    );
+
+    const row = screen.getByText("Dredg").closest("article")!;
+    expect(row).toHaveAttribute("data-density", "default");
+    expect(within(row).getByText("3")).toBeInTheDocument();
+    expect(within(row).getByText("12 plays")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Dredg" })).toHaveAttribute(
+      "href",
+      "/artists/dredg",
+    );
+
+    fireEvent.contextMenu(row);
+    expect(
+      await screen.findByRole("menuitem", { name: "Share artist" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the editorial variant as a larger circular tile", () => {
+    renderWithListenProviders(
+      <ArtistCard variant="editorial" name="Dredg" artistId={1} />,
+    );
+
+    expect(screen.getByAltText("Dredg")).toHaveAttribute("sizes", "156px");
+    expect(screen.getByText("Dredg").closest("article")).toHaveAttribute(
+      "data-shape",
+      "circle",
+    );
   });
 
   it("does not add inline actions to external artist links", () => {
@@ -549,7 +692,7 @@ describe("ArtistCard", () => {
     fireEvent.contextMenu(card!, { clientX: 160, clientY: 120 });
 
     const menu = await screen.findByRole("menu");
-    expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-[12px]");
+    expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-panel");
     expect(within(menu).getByText("Dredg")).toBeInTheDocument();
     expect(within(menu).getByAltText("Dredg")).toHaveAttribute(
       "src",

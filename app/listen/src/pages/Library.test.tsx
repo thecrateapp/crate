@@ -1,6 +1,9 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const statsRefetch = vi.hoisted(() => vi.fn());
+const apiMock = vi.hoisted(() => vi.fn());
 
 import { Library } from "@/pages/Library";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -10,6 +13,11 @@ let isDesktop = false;
 vi.mock("@crate/ui/lib/use-breakpoint", () => ({
   useIsDesktop: () => isDesktop,
 }));
+
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return { ...actual, api: apiMock };
+});
 
 vi.mock("@/contexts/PlaylistComposerContext", () => ({
   usePlaylistComposer: () => ({
@@ -75,7 +83,7 @@ vi.mock("@/hooks/use-api", () => ({
         },
         loading: false,
         error: null,
-        refetch: vi.fn(),
+        refetch: statsRefetch,
       };
     }
 
@@ -151,6 +159,9 @@ vi.mock("@/hooks/use-api", () => ({
 describe("Library", () => {
   beforeEach(() => {
     isDesktop = false;
+    statsRefetch.mockReset();
+    apiMock.mockReset();
+    apiMock.mockResolvedValue({ id: "crate-1" });
   });
 
   it("renders the playlists collection section on mobile without tab pills", () => {
@@ -164,16 +175,16 @@ describe("Library", () => {
       "library-new-playlist",
     );
     expect(
-      screen.queryByRole("button", { name: /Playlists/i }),
+      screen.queryByRole("tab", { name: /Playlists/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /Artists/i }),
+      screen.queryByRole("tab", { name: /Artists/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /Bandcamp/i }),
+      screen.queryByRole("tab", { name: /Bandcamp/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /Contributions/i }),
+      screen.queryByRole("tab", { name: /Contributions/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -203,7 +214,7 @@ describe("Library", () => {
 
     renderLibrary();
 
-    fireEvent.click(screen.getByRole("button", { name: "Crates" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Crates" }));
 
     expect(screen.getByRole("button", { name: "New Crate" })).toBeVisible();
   });
@@ -212,7 +223,7 @@ describe("Library", () => {
     isDesktop = true;
 
     renderLibrary("/collection/artists", "/collection/:section");
-    fireEvent.click(screen.getByRole("button", { name: "Crates" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Crates" }));
 
     expect(screen.getByRole("button", { name: "New Crate" })).toBeVisible();
   });
@@ -285,10 +296,26 @@ describe("Library", () => {
     expect(
       screen.getByRole("heading", { name: "Your Library" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Bandcamp/i })).toBeVisible();
-    expect(
-      screen.getByRole("button", { name: /Contributions/i }),
-    ).toBeVisible();
+    expect(screen.getByRole("tab", { name: /Bandcamp/i })).toBeVisible();
+    expect(screen.getByRole("tab", { name: /Contributions/i })).toBeVisible();
+  });
+
+  it("orders desktop collection sections consistently", () => {
+    isDesktop = true;
+
+    renderLibrary();
+
+    const tabButtons = screen.getAllByRole("tab");
+
+    expect(tabButtons.map((button) => button.textContent?.trim())).toEqual([
+      "Artists",
+      "Crates",
+      "Playlists",
+      "Albums",
+      "Liked",
+      "Bandcamp",
+      "Contributions",
+    ]);
   });
 
   it("shows the Crates count in the desktop library stats", () => {
@@ -299,6 +326,20 @@ describe("Library", () => {
     const cratesLabel = screen.getAllByText("Crates")[0]!;
     expect(cratesLabel).toBeVisible();
     expect(cratesLabel.parentElement).toHaveTextContent("2");
+  });
+
+  it("refreshes the desktop library stats after creating a Crate", async () => {
+    isDesktop = true;
+
+    renderLibrary("/collection/crates", "/collection/:section");
+
+    fireEvent.click(screen.getByRole("button", { name: "New Crate" }));
+    fireEvent.change(screen.getByLabelText("Name"), {
+      target: { value: "Year-end records" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create Crate" }));
+
+    await waitFor(() => expect(statsRefetch).toHaveBeenCalledOnce());
   });
 });
 

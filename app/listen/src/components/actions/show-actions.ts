@@ -1,83 +1,102 @@
-import { useMemo } from "react";
-import { useTranslation } from "react-i18next";
-import { Check, Mic2, Music2, Ticket } from "@crate/ui/icons";
-import { useNavigate } from "react-router";
-import { toast } from "sonner";
+import type { TFunction } from "i18next";
+import { Check, Disc3, Mic2, Music2, Ticket } from "@crate/ui/icons";
+import type { NavigateFunction } from "react-router";
 
 import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
+import { notify } from "@crate/ui/lib/notify";
 import { action } from "@/components/actions/shared";
-import { artistPagePath } from "@/lib/library-routes";
 import { openExternalUrl } from "@/lib/external-links";
+import { artistPagePath } from "@/lib/library-routes";
 import type { UpcomingItem } from "@/components/upcoming/upcoming-model";
 
-interface UseShowActionEntriesInput {
+export interface ShowActionInput {
   item: UpcomingItem;
   attending: boolean;
   toggleAttendance: () => Promise<void>;
   playProbableSetlist: () => Promise<void>;
 }
 
-export function useShowActionEntries(
-  input: UseShowActionEntriesInput,
+export function buildShowActions(
+  input: ShowActionInput,
+  { t, navigate }: { t: TFunction; navigate: NavigateFunction },
 ): ItemActionMenuEntry[] {
-  const navigate = useNavigate();
-  const { t } = useTranslation();
+  return [
+    action({
+      key: "attendance",
+      label: input.attending
+        ? t("actions.show.removeAttendance")
+        : t("actions.show.markAttending"),
+      icon: Check,
+      active: input.attending,
+      disabled: input.item.id == null,
+      onSelect: input.toggleAttendance,
+    }),
+    action({
+      key: "setlist",
+      label: t("actions.show.playProbableSetlist"),
+      icon: Music2,
+      disabled:
+        !input.item.probable_setlist?.length || input.item.artist_id == null,
+      onSelect: input.playProbableSetlist,
+    }),
+    action({
+      key: "artist",
+      label: t("actions.show.openArtist"),
+      icon: Mic2,
+      disabled: input.item.artist_id == null,
+      onSelect: () => {
+        navigate(
+          artistPagePath({
+            artistId: input.item.artist_id,
+            artistSlug: input.item.artist_slug,
+            artistName: input.item.artist,
+          }),
+        );
+      },
+    }),
+    action({
+      key: "tickets",
+      label: t("actions.show.openTickets"),
+      icon: Ticket,
+      disabled: !input.item.url,
+      onSelect: () => {
+        if (!input.item.url) return;
+        void openExternalUrl(input.item.url).catch(() =>
+          notify.error(t("common.toasts.openExternalFailed")),
+        );
+      },
+    }),
+  ];
+}
 
-  return useMemo<ItemActionMenuEntry[]>(
-    () => [
+export interface ReleaseActionInput {
+  albumPath: string | null;
+  artistPath: string;
+}
+
+export function buildReleaseActions(
+  input: ReleaseActionInput,
+  { t, navigate }: { t: TFunction; navigate: NavigateFunction },
+): ItemActionMenuEntry[] {
+  const entries: ItemActionMenuEntry[] = [];
+  const albumPath = input.albumPath;
+  if (albumPath) {
+    entries.push(
       action({
-        key: "attendance",
-        label: input.attending
-          ? t("actions.show.removeAttendance")
-          : t("actions.show.markAttending"),
-        icon: Check,
-        active: input.attending,
-        disabled: input.item.id == null,
-        onSelect: input.toggleAttendance,
+        key: "album",
+        label: t("actions.track.goToAlbum"),
+        icon: Disc3,
+        onSelect: () => navigate(albumPath),
       }),
-      action({
-        key: "setlist",
-        label: t("actions.show.playProbableSetlist"),
-        icon: Music2,
-        disabled:
-          !input.item.probable_setlist?.length || input.item.artist_id == null,
-        onSelect: input.playProbableSetlist,
-      }),
-      action({
-        key: "artist",
-        label: t("actions.show.openArtist"),
-        icon: Mic2,
-        disabled: input.item.artist_id == null,
-        onSelect: () => {
-          navigate(
-            artistPagePath({
-              artistId: input.item.artist_id,
-              artistSlug: input.item.artist_slug,
-              artistName: input.item.artist,
-            }),
-          );
-        },
-      }),
-      action({
-        key: "tickets",
-        label: t("actions.show.openTickets"),
-        icon: Ticket,
-        disabled: !input.item.url,
-        onSelect: () => {
-          if (!input.item.url) return;
-          void openExternalUrl(input.item.url).catch(() =>
-            toast.error(t("common.toasts.openExternalFailed")),
-          );
-        },
-      }),
-    ],
-    [
-      input.attending,
-      input.item,
-      input.playProbableSetlist,
-      input.toggleAttendance,
-      navigate,
-      t,
-    ],
+    );
+  }
+  entries.push(
+    action({
+      key: "artist",
+      label: t("actions.track.goToArtist"),
+      icon: Mic2,
+      onSelect: () => navigate(input.artistPath),
+    }),
   );
+  return entries;
 }

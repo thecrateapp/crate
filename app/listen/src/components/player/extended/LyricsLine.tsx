@@ -20,6 +20,7 @@ export function LyricsLine({
 
   return (
     <button
+      type="button"
       ref={isActive ? activeRef : null}
       onClick={() => onSeek(line.time)}
       className={`relative z-20 w-full rounded-md px-2 py-1 text-left transition-[color,background-color,font-size] duration-500 ${

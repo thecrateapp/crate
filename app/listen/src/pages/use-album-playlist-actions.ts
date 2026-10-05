@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
 import { usePlayerActions } from "@/contexts/PlayerContext";
@@ -117,11 +117,11 @@ export function useAlbumPlaylistActions({
       await api(`/api/playlists/${playlistId}/tracks`, "POST", {
         tracks: playlistTracksPayload,
       });
-      toast.success(t("album.toasts.addedToPlaylist"));
+      notify.success(t("album.toasts.addedToPlaylist"));
       closeAlbumMenu();
       setPlaylistPickerOpen(false);
     } catch {
-      toast.error(t("album.toasts.addToPlaylistFailed"));
+      notify.error(t("album.toasts.addToPlaylistFailed"));
     }
   }
 
@@ -131,7 +131,7 @@ export function useAlbumPlaylistActions({
       await api(`/api/playlists/${playlistId}/tracks`, "POST", {
         tracks: selectedPlaylistTracksPayload,
       });
-      toast.success(
+      notify.success(
         t("album.toasts.selectedAddedToPlaylist", {
           count: selectedPlaylistTracksPayload.length,
         }),
@@ -140,14 +140,14 @@ export function useAlbumPlaylistActions({
       setSelectionPlaylistPickerOpen(false);
       handleCloseSelectionMenu();
     } catch {
-      toast.error(t("album.toasts.addSelectedFailed"));
+      notify.error(t("album.toasts.addSelectedFailed"));
     }
   }
 
   function handlePlaySelectedNext() {
     if (!selectedPlayerTracks.length) return;
     [...selectedPlayerTracks].reverse().forEach((track) => playNext(track));
-    toast.success(
+    notify.success(
       t("album.toasts.selectedQueuedNext", {
         count: selectedPlayerTracks.length,
       }),
@@ -158,7 +158,7 @@ export function useAlbumPlaylistActions({
   function handleAddSelectedToQueue() {
     if (!selectedPlayerTracks.length) return;
     selectedPlayerTracks.forEach((track) => addToQueue(track));
-    toast.success(
+    notify.success(
       t("album.toasts.selectedAddedToQueue", {
         count: selectedPlayerTracks.length,
       }),
@@ -177,7 +177,7 @@ export function useAlbumPlaylistActions({
         ),
     );
     if (!missing.length) {
-      toast.info(t("album.toasts.selectedAlreadyCollection"));
+      notify.info(t("album.toasts.selectedAlreadyCollection"));
       handleCloseSelectionMenu();
       return;
     }
@@ -193,12 +193,12 @@ export function useAlbumPlaylistActions({
           ),
         ),
       );
-      toast.success(
+      notify.success(
         t("album.toasts.selectedAddedCollection", { count: missing.length }),
       );
       handleCloseSelectionMenu();
     } catch {
-      toast.error(t("album.toasts.updateCollectionFailed"));
+      notify.error(t("album.toasts.updateCollectionFailed"));
     }
   }
 
@@ -216,11 +216,11 @@ export function useAlbumPlaylistActions({
           }),
         ],
       });
-      toast.success(
+      notify.success(
         t("album.toasts.trackAddedToPlaylist", { title: track.title }),
       );
     } catch {
-      toast.error(t("album.toasts.addTrackToPlaylistFailed"));
+      notify.error(t("album.toasts.addTrackToPlaylistFailed"));
     }
   }
 

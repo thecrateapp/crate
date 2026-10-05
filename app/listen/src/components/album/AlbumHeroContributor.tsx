@@ -1,10 +1,11 @@
-import { User } from "@crate/ui/icons";
+import { useTranslation } from "react-i18next";
+import { CRATE_ICON_SIZE, User } from "@crate/ui/icons";
 
 import {
   GenrePillRow,
   type GenreProfileItem,
 } from "@crate/ui/domain/genres/GenrePill";
-import { CrateImage } from "@/components/artwork/CrateImage";
+import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
 import type { AlbumContributor, AlbumData } from "@/pages/album-types";
 
@@ -23,31 +24,29 @@ export function AlbumHeroContributor({
   primaryContributorSource: string | null;
   onGenreSelect: (item: GenreProfileItem) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       {visibleContributor ? (
         <div className="mt-3 flex items-center gap-2 text-xs text-text-muted">
-          <span className="inline-flex size-6 items-center justify-center overflow-hidden rounded-full bg-text-primary/8 ring-1 ring-text-primary/10">
-            {visibleContributor.user_avatar ? (
-              <CrateImage
-                src={visibleContributor.user_avatar}
-                alt=""
-                className=" size-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
-              />
-            ) : (
-              <User size={13} />
-            )}
-          </span>
+          <ArtworkSurface
+            source={visibleContributor.user_avatar || null}
+            alt=""
+            className="size-6 shrink-0 rounded-full bg-text-primary/8 ring-1 ring-text-primary/10"
+            imageClassName="object-cover"
+            fallback={
+              <span className="flex size-full items-center justify-center">
+                <User size={CRATE_ICON_SIZE.xs} />
+              </span>
+            }
+          />
           <span>
-            Added to Crate by{" "}
+            {t("album.contributor.addedBy")}{" "}
             {primaryContributorPath ? (
               <UserProfileLink
                 username={visibleContributor.user_username}
                 to={primaryContributorPath}
-                className="font-medium text-text-primary/85 transition-colors hover:text-accent-action"
+                className="link-meta font-medium text-text-primary/85"
               >
                 {primaryContributorName}
               </UserProfileLink>
@@ -59,7 +58,9 @@ export function AlbumHeroContributor({
             {primaryContributorSource ? (
               <span className="text-text-muted/70">
                 {" "}
-                via {primaryContributorSource}
+                {t("album.contributor.via", {
+                  source: primaryContributorSource,
+                })}
               </span>
             ) : null}
           </span>

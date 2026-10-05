@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
@@ -10,34 +10,23 @@ import {
   SIDEBAR_KEY,
   getStoredExpanded,
 } from "@/components/layout/sidebar/sidebar-model";
-import { isReservedArtistChildSlug } from "@/lib/library-routes";
+import {
+  TransparentHeaderProvider,
+  useTransparentHeaderRegistry,
+} from "@/components/layout/transparent-header";
+import {
+  HEADER_SOLID_SCROLL_THRESHOLD,
+  useScrolledPast,
+} from "@/components/layout/use-scrolled-past";
 
-function hasOverlayHeader(pathname: string, search = "") {
-  if (pathname === "/explore" && new URLSearchParams(search).has("genre")) {
-    return true;
-  }
-  if (
-    /^\/artists\/[^/]+$/.test(pathname) ||
-    /^\/albums\/[^/]+\/[^/]+$/.test(pathname) ||
-    /^\/playlist\/[^/]+$/.test(pathname) ||
-    /^\/curation\/playlist\/[^/]+$/.test(pathname) ||
-    /^\/home\/playlist\/[^/]+$/.test(pathname)
-  ) {
-    return true;
-  }
-  const artistChildMatch = pathname.match(/^\/artists\/([^/]+)\/([^/]+)$/);
-  if (!artistChildMatch) return false;
-  const childSlug = artistChildMatch[2];
-  return !isReservedArtistChildSlug(childSlug);
-}
-
-export function Shell() {
+export function Shell({ children }: { children?: ReactNode }) {
   const isDesktop = useIsDesktop();
   const location = useLocation();
   const { currentTrack } = usePlayerActions();
   const hasTrack = !!currentTrack;
   const [sidebarExpanded, setSidebarExpanded] = useState(getStoredExpanded);
-  const overlayHeader = hasOverlayHeader(location.pathname, location.search);
+  const { transparent: overlayHeader, register } =
+    useTransparentHeaderRegistry();
   const homePage = location.pathname === "/";
   const homeDesktopOverlay = isDesktop && homePage;
   const homeMobileOverlay = !isDesktop && homePage;
@@ -45,6 +34,11 @@ export function Shell() {
   const collectionActive =
     location.pathname === "/library" ||
     location.pathname.startsWith("/collection");
+  const headerScrolled = useScrolledPast(
+    HEADER_SOLID_SCROLL_THRESHOLD,
+    isDesktop ? desktopOverlayHeader : overlayHeader || homeMobileOverlay,
+    location.key,
+  );
   const headerOffsetClass = desktopOverlayHeader ? "" : "pt-24";
   const desktopContentPadClass = desktopOverlayHeader ? "pt-0 pb-6" : "py-6";
   const mobileContentPadClass =
@@ -67,30 +61,33 @@ export function Shell() {
     };
   }, []);
 
-  if (isDesktop) {
-    return (
-      <DesktopShell
-        desktopContentPadClass={desktopContentPadClass}
-        desktopOverlayHeader={desktopOverlayHeader}
-        hasTrack={hasTrack}
-        headerOffsetClass={headerOffsetClass}
-        homeDesktopOverlay={homeDesktopOverlay}
-        overlayHeader={overlayHeader}
-        sidebarLeft={sidebarExpanded ? "left-52" : "left-14"}
-        sidebarW={sidebarExpanded ? "ml-52" : "ml-14"}
-      />
-    );
-  }
-
   return (
-    <MobileShell
-      collectionActive={collectionActive}
-      hasTrack={hasTrack}
-      headerChromeClass={headerChromeClass}
-      homeMobileOverlay={homeMobileOverlay}
-      homePage={homePage}
-      mobileContentPadClass={mobileContentPadClass}
-      overlayHeader={overlayHeader}
-    />
+    <TransparentHeaderProvider value={register}>
+      {isDesktop ? (
+        <DesktopShell
+          children={children}
+          desktopContentPadClass={desktopContentPadClass}
+          desktopOverlayHeader={desktopOverlayHeader}
+          hasTrack={hasTrack}
+          headerOffsetClass={headerOffsetClass}
+          headerScrolled={headerScrolled}
+          homeDesktopOverlay={homeDesktopOverlay}
+          sidebarLeft={sidebarExpanded ? "left-52" : "left-14"}
+          sidebarW={sidebarExpanded ? "ml-52" : "ml-14"}
+        />
+      ) : (
+        <MobileShell
+          children={children}
+          collectionActive={collectionActive}
+          hasTrack={hasTrack}
+          headerChromeClass={headerChromeClass}
+          headerScrolled={headerScrolled}
+          homeMobileOverlay={homeMobileOverlay}
+          homePage={homePage}
+          mobileContentPadClass={mobileContentPadClass}
+          overlayHeader={overlayHeader}
+        />
+      )}
+    </TransparentHeaderProvider>
   );
 }

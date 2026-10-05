@@ -3,8 +3,8 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 
 const toastErrorMock = vi.hoisted(() => vi.fn());
 
-vi.mock("sonner", () => ({
-  toast: {
+vi.mock("@crate/ui/lib/notify", () => ({
+  notify: {
     error: toastErrorMock,
     success: vi.fn(),
   },

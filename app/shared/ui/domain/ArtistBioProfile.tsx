@@ -1,4 +1,10 @@
-import { ChevronDown, ChevronUp, Globe, X } from "@crate/ui/icons";
+import {
+  CRATE_ICON_SIZE,
+  ChevronDown,
+  ChevronUp,
+  Globe,
+  X,
+} from "@crate/ui/icons";
 import type { ReactNode } from "react";
 
 import {
@@ -42,6 +48,46 @@ export interface ArtistBioExternalLink {
   url: string;
 }
 
+export interface ArtistBioProfileLabels {
+  biography: string;
+  more: string;
+  less: string;
+  currentMembers: string;
+  formerMembers: string;
+  member: string;
+  role: string;
+  since: string;
+  from: string;
+  to: string;
+  unknown: string;
+  listeners: string;
+  scrobbles: string;
+  followers: string;
+  popularity: string;
+  albums: string;
+  tracks: string;
+}
+
+export const DEFAULT_ARTIST_BIO_PROFILE_LABELS: ArtistBioProfileLabels = {
+  biography: "Biography",
+  more: "More",
+  less: "Less",
+  currentMembers: "Current members",
+  formerMembers: "Former members",
+  member: "Member",
+  role: "Role",
+  since: "Since",
+  from: "From",
+  to: "To",
+  unknown: "Unknown",
+  listeners: "listeners",
+  scrobbles: "scrobbles",
+  followers: "followers",
+  popularity: "popularity",
+  albums: "albums",
+  tracks: "tracks",
+};
+
 export interface ArtistBioProfileProps {
   artistName: string;
   photoUrl?: string;
@@ -59,6 +105,7 @@ export interface ArtistBioProfileProps {
   onGenreSelect?: (item: GenreProfileItem) => void;
   onExternalLink?: (url: string) => void;
   scrollableBody?: boolean;
+  labels?: Partial<ArtistBioProfileLabels>;
   className?: string;
 }
 
@@ -137,35 +184,71 @@ function splitBioParagraphs(text: string): string[] {
     .filter(Boolean);
 }
 
-export function ArtistBioMembers({ members }: { members: ArtistBioMember[] }) {
-  const current = members.filter((member) => !member.end);
-  const former = members.filter((member) => member.end);
+export function ArtistBioMembers({
+  members,
+  labels = DEFAULT_ARTIST_BIO_PROFILE_LABELS,
+}: {
+  members: ArtistBioMember[];
+  labels?: ArtistBioProfileLabels;
+}) {
+  const merged = mergeArtistBioMembers(members);
+  const current = merged.filter((member) => !member.end);
+  const former = merged.filter((member) => member.end);
 
-  if (!members.length) return null;
+  if (!merged.length) return null;
 
   return (
     <div className="space-y-5">
       {current.length > 0 ? (
         <ArtistBioMemberTable
-          caption="Current members"
+          caption={labels.currentMembers}
+          labels={labels}
           members={current}
           current
         />
       ) : null}
       {former.length > 0 ? (
-        <ArtistBioMemberTable caption="Former members" members={former} />
+        <ArtistBioMemberTable
+          caption={labels.formerMembers}
+          labels={labels}
+          members={former}
+        />
       ) : null}
     </div>
   );
 }
 
+function artistBioMemberKey(member: ArtistBioMember) {
+  return `${member.name}|${member.begin ?? ""}|${member.end ?? ""}`;
+}
+
+export function mergeArtistBioMembers(
+  members: ArtistBioMember[],
+): ArtistBioMember[] {
+  const merged = new Map<string, ArtistBioMember>();
+  for (const member of members) {
+    const key = artistBioMemberKey(member);
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, { ...member, roles: [...new Set(member.roles ?? [])] });
+      continue;
+    }
+    existing.roles = [
+      ...new Set([...(existing.roles ?? []), ...(member.roles ?? [])]),
+    ];
+  }
+  return [...merged.values()];
+}
+
 function ArtistBioMemberTable({
   caption,
   current = false,
+  labels,
   members,
 }: {
   caption: string;
   current?: boolean;
+  labels: ArtistBioProfileLabels;
   members: ArtistBioMember[];
 }) {
   return (
@@ -180,19 +263,19 @@ function ArtistBioMemberTable({
         >
           <thead className="bg-surface-quiet-subtle text-xs uppercase tracking-wider text-text-meta">
             <tr>
-              <th className="px-3 py-2 font-medium">Member</th>
-              <th className="px-3 py-2 font-medium">Role</th>
+              <th className="px-3 py-2 font-medium">{labels.member}</th>
+              <th className="px-3 py-2 font-medium">{labels.role}</th>
               <th className="px-3 py-2 font-medium">
-                {current ? "Since" : "From"}
+                {current ? labels.since : labels.from}
               </th>
-              {!current ? <th className="px-3 py-2 font-medium">To</th> : null}
+              {!current ? (
+                <th className="px-3 py-2 font-medium">{labels.to}</th>
+              ) : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-border-quiet-subtle">
             {members.map((member) => (
-              <tr
-                key={`${member.name}-${member.begin ?? ""}-${member.end ?? ""}`}
-              >
+              <tr key={artistBioMemberKey(member)}>
                 <td className="px-3 py-2 font-medium text-text-hero">
                   {member.name}
                 </td>
@@ -200,11 +283,11 @@ function ArtistBioMemberTable({
                   {member.roles?.join(", ") || "—"}
                 </td>
                 <td className="whitespace-nowrap px-3 py-2 text-text-quiet">
-                  {formatMemberDate(member.begin, "Unknown")}
+                  {formatMemberDate(member.begin, labels.unknown)}
                 </td>
                 {!current ? (
                   <td className="whitespace-nowrap px-3 py-2 text-text-quiet">
-                    {formatMemberDate(member.end, "Unknown")}
+                    {formatMemberDate(member.end, labels.unknown)}
                   </td>
                 ) : null}
               </tr>
@@ -216,14 +299,21 @@ function ArtistBioMemberTable({
   );
 }
 
-function ArtistBioStats({ stats }: { stats?: ArtistBioStats }) {
+function ArtistBioStats({
+  stats,
+  labels,
+}: {
+  stats?: ArtistBioStats;
+  labels: ArtistBioProfileLabels;
+}) {
   if (!stats) return null;
   const items = [
-    [stats.listeners, "listeners"],
-    [stats.playcount, "scrobbles"],
-    [stats.spotifyFollowers, "followers"],
-    [stats.spotifyPopularity, "popularity"],
-  ].filter(([value]) => typeof value === "number" && value > 0) as [
+    ["listeners", stats.listeners, labels.listeners],
+    ["scrobbles", stats.playcount, labels.scrobbles],
+    ["followers", stats.spotifyFollowers, labels.followers],
+    ["popularity", stats.spotifyPopularity, labels.popularity],
+  ].filter(([, value]) => typeof value === "number" && value > 0) as [
+    string,
     number,
     string,
   ][];
@@ -232,10 +322,10 @@ function ArtistBioStats({ stats }: { stats?: ArtistBioStats }) {
 
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-      {items.map(([value, label]) => (
-        <div key={label}>
+      {items.map(([key, value, label]) => (
+        <div key={key}>
           <div className="text-xl font-bold text-text-hero">
-            {label === "popularity" ? `${value}%` : formatCompact(value)}
+            {key === "popularity" ? `${value}%` : formatCompact(value)}
           </div>
           <div className="text-xs text-text-meta">{label}</div>
         </div>
@@ -244,16 +334,24 @@ function ArtistBioStats({ stats }: { stats?: ArtistBioStats }) {
   );
 }
 
-function ArtistBioLibraryStats({ stats }: { stats?: ArtistBioLibraryStats }) {
+function ArtistBioLibraryStats({
+  stats,
+  labels,
+}: {
+  stats?: ArtistBioLibraryStats;
+  labels: ArtistBioProfileLabels;
+}) {
   if (!stats) return null;
 
   return (
     <div className="flex gap-6 text-xs text-text-quiet">
       <span>
-        <strong className="text-text-secondary">{stats.albums}</strong> albums
+        <strong className="text-text-secondary">{stats.albums}</strong>{" "}
+        {labels.albums}
       </span>
       <span>
-        <strong className="text-text-secondary">{stats.tracks}</strong> tracks
+        <strong className="text-text-secondary">{stats.tracks}</strong>{" "}
+        {labels.tracks}
       </span>
       <span>
         <strong className="text-text-secondary">
@@ -288,7 +386,8 @@ function ArtistBioExternalLinks({
           }}
           className="inline-flex items-center gap-1.5 rounded-md border border-border-quiet px-2.5 py-1 text-xs text-text-muted-strong transition-colors hover:border-border-interactive hover:bg-surface-quiet-subtle hover:text-text-secondary-strong"
         >
-          <Globe size={11} /> {linkLabel(link.type, link.url)}
+          <Globe size={CRATE_ICON_SIZE.micro} />{" "}
+          {linkLabel(link.type, link.url)}
         </a>
       ))}
     </div>
@@ -312,8 +411,12 @@ export function ArtistBioProfile({
   onGenreSelect,
   onExternalLink,
   scrollableBody = true,
+  labels: labelsProp,
   className,
 }: ArtistBioProfileProps) {
+  const labels = labelsProp
+    ? { ...DEFAULT_ARTIST_BIO_PROFILE_LABELS, ...labelsProp }
+    : DEFAULT_ARTIST_BIO_PROFILE_LABELS;
   return (
     <div className={cn("flex min-h-0 flex-col", className)}>
       <ModalHeader
@@ -369,13 +472,13 @@ export function ArtistBioProfile({
             : "overflow-visible",
         )}
       >
-        <ArtistBioStats stats={stats} />
+        <ArtistBioStats stats={stats} labels={labels} />
         {bio ? (
           <div>
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-meta">
-              Biography
+              {labels.biography}
             </h3>
-            <div className="space-y-4 text-sm leading-7 text-text-secondary-strong sm:text-[0.9375rem]">
+            <div className="space-y-4 text-sm leading-7 text-text-secondary-strong sm:text-body">
               {splitBioParagraphs(
                 bioExpanded ? bio : truncateArtistBio(bio, 500),
               ).map((paragraph) => (
@@ -388,23 +491,23 @@ export function ArtistBioProfile({
               <button
                 type="button"
                 onClick={onBioToggle}
-                className="mt-2 flex items-center gap-1 text-xs text-accent-action hover:text-accent-action-hover"
+                className="link-accent mt-2 flex w-fit max-w-full items-center gap-1 text-xs"
               >
                 {bioExpanded ? (
                   <>
-                    <ChevronUp size={12} /> Less
+                    <ChevronUp size={CRATE_ICON_SIZE.micro} /> {labels.less}
                   </>
                 ) : (
                   <>
-                    <ChevronDown size={12} /> More
+                    <ChevronDown size={CRATE_ICON_SIZE.micro} /> {labels.more}
                   </>
                 )}
               </button>
             ) : null}
           </div>
         ) : null}
-        <ArtistBioMembers members={members} />
-        <ArtistBioLibraryStats stats={libraryStats} />
+        <ArtistBioMembers members={members} labels={labels} />
+        <ArtistBioLibraryStats stats={libraryStats} labels={labels} />
         <ArtistBioExternalLinks links={urls} onOpen={onExternalLink} />
       </ModalBody>
     </div>

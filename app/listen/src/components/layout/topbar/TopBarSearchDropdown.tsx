@@ -3,7 +3,8 @@ import { useTranslation } from "react-i18next";
 import { CRATE_ICON_SIZE, Disc, Music, Search, User } from "@crate/ui/icons";
 
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
-import { CrateImage } from "@/components/artwork/CrateImage";
+import { CratePill } from "@crate/ui/primitives/CrateBadge";
+import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 import { cn } from "@/lib/utils";
 
 import type {
@@ -12,42 +13,31 @@ import type {
 } from "./topbar-search-model";
 
 export function SearchResultThumb({ item }: { item: TopBarSearchItem }) {
+  const FallbackIcon =
+    item.type === "artist" ? User : item.type === "album" ? Disc : Music;
+  const fallback = (
+    <FallbackIcon
+      size={CRATE_ICON_SIZE.md}
+      className="block size-8 p-1.5 text-text-primary/30"
+    />
+  );
+  const shapeClassName = item.type === "artist" ? "rounded-full" : "rounded";
+
   if (item.imageUrl) {
     return (
-      <CrateImage
-        src={item.imageUrl}
+      <ArtworkSurface
+        source={item.imageUrl}
         alt=""
-        className={[
-          "h-8 w-8 shrink-0 bg-text-primary/5 object-cover",
-          item.type === "artist" ? "rounded-full" : "rounded",
-        ].join(" ")}
-        onError={(event) => {
-          (event.target as HTMLImageElement).style.display = "none";
-        }}
-      />
-    );
-  }
-  if (item.type === "artist") {
-    return (
-      <User
-        size={CRATE_ICON_SIZE.md}
-        className=" size-8 shrink-0 rounded-full bg-text-primary/5 p-1.5 text-text-primary/30"
-      />
-    );
-  }
-  if (item.type === "album") {
-    return (
-      <Disc
-        size={CRATE_ICON_SIZE.md}
-        className=" size-8 shrink-0 rounded bg-text-primary/5 p-1.5 text-text-primary/30"
+        fallback={fallback}
+        imageClassName="object-cover"
+        className={cn("size-8 shrink-0 bg-text-primary/5", shapeClassName)}
       />
     );
   }
   return (
-    <Music
-      size={CRATE_ICON_SIZE.md}
-      className=" size-8 shrink-0 rounded bg-text-primary/5 p-1.5 text-text-primary/30"
-    />
+    <span className={cn("size-8 shrink-0 bg-text-primary/5", shapeClassName)}>
+      {fallback}
+    </span>
   );
 }
 
@@ -89,7 +79,7 @@ export function TopBarSearchDropdown({
     <AppPopover
       ref={dropdownRef}
       className={cn(
-        "listen-glass-panel fixed max-h-80 overflow-y-auto rounded-[12px] py-1",
+        "listen-glass-panel fixed max-h-80 overflow-y-auto rounded-panel py-1",
         showRecents ? "max-h-none" : undefined,
       )}
       style={dropdownStyle}
@@ -104,6 +94,7 @@ export function TopBarSearchDropdown({
                 item.sublabel ?? "",
                 item.origin ?? "local",
               ].join(":")}
+              type="button"
               onClick={() => void onSelectItem(item)}
               className={cn(
                 "flex w-full items-center gap-3 px-3 py-2 text-left transition-colors",
@@ -114,7 +105,7 @@ export function TopBarSearchDropdown({
             >
               <SearchResultThumb item={item} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[0.8125rem] text-text-primary/80">
+                <p className="truncate text-caption text-text-primary/80">
                   {item.label}
                 </p>
                 {item.sublabel ? (
@@ -125,9 +116,9 @@ export function TopBarSearchDropdown({
               </div>
               <div className="flex shrink-0 items-center gap-1.5 text-xs">
                 {item.origin === "remote" ? (
-                  <span className="rounded-full border border-accent-action/15 bg-accent-action/8 px-1.5 py-0.5 text-accent-action/80">
+                  <CratePill tone="accent" className="px-1.5 py-0.5 text-xs">
                     {item.nodeName || t("search.remoteSource")}
-                  </span>
+                  </CratePill>
                 ) : null}
                 <span className="capitalize text-text-primary/20">
                   {t("search.resultType." + item.type)}
@@ -151,6 +142,7 @@ export function TopBarSearchDropdown({
           ) : null}
           {trimmedQuery && !showSearchError ? (
             <button
+              type="button"
               onClick={onSeeAllResults}
               className="mt-1 w-full border-t border-text-primary/5 px-3 py-2 text-center text-xs text-accent-action transition-colors hover:bg-text-primary/5"
             >
@@ -171,6 +163,7 @@ export function TopBarSearchDropdown({
                 recent.navigateTo ?? recent.label,
                 recent.origin ?? "local",
               ].join(":")}
+              type="button"
               onClick={() => onSelectRecent(recent)}
               className={cn(
                 "flex w-full items-center gap-3 px-3 py-2 text-left transition-colors",
@@ -183,7 +176,7 @@ export function TopBarSearchDropdown({
                 size={CRATE_ICON_SIZE.xs}
                 className="shrink-0 text-text-primary/20"
               />
-              <span className="truncate text-[0.8125rem] text-text-primary/60">
+              <span className="truncate text-caption text-text-primary/60">
                 {recent.label}
               </span>
             </button>

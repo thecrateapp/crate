@@ -19,7 +19,7 @@ export function MetricBar({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-medium uppercase tracking-[0.16em] text-text-muted">
+        <span className="text-xs font-medium uppercase tracking-kicker text-text-muted">
           {label}
         </span>
         <span className="text-xs font-medium tabular-nums text-text-secondary">
@@ -50,7 +50,7 @@ export function StatCard({
 }) {
   return (
     <div className="info-tab-stat-card rounded-lg px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-subtle">
+      <p className="text-xs font-semibold uppercase tracking-eyebrow text-text-subtle">
         {label}
       </p>
       <p className="mt-1 text-lg font-semibold tabular-nums text-text-primary">
@@ -73,10 +73,10 @@ export function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="info-tab-section-card overflow-hidden rounded-[12px]">
+    <section className="info-tab-section-card overflow-hidden rounded-panel">
       <div className="info-tab-section-header flex items-start justify-between gap-4 px-4 py-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+          <p className="text-xs font-semibold uppercase tracking-eyebrow text-text-muted">
             {title}
           </p>
           {subtitle ? (

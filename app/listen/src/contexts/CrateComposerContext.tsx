@@ -7,14 +7,13 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate } from "react-router";
-import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
 
 import {
   CrateCreateModal,
   type CrateComposerAlbum,
+  type CreatedCrate,
 } from "@/components/CrateCreateModal";
-import { api } from "@/lib/api";
+import { cratePagePath } from "@/components/crates/crate-model";
 
 interface OpenCrateComposerOptions {
   album?: CrateComposerAlbum;
@@ -33,10 +32,6 @@ export interface CrateComposerAlbumInput {
 const CrateComposerContext = createContext<
   CrateComposerContextValue | undefined
 >(undefined);
-
-interface CreateCrateResponse {
-  id: string;
-}
 
 export function openCrateComposerForAlbum(
   composer:
@@ -58,10 +53,8 @@ export function openCrateComposerForAlbum(
 }
 
 export function CrateComposerProvider({ children }: { children: ReactNode }) {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [initialAlbum, setInitialAlbum] = useState<
     CrateComposerAlbum | undefined
   >();
@@ -71,40 +64,12 @@ export function CrateComposerProvider({ children }: { children: ReactNode }) {
     setOpen(true);
   }, []);
 
-  const handleSubmit = useCallback(
-    async (payload: { name: string; description: string }) => {
-      setSubmitting(true);
-      try {
-        const created = await api<CreateCrateResponse>("/api/crates", "POST", {
-          name: payload.name,
-          description: payload.description,
-          is_collaborative: false,
-        });
-
-        let albumAddFailed = false;
-        if (initialAlbum) {
-          try {
-            await api(`/api/crates/${created.id}/albums`, "POST", {
-              global_album_uid: initialAlbum.globalAlbumUid,
-            });
-          } catch {
-            albumAddFailed = true;
-          }
-        }
-
-        setOpen(false);
-        toast.success(t("library.crates.created"));
-        if (albumAddFailed) {
-          toast.error(t("album.toasts.addToCrateFailed"));
-        }
-        navigate(`/crate/${created.id}`);
-      } catch {
-        toast.error(t("library.crates.createFailed"));
-      } finally {
-        setSubmitting(false);
-      }
+  const handleCreated = useCallback(
+    (created: CreatedCrate) => {
+      setOpen(false);
+      navigate(cratePagePath(created));
     },
-    [initialAlbum, navigate, t],
+    [navigate],
   );
 
   const contextValue = useMemo(() => ({ openCreateCrate }), [openCreateCrate]);
@@ -118,9 +83,8 @@ export function CrateComposerProvider({ children }: { children: ReactNode }) {
         }`}
         open={open}
         initialAlbum={initialAlbum}
-        submitting={submitting}
         onClose={() => setOpen(false)}
-        onSubmit={handleSubmit}
+        onCreated={handleCreated}
       />
     </CrateComposerContext.Provider>
   );

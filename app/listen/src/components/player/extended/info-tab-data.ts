@@ -1,4 +1,4 @@
-import type { TrackInfo } from "@/lib/track-info";
+import { bitrateToKbps, type TrackInfo } from "@/lib/track-info";
 
 export type PaletteTriplet = [number, number, number];
 
@@ -42,7 +42,8 @@ export function parseMoodEntries(input: TrackInfo["mood_json"]): MoodEntry[] {
 }
 
 export function formatBitrate(value: number | null | undefined) {
-  return value && value > 0 ? `${Math.round(value)} kbps` : null;
+  const kbps = bitrateToKbps(value);
+  return kbps ? `${Math.round(kbps)} kbps` : null;
 }
 
 export function formatSampleRate(value: number | null | undefined) {

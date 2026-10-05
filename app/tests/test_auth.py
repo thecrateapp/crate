@@ -2668,3 +2668,132 @@ class TestLogout:
         resp = test_app.post("/api/auth/logout")
         assert resp.status_code == 200
         assert resp.json() == {"ok": True}
+
+
+def _cookie_request(host: str, *, scheme: str = "http", proto: str | None = None):
+    headers = [(b"host", host.encode())]
+    if proto:
+        headers.append((b"x-forwarded-proto", proto.encode()))
+    return Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/auth/login",
+            "headers": headers,
+            "query_string": b"",
+            "client": ("testclient", 50000),
+            "server": (host.split(":", 1)[0], 80),
+            "scheme": scheme,
+        }
+    )
+
+
+def _set_cookie_headers(response: Response) -> list[str]:
+    return [
+        value.decode("latin1")
+        for key, value in response.raw_headers
+        if key == b"set-cookie"
+    ]
+
+
+class TestRequestAwareAuthCookies:
+    @pytest.fixture(autouse=True)
+    def _cookie_env(self, monkeypatch):
+        monkeypatch.setenv("DOMAIN", "dev.lespedants.org")
+        for key in (
+            "CRATE_AUTH_COOKIE_DOMAIN",
+            "CRATE_AUTH_COOKIE_SECURE",
+            "CRATE_AUTH_COOKIE_SAMESITE",
+        ):
+            monkeypatch.delenv(key, raising=False)
+
+    def test_matching_host_keeps_domain_and_secure(self):
+        from crate.api import auth
+
+        response = Response()
+        auth._set_auth_cookie(
+            response,
+            "token",
+            request=_cookie_request("listen.dev.lespedants.org", proto="https"),
+        )
+
+        (cookie,) = _set_cookie_headers(response)
+        assert "Domain=.dev.lespedants.org" in cookie
+        assert "Secure" in cookie
+        assert "SameSite=none" in cookie
+
+    def test_matching_host_keeps_configured_secure_even_over_internal_http(self):
+        from crate.api import auth
+
+        response = Response()
+        auth._set_auth_cookie(
+            response,
+            "token",
+            request=_cookie_request("dev.lespedants.org"),
+        )
+
+        (cookie,) = _set_cookie_headers(response)
+        assert "Domain=.dev.lespedants.org" in cookie
+        assert "Secure" in cookie
+
+    @pytest.mark.parametrize("host", ["localhost:8585", "127.0.0.1:5174", "[::1]:8585"])
+    def test_localhost_over_http_omits_domain_and_secure(self, host):
+        from crate.api import auth
+
+        response = Response()
+        auth._set_auth_cookie(response, "token", request=_cookie_request(host))
+
+        (cookie,) = _set_cookie_headers(response)
+        assert cookie.startswith("crate_session=token")
+        assert "Domain=" not in cookie
+        assert "Secure" not in cookie
+        assert "SameSite=lax" in cookie
+
+    def test_non_matching_host_uses_secure_only_for_forwarded_https(self):
+        from crate.api import auth
+
+        response = Response()
+        auth._set_auth_cookie(
+            response,
+            "token",
+            request=_cookie_request("crate.example.net", proto="https"),
+        )
+
+        (cookie,) = _set_cookie_headers(response)
+        assert "Domain=" not in cookie
+        assert "Secure" in cookie
+
+    def test_logout_clears_cookies_with_same_attributes_as_login(self):
+        from crate.api import auth
+
+        for host, proto in (
+            ("localhost:5174", None),
+            ("listen.dev.lespedants.org", "https"),
+        ):
+            request = _cookie_request(host, proto=proto)
+            login_response = Response()
+            auth._set_auth_cookie(login_response, "token", request=request)
+            clear_response = Response()
+            auth._clear_auth_cookie(clear_response, request=request)
+
+            (set_cookie,) = _set_cookie_headers(login_response)
+            (clear_cookie,) = _set_cookie_headers(clear_response)
+            assert "Max-Age=0" in clear_cookie
+
+            def attributes(cookie: str) -> set[str]:
+                return {
+                    part.strip()
+                    for part in cookie.split(";")[1:]
+                    if not part.strip().lower().startswith(("max-age", "expires"))
+                }
+
+            assert attributes(set_cookie) == attributes(clear_cookie)
+
+    def test_logout_endpoint_on_localhost_omits_domain(self, test_app):
+        resp = test_app.post("/api/auth/logout", headers={"host": "localhost:8585"})
+
+        assert resp.status_code == 200
+        cookies = resp.headers.get_list("set-cookie")
+        assert cookies
+        assert all("Domain=" not in cookie for cookie in cookies)
+        assert all("Secure" not in cookie for cookie in cookies)

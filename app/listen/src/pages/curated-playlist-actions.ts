@@ -1,19 +1,7 @@
 import type { TFunction } from "i18next";
-import {
-  AlertCircle,
-  ArrowDownToLine,
-  ArrowDownToLineBold,
-  Heart,
-  HeartBold,
-  Loader2,
-  Play,
-  Radio,
-  Share2,
-  Shuffle,
-  type CrateIcon,
-} from "@crate/ui/icons";
+import type { CrateIcon } from "@crate/ui/icons";
 import type { ContextMenuEntry } from "@crate/ui/domain/actions";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import type { TrackRowData } from "@/components/cards/TrackRow";
 import type { PlaylistHeroSecondaryAction } from "@/components/playlists/PlaylistHeroSection";
@@ -34,6 +22,10 @@ import { openShareSheet } from "@/lib/social-share";
 import { shuffleArray } from "@/lib/utils";
 import type { CuratedOfflinePresentation } from "@/pages/curated-playlist-model";
 import type { CuratedPlaylistData } from "@/pages/curated-playlist-types";
+import {
+  buildPlaylistPageActions,
+  getPlaylistOfflineIcon,
+} from "@/pages/playlist-action-menus";
 
 type OpenCreatePlaylist = ReturnType<
   typeof usePlaylistComposer
@@ -130,12 +122,12 @@ export function buildCuratedPlaylistActions({
         playlistName: data.name,
       });
       if (!radio.tracks.length) {
-        toast.info(t("playlist.toasts.radioUnavailable"));
+        notify.info(t("playlist.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error(t("playlist.toasts.radioFailed"));
+      notify.error(t("playlist.toasts.radioFailed"));
     }
   }
 
@@ -165,9 +157,9 @@ export function buildCuratedPlaylistActions({
           }),
         ],
       });
-      toast.success(t("playlist.toasts.trackAdded"));
+      notify.success(t("playlist.toasts.trackAdded"));
     } catch {
-      toast.error(t("playlist.toasts.trackAddFailed"));
+      notify.error(t("playlist.toasts.trackAddFailed"));
     }
   }
 
@@ -183,14 +175,14 @@ export function buildCuratedPlaylistActions({
     try {
       if (data.is_followed) {
         await api(`/api/curation/playlists/${id}/follow`, "DELETE");
-        toast.success(t("playlist.toasts.removedLibrary"));
+        notify.success(t("playlist.toasts.removedLibrary"));
       } else {
         await api(`/api/curation/playlists/${id}/follow`, "POST");
-        toast.success(t("playlist.toasts.addedLibrary"));
+        notify.success(t("playlist.toasts.addedLibrary"));
       }
       refetch();
     } catch {
-      toast.error(t("playlist.toasts.updateFailed"));
+      notify.error(t("playlist.toasts.updateFailed"));
     } finally {
       setTogglingFollow(false);
     }
@@ -204,133 +196,45 @@ export function buildCuratedPlaylistActions({
         title: data.name,
         isSmart: data.is_smart,
       });
-      toast.success(
+      notify.success(
         result === "removed"
           ? t("playlist.toasts.offlineRemoved")
           : t("playlist.toasts.availableOffline"),
       );
     } catch (offlineError) {
-      toast.error(
+      notify.error(
         (offlineError as Error).message ||
           t("playlist.toasts.offlineUpdateFailed"),
       );
     }
   }
 
-  const offlineIcon: CrateIcon =
-    offlineState === "ready"
-      ? ArrowDownToLineBold
-      : offlinePresentation.busy
-        ? Loader2
-        : offlineState === "error"
-          ? AlertCircle
-          : ArrowDownToLine;
-  const secondaryActions: PlaylistHeroSecondaryAction[] = data
-    ? [
-        {
-          key: "radio",
-          label: "Radio",
-          ariaLabel: t("playlist.actions.radio"),
-          icon: Radio,
-          disabled: playerTracks.length === 0,
-          onClick: () => void handlePlaylistRadio(),
+  const { offlineIcon, playlistMenuItems, secondaryActions } = data
+    ? buildPlaylistPageActions({
+        t,
+        playDisabled: playerTracks.length === 0,
+        onPlay: handlePlay,
+        onShuffle: handleShuffle,
+        onRadio: handlePlaylistRadio,
+        onShare: handleShare,
+        offline: {
+          state: offlineState,
+          presentation: offlinePresentation,
+          supported: offlineSupported,
+          isSmart: data.is_smart,
+          onToggle: handleToggleOffline,
         },
-        {
-          key: "offline",
-          label: t("common.offline"),
-          ariaLabel:
-            offlineState === "ready"
-              ? t("playlist.offline.removeCopy")
-              : t("playlist.offline.makeAvailable"),
-          icon: offlineIcon,
-          iconClassName: offlinePresentation.busy ? "animate-spin" : undefined,
-          className:
-            offlineState === "ready"
-              ? "text-text-accent drop-shadow-accent-action"
-              : offlinePresentation.busy
-                ? "text-accent-action"
-                : offlineState === "error"
-                  ? "text-state-warning-text/90"
-                  : undefined,
-          disabled:
-            !offlineSupported || data.is_smart || offlinePresentation.busy,
-          title: offlinePresentation.buttonLabel,
-          onClick: () => void handleToggleOffline(),
+        follow: {
+          followed: data.is_followed,
+          pending: togglingFollow,
+          onToggle: handleToggleFollow,
         },
-        {
-          key: "follow",
-          label: data.is_followed ? t("common.following") : t("common.follow"),
-          ariaLabel: data.is_followed
-            ? t("playlist.actions.removeFromLibrary")
-            : t("common.follow"),
-          icon: togglingFollow ? Loader2 : data.is_followed ? HeartBold : Heart,
-          iconClassName: togglingFollow ? "animate-spin" : undefined,
-          active: data.is_followed,
-          pulseIcon: data.is_followed,
-          disabled: togglingFollow,
-          onClick: () => void handleToggleFollow(),
-        },
-        {
-          key: "share",
-          label: t("common.share"),
-          ariaLabel: t("common.share"),
-          icon: Share2,
-          onClick: handleShare,
-        },
-      ]
-    : [];
-  const playlistMenuItems: ContextMenuEntry[] = data
-    ? [
-        {
-          key: "play",
-          label: t("playlist.actions.playPlaylist"),
-          icon: Play,
-          disabled: playerTracks.length === 0,
-          onSelect: handlePlay,
-        },
-        {
-          key: "shuffle",
-          label: t("playlist.actions.shufflePlaylist"),
-          icon: Shuffle,
-          disabled: playerTracks.length === 0,
-          onSelect: handleShuffle,
-        },
-        {
-          key: "radio",
-          label: t("playlist.actions.startRadio"),
-          icon: Radio,
-          disabled: playerTracks.length === 0,
-          onSelect: handlePlaylistRadio,
-        },
-        { type: "divider", key: "curated-playlist-library-divider" },
-        {
-          key: "follow",
-          label: data.is_followed
-            ? t("playlist.actions.removeFromLibrary")
-            : t("playlist.actions.addToLibrary"),
-          icon: data.is_followed ? HeartBold : Heart,
-          active: data.is_followed,
-          disabled: togglingFollow,
-          onSelect: handleToggleFollow,
-        },
-        {
-          key: "offline",
-          label: offlinePresentation.buttonLabel,
-          icon: offlineIcon,
-          active: offlineState === "ready",
-          disabled:
-            !offlineSupported || data.is_smart || offlinePresentation.busy,
-          onSelect: handleToggleOffline,
-        },
-        { type: "divider", key: "curated-playlist-share-divider" },
-        {
-          key: "share",
-          label: t("playlist.actions.sharePlaylist"),
-          icon: Share2,
-          onSelect: handleShare,
-        },
-      ]
-    : [];
+      })
+    : {
+        offlineIcon: getPlaylistOfflineIcon(offlineState, offlinePresentation),
+        playlistMenuItems: [],
+        secondaryActions: [],
+      };
 
   return {
     handleAddTrackToPlaylist,

@@ -1,3 +1,5 @@
+import type { GenreProfileItem } from "@crate/ui/domain/genres/GenrePill";
+import type { TrackRowData } from "@/components/cards/TrackRowModel";
 import type { Track } from "@/contexts/PlayerContext";
 import { toPlayableTrack } from "@/lib/playable-track";
 
@@ -87,9 +89,60 @@ export interface StatsAlbum {
 
 export interface StatsGenre {
   genre_name: string;
+  slug?: string | null;
   play_count: number;
   complete_play_count: number;
   minutes_listened: number;
+  weight?: number | null;
+  share?: number | null;
+}
+
+export function buildStatsGenreProfile(
+  genres: StatsGenre[],
+  max = 8,
+): GenreProfileItem[] {
+  if (
+    genres.length &&
+    genres.every((genre) => typeof genre.share === "number")
+  ) {
+    return genres
+      .map((genre) => ({
+        name: genre.genre_name,
+        slug: genre.slug ?? null,
+        share: genre.share ?? 0,
+      }))
+      .sort((a, b) => b.share - a.share)
+      .slice(0, max);
+  }
+
+  const weights = new Map<string, { name: string; weight: number }>();
+  let total = 0;
+  for (const genre of genres) {
+    const labels = new Map<string, string>();
+    for (const rawLabel of genre.genre_name.split(",")) {
+      const label = rawLabel.trim();
+      const key = label.toLowerCase();
+      if (label && !labels.has(key)) labels.set(key, label);
+    }
+    if (!labels.size) continue;
+    const plays = Math.max(0, genre.play_count || 0);
+    const share = plays / labels.size;
+    total += plays;
+    for (const [key, label] of labels) {
+      const entry = weights.get(key);
+      if (entry) entry.weight += share;
+      else weights.set(key, { name: label, weight: share });
+    }
+  }
+
+  return [...weights.values()]
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, max)
+    .map(({ name, weight }) => ({
+      name,
+      weight,
+      share: total > 0 ? weight / total : 0,
+    }));
 }
 
 export interface StatsListResponse<T> {
@@ -101,6 +154,8 @@ export interface ReplayMix {
   window: StatsPeriodKey;
   title: string;
   subtitle: string;
+  title_key?: string | null;
+  subtitle_key?: string | null;
   track_count: number;
   minutes_listened: number;
   items: StatsTrack[];
@@ -254,6 +309,52 @@ export function toPlayerTrack(item: StatsTrack): Track {
     ...item,
     id: item.track_id || `${item.artist}-${item.title}`,
   });
+}
+
+export function statsTrackRowData(item: StatsTrack): TrackRowData {
+  return {
+    id: item.track_id ?? `${item.artist}-${item.title}`,
+    library_track_id: item.track_id ?? undefined,
+    entity_uid: item.track_entity_uid ?? undefined,
+    global_track_uid: item.global_track_uid ?? undefined,
+    global_artist_uid: item.global_artist_uid ?? undefined,
+    global_album_uid: item.global_album_uid ?? undefined,
+    title: item.title,
+    artist: item.artist,
+    artist_id: item.artist_id ?? undefined,
+    artist_slug: item.artist_slug ?? undefined,
+    album: item.album,
+    album_id: item.album_id ?? undefined,
+    album_slug: item.album_slug ?? undefined,
+    path: item.track_path ?? undefined,
+    bpm: item.bpm,
+    audio_key: item.audio_key,
+    audio_scale: item.audio_scale,
+    energy: item.energy,
+    danceability: item.danceability,
+    valence: item.valence,
+    bliss_vector: item.bliss_vector,
+  };
+}
+
+export function localizedReplayTitle(
+  replay: ReplayMix | undefined,
+  t: RecapTranslate,
+): string | undefined {
+  if (replay?.title_key) {
+    return t(replay.title_key, { defaultValue: replay.title });
+  }
+  return replay?.title || undefined;
+}
+
+export function localizedReplaySubtitle(
+  replay: ReplayMix | undefined,
+  t: RecapTranslate,
+): string | undefined {
+  if (replay?.subtitle_key) {
+    return t(replay.subtitle_key, { defaultValue: replay.subtitle });
+  }
+  return replay?.subtitle || undefined;
 }
 
 export function buildRecapHighlights(

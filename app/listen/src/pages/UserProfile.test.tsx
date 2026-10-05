@@ -6,6 +6,13 @@ import { useApi } from "@/hooks/use-api";
 
 import { UserProfile } from "@/pages/UserProfile";
 
+vi.mock("@/contexts/SavedAlbumsContext", () => ({
+  useSavedAlbums: () => ({
+    isSaved: () => false,
+    toggleAlbumSaved: vi.fn(),
+  }),
+}));
+
 vi.mock("@/hooks/use-api", () => ({
   useApi: vi.fn(),
 }));
@@ -200,6 +207,6 @@ describe("UserProfile", () => {
     expect(screen.getByText("Aún mapeando")).toBeVisible();
     expect(screen.getByText("Contribuciones a la biblioteca")).toBeVisible();
     expect(screen.getByText("Aún no hay playlists públicas.")).toBeVisible();
-    expect(screen.getByText("Aún no hay Crates públicas.")).toBeVisible();
+    expect(screen.getByText("Aún no hay Crates públicos.")).toBeVisible();
   });
 });

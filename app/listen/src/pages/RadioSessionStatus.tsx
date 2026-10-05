@@ -1,4 +1,4 @@
-import { ThumbsDown, ThumbsUp } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, ThumbsDown, ThumbsUp } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import type { RadioMode } from "./radio-model";
@@ -44,8 +44,10 @@ export function RadioSessionStatus({
         </span>
       </div>
       <div className="radio-session-muted mt-1.5 flex items-center gap-1 text-xs">
-        <ThumbsUp size={10} /> {t("radio.feedback.likePrefix")}{" "}
-        <ThumbsDown size={10} /> {t("radio.feedback.dislikeSuffix")}
+        <ThumbsUp size={CRATE_ICON_SIZE.nano} />{" "}
+        {t("radio.feedback.likePrefix")}{" "}
+        <ThumbsDown size={CRATE_ICON_SIZE.nano} />{" "}
+        {t("radio.feedback.dislikeSuffix")}
       </div>
     </div>
   );

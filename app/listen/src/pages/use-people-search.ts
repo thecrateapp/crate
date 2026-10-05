@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
 
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { api } from "@/lib/api";
 import type { UserSearchResult } from "@/pages/people-types";
+
+export const PEOPLE_SEARCH_DEBOUNCE_MS = 250;
 
 export function usePeopleSearch(query: string) {
   const [results, setResults] = useState<UserSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const trimmed = query.trim();
+  const debouncedQuery = useDebouncedValue(trimmed, PEOPLE_SEARCH_DEBOUNCE_MS);
 
   useEffect(() => {
-    const trimmed = query.trim();
-    if (!trimmed) {
+    if (!debouncedQuery) {
       setResults([]);
       setSearching(false);
       return;
@@ -18,7 +22,7 @@ export function usePeopleSearch(query: string) {
     const controller = new AbortController();
     setSearching(true);
     api<UserSearchResult[]>(
-      `/api/users/search?q=${encodeURIComponent(trimmed)}&limit=12`,
+      `/api/users/search?q=${encodeURIComponent(debouncedQuery)}&limit=12`,
       "GET",
       undefined,
       { signal: controller.signal },
@@ -32,7 +36,10 @@ export function usePeopleSearch(query: string) {
       });
 
     return () => controller.abort();
-  }, [query]);
+  }, [debouncedQuery]);
 
-  return { results, searching };
+  return {
+    results,
+    searching: searching || (trimmed !== "" && trimmed !== debouncedQuery),
+  };
 }

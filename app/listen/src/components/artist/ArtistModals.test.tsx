@@ -199,6 +199,59 @@ describe("artist mobile modals", () => {
     expect(close.className).not.toContain("border-white/10");
   });
 
+  it("exposes the bio sheet as a labelled dialog and merges member roles from enrichment", async () => {
+    apiMock.mockResolvedValue({
+      musicbrainz: {
+        members: [
+          { name: "Mo Chara", attributes: ["vocals"], begin: "2017" },
+          { name: "Mo Chara", attributes: ["lyrics"], begin: "2017" },
+        ],
+      },
+    });
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    renderWithProviders(
+      <ArtistBioModal
+        open
+        onClose={() => {}}
+        photoUrl="/artist.jpg"
+        tags={[]}
+        artist={{
+          id: 7,
+          name: "Kneecap",
+          albums: [],
+          total_tracks: 0,
+          total_size_mb: 0,
+          primary_format: null,
+          genres: [],
+          issue_count: 0,
+        }}
+        artistInfo={{
+          bio: "Belfast trio.",
+          tags: [],
+          similar: [],
+          listeners: 0,
+          playcount: 0,
+          image_url: null,
+          url: "",
+        }}
+      />,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Kneecap" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(await screen.findByText("vocals, lyrics")).toBeInTheDocument();
+    expect(screen.getAllByText("Mo Chara")).toHaveLength(1);
+    expect(
+      consoleError.mock.calls.some((call) =>
+        String(call[0]).includes("same key"),
+      ),
+    ).toBe(false);
+    consoleError.mockRestore();
+  });
+
   it("refetches enrichment when the open modal switches artists", async () => {
     const { rerender } = renderWithProviders(
       <ArtistBioModal

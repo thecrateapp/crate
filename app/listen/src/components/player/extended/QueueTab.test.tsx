@@ -17,8 +17,8 @@ const { queueRowRender } = vi.hoisted(() => ({
   queueRowRender: vi.fn(),
 }));
 
-vi.mock("./QueueTabRow", () => ({
-  QueueTabRow: () => {
+vi.mock("@/components/player/QueueTrackRow", () => ({
+  QueueTrackRow: () => {
     queueRowRender();
     return null;
   },

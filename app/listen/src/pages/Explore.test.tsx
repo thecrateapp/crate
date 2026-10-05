@@ -135,9 +135,10 @@ describe("Explore", () => {
         .getByText("Start from a track, artist, album or genre.")
         .closest("button"),
     ).toHaveClass("explore-feature-card");
-    expect(screen.getByText("Mathcore").closest("button")).toHaveClass(
+    expect(screen.getByText("Mathcore").closest("article")).toHaveClass(
       "explore-genre-card",
     );
+    expect(screen.getByText("Mathcore").closest("button")).toBeInTheDocument();
     expect(
       screen.getByText("Angular hardcore, odd meters and controlled chaos."),
     ).toBeInTheDocument();
@@ -406,7 +407,7 @@ describe("Explore", () => {
       screen.getByRole("button", { name: "Open next genre show in Radar" }),
     ).toHaveTextContent("Next show");
     expect(
-      screen.getByTestId("genre-mobile-hero-menu").parentElement,
+      screen.getByTestId("hero-mobile-menu-trigger").parentElement,
     ).toHaveClass("fixed", "z-app-header");
     expect(screen.getByRole("heading", { name: "Shows" })).toBeInTheDocument();
     expect(screen.getByText("Converge")).toBeInTheDocument();
@@ -425,7 +426,7 @@ describe("Explore", () => {
       screen.queryByRole("group", { name: "Secondary genre actions" }),
     ).toBeNull();
     expect(screen.queryByRole("button", { name: "Share genre" })).toBeNull();
-    expect(screen.getByTestId("genre-mobile-hero-menu")).toBeInTheDocument();
+    expect(screen.getByTestId("hero-mobile-menu-trigger")).toBeInTheDocument();
   });
 
   it("groups public genre actions into primary pills and secondary icon labels", () => {
@@ -771,7 +772,9 @@ describe("Explore", () => {
       path: "/explore",
     });
 
-    const card = screen.getByRole("button", { name: /Post-hardcore/i });
+    const card = screen
+      .getByRole("button", { name: /Post-hardcore/i })
+      .closest("article")!;
     const image = card.querySelector("img");
 
     expect(image).toHaveAttribute("loading", "eager");
@@ -803,7 +806,9 @@ describe("Explore", () => {
       route: "/explore?genre=hardcore",
       path: "/explore",
     });
-    const card = screen.getByRole("button", { name: /Emo/i });
+    const card = screen
+      .getByRole("button", { name: /Emo/i })
+      .closest("article")!;
 
     fireEvent.error(card.querySelector("img")!);
 

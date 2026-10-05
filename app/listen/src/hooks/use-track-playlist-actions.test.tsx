@@ -110,4 +110,23 @@ describe("useTrackPlaylistActions", () => {
     });
     expect(ensurePlaylistOptionsLoaded).toHaveBeenCalledOnce();
   });
+
+  it("toggles the playlist submenu and loads options before opening it", () => {
+    const { result } = renderHook(() => useTrackPlaylistActions(), { wrapper });
+
+    expect(result.current.playlistPickerOpen).toBe(false);
+
+    act(() => {
+      result.current.onTogglePlaylistPicker();
+    });
+
+    expect(result.current.playlistPickerOpen).toBe(true);
+    expect(ensurePlaylistOptionsLoaded).toHaveBeenCalledOnce();
+
+    act(() => {
+      result.current.onTogglePlaylistPicker();
+    });
+
+    expect(result.current.playlistPickerOpen).toBe(false);
+  });
 });

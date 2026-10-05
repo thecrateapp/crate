@@ -1,6 +1,14 @@
 import { useTranslation } from "react-i18next";
 
-import { Lock } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Lock } from "@crate/ui/icons";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { Button } from "@crate/ui/shadcn/button";
+import { Input } from "@crate/ui/shadcn/input";
+import { Textarea } from "@crate/ui/shadcn/textarea";
+
+const FIELD_CLASS_NAME =
+  "h-10 rounded-lg border-transparent bg-text-primary/5 px-3 shadow-none backdrop-blur-none focus-visible:border-transparent focus-visible:bg-text-primary/8 md:text-base";
+const FIELD_LABEL_CLASS_NAME = "text-xs font-normal text-text-muted";
 
 export function AccountProfileForm({
   name,
@@ -29,58 +37,56 @@ export function AccountProfileForm({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <label
-          htmlFor="settings-display-name"
-          className="text-xs text-text-muted"
-        >
-          {t("settings.account.displayName")}
-        </label>
-        <input
+      <FormField
+        label={t("settings.account.displayName")}
+        className="gap-2"
+        labelClassName={FIELD_LABEL_CLASS_NAME}
+      >
+        <Input
           id="settings-display-name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="h-10 w-full rounded-lg bg-text-primary/5 px-3 text-base text-text-primary outline-none focus:bg-text-primary/8"
+          className={FIELD_CLASS_NAME}
           placeholder={t("auth.register.namePlaceholder")}
         />
-      </div>
-      <div className="space-y-2">
-        <label htmlFor="settings-username" className="text-xs text-text-muted">
-          {t("settings.account.username")}
-        </label>
-        <input
+      </FormField>
+      <FormField
+        label={t("settings.account.username")}
+        hint={t("settings.account.usernameDescription")}
+        className="gap-2"
+        labelClassName={FIELD_LABEL_CLASS_NAME}
+      >
+        <Input
           id="settings-username"
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value.replace(/\s+/g, "-"))}
-          className="h-10 w-full rounded-lg bg-text-primary/5 px-3 text-base text-text-primary outline-none focus:bg-text-primary/8"
+          className={FIELD_CLASS_NAME}
           placeholder={t("settings.account.usernamePlaceholder")}
         />
-        <p className="text-xs text-text-muted">
-          {t("settings.account.usernameDescription")}
-        </p>
-      </div>
-      <div className="space-y-2">
-        <label htmlFor="settings-bio" className="text-xs text-text-muted">
-          {t("settings.account.bio")}
-        </label>
-        <textarea
+      </FormField>
+      <FormField
+        label={t("settings.account.bio")}
+        className="gap-2"
+        labelClassName={FIELD_LABEL_CLASS_NAME}
+      >
+        <Textarea
           id="settings-bio"
           value={bio}
           onChange={(e) => setBio(e.target.value)}
-          className="min-h-24 w-full rounded-lg bg-text-primary/5 p-3 text-base text-text-primary outline-none focus:bg-text-primary/8"
+          className="min-h-24 rounded-lg border-transparent bg-text-primary/5 p-3 shadow-none backdrop-blur-none focus-visible:border-transparent focus-visible:bg-text-primary/8 md:text-base"
           placeholder={t("settings.account.bioPlaceholder")}
         />
-      </div>
+      </FormField>
       <div className="flex justify-end">
-        <button
+        <Button
           onClick={onSave}
           disabled={saving || profileUnchanged}
-          className="h-10 rounded-lg bg-accent-action px-4 text-sm font-medium text-accent-action-foreground transition-opacity disabled:opacity-40"
+          className="h-10 rounded-lg px-4 disabled:opacity-40 has-[>svg]:px-4"
         >
           {saving ? t("common.saving") : t("settings.account.saveProfile")}
-        </button>
+        </Button>
       </div>
       <div className="space-y-2">
         <span className="text-xs text-text-muted">{t("common.email")}</span>
@@ -144,20 +150,21 @@ export function ConnectedAccounts({
                   : t("settings.account.notLinked")}
               </div>
             </div>
-            <button
-              type="button"
+            <Button
+              variant="outline"
+              size="sm"
               disabled={busy}
               onClick={() =>
                 void (linked ? onUnlink(provider) : onLink(provider))
               }
-              className="rounded-lg border border-border-quiet/15 bg-text-primary/5 px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-text-primary/10 disabled:opacity-50"
+              className="h-auto rounded-lg border-border-quiet/15 bg-text-primary/5 px-3 py-2 text-xs shadow-none hover:bg-text-primary/10 has-[>svg]:px-3"
             >
               {busy
                 ? t("common.working")
                 : linked
                   ? t("settings.account.unlink")
                   : t("settings.account.link")}
-            </button>
+            </Button>
           </div>
         );
       })}
@@ -193,59 +200,65 @@ export function PasswordChangeForm({
   if (!showPassword) {
     return (
       <button
+        type="button"
         onClick={() => setShowPassword(true)}
-        className="flex items-center gap-2 text-sm text-text-muted transition-colors hover:text-text-primary"
+        className="link-meta flex w-fit max-w-full items-center gap-2 text-sm"
       >
-        <Lock size={14} /> {t("settings.account.changePassword")}
+        <Lock size={CRATE_ICON_SIZE.xs} />{" "}
+        {t("settings.account.changePassword")}
       </button>
     );
   }
 
   return (
     <div className="space-y-2 rounded-xl bg-text-primary/5 p-4">
-      <input
+      <Input
         type="password"
         value={currentPassword}
         onChange={(e) => setCurrentPassword(e.target.value)}
         placeholder={t("settings.account.currentPassword")}
-        className="h-10 w-full rounded-lg bg-text-primary/5 px-3 text-base text-text-primary outline-none focus:bg-text-primary/8"
+        aria-label={t("settings.account.currentPassword")}
+        className={FIELD_CLASS_NAME}
         autoComplete="current-password"
       />
-      <input
+      <Input
         type="password"
         value={newPassword}
         onChange={(e) => setNewPassword(e.target.value)}
         placeholder={t("settings.account.newPassword")}
-        className="h-10 w-full rounded-lg bg-text-primary/5 px-3 text-base text-text-primary outline-none focus:bg-text-primary/8"
+        aria-label={t("settings.account.newPassword")}
+        className={FIELD_CLASS_NAME}
         autoComplete="new-password"
       />
-      <input
+      <Input
         type="password"
         value={confirmPassword}
         onChange={(e) => setConfirmPassword(e.target.value)}
         placeholder={t("settings.account.confirmPassword")}
-        className="h-10 w-full rounded-lg bg-text-primary/5 px-3 text-base text-text-primary outline-none focus:bg-text-primary/8"
+        aria-label={t("settings.account.confirmPassword")}
+        className={FIELD_CLASS_NAME}
         autoComplete="new-password"
       />
       <div className="flex gap-2 pt-1">
-        <button
+        <Button
           onClick={onChangePassword}
           disabled={saving}
-          className="h-9 rounded-lg bg-accent-action px-4 text-sm font-medium text-accent-action-foreground disabled:opacity-40"
+          className="h-9 rounded-lg px-4 disabled:opacity-40 has-[>svg]:px-4"
         >
           {t("settings.account.changePasswordAction")}
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="secondary"
           onClick={() => {
             setShowPassword(false);
             setCurrentPassword("");
             setNewPassword("");
             setConfirmPassword("");
           }}
-          className="h-9 rounded-lg bg-text-primary/5 px-4 text-sm text-text-primary/60"
+          className="h-9 rounded-lg bg-text-primary/5 px-4 font-normal text-text-primary/60 has-[>svg]:px-4"
         >
           {t("common.cancel")}
-        </button>
+        </Button>
       </div>
     </div>
   );

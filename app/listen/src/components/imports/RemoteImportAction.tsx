@@ -1,11 +1,19 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertCircle, ArrowDownToLine, Loader2 } from "@crate/ui/icons";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
+import {
+  AlertCircle,
+  ArrowDownToLine,
+  CRATE_ICON_SIZE,
+  Loader2,
+} from "@crate/ui/icons";
+import { Button } from "@crate/ui/shadcn/button";
 
 import {
   useRemoteImport,
   type RemoteImportStatus,
 } from "@/hooks/useRemoteImport";
+import { formatBytes } from "@/lib/utils";
 
 interface RemoteImportActionProps {
   globalAlbumUid: string;
@@ -13,23 +21,11 @@ interface RemoteImportActionProps {
   sourceName?: string | null;
 }
 
-function formatBytes(bytes?: number | null): string | null {
-  if (!bytes || bytes <= 0) return null;
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1000 && unit < units.length - 1) {
-    value /= 1000;
-    unit += 1;
-  }
-  return `${value.toFixed(unit > 1 ? 1 : 0)} ${units[unit]}`;
-}
-
 function RemoteImportCompleted() {
   const { t } = useTranslation();
   return (
     <p className="inline-flex items-center gap-2 text-sm font-medium text-accent-action">
-      <ArrowDownToLine size={16} />
+      <ArrowDownToLine size={CRATE_ICON_SIZE.sm} />
       {t("album.remoteImport.completed")}
     </p>
   );
@@ -63,7 +59,7 @@ function RemoteImportProgressStatus({
       className="inline-flex items-center gap-2 text-sm text-text-muted"
       role="status"
     >
-      <Loader2 size={16} className="animate-spin" />
+      <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
       {status === "downloading" && progress != null
         ? t("album.remoteImport.downloading", { progress })
         : t(`album.remoteImport.${status}`)}
@@ -95,11 +91,11 @@ function RemoteImportTerminalStatus({
   return (
     <div className="flex flex-wrap items-center gap-3 text-sm" role="status">
       <span className="inline-flex items-center gap-2 text-text-muted">
-        <AlertCircle size={16} /> {message}
+        <AlertCircle size={CRATE_ICON_SIZE.sm} /> {message}
       </span>
       <button
         type="button"
-        className="font-semibold text-accent-action hover:text-accent-action/80"
+        className="link-accent font-semibold"
         onClick={onRetry}
       >
         {t("album.remoteImport.retry")}
@@ -109,11 +105,13 @@ function RemoteImportTerminalStatus({
 }
 
 function RemoteImportConfirmation({
+  open,
   estimatedSize,
   sourceName,
   onConfirm,
   onCancel,
 }: {
+  open: boolean;
   estimatedSize: string | null;
   sourceName?: string | null;
   onConfirm: () => void;
@@ -121,37 +119,21 @@ function RemoteImportConfirmation({
 }) {
   const { t } = useTranslation();
   return (
-    <div
-      className="max-w-xl rounded-xl border border-border-quiet bg-text-primary/[0.04] p-4"
-      role="group"
-      aria-label={t("album.remoteImport.confirmTitle")}
-    >
-      <p className="text-sm font-semibold text-text-primary">
-        {t("album.remoteImport.confirmTitle")}
-      </p>
-      <p className="mt-1 text-sm text-text-muted">
-        {t("album.remoteImport.confirmBody", {
-          source: sourceName || t("album.remoteImport.remoteNode"),
-          size: estimatedSize || t("album.remoteImport.unknownSize"),
-        })}
-      </p>
-      <div className="mt-3 flex gap-3">
-        <button
-          type="button"
-          className="rounded-full bg-accent-action px-4 py-2 text-sm font-semibold text-accent-action-foreground"
-          onClick={onConfirm}
-        >
-          {t("album.remoteImport.confirm")}
-        </button>
-        <button
-          type="button"
-          className="rounded-full bg-text-primary/[0.08] px-4 py-2 text-sm font-semibold text-text-primary"
-          onClick={onCancel}
-        >
-          {t("common.cancel")}
-        </button>
-      </div>
-    </div>
+    <ConfirmDialog
+      open={open}
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+      title={t("album.remoteImport.confirmTitle")}
+      description={t("album.remoteImport.confirmBody", {
+        source: sourceName || t("album.remoteImport.remoteNode"),
+        size: estimatedSize || t("album.remoteImport.unknownSize"),
+      })}
+      confirmLabel={t("album.remoteImport.confirm")}
+      cancelLabel={t("common.cancel")}
+      closeLabel={t("common.close")}
+      ariaLabel={t("album.remoteImport.confirmTitle")}
+      backdropLabel={t("common.close")}
+    />
   );
 }
 
@@ -164,21 +146,22 @@ function RemoteImportRequestButton({
 }) {
   const { t } = useTranslation();
   return (
-    <button
-      type="button"
-      className="inline-flex h-11 items-center gap-2 rounded-full border border-accent-action/25 bg-accent-action/10 px-5 text-sm font-semibold text-accent-action transition-colors hover:bg-accent-action/15 disabled:cursor-wait disabled:opacity-60"
+    <Button
+      variant="secondary"
+      shape="pill"
+      className="h-11 border border-accent-action/25 bg-accent-action/10 px-5 font-semibold text-accent-action hover:bg-accent-action/15 disabled:cursor-wait disabled:opacity-60 [&_svg:not([class*='size-'])]:size-4 has-[>svg]:px-5"
       disabled={requesting}
       onClick={onRequest}
     >
       {requesting ? (
-        <Loader2 size={16} className="animate-spin" />
+        <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
       ) : (
-        <ArrowDownToLine size={16} />
+        <ArrowDownToLine size={CRATE_ICON_SIZE.sm} />
       )}
       {requesting
         ? t("album.remoteImport.requesting")
         : t("album.remoteImport.action")}
-    </button>
+    </Button>
   );
 }
 
@@ -190,7 +173,8 @@ export function RemoteImportAction({
   const { t } = useTranslation();
   const [confirming, setConfirming] = useState(false);
   const { status, progress, start, reset } = useRemoteImport(globalAlbumUid);
-  const estimatedSize = formatBytes(estimatedBytes);
+  const estimatedSize =
+    estimatedBytes && estimatedBytes > 0 ? formatBytes(estimatedBytes) : null;
 
   if (status === "completed") return <RemoteImportCompleted />;
   if (["awaiting_approval", "requested", "approved"].includes(status)) {
@@ -201,35 +185,36 @@ export function RemoteImportAction({
   }
 
   const message = terminalMessage(status, t);
-  if (message && !confirming) {
-    return (
-      <RemoteImportTerminalStatus
-        message={message}
-        onRetry={() => {
-          reset();
-          setConfirming(true);
-        }}
-      />
-    );
-  }
-  if (confirming) {
-    return (
-      <RemoteImportConfirmation
-        estimatedSize={estimatedSize}
-        sourceName={sourceName}
-        onConfirm={() => {
-          setConfirming(false);
-          void start();
-        }}
-        onCancel={() => setConfirming(false)}
-      />
-    );
-  }
+  const confirmation = (
+    <RemoteImportConfirmation
+      open={confirming}
+      estimatedSize={estimatedSize}
+      sourceName={sourceName}
+      onConfirm={() => {
+        setConfirming(false);
+        void start();
+      }}
+      onCancel={() => setConfirming(false)}
+    />
+  );
 
   return (
-    <RemoteImportRequestButton
-      requesting={status === "requesting"}
-      onRequest={() => setConfirming(true)}
-    />
+    <>
+      {message ? (
+        <RemoteImportTerminalStatus
+          message={message}
+          onRetry={() => {
+            reset();
+            setConfirming(true);
+          }}
+        />
+      ) : (
+        <RemoteImportRequestButton
+          requesting={status === "requesting"}
+          onRequest={() => setConfirming(true)}
+        />
+      )}
+      {confirmation}
+    </>
   );
 }

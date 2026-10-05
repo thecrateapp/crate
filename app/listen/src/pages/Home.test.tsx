@@ -136,14 +136,6 @@ describe("Home", () => {
   beforeEach(() => {
     viewportState.isDesktop = false;
     vi.stubGlobal("EventSource", MockEventSource);
-    vi.stubGlobal(
-      "ResizeObserver",
-      class ResizeObserver {
-        observe() {}
-        unobserve() {}
-        disconnect() {}
-      },
-    );
     vi.mocked(useApi).mockReturnValue({
       data: homeDiscoveryPayload(),
       loading: false,
@@ -222,7 +214,7 @@ describe("Home", () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getByTestId("home-discovery-content")).toHaveClass(
-      "max-w-[1480px]",
+      "max-w-content",
       "relative",
       "z-30",
       "mt-0",

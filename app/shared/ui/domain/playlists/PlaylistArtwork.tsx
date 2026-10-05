@@ -1,4 +1,4 @@
-import { ListMusic } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, ListMusic } from "@crate/ui/icons";
 import type { CSSProperties, ImgHTMLAttributes, Key, ReactNode } from "react";
 
 export interface PlaylistArtworkTrack {
@@ -162,7 +162,7 @@ export function PlaylistArtwork({
         } as CSSProperties
       }
     >
-      <ListMusic size={24} className="text-text-primary/60" />
+      <ListMusic size={CRATE_ICON_SIZE.xl} className="text-text-primary/60" />
       {crateMark}
     </div>
   );

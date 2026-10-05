@@ -43,7 +43,8 @@ export function ArtistTopTracksSection({
         </h2>
         {topTracksPath ? (
           <button
-            className="text-sm text-accent-action hover:underline"
+            type="button"
+            className="text-sm link-accent"
             onClick={() => navigate(topTracksPath)}
           >
             {t("common.viewAll")}

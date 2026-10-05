@@ -38,8 +38,8 @@ vi.mock("@/lib/platform", async (importOriginal) => ({
   isTauriRuntime: true,
 }));
 
-vi.mock("sonner", () => ({
-  toast: { error: mocks.toastError },
+vi.mock("@crate/ui/lib/notify", () => ({
+  notify: { error: mocks.toastError },
 }));
 
 describe("OAuthButtons", () => {

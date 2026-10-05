@@ -7,15 +7,13 @@ import {
   type FormEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2 } from "@crate/ui/icons";
 import { type DragEndEvent } from "@dnd-kit/core";
 import {
   AppModal,
   ModalBody,
-  ModalCloseButton,
   ModalFooter,
-  ModalHeader,
 } from "@crate/ui/primitives/AppModal";
+import { Button } from "@crate/ui/shadcn/button";
 import { api } from "@/lib/api";
 import {
   fileToDataUrl,
@@ -226,22 +224,17 @@ export function PlaylistCreateModal({
       onClose={() => {
         if (!submitting) onClose();
       }}
+      title={modalTitle}
+      description={modalSubtitle}
+      closeLabel={t("common.close")}
+      closeDisabled={submitting}
+      headerClassName="bg-transparent"
       maxWidthClassName="sm:max-w-3xl"
-      panelClassName="listen-glass-panel border-border-quiet"
+      panelClassName="listen-glass-panel flex flex-col border-border-quiet"
       closeOnEscape={!submitting}
       closeOnOverlay={!submitting}
     >
-      <form onSubmit={handleSubmit} className="flex flex-col max-h-[92vh]">
-        <ModalHeader className="flex items-center justify-between gap-4 bg-transparent px-5 py-4">
-          <div>
-            <h2 className="text-lg font-semibold text-text-primary">
-              {modalTitle}
-            </h2>
-            <p className="text-xs text-text-muted">{modalSubtitle}</p>
-          </div>
-          <ModalCloseButton onClick={onClose} disabled={submitting} />
-        </ModalHeader>
-
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-col">
         <ModalBody className="space-y-5 p-5 ">
           <PlaylistIdentitySection
             state={{
@@ -282,22 +275,22 @@ export function PlaylistCreateModal({
         </ModalBody>
 
         <ModalFooter className="flex items-center justify-end gap-3 bg-transparent px-5 py-4">
-          <button
-            type="button"
-            className="rounded-lg px-4 py-2.5 text-sm text-text-muted hover:text-text-primary hover:bg-text-primary/5 transition-colors"
+          <Button
+            variant="ghost"
+            className="rounded-lg"
             onClick={onClose}
             disabled={submitting}
           >
-            Cancel
-          </button>
-          <button
+            {t("common.cancel")}
+          </Button>
+          <Button
             type="submit"
-            disabled={submitting || !name.trim()}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90 disabled:opacity-50"
+            className="rounded-lg"
+            loading={submitting}
+            disabled={!name.trim()}
           >
-            {submitting ? <Loader2 size={15} className="animate-spin" /> : null}
             {submitLabel}
-          </button>
+          </Button>
         </ModalFooter>
       </form>
     </AppModal>

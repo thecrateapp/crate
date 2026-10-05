@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import type { PlayerSurfaceMode } from "@/lib/player-visualizer-prefs";
 import { cn } from "@crate/ui/lib/cn";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 
 const MODES: { id: PlayerSurfaceMode; icon: typeof Disc3; labelKey: string }[] =
   [
@@ -35,47 +36,37 @@ export function PlayerSurfaceModeSwitch({
   const { t } = useTranslation();
   const buttonClass = size === "md" ? "h-10 w-10" : "h-9 w-9";
   const iconSize = size === "md" ? 17 : 15;
+  const iconClass = size === "md" ? "size-[17px]" : "size-[15px]";
   const modes = allowVisualizer
     ? MODES
     : MODES.filter((item) => item.id !== "visualizer");
 
   return (
-    <div
+    <SegmentedControl
+      as="tabs"
+      variant="tonal"
+      label={t("player.surface.label")}
+      value={mode}
+      onValueChange={onChange}
+      items={modes.map(({ id, icon: Icon, labelKey }) => ({
+        value: id,
+        label: null,
+        ariaLabel: t(labelKey),
+        icon: <Icon size={iconSize} className={iconClass} />,
+      }))}
       className={cn(
-        "inline-flex items-center gap-1",
-        variant === "boxed" &&
-          "rounded-full border border-border-subtle bg-surface-chrome p-1 backdrop-blur-sm",
+        variant === "boxed"
+          ? "border border-border-subtle bg-surface-chrome backdrop-blur-sm"
+          : "p-0",
         className,
       )}
-      role="tablist"
-      aria-label={t("player.surface.label")}
-    >
-      {modes.map(({ id, icon: Icon, labelKey }) => {
-        const active = mode === id;
-        const label = t(labelKey);
-        return (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            aria-label={label}
-            title={label}
-            onClick={() => onChange(id)}
-            className={cn(
-              "flex items-center justify-center rounded-full transition-colors",
-              buttonClass,
-              active
-                ? "bg-accent-action/18 text-accent-action"
-                : variant === "boxed"
-                  ? "text-text-muted hover:bg-surface-control hover:text-text-secondary"
-                  : "text-text-muted hover:bg-surface-chrome hover:text-text-secondary",
-            )}
-          >
-            <Icon size={iconSize} />
-          </button>
-        );
-      })}
-    </div>
+      itemClassName={cn(
+        "px-0 data-[state=active]:bg-accent-action/18 data-[state=inactive]:text-text-muted data-[state=inactive]:hover:text-text-secondary",
+        buttonClass,
+        variant === "boxed"
+          ? "data-[state=inactive]:hover:bg-surface-control"
+          : "data-[state=inactive]:hover:bg-surface-chrome",
+      )}
+    />
   );
 }

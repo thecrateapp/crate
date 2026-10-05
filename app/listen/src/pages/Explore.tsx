@@ -1,13 +1,14 @@
 import { useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Radio, Route } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { SectionHeader } from "@crate/ui/domain/lists";
+import { EmptyState, LoadingState } from "@crate/ui/domain/states";
+import { PageHeader } from "@crate/ui/domain/navigation/PageHeader";
+import { notify } from "@crate/ui/lib/notify";
 
 import {
   DecadeDetailView,
-  ExploreLoadingState,
   ExplorePill,
-  ExploreSectionHeader,
   GenreDetailView,
   PlaylistCategoryView,
 } from "@/components/explore/ExploreViews";
@@ -25,6 +26,7 @@ import { JustLandedSection } from "@/components/home/HomeLibrarySections";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
 import { usePlayerActions } from "@/contexts/PlayerContext";
+import { useTransparentHeader } from "@/components/layout/transparent-header";
 
 export function Explore() {
   const { t } = useTranslation();
@@ -32,6 +34,7 @@ export function Explore() {
   const { playAll } = usePlayerActions();
   const [searchParams, setSearchParams] = useSearchParams();
   const genreSlug = searchParams.get("genre");
+  useTransparentHeader(searchParams.has("genre"));
   const playlistCategory = searchParams.get("playlistCategory");
 
   const {
@@ -50,7 +53,7 @@ export function Explore() {
         playAll(playlist.tracks, 0, { ...playlist.source, name: playlistName });
       }
     } catch {
-      toast.error(t("explore.toasts.playPlaylistFailed"));
+      notify.error(t("explore.toasts.playPlaylistFailed"));
     }
   }
 
@@ -60,14 +63,14 @@ export function Explore() {
         `/api/curation/playlists/${playlistId}/follow`,
         isFollowed ? "DELETE" : "POST",
       );
-      toast.success(
+      notify.success(
         isFollowed
           ? t("explore.toasts.removedFromLibrary")
           : t("explore.toasts.addedToLibrary"),
       );
       refetch();
     } catch {
-      toast.error(t("explore.toasts.updatePlaylistFailed"));
+      notify.error(t("explore.toasts.updatePlaylistFailed"));
     }
   }
 
@@ -95,9 +98,9 @@ export function Explore() {
   }
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">{t("explore.title")}</h1>
+      <PageHeader size="md" title={t("explore.title")} />
       <div className="space-y-6">
-        {loading ? <ExploreLoadingState /> : null}
+        {loading ? <LoadingState label={t("common.loadingShort")} /> : null}
 
         {filters ? (
           <>
@@ -132,7 +135,7 @@ export function Explore() {
 
             {filters.decades.length > 0 && (
               <div className="space-y-4">
-                <ExploreSectionHeader
+                <SectionHeader
                   title={t("explore.timeTunnels.title")}
                   subtitle={t("explore.timeTunnels.subtitle")}
                 />
@@ -162,8 +165,8 @@ export function Explore() {
               />
             ) : null}
           </>
-        ) : (
-          <p className="text-text-muted text-sm">{t("explore.noFilters")}</p>
+        ) : loading ? null : (
+          <EmptyState variant="inline" message={t("explore.noFilters")} />
         )}
       </div>
     </div>

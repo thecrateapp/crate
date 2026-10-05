@@ -1,5 +1,4 @@
-import { useCallback, useRef } from "react";
-import { toast } from "sonner";
+import { useCallback } from "react";
 import type { Track } from "@/contexts/player-types";
 import {
   preloadEqualizerPopover,
@@ -12,7 +11,6 @@ import { triggerHaptic } from "@/lib/haptics";
 
 type UsePlayerBarActionsOptions = {
   displayTrack: Track | undefined;
-  isDesktop: boolean;
   isRemoteConnectActive: boolean;
   jamQueueLocked: boolean;
   showQueue: boolean;
@@ -47,7 +45,6 @@ type UsePlayerBarActionsOptions = {
 
 export function usePlayerBarActions({
   displayTrack,
-  isDesktop,
   isRemoteConnectActive,
   jamQueueLocked,
   showQueue,
@@ -69,15 +66,6 @@ export function usePlayerBarActions({
   toggleShuffle,
   cycleRepeat,
 }: UsePlayerBarActionsOptions) {
-  const coverLongPressTimerRef = useRef<number | null>(null);
-  const coverLongPressTriggeredRef = useRef(false);
-
-  const clearCoverLongPressTimer = useCallback(() => {
-    if (coverLongPressTimerRef.current === null) return;
-    window.clearTimeout(coverLongPressTimerRef.current);
-    coverLongPressTimerRef.current = null;
-  }, []);
-
   const prepareQueuePanel = useCallback(() => {
     setShouldRenderQueuePanel(true);
     void preloadQueuePanel();
@@ -200,69 +188,19 @@ export function usePlayerBarActions({
     }
   }, [displayTrack, likeTrack, liked, unlikeTrack]);
 
-  const handleCoverTouchStart = useCallback(() => {
-    if (isDesktop) return;
-    coverLongPressTriggeredRef.current = false;
-    clearCoverLongPressTimer();
-    coverLongPressTimerRef.current = window.setTimeout(() => {
-      coverLongPressTriggeredRef.current = true;
-      coverLongPressTimerRef.current = null;
-      triggerHaptic("selection");
-      void toggleLike().then((nextLiked) => {
-        if (nextLiked === null) return;
-        toast.success(
-          nextLiked ? "Added to liked tracks" : "Removed from liked tracks",
-        );
-      });
-    }, 520);
-  }, [clearCoverLongPressTimer, isDesktop, toggleLike]);
-
-  const handleCoverTouchMove = useCallback(() => {
-    clearCoverLongPressTimer();
-  }, [clearCoverLongPressTimer]);
-
-  const handleCoverTouchEnd = useCallback(() => {
-    clearCoverLongPressTimer();
-  }, [clearCoverLongPressTimer]);
-
-  const handleAddToCollection = useCallback(async () => {
-    if (!displayTrack) return;
-    try {
-      await likeTrack(
-        displayTrack.libraryTrackId ?? null,
-        displayTrack.entityUid ?? null,
-        displayTrack.path || displayTrack.id,
-        displayTrack.globalTrackUid ?? null,
-      );
-      toast.success("Added to collection");
-    } catch {
-      // The collection action reports failures through its own UI.
-    }
-  }, [displayTrack, likeTrack]);
-
   return {
-    clearCoverLongPressTimer,
-    coverLongPressTriggeredRef,
-    handleAddToCollection,
-    handleCoverTouchEnd,
-    handleCoverTouchMove,
-    handleCoverTouchStart,
     handleCycleRepeat,
     handleToggleEqualizer,
     handleToggleExtendedPlayer,
     handleToggleLyrics,
     handleToggleQueue,
     handleToggleShuffle,
-    isCoverLongPressTriggered: () => coverLongPressTriggeredRef.current,
     openFullscreenPlayer,
     prepareEqualizerPopover,
     prepareExtendedPlayer,
     prepareFullscreenPlayer,
     prepareLyricsPanel,
     prepareQueuePanel,
-    resetCoverLongPress: () => {
-      coverLongPressTriggeredRef.current = false;
-    },
     toggleLike,
   };
 }

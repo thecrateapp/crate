@@ -3,13 +3,14 @@ import { useEffect, useSyncExternalStore, type MutableRefObject } from "react";
 import type { CrossfadeTransition } from "@/contexts/PlayerContext";
 import type { Track } from "@/contexts/player-types";
 import { extractPalette } from "@/lib/palette";
+import { clamp } from "@/lib/utils";
 import type { MusicVisualizer } from "./MusicVisualizer";
 import type { VisualizerTrackProfile } from "./useTrackVisualizerProfile";
 import {
   readVisualizerColors,
   type VisualizerColorTriplet,
 } from "./visualizer-colors";
-import { adjustPaletteColor, clamp } from "./visualizer-palette-math";
+import { adjustPaletteColor } from "./visualizer-palette-math";
 import {
   getAppliedThemeSkin,
   subscribeThemeSkin,

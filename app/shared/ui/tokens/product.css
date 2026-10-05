@@ -134,8 +134,6 @@
     var(--accent-action) 95%,
     transparent
   );
-  --map-popup-shadow: 0 10px 30px
-    color-mix(in srgb, var(--surface-glass-shadow) 93.75%, transparent);
   --home-upcoming-empty-surface: radial-gradient(
       circle at top left,
       color-mix(in srgb, var(--accent-action) 16%, transparent),
@@ -158,15 +156,12 @@
     var(--surface-canvas) 25%,
     transparent
   );
+  --artwork-scrim: #000;
+  --artwork-foreground: #fff;
   --artwork-mark-shadow: 0 1px 8px var(--surface-glass-shadow);
   --artwork-text-shadow: 0 2px 18px var(--surface-glass-shadow);
   --artwork-kicker-shadow: 0 1px 10px var(--surface-glass-shadow);
   --artwork-compact-mark-shadow: 0 1px 6px var(--surface-glass-shadow);
-  --user-profile-badge-rose-border: color-mix(
-    in srgb,
-    var(--state-danger) 30%,
-    transparent
-  );
   --hero-artwork-gradient-mobile: linear-gradient(
     to bottom,
     transparent 0%,

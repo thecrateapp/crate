@@ -732,6 +732,11 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ),
     ),
     (
+        "crate.worker_handlers.crate_download",
+        "CRATE_DOWNLOAD_TASK_HANDLERS",
+        ("crate_download",),
+    ),
+    (
         "crate.worker_handlers.cast_spectrum",
         "CAST_SPECTRUM_TASK_HANDLERS",
         ("generate_cast_spectrum",),

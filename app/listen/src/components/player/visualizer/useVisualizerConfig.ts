@@ -2,6 +2,7 @@ import { useMemo, type MutableRefObject } from "react";
 
 import type { CrossfadeTransition } from "@/contexts/PlayerContext";
 import type { Track } from "@/contexts/player-types";
+import { clamp } from "@/lib/utils";
 import {
   type PlayerSurfaceMode,
   type VisualizerSettingsPreference,
@@ -11,7 +12,6 @@ import {
   useTrackVisualizerProfile,
   type VisualizerTrackProfile,
 } from "./useTrackVisualizerProfile";
-import { clamp } from "./visualizer-palette-math";
 import { useVisualizerEngineSettings } from "./useVisualizerEngineSettings";
 import { useVisualizerPalette } from "./useVisualizerPalette";
 import { useVisualizerPreferences } from "./useVisualizerPreferences";

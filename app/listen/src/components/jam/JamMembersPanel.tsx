@@ -1,5 +1,7 @@
 import type { TFunction } from "i18next";
 
+import { Button } from "@crate/ui/shadcn/button";
+
 import { JamAvatarBubble } from "@/components/jam/JamAvatarBubble";
 import type { JamRoom, JamTrackRequest } from "@/pages/jam-reducer";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
@@ -21,7 +23,7 @@ export function JamMembersPanel({
   handleResolveRequest,
 }: JamMembersPanelProps) {
   return (
-    <section className="jam-members-panel min-h-0 min-w-0 overflow-hidden rounded-[12px] p-5 sm:p-6">
+    <section className="jam-members-panel min-h-0 min-w-0 overflow-hidden rounded-panel p-5 sm:p-6">
       <h2 className="text-lg font-semibold text-text-primary">
         {t("jam.room.members")}
       </h2>
@@ -54,20 +56,22 @@ export function JamMembersPanel({
                 </div>
                 {canManageQueue ? (
                   <>
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="xs"
                       onClick={() => handleResolveRequest(request.id, true)}
-                      className="jam-request-action rounded-md px-2 py-1 text-xs font-medium"
+                      className="jam-request-action h-auto px-2 py-1 has-[>svg]:px-2"
                     >
                       {t("jam.room.approveRequest")}
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="xs"
                       onClick={() => handleResolveRequest(request.id, false)}
-                      className="jam-secondary-action rounded-md px-2 py-1 text-xs text-text-muted transition-colors"
+                      className="jam-secondary-action h-auto px-2 py-1 font-normal text-text-muted hover:text-text-muted has-[>svg]:px-2"
                     >
                       {t("jam.room.rejectRequest")}
-                    </button>
+                    </Button>
                   </>
                 ) : (
                   <span className="jam-warning-text text-xs">

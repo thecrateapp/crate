@@ -9,6 +9,8 @@ export interface CrateAlbum {
 
 export interface CrateSummary {
   id: string;
+  short_code?: string | null;
+  public_ref?: string | null;
   owner_id: number;
   owner_username?: string | null;
   owner_name?: string | null;
@@ -16,9 +18,16 @@ export interface CrateSummary {
   description: string;
   visibility: "private" | "public";
   is_collaborative: boolean;
+  is_ordered: boolean;
+  sort_direction: "asc" | "desc";
+  loop_enabled: boolean;
   access: "owner" | "collaborator" | "public" | null;
   album_count: number;
+  track_count: number;
+  follower_count?: number;
+  is_followed?: boolean;
   first_album: CrateAlbum | null;
+  albums: CrateAlbum[];
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -26,15 +35,24 @@ export interface CrateSummary {
 export type PublicCrate = Pick<
   CrateSummary,
   | "id"
+  | "short_code"
+  | "public_ref"
   | "name"
   | "description"
   | "is_collaborative"
   | "album_count"
   | "first_album"
+  | "track_count"
+  | "visibility"
+  | "access"
+  | "owner_id"
+  | "follower_count"
+  | "is_followed"
 >;
 
 export interface CrateDetail extends CrateSummary {
   albums: CrateAlbum[];
+  owner_avatar?: string | null;
 }
 
 export interface CratePlaybackTrack {
@@ -55,8 +73,20 @@ export interface CrateMember {
   crate_id: string;
   user_id: number;
   username?: string | null;
+  name?: string | null;
   display_name?: string | null;
   avatar?: string | null;
+  role?: "owner" | "collaborator";
+}
+
+export interface CrateInvite {
+  token: string;
+  crate_id: string;
+  join_url: string;
+  created_at?: string | null;
+  expires_at?: string | null;
+  max_uses?: number | null;
+  use_count: number;
 }
 
 export interface CatalogAlbum {

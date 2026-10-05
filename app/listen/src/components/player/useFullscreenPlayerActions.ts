@@ -3,7 +3,7 @@ import type { TFunction } from "i18next";
 import type { Track } from "@/contexts/PlayerContext";
 import type { PlayerSurfaceMode } from "@/lib/player-visualizer-prefs";
 import { setPlayerSurfaceModePreference } from "@/lib/player-visualizer-prefs";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 import { triggerHaptic } from "@/lib/haptics";
 
 type LikeTrack = (
@@ -73,13 +73,13 @@ export function useFullscreenPlayerActions({
         currentTrack.path || currentTrack.id,
         currentTrack.globalTrackUid ?? null,
       );
-      toast.success(
+      notify.success(
         nextLiked
           ? t("actions.track.toasts.liked")
           : t("actions.track.toasts.unliked"),
       );
     } catch {
-      toast.error(t("player.toasts.updateLikedTracksFailed"));
+      notify.error(t("player.toasts.updateLikedTracksFailed"));
     }
   }, [currentTrack, t, toggleTrackLike]);
 

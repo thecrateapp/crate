@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
 import type { CrateIcon } from "@crate/ui/icons";
 import type { ContextMenuEntry } from "@crate/ui/domain/actions";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import type { TrackRowData } from "@/components/cards/TrackRow";
 import type { PlaylistHeroSecondaryAction } from "@/components/playlists/PlaylistHeroSection";
@@ -22,9 +22,9 @@ import { inviteShareUrl, publicShareUrl } from "@/lib/share-url";
 import { openShareSheet } from "@/lib/social-share";
 import { shuffleArray } from "@/lib/utils";
 import {
-  buildPlaylistMenuItems,
-  buildPlaylistSecondaryActions,
+  buildPlaylistPageActions,
   getPlaylistOfflineIcon,
+  type PlaylistPageActions,
 } from "@/pages/playlist-action-menus";
 import type { PlaylistOfflinePresentation } from "@/pages/playlist-page-model";
 import type {
@@ -32,6 +32,12 @@ import type {
   PlaylistInvite,
   PlaylistSavePayload,
 } from "@/pages/playlist-types";
+
+const EMPTY_PAGE_ACTIONS: PlaylistPageActions = {
+  offlineIcon: getPlaylistOfflineIcon("idle", { busy: false }),
+  playlistMenuItems: [],
+  secondaryActions: [],
+};
 
 type OpenCreatePlaylist = ReturnType<
   typeof usePlaylistComposer
@@ -151,12 +157,12 @@ export function buildPlaylistActions({
         playlistName: data.name,
       });
       if (!radio.tracks.length) {
-        toast.info(t("playlist.toasts.radioUnavailable"));
+        notify.info(t("playlist.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error(t("playlist.toasts.radioFailed"));
+      notify.error(t("playlist.toasts.radioFailed"));
     }
   }
 
@@ -179,13 +185,13 @@ export function buildPlaylistActions({
         title: data.name,
         isSmart: data.is_smart,
       });
-      toast.success(
+      notify.success(
         result === "removed"
           ? t("playlist.toasts.offlineRemoved")
           : t("playlist.toasts.availableOffline"),
       );
     } catch (error) {
-      toast.error(
+      notify.error(
         (error as Error).message || t("playlist.toasts.offlineUpdateFailed"),
       );
     }
@@ -206,9 +212,9 @@ export function buildPlaylistActions({
           }),
         ],
       });
-      toast.success(t("playlist.toasts.trackAdded"));
+      notify.success(t("playlist.toasts.trackAdded"));
     } catch {
-      toast.error(t("playlist.toasts.trackAddFailed"));
+      notify.error(t("playlist.toasts.trackAddFailed"));
     }
   }
 
@@ -222,10 +228,10 @@ export function buildPlaylistActions({
     if (!id) return;
     try {
       await api(`/api/playlists/${id}/generate`, "POST");
-      toast.success(t("playlist.toasts.regenerated"));
+      notify.success(t("playlist.toasts.regenerated"));
       refetch();
     } catch {
-      toast.error(t("playlist.toasts.regenerateFailed"));
+      notify.error(t("playlist.toasts.regenerateFailed"));
     }
   }
 
@@ -279,11 +285,11 @@ export function buildPlaylistActions({
         });
       }
 
-      toast.success(t("playlist.toasts.updated"));
+      notify.success(t("playlist.toasts.updated"));
       setEditorOpen(false);
       refetch();
     } catch {
-      toast.error(t("playlist.toasts.updateFailed"));
+      notify.error(t("playlist.toasts.updateFailed"));
     } finally {
       setSaving(false);
     }
@@ -294,10 +300,10 @@ export function buildPlaylistActions({
     setDeleting(true);
     try {
       await api(`/api/playlists/${id}`, "DELETE");
-      toast.success(t("playlist.toasts.deleted"));
+      notify.success(t("playlist.toasts.deleted"));
       navigate("/library?tab=playlists");
     } catch {
-      toast.error(t("playlist.toasts.deleteFailed"));
+      notify.error(t("playlist.toasts.deleteFailed"));
     } finally {
       setDeleting(false);
       setDeleteOpen(false);
@@ -314,9 +320,9 @@ export function buildPlaylistActions({
         {},
       );
       onInviteCreated(invite);
-      toast.success(t("playlist.toasts.inviteCreated"));
+      notify.success(t("playlist.toasts.inviteCreated"));
     } catch {
-      toast.error(t("playlist.toasts.inviteCreateFailed"));
+      notify.error(t("playlist.toasts.inviteCreateFailed"));
     } finally {
       setCreatingInvite(false);
     }
@@ -327,9 +333,9 @@ export function buildPlaylistActions({
     const inviteLink = inviteShareUrl(inviteData);
     try {
       await navigator.clipboard.writeText(inviteLink);
-      toast.success(t("playlist.toasts.inviteCopied"));
+      notify.success(t("playlist.toasts.inviteCopied"));
     } catch {
-      toast.error(t("playlist.toasts.inviteCopyFailed"));
+      notify.error(t("playlist.toasts.inviteCopyFailed"));
     }
   }
 
@@ -338,36 +344,38 @@ export function buildPlaylistActions({
     setRemovingMemberId(memberUserId);
     try {
       await api(`/api/playlists/${data.id}/members/${memberUserId}`, "DELETE");
-      toast.success(t("playlist.toasts.collaboratorRemoved"));
+      notify.success(t("playlist.toasts.collaboratorRemoved"));
       refetch();
     } catch {
-      toast.error(t("playlist.toasts.collaboratorRemoveFailed"));
+      notify.error(t("playlist.toasts.collaboratorRemoveFailed"));
     } finally {
       setRemovingMemberId(null);
     }
   }
 
-  const offlineIcon = getPlaylistOfflineIcon(offlineState, offlinePresentation);
-  const menuInput = {
-    data,
-    offlinePresentation,
-    offlineState,
-    offlineSupported,
-    playerTracks,
-    offlineIcon,
-    handlePlay,
-    handleShuffle,
-    handlePlaylistRadio,
-    handleRegenerate,
-    handleShare,
-    handleToggleOffline,
-    setDeleteOpen,
-    setEditorOpen,
-    setMembersOpen,
-    t,
-  };
-  const secondaryActions = buildPlaylistSecondaryActions(menuInput);
-  const playlistMenuItems = buildPlaylistMenuItems(menuInput);
+  const { offlineIcon, playlistMenuItems, secondaryActions } = data
+    ? buildPlaylistPageActions({
+        t,
+        playDisabled: playerTracks.length === 0,
+        onPlay: handlePlay,
+        onShuffle: handleShuffle,
+        onRadio: handlePlaylistRadio,
+        onShare: handleShare,
+        offline: {
+          state: offlineState,
+          presentation: offlinePresentation,
+          supported: offlineSupported,
+          isSmart: data.is_smart,
+          onToggle: handleToggleOffline,
+        },
+        onCollaborators: data.is_collaborative
+          ? () => setMembersOpen(true)
+          : undefined,
+        onEdit: () => setEditorOpen(true),
+        onRegenerate: data.is_smart ? handleRegenerate : undefined,
+        onDelete: () => setDeleteOpen(true),
+      })
+    : EMPTY_PAGE_ACTIONS;
 
   return {
     handleAddTrackToPlaylist,

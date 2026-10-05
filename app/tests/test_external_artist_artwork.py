@@ -333,6 +333,38 @@ def test_external_artist_photo_public_cache_miss_does_not_queue_remote_work(
     assert queued == []
 
 
+def test_external_artist_photo_known_miss_is_publicly_cacheable(monkeypatch):
+    from crate.api import browse_artist
+
+    queued: list[str] = []
+    monkeypatch.setattr(
+        browse_artist,
+        "get_cached_external_artist_artwork_path",
+        lambda _name: None,
+    )
+    monkeypatch.setattr(
+        browse_artist, "is_external_artist_artwork_missing", lambda _name: True
+    )
+    monkeypatch.setattr(
+        browse_artist,
+        "queue_external_artist_artwork",
+        lambda name: queued.append(name),
+    )
+
+    def unexpected_remote_lookup(_name: str):
+        raise AssertionError("the HTTP request must not resolve remote artwork")
+
+    monkeypatch.setattr("crate.lastfm.get_best_artist_image", unexpected_remote_lookup)
+
+    response = browse_artist.api_external_artist_photo(SimpleNamespace(), "Converge")
+
+    assert response.status_code == 404
+    assert response.headers["cache-control"] == "public, max-age=86400"
+    assert response.headers["x-crate-external-artwork"] == "missing"
+    assert "retry-after" not in response.headers
+    assert queued == []
+
+
 def test_authenticated_related_artist_enrichment_queues_external_artwork(
     monkeypatch,
 ):

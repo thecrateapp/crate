@@ -1,7 +1,7 @@
 import { useState } from "react";
 
-import { UpcomingEventRow } from "@/components/upcoming/UpcomingEventRow";
-import { UpcomingShowCard } from "@/components/upcoming/UpcomingShowCard";
+import { ReleaseRow } from "@/components/upcoming/ReleaseRow";
+import { ShowCard } from "@/components/upcoming/ShowCard";
 import {
   artistShowToUpcomingItem,
   formatMonthLabel,
@@ -17,8 +17,8 @@ export {
   itemKey,
   type ArtistShowEvent,
   type UpcomingItem,
-  UpcomingEventRow,
-  UpcomingShowCard,
+  ReleaseRow,
+  ShowCard,
 };
 
 export function UpcomingMonthGroup({
@@ -38,7 +38,7 @@ export function UpcomingMonthGroup({
 
   return (
     <div className="space-y-2">
-      <div className="border-b border-text-primary/5 pb-2 text-xs font-semibold uppercase tracking-[0.18em] text-text-primary/40">
+      <div className="border-b border-text-primary/5 pb-2 text-xs font-semibold uppercase tracking-eyebrow text-text-primary/40">
         {formatMonthLabel(month)}
       </div>
       <div className="space-y-2">
@@ -51,7 +51,7 @@ export function UpcomingMonthGroup({
 
           if (item.type === "show") {
             return (
-              <UpcomingShowCard
+              <ShowCard
                 key={key}
                 item={itemWithOverrides}
                 expanded={expandedId === key}
@@ -66,7 +66,7 @@ export function UpcomingMonthGroup({
             );
           }
 
-          return <UpcomingEventRow key={key} item={itemWithOverrides} />;
+          return <ReleaseRow key={key} item={itemWithOverrides} />;
         })}
       </div>
     </div>

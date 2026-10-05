@@ -1,19 +1,17 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { toast } from "sonner";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
-import {
-  artistGenreSlug,
-  type ArtistData,
-} from "@/components/artist/artist-model";
+import type { ArtistData } from "@/components/artist/artist-model";
 import { AppModal } from "@crate/ui/primitives/AppModal";
+import { notify } from "@crate/ui/lib/notify";
 import {
   ArtistBioProfile,
   type ArtistBioMember,
 } from "@crate/ui/domain/ArtistBioProfile";
 import { openExternalUrl } from "@/lib/external-links";
+import { genreSlug } from "@/lib/utils";
 
 import type { ArtistBioModalProps } from "./artist-bio-types";
 import { useArtistBioEnrichment } from "./use-artist-bio-enrichment";
@@ -28,8 +26,30 @@ export function ArtistBioModal({
   tags,
   onClose,
 }: ArtistBioModalProps) {
-  const navigate = useNavigate();
   const { t } = useTranslation();
+  const bioLabels = useMemo(
+    () => ({
+      biography: t("artist.bio.biography"),
+      more: t("common.more"),
+      less: t("artist.bio.less"),
+      currentMembers: t("artist.bio.currentMembers"),
+      formerMembers: t("artist.bio.formerMembers"),
+      member: t("artist.bio.member"),
+      role: t("artist.bio.role"),
+      since: t("artist.bio.memberSince"),
+      from: t("artist.bio.memberFrom"),
+      to: t("artist.bio.memberTo"),
+      unknown: t("common.unknown"),
+      listeners: t("artist.bio.listeners"),
+      scrobbles: t("artist.bio.scrobbles"),
+      followers: t("artist.bio.followers"),
+      popularity: t("artist.bio.popularity"),
+      albums: t("artist.bio.albums"),
+      tracks: t("artist.bio.tracks"),
+    }),
+    [t],
+  );
+  const navigate = useNavigate();
   const bio = artistInfo?.bio ?? "";
   const [bioExpanded, setBioExpanded] = useState(true);
   const enrichment = useArtistBioEnrichment(open, artist.id);
@@ -61,12 +81,14 @@ export function ArtistBioModal({
     <AppModal
       open={open}
       onClose={onClose}
+      ariaLabel={artist.name}
       maxWidthClassName="sm:max-w-4xl"
       overlayClassName="bg-surface-canvas-overlay"
       panelClassName="listen-glass-panel flex min-h-0 w-full max-w-4xl flex-col overflow-hidden border-0 sm:max-h-[92vh]"
       mobileSafeArea
     >
       <ArtistBioProfile
+        labels={bioLabels}
         artistName={artist.name}
         photoUrl={photoUrl}
         photoContent={
@@ -77,7 +99,9 @@ export function ArtistBioModal({
           />
         }
         meta={[
-          ...(mb?.begin_date ? [`Since ${mb.begin_date}`] : []),
+          ...(mb?.begin_date
+            ? [t("artist.bio.since", { date: mb.begin_date })]
+            : []),
           ...(mb?.country
             ? [mb.area ? `${mb.area}, ${mb.country}` : mb.country]
             : []),
@@ -103,14 +127,14 @@ export function ArtistBioModal({
         onGenreSelect={(item) => {
           navigate(
             `/explore?genre=${encodeURIComponent(
-              item.slug || artistGenreSlug(item.name),
+              item.slug || genreSlug(item.name),
             )}`,
           );
           onClose();
         }}
         onExternalLink={(url) =>
           void openExternalUrl(url).catch(() =>
-            toast.error(t("common.toasts.openExternalFailed")),
+            notify.error(t("common.toasts.openExternalFailed")),
           )
         }
       />
@@ -124,7 +148,7 @@ function getGenreItems(artist: ArtistData, tags: string[]) {
   }
   return tags.map((tag) => ({
     name: tag,
-    slug: artistGenreSlug(tag),
+    slug: genreSlug(tag),
     source: "artist" as const,
   }));
 }

@@ -21,54 +21,6 @@ export interface SavedAlbum {
   saved_at?: string;
 }
 
-export interface LibraryAddition {
-  type: "album" | "playlist" | "system_playlist";
-  added_at: string;
-  album_id?: number;
-  album_entity_uid?: string;
-  album_slug?: string;
-  album_name?: string;
-  album_artist?: string;
-  album_artist_id?: number;
-  album_artist_entity_uid?: string;
-  album_artist_slug?: string;
-  album_year?: string;
-  playlist_id?: number;
-  playlist_name?: string;
-  playlist_description?: string;
-  playlist_tracks?: PlaylistArtworkTrack[];
-  playlist_cover_data_url?: string | null;
-  playlist_track_count?: number;
-  playlist_follower_count?: number;
-  playlist_badge?: string;
-}
-
-export interface UserPlaylist {
-  id: number;
-  name: string;
-  description?: string;
-  cover_data_url?: string | null;
-  artwork_tracks?: PlaylistArtworkTrack[];
-  track_count: number;
-  updated_at?: string;
-  created_at?: string;
-}
-
-export interface CuratedPlaylist {
-  id: number;
-  name: string;
-  description?: string;
-  category?: string | null;
-  cover_data_url?: string | null;
-  artwork_tracks?: PlaylistArtworkTrack[];
-  track_count: number;
-  follower_count: number;
-  is_followed: boolean;
-  is_smart: boolean;
-  followed_at?: string;
-  updated_at?: string;
-}
-
 export interface GlobalArtist {
   id?: number;
   entity_uid?: string;
@@ -81,13 +33,6 @@ export interface GlobalArtist {
   track_count?: number;
   has_photo: boolean;
   photo_url?: string | null;
-}
-
-export interface PaginatedArtistsResponse {
-  items: GlobalArtist[];
-  total: number;
-  page: number;
-  per_page: number;
 }
 
 export interface HomeUpcomingItem {

@@ -12,6 +12,7 @@ import type { LocalOfflineIdentity } from "@/lib/offline-identity";
 import type {
   OfflineAlbumInput,
   OfflineContextValue,
+  OfflineCrateInput,
   OfflinePlaylistInput,
   OfflineTrackInput,
 } from "@/contexts/offline-context";
@@ -344,6 +345,27 @@ export function useOfflineRuntime(
     [assertWritable, enqueue, removeOfflineItem, syncManifestIntoItem],
   );
 
+  const toggleCrateOffline = useCallback(
+    (input: OfflineCrateInput) =>
+      enqueue(async () => {
+        const crateId = input.crateId?.trim();
+        if (!crateId) {
+          throw new Error("Crate offline requires Crate ID");
+        }
+        if (snapshotRef.current.items[getOfflineItemKey("crate", crateId)]) {
+          await removeOfflineItem("crate", crateId);
+          return "removed" as const;
+        }
+        await syncManifestIntoItem(
+          "crate",
+          crateId,
+          `/api/offline/crates/${encodeURIComponent(crateId)}/manifest`,
+        );
+        return "enabled" as const;
+      }),
+    [enqueue, removeOfflineItem, syncManifestIntoItem],
+  );
+
   const clearActiveProfile = useCallback(async () => {
     assertWritable();
     if (!profileKey || !supported) return;
@@ -375,10 +397,15 @@ export function useOfflineRuntime(
       getPlaylistState: (playlistId) =>
         snapshot.items[getOfflineItemKey("playlist", playlistId ?? "")]
           ?.state ?? "idle",
+      getCrateState: (crateId) =>
+        snapshot.items[getOfflineItemKey("crate", crateId ?? "")]?.state ??
+        "idle",
       getAlbumRecord: (albumId) =>
         snapshot.items[getOfflineItemKey("album", albumId ?? "")] ?? null,
       getPlaylistRecord: (playlistId) =>
         snapshot.items[getOfflineItemKey("playlist", playlistId ?? "")] ?? null,
+      getCrateRecord: (crateId) =>
+        snapshot.items[getOfflineItemKey("crate", crateId ?? "")] ?? null,
       isTrackOffline: (ref) => aggregateTrackState(items, ref) === "ready",
       isAlbumOffline: (albumId) =>
         snapshot.items[getOfflineItemKey("album", albumId ?? "")]?.state ===
@@ -386,9 +413,13 @@ export function useOfflineRuntime(
       isPlaylistOffline: (playlistId) =>
         snapshot.items[getOfflineItemKey("playlist", playlistId ?? "")]
           ?.state === "ready",
+      isCrateOffline: (crateId) =>
+        snapshot.items[getOfflineItemKey("crate", crateId ?? "")]?.state ===
+        "ready",
       toggleTrackOffline,
       toggleAlbumOffline,
       togglePlaylistOffline,
+      toggleCrateOffline,
       syncAll,
       clearActiveProfile,
     }),
@@ -403,6 +434,7 @@ export function useOfflineRuntime(
       syncing,
       toggleAlbumOffline,
       togglePlaylistOffline,
+      toggleCrateOffline,
       toggleTrackOffline,
     ],
   );

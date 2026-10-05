@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Globe } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Globe } from "@crate/ui/icons";
 
 import { Section } from "@/components/settings/SettingsPrimitives";
 import {
@@ -107,7 +107,7 @@ export function LanguageSection({
               <span className="block text-sm font-semibold">
                 {t(option.labelKey)}
               </span>
-              <span className="mt-1 block text-xs uppercase tracking-[0.18em] text-text-muted">
+              <span className="mt-1 block text-xs uppercase tracking-eyebrow text-text-muted">
                 {option.value}
               </span>
             </button>
@@ -116,7 +116,10 @@ export function LanguageSection({
       </div>
 
       <div className="flex items-start gap-3 rounded-lg border border-border-quiet/10 bg-text-primary/[0.03] px-4 py-3 text-sm text-text-muted">
-        <Globe size={16} className="mt-0.5 text-accent-action/80" />
+        <Globe
+          size={CRATE_ICON_SIZE.sm}
+          className="mt-0.5 text-accent-action/80"
+        />
         <span>
           {t("settings.language.current", {
             language: t(`settings.language.options.${activeLocale}`),

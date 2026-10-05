@@ -3,111 +3,133 @@ import { describe, expect, it, vi } from "vitest";
 import { ArrowDownToLine } from "@crate/ui/icons";
 
 import {
-  buildPlaylistMenuItems,
-  buildPlaylistSecondaryActions,
+  buildPlaylistPageActions,
   getPlaylistOfflineIcon,
-  type PlaylistActionMenuInput,
+  type PlaylistPageActionInput,
 } from "@/pages/playlist-action-menus";
-import type { PlaylistData } from "@/pages/playlist-types";
-
-const playlist = {
-  id: 42,
-  name: "Screamo",
-  is_smart: false,
-  is_collaborative: false,
-  user_id: 7,
-  track_count: 0,
-  total_duration: 0,
-  created_at: "2026-06-01T00:00:00Z",
-  updated_at: "2026-06-01T00:00:00Z",
-  tracks: [],
-} as PlaylistData;
 
 function buildInput(
-  overrides: Partial<PlaylistActionMenuInput> = {},
-): PlaylistActionMenuInput {
+  overrides: Partial<PlaylistPageActionInput> = {},
+): PlaylistPageActionInput {
   return {
-    data: playlist,
-    offlinePresentation: {
-      busy: false,
-      progress: null,
-      buttonLabel: "Make available offline",
-      statusDetail: null,
+    t: ((key: string) => key) as PlaylistPageActionInput["t"],
+    playDisabled: true,
+    onPlay: vi.fn(),
+    onShuffle: vi.fn(),
+    onRadio: vi.fn(),
+    onShare: vi.fn(),
+    offline: {
+      state: "idle",
+      presentation: { busy: false, buttonLabel: "Make available offline" },
+      supported: true,
+      isSmart: false,
+      onToggle: vi.fn(),
     },
-    offlineState: "idle",
-    offlineSupported: true,
-    playerTracks: [],
-    offlineIcon: ArrowDownToLine,
-    handlePlay: vi.fn(),
-    handleShuffle: vi.fn(),
-    handlePlaylistRadio: vi.fn(),
-    handleRegenerate: vi.fn(),
-    handleShare: vi.fn(),
-    handleToggleOffline: vi.fn(),
-    setDeleteOpen: vi.fn(),
-    setEditorOpen: vi.fn(),
-    setMembersOpen: vi.fn(),
-    t: ((key: string) => key) as PlaylistActionMenuInput["t"],
+    onEdit: vi.fn(),
+    onDelete: vi.fn(),
     ...overrides,
   };
 }
 
+function keys(input: PlaylistPageActionInput) {
+  const actions = buildPlaylistPageActions(input);
+  return {
+    secondary: actions.secondaryActions.map((action) => action.key),
+    menu: actions.playlistMenuItems.map((item) => item.key),
+  };
+}
+
 describe("playlist action menus", () => {
-  it("returns empty menus while the playlist is unavailable", () => {
-    const input = buildInput({ data: undefined });
-
-    expect(buildPlaylistSecondaryActions(input)).toEqual([]);
-    expect(buildPlaylistMenuItems(input)).toEqual([]);
-  });
-
   it("keeps the regular playlist action order and visibility", () => {
-    const input = buildInput();
-
-    expect(
-      buildPlaylistSecondaryActions(input).map((action) => action.key),
-    ).toEqual(["radio", "offline", "edit", "share"]);
-    expect(buildPlaylistMenuItems(input).map((item) => item.key)).toEqual([
-      "play",
-      "shuffle",
-      "radio",
-      "playlist-state-divider",
-      "offline",
-      "edit",
-      "share",
-      "playlist-danger-divider",
-      "delete",
-    ]);
+    expect(keys(buildInput())).toEqual({
+      secondary: ["radio", "offline", "edit", "share"],
+      menu: [
+        "play",
+        "shuffle",
+        "radio",
+        "divider-playlist-library",
+        "offline",
+        "edit",
+        "divider-playlist-share",
+        "share",
+        "divider-playlist-danger",
+        "delete",
+      ],
+    });
   });
 
   it("adds collaborator and smart-playlist actions only when applicable", () => {
     const input = buildInput({
-      data: { ...playlist, is_smart: true, is_collaborative: true },
+      onCollaborators: vi.fn(),
+      onRegenerate: vi.fn(),
     });
 
-    expect(
-      buildPlaylistSecondaryActions(input).map((action) => action.key),
-    ).toContain("collaborators");
-    expect(buildPlaylistMenuItems(input).map((item) => item.key)).toEqual([
-      "play",
-      "shuffle",
-      "radio",
-      "playlist-state-divider",
-      "offline",
-      "collaborators",
-      "edit",
-      "regenerate",
-      "share",
-      "playlist-danger-divider",
-      "delete",
-    ]);
+    expect(keys(input)).toEqual({
+      secondary: ["radio", "offline", "collaborators", "edit", "share"],
+      menu: [
+        "play",
+        "shuffle",
+        "radio",
+        "divider-playlist-library",
+        "offline",
+        "collaborators",
+        "edit",
+        "regenerate",
+        "divider-playlist-share",
+        "share",
+        "divider-playlist-danger",
+        "delete",
+      ],
+    });
+  });
+
+  it("builds the curated playlist surface from the same builder", () => {
+    const input = buildInput({
+      onEdit: undefined,
+      onDelete: undefined,
+      follow: { followed: false, pending: false, onToggle: vi.fn() },
+    });
+
+    expect(keys(input)).toEqual({
+      secondary: ["radio", "offline", "follow", "share"],
+      menu: [
+        "play",
+        "shuffle",
+        "radio",
+        "divider-playlist-library",
+        "follow",
+        "offline",
+        "divider-playlist-share",
+        "share",
+      ],
+    });
+  });
+
+  it("omits offline actions for generated playlists", () => {
+    const input = buildInput({
+      offline: undefined,
+      onEdit: undefined,
+      onDelete: undefined,
+    });
+
+    expect(keys(input)).toEqual({
+      secondary: ["radio", "share"],
+      menu: ["play", "shuffle", "radio", "divider-playlist-share", "share"],
+    });
+  });
+
+  it("disables playback entries while the playlist has no playable tracks", () => {
+    const { playlistMenuItems } = buildPlaylistPageActions(buildInput());
+    const play = playlistMenuItems.find((item) => item.key === "play");
+    expect(play).toMatchObject({ disabled: true });
   });
 
   it("uses the download icon state shared by both menu surfaces", () => {
-    expect(
-      getPlaylistOfflineIcon("idle", buildInput().offlinePresentation),
-    ).toBe(ArrowDownToLine);
-    expect(
-      getPlaylistOfflineIcon("ready", buildInput().offlinePresentation),
-    ).not.toBe(ArrowDownToLine);
+    expect(getPlaylistOfflineIcon("idle", { busy: false })).toBe(
+      ArrowDownToLine,
+    );
+    expect(getPlaylistOfflineIcon("ready", { busy: false })).not.toBe(
+      ArrowDownToLine,
+    );
   });
 });

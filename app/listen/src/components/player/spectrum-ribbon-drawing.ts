@@ -1,4 +1,5 @@
 import { readCanvasColorToken } from "@/lib/canvas-color";
+import { clamp } from "@/lib/utils";
 import { SPECTRUM_RIBBON_COLOR_TOKENS } from "./visualizer-color-tokens";
 
 export interface SpectrumRibbonBands {
@@ -26,10 +27,6 @@ const BAND_RANGES = [
 ] as const;
 const POINT_COUNT = 88;
 const THREAD_COUNT = SPECTRUM_RIBBON_PERSISTENCE.threadCount;
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
 
 function gaussian(x: number, center: number, width: number) {
   const distance = (x - center) / width;

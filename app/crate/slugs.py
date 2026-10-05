@@ -28,3 +28,7 @@ def build_track_slug(
     artist_name: str | None, title: str | None, filename: str | None = None
 ) -> str:
     return slugify(f"{artist_name or ''}-{title or filename or ''}", "track")
+
+
+def build_crate_slug(name: str | None) -> str:
+    return slugify(name, "crate")

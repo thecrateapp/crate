@@ -8,7 +8,10 @@ import { I18nProvider } from "./i18n/I18nProvider";
 import { startMediaAccessTicketRefresh } from "./lib/api";
 import { initCapacitor } from "./lib/capacitor";
 import { applyNativeColorMode } from "./lib/capacitor-init";
-import { primeOfflineRuntimeProfile } from "./lib/offline";
+import {
+  isOfflineMediaCacheName,
+  primeOfflineRuntimeProfile,
+} from "./lib/offline";
 import { shouldRegisterServiceWorker, usesMobileShell } from "./lib/platform";
 import { initRuntimeSentry, reportRuntimeError } from "./lib/runtime-sentry";
 import { bootstrapNativeSessionStore } from "./lib/server-store";
@@ -39,7 +42,8 @@ async function disableDevServiceWorker() {
     const cacheNames = await caches.keys();
     await Promise.all(
       cacheNames.map((cacheName) =>
-        cacheName.startsWith("crate-listen")
+        cacheName.startsWith("crate-listen") &&
+        !isOfflineMediaCacheName(cacheName)
           ? caches.delete(cacheName)
           : Promise.resolve(false),
       ),

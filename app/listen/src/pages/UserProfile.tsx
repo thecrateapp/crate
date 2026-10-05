@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router";
-import { ArrowLeft } from "@crate/ui/icons";
+import { useParams } from "react-router";
+import { ErrorState } from "@crate/ui/domain/states";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
@@ -28,7 +28,7 @@ export function UserProfile() {
     try {
       if (data.relationship_state.following) {
         await api("/api/users/" + data.id + "/follow", "DELETE");
-        toast.success(
+        notify.success(
           t("userProfile.toasts.unfollowed", {
             name:
               data.display_name || data.username || t("userProfile.thisUser"),
@@ -36,7 +36,7 @@ export function UserProfile() {
         );
       } else {
         await api("/api/users/" + data.id + "/follow", "POST");
-        toast.success(
+        notify.success(
           t("userProfile.toasts.following", {
             name:
               data.display_name || data.username || t("userProfile.thisUser"),
@@ -45,7 +45,7 @@ export function UserProfile() {
       }
       refetch();
     } catch {
-      toast.error(t("userProfile.toasts.updateFailed"));
+      notify.error(t("userProfile.toasts.updateFailed"));
     } finally {
       setBusy(false);
     }
@@ -57,18 +57,13 @@ export function UserProfile() {
 
   if (!data) {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-        <p className="text-lg font-medium text-text-primary">
-          {t("userProfile.notFound")}
-        </p>
-        <Link
-          to="/people"
-          className="inline-flex items-center gap-2 text-sm text-accent-action hover:underline"
-        >
-          <ArrowLeft size={14} />
-          {t("userProfile.backToPeople")}
-        </Link>
-      </div>
+      <ErrorState
+        kind="notFound"
+        title={t("userProfile.notFound")}
+        backTo="/people"
+        backLabel={t("userProfile.backToPeople")}
+        className="py-16"
+      />
     );
   }
 

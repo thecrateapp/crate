@@ -7,7 +7,7 @@ type EditorialVariant = "core" | "history" | "crate";
 
 interface EditorialPlaylistArtworkProps {
   title: string;
-  kicker?: string;
+  kicker: string;
   tracks?: PlaylistArtworkTrack[];
   coverDataUrl?: string | null;
   backgroundImageUrl?: string | null;
@@ -30,10 +30,20 @@ const VARIANT_RADIALS: Record<EditorialVariant, string> = {
 
 const EMPTY_TRACKS: PlaylistArtworkTrack[] = [];
 
+export type EditorialPlaylistKind = "core" | "crate";
+
+export const EDITORIAL_PLAYLIST_KICKER_KEYS: Record<
+  EditorialPlaylistKind,
+  string
+> = {
+  core: "playlist.editorial.coreTracks",
+  crate: "playlist.editorial.crateSelects",
+};
+
 export function editorialPlaylistLabel(
   name: string,
-  fallbackKicker = "Core Tracks",
-): { title: string; kicker: string } {
+  fallbackKind: EditorialPlaylistKind = "core",
+): { title: string; kind: EditorialPlaylistKind } {
   const cleaned = name.trim();
   const coreMatch = cleaned.match(/\s+core\s+tracks$/i);
   const mixMatch = cleaned.match(/\s+mix$/i);
@@ -41,23 +51,23 @@ export function editorialPlaylistLabel(
   if (coreMatch) {
     return {
       title: cleaned.slice(0, coreMatch.index).trim() || cleaned,
-      kicker: "Core Tracks",
+      kind: "core",
     };
   }
 
-  if (mixMatch && fallbackKicker === "Core Tracks") {
+  if (mixMatch && fallbackKind === "core") {
     return {
       title: cleaned.slice(0, mixMatch.index).trim() || cleaned,
-      kicker: fallbackKicker,
+      kind: "core",
     };
   }
 
-  return { title: cleaned || "Crate", kicker: fallbackKicker };
+  return { title: cleaned || "Crate", kind: fallbackKind };
 }
 
 export function EditorialPlaylistArtwork({
   title,
-  kicker = "Core Tracks",
+  kicker,
   tracks = EMPTY_TRACKS,
   coverDataUrl,
   backgroundImageUrl,

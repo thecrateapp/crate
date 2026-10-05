@@ -4,8 +4,9 @@ import type {
   MouseEvent as ReactMouseEvent,
   MouseEventHandler,
 } from "react";
+import { useTranslation } from "react-i18next";
 
-import { HeartBold } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, HeartBold } from "@crate/ui/icons";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import type { CrossfadeTransition } from "@/contexts/player-context";
@@ -18,9 +19,6 @@ interface PlayerBarArtworkProps {
   isDesktop: boolean;
   liked: boolean;
   onOpenAlbum: () => void;
-  onCoverTouchStart: () => void;
-  onCoverTouchMove: () => void;
-  onCoverTouchEnd: () => void;
 }
 
 interface ArtworkInteractionOptions {
@@ -115,14 +113,18 @@ function PlayerBarArtworkImage({
 }
 
 function PlayerBarLikedIndicator({ liked }: { liked: boolean }) {
+  const { t } = useTranslation();
   if (!liked) return null;
 
   return (
     <span
-      aria-label="Liked track"
+      aria-label={t("player.likedTrack")}
       className="listen-player-liked-indicator absolute -bottom-1 -right-1 flex size-4 items-center justify-center rounded-full backdrop-blur-md"
     >
-      <HeartBold size={10} className="animate-crate-icon-active-pulse" />
+      <HeartBold
+        size={CRATE_ICON_SIZE.nano}
+        className="animate-crate-icon-active-pulse"
+      />
     </span>
   );
 }
@@ -134,9 +136,6 @@ export function PlayerBarArtwork({
   isDesktop,
   liked,
   onOpenAlbum,
-  onCoverTouchStart,
-  onCoverTouchMove,
-  onCoverTouchEnd,
 }: PlayerBarArtworkProps) {
   const hasAlbum = Boolean(displayTrack.globalAlbumUid || displayTrack.albumId);
   const interactionProps = getArtworkInteractionProps({
@@ -146,13 +145,7 @@ export function PlayerBarArtwork({
   });
 
   return (
-    <div
-      {...interactionProps}
-      onTouchStart={onCoverTouchStart}
-      onTouchMove={onCoverTouchMove}
-      onTouchEnd={onCoverTouchEnd}
-      onTouchCancel={onCoverTouchEnd}
-    >
+    <div {...interactionProps}>
       <PlayerBarArtworkImage
         displayTrack={displayTrack}
         displayCrossfadeTransition={displayCrossfadeTransition}

@@ -1,5 +1,6 @@
 import { CRATE_ICON_SIZE, MoreHorizontal } from "@crate/ui/icons";
 
+import { cn } from "@crate/ui/lib/cn";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 
 import { ContextMenu } from "./ContextMenu";
@@ -28,6 +29,8 @@ export function ItemActionMenu({
   menuRef,
   onClose,
   renderMediaImage,
+  surfaceClassName,
+  sheetLabel,
 }: ItemActionMenuProps) {
   return (
     <ContextMenu
@@ -38,6 +41,8 @@ export function ItemActionMenu({
       open={open}
       position={position}
       renderMediaImage={renderMediaImage}
+      surfaceClassName={surfaceClassName}
+      sheetLabel={sheetLabel}
     />
   );
 }
@@ -49,6 +54,7 @@ export function ItemActionMenuButton({
   title = "More actions",
   onContextMenu,
   hasActions = true,
+  expanded,
 }: ItemActionMenuButtonProps) {
   if (!hasActions) return null;
   return (
@@ -63,8 +69,13 @@ export function ItemActionMenuButton({
       onClick={onClick}
       onContextMenu={onContextMenu}
       aria-label={title}
+      aria-haspopup="menu"
+      aria-expanded={expanded}
       title={title}
-      className={className}
+      className={cn(
+        "focus-visible:shadow-focus focus-visible:outline-none",
+        className,
+      )}
     >
       <MoreHorizontal size={CRATE_ICON_SIZE.md} />
     </ActionIconButton>

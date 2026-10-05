@@ -1,6 +1,7 @@
 import { vec3 } from "gl-matrix";
 import { recordDevLog } from "@/lib/dev-logs";
 import { type VisualizerMode } from "@/lib/player-visualizer-prefs";
+import { clamp } from "@/lib/utils";
 import {
   DEFAULT_VISUALIZER_COLORS,
   type VisualizerColorTriplet,
@@ -17,10 +18,6 @@ import {
   type VisualizerQualityProfile,
   type VisualizerQualityProfileName,
 } from "./visualizer-quality";
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;

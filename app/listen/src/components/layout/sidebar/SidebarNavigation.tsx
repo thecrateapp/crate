@@ -16,8 +16,10 @@ import {
   PanelLeftOpen,
   Radar,
   Search,
+  Upload,
   Users,
 } from "@crate/ui/icons";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import { VtNavLink as NavLink } from "@crate/ui/primitives/VtNavLink";
 
 interface SidebarNavigationProps {
@@ -26,6 +28,16 @@ interface SidebarNavigationProps {
 }
 
 const COLLECTION_ITEMS = [
+  {
+    to: "/library?tab=artists",
+    icon: Users,
+    labelKey: "nav.collection.artists",
+  },
+  {
+    to: "/library?tab=crates",
+    icon: Disc3,
+    labelKey: "nav.collection.crates",
+  },
   {
     to: "/library?tab=playlists",
     icon: ListMusic,
@@ -42,19 +54,14 @@ const COLLECTION_ITEMS = [
     labelKey: "nav.collection.likedTracks",
   },
   {
-    to: "/library?tab=artists",
-    icon: Users,
-    labelKey: "nav.collection.artists",
-  },
-  {
-    to: "/library?tab=crates",
-    icon: Disc3,
-    labelKey: "nav.collection.crates",
-  },
-  {
     to: "/bandcamp",
     icon: BandcampLogo,
     labelKey: "nav.collection.bandcamp",
+  },
+  {
+    to: "/library?tab=contributions",
+    icon: Upload,
+    labelKey: "nav.collection.contributions",
   },
 ] as const;
 
@@ -100,9 +107,7 @@ export function SidebarNavigation({
         <NavLink to="/" end title={t("nav.music")} className={navLinkClass}>
           <Music size={CRATE_ICON_SIZE.nav} />
           {expanded && (
-            <span className="text-[0.8125rem] font-medium">
-              {t("nav.music")}
-            </span>
+            <span className="text-caption font-medium">{t("nav.music")}</span>
           )}
         </NavLink>
         <NavLink
@@ -112,30 +117,26 @@ export function SidebarNavigation({
         >
           <Search size={CRATE_ICON_SIZE.nav} />
           {expanded && (
-            <span className="text-[0.8125rem] font-medium">
-              {t("nav.explore")}
-            </span>
+            <span className="text-caption font-medium">{t("nav.explore")}</span>
           )}
         </NavLink>
         <NavLink to="/upcoming" title={t("nav.radar")} className={navLinkClass}>
           <Radar size={CRATE_ICON_SIZE.nav} />
           {expanded && (
-            <span className="text-[0.8125rem] font-medium">
-              {t("nav.radar")}
-            </span>
+            <span className="text-caption font-medium">{t("nav.radar")}</span>
           )}
         </NavLink>
         <NavLink to="/stats" title={t("nav.stats")} className={navLinkClass}>
           <Activity size={CRATE_ICON_SIZE.nav} />
           {expanded && (
-            <span className="text-[0.8125rem] font-medium">
-              {t("nav.stats")}
-            </span>
+            <span className="text-caption font-medium">{t("nav.stats")}</span>
           )}
         </NavLink>
 
         <div className="relative" ref={collectionRef}>
           <button
+            type="button"
+            aria-expanded={collectionOpen}
             onClick={() => setCollectionOpen(!collectionOpen)}
             title={t("nav.collection")}
             className={`flex w-full items-center gap-3 rounded-lg transition-colors ${
@@ -149,7 +150,7 @@ export function SidebarNavigation({
             <Collection size={CRATE_ICON_SIZE.nav} />
             {expanded && (
               <>
-                <span className="flex-1 text-left text-[0.8125rem] font-medium">
+                <span className="flex-1 text-left text-caption font-medium">
                   {t("nav.collection")}
                 </span>
                 <ChevronRight
@@ -173,6 +174,7 @@ export function SidebarNavigation({
               {COLLECTION_ITEMS.map(({ to, icon: Icon, labelKey }) => (
                 <button
                   key={to}
+                  type="button"
                   onClick={() => {
                     navigate(to);
                     setCollectionOpen(false);
@@ -181,7 +183,7 @@ export function SidebarNavigation({
                     expanded ? "px-3 py-1.5" : "px-4 py-2"
                   }`}
                 >
-                  <Icon size={17} />
+                  <Icon size={CRATE_ICON_SIZE.md} />
                   <span className="text-[0.75rem] font-medium">
                     {t(labelKey)}
                   </span>
@@ -194,13 +196,13 @@ export function SidebarNavigation({
 
       {!expanded && (
         <div className="mt-auto flex justify-center pb-4">
-          <button
+          <IconButton
             onClick={onToggleExpanded}
-            aria-label={t("nav.sidebar.expand")}
-            className="text-text-faint transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action"
+            label={t("nav.sidebar.expand")}
+            className="size-auto text-text-faint"
           >
-            <PanelLeftOpen size={CRATE_ICON_SIZE.nav} />
-          </button>
+            <PanelLeftOpen size={CRATE_ICON_SIZE.nav} className="size-[21px]" />
+          </IconButton>
         </div>
       )}
     </>

@@ -1,24 +1,18 @@
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
-import { ArrowDownToLine, Loader2, RefreshCw, Trash2 } from "@crate/ui/icons";
+import {
+  ArrowDownToLine,
+  CRATE_ICON_SIZE,
+  Loader2,
+  RefreshCw,
+  Trash2,
+} from "@crate/ui/icons";
+import { Button } from "@crate/ui/shadcn/button";
 
 import { Section } from "@/components/settings/SettingsPrimitives";
 import { useOffline } from "@/contexts/OfflineContext";
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let value = bytes;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  return `${
-    value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)
-  } ${units[unitIndex]}`;
-}
+import { formatBytes } from "@/lib/utils";
 
 export function OfflineSection() {
   const { t } = useTranslation();
@@ -37,7 +31,7 @@ export function OfflineSection() {
     >
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-border-quiet/10 bg-text-primary/[0.03] p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-text-primary/40">
+          <div className="text-xs uppercase tracking-eyebrow-wide text-text-primary/40">
             {t("settings.offline.items")}
           </div>
           <div className="mt-2 text-2xl font-semibold text-text-primary">
@@ -55,7 +49,7 @@ export function OfflineSection() {
           </p>
         </div>
         <div className="rounded-xl border border-border-quiet/10 bg-text-primary/[0.03] p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-text-primary/40">
+          <div className="text-xs uppercase tracking-eyebrow-wide text-text-primary/40">
             {t("common.tracks")}
           </div>
           <div className="mt-2 text-2xl font-semibold text-text-primary">
@@ -66,7 +60,7 @@ export function OfflineSection() {
           </p>
         </div>
         <div className="rounded-xl border border-border-quiet/10 bg-text-primary/[0.03] p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-text-primary/40">
+          <div className="text-xs uppercase tracking-eyebrow-wide text-text-primary/40">
             {t("settings.offline.storage")}
           </div>
           <div className="mt-2 text-2xl font-semibold text-text-primary">
@@ -79,8 +73,8 @@ export function OfflineSection() {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           disabled={
             !offlineSupported ||
             offlineSyncing ||
@@ -89,26 +83,29 @@ export function OfflineSection() {
           onClick={() => {
             void syncAll()
               .then(() => {
-                toast.success(t("settings.offline.toasts.synced"));
+                notify.success(t("settings.offline.toasts.synced"));
               })
               .catch((error) => {
-                toast.error(
+                notify.error(
                   (error as Error).message ||
                     t("settings.offline.toasts.syncFailed"),
                 );
               });
           }}
-          className="inline-flex items-center gap-2 rounded-lg border border-accent-action/30 bg-accent-action/10 px-4 py-2 text-sm font-medium text-accent-action transition-colors hover:bg-accent-action/15 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-auto rounded-lg border border-accent-action/30 bg-accent-action/10 px-4 py-2 text-accent-action hover:bg-accent-action/15 has-[>svg]:px-4"
         >
           {offlineSyncing ? (
-            <Loader2 size={16} className="animate-spin" />
+            <Loader2
+              size={CRATE_ICON_SIZE.sm}
+              className="size-4 animate-spin"
+            />
           ) : (
-            <RefreshCw size={16} />
+            <RefreshCw size={CRATE_ICON_SIZE.sm} className="size-4" />
           )}
           {t("settings.offline.syncNow")}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="danger-soft"
           disabled={
             !offlineSupported ||
             offlineSyncing ||
@@ -117,25 +114,28 @@ export function OfflineSection() {
           onClick={() => {
             void clearActiveProfile()
               .then(() => {
-                toast.success(t("settings.offline.toasts.removed"));
+                notify.success(t("settings.offline.toasts.removed"));
               })
               .catch((error) => {
-                toast.error(
+                notify.error(
                   (error as Error).message ||
                     t("settings.offline.toasts.clearFailed"),
                 );
               });
           }}
-          className="inline-flex items-center gap-2 rounded-lg border border-state-danger/25 bg-state-danger/10 px-4 py-2 text-sm font-medium text-state-danger transition-colors hover:bg-state-danger/15 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-auto rounded-lg px-4 py-2 text-state-danger has-[>svg]:px-4"
         >
-          <Trash2 size={16} />
+          <Trash2 size={CRATE_ICON_SIZE.sm} className="size-4" />
           {t("settings.offline.removeCopies")}
-        </button>
+        </Button>
       </div>
 
       <div className="rounded-lg border border-border-quiet/10 bg-text-primary/[0.03] px-4 py-3 text-sm text-text-muted">
         <div className="flex items-start gap-3">
-          <ArrowDownToLine size={16} className="mt-0.5 text-text-primary/50" />
+          <ArrowDownToLine
+            size={CRATE_ICON_SIZE.sm}
+            className="mt-0.5 text-text-primary/50"
+          />
           <div>
             {offlineSupported
               ? t("settings.offline.localMirrorDescription")

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 
 import { usePlayerActions } from "@/contexts/PlayerContext";
-import { useHoverCapability } from "@/hooks/use-hover-capability";
+import { useHoverCapability } from "@crate/ui/lib/use-hover-capability";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import {
@@ -117,6 +117,7 @@ export function TopBarSearch() {
         openSearch: lifecycle.openSearch,
         focusInputSoon: lifecycle.focusInputSoon,
         scheduleCollapseIfIdle: lifecycle.scheduleCollapseIfIdle,
+        collapseOnFocusExit: lifecycle.collapseOnFocusExit,
         setQuery,
         setResults,
         setCompletedQuery,

@@ -1,9 +1,9 @@
 export {
   RecommendedTracksSection,
   FavoriteArtistsSection,
-  CoreTracksPlaylistCard,
   EssentialsSection,
 } from "./HomeDiscoveryRecommendations";
+export { CoreTracksPlaylistCard } from "./CoreTracksPlaylistCard";
 export { CustomMixCard, CustomMixesSection } from "./HomeCustomMixes";
 export {
   SuggestedAlbumsSection,

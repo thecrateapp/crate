@@ -64,6 +64,7 @@ type RadioSeedType =
   | "album"
   | "artist"
   | "playlist"
+  | "crate"
   | "home-playlist"
   | "genre"
   | "discovery";

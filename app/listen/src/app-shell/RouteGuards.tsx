@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { loginPathWithReturnTo } from "@/lib/auth-route-policy";
 import { connectCacheEvents } from "@/lib/cache";
 import { usesConfigurableServer } from "@/lib/platform";
 import { getCurrentServer, SERVER_STORE_EVENT } from "@/lib/server-store";
@@ -27,12 +28,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 
   if (!user) {
     const returnTo = `${location.pathname}${location.search}${location.hash}`;
-    return (
-      <Navigate
-        to={`/login?return_to=${encodeURIComponent(returnTo)}`}
-        replace
-      />
-    );
+    return <Navigate to={loginPathWithReturnTo(returnTo)} replace />;
   }
 
   return <>{children}</>;
@@ -51,7 +47,9 @@ export function ServerGate({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(SERVER_STORE_EVENT, sync);
   }, []);
 
-  if (!usesConfigurableServer) return <>{children}</>;
+  if (!usesConfigurableServer) {
+    return <>{children}</>;
+  }
   if (hasServer) return <>{children}</>;
   if (location.pathname === "/server-setup") return <>{children}</>;
   return <Navigate to="/server-setup" replace />;

@@ -69,6 +69,13 @@ describe("ActionIconButton", () => {
     );
   });
 
+  it("shows a visible focus ring", () => {
+    render(<ActionIconButton aria-label="Focus">Icon</ActionIconButton>);
+    expect(screen.getByRole("button")).toHaveClass(
+      "focus-visible:shadow-focus",
+    );
+  });
+
   it("forwards ref correctly", () => {
     const ref = { current: null as HTMLButtonElement | null };
     render(<ActionIconButton ref={ref}>Icon</ActionIconButton>);

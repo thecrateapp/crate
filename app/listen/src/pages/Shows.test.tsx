@@ -131,9 +131,9 @@ describe("Shows page", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Artistas seguidos")).toBeInTheDocument();
     expect(screen.getByText("Próximo concierto")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Todo" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Todo" })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Conciertos" }),
+      screen.getByRole("radio", { name: "Conciertos" }),
     ).toBeInTheDocument();
     expect(
       screen.getByPlaceholderText("Filtra por artista, sala o ciudad..."),
@@ -188,10 +188,9 @@ describe("Shows page", () => {
     renderWithListenProviders(<Shows />);
 
     expect(screen.queryByText("announced")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open" })).toHaveAttribute(
-      "href",
-      expect.stringContaining("future-lp"),
-    );
+    expect(
+      screen.getByRole("link", { name: "Open Future LP" }),
+    ).toHaveAttribute("href", expect.stringContaining("future-lp"));
     expect(
       screen.queryByRole("link", { name: "Source" }),
     ).not.toBeInTheDocument();

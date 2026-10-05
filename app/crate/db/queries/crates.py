@@ -2,17 +2,115 @@
 
 from __future__ import annotations
 
+import re
 from typing import Literal
+from uuid import UUID
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from crate.db.tx import read_scope
+from crate.slugs import build_crate_slug
 
 CrateAccess = Literal["owner", "collaborator", "public", "none"]
+CrateListScope = Literal["member", "public_owned", "followed"]
+
+_CRATE_LIST_SCOPES: dict[str, str] = {
+    "member": """
+        SELECT
+            c.*,
+            owner.username AS owner_username,
+            owner.name AS owner_name,
+            CASE WHEN c.owner_id = :user_id THEN 'owner' ELSE 'collaborator' END
+                AS access,
+            NULL::timestamptz AS followed_at
+        FROM crates c
+        JOIN users owner ON owner.id = c.owner_id
+        WHERE c.owner_id = :user_id
+           OR (
+               c.is_collaborative IS TRUE
+               AND EXISTS (
+                   SELECT 1
+                   FROM crate_members member
+                   WHERE member.crate_id = c.id
+                     AND member.user_id = :user_id
+               )
+           )
+    """,
+    "public_owned": """
+        SELECT
+            c.*,
+            owner.username AS owner_username,
+            owner.name AS owner_name,
+            NULL::text AS access,
+            NULL::timestamptz AS followed_at
+        FROM crates c
+        JOIN users owner ON owner.id = c.owner_id
+        WHERE c.owner_id = :user_id
+          AND c.visibility = 'public'
+    """,
+    "followed": """
+        SELECT
+            c.*,
+            owner.username AS owner_username,
+            owner.name AS owner_name,
+            NULL::text AS access,
+            follower.followed_at
+        FROM crate_followers follower
+        JOIN crates c ON c.id = follower.crate_id
+        JOIN users owner ON owner.id = c.owner_id
+        WHERE follower.user_id = :user_id
+          AND c.visibility = 'public'
+    """,
+}
 
 
-def get_crate(crate_id: str, *, session: Session | None = None) -> dict | None:
+_SHORT_CODE_RE = re.compile(r"^[0-9A-Za-z]{8}$")
+
+
+def crate_public_ref(name: str | None, short_code: str) -> str:
+    return f"{build_crate_slug(name)}-{short_code}"
+
+
+def _with_public_ref(crate: dict) -> dict:
+    if crate.get("short_code"):
+        crate["public_ref"] = crate_public_ref(crate.get("name"), crate["short_code"])
+    return crate
+
+
+def resolve_crate_ref(ref: str, *, session: Session | None = None) -> str | None:
+    """Resolve a Crate UUID or ``{slug}-{short_code}`` ref to its UUID."""
+
+    try:
+        return str(UUID(str(ref)))
+    except (TypeError, ValueError):
+        pass
+    short_code = str(ref or "").rsplit("-", 1)[-1]
+    if not _SHORT_CODE_RE.match(short_code):
+        return None
+
+    def _impl(current: Session) -> str | None:
+        return current.execute(
+            text("SELECT id::text FROM crates WHERE short_code = :short_code"),
+            {"short_code": short_code},
+        ).scalar_one_or_none()
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
+def _is_descending(crate: dict) -> bool:
+    return bool(crate.get("is_ordered", True)) and crate.get("sort_direction") == "desc"
+
+
+def get_crate(
+    crate_id: str,
+    user_id: int | None = None,
+    *,
+    session: Session | None = None,
+) -> dict | None:
     def _impl(current: Session) -> dict | None:
         row = (
             current.execute(
@@ -20,6 +118,7 @@ def get_crate(crate_id: str, *, session: Session | None = None) -> dict | None:
                     """
                     SELECT
                         c.id::text AS id,
+                        c.short_code,
                         c.owner_id,
                         owner.username AS owner_username,
                         owner.name AS owner_name,
@@ -28,8 +127,37 @@ def get_crate(crate_id: str, *, session: Session | None = None) -> dict | None:
                         c.description,
                         c.visibility,
                         c.is_collaborative,
+                        c.is_ordered,
+                        c.sort_direction,
+                        c.loop_enabled,
                         c.created_at,
                         c.updated_at,
+                        (
+                            SELECT COUNT(*)::integer
+                            FROM crate_albums crate_album_count
+                            WHERE crate_album_count.crate_id = c.id
+                        ) AS album_count,
+                        (
+                            SELECT COUNT(*)::integer
+                            FROM crate_albums crate_album_count
+                            JOIN global_catalog_tracks track_count
+                              ON track_count.global_album_uid = crate_album_count.global_album_uid
+                            WHERE crate_album_count.crate_id = c.id
+                        ) AS track_count,
+                        (
+                            SELECT COUNT(*)::integer
+                            FROM crate_followers follower
+                            WHERE follower.crate_id = c.id
+                        ) AS follower_count,
+                        (
+                            CAST(:user_id AS integer) IS NOT NULL
+                            AND EXISTS (
+                                SELECT 1
+                                FROM crate_followers follower
+                                WHERE follower.crate_id = c.id
+                                  AND follower.user_id = :user_id
+                            )
+                        ) AS is_followed,
                         COALESCE(
                             jsonb_agg(
                                 jsonb_build_object(
@@ -53,12 +181,12 @@ def get_crate(crate_id: str, *, session: Session | None = None) -> dict | None:
                     GROUP BY c.id, owner.id
                     """
                 ),
-                {"crate_id": crate_id},
+                {"crate_id": crate_id, "user_id": user_id},
             )
             .mappings()
             .first()
         )
-        return dict(row) if row else None
+        return _with_public_ref(dict(row)) if row else None
 
     if session is not None:
         return _impl(session)
@@ -89,11 +217,18 @@ def get_crate_playback_tracks(
                         track.disc_number,
                         track.track_number
                     FROM crate_albums crate_album
+                    JOIN crates crate
+                      ON crate.id = crate_album.crate_id
                     JOIN global_catalog_tracks track
                       ON track.global_album_uid = crate_album.global_album_uid
                     WHERE crate_album.crate_id = CAST(:crate_id AS uuid)
                       AND (track.has_local IS TRUE OR track.has_remote IS TRUE)
-                    ORDER BY crate_album.position,
+                    ORDER BY CASE
+                                 WHEN crate.is_ordered IS TRUE
+                                  AND crate.sort_direction = 'desc'
+                                     THEN -crate_album.position
+                                 ELSE crate_album.position
+                             END,
                              COALESCE(track.disc_number, 1),
                              COALESCE(track.track_number, 0),
                              track.canonical_title,
@@ -125,7 +260,7 @@ def get_crate_for_user(
         access = get_crate_access(crate_id, user_id, session=current)
         if access == "none":
             return None, access
-        return get_crate(crate_id, session=current), access
+        return get_crate(crate_id, user_id=user_id, session=current), access
 
     if session is not None:
         return _impl(session)
@@ -152,86 +287,283 @@ def get_crate_playback_tracks_for_user(
         return _impl(current)
 
 
-def _list_crates(
+def get_crate_offline_tracks_for_user(
+    crate_id: str,
     user_id: int,
     *,
-    public_only: bool,
     session: Session | None = None,
+) -> tuple[dict | None, list[dict] | None]:
+    """Return an accessible Crate and its local tracks for offline transfer."""
+
+    def _impl(current: Session) -> tuple[dict | None, list[dict] | None]:
+        if get_crate_access(crate_id, user_id, session=current) == "none":
+            return None, None
+        crate = get_crate(crate_id, user_id=user_id, session=current)
+        if crate is None:
+            return None, None
+        rows = (
+            current.execute(
+                text(
+                    """
+                    SELECT
+                        lt.*,
+                        album.slug AS album_slug,
+                        crate_album.position AS crate_position,
+                        catalog_track.disc_number,
+                        catalog_track.track_number
+                    FROM crate_albums crate_album
+                    JOIN global_catalog_tracks catalog_track
+                      ON catalog_track.global_album_uid = crate_album.global_album_uid
+                    JOIN LATERAL (
+                        SELECT candidate.*
+                        FROM library_tracks candidate
+                        WHERE candidate.id = catalog_track.local_track_id
+                           OR candidate.entity_uid = catalog_track.local_track_entity_uid
+                        ORDER BY (candidate.id = catalog_track.local_track_id)
+                                 DESC NULLS LAST
+                        LIMIT 1
+                    ) lt ON TRUE
+                    LEFT JOIN library_albums album ON album.id = lt.album_id
+                    WHERE crate_album.crate_id = CAST(:crate_id AS uuid)
+                    ORDER BY CASE
+                                 WHEN :descending THEN -crate_album.position
+                                 ELSE crate_album.position
+                             END,
+                             COALESCE(catalog_track.disc_number, 1),
+                             COALESCE(catalog_track.track_number, 0),
+                             lt.title,
+                             lt.id
+                    """
+                ),
+                {
+                    "crate_id": crate_id,
+                    "descending": _is_descending(crate),
+                },
+            )
+            .mappings()
+            .all()
+        )
+        unique_rows: list[dict] = []
+        seen_track_ids: set[int] = set()
+        for row in rows:
+            if row["id"] in seen_track_ids:
+                continue
+            seen_track_ids.add(row["id"])
+            unique_rows.append(dict(row))
+        return crate, unique_rows
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
+def get_crate_download_source(
+    crate_id: str, *, session: Session | None = None
+) -> tuple[dict | None, list[dict]]:
+    """Return the Crate identity and its ordered local tracks for ZIP packaging."""
+
+    def _impl(current: Session) -> tuple[dict | None, list[dict]]:
+        crate = (
+            current.execute(
+                text(
+                    """
+                    SELECT
+                        id::text AS id,
+                        name,
+                        is_ordered,
+                        sort_direction
+                    FROM crates
+                    WHERE id = CAST(:crate_id AS uuid)
+                    """
+                ),
+                {"crate_id": crate_id},
+            )
+            .mappings()
+            .first()
+        )
+        if crate is None:
+            return None, []
+        crate = dict(crate)
+        rows = (
+            current.execute(
+                text(
+                    """
+                    SELECT
+                        lt.id,
+                        lt.path,
+                        lt.size,
+                        lt.updated_at,
+                        lt.artist,
+                        lt.album
+                    FROM crate_albums crate_album
+                    JOIN global_catalog_tracks catalog_track
+                      ON catalog_track.global_album_uid = crate_album.global_album_uid
+                    JOIN LATERAL (
+                        SELECT
+                            candidate.id,
+                            candidate.path,
+                            candidate.size,
+                            candidate.updated_at,
+                            candidate.artist,
+                            candidate.album,
+                            candidate.title
+                        FROM library_tracks candidate
+                        WHERE candidate.id = catalog_track.local_track_id
+                           OR candidate.entity_uid = catalog_track.local_track_entity_uid
+                        ORDER BY (candidate.id = catalog_track.local_track_id)
+                                 DESC NULLS LAST
+                        LIMIT 1
+                    ) lt ON TRUE
+                    WHERE crate_album.crate_id = CAST(:crate_id AS uuid)
+                      AND COALESCE(lt.path, '') <> ''
+                    ORDER BY CASE
+                                 WHEN :descending THEN -crate_album.position
+                                 ELSE crate_album.position
+                             END,
+                             COALESCE(catalog_track.disc_number, 1),
+                             COALESCE(catalog_track.track_number, 0),
+                             lt.title,
+                             lt.id
+                    """
+                ),
+                {"crate_id": crate_id, "descending": _is_descending(crate)},
+            )
+            .mappings()
+            .all()
+        )
+        tracks: list[dict] = []
+        seen_track_ids: set[int] = set()
+        for row in rows:
+            if row["id"] in seen_track_ids:
+                continue
+            seen_track_ids.add(row["id"])
+            tracks.append(dict(row))
+        return crate, tracks
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
+def get_crate_download_source_for_user(
+    crate_id: str,
+    user_id: int,
+    *,
+    session: Session | None = None,
+) -> tuple[dict | None, list[dict]]:
+    def _impl(current: Session) -> tuple[dict | None, list[dict]]:
+        if get_crate_access(crate_id, user_id, session=current) == "none":
+            return None, []
+        return get_crate_download_source(crate_id, session=current)
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
+def get_active_crate_invites(
+    crate_id: str, *, session: Session | None = None
 ) -> list[dict]:
     def _impl(current: Session) -> list[dict]:
         rows = (
             current.execute(
                 text(
                     """
-                    WITH visible_crates AS (
-                        SELECT
-                            c.id,
-                            c.owner_id,
-                            owner.username AS owner_username,
-                            owner.name AS owner_name,
-                            c.name,
-                            c.description,
-                            c.visibility,
-                            c.is_collaborative,
-                            c.created_at,
-                            c.updated_at,
-                            CASE
-                                WHEN :public_only THEN NULL::text
-                                WHEN c.owner_id = :user_id THEN 'owner'
-                                ELSE 'collaborator'
-                            END AS access
-                        FROM crates c
-                        JOIN users owner ON owner.id = c.owner_id
-                        WHERE (
-                            :public_only
-                            AND c.owner_id = :user_id
-                            AND c.visibility = 'public'
-                        ) OR (
-                            NOT :public_only
-                            AND (
-                                c.owner_id = :user_id
-                                OR (
-                                    c.is_collaborative IS TRUE
-                                    AND EXISTS (
-                                        SELECT 1
-                                        FROM crate_members member
-                                        WHERE member.crate_id = c.id
-                                          AND member.user_id = :user_id
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    crate_album_counts AS (
+                    SELECT
+                        invite.token,
+                        invite.crate_id::text AS crate_id,
+                        invite.created_by,
+                        invite.created_at,
+                        invite.expires_at,
+                        invite.max_uses,
+                        invite.use_count
+                    FROM crate_invites invite
+                    JOIN crates crate ON crate.id = invite.crate_id
+                    WHERE invite.crate_id = CAST(:crate_id AS uuid)
+                      AND crate.is_collaborative IS TRUE
+                      AND (invite.expires_at IS NULL OR invite.expires_at > NOW())
+                      AND (
+                          invite.max_uses IS NULL
+                          OR invite.use_count < invite.max_uses
+                      )
+                    ORDER BY invite.created_at DESC, invite.token
+                    """
+                ),
+                {"crate_id": crate_id},
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(row) for row in rows]
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
+def _list_crates(
+    user_id: int,
+    *,
+    scope: CrateListScope,
+    viewer_id: int | None,
+    session: Session | None = None,
+) -> list[dict]:
+    visible_crates_sql = _CRATE_LIST_SCOPES[scope]
+
+    def _impl(current: Session) -> list[dict]:
+        rows = (
+            current.execute(
+                text(
+                    f"""
+                    WITH visible_crates AS ({visible_crates_sql}),
+                    crate_album_previews AS (
                         SELECT
                             ca.crate_id,
-                            COUNT(*)::integer AS album_count
+                            COUNT(*)::integer AS album_count,
+                            jsonb_agg(
+                                jsonb_build_object(
+                                    'global_album_uid', album.global_album_uid::text,
+                                    'position', ca.position,
+                                    'name', album.canonical_name,
+                                    'artist_name', album.artist_name,
+                                    'year', album.year,
+                                    'has_cover', album.has_cover,
+                                    'artwork_source_json', album.artwork_source_json
+                                ) ORDER BY ca.position, ca.global_album_uid
+                            ) AS albums
                         FROM visible_crates visible
                         JOIN crate_albums ca ON ca.crate_id = visible.id
                         JOIN global_catalog_albums album
                           ON album.global_album_uid = ca.global_album_uid
                         GROUP BY ca.crate_id
                     ),
-                    crate_first_albums AS (
-                        SELECT DISTINCT ON (ca.crate_id)
+                    crate_track_counts AS (
+                        SELECT
                             ca.crate_id,
-                            jsonb_build_object(
-                                'global_album_uid', album.global_album_uid::text,
-                                'position', ca.position,
-                                'name', album.canonical_name,
-                                'artist_name', album.artist_name,
-                                'year', album.year,
-                                'has_cover', album.has_cover,
-                                'artwork_source_json', album.artwork_source_json
-                            ) AS first_album
+                            COUNT(track.global_track_uid)::integer AS track_count
                         FROM visible_crates visible
                         JOIN crate_albums ca ON ca.crate_id = visible.id
-                        JOIN global_catalog_albums album
-                          ON album.global_album_uid = ca.global_album_uid
-                        ORDER BY ca.crate_id, ca.position, ca.global_album_uid
+                        JOIN global_catalog_tracks track
+                          ON track.global_album_uid = ca.global_album_uid
+                        GROUP BY ca.crate_id
+                    ),
+                    crate_follower_counts AS (
+                        SELECT
+                            follower.crate_id,
+                            COUNT(*)::integer AS follower_count,
+                            BOOL_OR(follower.user_id = :viewer_id) AS is_followed
+                        FROM visible_crates visible
+                        JOIN crate_followers follower
+                          ON follower.crate_id = visible.id
+                        GROUP BY follower.crate_id
                     )
                     SELECT
                         visible.id::text AS id,
+                        visible.short_code,
                         visible.owner_id,
                         visible.owner_username,
                         visible.owner_name,
@@ -239,26 +571,37 @@ def _list_crates(
                         visible.description,
                         visible.visibility,
                         visible.is_collaborative,
+                        visible.is_ordered,
+                        visible.sort_direction,
+                        visible.loop_enabled,
                         visible.created_at,
                         visible.updated_at,
-                        COALESCE(counts.album_count, 0) AS album_count,
-                        first_album.first_album,
+                        COALESCE(previews.album_count, 0) AS album_count,
+                        previews.albums -> 0 AS first_album,
+                        COALESCE(previews.albums, '[]'::jsonb) AS albums,
+                        COALESCE(track_counts.track_count, 0) AS track_count,
+                        COALESCE(followers.follower_count, 0) AS follower_count,
+                        COALESCE(followers.is_followed, FALSE) AS is_followed,
                         visible.access
                     FROM visible_crates visible
-                    LEFT JOIN crate_album_counts counts
-                      ON counts.crate_id = visible.id
-                    LEFT JOIN crate_first_albums first_album
-                      ON first_album.crate_id = visible.id
-                    ORDER BY visible.updated_at DESC, visible.id
+                    LEFT JOIN crate_album_previews previews
+                      ON previews.crate_id = visible.id
+                    LEFT JOIN crate_track_counts track_counts
+                      ON track_counts.crate_id = visible.id
+                    LEFT JOIN crate_follower_counts followers
+                      ON followers.crate_id = visible.id
+                    ORDER BY visible.followed_at DESC NULLS LAST,
+                             visible.updated_at DESC,
+                             visible.id
                     """
                 ),
-                {"user_id": user_id, "public_only": public_only},
+                {"user_id": user_id, "viewer_id": viewer_id},
             )
             .mappings()
             .all()
         )
-        result = [dict(row) for row in rows]
-        if public_only:
+        result = [_with_public_ref(dict(row)) for row in rows]
+        if scope != "member":
             for row in result:
                 row.pop("access", None)
         return result
@@ -270,13 +613,65 @@ def _list_crates(
 
 
 def get_crates_for_user(user_id: int, *, session: Session | None = None) -> list[dict]:
-    return _list_crates(user_id, public_only=False, session=session)
+    return _list_crates(
+        user_id,
+        scope="member",
+        viewer_id=user_id,
+        session=session,
+    )
 
 
 def get_public_crates_for_user(
+    user_id: int,
+    *,
+    viewer_id: int | None = None,
+    session: Session | None = None,
+) -> list[dict]:
+    return _list_crates(
+        user_id,
+        scope="public_owned",
+        viewer_id=viewer_id,
+        session=session,
+    )
+
+
+def get_followed_crates_for_user(
     user_id: int, *, session: Session | None = None
 ) -> list[dict]:
-    return _list_crates(user_id, public_only=True, session=session)
+    return _list_crates(
+        user_id,
+        scope="followed",
+        viewer_id=user_id,
+        session=session,
+    )
+
+
+def is_album_in_public_crate(
+    crate_id: str, global_album_uid: str, *, session: Session | None = None
+) -> bool:
+    def _impl(current: Session) -> bool:
+        return bool(
+            current.execute(
+                text(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM crate_albums crate_album
+                        JOIN crates crate ON crate.id = crate_album.crate_id
+                        WHERE crate_album.crate_id = CAST(:crate_id AS uuid)
+                          AND crate_album.global_album_uid = CAST(:album_uid AS uuid)
+                          AND crate.visibility = 'public'
+                    )
+                    """
+                ),
+                {"crate_id": crate_id, "album_uid": global_album_uid},
+            ).scalar_one()
+        )
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
 
 
 def get_crate_access(
@@ -322,17 +717,45 @@ def get_crate_members(crate_id: str, *, session: Session | None = None) -> list[
                 text(
                     """
                     SELECT
-                        member.crate_id::text AS crate_id,
-                        member.user_id,
-                        member.invited_by,
-                        member.created_at,
-                        member_user.username,
-                        member_user.name AS display_name,
-                        member_user.avatar
-                    FROM crate_members member
-                    JOIN users member_user ON member_user.id = member.user_id
-                    WHERE member.crate_id = CAST(:crate_id AS uuid)
-                    ORDER BY member.created_at, member.user_id
+                        crate_id,
+                        user_id,
+                        invited_by,
+                        created_at,
+                        username,
+                        name,
+                        name AS display_name,
+                        avatar,
+                        role
+                    FROM (
+                        SELECT
+                            crate.id::text AS crate_id,
+                            crate.owner_id AS user_id,
+                            NULL::integer AS invited_by,
+                            crate.created_at,
+                            owner.username,
+                            owner.name,
+                            owner.avatar,
+                            'owner' AS role,
+                            0 AS role_order
+                        FROM crates crate
+                        JOIN users owner ON owner.id = crate.owner_id
+                        WHERE crate.id = CAST(:crate_id AS uuid)
+                        UNION ALL
+                        SELECT
+                            member.crate_id::text,
+                            member.user_id,
+                            member.invited_by,
+                            member.created_at,
+                            member_user.username,
+                            member_user.name,
+                            member_user.avatar,
+                            'collaborator',
+                            1
+                        FROM crate_members member
+                        JOIN users member_user ON member_user.id = member.user_id
+                        WHERE member.crate_id = CAST(:crate_id AS uuid)
+                    ) crate_member_rows
+                    ORDER BY role_order, created_at, user_id
                     """
                 ),
                 {"crate_id": crate_id},
@@ -395,13 +818,22 @@ def get_crate_invite(
 
 __all__ = [
     "CrateAccess",
+    "CrateListScope",
+    "crate_public_ref",
     "get_crate",
+    "get_active_crate_invites",
     "get_crate_access",
+    "get_crate_download_source",
+    "get_crate_download_source_for_user",
     "get_crate_for_user",
     "get_crate_playback_tracks",
     "get_crate_playback_tracks_for_user",
+    "get_crate_offline_tracks_for_user",
     "get_crates_for_user",
     "get_crate_invite",
     "get_crate_members",
+    "get_followed_crates_for_user",
     "get_public_crates_for_user",
+    "is_album_in_public_crate",
+    "resolve_crate_ref",
 ]

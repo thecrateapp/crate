@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CRATE_ICON_SIZE, Volume2, VolumeX } from "@crate/ui/icons";
 
-import { useHoverCapability } from "@/hooks/use-hover-capability";
+import { useHoverCapability } from "@crate/ui/lib/use-hover-capability";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { useTranslation } from "react-i18next";
 import { PlayerVolumeSlider } from "@/components/player/bar/PlayerVolumeSlider";
@@ -110,6 +110,7 @@ export function PlayerVolumeControl({
   return (
     <div className="relative flex items-center" onWheel={handleWheel}>
       <button
+        type="button"
         ref={volumeButtonRef}
         onClick={() => {
           const nextOpen = !showVolume;

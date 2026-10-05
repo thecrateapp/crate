@@ -66,6 +66,10 @@
       "types": "./domain/actions/useItemActionMenu.ts",
       "default": "./domain/actions/useItemActionMenu.ts"
     },
+    "./domain/actions/useItemActionTarget": {
+      "types": "./domain/actions/useItemActionTarget.ts",
+      "default": "./domain/actions/useItemActionTarget.ts"
+    },
     "./domain/actions/shared": {
       "types": "./domain/actions/shared.ts",
       "default": "./domain/actions/shared.ts"
@@ -121,6 +125,58 @@
     "./domain/user/UserMenu": {
       "types": "./domain/user/UserMenu.tsx",
       "default": "./domain/user/UserMenu.tsx"
+    },
+    "./domain/navigation/BackLink": {
+      "types": "./domain/navigation/BackLink.tsx",
+      "default": "./domain/navigation/BackLink.tsx"
+    },
+    "./domain/navigation/PageHeader": {
+      "types": "./domain/navigation/PageHeader.tsx",
+      "default": "./domain/navigation/PageHeader.tsx"
+    },
+    "./domain/states": {
+      "types": "./domain/states/index.ts",
+      "default": "./domain/states/index.ts"
+    },
+    "./domain/states/LoadingState": {
+      "types": "./domain/states/LoadingState.tsx",
+      "default": "./domain/states/LoadingState.tsx"
+    },
+    "./domain/brand/CrateLoader": {
+      "types": "./domain/brand/CrateLoader.tsx",
+      "default": "./domain/brand/CrateLoader.tsx"
+    },
+    "./domain/hero": {
+      "types": "./domain/hero/index.ts",
+      "default": "./domain/hero/index.ts"
+    },
+    "./domain/hero/PageHero": {
+      "types": "./domain/hero/PageHero.tsx",
+      "default": "./domain/hero/PageHero.tsx"
+    },
+    "./domain/hero/HeroActionBar": {
+      "types": "./domain/hero/HeroActionBar.tsx",
+      "default": "./domain/hero/HeroActionBar.tsx"
+    },
+    "./domain/entity": {
+      "types": "./domain/entity/index.ts",
+      "default": "./domain/entity/index.ts"
+    },
+    "./domain/tracks": {
+      "types": "./domain/tracks/index.ts",
+      "default": "./domain/tracks/index.ts"
+    },
+    "./domain/tracks/TrackList": {
+      "types": "./domain/tracks/TrackList.tsx",
+      "default": "./domain/tracks/TrackList.tsx"
+    },
+    "./domain/filters": {
+      "types": "./domain/filters/index.ts",
+      "default": "./domain/filters/index.ts"
+    },
+    "./domain/filters/FilterBar": {
+      "types": "./domain/filters/FilterBar.tsx",
+      "default": "./domain/filters/FilterBar.tsx"
     },
     "./charts/*": {
       "types": "./charts/*.ts",
@@ -182,6 +238,10 @@
         "types": "./dist/domain/actions/useItemActionMenu.d.ts",
         "default": "./dist/domain/actions/useItemActionMenu.js"
       },
+      "./domain/actions/useItemActionTarget": {
+        "types": "./dist/domain/actions/useItemActionTarget.d.ts",
+        "default": "./dist/domain/actions/useItemActionTarget.js"
+      },
       "./domain/actions/shared": {
         "types": "./dist/domain/actions/shared.d.ts",
         "default": "./dist/domain/actions/shared.js"
@@ -238,6 +298,58 @@
         "types": "./dist/domain/user/UserMenu.d.ts",
         "default": "./dist/domain/user/UserMenu.js"
       },
+      "./domain/navigation/BackLink": {
+        "types": "./dist/domain/navigation/BackLink.d.ts",
+        "default": "./dist/domain/navigation/BackLink.js"
+      },
+      "./domain/navigation/PageHeader": {
+        "types": "./dist/domain/navigation/PageHeader.d.ts",
+        "default": "./dist/domain/navigation/PageHeader.js"
+      },
+      "./domain/states": {
+        "types": "./dist/domain/states/index.d.ts",
+        "default": "./dist/domain/states/index.js"
+      },
+      "./domain/states/LoadingState": {
+        "types": "./dist/domain/states/LoadingState.d.ts",
+        "default": "./dist/domain/states/LoadingState.js"
+      },
+      "./domain/brand/CrateLoader": {
+        "types": "./dist/domain/brand/CrateLoader.d.ts",
+        "default": "./dist/domain/brand/CrateLoader.js"
+      },
+      "./domain/hero": {
+        "types": "./dist/domain/hero/index.d.ts",
+        "default": "./dist/domain/hero/index.js"
+      },
+      "./domain/hero/PageHero": {
+        "types": "./dist/domain/hero/PageHero.d.ts",
+        "default": "./dist/domain/hero/PageHero.js"
+      },
+      "./domain/hero/HeroActionBar": {
+        "types": "./dist/domain/hero/HeroActionBar.d.ts",
+        "default": "./dist/domain/hero/HeroActionBar.js"
+      },
+      "./domain/entity": {
+        "types": "./dist/domain/entity/index.d.ts",
+        "default": "./dist/domain/entity/index.js"
+      },
+      "./domain/tracks": {
+        "types": "./dist/domain/tracks/index.d.ts",
+        "default": "./dist/domain/tracks/index.js"
+      },
+      "./domain/tracks/TrackList": {
+        "types": "./dist/domain/tracks/TrackList.d.ts",
+        "default": "./dist/domain/tracks/TrackList.js"
+      },
+      "./domain/filters": {
+        "types": "./dist/domain/filters/index.d.ts",
+        "default": "./dist/domain/filters/index.js"
+      },
+      "./domain/filters/FilterBar": {
+        "types": "./dist/domain/filters/FilterBar.d.ts",
+        "default": "./dist/domain/filters/FilterBar.js"
+      },
       "./charts/*": {
         "types": "./dist/charts/*.d.ts",
         "default": "./dist/charts/*.js"
@@ -263,6 +375,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router": "^7.0.0",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.0.0"
   },
   "devDependencies": {

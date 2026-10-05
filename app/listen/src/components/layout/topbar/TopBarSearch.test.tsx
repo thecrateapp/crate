@@ -212,6 +212,72 @@ describe("TopBarSearch", () => {
     });
   });
 
+  it("shows a token focus ring around the search shell", () => {
+    renderWithListenProviders(<TopBarSearch />);
+
+    const searchButton = screen.getByRole("button", { name: "Search" });
+
+    expect(searchButton.closest("div[data-state]")).toHaveClass(
+      "focus-within:shadow-focus",
+    );
+  });
+
+  it("collapses when focus tabs away with an empty query", async () => {
+    const user = userEvent.setup();
+    renderWithListenProviders(
+      <>
+        <TopBarSearch />
+        <button type="button">After</button>
+      </>,
+    );
+
+    const searchButton = screen.getByRole("button", { name: "Search" });
+    await user.click(searchButton);
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
+    await waitFor(() => {
+      expect(document.activeElement).toBe(input);
+    });
+
+    await user.tab();
+
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "After" }),
+    );
+    await waitFor(() => {
+      expect(searchButton.getAttribute("aria-expanded")).toBe("false");
+    });
+  });
+
+  it("stays expanded after tabbing away while a query is typed", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api).mockResolvedValue({ artists: [], albums: [], tracks: [] });
+    renderWithListenProviders(
+      <>
+        <TopBarSearch />
+        <button type="button">After</button>
+      </>,
+    );
+
+    const searchButton = screen.getByRole("button", { name: "Search" });
+    await user.click(searchButton);
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
+    await waitFor(() => {
+      expect(document.activeElement).toBe(input);
+    });
+    await user.type(input, "high");
+
+    act(() => {
+      screen.getByRole("button", { name: "After" }).focus();
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(searchButton.getAttribute("aria-expanded")).toBe("true");
+  });
+
   it("renders fetched results after typing a query", async () => {
     vi.useFakeTimers();
     vi.mocked(api).mockResolvedValue({
@@ -242,7 +308,7 @@ describe("TopBarSearch", () => {
     expect(screen.getByText("High Vis")).toHaveClass("text-text-primary/80");
     expect(screen.getByText("High Vis").closest(".z-app-dropdown")).toHaveClass(
       "listen-glass-panel",
-      "rounded-[12px]",
+      "rounded-panel",
     );
   });
 

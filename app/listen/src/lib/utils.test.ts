@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatTotalDuration, shuffleArray } from "./utils";
+import { formatTotalDuration, genreSlug, shuffleArray } from "./utils";
 
 describe("formatTotalDuration", () => {
   it("returns empty string for 0", () => {
@@ -37,5 +37,13 @@ describe("shuffleArray", () => {
 
   it("handles single element", () => {
     expect(shuffleArray([42])).toEqual([42]);
+  });
+});
+
+describe("genreSlug", () => {
+  it("lowercases, strips punctuation and joins words with dashes", () => {
+    expect(genreSlug("  Post-Hardcore ")).toBe("post-hardcore");
+    expect(genreSlug("Drum & Bass")).toBe("drum-bass");
+    expect(genreSlug("Hip Hop")).toBe("hip-hop");
   });
 });

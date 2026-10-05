@@ -10,6 +10,7 @@ import {
   CRATE_ICON_SIZE,
 } from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 import { triggerHaptic } from "@/lib/haptics";
 
 type FullscreenPlayerHeaderProps = {
@@ -37,14 +38,13 @@ export function FullscreenPlayerHeader({
 
   return (
     <div className="flex items-center gap-2 px-4 pb-3">
-      <button
-        type="button"
+      <IconButton
         onClick={onClose}
-        aria-label={t("player.close")}
-        className="-ml-2 flex size-12 shrink-0 touch-manipulation items-center justify-center text-text-secondary active:text-text-primary"
+        label={t("player.close")}
+        className="-ml-2 size-12 touch-manipulation text-text-secondary hover:translate-y-0 hover:drop-shadow-none hover:text-text-secondary active:text-text-primary"
       >
-        <ChevronDown size={28} />
-      </button>
+        <ChevronDown size={28} className="size-7" />
+      </IconButton>
       <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
         {panelSwitches.map(({ id, icon: Icon, label }) => {
           const selected = activePanel === id;

@@ -7,12 +7,12 @@ import {
   DISC_DEGREES_PER_SECOND,
   JOG_RATE_UPDATE_INTERVAL_MS,
   JOG_SEEK_INTERVAL_MS,
-  clamp,
   getJogTime,
   getPointerAngle,
   normalizeDeltaDegrees,
 } from "@/components/player/spinning-disc-math";
 import { useSpinningDiscPlayback } from "@/components/player/use-spinning-disc-playback";
+import { clamp } from "@/lib/utils";
 
 type JogSeekMode = "live" | "commit";
 

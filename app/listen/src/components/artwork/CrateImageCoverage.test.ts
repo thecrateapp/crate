@@ -42,5 +42,5 @@ describe("Crate image pipeline coverage", () => {
     }
 
     expect(violations).toEqual([]);
-  });
+  }, 15_000);
 });

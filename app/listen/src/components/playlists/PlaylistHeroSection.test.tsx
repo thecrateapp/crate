@@ -72,6 +72,10 @@ beforeEach(() => {
   mockDesktopPointer();
 });
 
+function heroActionGroup(index: number) {
+  return screen.getByTestId("hero-action-bar").children[index] as HTMLElement;
+}
+
 describe("PlaylistHeroSection", () => {
   it("keeps the hero background in the artist/album language without blur", () => {
     const { container } = renderWithI18n(
@@ -94,14 +98,16 @@ describe("PlaylistHeroSection", () => {
     );
 
     expect(container.querySelector('[class*="blur-"]')).not.toBeInTheDocument();
+    const background = screen.getByTestId("page-hero-background");
+    expect(background).toHaveAttribute("data-treatment", "muted");
     expect(
-      container.querySelector('[data-testid="playlist-hero-mobile-gradient"]'),
-    ).toHaveStyle({ background: "var(--hero-artwork-gradient-mobile)" });
+      background.querySelector('[style*="--hero-artwork-gradient-mobile"]'),
+    ).toBeInTheDocument();
     expect(
-      container.querySelector('[data-testid="playlist-hero-desktop-gradient"]'),
-    ).toHaveStyle({
-      background: "var(--hero-artwork-gradient-desktop-strong)",
-    });
+      background.querySelector(
+        '[style*="--hero-artwork-gradient-desktop-strong"]',
+      ),
+    ).toBeInTheDocument();
   });
 
   it("uses an explicit mobile hero height so copy sits directly above CTAs", () => {
@@ -124,9 +130,9 @@ describe("PlaylistHeroSection", () => {
       />,
     );
 
-    const hero = container.firstElementChild as HTMLElement;
-    expect(hero).toHaveClass("h-[420px]");
-    expect(hero).not.toHaveClass("min-h-[430px]");
+    const hero = container.querySelector("section") as HTMLElement;
+    expect(hero).toHaveClass("h-hero-md");
+    expect(hero).not.toHaveClass("min-h-hero-lg");
   });
 
   it("uses artist/album-style primary pills and secondary icon labels", () => {
@@ -171,9 +177,7 @@ describe("PlaylistHeroSection", () => {
       />,
     );
 
-    const primary = screen.getByRole("group", {
-      name: "Primary playlist actions",
-    });
+    const primary = heroActionGroup(0);
     const playButton = within(primary).getByRole("button", { name: "Play" });
     expect(playButton).toHaveTextContent("Play");
     expect(playButton).toHaveClass(
@@ -186,9 +190,7 @@ describe("PlaylistHeroSection", () => {
     expect(shuffleButton).toHaveTextContent("Shuffle");
     expect(shuffleButton).toHaveClass("shadow-control-inset");
 
-    const secondary = screen.getByRole("group", {
-      name: "Secondary playlist actions",
-    });
+    const secondary = heroActionGroup(1);
     expect(
       within(secondary).getByRole("button", { name: "Playlist Radio" }),
     ).toHaveTextContent("Radio");
@@ -237,9 +239,7 @@ describe("PlaylistHeroSection", () => {
       "es",
     );
 
-    const primary = screen.getByRole("group", {
-      name: "Acciones principales de playlist",
-    });
+    const primary = heroActionGroup(0);
     expect(
       within(primary).getByRole("button", { name: "Reproducir" }),
     ).toHaveTextContent("Reproducir");
@@ -247,9 +247,7 @@ describe("PlaylistHeroSection", () => {
       within(primary).getByRole("button", { name: "Aleatorio" }),
     ).toHaveTextContent("Aleatorio");
 
-    const secondary = screen.getByRole("group", {
-      name: "Acciones secundarias de playlist",
-    });
+    const secondary = heroActionGroup(1);
     expect(
       within(secondary).getByRole("button", { name: "Compartir" }),
     ).toHaveTextContent("Compartir");
@@ -285,7 +283,6 @@ describe("PlaylistHeroSection", () => {
     expect(menu).toHaveClass(
       "listen-glass-panel",
       "w-72",
-      "rounded-[12px]",
       "z-app-context-menu",
     );
     expect(within(menu).getByText("Friday Damage")).toBeInTheDocument();
@@ -324,14 +321,12 @@ describe("PlaylistHeroSection", () => {
       />,
     );
 
-    const secondary = screen.getByRole("group", {
-      name: "Secondary playlist actions",
-    });
+    const secondary = heroActionGroup(1);
     expect(
       within(secondary).queryByRole("button", { name: "More" }),
     ).toBeNull();
 
-    const heroMenu = screen.getByTestId("playlist-mobile-hero-menu");
+    const heroMenu = screen.getByTestId("hero-mobile-menu-trigger");
     expect(heroMenu).toHaveAttribute("aria-label", "More");
     expect(heroMenu.parentElement).toHaveClass("fixed", "z-app-header");
 

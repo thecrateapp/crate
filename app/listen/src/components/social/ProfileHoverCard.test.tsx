@@ -98,8 +98,9 @@ describe("ProfileHoverCard", () => {
     expect(screen.getByText("Jane")).toHaveClass("profile-hover-title");
     expect(screen.getAllByText("82").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("screamo")).toHaveClass("profile-hover-top-genre");
-    expect(screen.getAllByText("Contributor")[1]).toHaveClass(
-      "profile-hover-badge-cyan",
+    expect(screen.getAllByText("Contributor")[1]).toHaveAttribute(
+      "data-tone",
+      "accent",
     );
   });
 

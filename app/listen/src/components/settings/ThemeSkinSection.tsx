@@ -27,6 +27,7 @@ import {
   type AppearancePreferencesV2,
 } from "@crate/ui/lib/appearance-resolver";
 import { SKIN_REGISTRY } from "@crate/ui/lib/theme-skin";
+import { Button } from "@crate/ui/shadcn/button";
 
 const MODE_OPTIONS = Object.values(MODE_REGISTRY).map((mode) => ({
   id: mode.id as ColorModePreference,
@@ -35,6 +36,8 @@ const SKIN_OPTIONS = Object.values(SKIN_REGISTRY).map((skin) => ({
   id: skin.id as SkinId,
 }));
 const DEFAULT_OVERRIDE_VALUE = "__from_skin__";
+const SECONDARY_ACTION_CLASS_NAME =
+  "h-auto border border-border-quiet/20 px-3 py-2 text-xs font-semibold text-text-secondary hover:bg-surface-control";
 
 const selectionButtonClass = (selected: boolean) =>
   `rounded-lg border px-3 py-3 text-left transition-colors focus-within:ring-2 focus-within:ring-focus-ring/50 ${
@@ -355,7 +358,7 @@ export function ThemeSkinSection() {
           data-testid="appearance-preview"
           className="rounded-xl border border-border-quiet/20 bg-surface-container p-4"
         >
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent-action">
+          <p className="text-micro font-bold uppercase tracking-eyebrow text-accent-action">
             {t("settings.appearance.previewLabel")}
           </p>
           <p className="mt-2 text-base font-semibold text-text-primary">
@@ -364,12 +367,9 @@ export function ThemeSkinSection() {
           <p className="mt-1 text-xs text-text-muted">
             {t("settings.appearance.previewDescription")}
           </p>
-          <button
-            type="button"
-            className="mt-3 rounded-md bg-accent-action px-3 py-2 text-xs font-semibold text-accent-action-foreground shadow-action"
-          >
+          <Button className="mt-3 h-auto px-3 py-2 text-xs font-semibold has-[>svg]:px-3">
             {t("player.play")}
-          </button>
+          </Button>
         </ThemeScope>
 
         {saveError ? (
@@ -379,27 +379,26 @@ export function ThemeSkinSection() {
         ) : null}
 
         <div className="flex flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            className="rounded-md border border-border-quiet/20 px-3 py-2 text-xs font-semibold text-text-secondary hover:bg-surface-control"
+          <Button
+            variant="ghost"
+            className={SECONDARY_ACTION_CLASS_NAME}
             onClick={resetOverrides}
           >
             {t("settings.appearance.actions.reset")}
-          </button>
-          <button
-            type="button"
-            className="rounded-md border border-border-quiet/20 px-3 py-2 text-xs font-semibold text-text-secondary hover:bg-surface-control"
+          </Button>
+          <Button
+            variant="ghost"
+            className={SECONDARY_ACTION_CLASS_NAME}
             onClick={cancelDraft}
           >
             {t("settings.appearance.actions.cancel")}
-          </button>
-          <button
-            type="button"
-            className="rounded-md bg-accent-action px-3 py-2 text-xs font-semibold text-accent-action-foreground shadow-action"
+          </Button>
+          <Button
+            className="h-auto px-3 py-2 text-xs font-semibold has-[>svg]:px-3"
             onClick={applyDraft}
           >
             {t("settings.appearance.actions.apply")}
-          </button>
+          </Button>
         </div>
       </div>
     </Section>

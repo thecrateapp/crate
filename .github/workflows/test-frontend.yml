@@ -145,6 +145,9 @@ jobs:
       - name: Test design-system tooling
         run: node --test scripts/design-system/*.test.mjs
 
+      - name: Check design-system drift budget
+        run: npm run design-system:drift -- --check
+
       - name: Check generated appearance tokens
         run: npm run design-system:tokens:check
 

@@ -70,7 +70,7 @@ describe("RemoteImportAction", () => {
       screen.getByRole("button", { name: "Make available locally" }),
     );
     expect(screen.getByText(/Node B/)).toBeInTheDocument();
-    expect(screen.getByText(/12.5 MB/)).toBeInTheDocument();
+    expect(screen.getByText(/12 MB/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Confirm import" }));
 

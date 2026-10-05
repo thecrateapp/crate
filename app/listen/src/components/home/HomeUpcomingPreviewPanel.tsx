@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Calendar } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Calendar } from "@crate/ui/icons";
 
 import type { HomeUpcomingItem, HomeUpcomingResponse } from "./home-model";
 import { UpcomingPreviewRow } from "./HomeSections";
@@ -16,13 +16,13 @@ export function HomeUpcomingPreviewPanel({
   const { t } = useTranslation();
 
   return (
-    <div className="home-upcoming-panel overflow-hidden rounded-[12px] p-4">
+    <div className="home-upcoming-panel overflow-hidden rounded-panel p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="home-upcoming-panel-kicker flex items-center gap-2 text-xs uppercase tracking-wider">
-          <Calendar size={12} />
+          <Calendar size={CRATE_ICON_SIZE.micro} />
           {t("home.radar.nextUp")}
         </div>
-        <div className="home-upcoming-summary text-xs uppercase tracking-[0.16em]">
+        <div className="home-upcoming-summary text-xs uppercase tracking-kicker">
           {t("home.radar.summary", {
             shows: summary?.show_count ?? 0,
             releases: summary?.release_count ?? 0,

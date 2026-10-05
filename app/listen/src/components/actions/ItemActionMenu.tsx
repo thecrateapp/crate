@@ -4,6 +4,7 @@ import {
   type ItemActionMenuProps,
   type ContextMenuMediaImageProps,
 } from "@crate/ui/domain/actions";
+import { useTranslation } from "react-i18next";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { cn } from "@/lib/utils";
@@ -12,12 +13,14 @@ export {
   ItemActionMenuButton,
   MobileActionSheet,
   useItemActionMenu,
+  useItemActionTarget,
 } from "@crate/ui/domain/actions";
 export type {
   ContextMenuEntry,
   ContextMenuHeader,
   ItemActionMenuEntry,
   ItemActionMenuProps,
+  ItemActionTargetProps,
   UseItemActionMenuOptions,
   UseItemActionMenuReturn,
 } from "@crate/ui/domain/actions";
@@ -27,6 +30,7 @@ function renderMediaImage({ src, ...props }: ContextMenuMediaImageProps) {
 }
 
 export function ItemActionMenu(props: ItemActionMenuProps) {
+  const { t } = useTranslation();
   return (
     <ContextMenu
       header={props.header}
@@ -35,6 +39,7 @@ export function ItemActionMenu(props: ItemActionMenuProps) {
       onClose={props.onClose}
       open={props.open}
       position={props.position}
+      sheetLabel={props.sheetLabel ?? t("actions.menu.sheetLabel")}
     />
   );
 }
@@ -43,7 +48,7 @@ export function ContextMenu(props: ContextMenuProps) {
   return (
     <SharedContextMenu
       {...props}
-      className={cn("rounded-[12px]", props.className)}
+      className={cn("rounded-panel", props.className)}
       renderMediaImage={renderMediaImage}
     />
   );

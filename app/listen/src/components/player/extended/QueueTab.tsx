@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { JamQueueLockedNotice } from "@/components/player/JamQueueLockedNotice";
 import { usePlayerActions, usePlayerState } from "@/contexts/PlayerContext";
@@ -26,14 +26,13 @@ export const QueueTab = memo(function QueueTab() {
 
   const history = queue.slice(0, currentIndex).reverse();
   const upcoming = queue.slice(currentIndex + 1);
-  const sourceName = getPlaySourceLabel(playSource) || t("player.queue");
 
   async function handleSaveAsPlaylist() {
     const validTracks = queue.filter(
       (track) => track.path && track.path.includes("/"),
     );
     if (!validTracks.length) {
-      toast.error(t("player.queue.toasts.noLocalTracks"));
+      notify.error(t("player.queue.toasts.noLocalTracks"));
       return;
     }
     try {
@@ -46,36 +45,28 @@ export const QueueTab = memo(function QueueTab() {
           album: track.album || "",
         })),
       });
-      toast.success(
+      notify.success(
         t("player.queue.toasts.saved", { count: validTracks.length }),
       );
     } catch {
-      toast.error(t("player.queue.toasts.saveFailed"));
+      notify.error(t("player.queue.toasts.saveFailed"));
     }
   }
 
   return (
     <div className="flex-1 overflow-y-auto overscroll-contain pr-1">
       {jamQueueLocked ? <JamQueueLockedNotice /> : null}
-      <QueueTabPastTracks
-        tracks={history}
-        currentIndex={currentIndex}
-        onJump={jumpTo}
-        locked={jamQueueLocked}
-      />
       {currentTrack ? (
         <QueueTabCurrentTrack
           currentTrack={currentTrack}
           currentIndex={currentIndex}
           isPlaying={isPlaying}
-          sourceName={sourceName}
           onSave={() => void handleSaveAsPlaylist()}
         />
       ) : null}
       <QueueTabUpcoming
         tracks={upcoming}
         currentIndex={currentIndex}
-        sourceName={sourceName}
         locked={jamQueueLocked}
         onJump={jumpTo}
         onRemove={removeFromQueue}
@@ -85,6 +76,12 @@ export const QueueTab = memo(function QueueTab() {
           {t("player.queue.empty")}
         </div>
       ) : null}
+      <QueueTabPastTracks
+        tracks={history}
+        currentIndex={currentIndex}
+        onJump={jumpTo}
+        locked={jamQueueLocked}
+      />
     </div>
   );
 });

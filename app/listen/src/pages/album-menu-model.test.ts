@@ -1,38 +1,89 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { buildAlbumMenuItems } from "@/pages/album-menu-model";
+import {
+  buildAlbumMenuEntries,
+  type AlbumMenuOptions,
+} from "@/components/actions/album-actions";
 
 const t = ((key: string) => key) as never;
 
-describe("buildAlbumMenuItems", () => {
+function menuOptions(overrides: Partial<AlbumMenuOptions> = {}) {
+  return {
+    saved: false,
+    canSave: true,
+    canAddToCrate: true,
+    canAddToPlaylist: true,
+    canRadio: true,
+    canDownload: true,
+    offlineEnabled: true,
+    offlineState: "idle",
+    offlineLabel: "Offline",
+    globalAlbumUid: null,
+    crates: [],
+    cratePickerOpen: false,
+    playlists: [],
+    playlistPickerOpen: false,
+    onPlay: vi.fn(),
+    onPlayNext: vi.fn(),
+    onShuffle: vi.fn(),
+    onToggleCratePicker: vi.fn(),
+    onCreateCrate: vi.fn(),
+    onAddToCrate: vi.fn(),
+    onTogglePlaylistPicker: vi.fn(),
+    onCreatePlaylist: vi.fn(),
+    onAddToPlaylist: vi.fn(),
+    onToggleSaved: vi.fn(),
+    onRadio: vi.fn(),
+    onToggleOffline: vi.fn(),
+    onDownload: vi.fn(),
+    onGoToArtist: vi.fn(),
+    onShare: vi.fn(),
+    ...overrides,
+  } satisfies AlbumMenuOptions;
+}
+
+function entryKeys(options: AlbumMenuOptions) {
+  return buildAlbumMenuEntries(options, t)
+    .filter((entry) => entry.type !== "divider")
+    .map((entry) => entry.key);
+}
+
+describe("buildAlbumMenuEntries", () => {
+  it("builds the union of album actions in a stable order", () => {
+    expect(entryKeys(menuOptions())).toEqual([
+      "play",
+      "play-next",
+      "shuffle",
+      "crate",
+      "playlist",
+      "save",
+      "radio",
+      "offline",
+      "download",
+      "artist",
+      "share",
+    ]);
+  });
+
+  it("disables playback entries when the album has no playable tracks", () => {
+    const entries = buildAlbumMenuEntries(
+      menuOptions({ canPlay: false, canRadio: false }),
+      t,
+    );
+    const disabledKeys = entries
+      .filter((entry) => "disabled" in entry && entry.disabled)
+      .map((entry) => entry.key);
+
+    expect(disabledKeys).toEqual(
+      expect.arrayContaining(["play", "play-next", "shuffle", "radio"]),
+    );
+  });
+
   it("exposes the user's Crates and adds the album to the selected Crate", () => {
     const onAddToCrate = vi.fn();
-    const items = buildAlbumMenuItems(
-      {
-        playlistPickerOpen: false,
-        cratePickerOpen: false,
-        canPersistAlbum: true,
-        canAddToCrate: true,
-        canSaveAlbum: true,
-        saved: false,
-        offlineSupported: true,
-        offlineState: "idle",
-        offlineButtonLabel: "Offline",
-        playlists: [],
-        crates: [{ id: "crate-1", name: "Year-end records" }],
-        onPlay: vi.fn(),
-        onPlayNext: vi.fn(),
-        onTogglePlaylistPicker: vi.fn(),
-        onToggleCratePicker: vi.fn(),
-        onCreatePlaylist: vi.fn(),
-        onCreateCrate: vi.fn(),
-        onAddToPlaylist: vi.fn(),
-        onAddToCrate,
-        onToggleSaved: vi.fn(),
-        onToggleOffline: vi.fn(),
-        onGoToArtist: vi.fn(),
-        onShare: vi.fn(),
-      },
+    const crate = { id: "crate-1", name: "Year-end records", albumUids: [] };
+    const items = buildAlbumMenuEntries(
+      menuOptions({ crates: [crate], onAddToCrate }),
       t,
     );
 
@@ -57,117 +108,56 @@ describe("buildAlbumMenuItems", () => {
     expect(crateItem.label).toBe("Year-end records");
 
     crateItem.onSelect?.();
-    expect(onAddToCrate).toHaveBeenCalledWith("crate-1");
+    expect(onAddToCrate).toHaveBeenCalledWith(crate);
+  });
+
+  it("marks Crates that already contain the album", () => {
+    const items = buildAlbumMenuEntries(
+      menuOptions({
+        globalAlbumUid: "album-uid",
+        crates: [{ id: "crate-1", name: "Mine", albumUids: ["album-uid"] }],
+      }),
+      t,
+    );
+    const crateMenu = items.find((item) => item.key === "crate");
+    if (crateMenu?.type !== "disclosure") {
+      throw new Error("Crate menu missing");
+    }
+    const crateItem = crateMenu.items[1];
+    expect(crateItem && "active" in crateItem && crateItem.active).toBe(true);
   });
 
   it("does not expose the Crate picker for non-persistable albums", () => {
-    const items = buildAlbumMenuItems(
-      {
-        playlistPickerOpen: false,
-        cratePickerOpen: false,
-        canPersistAlbum: false,
-        canAddToCrate: false,
-        canSaveAlbum: true,
-        saved: false,
-        offlineSupported: true,
-        offlineState: "idle",
-        offlineButtonLabel: "Offline",
-        playlists: [],
-        crates: [{ id: "crate-1", name: "Year-end records" }],
-        onPlay: vi.fn(),
-        onPlayNext: vi.fn(),
-        onTogglePlaylistPicker: vi.fn(),
-        onToggleCratePicker: vi.fn(),
-        onCreatePlaylist: vi.fn(),
-        onCreateCrate: vi.fn(),
-        onAddToPlaylist: vi.fn(),
-        onAddToCrate: vi.fn(),
-        onToggleSaved: vi.fn(),
-        onToggleOffline: vi.fn(),
-        onGoToArtist: vi.fn(),
-        onShare: vi.fn(),
-      },
-      t,
+    const keys = entryKeys(
+      menuOptions({ canAddToCrate: false, canAddToPlaylist: false }),
     );
-
-    expect(items.some((item) => item.key === "crate")).toBe(false);
+    expect(keys).not.toContain("crate");
+    expect(keys).not.toContain("playlist");
   });
 
   it("keeps the playlist picker when no Crates exist yet", () => {
-    const items = buildAlbumMenuItems(
-      {
-        playlistPickerOpen: false,
-        cratePickerOpen: false,
-        canPersistAlbum: true,
-        canAddToCrate: true,
-        canSaveAlbum: true,
-        saved: false,
-        offlineSupported: true,
-        offlineState: "idle",
-        offlineButtonLabel: "Offline",
-        playlists: [],
-        crates: [],
-        onPlay: vi.fn(),
-        onPlayNext: vi.fn(),
-        onTogglePlaylistPicker: vi.fn(),
-        onToggleCratePicker: vi.fn(),
-        onCreatePlaylist: vi.fn(),
-        onCreateCrate: vi.fn(),
-        onAddToPlaylist: vi.fn(),
-        onAddToCrate: vi.fn(),
-        onToggleSaved: vi.fn(),
-        onToggleOffline: vi.fn(),
-        onGoToArtist: vi.fn(),
-        onShare: vi.fn(),
-      },
-      t,
-    );
-
-    expect(items.some((item) => item.key === "crate")).toBe(true);
+    const items = buildAlbumMenuEntries(menuOptions(), t);
     const crateMenu = items.find((item) => item.key === "crate");
     if (crateMenu?.type !== "disclosure") {
       throw new Error("Crate menu missing");
     }
     expect(crateMenu.items).toHaveLength(1);
-    const createCrateItem = crateMenu.items[0];
-    if (!createCrateItem || !("label" in createCrateItem)) {
-      throw new Error("Create Crate option missing");
-    }
-    expect(createCrateItem.label).toBe("library.crates.create");
     expect(items.some((item) => item.key === "playlist")).toBe(true);
   });
 
-  it("hides the Crate picker when the album cannot be added to a Crate", () => {
-    const items = buildAlbumMenuItems(
-      {
-        playlistPickerOpen: false,
-        cratePickerOpen: false,
-        canPersistAlbum: true,
-        canAddToCrate: false,
-        canSaveAlbum: true,
-        saved: false,
-        offlineSupported: true,
-        offlineState: "idle",
-        offlineButtonLabel: "Offline",
-        playlists: [],
-        crates: [],
-        onPlay: vi.fn(),
-        onPlayNext: vi.fn(),
-        onTogglePlaylistPicker: vi.fn(),
-        onToggleCratePicker: vi.fn(),
-        onCreatePlaylist: vi.fn(),
-        onCreateCrate: vi.fn(),
-        onAddToPlaylist: vi.fn(),
-        onAddToCrate: vi.fn(),
-        onToggleSaved: vi.fn(),
-        onToggleOffline: vi.fn(),
-        onGoToArtist: vi.fn(),
-        onShare: vi.fn(),
-      },
+  it("disables unavailable actions instead of hiding them", () => {
+    const items = buildAlbumMenuEntries(
+      menuOptions({
+        canSave: false,
+        canRadio: false,
+        canDownload: false,
+        offlineEnabled: false,
+      }),
       t,
     );
-
-    expect(items.some((item) => item.key === "crate")).toBe(false);
-    expect(items.some((item) => item.key === "playlist")).toBe(true);
+    for (const key of ["save", "radio", "download", "offline"]) {
+      const entry = items.find((item) => item.key === key);
+      expect(entry && "disabled" in entry && entry.disabled).toBe(true);
+    }
   });
 });

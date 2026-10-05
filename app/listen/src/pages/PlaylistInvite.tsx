@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Loader2 } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { api } from "@/lib/api";
 
@@ -21,12 +21,12 @@ export function PlaylistInvite() {
     )
       .then((response) => {
         if (cancelled) return;
-        toast.success(t("playlistInvite.toasts.joined"));
+        notify.success(t("playlistInvite.toasts.joined"));
         navigate(`/playlist/${response.playlist_id}`, { replace: true });
       })
       .catch(() => {
         if (cancelled) return;
-        toast.error(t("playlistInvite.toasts.invalid"));
+        notify.error(t("playlistInvite.toasts.invalid"));
         navigate("/library?tab=playlists", { replace: true });
       });
     return () => {

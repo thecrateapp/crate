@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import type { PlayerActionsValue } from "@/contexts/player-context";
 import { sendConnectCommand } from "@/lib/crate-connect";
 import { triggerHaptic } from "@/lib/haptics";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 import { usePlayerBarRemoteConnection } from "@/components/player/bar/usePlayerBarRemoteConnection";
 
 type RemoteTransportCommand =
@@ -68,7 +68,7 @@ export function usePlayerBarRemotePlayback({
                 : type;
         const ok = connect.sendRemoteCommand(wsType, payload);
         if (!ok) {
-          toast.error(
+          notify.error(
             remoteConnectDeviceLabel
               ? `Could not control ${remoteConnectDeviceLabel}`
               : "Could not control remote device",
@@ -89,7 +89,7 @@ export function usePlayerBarRemotePlayback({
         }
         window.setTimeout(runRefreshConnectSession, 600);
       } catch {
-        toast.error(
+        notify.error(
           remoteConnectDeviceLabel
             ? `Could not control ${remoteConnectDeviceLabel}`
             : "Could not control remote device",

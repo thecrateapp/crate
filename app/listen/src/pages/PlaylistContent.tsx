@@ -1,6 +1,7 @@
 import { Sparkles } from "@crate/ui/icons";
 
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
+import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import { PlaylistCollaboratorsModal } from "@/components/playlists/PlaylistCollaboratorsModal";
 import { PlaylistDeleteModal } from "@/components/playlists/PlaylistDeleteModal";
 import { PlaylistTrackList } from "@/components/playlists/PlaylistTrackList";
@@ -35,20 +36,23 @@ function PlaylistBadges({
     <>
       <OfflineBadge state={offlineState} />
       {data.is_smart ? (
-        <span className="inline-flex items-center rounded-md border border-accent-action/30 px-1.5 py-0 text-xs font-medium text-accent-action">
-          <Sparkles size={10} className="mr-0.5" />
+        <CrateChip
+          tone="accent"
+          icon={Sparkles}
+          className="py-0 text-xs font-medium"
+        >
           {t("playlist.badges.smart")}
-        </span>
+        </CrateChip>
       ) : null}
-      <span className="inline-flex items-center rounded-md border border-border-quiet px-1.5 py-0 text-xs font-medium text-text-primary/60">
+      <CrateChip tone="neutral" className="py-0 text-xs font-medium">
         {data.visibility === "public"
           ? t("playlist.visibility.public")
           : t("playlist.visibility.private")}
-      </span>
+      </CrateChip>
       {data.is_collaborative ? (
-        <span className="inline-flex items-center rounded-md border border-accent-action/20 bg-accent-action/10 px-1.5 py-0 text-xs font-medium text-text-accent">
+        <CrateChip tone="accent" className="py-0 text-xs font-medium">
           {t("playlist.badges.collaborative")}
-        </span>
+        </CrateChip>
       ) : null}
     </>
   );
@@ -100,7 +104,7 @@ export function PlaylistContent({
         menuItems={page.playlistMenuItems}
       />
 
-      <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 pb-8 sm:px-6">
+      <div className="mx-auto w-full max-w-content space-y-6 px-4 pb-8 sm:px-6">
         {page.offlineStatusDetail ? (
           <p className="text-xs text-text-muted">{page.offlineStatusDetail}</p>
         ) : null}

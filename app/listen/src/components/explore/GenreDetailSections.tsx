@@ -1,20 +1,68 @@
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { MediaGrid, SectionHeader } from "@crate/ui/domain/lists";
 
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import {
   itemKey,
-  UpcomingShowCard,
+  ShowCard,
   type UpcomingItem,
 } from "@/components/upcoming/UpcomingRows";
 
-import { RelatedGenreCard, type RelatedGenre } from "./RelatedGenreCard";
 import type { GenreDetail } from "./explore-model";
-import {
-  GenreActionBar,
-  GenreHero,
-  type GenreActionBarProps,
-} from "./GenreDetailHero";
+import { buildRelatedGenreImageCandidates } from "./genre-covers";
+import { GenreHero, type GenreActionBarProps } from "./GenreDetailHero";
+import { GenreTile } from "./GenreTile";
+
+type RelatedGenre = NonNullable<GenreDetail["related_genres"]>[number];
+
+const RELATION_LABEL_KEY: Record<string, string> = {
+  parent: "genre.relation.parent",
+  child: "genre.relation.child",
+  sibling: "genre.relation.sibling",
+  related: "genre.relation.related",
+  influenced_by: "genre.relation.influencedBy",
+  influences: "genre.relation.influences",
+  fusion: "genre.relation.fusion",
+};
+
+function RelatedGenreTile({
+  genre,
+  onOpen,
+}: {
+  genre: RelatedGenre;
+  onOpen: (genre: RelatedGenre) => void;
+}) {
+  const { t } = useTranslation();
+  const imageCandidates = useMemo(
+    () => buildRelatedGenreImageCandidates(genre),
+    [genre],
+  );
+  const relationKey = RELATION_LABEL_KEY[genre.relation_type];
+  const detail = [
+    genre.artist_count > 0
+      ? t("common.artistCountLabel", { count: genre.artist_count })
+      : null,
+    genre.album_count > 0
+      ? t("common.albumCountLabel", { count: genre.album_count })
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <GenreTile
+      variant="related"
+      slug={genre.slug}
+      name={genre.name}
+      kicker={relationKey ? t(relationKey) : genre.relation_label}
+      detail={detail}
+      imageCandidates={imageCandidates}
+      onOpen={() => onOpen(genre)}
+    />
+  );
+}
 
 function RelatedGenresSection({
   genres,
@@ -27,23 +75,19 @@ function RelatedGenresSection({
   if (!genres.length) return null;
   return (
     <section className="space-y-3">
-      <div className="flex items-end justify-between gap-3 px-1">
-        <div>
-          <h2 className="text-lg font-bold">{t("genre.related.title")}</h2>
-          <p className="mt-1 text-xs text-text-muted">
-            {t("genre.related.subtitle")}
-          </p>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+      <SectionHeader
+        title={t("genre.related.title")}
+        subtitle={t("genre.related.subtitle")}
+      />
+      <MediaGrid>
         {genres.map((genre) => (
-          <RelatedGenreCard
+          <RelatedGenreTile
             key={`${genre.relation_type}-${genre.slug}`}
             genre={genre}
-            onOpen={() => onOpen(genre)}
+            onOpen={onOpen}
           />
         ))}
-      </div>
+      </MediaGrid>
     </section>
   );
 }
@@ -61,12 +105,12 @@ function ShowsSection({
   if (!shows.length) return null;
   return (
     <section className="space-y-3">
-      <h2 className="px-1 text-lg font-bold">{t("genre.sections.shows")}</h2>
+      <SectionHeader title={t("genre.sections.shows")} />
       <div className="grid gap-3 lg:grid-cols-2">
         {shows.map((show, index) => {
           const key = itemKey(show, index);
           return (
-            <UpcomingShowCard
+            <ShowCard
               key={key}
               item={show}
               expanded={expandedShowId === key}
@@ -84,8 +128,8 @@ function ArtistsSection({ artists }: { artists: GenreDetail["artists"] }) {
   if (!artists.length) return null;
   return (
     <div className="space-y-3">
-      <h2 className="px-1 text-lg font-bold">{t("nav.collection.artists")}</h2>
-      <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
+      <SectionHeader title={t("nav.collection.artists")} />
+      <MediaGrid density="compact">
         {artists.map((artist) => (
           <ArtistCard
             key={
@@ -105,7 +149,7 @@ function ArtistsSection({ artists }: { artists: GenreDetail["artists"] }) {
             layout="grid"
           />
         ))}
-      </div>
+      </MediaGrid>
     </div>
   );
 }
@@ -115,8 +159,8 @@ function AlbumsSection({ albums }: { albums: GenreDetail["albums"] }) {
   if (!albums.length) return null;
   return (
     <div className="space-y-3">
-      <h2 className="px-1 text-lg font-bold">{t("nav.collection.albums")}</h2>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <SectionHeader title={t("nav.collection.albums")} />
+      <MediaGrid>
         {albums.map((album) => (
           <AlbumCard
             key={
@@ -136,7 +180,7 @@ function AlbumsSection({ albums }: { albums: GenreDetail["albums"] }) {
             layout="grid"
           />
         ))}
-      </div>
+      </MediaGrid>
     </div>
   );
 }
@@ -175,6 +219,7 @@ export function GenreDetailContent({
   return (
     <div className="space-y-6">
       <GenreHero
+        actionBar={actionBar}
         artistCount={artistCount}
         albumCount={albumCount}
         data={data}
@@ -183,7 +228,6 @@ export function GenreDetailContent({
         onCoverError={onCoverError}
         trackCount={trackCount}
       />
-      <GenreActionBar {...actionBar} />
       <RelatedGenresSection genres={relatedGenres} onOpen={onOpenRelated} />
       <ShowsSection
         shows={data.shows?.slice(0, 5) ?? []}

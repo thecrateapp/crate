@@ -1,9 +1,31 @@
+import {
+  TrackList,
+  type TrackListVirtualListProps,
+} from "@crate/ui/domain/tracks";
+import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
+
+import { TrackRow } from "@/components/cards/TrackRow";
 import { PlaylistArtwork } from "@/components/playlists/PlaylistArtwork";
 import { PlaylistHeroSection } from "@/components/playlists/PlaylistHeroSection";
 import { PlaylistTrackFilterBar } from "@/components/playlists/PlaylistTrackFilterBar";
-import { CuratedPlaylistTrackList } from "@/components/playlists/CuratedPlaylistTrackList";
-import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
+import { WindowVirtualList } from "@/components/ui/WindowVirtualList";
+import { toTrackRowData } from "@/lib/track-row-data";
+import type { CuratedPlaylistTrack } from "@/pages/curated-playlist-types";
 import type { CuratedPlaylistPageController } from "@/pages/use-curated-playlist-page-controller";
+
+function CuratedTracksVirtualList({
+  itemKey,
+  ...props
+}: TrackListVirtualListProps<CuratedPlaylistTrack>) {
+  return (
+    <WindowVirtualList
+      {...props}
+      itemKey={
+        itemKey ? (item, index) => String(itemKey(item, index)) : undefined
+      }
+    />
+  );
+}
 
 export function CuratedPlaylistContent({
   page,
@@ -59,7 +81,7 @@ export function CuratedPlaylistContent({
         menuItems={playlistMenuItems}
       />
 
-      <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 pb-8 sm:px-6">
+      <div className="mx-auto w-full max-w-content space-y-6 px-4 pb-8 sm:px-6">
         {offlineStatusDetail ? (
           <p className="text-xs text-text-muted">{offlineStatusDetail}</p>
         ) : null}
@@ -84,13 +106,29 @@ export function CuratedPlaylistContent({
             </p>
           </div>
         ) : (
-          <CuratedPlaylistTrackList
-            tracks={filteredTracks}
-            playlistOptions={playlistOptions}
-            onAddToPlaylist={handleAddTrackToPlaylist}
-            onCreatePlaylist={handleCreatePlaylistFromTrack}
-            onActionMenuOpen={ensurePlaylistOptionsLoaded}
-            onPlayTrack={handlePlayTrack}
+          <TrackList
+            items={filteredTracks}
+            virtualList={CuratedTracksVirtualList}
+            overscan={12}
+            itemKey={(track) => track.id}
+            renderRow={(track, index) => (
+              <TrackRow
+                track={toTrackRowData({
+                  ...track,
+                  id: track.track_id ?? track.track_path ?? track.title,
+                  library_track_id: track.track_id,
+                })}
+                index={index + 1}
+                showCoverThumb
+                showArtist
+                showAlbum
+                playlistOptions={playlistOptions}
+                onAddToPlaylist={handleAddTrackToPlaylist}
+                onCreatePlaylist={handleCreatePlaylistFromTrack}
+                onActionMenuOpen={ensurePlaylistOptionsLoaded}
+                onPlayOverride={() => handlePlayTrack(track.id)}
+              />
+            )}
           />
         )}
       </div>

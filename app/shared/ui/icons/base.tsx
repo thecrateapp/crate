@@ -21,6 +21,7 @@ export type CrateIcon = ForwardRefExoticComponent<
 export type LucideIcon = CrateIcon;
 
 export const CRATE_ICON_SIZE = {
+  nano: 10,
   micro: 12,
   xs: 14,
   sm: 16,

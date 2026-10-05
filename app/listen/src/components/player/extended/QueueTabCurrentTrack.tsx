@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { Save } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Save } from "@crate/ui/icons";
+import { Button } from "@crate/ui/shadcn/button";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import type { Track } from "@/contexts/PlayerContext";
@@ -8,13 +9,11 @@ export function QueueTabCurrentTrack({
   currentTrack,
   currentIndex,
   isPlaying,
-  sourceName,
   onSave,
 }: {
   currentTrack: Track;
   currentIndex: number;
   isPlaying: boolean;
-  sourceName: string;
   onSave: () => void;
 }) {
   const { t } = useTranslation();
@@ -23,16 +22,18 @@ export function QueueTabCurrentTrack({
     <div className="mb-4">
       <div className="mb-2 flex items-center justify-between px-1">
         <p className="text-xs font-bold uppercase tracking-wider text-text-muted">
-          {t("player.queue.nowPlayingFrom", { source: sourceName })}
+          {t("player.queue.nowPlaying")}
         </p>
-        <button
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-text-muted transition-colors hover:bg-surface-control hover:text-text-secondary"
+        <Button
+          variant="ghost"
+          size="xs"
+          className="h-auto gap-1 rounded px-1.5 py-0.5 font-normal text-text-muted hover:bg-surface-control hover:text-text-secondary has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3"
           onClick={onSave}
           title={t("player.queue.saveAsPlaylist")}
         >
-          <Save size={10} />
+          <Save size={CRATE_ICON_SIZE.micro} />
           {t("common.save")}
-        </button>
+        </Button>
       </div>
       <div className="flex items-center gap-3 rounded-lg bg-surface-control px-2 py-1.5">
         <span className="w-4 shrink-0 text-right text-xs tabular-nums text-accent-action">

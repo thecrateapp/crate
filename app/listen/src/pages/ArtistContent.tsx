@@ -51,7 +51,7 @@ export function ArtistContent({ page }: { page: LoadedArtistPageController }) {
         onOpenBio={() => setBioModalOpen(true)}
       />
 
-      <div className="mx-auto w-full max-w-[1480px] space-y-8 px-4 pb-8 sm:px-6">
+      <div className="mx-auto w-full max-w-content space-y-8 px-4 pb-8 sm:px-6">
         <ArtistTopTracksSection
           artistId={data.id}
           artistSlug={data.slug}

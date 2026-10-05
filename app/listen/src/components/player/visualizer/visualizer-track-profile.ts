@@ -1,6 +1,7 @@
+import { clamp } from "@/lib/utils";
+
 import {
   DEFAULT_PROFILE,
-  clamp,
   describeTempo,
   getKeyIndex,
   hasAnalysisData,

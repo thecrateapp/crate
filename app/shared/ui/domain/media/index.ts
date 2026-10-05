@@ -11,3 +11,9 @@ export type {
 } from "./MediaEntity";
 export { MediaCover } from "./MediaCover";
 export type { MediaCoverProps } from "./MediaCover";
+export { PlayButton } from "./PlayButton";
+export type {
+  PlayButtonProps,
+  PlayButtonReveal,
+  PlayButtonSize,
+} from "./PlayButton";

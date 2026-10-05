@@ -6,6 +6,10 @@ from datetime import date, datetime
 from sqlalchemy import text
 
 from crate.db.queries.user_library_shared import normalize_stats_window
+from crate.db.queries.user_library_stats_genres import (
+    format_weighted_genre_rows,
+    weighted_genre_split_sql,
+)
 from crate.db.tx import read_scope
 
 
@@ -244,26 +248,26 @@ def get_top_genres(user_id: int, window: str = "30d", limit: int = 20) -> list[d
         rows = (
             session.execute(
                 text(
-                    """
-                SELECT
-                    genre_name,
-                    play_count,
-                    complete_play_count,
-                    minutes_listened,
-                    first_played_at,
-                    last_played_at
-                FROM user_genre_stats
-                WHERE user_id = :user_id AND stat_window = :window
-                ORDER BY play_count DESC, minutes_listened DESC, last_played_at DESC
-                LIMIT :lim
-                """
+                    weighted_genre_split_sql(
+                        """
+                        SELECT
+                            genre_name,
+                            play_count,
+                            complete_play_count,
+                            minutes_listened,
+                            first_played_at,
+                            last_played_at
+                        FROM user_genre_stats
+                        WHERE user_id = :user_id AND stat_window = :window
+                        """
+                    )
                 ),
                 {"user_id": user_id, "window": normalized, "lim": limit},
             )
             .mappings()
             .all()
         )
-    return [dict(row) for row in rows]
+    return format_weighted_genre_rows(rows)
 
 
 def get_replay_mix(user_id: int, window: str = "30d", limit: int = 30) -> dict:
@@ -403,21 +407,7 @@ def get_replay_mix(user_id: int, window: str = "30d", limit: int = 30) -> dict:
         if item.get("bliss_vector") is not None:
             item["bliss_vector"] = list(item["bliss_vector"])
 
-    if normalized == "7d":
-        title = "Your last 7 days"
-        subtitle = "A quick replay of the week so far."
-    elif normalized == "30d":
-        title = "Replay this month"
-        subtitle = "The tracks that defined your last 30 days."
-    elif normalized == "90d":
-        title = "Replay this season"
-        subtitle = "The songs you've kept coming back to lately."
-    elif normalized == "365d":
-        title = "Replay this year"
-        subtitle = "A long-view mix from your past year."
-    else:
-        title = "All-time replay"
-        subtitle = "Your enduring favorites across the whole library."
+    copy_key, title, subtitle = _REPLAY_COPY.get(normalized, _REPLAY_COPY["all_time"])
 
     total_minutes = round(
         sum(float(item.get("minutes_listened") or 0) for item in items), 1
@@ -427,10 +417,33 @@ def get_replay_mix(user_id: int, window: str = "30d", limit: int = 30) -> dict:
         "window": normalized,
         "title": title,
         "subtitle": subtitle,
+        "title_key": f"stats.replay.{copy_key}.title",
+        "subtitle_key": f"stats.replay.{copy_key}.subtitle",
         "track_count": len(items),
         "minutes_listened": total_minutes,
         "items": items,
     }
+
+
+_REPLAY_COPY: dict[str, tuple[str, str, str]] = {
+    "7d": ("lastWeek", "Your last 7 days", "A quick replay of the week so far."),
+    "30d": (
+        "thisMonth",
+        "Replay this month",
+        "The tracks that defined your last 30 days.",
+    ),
+    "90d": (
+        "thisSeason",
+        "Replay this season",
+        "The songs you've kept coming back to lately.",
+    ),
+    "365d": ("thisYear", "Replay this year", "A long-view mix from your past year."),
+    "all_time": (
+        "allTime",
+        "All-time replay",
+        "Your enduring favorites across the whole library.",
+    ),
+}
 
 
 def _coerce_datetime(value) -> datetime | None:

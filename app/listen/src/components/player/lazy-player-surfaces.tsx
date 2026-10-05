@@ -50,12 +50,3 @@ export function preloadExtendedPlayer() {
 export function preloadFullscreenPlayer() {
   return fullscreenPlayer.preload();
 }
-
-export function preloadDesktopPlayerSurfaces() {
-  return Promise.all([
-    queuePanel.preload(),
-    lyricsPanel.preload(),
-    equalizerPopover.preload(),
-    extendedPlayer.preload(),
-  ]);
-}

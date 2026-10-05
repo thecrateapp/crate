@@ -20,7 +20,7 @@ import { useAlbumPlaylistActions } from "@/pages/use-album-playlist-actions";
 import { useAlbumPresentation } from "@/pages/use-album-presentation";
 import { useAlbumSelection } from "@/pages/use-album-selection";
 import { api } from "@/lib/api";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 export function useAlbumPageController() {
   const { t } = useTranslation();
@@ -49,9 +49,6 @@ export function useAlbumPageController() {
   const albumHeroInfoRef = useRef<HTMLDivElement>(null);
   const albumPrimaryActionsRef = useRef<HTMLDivElement>(null);
   const [mobileHeroInfoOffset, setMobileHeroInfoOffset] = useState(0);
-  const albumMenuController = useContextMenuController<HTMLButtonElement>({
-    placement: "bottom-end",
-  });
   const selectionMenuController = useContextMenuController<HTMLButtonElement>();
   const playlistComposer = useOptionalPlaylistComposer();
   const playlists = playlistComposer?.playlistOptions ?? [];
@@ -82,21 +79,34 @@ export function useAlbumPageController() {
   });
 
   function closeAlbumMenu() {
-    albumMenuController.close();
     setPlaylistPickerOpen(false);
     setCratePickerOpen(false);
   }
 
   async function handleAddToCrate(crateId: string) {
     if (!globalAlbumUid) return;
+    const crateName = crates.find((crate) => crate.id === crateId)?.name ?? "";
+    if (
+      crates.some(
+        (crate) =>
+          crate.id === crateId && crate.albumUids.includes(globalAlbumUid),
+      )
+    ) {
+      notify.info(t("album.toasts.alreadyInCrate", { name: crateName }));
+      return;
+    }
     try {
       await api(`/api/crates/${crateId}/albums`, "POST", {
         global_album_uid: globalAlbumUid,
       });
-      toast.success(t("album.toasts.addedToCrate"));
+      notify.success(t("album.toasts.addedToCrate"));
       closeAlbumMenu();
-    } catch {
-      toast.error(t("album.toasts.addToCrateFailed"));
+    } catch (error) {
+      if ((error as { status?: number }).status === 409) {
+        notify.info(t("album.toasts.alreadyInCrate", { name: crateName }));
+        return;
+      }
+      notify.error(t("album.toasts.addToCrateFailed"));
     }
   }
 
@@ -155,8 +165,9 @@ export function useAlbumPageController() {
   });
   const presentation = useAlbumPresentation({
     albumId,
-    albumMenuController,
     artistName,
+    canPlay: playerTracks.length > 0,
+    canRadio: albumRadioSeed != null && !isPreRelease,
     cratePickerOpen,
     crates,
     data,
@@ -169,12 +180,14 @@ export function useAlbumPageController() {
     handleAddSelectedToQueue,
     handleAddToPlaylist,
     handleAddToCrate,
+    handleAlbumRadio,
     handleCreateCrate,
     handleCreatePlaylistFromAlbum,
     handleCreatePlaylistFromSelection,
     handlePlay,
     handlePlayNextAlbum,
     handlePlaySelectedNext,
+    handleShuffle,
     handleToggleSelectionMenuPlaylist,
     ensureCrateOptionsLoaded,
     mobileHeroInfoOffset,
@@ -190,15 +203,9 @@ export function useAlbumPageController() {
   });
 
   useDismissibleLayer({
-    active:
-      playlistPickerOpen || cratePickerOpen || selectionPlaylistPickerOpen,
-    refs: [
-      albumMenuController.menuRef,
-      selectionBarRef,
-      selectionMenuController.menuRef,
-    ],
+    active: selectionPlaylistPickerOpen,
+    refs: [selectionBarRef, selectionMenuController.menuRef],
     onDismiss: () => {
-      closeAlbumMenu();
       setSelectionPlaylistPickerOpen(false);
       handleCloseSelectionMenu();
     },
@@ -220,7 +227,6 @@ export function useAlbumPageController() {
   return {
     albumHeroInfoRef,
     albumPrimaryActionsRef,
-    albumMenuController,
     canonicalPath,
     closeAlbumMenu,
     clearTrackSelection,

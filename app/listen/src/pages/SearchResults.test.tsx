@@ -122,6 +122,25 @@ describe("SearchResults", () => {
     expect(screen.queryByText("No music found")).not.toBeInTheDocument();
   });
 
+  it("retries a failed search from the error state", async () => {
+    vi.mocked(api).mockRejectedValue(new ApiError(500, "Server error"));
+
+    renderWithListenProviders(<SearchResults />, {
+      path: "/search",
+      route: "/search?q=high-vis",
+    });
+
+    const retry = await screen.findByRole("button", { name: "Retry" });
+    vi.mocked(api).mockClear();
+    vi.mocked(api).mockResolvedValue({ artists: [], albums: [], tracks: [] });
+    await userEvent.click(retry);
+
+    await waitFor(() => {
+      expect(screen.getByText("No music found")).toBeInTheDocument();
+    });
+    expect(api).toHaveBeenCalled();
+  });
+
   it("renders global catalog tracks as playable rows", async () => {
     vi.mocked(api).mockResolvedValue({
       artists: [],

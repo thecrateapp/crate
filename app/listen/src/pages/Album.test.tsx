@@ -5,6 +5,8 @@ import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 import { useApi } from "@/hooks/use-api";
 import { fetchAlbumRadio } from "@/lib/radio";
 
+import { AlbumCard } from "@/components/cards/AlbumCard";
+
 import { Album } from "./Album";
 
 const openCrateComposerForAlbum = vi.hoisted(() => vi.fn(() => true));
@@ -86,6 +88,10 @@ vi.mock("@/lib/api", async (importOriginal) => {
 vi.mock("@/lib/radio", () => ({
   fetchAlbumRadio: vi.fn(),
 }));
+
+function heroActionGroup(index: number) {
+  return screen.getByTestId("hero-action-bar").children[index] as HTMLElement;
+}
 
 const ALBUM_DATA = {
   id: 42,
@@ -381,7 +387,7 @@ describe("Album page", () => {
 
     const badge = screen.getByText("Pre-release");
     const title = screen.getByRole("heading", { name: "MORIR" });
-    expect(badge.parentElement).toHaveClass("flex", "flex-col");
+    expect(badge.parentElement).toHaveClass("flex", "flex-wrap");
     expect(badge.compareDocumentPosition(title)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
@@ -393,9 +399,7 @@ describe("Album page", () => {
       path: "/artists/:artistSlug/:albumSlug",
     });
 
-    const primary = screen.getByRole("group", {
-      name: "Primary album actions",
-    });
+    const primary = heroActionGroup(0);
     const playButton = within(primary).getByRole("button", { name: "Play" });
     expect(playButton).toHaveTextContent("Play");
     expect(playButton).toHaveClass(
@@ -408,9 +412,7 @@ describe("Album page", () => {
     expect(shuffleButton).toHaveTextContent("Shuffle");
     expect(shuffleButton).toHaveClass("shadow-control-inset");
 
-    const secondary = screen.getByRole("group", {
-      name: "Secondary album actions",
-    });
+    const secondary = heroActionGroup(1);
     expect(
       within(secondary).getByRole("button", { name: "Album Radio" }),
     ).toHaveTextContent("Radio");
@@ -437,9 +439,7 @@ describe("Album page", () => {
       playerActions: { playAll },
     });
 
-    const primary = screen.getByRole("group", {
-      name: "Primary album actions",
-    });
+    const primary = heroActionGroup(0);
     const playButton = within(primary).getByRole("button", { name: "Play" });
 
     expect(playButton).toHaveAttribute("type", "button");
@@ -459,9 +459,7 @@ describe("Album page", () => {
       path: "/artists/:artistSlug/:albumSlug",
     });
 
-    const primary = screen.getByRole("group", {
-      name: "Acciones principales de álbum",
-    });
+    const primary = heroActionGroup(0);
     expect(
       within(primary).getByRole("button", { name: "Reproducir" }),
     ).toHaveTextContent("Reproducir");
@@ -469,9 +467,7 @@ describe("Album page", () => {
       within(primary).getByRole("button", { name: "Aleatorio" }),
     ).toHaveTextContent("Aleatorio");
 
-    const secondary = screen.getByRole("group", {
-      name: "Acciones secundarias de álbum",
-    });
+    const secondary = heroActionGroup(1);
     expect(
       within(secondary).getByRole("button", { name: "Radio de álbum" }),
     ).toHaveTextContent("Radio");
@@ -545,9 +541,7 @@ describe("Album page", () => {
       playerActions: { playAll },
     });
 
-    const secondary = screen.getByRole("group", {
-      name: "Secondary album actions",
-    });
+    const secondary = heroActionGroup(1);
     expect(
       within(secondary).getByRole("button", { name: "Add to collection" }),
     ).toHaveTextContent("Add");
@@ -589,12 +583,45 @@ describe("Album page", () => {
     expect(menu).toHaveClass(
       "listen-glass-panel",
       "w-72",
-      "rounded-[12px]",
       "z-app-context-menu",
     );
 
-    const menuItem = await screen.findByRole("menuitem", { name: "Play now" });
+    const menuItem = await screen.findByRole("menuitem", {
+      name: "Play album",
+    });
     expect(menuItem.closest(".overflow-x-auto")).toBeNull();
+  });
+
+  it("builds the same album menu entries on the page and on the album card", async () => {
+    const page = renderWithListenProviders(<Album />, {
+      route: "/artists/crossed/morir",
+      path: "/artists/:artistSlug/:albumSlug",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    const pageMenu = await screen.findByRole("menu");
+    const pageEntries = within(pageMenu)
+      .getAllByRole("menuitem")
+      .map((item) => item.textContent);
+    page.unmount();
+
+    renderWithListenProviders(
+      <AlbumCard
+        artist="Crossed"
+        album="MORIR"
+        albumId={42}
+        albumEntityUid="album-entity-42"
+        albumSlug="morir"
+        artistSlug="crossed"
+      />,
+    );
+    fireEvent.contextMenu(screen.getByText("MORIR").closest("article")!);
+    const cardMenu = await screen.findByRole("menu");
+    const cardEntries = within(cardMenu)
+      .getAllByRole("menuitem")
+      .map((item) => item.textContent);
+
+    expect(cardEntries).toEqual(pageEntries);
   });
 
   it("opens the Crate composer from the album menu and closes the menu", async () => {
@@ -626,6 +653,30 @@ describe("Album page", () => {
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
+  it("collapses the playlist picker when the album menu is dismissed", async () => {
+    renderWithListenProviders(<Album />, {
+      route: "/artists/crossed/morir",
+      path: "/artists/:artistSlug/:albumSlug",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    const disclosure = await screen.findByRole("menuitem", {
+      name: "Add to playlist",
+    });
+    fireEvent.click(disclosure);
+    expect(
+      await screen.findByRole("menuitem", { name: "Add to playlist" }),
+    ).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(
+      await screen.findByRole("menuitem", { name: "Add to playlist" }),
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("uses frameless labelled secondary actions on mobile album pages", async () => {
     mockMobilePointer();
 
@@ -634,9 +685,9 @@ describe("Album page", () => {
       path: "/artists/:artistSlug/:albumSlug",
     });
 
-    const secondary = screen.getByRole("group", {
-      name: "Secondary album actions",
-    });
+    const secondary = screen.getByRole("button", {
+      name: "Album Radio",
+    }).parentElement!;
     expect(secondary).toHaveClass("grid");
 
     const radio = within(secondary).getByRole("button", {
@@ -662,21 +713,18 @@ describe("Album page", () => {
       }),
     ).toHaveTextContent("Bandcamp");
 
-    const heroMenu = screen.getByTestId("album-mobile-hero-menu");
+    const heroMenu = screen.getByTestId("hero-mobile-menu-trigger");
     expect(heroMenu).toHaveAttribute("aria-label", "More");
     expect(heroMenu.parentElement).not.toBeNull();
     expect(heroMenu.parentElement!).toHaveClass("fixed", "z-app-header");
     expect(heroMenu.parentElement!).not.toHaveClass("z-app-context-menu");
-    expect(
-      screen.getByTestId("album-mobile-hero-menu-icon"),
-    ).toBeInTheDocument();
     expect(
       within(secondary).queryByRole("button", { name: "More" }),
     ).toBeNull();
 
     fireEvent.click(heroMenu);
     expect(
-      await screen.findByRole("menuitem", { name: "Play now" }),
+      await screen.findByRole("menuitem", { name: "Play album" }),
     ).toBeInTheDocument();
   });
 
@@ -716,42 +764,30 @@ describe("Album page", () => {
       "hidden",
       "sm:block",
     );
-    expect(screen.getByTestId("album-hero-background")).toHaveClass(
+    const heroBackgroundImage = screen
+      .getByTestId("album-hero-background")
+      .querySelector("img");
+    expect(heroBackgroundImage).toHaveClass(
       "brightness-[0.72]",
       "opacity-[0.82]",
       "sm:grayscale",
       "sm:brightness-[0.42]",
       "sm:opacity-[0.42]",
     );
-    expect(screen.getByTestId("album-hero-background")).not.toHaveClass(
-      "grayscale",
-    );
-    expect(screen.getByTestId("album-hero-mobile-gradient")).toHaveStyle({
-      background: "var(--hero-artwork-gradient-mobile)",
-    });
-    expect(screen.getByTestId("album-hero-desktop-gradient")).toHaveStyle({
-      background: "var(--hero-artwork-gradient-desktop)",
-    });
-    expect(screen.getByTestId("album-hero-content")).toHaveClass(
+    expect(heroBackgroundImage).not.toHaveClass("grayscale");
+    expect(screen.getByTestId("page-hero-background")).toBeInTheDocument();
+    const heroContent = screen.getByRole("heading", { level: 1, name: "MORIR" })
+      .parentElement!.parentElement!.parentElement!;
+    expect(heroContent).toHaveClass(
       "pb-[calc(var(--album-mobile-action-overlap)+var(--album-mobile-info-action-gap))]",
       "sm:pb-6",
-    );
-    expect(screen.getByTestId("album-action-row")).toHaveClass(
-      "-mt-[var(--album-mobile-action-overlap)]",
-      "pt-0",
-      "sm:mt-0",
-    );
-    expect(screen.getByTestId("album-hero-info")).toHaveClass(
-      "flex",
-      "min-w-0",
-      "text-left",
-    );
-    expect(screen.getByTestId("album-hero-info")).toHaveClass(
       "translate-y-[var(--album-mobile-info-y)]",
       "sm:translate-y-0",
     );
-    expect(screen.getByTestId("album-hero-info")).not.toHaveClass(
-      "translate-y-12",
+    expect(screen.getByTestId("album-action-row").parentElement).toHaveClass(
+      "-mt-[var(--album-mobile-action-overlap)]",
+      "pt-0",
+      "sm:mt-0",
     );
   });
 
@@ -762,8 +798,8 @@ describe("Album page", () => {
     });
 
     const actionRow = screen.getByTestId("album-action-row");
-    expect(actionRow).toHaveClass("sm:px-0");
-    expect(actionRow.firstElementChild).toHaveClass("sm:px-6");
+    expect(actionRow.parentElement).toHaveClass("sm:px-6");
+    expect(actionRow.firstElementChild).toHaveClass("max-w-content");
   });
 
   it("anchors mobile album metadata above the measured primary action buttons", async () => {
@@ -781,7 +817,7 @@ describe("Album page", () => {
             ) || 0;
           return rect(300 + offset, 390 + offset);
         }
-        if (this.dataset.testid === "album-primary-actions") {
+        if (this.dataset.testid === "album-action-row") {
           return rect(474, 522, 398);
         }
         return rect(0, 1);

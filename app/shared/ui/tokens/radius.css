@@ -7,3 +7,7 @@
   --radius-lg: var(--crate-token-radius-lg);
   --radius-xl: var(--crate-token-radius-xl);
 }
+
+@theme {
+  --radius-panel: 12px;
+}

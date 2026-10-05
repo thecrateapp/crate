@@ -44,7 +44,7 @@ vi.mock("@/lib/radio", () => ({
   fetchTrackRadio: vi.fn(),
 }));
 
-vi.mock("sonner", () => ({ toast }));
+vi.mock("@crate/ui/lib/notify", () => ({ notify: toast }));
 
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { I18nProvider, type ListenLocale } from "@/i18n";
@@ -226,11 +226,53 @@ describe("useTrackActionEntries", () => {
         "Iniciar radio de canción",
         "Compartir canción",
         "Descargar canción",
-        "Playlists",
-        "Añadir a una playlist nueva",
-        "Añadir a Favorites",
       ]),
     );
+
+    const playlistMenu = result.current.find(
+      (entry) => entry.key === "playlist",
+    );
+    expect(playlistMenu?.type).toBe("disclosure");
+    if (playlistMenu?.type !== "disclosure") {
+      throw new Error("Playlist submenu missing");
+    }
+    expect(playlistMenu.label).toBe("Añadir a playlist");
+    expect(playlistMenu.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "Añadir a una playlist nueva" }),
+        expect.objectContaining({ label: "Añadir a Favorites" }),
+      ]),
+    );
+  });
+
+  it("groups playlist actions under a disclosure submenu", () => {
+    const { result } = renderHook(
+      () =>
+        useTrackActionEntries({
+          track: {
+            id: 12,
+            entity_uid: "track-entity-12",
+            title: "Talk for Hours",
+            artist: "High Vis",
+          },
+          playlistOptions: [{ id: 1, name: "Favorites" }],
+          onCreatePlaylist: vi.fn(),
+          onAddToPlaylist: vi.fn(),
+        }),
+      { wrapper: i18nWrapper("es") },
+    );
+
+    const playlistMenu = result.current.find(
+      (entry) => entry.key === "playlist",
+    );
+    expect(playlistMenu?.type).toBe("disclosure");
+    if (playlistMenu?.type !== "disclosure") {
+      throw new Error("Playlist submenu missing");
+    }
+    expect(playlistMenu.items.map((item) => item.key)).toEqual([
+      "playlist-create",
+      "playlist-1",
+    ]);
   });
 
   it("shows an error when adding a track to a playlist fails", async () => {
@@ -252,9 +294,13 @@ describe("useTrackActionEntries", () => {
       { wrapper: i18nWrapper("es") },
     );
 
-    const addAction = result.current.find(
-      (entry) => entry.key === "playlist-1",
+    const playlistMenu = result.current.find(
+      (entry) => entry.key === "playlist",
     );
+    const addAction =
+      playlistMenu?.type === "disclosure"
+        ? playlistMenu.items.find((entry) => entry.key === "playlist-1")
+        : undefined;
     if (
       !addAction ||
       addAction.type === "divider" ||

@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, Loader2, Play, RefreshCw, Trash2 } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { BackLink } from "@crate/ui/domain/navigation";
+import { ErrorState } from "@crate/ui/domain/states";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
+import { PlayButton } from "@crate/ui/domain/media/PlayButton";
+import { CRATE_ICON_SIZE, Loader2, RefreshCw, Trash2 } from "@crate/ui/icons";
+import { notify } from "@crate/ui/lib/notify";
+import { Button } from "@crate/ui/shadcn/button";
 
 import { CrateLoader } from "@/components/ui/CrateLoader";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
@@ -12,6 +17,9 @@ import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 import { PathRouteVisualization, PathTrackList } from "./PathDetailParts";
 import type { PathDetail as PathData, PathTrack } from "./paths-model";
+
+const PILL_ACTION_CLASS_NAME =
+  "h-auto gap-1.5 border border-border-quiet bg-text-primary/5 px-3 py-1.5 has-[>svg]:px-3 text-xs text-text-primary/60 hover:bg-text-primary/5 hover:text-text-primary [&_svg:not([class*='size-'])]:size-3";
 
 function mapToPlayerTrack(track: PathTrack): Track {
   return toPlayableTrack(track, {
@@ -33,9 +41,16 @@ export function PathDetail() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: path, loading, refetch } = useApi<PathData>(`/api/paths/${id}`);
+  const {
+    data: path,
+    loading,
+    error,
+    status,
+    refetch,
+  } = useApi<PathData>(`/api/paths/${id}`);
   const { playAll, currentTrack } = usePlayerActions();
   const [regenerating, setRegenerating] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [animate, setAnimate] = useState(true);
   const activeTrackRef = useRef<HTMLDivElement>(null);
 
@@ -61,10 +76,10 @@ export function PathDetail() {
     setRegenerating(true);
     try {
       await api(`/api/paths/${path.id}/regenerate`, "POST");
-      toast.success(t("paths.toasts.regenerated"));
+      notify.success(t("paths.toasts.regenerated"));
       refetch();
     } catch {
-      toast.error(t("paths.toasts.regenerateFailed"));
+      notify.error(t("paths.toasts.regenerateFailed"));
     } finally {
       setRegenerating(false);
     }
@@ -82,18 +97,27 @@ export function PathDetail() {
     requestAnimationFrame(() => requestAnimationFrame(() => setAnimate(true)));
   }, []);
 
-  if (loading || !path) {
-    return <CrateLoader label={t("paths.loadingDetail")} />;
+  if (!path) {
+    if (loading) {
+      return <CrateLoader label={t("paths.loadingDetail")} />;
+    }
+    const notFound = status === 404 || !error;
+    return (
+      <div className="animate-page-in sm:py-6">
+        <BackLink to="/paths" label={t("paths.back")} className="mb-5" />
+        <ErrorState
+          kind={notFound ? "notFound" : "error"}
+          message={t(notFound ? "paths.notFound" : "paths.toasts.loadFailed")}
+          onRetry={notFound ? undefined : refetch}
+          retryLabel={t("common.retry")}
+        />
+      </div>
+    );
   }
 
   return (
-    <div className="animate-page-in px-4  sm:p-6">
-      <button
-        onClick={() => navigate("/paths")}
-        className="mb-5 flex items-center gap-1.5 text-sm text-text-primary/40 transition hover:text-text-primary"
-      >
-        <ArrowLeft size={14} /> {t("paths.back")}
-      </button>
+    <div className="animate-page-in sm:py-6">
+      <BackLink to="/paths" label={t("paths.back")} className="mb-5" />
 
       <div className="mb-6 flex items-start justify-between gap-3">
         <div>
@@ -112,12 +136,12 @@ export function PathDetail() {
             </span>
           </div>
         </div>
-        <button
+        <PlayButton
+          size="md"
+          label={t("player.play")}
           onClick={() => playFromStep(0)}
-          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent-action text-accent-action-foreground shadow-accent-action-strong transition hover:bg-accent-action/90"
-        >
-          <Play size={18} className="ml-0.5 fill-current" />
-        </button>
+          className="shadow-accent-action-strong hover:bg-accent-action/90"
+        />
       </div>
 
       <PathRouteVisualization
@@ -128,35 +152,53 @@ export function PathDetail() {
       />
 
       <div className="mb-4 flex items-center gap-2">
-        <button
+        <Button
+          variant="ghost"
+          shape="pill"
           onClick={() => void regenerate()}
           disabled={regenerating}
-          className="flex items-center gap-1.5 rounded-full border border-border-quiet bg-text-primary/5 px-3 py-1.5 text-xs font-medium text-text-primary/60 transition hover:border-text-primary/20 hover:text-text-primary disabled:opacity-30"
+          className={`${PILL_ACTION_CLASS_NAME} hover:border-text-primary/20 disabled:opacity-30`}
         >
           {regenerating ? (
-            <Loader2 size={11} className="animate-spin" />
+            <Loader2 size={CRATE_ICON_SIZE.micro} className="animate-spin" />
           ) : (
-            <RefreshCw size={11} />
+            <RefreshCw size={CRATE_ICON_SIZE.micro} />
           )}
           {t("paths.regenerate")}
-        </button>
-        <button
-          onClick={async () => {
-            await api(`/api/paths/${path.id}`, "DELETE");
-            toast.success(t("paths.toasts.deleted"));
-            navigate("/paths");
-          }}
-          className="flex items-center gap-1.5 rounded-full border border-border-quiet bg-text-primary/5 px-3 py-1.5 text-xs font-medium text-text-primary/60 transition hover:border-state-danger/30 hover:text-state-danger-text"
+        </Button>
+        <Button
+          variant="ghost"
+          shape="pill"
+          onClick={() => setConfirmingDelete(true)}
+          className={`${PILL_ACTION_CLASS_NAME} hover:border-state-danger/30 hover:text-state-danger-text`}
         >
-          <Trash2 size={11} /> {t("common.delete")}
-        </button>
+          <Trash2 size={CRATE_ICON_SIZE.micro} /> {t("common.delete")}
+        </Button>
       </div>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        onConfirm={async () => {
+          await api(`/api/paths/${path.id}`, "DELETE");
+          notify.success(t("paths.toasts.deleted"));
+          navigate("/paths");
+        }}
+        onError={() => notify.error(t("paths.toasts.deleteFailed"))}
+        tone="danger"
+        title={t("paths.delete.confirmTitle")}
+        description={t("paths.delete.confirmDescription", { name: path.name })}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
+        closeLabel={t("common.close")}
+        ariaLabel={t("paths.delete.confirmTitle")}
+        backdropLabel={t("common.close")}
+      />
 
       <PathTrackList
         path={path}
         activeStep={activeStep}
         activeTrackRef={activeTrackRef}
-        onPlayFromStep={playFromStep}
       />
     </div>
   );

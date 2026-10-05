@@ -4,11 +4,22 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 import secrets
+import string
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from crate.db.tx import optional_scope
+
+SHORT_CODE_ALPHABET = string.digits + string.ascii_uppercase + string.ascii_lowercase
+SHORT_CODE_LENGTH = 8
+_SHORT_CODE_ATTEMPTS = 8
+
+
+def generate_crate_short_code() -> str:
+    return "".join(
+        secrets.choice(SHORT_CODE_ALPHABET) for _ in range(SHORT_CODE_LENGTH)
+    )
 
 
 class CrateNotFoundError(LookupError):
@@ -37,6 +48,10 @@ class CrateInviteExhaustedError(LookupError):
 
 class CrateAccessDeniedError(PermissionError):
     """Raised when a write is attempted without current Crate access."""
+
+
+class CrateSelfFollowError(ValueError):
+    """Raised when a user tries to follow their own Crate."""
 
 
 def _lock_crate_for_write(
@@ -90,27 +105,110 @@ def create_crate(
     owner_id: int,
     name: str,
     description: str = "",
+    visibility: str = "private",
     is_collaborative: bool = False,
+    is_ordered: bool = True,
+    sort_direction: str = "asc",
+    loop_enabled: bool = False,
     *,
     session: Session | None = None,
 ) -> str:
+    params = {
+        "owner_id": owner_id,
+        "name": name,
+        "description": description,
+        "visibility": visibility,
+        "is_collaborative": is_collaborative,
+        "is_ordered": is_ordered,
+        "sort_direction": sort_direction,
+        "loop_enabled": loop_enabled,
+    }
     with optional_scope(session) as current:
-        crate_id = current.execute(
+        for _ in range(_SHORT_CODE_ATTEMPTS):
+            crate_id = current.execute(
+                text(
+                    """
+                    INSERT INTO crates (
+                        owner_id, name, description, visibility, is_collaborative,
+                        is_ordered, sort_direction, loop_enabled, short_code
+                    )
+                    VALUES (
+                        :owner_id, :name, :description, :visibility,
+                        :is_collaborative, :is_ordered, :sort_direction,
+                        :loop_enabled, :short_code
+                    )
+                    ON CONFLICT (short_code) DO NOTHING
+                    RETURNING id::text
+                    """
+                ),
+                {**params, "short_code": generate_crate_short_code()},
+            ).scalar_one_or_none()
+            if crate_id is not None:
+                return str(crate_id)
+    raise RuntimeError("Could not allocate a unique Crate short code")
+
+
+def follow_crate(
+    crate_id: str,
+    user_id: int,
+    *,
+    session: Session | None = None,
+) -> bool:
+    with optional_scope(session) as current:
+        result = (
+            current.execute(
+                text(
+                    """
+                    WITH target AS (
+                        SELECT c.id, c.owner_id
+                        FROM crates c
+                        WHERE c.id = CAST(:crate_id AS uuid)
+                          AND c.visibility = 'public'
+                    ),
+                    inserted AS (
+                        INSERT INTO crate_followers (crate_id, user_id)
+                        SELECT target.id, :user_id
+                        FROM target
+                        WHERE target.owner_id <> :user_id
+                        ON CONFLICT (crate_id, user_id) DO NOTHING
+                        RETURNING crate_id
+                    )
+                    SELECT
+                        (SELECT owner_id FROM target) AS owner_id,
+                        EXISTS (SELECT 1 FROM inserted) AS inserted
+                    """
+                ),
+                {"crate_id": crate_id, "user_id": user_id},
+            )
+            .mappings()
+            .one()
+        )
+    if result["owner_id"] is None:
+        raise CrateNotFoundError(crate_id)
+    if result["owner_id"] == user_id:
+        raise CrateSelfFollowError(crate_id)
+    return bool(result["inserted"])
+
+
+def unfollow_crate(
+    crate_id: str,
+    user_id: int,
+    *,
+    session: Session | None = None,
+) -> bool:
+    with optional_scope(session) as current:
+        removed = current.execute(
             text(
                 """
-                INSERT INTO crates (owner_id, name, description, is_collaborative)
-                VALUES (:owner_id, :name, :description, :is_collaborative)
-                RETURNING id::text
+                DELETE FROM crate_followers
+                WHERE crate_id = CAST(:crate_id AS uuid)
+                  AND user_id = :user_id
+                RETURNING crate_id
                 """
             ),
-            {
-                "owner_id": owner_id,
-                "name": name,
-                "description": description,
-                "is_collaborative": is_collaborative,
-            },
-        ).scalar_one()
-    return str(crate_id)
+            {"crate_id": crate_id, "user_id": user_id},
+        ).scalar_one_or_none()
+    return removed is not None
 
 
 def update_crate(
@@ -120,6 +218,9 @@ def update_crate(
     description: str | None = None,
     visibility: str | None = None,
     is_collaborative: bool | None = None,
+    is_ordered: bool | None = None,
+    sort_direction: str | None = None,
+    loop_enabled: bool | None = None,
     actor_id: int,
     session: Session | None = None,
 ) -> bool:
@@ -130,6 +231,9 @@ def update_crate(
             "description": description,
             "visibility": visibility,
             "is_collaborative": is_collaborative,
+            "is_ordered": is_ordered,
+            "sort_direction": sort_direction,
+            "loop_enabled": loop_enabled,
         }.items()
         if value is not None
     }
@@ -416,7 +520,9 @@ def remove_crate_member(
     session: Session | None = None,
 ) -> bool:
     with optional_scope(session) as current:
-        _lock_crate_for_write(current, crate_id, actor_id=actor_id, owner_only=True)
+        _lock_crate_for_write(
+            current, crate_id, actor_id=actor_id, owner_only=actor_id != user_id
+        )
         removed = current.execute(
             text(
                 """
@@ -623,21 +729,27 @@ def accept_crate_invite(
 
 
 __all__ = [
+    "SHORT_CODE_ALPHABET",
+    "SHORT_CODE_LENGTH",
     "CrateAlbumAlreadyExistsError",
     "CrateAlbumNotFoundError",
     "CrateAccessDeniedError",
     "CrateCollaborationDisabledError",
     "CrateInviteExhaustedError",
     "CrateNotFoundError",
+    "CrateSelfFollowError",
     "InvalidCrateAlbumOrderError",
     "add_crate_album",
     "accept_crate_invite",
     "create_crate",
     "create_crate_invite",
     "delete_crate",
+    "follow_crate",
+    "generate_crate_short_code",
     "remove_crate_album",
     "remove_crate_member",
     "reorder_crate_albums",
     "revoke_crate_invite",
+    "unfollow_crate",
     "update_crate",
 ]

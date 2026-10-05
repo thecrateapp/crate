@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { PageHeader } from "@crate/ui/domain/navigation";
 
 import { AccountSection } from "@/components/settings/AccountSection";
 import { BandcampSection } from "@/components/settings/BandcampSection";
@@ -19,12 +20,11 @@ export function Settings() {
 
   return (
     <div className="space-y-8">
-      <div className="settings-header">
-        <h1 className="text-3xl font-bold text-text-primary">
-          {t("settings.title")}
-        </h1>
-        <p className="mt-1 text-sm text-text-muted">{t("settings.subtitle")}</p>
-      </div>
+      <PageHeader
+        className="settings-header"
+        title={t("settings.title")}
+        subtitle={t("settings.subtitle")}
+      />
 
       {LISTEN_APPEARANCE_SETTINGS_ENABLED ? <ThemeSkinSection /> : null}
       <LanguageSection i18n={i18n} />

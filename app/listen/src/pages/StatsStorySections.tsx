@@ -124,9 +124,9 @@ function StorySignalCard({
   body: string;
 }) {
   return (
-    <div className="stats-card relative overflow-hidden rounded-[12px] p-5">
+    <div className="stats-card relative overflow-hidden rounded-panel p-5">
       <div className="relative">
-        <div className="text-xs font-black uppercase tracking-[0.22em] text-accent-action">
+        <div className="text-xs font-black uppercase tracking-overline text-accent-action">
           {label}
         </div>
         <div className="mt-3 line-clamp-2 text-2xl font-black uppercase leading-[0.9] tracking-[-0.07em] text-text-primary">

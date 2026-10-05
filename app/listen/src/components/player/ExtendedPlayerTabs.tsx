@@ -8,7 +8,7 @@ import type {
   ExtendedPlayerViewActions,
   ExtendedPlayerViewState,
 } from "@/components/player/extended-player-view-types";
-import { cn } from "@crate/ui/lib/cn";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { triggerHaptic } from "@/lib/haptics";
 
 const TABS = [
@@ -31,25 +31,23 @@ export function ExtendedPlayerTabs({
 }: ExtendedPlayerTabsProps) {
   return (
     <div className="flex w-1/2 flex-col bg-surface-canvas">
-      <div className="flex items-center gap-1.5 px-5 pt-5 pb-3">
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => {
-              triggerHaptic("selection");
-              actions.onTabChange(item.id);
-            }}
-            className={cn(
-              "rounded-full px-3.5 py-1.5 text-[0.75rem] font-medium transition-colors",
-              state.tab === item.id
-                ? "bg-surface-control text-text-primary"
-                : "text-text-muted hover:text-text-secondary",
-            )}
-          >
-            {t(item.labelKey)}
-          </button>
-        ))}
+      <div className="px-5 pt-5 pb-3">
+        <SegmentedControl
+          as="tabs"
+          variant="tonal"
+          label={t("player.tabsLabel")}
+          value={state.tab}
+          onValueChange={(tab) => {
+            triggerHaptic("selection");
+            actions.onTabChange(tab);
+          }}
+          items={TABS.map((item) => ({
+            value: item.id,
+            label: t(item.labelKey),
+          }))}
+          className="gap-1.5 p-0"
+          itemClassName="h-auto px-3.5 py-1.5 text-[0.75rem] data-[state=active]:bg-surface-control data-[state=active]:text-text-primary data-[state=inactive]:text-text-muted data-[state=inactive]:hover:text-text-secondary"
+        />
       </div>
       <div className="flex flex-1 flex-col overflow-hidden px-5 pb-5">
         {state.tab === "queue" ? <QueueTab /> : null}

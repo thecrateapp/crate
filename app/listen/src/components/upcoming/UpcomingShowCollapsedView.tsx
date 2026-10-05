@@ -1,7 +1,15 @@
 import { useTranslation } from "react-i18next";
-import { CalendarCheck, CalendarPlus, Loader2, MapPin } from "@crate/ui/icons";
+import {
+  CalendarCheck,
+  CalendarPlus,
+  CRATE_ICON_SIZE,
+  Loader2,
+  MapPin,
+} from "@crate/ui/icons";
+import { IconButton } from "@crate/ui/primitives/IconButton";
 
 import { ItemActionMenuButton } from "@/components/actions/ItemActionMenu";
+import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import {
@@ -24,27 +32,16 @@ function PreloadBackground({ item }: { item: CollapsedViewProps["item"] }) {
   return <CrateImage src={url} alt="" className="hidden" />;
 }
 
-function CollapsedShowArtwork({
-  item,
-  artistImageUrl,
-}: {
-  item: CollapsedViewProps["item"];
-  artistImageUrl?: string;
-}) {
+function CollapsedShowArtwork({ artistImageUrl }: { artistImageUrl?: string }) {
   return (
-    <div className="h-full w-[88px] shrink-0 bg-text-primary/5">
-      {artistImageUrl && (
-        <CrateImage
-          src={artistImageUrl}
-          alt={item.artist}
-          loading="lazy"
-          className=" size-full object-cover"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
-        />
-      )}
-    </div>
+    <ArtworkSurface
+      source={artistImageUrl ?? null}
+      alt=""
+      imageClassName="object-cover"
+      imageProps={{ loading: "lazy" }}
+      className="h-full w-[88px] shrink-0 bg-text-primary/5"
+      fallback={null}
+    />
   );
 }
 
@@ -59,9 +56,9 @@ function CollapsedShowDetails({
   const support = (item.lineup || []).slice(1);
 
   return (
-    <div className="min-w-0 flex-1 px-3 py-2.5">
-      <div className="flex items-center gap-1.5">
-        <span className="truncate text-[0.8125rem] font-semibold text-text-primary">
+    <span className="block min-w-0 flex-1 px-3 py-2.5">
+      <span className="flex items-center gap-1.5">
+        <span className="truncate text-caption font-semibold text-text-primary">
           {item.artist}
         </span>
         {attending && (
@@ -70,9 +67,12 @@ function CollapsedShowDetails({
             title={t("radar.show.attending")}
           />
         )}
-      </div>
-      <div className="mt-1 flex items-center gap-1 text-xs text-text-primary/40">
-        <MapPin size={10} className="shrink-0 text-accent-action/60" />
+      </span>
+      <span className="mt-1 flex items-center gap-1 text-xs text-text-primary/40">
+        <MapPin
+          size={CRATE_ICON_SIZE.nano}
+          className="shrink-0 text-accent-action/60"
+        />
         <span className="truncate">{item.venue}</span>
         {item.city && (
           <>
@@ -80,14 +80,14 @@ function CollapsedShowDetails({
             <span className="shrink-0">{item.city}</span>
           </>
         )}
-      </div>
+      </span>
       {support.length > 0 && (
-        <div className="mt-0.5 truncate text-xs text-text-primary/40">
+        <span className="mt-0.5 block truncate text-xs text-text-primary/40">
           {t("radar.show.withSupportPrefix")} {support.slice(0, 3).join(", ")}
           {support.length > 3 && ` +${support.length - 3}`}
-        </div>
+        </span>
       )}
-    </div>
+    </span>
   );
 }
 
@@ -108,8 +108,8 @@ function CollapsedShowDate({
     : "";
 
   return (
-    <div className="flex shrink-0 flex-col items-center justify-center px-2">
-      <span className="text-xs font-bold leading-none tracking-[0.12em] text-accent-action/55">
+    <span className="flex shrink-0 flex-col items-center justify-center px-2">
+      <span className="text-xs font-bold leading-none tracking-label text-accent-action/55">
         {month}
       </span>
       <span className="text-[1.25rem] font-black leading-tight text-accent-action">
@@ -118,7 +118,7 @@ function CollapsedShowDate({
       <span className="text-xs font-medium leading-none text-text-primary/40">
         {weekday}
       </span>
-    </div>
+    </span>
   );
 }
 
@@ -128,36 +128,43 @@ function CollapsedShowActions({
   savingAttendance,
   actionMenu,
   onToggleAttendance,
-}: CollapsedViewProps) {
+}: Omit<CollapsedViewProps, "onToggle">) {
   const { t } = useTranslation();
 
   return (
     <div className="flex shrink-0 flex-col items-center gap-1 pr-2">
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
+      <IconButton
+        size="sm"
+        onClick={() => {
           void onToggleAttendance();
         }}
         disabled={!item.id || savingAttendance}
-        title={
+        aria-pressed={attending}
+        active={false}
+        label={
           attending
             ? t("radar.show.attending")
             : t("actions.show.markAttending")
         }
-        className="flex size-8 items-center justify-center rounded-lg text-text-primary/30 transition-colors hover:bg-text-primary/8 hover:text-text-primary/60 disabled:opacity-30"
+        className="rounded-lg text-text-primary/30 hover:bg-text-primary/8 hover:text-text-primary/60 disabled:opacity-30"
       >
         {savingAttendance ? (
-          <Loader2 size={15} className="animate-spin" />
+          <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
         ) : attending ? (
-          <CalendarCheck size={15} className="text-accent-action" />
+          <CalendarCheck
+            size={CRATE_ICON_SIZE.sm}
+            className="text-accent-action"
+          />
         ) : (
-          <CalendarPlus size={15} />
+          <CalendarPlus size={CRATE_ICON_SIZE.sm} />
         )}
-      </button>
+      </IconButton>
       <ItemActionMenuButton
         buttonRef={actionMenu.triggerRef}
         hasActions={actionMenu.hasActions}
         onClick={actionMenu.onOpen}
+        expanded={actionMenu.open}
+        title={t("actions.menu.more")}
         className=" size-7 opacity-40 transition-opacity hover:opacity-80"
       />
     </div>
@@ -170,6 +177,7 @@ export function UpcomingShowCollapsedView({
   savingAttendance,
   actionMenu,
   onToggleAttendance,
+  onToggle,
 }: CollapsedViewProps) {
   const { i18n } = useTranslation();
   const artistImageUrl =
@@ -187,9 +195,16 @@ export function UpcomingShowCollapsedView({
   return (
     <div className="absolute inset-x-0 top-0 z-10 flex h-full items-center gap-0">
       <PreloadBackground item={item} />
-      <CollapsedShowArtwork item={item} artistImageUrl={artistImageUrl} />
-      <CollapsedShowDetails item={item} attending={attending} />
-      <CollapsedShowDate item={item} locale={i18n.language} />
+      <button
+        type="button"
+        aria-expanded={false}
+        onClick={onToggle}
+        className="flex h-full min-w-0 flex-1 items-center rounded-l-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
+      >
+        <CollapsedShowArtwork artistImageUrl={artistImageUrl} />
+        <CollapsedShowDetails item={item} attending={attending} />
+        <CollapsedShowDate item={item} locale={i18n.language} />
+      </button>
       <CollapsedShowActions
         item={item}
         attending={attending}

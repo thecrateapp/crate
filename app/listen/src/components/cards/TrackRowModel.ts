@@ -1,12 +1,17 @@
-import { useState, type MouseEvent } from "react";
+import { useState, type MouseEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useItemActionMenu } from "@/components/actions/ItemActionMenu";
-import { useTrackActionEntries } from "@/components/actions/track-actions";
+import {
+  useItemActionMenu,
+  type ItemActionMenuEntry,
+} from "@/components/actions/ItemActionMenu";
 import { buildTrackMenuPlayerTrack } from "@/components/actions/shared";
 import { useOffline } from "@/contexts/OfflineContext";
-import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
+import {
+  usePlayerActions,
+  type PlaySource,
+  type Track,
+} from "@/contexts/PlayerContext";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
-import { useTrackPlaylistActions } from "@/hooks/use-track-playlist-actions";
 import {
   hasPlayableTrackReference,
   resolvePlayableTrackId,
@@ -15,7 +20,7 @@ import {
 import { resolveRemotePlayableTrack } from "@/lib/remote-track-playback";
 import { getOfflineStateLabel } from "@/lib/offline";
 import { albumCoverApiUrl } from "@/lib/library-routes";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 export interface TrackRowData {
   id?: string | number;
@@ -83,6 +88,7 @@ export interface TrackRowProps {
   onCreatePlaylist?: (track: TrackRowData) => void | Promise<void>;
   onActionMenuOpen?: () => void;
   onPlayOverride?: () => void;
+  isActiveOverride?: boolean;
   selectable?: boolean;
   selected?: boolean;
   onSelect?: (track: TrackRowData, event: MouseEvent<HTMLDivElement>) => void;
@@ -92,7 +98,16 @@ export interface TrackRowProps {
   ) => boolean | void;
   /** Pass the full sibling track list so clicking plays all from this track's position. */
   queueTracks?: TrackRowData[];
+  playSource?: PlaySource;
+  rank?: number;
+  meta?: ReactNode;
+  density?: "default" | "compact";
+  extraActions?: ItemActionMenuEntry[];
+  showLike?: boolean;
+  showDuration?: boolean;
 }
+
+const NO_ACTIONS: ItemActionMenuEntry[] = [];
 
 export type TrackRowResolvedState = {
   cover?: string;
@@ -100,6 +115,7 @@ export type TrackRowResolvedState = {
   isRemote: boolean;
   isGlobalCatalogOnly: boolean;
   showLocalActions: boolean;
+  hasLinkActions: boolean;
   disabled: boolean;
   playbackId: string;
 };
@@ -138,12 +154,20 @@ function resolveTrackRowState(
     (isRemote && playerTrack.remote?.availability.stream === false) ||
     (isGlobalCatalogOnly && track.availability?.healthy === false);
 
+  const hasLinkActions = Boolean(
+    track.artist_id != null ||
+      track.global_artist_uid ||
+      track.album_id != null ||
+      track.global_album_uid,
+  );
+
   return {
     cover,
     playerTrack,
     isRemote,
     isGlobalCatalogOnly,
     showLocalActions,
+    hasLinkActions,
     disabled,
     playbackId: resolvePlayableTrackId(track),
   };
@@ -152,22 +176,10 @@ function resolveTrackRowState(
 export function useTrackRowModel({
   track,
   albumCover,
-  playlistOptions,
-  onAddToPlaylist,
-  onCreatePlaylist,
-  onPlayOverride,
-}: Pick<
-  TrackRowProps,
-  | "track"
-  | "albumCover"
-  | "playlistOptions"
-  | "onAddToPlaylist"
-  | "onCreatePlaylist"
-  | "onPlayOverride"
->) {
+  extraActions,
+}: Pick<TrackRowProps, "track" | "albumCover" | "extraActions">) {
   const { isLiked } = useLikedTracks();
   const { getTrackState } = useOffline();
-  const defaultPlaylistActions = useTrackPlaylistActions();
   const resolved = resolveTrackRowState(track, albumCover);
   const hasTrackRef = hasPlayableTrackReference(track);
   const liked = hasTrackRef
@@ -185,38 +197,29 @@ export function useTrackRowModel({
   const offlineLabel = resolved.showLocalActions
     ? getOfflineStateLabel(offlineState)
     : "";
-  const resolvedPlaylistOptions =
-    playlistOptions ?? defaultPlaylistActions.playlistOptions;
-  const resolvedOnAddToPlaylist =
-    onAddToPlaylist ?? defaultPlaylistActions.onAddToPlaylist;
-  const resolvedOnCreatePlaylist =
-    onCreatePlaylist ?? defaultPlaylistActions.onCreatePlaylist;
-  const actions = useTrackActionEntries({
-    track,
-    albumCover: resolved.cover,
-    playlistOptions: resolvedPlaylistOptions,
-    onAddToPlaylist: resolvedOnAddToPlaylist,
-    onCreatePlaylist: resolvedOnCreatePlaylist,
-    onPlayNowOverride: onPlayOverride,
-  });
-  const actionMenu = useItemActionMenu(actions, {
+  const actionMenu = useItemActionMenu(NO_ACTIONS, {
     placement: "bottom-end",
-    onOpenChange: (open) => {
-      if (open && playlistOptions === undefined) {
-        defaultPlaylistActions.onOpenChange(open);
-      }
-    },
+    hasActions:
+      !resolved.disabled &&
+      (resolved.showLocalActions ||
+        resolved.hasLinkActions ||
+        Boolean(extraActions?.length)),
   });
 
   return {
     ...resolved,
     actionMenu,
-    actions,
     hasTrackRef,
     liked,
     offlineLabel,
     offlineState,
   };
+}
+
+function isQueueableTrackRow(track: TrackRowData): boolean {
+  return (
+    hasPlayableTrackReference(track) && !resolveTrackRowState(track).disabled
+  );
 }
 
 async function activateTrack({
@@ -229,6 +232,7 @@ async function activateTrack({
   play,
   playAll,
   playerTrack,
+  playSource,
   queueTracks,
   resume,
   track,
@@ -240,8 +244,9 @@ async function activateTrack({
   onRemotePlayback: () => Promise<void>;
   pause: () => void;
   play: (track: Track) => void;
-  playAll: (tracks: Track[], index?: number) => void;
+  playAll: (tracks: Track[], index?: number, source?: PlaySource) => void;
   playerTrack: Track;
+  playSource?: PlaySource;
   queueTracks?: TrackRowData[];
   resume: () => void;
   track: TrackRowData;
@@ -261,15 +266,19 @@ async function activateTrack({
     return;
   }
   if (queueTracks && queueTracks.length > 1) {
+    const playableRows = queueTracks.filter(isQueueableTrackRow);
     const myId = resolvePlayableTrackId(track);
-    const idx = queueTracks.findIndex(
+    const idx = playableRows.findIndex(
       (queueTrack) => resolvePlayableTrackId(queueTrack) === myId,
     );
-    playAll(
-      queueTracks.map((queueTrack) => buildTrackMenuPlayerTrack(queueTrack)),
-      Math.max(0, idx),
-    );
-    return;
+    if (idx >= 0) {
+      const tracks = playableRows.map((queueTrack) =>
+        buildTrackMenuPlayerTrack(queueTrack),
+      );
+      if (playSource) playAll(tracks, idx, playSource);
+      else playAll(tracks, idx);
+      return;
+    }
   }
   play(playerTrack);
 }
@@ -280,12 +289,14 @@ export function useTrackRowPlayback({
   isPlaying,
   onPlayOverride,
   playerTrack,
+  playSource,
   queueTracks,
   track,
 }: Pick<TrackRowResolvedState, "disabled" | "playerTrack"> & {
   isActive: boolean;
   isPlaying: boolean;
   onPlayOverride?: () => void;
+  playSource?: PlaySource;
   queueTracks?: TrackRowData[];
   track: TrackRowData;
 }) {
@@ -300,7 +311,7 @@ export function useTrackRowPlayback({
       const resolved = await resolveRemotePlayableTrack(playerTrack);
       play(resolved);
     } catch {
-      toast.error(t("search.tryAgain"));
+      notify.error(t("search.tryAgain"));
     } finally {
       setResolvingRemote(false);
     }
@@ -317,6 +328,7 @@ export function useTrackRowPlayback({
       play,
       playAll,
       playerTrack,
+      playSource,
       queueTracks,
       resume,
       track,
@@ -325,9 +337,14 @@ export function useTrackRowPlayback({
 
   return {
     handleActivate,
-    playControlLabel: `${
-      resolvingRemote ? "Resolving" : isActive && isPlaying ? "Pause" : "Play"
-    } ${track.title || "track"}`,
+    playControlLabel: t(
+      resolvingRemote
+        ? "trackRow.resolvingLabel"
+        : isActive && isPlaying
+          ? "trackRow.pauseLabel"
+          : "trackRow.playLabel",
+      { title: track.title || t("trackRow.unknownTitle") },
+    ),
     resolvingRemote,
   };
 }

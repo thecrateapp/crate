@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
-import { Shield } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Shield } from "@crate/ui/icons";
 
 import { ConnectDevicesSection } from "@/components/settings/ConnectDevicesSection";
 import {
@@ -77,7 +77,7 @@ export function AccountSection() {
             ? "Apple"
             : detail.provider;
       if (linkingProvider === detail.provider) setLinkingProvider(null);
-      toast.success(
+      notify.success(
         t("settings.account.toasts.linkSucceeded", {
           provider,
         }),
@@ -99,7 +99,7 @@ export function AccountSection() {
             ? "Apple"
             : detail.provider;
       if (linkingProvider === detail.provider) setLinkingProvider(null);
-      toast.error(
+      notify.error(
         t("settings.account.toasts.linkCompletionFailed", {
           provider,
         }),
@@ -146,14 +146,14 @@ export function AccountSection() {
         username: username.trim() || null,
         bio: bio.trim() || null,
       });
-      toast.success(t("settings.account.toasts.profileUpdated"));
+      notify.success(t("settings.account.toasts.profileUpdated"));
       await refetch();
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       if (message.includes("Username is already taken")) {
-        toast.error(t("settings.account.toasts.usernameTaken"));
+        notify.error(t("settings.account.toasts.usernameTaken"));
       } else {
-        toast.error(t("settings.account.toasts.profileUpdateFailed"));
+        notify.error(t("settings.account.toasts.profileUpdateFailed"));
       }
     } finally {
       setSaving(false);
@@ -162,11 +162,11 @@ export function AccountSection() {
 
   async function handleChangePassword() {
     if (!newPassword || newPassword.length < 6) {
-      toast.error(t("settings.account.toasts.passwordTooShort"));
+      notify.error(t("settings.account.toasts.passwordTooShort"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast.error(t("settings.account.toasts.passwordMismatch"));
+      notify.error(t("settings.account.toasts.passwordMismatch"));
       return;
     }
     setSaving(true);
@@ -175,13 +175,13 @@ export function AccountSection() {
         current_password: currentPassword,
         new_password: newPassword,
       });
-      toast.success(t("settings.account.toasts.passwordChanged"));
+      notify.success(t("settings.account.toasts.passwordChanged"));
       setShowPassword(false);
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch {
-      toast.error(t("settings.account.toasts.passwordChangeFailed"));
+      notify.error(t("settings.account.toasts.passwordChangeFailed"));
     } finally {
       setSaving(false);
     }
@@ -206,8 +206,8 @@ export function AccountSection() {
       );
       window.location.href = response.login_url;
     } catch {
-      toast.error(t("settings.account.toasts.linkFailed", { provider }));
-      if (linkingProvider === provider) setLinkingProvider(null);
+      notify.error(t("settings.account.toasts.linkFailed", { provider }));
+      setLinkingProvider((current) => (current === provider ? null : current));
     }
   }
 
@@ -215,10 +215,10 @@ export function AccountSection() {
     setUnlinkingProvider(provider);
     try {
       await api(`/api/auth/oauth/${provider}/unlink`, "POST");
-      toast.success(t("settings.account.toasts.unlinked", { provider }));
+      notify.success(t("settings.account.toasts.unlinked", { provider }));
       await refetch();
     } catch {
-      toast.error(t("settings.account.toasts.unlinkFailed", { provider }));
+      notify.error(t("settings.account.toasts.unlinkFailed", { provider }));
     } finally {
       setUnlinkingProvider(null);
     }
@@ -267,7 +267,7 @@ export function AccountSection() {
         <ConnectDevicesSection />
         {authConfig.invite_only ? (
           <div className="flex items-start gap-3 rounded-xl border border-accent-action/20 bg-accent-action/10 px-4 py-3 text-sm text-accent-action">
-            <Shield size={16} className="mt-0.5 shrink-0" />
+            <Shield size={CRATE_ICON_SIZE.sm} className="mt-0.5 shrink-0" />
             <div>{t("settings.account.inviteOnlyNotice")}</div>
           </div>
         ) : null}

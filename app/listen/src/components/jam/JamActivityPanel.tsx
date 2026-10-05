@@ -6,7 +6,7 @@ import type { AuthUser } from "@/contexts/auth-context";
 import type { JamRoom } from "@/pages/jam-reducer";
 import { payloadToTrack } from "@/pages/jam-reducer";
 import { eventActivityText, resolveJamActor } from "@/pages/jam-session-utils";
-import { ListMusic } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, ListMusic } from "@crate/ui/icons";
 
 export interface JamActivityPanelProps {
   t: TFunction;
@@ -16,7 +16,7 @@ export interface JamActivityPanelProps {
 
 export function JamActivityPanel({ t, room, user }: JamActivityPanelProps) {
   return (
-    <section className="jam-activity-panel min-h-0 min-w-0 overflow-hidden rounded-[12px] p-5 sm:p-6">
+    <section className="jam-activity-panel min-h-0 min-w-0 overflow-hidden rounded-panel p-5 sm:p-6">
       <h2 className="text-lg font-semibold text-text-primary">
         {t("jam.room.recentActivity")}
       </h2>
@@ -67,7 +67,7 @@ export function JamActivityPanel({ t, room, user }: JamActivityPanelProps) {
                           />
                         ) : (
                           <div className="jam-artwork-placeholder flex size-9 items-center justify-center rounded-lg">
-                            <ListMusic size={14} />
+                            <ListMusic size={CRATE_ICON_SIZE.xs} />
                           </div>
                         )}
                         <div className="min-w-0">

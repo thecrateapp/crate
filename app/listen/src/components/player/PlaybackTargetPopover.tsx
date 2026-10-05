@@ -46,11 +46,11 @@ export function PlaybackTargetPopover({
       ref={popoverRef}
       role="menu"
       aria-label={t("player.output.targets")}
-      className="fixed z-[1600] w-[min(calc(100vw-1rem),340px)] rounded-[12px] p-2"
+      className="fixed z-app-player-popover w-[min(calc(100vw-1rem),340px)] rounded-panel p-2"
       style={{ right: position.right, bottom: position.bottom }}
     >
       <div className="px-2 pb-2 pt-1">
-        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
+        <div className="text-xs font-semibold uppercase tracking-kicker text-text-muted">
           {t("player.output.label")}
         </div>
       </div>
@@ -137,7 +137,7 @@ function CastSessionAction({
         )}
         {label}
       </span>
-      <span className="mt-1 block text-[10px] leading-tight text-text-muted">
+      <span className="mt-1 block text-micro leading-tight text-text-muted">
         {description}
       </span>
     </button>
@@ -153,7 +153,7 @@ function PlaybackTargetGroupView({
 }) {
   return (
     <div className="pb-2 last:pb-0">
-      <div className="px-2 py-1 text-xs font-medium uppercase tracking-[0.14em] text-text-subtle">
+      <div className="px-2 py-1 text-xs font-medium uppercase tracking-caps text-text-subtle">
         {group.label}
       </div>
       {group.targets.map((target) => (
@@ -214,7 +214,10 @@ function PlaybackTargetRow({
         <span className="flex items-center gap-2">
           <span className="truncate text-sm font-medium">{target.name}</span>
           {target.active ? (
-            <Check size={13} className="shrink-0 text-accent-action" />
+            <Check
+              size={CRATE_ICON_SIZE.xs}
+              className="shrink-0 text-accent-action"
+            />
           ) : null}
         </span>
         {target.subtitle ? (

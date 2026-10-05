@@ -38,7 +38,11 @@ describe("lyrics surfaces", () => {
       name: "First line",
     });
 
-    expect(panel).toHaveClass("border-l", "border-border-quiet");
+    expect(panel).toHaveClass(
+      "border-l",
+      "border-border-quiet",
+      "bottom-(--listen-desktop-player-clearance)",
+    );
     expect(screen.getByText("Lyrics")).toHaveClass("text-text-primary");
     expect(container.querySelector(".lyrics-ambient-glow")).toBeInTheDocument();
     expect(activeLine).toHaveClass(

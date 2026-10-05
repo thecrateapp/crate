@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { Play } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Play } from "@crate/ui/icons";
+import { Button } from "@crate/ui/shadcn/button";
 
 import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
 import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
@@ -55,7 +56,7 @@ export function HeroGenres({ hero }: { hero: HomeHeroArtist }) {
         <GenrePill
           key={genre.name}
           item={genre}
-          className="home-hero-genre max-w-[42vw] backdrop-blur-sm sm:max-w-none"
+          className="max-w-[42vw] backdrop-blur-sm sm:max-w-none"
         />
       ))}
     </div>
@@ -83,22 +84,19 @@ export function HeroActions({
 
   return (
     <div className="mt-6 flex items-center gap-2.5">
-      <button
-        type="button"
+      <Button
         aria-label={playLabel}
-        className={cn(
-          "home-discovery-play-button inline-flex h-11 items-center justify-center gap-2 rounded-md font-semibold text-accent-action-foreground transition-colors hover:bg-accent-action/90",
-          "px-5",
-        )}
+        size="lg"
+        className="home-discovery-play-button px-5 text-base font-semibold has-[>svg]:px-5"
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
           onPlay();
         }}
       >
-        <Play size={17} fill="currentColor" />
+        <Play size={CRATE_ICON_SIZE.md} fill="currentColor" />
         <span>{t("home.hero.playCta")}</span>
-      </button>
+      </Button>
       <FollowHeartButton
         aria-label={followLabel}
         className="home-hero-follow inline-flex size-11 items-center justify-center rounded-md border-0 bg-transparent transition-colors hover:bg-transparent"

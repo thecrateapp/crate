@@ -2,8 +2,6 @@ import type { TFunction } from "i18next";
 
 import {
   Disc3,
-  Heart,
-  HeartBold,
   Loader2,
   Pause,
   Play,
@@ -17,6 +15,7 @@ import {
   CRATE_ICON_SIZE,
 } from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
+import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 
 import { PlayerTrackMenu } from "@/components/player/bar/PlayerTrackMenu";
 import type {
@@ -134,21 +133,16 @@ function FullscreenPlayerUtilityControls({
 }: FullscreenPlayerUtilityControlsProps) {
   return (
     <div className="mx-auto mt-3 flex w-full max-w-[360px] items-center justify-center gap-2">
-      <button
-        type="button"
+      <FollowHeartButton
+        following={state.liked}
+        label={t("actions.track.like")}
+        labelActive={t("actions.track.unlike")}
+        heartTestId="fullscreen-like-heart"
+        particlesTestId="fullscreen-like-particles"
+        iconSize={CRATE_ICON_SIZE.md}
         onClick={() => void actions.toggleLikeWithFeedback()}
-        aria-label={state.liked ? "Unlike track" : "Like track"}
-        className="flex size-12 touch-manipulation items-center justify-center rounded-full border border-border-subtle bg-surface-control text-text-secondary transition-colors active:bg-surface-control-hover active:text-text-primary"
-      >
-        {state.liked ? (
-          <HeartBold
-            size={19}
-            className="animate-crate-icon-active-pulse text-accent-action drop-shadow-accent-action"
-          />
-        ) : (
-          <Heart size={19} />
-        )}
-      </button>
+        className="size-12 touch-manipulation rounded-full border border-border-subtle bg-surface-control active:bg-surface-control-hover"
+      />
       {state.allowMobileEqualizer ? (
         <button
           type="button"

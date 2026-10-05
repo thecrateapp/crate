@@ -93,7 +93,7 @@ function DesktopTasteHero({
   return (
     <div
       data-testid="desktop-editorial-hero"
-      className="relative mx-auto aspect-[1480/600] min-h-[clamp(480px,38dvh,600px)] w-full max-w-[1480px] overflow-hidden bg-surface-canvas"
+      className="relative mx-auto aspect-[1480/600] min-h-[clamp(480px,38dvh,600px)] w-full max-w-content overflow-hidden bg-surface-canvas"
     >
       {heroes.map((hero, index) => {
         const source =
@@ -151,7 +151,7 @@ function DesktopTasteHero({
           data-testid="desktop-hero-intro"
           className="pointer-events-none absolute inset-x-0 top-0 z-20"
         >
-          <div className="mx-auto w-full max-w-[1480px] px-6 pt-[92px]">
+          <div className="mx-auto w-full max-w-content px-6 pt-[92px]">
             {desktopIntro}
           </div>
         </div>

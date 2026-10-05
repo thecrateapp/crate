@@ -1,9 +1,11 @@
 import { memo, type MouseEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { usePlayerActions, usePlayerState } from "@/contexts/PlayerContext";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
 import { cn, formatDuration } from "@/lib/utils";
+import { useItemActionTarget } from "@/components/actions/ItemActionMenu";
 import {
   TrackRowActions,
   TrackRowDetails,
@@ -33,31 +35,38 @@ export const TrackRow = memo(function TrackRow({
   onCreatePlaylist,
   onActionMenuOpen,
   onPlayOverride,
+  isActiveOverride,
   selectable = false,
   selected = false,
   onSelect,
   onSelectionActionMenuOpen,
   queueTracks,
+  playSource,
+  rank,
+  meta,
+  density = "default",
+  extraActions,
+  showLike = true,
+  showDuration = true,
 }: TrackRowProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { isPlaying } = usePlayerState();
   const { currentTrack } = usePlayerActions();
   const { toggleTrackLike } = useLikedTracks();
-  const model = useTrackRowModel({
-    track,
-    albumCover,
-    playlistOptions,
-    onAddToPlaylist,
-    onCreatePlaylist,
-    onPlayOverride,
+  const model = useTrackRowModel({ track, albumCover, extraActions });
+  const actionTarget = useItemActionTarget(model.actionMenu, {
+    disabled: model.disabled,
   });
-  const isActive = currentTrack?.id === model.playbackId;
+  const isActive = isActiveOverride ?? currentTrack?.id === model.playbackId;
+  const compact = density === "compact";
   const playback = useTrackRowPlayback({
     disabled: model.disabled,
     isActive,
     isPlaying,
     onPlayOverride,
     playerTrack: model.playerTrack,
+    playSource,
     queueTracks,
     track,
   });
@@ -71,19 +80,22 @@ export const TrackRow = memo(function TrackRow({
   return (
     <div
       className={cn(
-        "group track-row flex items-center gap-[var(--content-row-gap)] rounded-lg px-3 py-[var(--content-row-padding-y)] transition-colors",
+        "item-action-target group track-row flex items-center gap-[var(--content-row-gap)] rounded-lg transition-colors",
+        compact ? "px-2 py-1.5" : "px-3 py-[var(--content-row-padding-y)]",
       )}
       data-active={isActive}
+      data-density={density}
       data-disabled={model.disabled}
       data-selected={selected}
       aria-label={track.title}
       aria-selected={selectable ? selected : undefined}
-      onContextMenu={(event) => {
-        if (model.disabled) return;
-        if (!model.showLocalActions) return;
-        onActionMenuOpen?.();
-        model.actionMenu.handleContextMenu(event);
-      }}
+      onContextMenu={actionTarget.onContextMenu}
+      onPointerDown={actionTarget.onPointerDown}
+      onPointerMove={actionTarget.onPointerMove}
+      onPointerUp={actionTarget.onPointerUp}
+      onPointerCancel={actionTarget.onPointerCancel}
+      onPointerLeave={actionTarget.onPointerLeave}
+      onClickCapture={actionTarget.onClickCapture}
       onClick={(event) => {
         if (model.disabled) return;
         if (selectable && onSelect) {
@@ -93,6 +105,8 @@ export const TrackRow = memo(function TrackRow({
         void playback.handleActivate();
       }}
       onKeyDown={(event) => {
+        actionTarget.onKeyDown(event);
+        if (event.defaultPrevented) return;
         if (event.target !== event.currentTarget) return;
         if (event.key !== "Enter" && event.key !== " ") return;
         event.preventDefault();
@@ -114,7 +128,13 @@ export const TrackRow = memo(function TrackRow({
           : undefined
       }
     >
+      {rank != null ? (
+        <span className="w-6 shrink-0 text-right text-xs tabular-nums text-text-muted">
+          {rank}
+        </span>
+      ) : null}
       <TrackRowLeadingControl
+        compact={compact}
         cover={model.cover}
         disabled={model.disabled}
         index={index}
@@ -134,7 +154,7 @@ export const TrackRow = memo(function TrackRow({
               isActive ? "font-medium text-accent-action" : "text-text-primary",
             )}
           >
-            {track.title || "Unknown"}
+            {track.title || t("trackRow.unknownTitle")}
           </div>
           {!model.isRemote ? (
             <OfflineBadge
@@ -145,8 +165,8 @@ export const TrackRow = memo(function TrackRow({
             />
           ) : null}
           {model.disabled ? (
-            <span className="track-row-disabled-badge shrink-0 rounded-full px-2 py-0.5 text-xs uppercase tracking-[0.14em]">
-              Soon
+            <span className="track-row-disabled-badge shrink-0 rounded-full px-2 py-0.5 text-xs uppercase tracking-caps">
+              {t("trackRow.soon")}
             </span>
           ) : null}
         </div>
@@ -160,27 +180,38 @@ export const TrackRow = memo(function TrackRow({
           showArtist={showArtist}
           track={track}
         />
+        {meta != null ? (
+          <div className="truncate text-xs tabular-nums text-text-muted">
+            {meta}
+          </div>
+        ) : null}
       </div>
 
-      {track.duration != null && track.duration > 0 && (
+      {showDuration && track.duration != null && track.duration > 0 && (
         <span className="text-text-muted shrink-0 text-xs tabular-nums">
           {formatDuration(track.duration)}
         </span>
       )}
 
-      <TrackRowLikeControl
-        hasTrackRef={model.hasTrackRef}
-        liked={model.liked}
-        toggleTrackLike={toggleTrackLike}
-        track={track}
-      />
+      {showLike ? (
+        <TrackRowLikeControl
+          hasTrackRef={model.hasTrackRef}
+          liked={model.liked}
+          toggleTrackLike={toggleTrackLike}
+          track={track}
+        />
+      ) : null}
       <TrackRowActions
         actionMenu={model.actionMenu}
-        actions={model.actions}
+        compact={compact}
         cover={model.cover}
-        disabled={model.disabled}
+        extraActions={extraActions}
         onActionMenuOpen={onActionMenuOpen}
+        onAddToPlaylist={onAddToPlaylist}
+        onCreatePlaylist={onCreatePlaylist}
+        onPlayOverride={onPlayOverride}
         onSelectionActionMenuOpen={onSelectionActionMenuOpen}
+        playlistOptions={playlistOptions}
         selectable={selectable}
         selected={selected}
         showLocalActions={model.showLocalActions}

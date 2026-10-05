@@ -50,18 +50,11 @@ type PlayerBarViewProps = {
   sourceLabel: string | null;
   shapedRadioSessionId: string | null | undefined;
   effectiveDisplayedDuration: number;
-  duration: number;
   onNavigate: (path: string) => void;
   onPrepareFullscreen: () => void;
   onOpenFullscreen: () => void;
-  onCoverTouchStart: () => void;
-  onCoverTouchMove: () => void;
-  onCoverTouchEnd: () => void;
-  isCoverLongPressTriggered: () => boolean;
-  resetCoverLongPress: () => void;
   onToggleLike: () => void;
   onNextTrack: () => void;
-  onAddToCollection: () => Promise<void>;
   onOverlayChange: (open: boolean) => void;
   handleTouchStart: TouchEventHandler<HTMLDivElement>;
   handleTouchEnd: TouchEventHandler<HTMLDivElement>;
@@ -109,18 +102,11 @@ export function PlayerBarView({
   sourceLabel,
   shapedRadioSessionId,
   effectiveDisplayedDuration,
-  duration,
   onNavigate,
   onPrepareFullscreen,
   onOpenFullscreen,
-  onCoverTouchStart,
-  onCoverTouchMove,
-  onCoverTouchEnd,
-  isCoverLongPressTriggered,
-  resetCoverLongPress,
   onToggleLike,
   onNextTrack,
-  onAddToCollection,
   onOverlayChange,
   handleTouchStart,
   handleTouchEnd,
@@ -194,12 +180,12 @@ export function PlayerBarView({
       {!hidePlayerBarForMobileFullscreen ? (
         <div
           className={cn(
-            "fixed isolate h-[var(--listen-mobile-player-height)] overflow-visible transition-[bottom,left,right,height] duration-200 md:left-3 md:right-3 md:h-[82px]",
+            "fixed isolate h-[var(--listen-mobile-player-height)] overflow-visible transition-[bottom,left,right,height] duration-200 md:left-3 md:right-3 md:h-(--listen-desktop-player-height)",
             hasFloatingOverlayOpen ? "z-app-player-overlay" : "z-app-player",
           )}
           style={{
             bottom: isDesktop
-              ? 12
+              ? "var(--listen-desktop-player-bottom-offset)"
               : "calc(var(--listen-safe-bottom) + var(--listen-mobile-bottom-dock-inset) + var(--listen-mobile-bottom-nav-content-height))",
             left: isDesktop ? undefined : "max(1rem, var(--listen-safe-left))",
             right: isDesktop
@@ -214,7 +200,7 @@ export function PlayerBarView({
             className={cn(
               "pointer-events-none absolute inset-0 z-0",
               isDesktop
-                ? "listen-player-shell md:rounded-[12px] md:backdrop-blur-xl"
+                ? "listen-player-shell md:rounded-panel md:backdrop-blur-xl"
                 : "rounded-t-[2rem] rounded-b-none",
             )}
           />
@@ -234,19 +220,11 @@ export function PlayerBarView({
               liked={liked}
               isShapedRadioTrack={isShapedRadioTrack}
               shapedRadioSessionId={shapedRadioSessionId}
-              effectiveDisplayedDuration={effectiveDisplayedDuration}
-              duration={duration}
               onNavigate={onNavigate}
               onPrepareFullscreen={onPrepareFullscreen}
               onOpenFullscreen={onOpenFullscreen}
-              onCoverTouchStart={onCoverTouchStart}
-              onCoverTouchMove={onCoverTouchMove}
-              onCoverTouchEnd={onCoverTouchEnd}
-              isCoverLongPressTriggered={isCoverLongPressTriggered}
-              resetCoverLongPress={resetCoverLongPress}
               onToggleLike={onToggleLike}
               onNextTrack={onNextTrack}
-              onAddToCollection={onAddToCollection}
               onOverlayChange={onOverlayChange}
             />
             <PlayerBarTransportControls

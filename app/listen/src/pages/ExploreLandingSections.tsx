@@ -1,23 +1,21 @@
 import { useState } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { ArrowRight, Radio } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { ArrowRight, CRATE_ICON_SIZE, Radio } from "@crate/ui/icons";
+import { MediaRail, SectionHeader } from "@crate/ui/domain/lists";
+import { notify } from "@crate/ui/lib/notify";
 
 import {
   type BrowseFilters,
   type MoodPreset,
   type SystemPlaylist,
 } from "@/components/explore/explore-model";
-import { CrateImage } from "@/components/artwork/CrateImage";
+import { GenreTile } from "@/components/explore/GenreTile";
 import { PlaylistCard } from "@/components/playlists/PlaylistCard";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
-import {
-  ExploreSectionHeader,
-  ExploreSectionRail,
-} from "@/components/explore/ExploreViews";
 
 const MOOD_COLORS: Record<string, string> = {
   energetic: "bg-state-warning/20 text-state-warning border-state-warning/30",
@@ -29,6 +27,22 @@ const MOOD_COLORS: Record<string, string> = {
   groovy: "bg-state-success/20 text-state-success border-state-success/30",
   acoustic: "bg-state-warning/20 text-state-warning border-state-warning/30",
 };
+
+const MOOD_LABEL_KEY: Record<string, string> = {
+  energetic: "explore.moods.names.energetic",
+  chill: "explore.moods.names.chill",
+  dark: "explore.moods.names.dark",
+  happy: "explore.moods.names.happy",
+  melancholy: "explore.moods.names.melancholy",
+  intense: "explore.moods.names.intense",
+  groovy: "explore.moods.names.groovy",
+  acoustic: "explore.moods.names.acoustic",
+};
+
+function moodLabel(mood: string, t: TFunction) {
+  const key = MOOD_LABEL_KEY[mood];
+  return key ? t(key) : mood.charAt(0).toUpperCase() + mood.slice(1);
+}
 
 export function ExploreFeatureCard({
   title,
@@ -45,17 +59,17 @@ export function ExploreFeatureCard({
     <button
       type="button"
       onClick={onClick}
-      className="explore-feature-card group relative min-h-36 overflow-hidden rounded-[12px] p-5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/60"
+      className="explore-feature-card group relative min-h-36 overflow-hidden rounded-panel p-5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/60"
     >
       <div className="explore-feature-card-aura absolute inset-0 opacity-80 transition group-hover:opacity-100" />
       <div className="relative flex h-full flex-col justify-between gap-8">
         <div className="flex items-center justify-between">
           <Icon
-            size={24}
+            size={CRATE_ICON_SIZE.xl}
             className="text-accent-action drop-shadow-accent-action-feature"
           />
           <ArrowRight
-            size={18}
+            size={CRATE_ICON_SIZE.md}
             className="text-text-primary/35 transition group-hover:translate-x-1 group-hover:text-accent-action"
           />
         </div>
@@ -87,11 +101,11 @@ export function ExploreCratePlaylists({
 
   return (
     <section className="space-y-4">
-      <ExploreSectionHeader
+      <SectionHeader
         title={t("explore.fromCrate.title")}
         subtitle={t("explore.fromCrate.subtitle")}
       />
-      <ExploreSectionRail>
+      <MediaRail>
         {playlists.map((playlist) => (
           <PlaylistCard
             key={playlist.id}
@@ -123,7 +137,7 @@ export function ExploreCratePlaylists({
             onClick={() => onOpen(playlist.id)}
           />
         ))}
-      </ExploreSectionRail>
+      </MediaRail>
     </section>
   );
 }
@@ -145,66 +159,31 @@ export function GenreExplorer({
 
   return (
     <section className="space-y-4">
-      <ExploreSectionHeader
+      <SectionHeader
         title={t("explore.genreRooms.title")}
         subtitle={t("explore.genreRooms.subtitle")}
       />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {topGenres.slice(0, 8).map((genre, index) => {
-          const resolvedCoverUrl = resolveMaybeApiAssetUrl(genre.cover_url);
-          const detail =
-            genre.description ||
-            (genre.top_artists?.length
-              ? genre.top_artists.slice(0, 3).join(", ")
-              : null);
-
+          const slug = getGenreSlug(genre);
+          const coverUrl = resolveMaybeApiAssetUrl(genre.cover_url);
           return (
-            <button
+            <GenreTile
               key={genre.slug || genre.name}
-              type="button"
-              onClick={() => onOpen(getGenreSlug(genre))}
-              className="explore-genre-card group relative min-h-36 overflow-hidden rounded-[12px] p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/60"
-            >
-              {resolvedCoverUrl ? (
-                <CrateImage
-                  src={resolvedCoverUrl}
-                  alt=""
-                  aria-hidden="true"
-                  loading="lazy"
-                  className="absolute inset-0 size-full object-cover opacity-60 blur-[1px] saturate-125 transition duration-300 group-hover:scale-[1.04] group-hover:opacity-70"
-                />
-              ) : null}
-              <div
-                className={`explore-genre-card-overlay absolute inset-0 opacity-80 ${
-                  resolvedCoverUrl
-                    ? "explore-genre-card-overlay-image"
-                    : `explore-genre-card-overlay-placeholder explore-genre-card-overlay-position-${
-                        index % 4
-                      }`
-                }`}
-              />
-              <div className="relative flex h-full flex-col justify-between gap-5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-[0.18em] text-accent-action/90">
-                    {t("explore.genreRooms.badge")}
-                  </span>
-                  <Radio
-                    size={15}
-                    className="text-text-primary/30 transition group-hover:text-accent-action"
-                  />
-                </div>
-                <div>
-                  <div className="text-lg font-black leading-none tracking-[-0.04em] text-text-primary">
-                    {genre.name}
-                  </div>
-                  {detail ? (
-                    <div className="mt-2 line-clamp-2 text-xs leading-5 text-text-primary/62">
-                      {detail}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </button>
+              variant="room"
+              slug={slug}
+              name={genre.name}
+              kicker={t("explore.genreRooms.badge")}
+              detail={
+                genre.description ||
+                (genre.top_artists?.length
+                  ? genre.top_artists.slice(0, 3).join(", ")
+                  : null)
+              }
+              imageCandidates={coverUrl ? [coverUrl] : []}
+              placeholderIndex={index}
+              onOpen={() => onOpen(slug)}
+            />
           );
         })}
       </div>
@@ -263,16 +242,14 @@ export function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
           0,
           {
             type: "playlist",
-            name: t("explore.moods.mixName", {
-              mood: mood.charAt(0).toUpperCase() + mood.slice(1),
-            }),
+            name: t("explore.moods.mixName", { mood: moodLabel(mood, t) }),
           },
         );
       } else {
-        toast.info(t("explore.toasts.noMoodTracks"));
+        notify.info(t("explore.toasts.noMoodTracks"));
       }
     } catch {
-      toast.error(t("explore.toasts.loadMoodTracksFailed"));
+      notify.error(t("explore.toasts.loadMoodTracksFailed"));
     } finally {
       setLoadingMood(null);
     }
@@ -282,7 +259,7 @@ export function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
 
   return (
     <div className="space-y-3">
-      <ExploreSectionHeader
+      <SectionHeader
         title={t("explore.moods.title")}
         subtitle={t("explore.moods.subtitle")}
       />
@@ -290,6 +267,7 @@ export function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
         {moods.map((mood) => (
           <button
             key={mood.name}
+            type="button"
             onClick={() => void playMood(mood.name)}
             disabled={loadingMood !== null}
             className={`rounded-lg border px-4 py-3 text-left transition-colors ${
@@ -297,8 +275,10 @@ export function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
               "bg-text-primary/5 text-text-primary/70 border-border-quiet"
             } active:scale-[0.98]`}
           >
-            <span className="text-sm font-medium capitalize">
-              {loadingMood === mood.name ? t("common.loadingShort") : mood.name}
+            <span className="text-sm font-medium">
+              {loadingMood === mood.name
+                ? t("common.loadingShort")
+                : moodLabel(mood.name, t)}
             </span>
             <span className="mt-0.5 block text-xs opacity-60">
               {t("common.trackCount", { count: mood.track_count })}

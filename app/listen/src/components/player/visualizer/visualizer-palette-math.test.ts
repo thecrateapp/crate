@@ -1,17 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  adjustPaletteColor,
-  clamp,
-} from "@/components/player/visualizer/visualizer-palette-math";
+import { adjustPaletteColor } from "@/components/player/visualizer/visualizer-palette-math";
 
 describe("visualizer palette math", () => {
-  it("clamps values to the requested range", () => {
-    expect(clamp(-1, 0, 1)).toBe(0);
-    expect(clamp(0.5, 0, 1)).toBe(0.5);
-    expect(clamp(2, 0, 1)).toBe(1);
-  });
-
   it("keeps a neutral palette unchanged", () => {
     const adjusted = adjustPaletteColor([0.2, 0.4, 0.6], 0, 0, 0, 0);
     expect(adjusted[0]).toBeCloseTo(0.2);

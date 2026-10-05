@@ -7,6 +7,8 @@ import {
   analyzeRawColorDrift,
   analyzeSemanticTokens,
   buildDriftInventory,
+  evaluateDriftBudget,
+  loadDriftBudget,
 } from "./drift-inventory.mjs";
 
 test("counts raw colors, arbitrary utilities, inline styles and imports", () => {
@@ -207,6 +209,20 @@ test("exposes ownership metadata for every raw color exception", () => {
       reason: "Capacitor requires a fully transparent native status-bar color.",
       reviewBy: "2026-12-31",
     },
+    {
+      path: "app/listen/src/lib/social-share-story-canvas.ts",
+      owner: "listen-social",
+      reason:
+        "Canvas compositing uses neutral black and white overlays with computed alpha for cover shading, reflection masks and glass pills; themed surfaces are read from tokens.",
+      reviewBy: "2026-12-31",
+    },
+    {
+      path: "app/listen/src/components/crates/CrateMembersModal.tsx",
+      owner: "listen-social",
+      reason:
+        "Invite QR codes stay black on white in every theme so phone scanners keep maximum contrast.",
+      reviewBy: "2026-12-31",
+    },
   ]);
 });
 
@@ -358,4 +374,28 @@ test("keeps semantic aliases, product slots and recipes physically separate", ()
   assert.match(product, /--stats-/);
   assert.match(product, /--visualizer-/);
   assert.match(recipes, /\.track-row\b/);
+});
+
+test("compares drift metrics against the committed budget", () => {
+  const results = evaluateDriftBudget(
+    {
+      totals: { inlineStyles: 5 },
+      semanticTokens: { oneShotTokens: [{ name: "--a" }, { name: "--b" }] },
+    },
+    { totals: { inlineStyles: 4 }, semanticTokens: { oneShotTokens: 2 } },
+  );
+
+  assert.deepEqual(results, [
+    { metric: "totals.inlineStyles", actual: 5, limit: 4 },
+    { metric: "semanticTokens.oneShotTokens", actual: 2, limit: 2 },
+  ]);
+});
+
+test("keeps the current drift inventory within its budget", () => {
+  const exceeded = evaluateDriftBudget(
+    buildDriftInventory(),
+    loadDriftBudget(),
+  ).filter(({ actual, limit }) => actual > limit);
+
+  assert.deepEqual(exceeded, []);
 });

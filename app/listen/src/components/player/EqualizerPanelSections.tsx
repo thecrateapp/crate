@@ -14,12 +14,22 @@ import type { TFunction } from "i18next";
 import { useEqualizer } from "@/hooks/use-equalizer";
 import { type EqPresetName } from "@/lib/equalizer";
 import { EqBands } from "@crate/ui/domain/player/EqBands";
+import { Checkbox } from "@crate/ui/primitives/Checkbox";
 import { CratePill } from "@crate/ui/primitives/CrateBadge";
+import { IconButton } from "@crate/ui/primitives/IconButton";
+import { Button } from "@crate/ui/shadcn/button";
 import { EqualizerSmartReadout } from "@/components/player/EqualizerSmartReadout";
 import {
   AdaptiveFeatureChips,
   GenreResolutionChip,
 } from "@/components/player/EqualizerAdaptiveReadouts";
+
+const PANEL_CLOSE_BUTTON_CLASS_NAME =
+  "size-9 text-text-muted hover:translate-y-0 hover:text-text-primary hover:drop-shadow-none";
+const MODE_BADGE_CLASS_NAME =
+  "gap-1 border-accent-action/40 px-2 py-0.5 text-xs";
+const TRACK_PRESET_ACTION_CLASS_NAME =
+  "h-auto gap-1 border px-2.5 py-0.5 font-normal has-[>svg]:px-2.5 [&_svg:not([class*='size-'])]:size-3";
 
 const PRESET_LABELS: Record<EqPresetName, string> = {
   flat: "Flat",
@@ -82,23 +92,21 @@ function EqualizerHeader({
           ) : null}
         </CratePill>
         <label className="flex items-center gap-1.5 text-xs font-medium text-text-primary">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={eq.enabled}
-            onChange={(event) => eq.toggleEnabled(event.target.checked)}
-            className=" size-3.5 accent-accent-action"
+            onCheckedChange={(checked) => eq.toggleEnabled(checked === true)}
+            className="size-3.5"
           />
           {t("common.on")}
         </label>
         {onClose ? (
-          <button
-            type="button"
+          <IconButton
             onClick={onClose}
-            aria-label={t("player.equalizer.close")}
-            className="flex size-9 items-center justify-center text-text-muted hover:text-text-primary"
+            label={t("player.equalizer.close")}
+            className={PANEL_CLOSE_BUTTON_CLASS_NAME}
           >
-            <X size={CRATE_ICON_SIZE.lg} />
-          </button>
+            <X size={CRATE_ICON_SIZE.lg} className="size-5" />
+          </IconButton>
         ) : null}
       </div>
     </div>
@@ -114,7 +122,7 @@ function EqualizerModePicker({ eq, t }: { eq: EqualizerState; t: TFunction }) {
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border-quiet bg-surface-control px-2.5 py-2">
-      <span className="mr-1 text-xs uppercase tracking-[0.18em] text-text-subtle">
+      <span className="mr-1 text-xs uppercase tracking-eyebrow text-text-subtle">
         {t("player.equalizer.manualHelpers")}
       </span>
       <CratePill
@@ -183,33 +191,34 @@ function EqualizerModeBadge({
 }) {
   if (smart) {
     return (
-      <span className="flex items-center gap-1 rounded-full border border-accent-action/40 bg-accent-action/10 px-2 py-0.5 text-xs text-accent-action">
-        <Brain size={9} />
+      <CratePill tone="accent" icon={Brain} className={MODE_BADGE_CLASS_NAME}>
         {t("player.equalizer.smartCurve")}
-      </span>
+      </CratePill>
     );
   }
   if (adaptive) {
     return (
-      <span className="flex items-center gap-1 rounded-full border border-accent-action/40 bg-accent-action/10 px-2 py-0.5 text-xs text-accent-action">
-        <Sparkles size={9} />
+      <CratePill
+        tone="accent"
+        icon={Sparkles}
+        className={MODE_BADGE_CLASS_NAME}
+      >
         {t("player.equalizer.adaptiveActive")}
-      </span>
+      </CratePill>
     );
   }
   if (genreAdaptive) {
     return (
-      <span className="flex items-center gap-1 rounded-full border border-accent-action/40 bg-accent-action/10 px-2 py-0.5 text-xs text-accent-action">
-        <Tag size={9} />
+      <CratePill tone="accent" icon={Tag} className={MODE_BADGE_CLASS_NAME}>
         {t("player.equalizer.genreActive")}
-      </span>
+      </CratePill>
     );
   }
   if (preset === "custom") {
     return (
-      <span className="rounded-full border border-border-quiet bg-surface-control px-2 py-0.5 text-xs text-text-secondary">
+      <CratePill tone="neutral" className="px-2 py-0.5 text-xs">
         {t("player.equalizer.custom")}
-      </span>
+      </CratePill>
     );
   }
   return <span />;
@@ -235,37 +244,41 @@ function EqualizerTrackPresetActions({
   return (
     <div className="flex items-center gap-1.5">
       {hasUserTrackPreset ? (
-        <button
-          type="button"
+        <Button
+          variant="danger-soft"
+          shape="pill"
+          size="xs"
           disabled={saving}
           onClick={onClear}
-          className="inline-flex items-center gap-1 rounded-full border border-state-danger/20 bg-state-danger/[0.06] px-2.5 py-0.5 text-xs text-state-danger/80 hover:border-state-danger/35 hover:text-state-danger disabled:cursor-wait disabled:opacity-50"
+          className={`${TRACK_PRESET_ACTION_CLASS_NAME} border-state-danger/20 bg-state-danger/[0.06] text-state-danger/80 hover:border-state-danger/35 hover:bg-state-danger/[0.06] hover:text-state-danger disabled:cursor-wait`}
         >
-          <Trash2 size={9} />
+          <Trash2 size={CRATE_ICON_SIZE.micro} />
           {t("player.equalizer.clearTrackPreset")}
-        </button>
+        </Button>
       ) : (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          shape="pill"
+          size="xs"
           disabled={!eq.enabled || saving}
           onClick={onSave}
-          className="inline-flex items-center gap-1 rounded-full border border-accent-action/20 bg-accent-action/[0.06] px-2.5 py-0.5 text-xs text-accent-action/80 hover:border-accent-action/35 hover:text-accent-action disabled:cursor-not-allowed disabled:opacity-40"
+          className={`${TRACK_PRESET_ACTION_CLASS_NAME} border-accent-action/20 bg-accent-action/[0.06] text-accent-action/80 hover:border-accent-action/35 hover:bg-accent-action/[0.06] hover:text-accent-action disabled:opacity-40`}
         >
-          <Save size={9} />
+          <Save size={CRATE_ICON_SIZE.micro} />
           {t("player.equalizer.saveForTrack")}
-        </button>
+        </Button>
       )}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        shape="pill"
+        size="xs"
         disabled={!manualControlsEnabled}
         onClick={eq.resetToFlat}
-        className={`inline-flex items-center gap-1 rounded-full border border-border-quiet bg-surface-control px-2.5 py-0.5 text-xs text-text-secondary hover:border-border-interactive hover:text-text-primary ${
-          !manualControlsEnabled ? "cursor-not-allowed opacity-40" : ""
-        }`}
+        className={`${TRACK_PRESET_ACTION_CLASS_NAME} border-border-quiet bg-surface-control text-text-secondary hover:border-border-interactive hover:bg-surface-control hover:text-text-primary disabled:opacity-40`}
       >
-        <RotateCcw size={9} />
+        <RotateCcw size={CRATE_ICON_SIZE.micro} />
         {t("player.equalizer.reset")}
-      </button>
+      </Button>
     </div>
   );
 }

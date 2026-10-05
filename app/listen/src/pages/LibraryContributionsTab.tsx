@@ -1,16 +1,12 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Download, Loader2, Plus, Trash2 } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { CRATE_ICON_SIZE, Download, Plus, Trash2 } from "@crate/ui/icons";
 
-import {
-  AppModal,
-  ModalBody,
-  ModalCloseButton,
-  ModalFooter,
-  ModalHeader,
-} from "@crate/ui/primitives/AppModal";
+import { notify } from "@crate/ui/lib/notify";
+import { IconButton } from "@crate/ui/primitives/IconButton";
+import { Button } from "@crate/ui/shadcn/button";
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
+import { EmptyState, LoadingState } from "@crate/ui/domain/states";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { useApi } from "@/hooks/use-api";
 import { api, apiAssetUrl } from "@/lib/api";
@@ -18,12 +14,16 @@ import { contributionSourceLabel } from "@/lib/contributions";
 import { openExternalUrl } from "@/lib/external-links";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 
-import { EmptyState, Spinner } from "./LibraryPrimitives";
 import type {
   BandcampTaskResponse,
   ContributionsResponse,
   LibraryContribution,
 } from "./library-model";
+import {
+  CONTRIBUTION_EXPORT_CLASS_NAME,
+  CONTRIBUTION_WITHDRAW_CLASS_NAME,
+  ContributionWithdrawDialog,
+} from "./LibraryPrimitives";
 
 function ContributionArtwork({
   contribution,
@@ -52,7 +52,7 @@ function ContributionArtwork({
           {contribution.source === "bandcamp" ? (
             <BandcampLogo size={20} />
           ) : (
-            <Plus size={20} />
+            <Plus size={CRATE_ICON_SIZE.lg} />
           )}
         </div>
       )}
@@ -74,10 +74,10 @@ export function LibraryContributionsTab() {
   function exportContribution(contribution: LibraryContribution) {
     void openExternalUrl(
       apiAssetUrl(`/api/me/contributions/${contribution.id}/export`),
-    ).catch(() => toast.error(t("common.toasts.openExternalFailed")));
+    ).catch(() => notify.error(t("common.toasts.openExternalFailed")));
   }
 
-  if (loading) return <Spinner />;
+  if (loading) return <LoadingState label={t("common.loadingShort")} />;
 
   const contributions = data?.items ?? [];
 
@@ -89,7 +89,7 @@ export function LibraryContributionsTab() {
         `/api/me/contributions/${withdrawTarget.id}/withdraw`,
         "POST",
       );
-      toast.success(
+      notify.success(
         t("library.contributions.toasts.removalQueued", {
           taskId: response.task_id,
         }),
@@ -97,7 +97,7 @@ export function LibraryContributionsTab() {
       setWithdrawTarget(null);
       refetchContributions();
     } catch (error) {
-      toast.error(
+      notify.error(
         (error as Error).message ||
           t("library.contributions.toasts.removeFailed"),
       );
@@ -108,7 +108,7 @@ export function LibraryContributionsTab() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-[12px] border border-border-quiet bg-text-primary/[0.04] p-5">
+      <div className="rounded-panel border border-border-quiet bg-text-primary/[0.04] p-5">
         <h2 className="text-xl font-black text-text-primary">
           {t("library.contributions.title")}
         </h2>
@@ -118,7 +118,11 @@ export function LibraryContributionsTab() {
       </div>
 
       {!contributions.length ? (
-        <EmptyState message={t("library.contributions.empty")} />
+        <EmptyState
+          variant="dashed"
+          title={t("library.contributions.emptyTitle")}
+          description={t("library.contributions.empty")}
+        />
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {contributions.map((contribution) => (
@@ -134,75 +138,45 @@ export function LibraryContributionsTab() {
                 <p className="truncate text-xs text-text-muted">
                   {contribution.artist_name}
                 </p>
-                <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-accent-action/80">
+                <p className="mt-1 text-xs font-bold uppercase tracking-eyebrow text-accent-action/80">
                   {contributionSourceLabel(contribution.source)}
                 </p>
               </div>
-              <button
-                type="button"
+              <Button
+                variant="outline"
+                size="sm"
+                shape="pill"
                 disabled={!contribution.album_id}
                 onClick={() => exportContribution(contribution)}
-                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border-quiet px-3 text-xs font-bold text-text-muted disabled:opacity-40"
+                className={CONTRIBUTION_EXPORT_CLASS_NAME}
               >
-                <Download size={14} />
+                <Download size={CRATE_ICON_SIZE.xs} />
                 {t("common.export")}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <IconButton
+                label={t("library.contributions.withdraw.confirm")}
+                tone="danger"
+                size="sm"
                 onClick={() => setWithdrawTarget(contribution)}
-                className="inline-flex min-h-10 items-center rounded-full border border-state-danger/20 px-3 text-xs font-bold text-state-danger"
+                className={CONTRIBUTION_WITHDRAW_CLASS_NAME}
               >
-                <Trash2 size={14} />
-              </button>
+                <Trash2 size={CRATE_ICON_SIZE.xs} />
+              </IconButton>
             </article>
           ))}
         </div>
       )}
 
-      <AppModal
+      <ContributionWithdrawDialog
         open={Boolean(withdrawTarget)}
-        onClose={() => {
-          if (!withdrawing) setWithdrawTarget(null);
-        }}
-      >
-        <ModalHeader>
-          <h2 className="text-lg font-black text-text-primary">
-            {t("library.contributions.withdraw.title")}
-          </h2>
-          <ModalCloseButton
-            disabled={withdrawing}
-            onClick={() => setWithdrawTarget(null)}
-          />
-        </ModalHeader>
-        <ModalBody>
-          <p className="text-sm text-text-muted">
-            {t("library.contributions.withdraw.description", {
-              album: withdrawTarget?.album_name,
-            })}
-          </p>
-        </ModalBody>
-        <ModalFooter>
-          <button
-            type="button"
-            disabled={withdrawing}
-            onClick={() => setWithdrawTarget(null)}
-            className="inline-flex min-h-11 items-center rounded-full border border-border-quiet px-4 text-sm font-bold text-text-muted disabled:opacity-50"
-          >
-            {t("common.keepIt")}
-          </button>
-          <button
-            type="button"
-            disabled={withdrawing}
-            onClick={() => void withdrawContribution()}
-            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-state-danger px-4 text-sm font-black text-state-danger-foreground disabled:opacity-50"
-          >
-            {withdrawing ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : null}
-            {t("library.contributions.withdraw.confirm")}
-          </button>
-        </ModalFooter>
-      </AppModal>
+        pending={withdrawing}
+        title={t("library.contributions.withdraw.title")}
+        body={t("library.contributions.withdraw.description", {
+          album: withdrawTarget?.album_name,
+        })}
+        onCancel={() => setWithdrawTarget(null)}
+        onConfirm={withdrawContribution}
+      />
     </div>
   );
 }

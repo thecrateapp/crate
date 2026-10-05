@@ -1,19 +1,17 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router";
-import { Play, Radio, Share2, Shuffle, Sparkles } from "@crate/ui/icons";
-import type { ContextMenuEntry } from "@crate/ui/domain/actions";
-import { toast } from "sonner";
+import { Sparkles } from "@crate/ui/icons";
+import { EmptyState, ErrorState } from "@crate/ui/domain/states";
+import { notify } from "@crate/ui/lib/notify";
+import { CratePill } from "@crate/ui/primitives/CrateBadge";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { CoreTracksArtwork } from "@/components/home/CoreTracksArtwork";
 import { MixArtwork } from "@/components/home/MixArtwork";
 import type { HomeGeneratedPlaylistDetail } from "@/components/home/home-model";
 import { PlaylistArtwork } from "@/components/playlists/PlaylistArtwork";
-import {
-  PlaylistHeroSection,
-  type PlaylistHeroSecondaryAction,
-} from "@/components/playlists/PlaylistHeroSection";
+import { PlaylistHeroSection } from "@/components/playlists/PlaylistHeroSection";
 import {
   PlaylistTrackFilterBar,
   filterPlaylistTracks,
@@ -34,6 +32,7 @@ import { fetchHomePlaylistRadio } from "@/lib/radio";
 import { publicShareUrl } from "@/lib/share-url";
 import { openShareSheet } from "@/lib/social-share";
 import { formatTotalDuration, shuffleArray } from "@/lib/utils";
+import { buildPlaylistPageActions } from "@/pages/playlist-action-menus";
 
 export function newArrivalsWindowLabel(
   data: HomeGeneratedPlaylistDetail | null,
@@ -160,12 +159,12 @@ export function HomePlaylist() {
         playlistName: data.name,
       });
       if (!radio.tracks.length) {
-        toast.info(t("playlist.toasts.radioUnavailable"));
+        notify.info(t("playlist.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error(t("playlist.toasts.radioFailed"));
+      notify.error(t("playlist.toasts.radioFailed"));
     }
   }
 
@@ -184,9 +183,9 @@ export function HomePlaylist() {
           }),
         ],
       });
-      toast.success(t("playlist.toasts.trackAdded"));
+      notify.success(t("playlist.toasts.trackAdded"));
     } catch {
-      toast.error(t("playlist.toasts.trackAddFailed"));
+      notify.error(t("playlist.toasts.trackAddFailed"));
     }
   }
 
@@ -202,62 +201,23 @@ export function HomePlaylist() {
 
   if (!data) {
     return (
-      <div className="space-y-4 py-16 text-center">
-        <p className="text-sm text-text-muted">{t("playlist.notFound")}</p>
-      </div>
+      <ErrorState
+        kind="notFound"
+        title={t("playlist.notFound")}
+        backTo="/"
+        backLabel={t("common.back")}
+      />
     );
   }
 
-  const secondaryActions: PlaylistHeroSecondaryAction[] = [
-    {
-      key: "radio",
-      label: "Radio",
-      ariaLabel: t("playlist.actions.radio"),
-      icon: Radio,
-      disabled: playerTracks.length === 0,
-      onClick: () => void handleRadio(),
-    },
-    {
-      key: "share",
-      label: t("common.share"),
-      ariaLabel: t("common.share"),
-      icon: Share2,
-      onClick: () => void handleShare(),
-    },
-  ];
-  const playlistMenuItems: ContextMenuEntry[] = [
-    {
-      key: "play",
-      label: t("playlist.actions.playPlaylist"),
-      icon: Play,
-      disabled: playerTracks.length === 0,
-      onSelect: handlePlay,
-    },
-    {
-      key: "shuffle",
-      label: t("playlist.actions.shufflePlaylist"),
-      icon: Shuffle,
-      disabled: playerTracks.length === 0,
-      onSelect: handleShuffle,
-    },
-    {
-      key: "radio",
-      label: t("playlist.actions.startRadio"),
-      icon: Radio,
-      disabled: playerTracks.length === 0,
-      onSelect: handleRadio,
-    },
-    {
-      type: "divider",
-      key: "home-playlist-share-divider",
-    },
-    {
-      key: "share",
-      label: t("playlist.actions.sharePlaylist"),
-      icon: Share2,
-      onSelect: handleShare,
-    },
-  ];
+  const { secondaryActions, playlistMenuItems } = buildPlaylistPageActions({
+    t,
+    playDisabled: playerTracks.length === 0,
+    onPlay: handlePlay,
+    onShuffle: handleShuffle,
+    onRadio: handleRadio,
+    onShare: handleShare,
+  });
   const playlistMetaItems = [
     t("common.trackCountLabel", { count: data.track_count }),
     data.total_duration > 0 ? formatTotalDuration(data.total_duration) : null,
@@ -285,10 +245,13 @@ export function HomePlaylist() {
         description={data.description}
         metaItems={playlistMetaItems}
         badges={
-          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-accent-action/25 bg-accent-action/10 px-3 py-1 text-xs font-medium uppercase tracking-wider text-accent-action">
-            <Sparkles size={12} />
+          <CratePill
+            tone="accent"
+            icon={Sparkles}
+            className="w-fit gap-2 px-3 text-xs font-medium uppercase tracking-wider"
+          >
             {data.badge}
-          </span>
+          </CratePill>
         }
         artwork={renderArtwork}
         onPlay={handlePlay}
@@ -299,7 +262,7 @@ export function HomePlaylist() {
         menuItems={playlistMenuItems}
       />
 
-      <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 pb-8 sm:px-6">
+      <div className="mx-auto w-full max-w-content space-y-6 px-4 pb-8 sm:px-6">
         <PlaylistTrackFilterBar
           query={filterQuery}
           onQueryChange={setFilterQuery}
@@ -308,17 +271,9 @@ export function HomePlaylist() {
         />
 
         {data.tracks.length === 0 ? (
-          <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-text-muted">
-              {t("playlist.empty.noTracks")}
-            </p>
-          </div>
+          <EmptyState variant="inline" message={t("playlist.empty.noTracks")} />
         ) : filteredTracks.length === 0 ? (
-          <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-text-muted">
-              {t("playlist.empty.noFilter")}
-            </p>
-          </div>
+          <EmptyState variant="inline" message={t("playlist.empty.noFilter")} />
         ) : (
           <div className="space-y-1">
             {trackRows.map((row, index) => (

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { ContinuePlaybackPrompt } from "@/components/player/ContinuePlaybackPrompt";
 import {
@@ -37,18 +38,25 @@ export function PlayerProviderSurface({
           {children}
           <ContinuePlaybackPrompt />
           {playbackNeedsUserGesture && currentTrack ? (
-            <div className="pointer-events-none fixed inset-x-4 bottom-[calc(var(--listen-player-bottom-offset,5.5rem)+env(safe-area-inset-bottom))] z-[1600] flex justify-center sm:bottom-28">
-              <button
-                type="button"
-                className="pointer-events-auto rounded-full border border-accent-action/30 bg-surface-canvas/95 px-4 py-3 text-sm font-semibold text-text-primary backdrop-blur"
-                onClick={resumeAfterUserGesture}
-              >
-                Tap to resume playback
-              </button>
-            </div>
+            <ResumePlaybackPrompt onResume={resumeAfterUserGesture} />
           ) : null}
         </PlayerProgressContext.Provider>
       </PlayerStateContext.Provider>
     </PlayerActionsContext.Provider>
+  );
+}
+
+function ResumePlaybackPrompt({ onResume }: { onResume: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="pointer-events-none fixed inset-x-4 bottom-[calc(var(--listen-player-bottom-offset,5.5rem)+env(safe-area-inset-bottom))] z-app-player-popover flex justify-center sm:bottom-28">
+      <button
+        type="button"
+        className="pointer-events-auto rounded-full border border-accent-action/30 bg-surface-canvas/95 px-4 py-3 text-sm font-semibold text-text-primary backdrop-blur"
+        onClick={onResume}
+      >
+        {t("player.tapToResume")}
+      </button>
+    </div>
   );
 }

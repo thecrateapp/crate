@@ -26,6 +26,7 @@ import type {
 export interface CuratedPlaylistPageController extends CuratedPlaylistActions {
   data: CuratedPlaylistData | undefined;
   error: unknown;
+  status: number | null;
   filterQuery: string;
   filteredTracks: CuratedPlaylistTrack[];
   loading: boolean;
@@ -60,6 +61,7 @@ export function useCuratedPlaylistPageController(): CuratedPlaylistPageControlle
     data: responseData,
     loading,
     error,
+    status,
     refetch,
   } = useApi<CuratedPlaylistData>(
     id ? `/api/curation/playlists/${id}` : null,
@@ -104,6 +106,7 @@ export function useCuratedPlaylistPageController(): CuratedPlaylistPageControlle
     ...actions,
     data,
     error,
+    status: status ?? null,
     filterQuery,
     filteredTracks,
     loading,

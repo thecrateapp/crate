@@ -38,7 +38,7 @@ class OfflineManifestTrackResponse(IdentityFieldsMixin):
 class OfflineManifestResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    kind: Literal["track", "album", "playlist"]
+    kind: Literal["track", "album", "playlist", "crate"]
     id: int | str
     title: str
     content_version: str

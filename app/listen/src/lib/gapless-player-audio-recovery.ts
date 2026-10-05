@@ -115,10 +115,7 @@ export function createAudioRecoveryController(
         { reason, restoredPosition },
         "info",
       );
-    } else if (
-      options.rebuildIfTauriOutputMayBeStale &&
-      staleTauriOutput
-    ) {
+    } else if (options.rebuildIfTauriOutputMayBeStale && staleTauriOutput) {
       dependencies.rebuildPlayer(`${reason}:tauri-output-stale`);
       dependencies.clearOutputStale();
       ctx = dependencies.getAudioContext();

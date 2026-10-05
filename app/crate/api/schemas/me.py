@@ -499,9 +499,12 @@ class StatsAlbumResponse(BaseModel):
 
 class StatsGenreResponse(BaseModel):
     genre_name: str
+    slug: str | None = None
     play_count: int
     complete_play_count: int
     minutes_listened: float | int
+    weight: float | None = None
+    share: float | None = None
     first_played_at: datetime | str | None = None
     last_played_at: datetime | str | None = None
 
@@ -530,6 +533,8 @@ class ReplayMixResponse(BaseModel):
     window: str
     title: str
     subtitle: str
+    title_key: str | None = None
+    subtitle_key: str | None = None
     track_count: int
     minutes_listened: float | int
     items: list[StatsTrackResponse] = Field(default_factory=list)

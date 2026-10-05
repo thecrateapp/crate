@@ -1,4 +1,4 @@
-import { Sparkles, Disc3, AudioLines } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Sparkles, Disc3, AudioLines } from "@crate/ui/icons";
 import type { QualityBadge as QualityBadgeData } from "./player-bar-utils";
 
 const tierStyles: Record<
@@ -65,7 +65,7 @@ export function QualityBadge({
       className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-badge font-bold tracking-wider leading-none whitespace-nowrap border ${variantClass}`}
       title={title}
     >
-      {Icon && <Icon size={9} />}
+      {Icon && <Icon size={CRATE_ICON_SIZE.nano} />}
       {badge.label}
     </span>
   );

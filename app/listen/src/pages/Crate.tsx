@@ -1,40 +1,250 @@
-import { useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
 import {
-  ArrowLeft,
+  lazy,
+  memo,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
+import {
+  ArrowDownToLine,
+  ArrowDownToLineBold,
+  CRATE_ICON_SIZE,
   Disc3,
+  Loader2,
   Pencil,
   Play,
-  Share2,
+  Radio,
   Shuffle,
+  Trash2,
+  Users,
 } from "@crate/ui/icons";
+import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
+import {
+  HERO_PRIMARY_ACTION_CLASS,
+  HERO_SECONDARY_ACTION_ACTIVE_CLASS,
+  HERO_SECONDARY_ACTION_CLASS,
+  type HeroSecondaryAction,
+} from "@crate/ui/domain/hero";
+import { EmptyState, ErrorState } from "@crate/ui/domain/states";
+import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
+import { Button } from "@crate/ui/shadcn/button";
 import { useTranslation } from "react-i18next";
+import { notify } from "@crate/ui/lib/notify";
 
-import { CrateEditor } from "@/components/CrateEditor";
+import { buildCrateMenuItems } from "@/components/actions/crate-actions";
+import { action } from "@/components/actions/shared";
 import { CrateImage } from "@/components/artwork/CrateImage";
+import { useTransparentHeader } from "@/components/layout/transparent-header";
+import { AlbumCard } from "@/components/cards/AlbumCard";
+import {
+  authenticatedCrateCoverUrl,
+  type CrateCoverUrl,
+} from "@/components/crates/CrateCoverFlow";
+import { useCrateDownload } from "@/components/crates/crate-download";
+import {
+  buildCrateSharePayload,
+  cratePagePath,
+  crateRef,
+  isShareableCrate,
+  orderCrateAlbums,
+  type NumberedCrateAlbum,
+} from "@/components/crates/crate-model";
+import {
+  CRATE_SECONDARY_ACTION_CLASS,
+  CrateHero,
+  crateShareAction,
+} from "@/components/crates/CratePageHeader";
+import { ListenHeroActionBar } from "@/components/hero/ListenHeroActionBar";
+import { useCrateFollow } from "@/components/crates/use-crate-follow";
 import { CrateLoader } from "@/components/ui/CrateLoader";
+import { useAuth } from "@/contexts/AuthContext";
+import { useOffline } from "@/contexts/OfflineContext";
 import { useApi } from "@/hooks/use-api";
+import { api } from "@/lib/api";
+import { cacheSet } from "@/lib/cache";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
-import { albumCoverApiUrl, albumPagePath } from "@/lib/library-routes";
-import { publicShareUrl } from "@/lib/share-url";
+import { loginPathWithReturnTo } from "@/lib/auth-route-policy";
+import { albumCoverApiUrl } from "@/lib/library-routes";
+import { publicCrateAlbumCoverUrl } from "@/lib/share-url";
 import { openShareSheet } from "@/lib/social-share";
-import { shuffleArray } from "@/lib/utils";
+import { cn, shuffleArray } from "@/lib/utils";
 import { toPlayableTrack } from "@/lib/playable-track";
-import type { CrateDetail, CratePlaybackTrack } from "@/pages/crates-types";
+import { startShapedRadio } from "@/lib/radio";
+import { getOfflineActionLabelKey, isOfflineBusy } from "@/lib/offline";
+import type {
+  CrateAlbum,
+  CrateDetail,
+  CratePlaybackTrack,
+} from "@/pages/crates-types";
+
+const CrateEditor = lazy(() =>
+  import("@/components/CrateEditor").then((module) => ({
+    default: module.CrateEditor,
+  })),
+);
+
+const CrateMembersModal = lazy(() =>
+  import("@/components/crates/CrateMembersModal").then((module) => ({
+    default: module.CrateMembersModal,
+  })),
+);
 
 export function Crate() {
+  useTransparentHeader();
+  const { t } = useTranslation();
+  const { user, loading } = useAuth();
+
+  if (loading && !user) {
+    return <CrateLoader label={t("crate.page.loading")} />;
+  }
+
+  return user ? <AuthenticatedCrate /> : <AnonymousCrate />;
+}
+
+function crateDetailUrl(ref: string) {
+  return `/api/crates/${encodeURIComponent(ref)}`;
+}
+
+function useCrateDetail() {
+  const { crateRef: requestedRef } = useParams<{ crateRef: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const detail = useApi<CrateDetail>(
+    requestedRef ? crateDetailUrl(requestedRef) : null,
+  );
+  const canonicalRef = detail.data ? crateRef(detail.data) : null;
+
+  useEffect(() => {
+    if (!detail.data || !canonicalRef || canonicalRef === requestedRef) return;
+    cacheSet(crateDetailUrl(canonicalRef), detail.data);
+    navigate(
+      `${cratePagePath(detail.data)}${location.search}${location.hash}`,
+      { replace: true },
+    );
+  }, [
+    canonicalRef,
+    detail.data,
+    location.hash,
+    location.search,
+    navigate,
+    requestedRef,
+  ]);
+
+  const albums = useMemo(
+    () =>
+      detail.data
+        ? orderCrateAlbums(
+            detail.data.albums,
+            detail.data.is_ordered,
+            detail.data.sort_direction,
+          )
+        : [],
+    [detail.data],
+  );
+  return { ...detail, albums };
+}
+
+function shareCrate(crate: CrateDetail, albums: NumberedCrateAlbum[]) {
+  if (!isShareableCrate(crate)) return;
+  openShareSheet(buildCrateSharePayload(crate, albums));
+}
+
+function AnonymousCrate() {
+  const { t } = useTranslation();
+  const location = useLocation();
+  const { data, loading, albums } = useCrateDetail();
+  const crateId = data?.id ?? null;
+  const coverUrl = useCallback<CrateCoverUrl>(
+    (album, size) =>
+      crateId && album.has_cover
+        ? publicCrateAlbumCoverUrl(crateId, album.global_album_uid, size)
+        : null,
+    [crateId],
+  );
+
+  if (loading && !data) {
+    return <CrateLoader label={t("crate.page.loading")} />;
+  }
+  if (!data) {
+    return (
+      <CrateUnavailable
+        showBackLink={false}
+        loginPath={loginPathWithReturnTo(location.pathname)}
+      />
+    );
+  }
+
+  const loginPath = loginPathWithReturnTo(cratePagePath(data));
+
+  return (
+    <div data-testid="crate-shell" className="-mx-4 -mt-6 pb-12 sm:-mx-6">
+      <CrateHero
+        crate={data}
+        albums={albums}
+        coverUrl={coverUrl}
+        followerCount={data.follower_count ?? 0}
+        contentClassName="pt-6"
+        actions={
+          <>
+            <ListenHeroActionBar
+              primaryLabel={t("crate.page.primaryActions")}
+              secondaryLabel={t("crate.page.secondaryActions")}
+              primaryExtra={
+                <Link
+                  to={loginPath}
+                  className={cn(HERO_PRIMARY_ACTION_CLASS, "col-span-2")}
+                >
+                  <Play size={CRATE_ICON_SIZE.md} fill="currentColor" />
+                  <span>{t("crate.page.signInToListen")}</span>
+                </Link>
+              }
+              secondaryLayout="fill"
+              secondaryActions={[
+                crateShareAction(data, () => shareCrate(data, albums), t),
+              ]}
+            />
+            <p className="mx-auto mt-3 w-full max-w-content text-sm text-text-muted">
+              {t("crate.page.signInHint")}
+            </p>
+          </>
+        }
+      />
+      <CrateAlbumList albums={albums} coverUrl={coverUrl} linkAlbums={false} />
+    </div>
+  );
+}
+
+function AuthenticatedCrate() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { crateId } = useParams<{ crateId: string }>();
-  const { data, loading, refetch } = useApi<CrateDetail>(
-    crateId ? `/api/crates/${crateId}` : null,
-  );
+  const { data, loading, refetch, albums } = useCrateDetail();
+  const crateId = data?.id ?? null;
+  const {
+    supported: offlineSupported,
+    getCrateState,
+    toggleCrateOffline,
+  } = useOffline();
   const { data: playbackData, loading: playbackLoading } = useApi<
     CratePlaybackTrack[]
-  >(crateId ? `/api/crates/${crateId}/playback` : null);
-  const { playAll } = usePlayerActions();
+  >(crateId ? `/api/crates/${encodeURIComponent(crateId)}/playback` : null);
+  const { playAll, setRepeatMode } = usePlayerActions();
   const [editing, setEditing] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
+  const downloadCrate = useCrateDownload();
   const canEdit = data?.access === "owner" || data?.access === "collaborator";
+  const canManageMembers =
+    data?.access === "owner" || data?.access === "collaborator";
+  const canFollow = data?.visibility === "public" && data?.access === "public";
+  const offlineState = data ? getCrateState(data.id) : "idle";
+  const crateFollow = useCrateFollow({
+    crateId: data?.id ?? null,
+    initialFollowed: data?.is_followed ?? false,
+    initialFollowerCount: data?.follower_count ?? 0,
+    enabled: canFollow,
+  });
   const playerTracks = useMemo<Track[]>(
     () =>
       (playbackData ?? []).map((track) =>
@@ -66,223 +276,458 @@ export function Crate() {
     [playbackData],
   );
   const canPlay = !playbackLoading && playerTracks.length > 0;
+  const removeAlbum = useCallback(
+    async (album: CrateAlbum) => {
+      if (!crateId) return;
+      try {
+        await api(
+          `/api/crates/${crateId}/albums/${encodeURIComponent(
+            album.global_album_uid,
+          )}`,
+          "DELETE",
+        );
+        refetch();
+      } catch {
+        notify.error(t("library.crates.albumRemoveFailed"));
+      }
+    },
+    [crateId, refetch, t],
+  );
 
   function startCratePlayback(tracks: Track[]) {
     if (!data || tracks.length === 0) return;
+    setRepeatMode(data.loop_enabled ? "all" : "off");
     playAll(tracks, 0, {
       type: "crate",
       name: data.name,
       id: data.id,
-      href: `/crate/${data.id}`,
+      href: cratePagePath(data),
     });
   }
 
-  if (editing && data && canEdit) {
-    return (
-      <CrateEditor
-        crateId={data.id}
-        onBack={() => {
-          setEditing(false);
-          refetch();
-        }}
-        onCreated={() => {}}
-        onDeleted={() => navigate("/collection?tab=crates", { replace: true })}
-      />
-    );
+  async function startCrateRadio() {
+    if (!data) return;
+    try {
+      const radio = await startShapedRadio("seeded", "crate", data.id);
+      if (!radio?.tracks.length) {
+        notify.info(t("actions.crate.toasts.radioUnavailable"));
+        return;
+      }
+      playAll(radio.tracks, 0, radio.source);
+    } catch {
+      notify.error(t("actions.crate.toasts.radioFailed"));
+    }
+  }
+
+  async function toggleOffline() {
+    if (!data) return;
+    try {
+      const result = await toggleCrateOffline({
+        crateId: data.id,
+        title: data.name,
+      });
+      notify.success(
+        result === "removed"
+          ? t("actions.offline.toasts.removed")
+          : t("actions.crate.toasts.offlineReady"),
+      );
+    } catch (error) {
+      notify.error(
+        error instanceof Error
+          ? error.message
+          : t("actions.offline.toasts.updateFailed"),
+      );
+    }
   }
 
   if (loading && !data) {
     return <CrateLoader label={t("crate.page.loading")} />;
   }
 
-  if (!data) {
-    return (
-      <div className="mx-auto flex max-w-lg flex-col items-center gap-3 py-16 text-center">
-        <Disc3 size={28} className="text-accent-action" />
-        <p className="text-lg font-semibold text-text-primary">
-          {t("crate.page.notFound")}
-        </p>
-        <Link
-          to="/collection?tab=crates"
-          className="inline-flex items-center gap-2 text-sm text-accent-action hover:underline"
-        >
-          <ArrowLeft size={15} />
-          {t("crate.page.backToCollection")}
-        </Link>
-      </div>
-    );
-  }
+  if (!data) return <CrateUnavailable showBackLink />;
 
-  const ownerName =
-    data.owner_name || data.owner_username || t("people.unknownUser");
-  const firstAlbum = data.albums[0];
-  const coverUrl = firstAlbum?.has_cover
-    ? albumCoverApiUrl(
-        {
-          globalAlbumUid: firstAlbum.global_album_uid,
-          albumName: firstAlbum.name,
-          artistName: firstAlbum.artist_name,
-        },
-        { size: 768 },
-      )
-    : null;
-  function shareCrate() {
-    const crate = data;
-    if (!crate || crate.visibility !== "public") return;
-    openShareSheet({
-      kind: "crate",
-      title: crate.name,
-      subtitle: ownerName,
-      imageUrl: coverUrl,
-      url: publicShareUrl(`/share/crate/${encodeURIComponent(crate.id)}`),
-    });
-  }
+  const hasAlbums = albums.length > 0;
 
   return (
-    <main className="mx-auto w-full max-w-5xl space-y-8 pb-12">
-      <section className="grid gap-6 overflow-hidden rounded-xl border border-border-quiet bg-text-primary/[0.035] p-5 sm:p-7 md:grid-cols-[minmax(200px,300px)_1fr] md:items-center">
-        <div className="aspect-square overflow-hidden rounded-xl border border-border-quiet bg-text-primary/[0.04]">
-          {coverUrl ? (
-            <CrateImage
-              src={coverUrl}
-              alt={firstAlbum?.name ?? ""}
-              className="size-full object-cover"
-            />
-          ) : (
-            <div className="flex size-full items-center justify-center bg-gradient-to-br from-accent-action/15 via-text-primary/[0.03] to-surface-canvas/20 text-accent-action/80">
-              <Disc3 size={64} strokeWidth={1.2} />
-            </div>
-          )}
-        </div>
+    <div
+      data-testid="crate-shell"
+      className="-mx-4 -mt-4 pb-12 sm:-mx-6 sm:-mt-6"
+    >
+      <CrateHero
+        crate={data}
+        albums={albums}
+        coverUrl={authenticatedCrateCoverUrl}
+        followerCount={crateFollow.followerCount}
+        contentClassName="pt-[var(--listen-mobile-page-top)] sm:pt-20"
+        actions={
+          <CratePageActions
+            crate={data}
+            canPlay={canPlay}
+            canEdit={Boolean(canEdit)}
+            canManageMembers={canManageMembers}
+            canFollow={canFollow}
+            offlineSupported={offlineSupported && hasAlbums}
+            offlineBusy={isOfflineBusy(offlineState)}
+            offlineLabel={t(getOfflineActionLabelKey(offlineState))}
+            offlineActive={offlineState === "ready"}
+            followed={crateFollow.followed}
+            followPending={crateFollow.pending}
+            onPlay={() => startCratePlayback(playerTracks)}
+            onShuffle={() => startCratePlayback(shuffleArray(playerTracks))}
+            onRadio={() => void startCrateRadio()}
+            onOffline={() => void toggleOffline()}
+            onEdit={() => setEditing(true)}
+            onMembers={() => setMembersOpen(true)}
+            onFollow={() => void crateFollow.toggle()}
+            onShare={() => shareCrate(data, albums)}
+            onDownload={hasAlbums ? () => void downloadCrate(data) : undefined}
+          />
+        }
+      />
 
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent-action">
-            {t("crate.page.kicker", { name: ownerName })}
-          </p>
-          <h1 className="mt-3 break-words text-3xl font-black leading-tight text-text-primary sm:text-5xl">
-            {data.name}
-          </h1>
-          {data.description ? (
-            <p className="mt-4 max-w-2xl whitespace-pre-wrap text-sm leading-6 text-text-muted sm:text-base">
-              {data.description}
-            </p>
-          ) : null}
-          <p className="mt-4 text-sm text-text-muted">
-            {t("common.albumCountLabel", { count: data.albums.length })}
-          </p>
-          <div className="mt-6 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => startCratePlayback(playerTracks)}
-              disabled={!canPlay}
-              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-semibold text-accent-action-foreground transition-colors hover:bg-accent-action/90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Play size={16} fill="currentColor" />
-              {t("crate.page.play")}
-            </button>
-            <button
-              type="button"
-              onClick={() => startCratePlayback(shuffleArray(playerTracks))}
-              disabled={!canPlay}
-              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border-quiet bg-text-primary/[0.04] px-4 py-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-text-primary/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Shuffle size={16} />
-              {t("crate.page.shuffle")}
-            </button>
-            {data.visibility === "public" ? (
-              <button
-                type="button"
-                onClick={shareCrate}
-                className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-semibold text-accent-action-foreground transition-colors hover:bg-accent-action/90"
-              >
-                <Share2 size={16} />
-                {t("crate.page.share")}
-              </button>
-            ) : null}
-            {canEdit ? (
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border-quiet bg-text-primary/[0.04] px-4 py-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-text-primary/[0.08]"
-              >
-                <Pencil size={15} />
-                {t("crate.page.edit")}
-              </button>
-            ) : null}
-          </div>
-        </div>
-      </section>
+      {editing && canEdit ? (
+        <Suspense fallback={null}>
+          <CrateEditor
+            crateId={data.id}
+            onBack={() => {
+              setEditing(false);
+              refetch();
+            }}
+            onDeleted={() =>
+              navigate("/collection?tab=crates", { replace: true })
+            }
+          />
+        </Suspense>
+      ) : null}
 
-      <section className="space-y-4">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-xl font-bold text-text-primary">
-            {t("crate.page.albums")}
-          </h2>
-          <span className="text-sm text-text-muted">
-            {t("common.albumCountLabel", { count: data.albums.length })}
-          </span>
-        </div>
-        {data.albums.length > 0 ? (
-          <ol className="divide-y divide-text-primary/6 overflow-hidden rounded-xl border border-border-quiet bg-text-primary/[0.025]">
-            {data.albums.map((album, index) => {
-              const albumCover = album.has_cover
-                ? albumCoverApiUrl(
-                    {
-                      globalAlbumUid: album.global_album_uid,
-                      albumName: album.name,
-                      artistName: album.artist_name,
-                    },
-                    { size: 192 },
-                  )
-                : null;
+      {membersOpen && canManageMembers ? (
+        <Suspense fallback={null}>
+          <CrateMembersModal
+            crate={data}
+            open
+            onClose={() => setMembersOpen(false)}
+            onCrateChange={refetch}
+            onLeft={() => {
+              setMembersOpen(false);
+              navigate("/collection?tab=crates", { replace: true });
+            }}
+          />
+        </Suspense>
+      ) : null}
 
-              return (
-                <li key={album.global_album_uid}>
-                  <Link
-                    to={albumPagePath({
-                      globalAlbumUid: album.global_album_uid,
-                      albumName: album.name,
-                      artistName: album.artist_name,
-                    })}
-                    className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-text-primary/[0.04] sm:px-5"
-                  >
-                    <span className="w-7 shrink-0 text-right text-xs tabular-nums text-text-muted">
-                      {index + 1}
-                    </span>
-                    <div className="size-14 shrink-0 overflow-hidden rounded-lg bg-text-primary/[0.05]">
-                      {albumCover ? (
-                        <CrateImage
-                          src={albumCover}
-                          alt=""
-                          loading="lazy"
-                          className="size-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex size-full items-center justify-center text-accent-action/60">
-                          <Disc3 size={22} />
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-text-primary sm:text-base">
-                        {album.name}
-                      </p>
-                      <p className="mt-1 truncate text-sm text-text-muted">
-                        {album.artist_name}
-                        {album.year ? ` · ${album.year}` : ""}
-                      </p>
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
-          </ol>
+      <CrateAlbumList
+        albums={albums}
+        coverUrl={authenticatedCrateCoverUrl}
+        linkAlbums
+        onRemoveAlbum={canEdit ? removeAlbum : undefined}
+      />
+    </div>
+  );
+}
+
+function CrateUnavailable({
+  showBackLink,
+  loginPath,
+}: {
+  showBackLink: boolean;
+  loginPath?: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <ErrorState
+      kind="unavailable"
+      icon={Disc3}
+      title={t("crate.page.notFound")}
+      backTo={showBackLink ? "/collection?tab=crates" : undefined}
+      backLabel={t("crate.page.backToCollection")}
+      action={
+        loginPath ? (
+          <Button asChild size="sm" variant="outline">
+            <Link to={loginPath}>{t("auth.login")}</Link>
+          </Button>
+        ) : undefined
+      }
+      className="py-16"
+    />
+  );
+}
+
+const CrateAlbumRow = memo(function CrateAlbumRow({
+  album,
+  coverUrl,
+  onRemoveAlbum,
+}: {
+  album: NumberedCrateAlbum;
+  coverUrl: CrateCoverUrl;
+  onRemoveAlbum?: (album: CrateAlbum) => void;
+}) {
+  const { t } = useTranslation();
+  const extraActions = useMemo<ItemActionMenuEntry[] | undefined>(
+    () =>
+      onRemoveAlbum
+        ? [
+            action({
+              key: "crate-remove-album",
+              label: t("crate.page.removeFromCrate"),
+              icon: Trash2,
+              danger: true,
+              onSelect: () => onRemoveAlbum(album),
+            }),
+          ]
+        : undefined,
+    [album, onRemoveAlbum, t],
+  );
+
+  return (
+    <AlbumCard
+      variant="row"
+      rank={album.displayNumber}
+      artist={album.artist_name}
+      album={album.name}
+      globalAlbumUid={album.global_album_uid}
+      year={album.year ?? undefined}
+      cover={coverUrl(album, 192) ?? undefined}
+      extraActions={extraActions}
+    />
+  );
+});
+
+function CrateAlbumPreviewRow({
+  album,
+  coverUrl,
+}: {
+  album: NumberedCrateAlbum;
+  coverUrl: CrateCoverUrl;
+}) {
+  const albumCover = coverUrl(album, 192);
+  return (
+    <div className="flex items-center gap-[var(--content-row-gap)] px-3 py-[var(--content-row-padding-y)]">
+      <span className="w-6 shrink-0 text-right text-xs tabular-nums text-text-muted">
+        {album.displayNumber}
+      </span>
+      <div className="size-12 shrink-0 overflow-hidden rounded-md bg-text-primary/5">
+        {albumCover ? (
+          <CrateImage
+            src={albumCover}
+            alt=""
+            loading="lazy"
+            className="size-full object-cover"
+          />
         ) : (
-          <div className="rounded-xl border border-dashed border-border-quiet px-5 py-12 text-center text-sm text-text-muted">
-            {t("crate.page.noAlbums")}
+          <div className="flex size-full items-center justify-center text-text-primary/35">
+            <Disc3 size={CRATE_ICON_SIZE.md} />
           </div>
         )}
-      </section>
-    </main>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-text-primary">
+          {album.name}
+        </p>
+        <p className="truncate text-xs text-text-muted">
+          {album.year ? `${album.year} · ` : ""}
+          {album.artist_name}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function CrateAlbumList({
+  albums,
+  coverUrl,
+  linkAlbums,
+  onRemoveAlbum,
+}: {
+  albums: NumberedCrateAlbum[];
+  coverUrl: CrateCoverUrl;
+  linkAlbums: boolean;
+  onRemoveAlbum?: (album: CrateAlbum) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <section className="mx-auto max-w-content space-y-4 px-4 sm:px-6">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-xl font-bold text-text-primary">
+          {t("crate.page.albums")}
+        </h2>
+        <span className="text-sm text-text-muted">
+          {t("common.albumCountLabel", { count: albums.length })}
+        </span>
+      </div>
+      {albums.length > 0 ? (
+        <ol className="space-y-1">
+          {albums.map((album) => (
+            <li key={album.global_album_uid}>
+              {linkAlbums ? (
+                <CrateAlbumRow
+                  album={album}
+                  coverUrl={coverUrl}
+                  onRemoveAlbum={onRemoveAlbum}
+                />
+              ) : (
+                <CrateAlbumPreviewRow album={album} coverUrl={coverUrl} />
+              )}
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <EmptyState variant="dashed" message={t("crate.page.noAlbums")} />
+      )}
+    </section>
+  );
+}
+
+function CratePageActions({
+  crate,
+  canPlay,
+  canEdit,
+  canManageMembers,
+  canFollow,
+  offlineSupported,
+  offlineBusy,
+  offlineLabel,
+  offlineActive,
+  followed,
+  followPending,
+  onPlay,
+  onShuffle,
+  onRadio,
+  onOffline,
+  onEdit,
+  onMembers,
+  onFollow,
+  onShare,
+  onDownload,
+}: {
+  crate: CrateDetail;
+  canPlay: boolean;
+  canEdit: boolean;
+  canManageMembers: boolean;
+  canFollow: boolean;
+  offlineSupported: boolean;
+  offlineBusy: boolean;
+  offlineLabel: string;
+  offlineActive: boolean;
+  followed: boolean;
+  followPending: boolean;
+  onPlay: () => void;
+  onShuffle: () => void;
+  onRadio: () => void;
+  onOffline: () => void;
+  onEdit: () => void;
+  onMembers: () => void;
+  onFollow: () => void;
+  onShare: () => void;
+  onDownload?: () => void;
+}) {
+  const { t } = useTranslation();
+  const entries = useMemo(
+    () => buildCrateMenuItems({ crate, onDownload }, t),
+    [crate, onDownload, t],
+  );
+  const followLabel = followed ? t("common.following") : t("common.follow");
+  const secondaryActions: HeroSecondaryAction[] = [];
+  if (canPlay) {
+    secondaryActions.push({
+      key: "radio",
+      label: t("crate.page.radio"),
+      icon: <Radio size={CRATE_ICON_SIZE.lg} />,
+      ariaLabel: t("actions.crate.radio"),
+      title: t("actions.crate.radio"),
+      onClick: onRadio,
+      className: CRATE_SECONDARY_ACTION_CLASS,
+    });
+  }
+  if (offlineSupported) {
+    secondaryActions.push({
+      key: "offline",
+      label: t("common.offline"),
+      icon: offlineBusy ? (
+        <Loader2 size={CRATE_ICON_SIZE.lg} className="animate-spin" />
+      ) : offlineActive ? (
+        <ArrowDownToLineBold size={CRATE_ICON_SIZE.lg} />
+      ) : (
+        <ArrowDownToLine size={CRATE_ICON_SIZE.lg} />
+      ),
+      ariaLabel: offlineLabel,
+      title: offlineLabel,
+      disabled: offlineBusy,
+      onClick: onOffline,
+      className: cn(
+        CRATE_SECONDARY_ACTION_CLASS,
+        offlineActive && "text-text-accent drop-shadow-accent-action",
+      ),
+    });
+  }
+  if (canManageMembers) {
+    secondaryActions.push({
+      key: "members",
+      label: t("crate.page.members"),
+      icon: <Users size={CRATE_ICON_SIZE.lg} />,
+      ariaLabel: t("library.crates.collaborators"),
+      title: t("library.crates.collaborators"),
+      onClick: onMembers,
+      className: CRATE_SECONDARY_ACTION_CLASS,
+    });
+  }
+  if (canEdit) {
+    secondaryActions.push({
+      key: "edit",
+      label: t("common.edit"),
+      icon: <Pencil size={CRATE_ICON_SIZE.lg} />,
+      ariaLabel: t("crate.page.edit"),
+      title: t("crate.page.edit"),
+      onClick: onEdit,
+      className: CRATE_SECONDARY_ACTION_CLASS,
+    });
+  }
+  secondaryActions.push(crateShareAction(crate, onShare, t));
+
+  return (
+    <ListenHeroActionBar
+      primaryLabel={t("crate.page.primaryActions")}
+      secondaryLabel={t("crate.page.secondaryActions")}
+      primaryActions={[
+        {
+          key: "play",
+          label: t("player.play"),
+          icon: <Play size={CRATE_ICON_SIZE.md} fill="currentColor" />,
+          onClick: onPlay,
+          disabled: !canPlay,
+          ariaLabel: t("player.play"),
+        },
+        {
+          key: "shuffle",
+          label: t("player.shuffle"),
+          icon: <Shuffle size={CRATE_ICON_SIZE.md} />,
+          tone: "neutral",
+          onClick: onShuffle,
+          disabled: !canPlay,
+          ariaLabel: t("player.shuffle"),
+        },
+      ]}
+      secondaryLayout="fill"
+      secondaryLeading={
+        canFollow ? (
+          <FollowHeartButton
+            className={cn(
+              HERO_SECONDARY_ACTION_CLASS,
+              CRATE_SECONDARY_ACTION_CLASS,
+              followed && HERO_SECONDARY_ACTION_ACTIVE_CLASS,
+            )}
+            following={followed}
+            iconSize={CRATE_ICON_SIZE.lg}
+            aria-label={followLabel}
+            title={followLabel}
+            disabled={followPending}
+            onClick={onFollow}
+          >
+            <span>{followLabel}</span>
+          </FollowHeartButton>
+        ) : null
+      }
+      secondaryActions={secondaryActions}
+      menu={entries.length > 0 ? { actions: entries } : undefined}
+    />
   );
 }

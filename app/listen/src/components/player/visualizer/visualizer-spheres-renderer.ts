@@ -1,5 +1,6 @@
 import { vec4 } from "gl-matrix";
 
+import { clamp } from "@/lib/utils";
 import type { AudioMetrics } from "./visualizer-audio-analyzer";
 import type { VisualizerColorTriplet } from "./visualizer-colors";
 import { VisualizerWebGLResources } from "./visualizer-webgl-resources";
@@ -26,10 +27,6 @@ export interface VisualizerSpheresRenderState {
   color1: VisualizerColorTriplet;
   color2: VisualizerColorTriplet;
   color3: VisualizerColorTriplet;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
 }
 
 function mixColor(

@@ -1,17 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { Button } from "@crate/ui/shadcn/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@crate/ui/shadcn/alert-dialog";
 
 import { Section } from "@/components/settings/SettingsPrimitives";
 import { api } from "@/lib/api";
@@ -41,8 +32,9 @@ export function OpenSubsonicCredentialsSection() {
   const [error, setError] = useState<RequestError | null>(null);
   const [busy, setBusy] = useState(false);
   const copyInProgress = useRef(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmingAction, setConfirmingAction] =
-    useState<ConfirmedAction | null>(null);
+    useState<ConfirmedAction>("rotate");
 
   useEffect(() => {
     let active = true;
@@ -97,12 +89,15 @@ export function OpenSubsonicCredentialsSection() {
     }
   }
 
+  function requestConfirmation(action: ConfirmedAction) {
+    setConfirmingAction(action);
+    setConfirmOpen(true);
+  }
+
   async function confirmAction() {
-    const action = confirmingAction;
-    setConfirmingAction(null);
-    if (action === "rotate") {
+    if (confirmingAction === "rotate") {
       await createCredential();
-    } else if (action === "revoke") {
+    } else {
       await revokeCredential();
     }
   }
@@ -257,7 +252,7 @@ export function OpenSubsonicCredentialsSection() {
                   type="button"
                   variant="outline"
                   disabled={busy}
-                  onClick={() => setConfirmingAction("rotate")}
+                  onClick={() => requestConfirmation("rotate")}
                   className="w-full sm:w-auto"
                 >
                   {t("settings.openSubsonic.rotateKey")}
@@ -266,7 +261,7 @@ export function OpenSubsonicCredentialsSection() {
                   type="button"
                   variant="destructive"
                   disabled={busy}
-                  onClick={() => setConfirmingAction("revoke")}
+                  onClick={() => requestConfirmation("revoke")}
                   className="w-full sm:w-auto"
                 >
                   {t("settings.openSubsonic.revokeKey")}
@@ -286,42 +281,35 @@ export function OpenSubsonicCredentialsSection() {
         </>
       )}
 
-      <AlertDialog
-        open={confirmingAction !== null}
-        onOpenChange={(open) => {
-          if (!open) setConfirmingAction(null);
-        }}
-      >
-        <AlertDialogContent className="border-border-subtle bg-surface-container">
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {confirmingAction === "rotate"
-                ? t("settings.openSubsonic.rotateConfirmTitle")
-                : t("settings.openSubsonic.revokeConfirmTitle")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirmingAction === "rotate"
-                ? t("settings.openSubsonic.rotateConfirmDescription")
-                : t("settings.openSubsonic.revokeConfirmDescription")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => void confirmAction()}
-              className={
-                confirmingAction === "revoke"
-                  ? "bg-state-danger text-state-danger-foreground hover:bg-state-danger/90"
-                  : ""
-              }
-            >
-              {confirmingAction === "rotate"
-                ? t("settings.openSubsonic.rotateConfirmAction")
-                : t("settings.openSubsonic.revokeConfirmAction")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        onConfirm={confirmAction}
+        tone={confirmingAction === "revoke" ? "danger" : "default"}
+        title={
+          confirmingAction === "rotate"
+            ? t("settings.openSubsonic.rotateConfirmTitle")
+            : t("settings.openSubsonic.revokeConfirmTitle")
+        }
+        description={
+          confirmingAction === "rotate"
+            ? t("settings.openSubsonic.rotateConfirmDescription")
+            : t("settings.openSubsonic.revokeConfirmDescription")
+        }
+        confirmLabel={
+          confirmingAction === "rotate"
+            ? t("settings.openSubsonic.rotateConfirmAction")
+            : t("settings.openSubsonic.revokeConfirmAction")
+        }
+        cancelLabel={t("common.cancel")}
+        closeLabel={t("common.close")}
+        ariaLabel={
+          confirmingAction === "rotate"
+            ? t("settings.openSubsonic.rotateConfirmTitle")
+            : t("settings.openSubsonic.revokeConfirmTitle")
+        }
+        backdropLabel={t("common.close")}
+      />
     </Section>
   );
 }

@@ -1,11 +1,15 @@
 import type { ReactNode } from "react";
 
-import { Calendar, Loader2, Sparkles } from "@crate/ui/icons";
+import { PageHeader } from "@crate/ui/domain/navigation";
+import { EmptyState, LoadingState } from "@crate/ui/domain/states";
+import { CRATE_ICON_SIZE, Calendar, Sparkles } from "@crate/ui/icons";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 
 import {
   groupByMonth,
   UpcomingMonthGroup,
-  UpcomingShowCard,
+  ShowCard,
 } from "@/components/upcoming/UpcomingRows";
 import { cn } from "@/lib/utils";
 import type { ShowsFilter } from "@/pages/shows-page-model";
@@ -21,15 +25,11 @@ function ShowsHeader({ page }: ShowsSectionProps) {
     : page.t("radar.intro");
 
   return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-      <div>
-        <h1 className="text-3xl font-bold text-text-primary">Radar</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-text-muted">
-          {headingCopy}
-        </p>
-      </div>
-      <ShowsSummary page={page} />
-    </div>
+    <PageHeader
+      title={page.t("nav.radar")}
+      subtitle={headingCopy}
+      actions={<ShowsSummary page={page} />}
+    />
   );
 }
 
@@ -95,7 +95,7 @@ function SummaryPill({
         accentClass,
       )}
     >
-      <div className="text-xs uppercase tracking-[0.16em] opacity-70">
+      <div className="text-xs uppercase tracking-kicker opacity-70">
         {label}
       </div>
       <div className="mt-1 text-sm font-semibold">{value}</div>
@@ -109,18 +109,12 @@ function ShowsFeatured({ page }: ShowsSectionProps) {
   return (
     <section className="space-y-4">
       <div className="flex items-center gap-2">
-        <Calendar size={15} className="text-accent-action" />
-        <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-accent-action">
+        <Calendar size={CRATE_ICON_SIZE.sm} className="text-accent-action" />
+        <h2 className="text-sm font-semibold uppercase tracking-eyebrow text-accent-action">
           {page.t("radar.sections.nextShow")}
         </h2>
       </div>
-      <UpcomingShowCard
-        item={page.featuredShow}
-        expanded
-        featured
-        showClose={false}
-        onToggle={() => undefined}
-      />
+      <ShowCard item={page.featuredShow} variant="feature" />
     </section>
   );
 }
@@ -129,30 +123,28 @@ const SHOW_FILTERS: ShowsFilter[] = ["all", "shows", "releases"];
 
 function ShowsFilters({ page }: ShowsSectionProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-[12px] border border-text-primary/5 bg-text-primary/[0.02] p-4 md:flex-row md:items-center md:justify-between">
-      <div className="flex flex-wrap items-center gap-2">
-        {SHOW_FILTERS.map((value) => (
-          <button
-            key={value}
-            onClick={() => page.setFilter(value)}
-            className={cn(
-              "rounded-full border px-4 py-2 text-sm transition-colors",
-              page.filter === value
-                ? "border-accent-action/40 bg-accent-action/15 text-accent-action"
-                : "border-border-quiet text-text-muted hover:border-text-primary/20 hover:text-text-primary",
-            )}
-          >
-            {filterLabel(page, value)}
-          </button>
-        ))}
-      </div>
+    <div className="flex flex-col gap-3 rounded-panel border border-text-primary/5 bg-text-primary/[0.02] p-4 md:flex-row md:items-center md:justify-between">
+      <SegmentedControl
+        as="radio"
+        variant="tonal"
+        label={page.t("radar.filtersLabel")}
+        items={SHOW_FILTERS.map((value) => ({
+          value,
+          label: filterLabel(page, value),
+        }))}
+        value={page.filter}
+        onValueChange={page.setFilter}
+        className="flex-wrap gap-2 p-0"
+        itemClassName="h-auto border border-border-quiet px-4 py-2 font-normal text-text-muted hover:border-text-primary/20 data-[state=active]:border-accent-action/40 data-[state=active]:bg-accent-action/15 data-[state=active]:text-accent-action"
+      />
       <div className="relative w-full md:w-[280px]">
-        <input
-          type="text"
+        <SearchInput
           value={page.search}
-          onChange={(event) => page.setSearch(event.target.value)}
+          onValueChange={page.setSearch}
+          label={page.t("radar.searchPlaceholder")}
+          clearLabel={page.t("common.clear")}
           placeholder={page.t("radar.searchPlaceholder")}
-          className="h-11 w-full rounded-lg border border-border-quiet bg-surface-canvas/25 px-4 text-base text-text-primary placeholder:text-text-primary/40 focus:border-accent-action/40 focus:outline-none"
+          className="rounded-lg focus-visible:border-accent-action/40 md:text-base"
         />
       </div>
     </div>
@@ -168,26 +160,26 @@ function filterLabel(page: ShowsPageController, filter: ShowsFilter) {
 function ShowsEmptyStates({ page }: ShowsSectionProps) {
   if (page.loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 size={24} className="animate-spin text-accent-action" />
-      </div>
+      <LoadingState label={page.t("common.loadingShort")} className="py-24" />
     );
   }
   if (page.isGenreRadar && page.items.length === 0) {
     return (
       <EmptyState
-        icon={<Calendar size={22} className="text-accent-action" />}
+        titleAs="h2"
+        icon={Calendar}
         title={page.t("radar.empty.genreTitle")}
-        body={page.t("radar.empty.genreBody")}
+        description={page.t("radar.empty.genreBody")}
       />
     );
   }
   if (!page.isGenreRadar && !page.hasFollowedArtists) {
     return (
       <EmptyState
-        icon={<Sparkles size={22} className="text-accent-action" />}
+        titleAs="h2"
+        icon={Sparkles}
         title={page.t("radar.empty.followTitle")}
-        body={page.t("radar.empty.followBody")}
+        description={page.t("radar.empty.followBody")}
       />
     );
   }
@@ -198,9 +190,10 @@ function ShowsEmptyStates({ page }: ShowsSectionProps) {
   ) {
     return (
       <EmptyState
-        icon={<Sparkles size={22} className="text-accent-action" />}
+        titleAs="h2"
+        icon={Sparkles}
         title={page.t("radar.empty.noSignalsTitle")}
-        body={page.t("radar.empty.noSignalsBody")}
+        description={page.t("radar.empty.noSignalsBody")}
       />
     );
   }
@@ -211,9 +204,10 @@ function ShowsEmptyStates({ page }: ShowsSectionProps) {
   ) {
     return (
       <EmptyState
-        icon={<Calendar size={22} className="text-accent-action" />}
+        titleAs="h2"
+        icon={Calendar}
         title={page.t("radar.empty.filteredTitle")}
-        body={page.t("radar.empty.filteredBody")}
+        description={page.t("radar.empty.filteredBody")}
       />
     );
   }
@@ -228,13 +222,17 @@ function ShowsResults({ page }: ShowsSectionProps) {
   return (
     <div className="space-y-10">
       <ShowsMonthSection
-        icon={<Sparkles size={15} className="text-accent-action" />}
+        icon={
+          <Sparkles size={CRATE_ICON_SIZE.sm} className="text-accent-action" />
+        }
         items={page.comingUp}
         monthTitle={page.t("radar.sections.comingUp")}
         page={page}
       />
       <ShowsMonthSection
-        icon={<Calendar size={15} className="text-text-muted" />}
+        icon={
+          <Calendar size={CRATE_ICON_SIZE.sm} className="text-text-muted" />
+        }
         items={page.recentlyReleased}
         muted
         monthTitle={page.t("radar.sections.recentlyReleased")}
@@ -264,7 +262,7 @@ function ShowsMonthSection({
         {icon}
         <h2
           className={cn(
-            "text-sm font-semibold uppercase tracking-[0.18em]",
+            "text-sm font-semibold uppercase tracking-eyebrow",
             muted ? "text-text-muted" : "text-accent-action",
           )}
         >
@@ -283,26 +281,6 @@ function ShowsMonthSection({
         ))}
       </div>
     </section>
-  );
-}
-
-function EmptyState({
-  icon,
-  title,
-  body,
-}: {
-  icon: ReactNode;
-  title: string;
-  body: string;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-[12px] border border-text-primary/5 bg-text-primary/[0.02] px-6 py-16 text-center">
-      <div className="mb-4 flex size-12 items-center justify-center rounded-xl border border-border-quiet bg-text-primary/5">
-        {icon}
-      </div>
-      <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
-      <p className="mt-2 max-w-md text-sm leading-6 text-text-muted">{body}</p>
-    </div>
   );
 }
 

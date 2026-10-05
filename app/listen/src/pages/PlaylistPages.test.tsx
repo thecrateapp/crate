@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 import { useApi } from "@/hooks/use-api";
@@ -108,8 +108,8 @@ vi.mock("@/components/playlists/PlaylistHeroSection", () => ({
   ),
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
+vi.mock("@crate/ui/lib/notify", () => ({
+  notify: {
     error: vi.fn(),
     info: vi.fn(),
     success: vi.fn(),
@@ -247,6 +247,29 @@ describe("playlist pages", () => {
       "data-show-cover-thumb",
       "true",
     );
+  });
+
+  it("renders a retryable error state when a curated playlist fails to load", () => {
+    const refetch = vi.fn();
+    vi.mocked(useApi).mockReturnValue({
+      data: null,
+      loading: false,
+      error: "Server error",
+      status: 500,
+      refetch,
+    });
+
+    renderWithListenProviders(<CuratedPlaylist />, {
+      locale: "es",
+      route: "/playlists/curated/42",
+      path: "/playlists/curated/:id",
+    });
+
+    expect(
+      screen.getByText("No se pudo cargar la playlist"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 
   it("localizes playlist page chrome", () => {

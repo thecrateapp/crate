@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { useEqualizer } from "@/hooks/use-equalizer";
 
@@ -20,11 +20,11 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
     setSaving(true);
     try {
       const result = await eq.saveForCurrentTrack();
-      if (result) toast.success(t("player.equalizer.toasts.saved"));
-      else toast.error(t("player.equalizer.toasts.cannotSave"));
+      if (result) notify.success(t("player.equalizer.toasts.saved"));
+      else notify.error(t("player.equalizer.toasts.cannotSave"));
     } catch (error) {
       console.error("[eq] failed to save track preset", error);
-      toast.error(t("player.equalizer.toasts.saveFailed"));
+      notify.error(t("player.equalizer.toasts.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -34,10 +34,10 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
     setSaving(true);
     try {
       await eq.clearCurrentTrackPreset();
-      toast.success(t("player.equalizer.toasts.cleared"));
+      notify.success(t("player.equalizer.toasts.cleared"));
     } catch (error) {
       console.error("[eq] failed to clear track preset", error);
-      toast.error(t("player.equalizer.toasts.clearFailed"));
+      notify.error(t("player.equalizer.toasts.clearFailed"));
     } finally {
       setSaving(false);
     }

@@ -1,11 +1,13 @@
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { CRATE_ICON_SIZE, Loader2, Play } from "@crate/ui/icons";
-import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
-import { toast } from "sonner";
-
-import { useItemActionMenu } from "@/components/actions/ItemActionMenu";
+import { UserRound } from "@crate/ui/icons";
 import { useHoverCapability } from "@crate/ui/lib/use-hover-capability";
+import { notify } from "@crate/ui/lib/notify";
+
+import {
+  ItemActionMenu,
+  type UseItemActionMenuReturn,
+} from "@/components/actions/ItemActionMenu";
 import { fetchArtistTopTracks } from "@/components/actions/shared";
 import { useArtistActionEntries } from "@/components/actions/artist-actions";
 import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
@@ -29,6 +31,8 @@ function artistMonogram(name: string): string {
   return `${firstWord[0] ?? ""}${lastWord[0] ?? ""}`;
 }
 
+export type ArtistCardVariant = "tile" | "row" | "editorial";
+
 export interface ArtistCardProps {
   name: string;
   artistId?: number;
@@ -45,18 +49,20 @@ export interface ArtistCardProps {
   large?: boolean;
   layout?: "rail" | "grid";
   fillGrid?: boolean;
+  variant?: ArtistCardVariant;
+  rank?: number;
+  meta?: ReactNode;
 }
 
-type ArtistCardResolvedProps = ArtistCardProps & {
-  compact: boolean;
-  external: boolean;
-  imageTone: "normal" | "muted";
-  large: boolean;
-  layout: "rail" | "grid";
-  fillGrid: boolean;
-};
+const ROW_IMAGE_SIZE = 48;
 
-function resolveArtistCardVisuals({
+function artistImageSize(variant: ArtistCardVariant, compact: boolean) {
+  if (variant === "row") return ROW_IMAGE_SIZE;
+  if (variant === "editorial") return 156;
+  return compact ? 100 : 140;
+}
+
+export function resolveArtistCardVisuals({
   name,
   artistId,
   artistEntityUid,
@@ -68,10 +74,25 @@ function resolveArtistCardVisuals({
   href,
   external,
   layout,
-  large,
-  fillGrid,
-}: ArtistCardResolvedProps) {
-  const imageSize = compact ? 100 : large ? 156 : 140;
+  variant,
+}: Pick<
+  ArtistCardProps,
+  | "name"
+  | "artistId"
+  | "artistEntityUid"
+  | "globalArtistUid"
+  | "artistSlug"
+  | "photo"
+  | "hasPhoto"
+  | "href"
+> & {
+  compact: boolean;
+  external: boolean;
+  layout: "rail" | "grid";
+  variant: ArtistCardVariant;
+}) {
+  const imageSize = artistImageSize(variant, compact);
+  const gridArtwork = layout === "grid" && variant !== "row";
   const artistRouteInput = {
     artistId,
     artistEntityUid,
@@ -81,8 +102,17 @@ function resolveArtistCardVisuals({
   };
   const generatedArtwork = artistPhotoArtwork(artistRouteInput, {
     preset: "artist-card",
-    size: layout === "grid" ? 320 : compact ? 160 : large ? 320 : 256,
-    ...(layout === "grid" ? {} : { sizes: `${imageSize}px` }),
+    size:
+      variant === "row"
+        ? 128
+        : gridArtwork
+          ? 320
+          : compact
+            ? 160
+            : variant === "editorial"
+              ? 320
+              : 256,
+    ...(gridArtwork ? {} : { sizes: `${imageSize}px` }),
   });
   const isPendingExternalArtwork =
     external && Boolean(photo?.includes("/api/network/external-artist/photo"));
@@ -100,98 +130,39 @@ function resolveArtistCardVisuals({
                 : "credentials",
           })
         : generatedArtwork;
-  const targetHref =
-    href ||
-    artistPagePath({
-      artistId,
-      artistEntityUid,
-      globalArtistUid,
-      artistSlug,
-      artistName: name,
-    });
-  const wrapperClassName = cn(
-    "group/card snap-start text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl",
-    layout === "grid"
-      ? "listen-deferred-grid-item w-full min-w-0"
-      : `shrink-0 ${compact ? "w-[100px]" : large ? "w-[156px]" : "w-[140px]"}`,
-  );
+  const targetHref = href || artistPagePath(artistRouteInput);
 
   return {
-    artworkWidth: layout === "grid" ? "100%" : `${imageSize}px`,
     imageSize,
     monogram: artistMonogram(name).toUpperCase(),
     photoArtwork,
     photoUrl: photoArtwork?.src ?? undefined,
     targetHref,
-    wrapperClassName,
-    fillGrid,
   };
 }
 
-export function useArtistCardModel({
-  name,
-  artistId,
-  artistEntityUid,
-  globalArtistUid,
-  artistSlug,
-  photo,
-  hasPhoto,
-  subtitle,
-  compact,
-  href,
-  external,
-  imageTone,
-  large,
-  layout,
-  fillGrid,
-}: ArtistCardResolvedProps) {
+export function useArtistCardModel(
+  props: ArtistCardProps & {
+    compact: boolean;
+    external: boolean;
+    layout: "rail" | "grid";
+    variant: ArtistCardVariant;
+  },
+) {
   const { t } = useTranslation();
   const { isFollowing, toggleArtistFollow } = useArtistFollows();
   const canUseInlineHoverActions = useHoverCapability();
-  const visuals = resolveArtistCardVisuals({
-    name,
-    artistId,
-    artistEntityUid,
-    globalArtistUid,
-    artistSlug,
-    photo,
-    hasPhoto,
-    subtitle,
-    compact,
-    href,
-    external,
-    imageTone,
-    large,
-    layout,
-    fillGrid,
-  });
-  const following = isFollowing(artistId, globalArtistUid);
-  const hasPlayableArtist = artistId != null || Boolean(globalArtistUid);
-  const actions = useArtistActionEntries({
-    artistId,
-    artistEntityUid,
-    globalArtistUid,
-    artistSlug,
-    imageUrl: visuals.photoUrl,
-    name,
-  });
-  const actionMenu = useItemActionMenu(actions, { disabled: external });
-  const menuPhotoUrl = actionMenu.open
-    ? resolveMaybeApiAssetUrl(visuals.photoUrl)
-    : null;
+  const visuals = resolveArtistCardVisuals(props);
+  const following = isFollowing(props.artistId, props.globalArtistUid);
+  const hasPlayableArtist =
+    props.artistId != null || Boolean(props.globalArtistUid);
   return {
     ...visuals,
-    actionMenu,
-    actions,
     canUseInlineHoverActions,
     following,
     hasPlayableArtist,
-    menuPhotoUrl,
     t,
     toggleArtistFollow,
-    imageTone,
-    name,
-    subtitle,
   };
 }
 
@@ -214,10 +185,7 @@ export function useArtistCardPlayback({
 }) {
   const [playingTopTracks, setPlayingTopTracks] = useState(false);
 
-  async function handlePlayTopTracks(
-    event: React.MouseEvent<HTMLButtonElement>,
-  ) {
-    event.stopPropagation();
+  const handlePlayTopTracks = useCallback(async () => {
     setPlayingTopTracks(true);
     try {
       const tracks = await fetchArtistTopTracks({
@@ -228,7 +196,7 @@ export function useArtistCardPlayback({
         name,
       });
       if (!tracks.length) {
-        toast.info(t("actions.artist.toasts.noTopTracks"));
+        notify.info(t("actions.artist.toasts.noTopTracks"));
         return;
       }
       playAll(tracks, 0, {
@@ -236,11 +204,19 @@ export function useArtistCardPlayback({
         name: t("actions.artist.topTracksSource", { name }),
       });
     } catch {
-      toast.error(t("actions.artist.toasts.loadTopTracksFailed"));
+      notify.error(t("actions.artist.toasts.loadTopTracksFailed"));
     } finally {
       setPlayingTopTracks(false);
     }
-  }
+  }, [
+    artistId,
+    artistEntityUid,
+    globalArtistUid,
+    artistSlug,
+    name,
+    playAll,
+    t,
+  ]);
 
   return { handlePlayTopTracks, playingTopTracks };
 }
@@ -258,19 +234,12 @@ export function useArtistCardFollow({
 }) {
   const [togglingFollow, setTogglingFollow] = useState(false);
 
-  async function handleToggleFollow(
-    event: React.MouseEvent<HTMLButtonElement>,
-  ) {
-    event.stopPropagation();
+  const handleToggleFollow = useCallback(() => {
     setTogglingFollow(true);
-    try {
-      await toggleArtistFollow(artistId, globalArtistUid, name);
-    } catch {
-      // Follow state rolls back in ArtistFollowsContext.
-    } finally {
-      setTogglingFollow(false);
-    }
-  }
+    toggleArtistFollow(artistId, globalArtistUid, name)
+      .catch(() => undefined)
+      .finally(() => setTogglingFollow(false));
+  }, [artistId, globalArtistUid, name, toggleArtistFollow]);
 
   return { handleToggleFollow, togglingFollow };
 }
@@ -278,32 +247,21 @@ export function useArtistCardFollow({
 export function ArtistCardArtwork({
   photoArtwork,
   name,
-  imageSize,
-  artworkWidth,
-  fillGrid,
   imageTone,
   monogram,
-  children,
+  className,
 }: {
   photoArtwork: ArtworkSource | null;
   name: string;
-  imageSize: number;
-  artworkWidth: string;
-  fillGrid: boolean;
   imageTone: "normal" | "muted";
   monogram: string;
-  children?: ReactNode;
+  className: string;
 }) {
   return (
     <ArtworkSurface
       source={photoArtwork}
       alt={name}
-      className="relative mx-auto mb-[var(--content-card-gap)] aspect-square overflow-hidden rounded-full bg-text-primary/5"
-      style={{
-        width: artworkWidth,
-        maxWidth: artworkWidth === "100%" && fillGrid ? "none" : imageSize,
-        height: artworkWidth === "100%" ? "auto" : imageSize,
-      }}
+      className={cn("rounded-full bg-text-primary/5", className)}
       fallback={
         <div
           aria-hidden="true"
@@ -322,93 +280,54 @@ export function ArtistCardArtwork({
         imageTone === "muted" &&
           "grayscale saturate-0 brightness-[0.52] contrast-125 transition duration-300 group-hover/card:brightness-[0.72]",
       )}
-    >
-      {children}
-    </ArtworkSurface>
+    />
   );
 }
 
-export function ArtistCardDetails({
+export function ArtistCardMenu({
+  actionMenu,
   name,
   subtitle,
+  artistId,
+  artistEntityUid,
+  globalArtistUid,
+  artistSlug,
+  photoUrl,
 }: {
+  actionMenu: UseItemActionMenuReturn;
   name: string;
   subtitle?: string;
+  artistId?: number;
+  artistEntityUid?: string;
+  globalArtistUid?: string;
+  artistSlug?: string;
+  photoUrl?: string;
 }) {
-  return (
-    <>
-      <div className="truncate text-center text-sm font-medium text-text-primary">
-        {name}
-      </div>
-      {subtitle ? (
-        <div className="truncate text-center text-xs text-text-muted">
-          {subtitle}
-        </div>
-      ) : null}
-    </>
-  );
-}
-
-export function ArtistCardInlineActions({
-  artistName,
-  following,
-  hasPlayableArtist,
-  canUseInlineHoverActions,
-  playingTopTracks,
-  togglingFollow,
-  handlePlayTopTracks,
-  handleToggleFollow,
-  t,
-}: {
-  artistName: string;
-  following: boolean;
-  hasPlayableArtist: boolean;
-  canUseInlineHoverActions: boolean;
-  playingTopTracks: boolean;
-  togglingFollow: boolean;
-  handlePlayTopTracks: (event: React.MouseEvent<HTMLButtonElement>) => void;
-  handleToggleFollow: (event: React.MouseEvent<HTMLButtonElement>) => void;
-  t: ReturnType<typeof useTranslation>["t"];
-}) {
-  if (!hasPlayableArtist || !canUseInlineHoverActions) return null;
+  const actions = useArtistActionEntries({
+    artistId,
+    artistEntityUid,
+    globalArtistUid,
+    artistSlug,
+    imageUrl: photoUrl,
+    name,
+  });
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-full bg-surface-canvas/0 transition-colors group-hover/card:bg-surface-canvas/42">
-      <div className="pointer-events-none flex translate-y-2 items-center justify-center gap-2 opacity-0 transition-[transform,opacity] group-focus-within/card:translate-y-0 group-focus-within/card:opacity-100 group-hover/card:translate-y-0 group-hover/card:opacity-100">
-        <button
-          type="button"
-          className="pointer-events-auto inline-flex size-10 items-center justify-center rounded-full bg-accent-action text-accent-action-foreground shadow-lg"
-          onClick={handlePlayTopTracks}
-          aria-label={t("actions.artist.playTopTracksFrom", {
-            name: artistName,
-          })}
-          title={t("actions.artist.playTopTracks")}
-        >
-          {playingTopTracks ? (
-            <Loader2 size={CRATE_ICON_SIZE.md} className="animate-spin" />
-          ) : (
-            <Play size={CRATE_ICON_SIZE.md} fill="currentColor" />
-          )}
-        </button>
-        <FollowHeartButton
-          className={cn(
-            "pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full border shadow-lg backdrop-blur-sm",
-            following
-              ? "border-accent-action/30 bg-accent-action/15 text-accent-action"
-              : "border-text-primary/16 bg-surface-canvas/35 text-text-primary",
-          )}
-          onClick={handleToggleFollow}
-          aria-label={
-            following
-              ? t("actions.artist.unfollowNamed", { name: artistName })
-              : t("actions.artist.followNamed", { name: artistName })
-          }
-          title={following ? t("common.following") : t("common.follow")}
-          following={following}
-          disabled={togglingFollow}
-          iconSize={CRATE_ICON_SIZE.md}
-        />
-      </div>
-    </div>
+    <ItemActionMenu
+      actions={actions}
+      header={{
+        type: "media",
+        title: name,
+        subtitle,
+        imageUrl: resolveMaybeApiAssetUrl(photoUrl),
+        imageAlt: name,
+        imageShape: "circle",
+        fallbackIcon: UserRound,
+      }}
+      open={actionMenu.open}
+      position={actionMenu.position}
+      menuRef={actionMenu.menuRef}
+      onClose={actionMenu.close}
+    />
   );
 }

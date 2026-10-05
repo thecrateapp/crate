@@ -1,22 +1,41 @@
-import { memo } from "react";
+import { memo, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { Disc3 } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE } from "@crate/ui/icons";
+import {
+  EntityCard,
+  EntityRow,
+  type EntityCardOverlay,
+  type EntityMenuRenderer,
+} from "@crate/ui/domain/entity";
 
-import { ItemActionMenu } from "@/components/actions/ItemActionMenu";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { albumPagePath } from "@/lib/library-routes";
-import { isOfflineBusy } from "@/lib/offline";
-import { cn } from "@/lib/utils";
+import { isOfflineBusy, type OfflineItemState } from "@/lib/offline";
 import {
-  AlbumCardArtworkControls,
-  AlbumCardArtworkSurface,
-  AlbumCardDetails,
+  AlbumCardArtwork,
+  AlbumCardArtworkBadges,
+  AlbumCardMenu,
+  AlbumCardSubtitle,
   useAlbumCardModel,
   useAlbumCardPlayback,
   type AlbumCardProps,
 } from "./AlbumCardParts";
 
 export type { AlbumCardProps } from "./AlbumCardParts";
+
+function offlineActionClassName(state: OfflineItemState) {
+  if (state === "ready") {
+    return "bg-accent-action/[0.04] hover:bg-accent-action/[0.04]";
+  }
+  if (isOfflineBusy(state)) {
+    return "bg-accent-action/[0.05] hover:bg-accent-action/[0.05]";
+  }
+  if (state === "error") {
+    return "bg-state-warning/[0.05] hover:bg-state-warning/[0.05]";
+  }
+  return undefined;
+}
 
 export const AlbumCard = memo(function AlbumCard({
   artist,
@@ -33,7 +52,12 @@ export const AlbumCard = memo(function AlbumCard({
   releaseDate,
   compact,
   layout = "rail",
+  variant = "tile",
+  rank,
+  meta,
+  extraActions,
 }: AlbumCardProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { playAll } = usePlayerActions();
   const model = useAlbumCardModel({
@@ -51,6 +75,7 @@ export const AlbumCard = memo(function AlbumCard({
     releaseDate,
     compact,
     layout,
+    variant,
   });
 
   const { playing, handlePlayOverlay } = useAlbumCardPlayback({
@@ -63,81 +88,112 @@ export const AlbumCard = memo(function AlbumCard({
     playAll,
   });
 
-  return (
-    <article
-      className={cn(
-        "group/card relative snap-start rounded-xl text-left transition-colors",
-        layout === "grid"
-          ? "listen-deferred-grid-item w-full min-w-0"
-          : `shrink-0 ${compact ? "w-[120px]" : "w-[160px]"}`,
-      )}
-      onContextMenu={model.actionMenu.handleContextMenu}
-      {...model.actionMenu.longPressHandlers}
-    >
-      <button
-        type="button"
-        className={cn(
-          "group block w-full rounded-xl p-[var(--content-card-padding)] text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-          model.offlineState === "ready"
-            ? "bg-accent-action/[0.04]"
-            : isOfflineBusy(model.offlineState)
-              ? "bg-accent-action/[0.05]"
-              : model.offlineState === "error"
-                ? "bg-state-warning/[0.05]"
-                : "hover:bg-text-primary/5",
-        )}
-        onClick={() => navigate(albumPagePath(model.albumRouteInput))}
-        onKeyDown={(event) => {
-          model.actionMenu.handleKeyboardTrigger(event);
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            navigate(albumPagePath(model.albumRouteInput));
+  const albumPath = albumPagePath(model.albumRouteInput);
+  const openAlbum = useCallback(
+    () => navigate(albumPath),
+    [navigate, albumPath],
+  );
+  const { menuInput, saved, savedLabel, handleToggleSaved } = model;
+  const renderMenu = useCallback<EntityMenuRenderer>(
+    (controller) => (
+      <AlbumCardMenu
+        actionMenu={controller}
+        extraActions={extraActions}
+        input={menuInput}
+      />
+    ),
+    [extraActions, menuInput],
+  );
+  const canSave = albumId != null || Boolean(globalAlbumUid);
+  const playLabel = t("common.playItem", { name: album });
+  const overlay = useMemo<EntityCardOverlay>(
+    () => ({
+      onPlay: handlePlayOverlay,
+      loading: playing,
+      playLabel,
+      follow: canSave
+        ? {
+            following: saved,
+            label: savedLabel,
+            onToggle: handleToggleSaved,
           }
-        }}
-      >
-        <AlbumCardArtworkSurface
+        : undefined,
+    }),
+    [
+      canSave,
+      handlePlayOverlay,
+      handleToggleSaved,
+      playLabel,
+      playing,
+      saved,
+      savedLabel,
+    ],
+  );
+  const subtitle = (
+    <AlbumCardSubtitle
+      artist={artist}
+      year={year}
+      isPreRelease={model.isPreRelease}
+      releaseDate={model.releaseDate}
+      offlineMeta={model.offlineMeta}
+      offlineState={model.offlineState}
+    />
+  );
+  const menuLabel = t("actions.menu.more");
+
+  if (variant === "row") {
+    return (
+      <EntityRow
+        title={album}
+        subtitle={subtitle}
+        meta={meta}
+        rank={rank}
+        leading={
+          <AlbumCardArtwork
+            coverArtwork={model.coverArtwork}
+            coverSizes={model.coverSizes}
+            album={album}
+            iconSize={CRATE_ICON_SIZE.md}
+            className="relative size-12 shrink-0 overflow-hidden rounded-md bg-text-primary/5"
+          />
+        }
+        onOpen={openAlbum}
+        renderMenu={renderMenu}
+        menuLabel={menuLabel}
+      />
+    );
+  }
+
+  const actionClassName = offlineActionClassName(model.offlineState);
+
+  return (
+    <EntityCard
+      title={album}
+      subtitle={subtitle}
+      meta={meta}
+      rank={rank}
+      layout={layout}
+      compact={compact}
+      className={layout === "grid" ? "listen-deferred-grid-item" : undefined}
+      classNames={actionClassName ? { action: actionClassName } : undefined}
+      artwork={
+        <AlbumCardArtwork
           coverArtwork={model.coverArtwork}
           coverSizes={model.coverSizes}
           album={album}
+          className="size-full"
+        />
+      }
+      artworkOverlay={
+        <AlbumCardArtworkBadges
           offlineState={model.offlineState}
           isPreRelease={model.isPreRelease}
         />
-        <AlbumCardDetails
-          album={album}
-          artist={artist}
-          year={year}
-          isPreRelease={model.isPreRelease}
-          releaseDate={model.releaseDate}
-          offlineMeta={model.offlineMeta}
-          offlineState={model.offlineState}
-        />
-      </button>
-      <AlbumCardArtworkControls
-        album={album}
-        albumId={albumId}
-        globalAlbumUid={globalAlbumUid}
-        saved={model.saved}
-        savedLabel={model.savedLabel}
-        onToggleSaved={model.handleToggleSaved}
-        playing={playing}
-        onPlayOverlay={handlePlayOverlay}
-      />
-      <ItemActionMenu
-        actions={model.actions}
-        header={{
-          type: "media",
-          title: album,
-          subtitle: artist,
-          imageUrl: model.menuCoverUrl,
-          imageAlt: album,
-          imageShape: "square",
-          fallbackIcon: Disc3,
-        }}
-        open={model.actionMenu.open}
-        position={model.actionMenu.position}
-        menuRef={model.actionMenu.menuRef}
-        onClose={model.actionMenu.close}
-      />
-    </article>
+      }
+      overlay={overlay}
+      onOpen={openAlbum}
+      renderMenu={renderMenu}
+      menuLabel={menuLabel}
+    />
   );
 });

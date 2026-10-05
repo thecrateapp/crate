@@ -2,7 +2,12 @@ import { DeferredRoute } from "@/app-shell/AppFallbacks";
 import { createPreloadableLazy } from "@/lib/create-preloadable-lazy";
 import { Navigate, useParams } from "react-router";
 
-import { artistPagePath, artistTopTracksPath } from "@/lib/library-routes";
+import { useTransparentHeader } from "@/components/layout/transparent-header";
+import {
+  artistPagePath,
+  artistTopTracksPath,
+  isReservedArtistChildSlug,
+} from "@/lib/library-routes";
 
 const albumRoute = createPreloadableLazy(
   () => import("@/pages/Album"),
@@ -14,11 +19,18 @@ function isNumericIdSegment(value: string | undefined) {
   return Boolean(value && /^\d+$/.test(value));
 }
 
-export function ArtistChildRoute() {
+export function ArtistChildRoute({
+  transparentHeader = false,
+}: {
+  transparentHeader?: boolean;
+}) {
   const { artistSlug, albumSlug } = useParams<{
     artistSlug?: string;
     albumSlug?: string;
   }>();
+  useTransparentHeader(
+    transparentHeader && !isReservedArtistChildSlug(albumSlug),
+  );
 
   if (!artistSlug || !albumSlug) {
     return <Navigate to="/artists" replace />;

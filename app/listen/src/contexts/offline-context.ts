@@ -26,6 +26,11 @@ export interface OfflinePlaylistInput {
   isSmart?: boolean;
 }
 
+export interface OfflineCrateInput {
+  crateId?: string | null;
+  title?: string | null;
+}
+
 export interface OfflineContextValue {
   supported: boolean;
   readOnly: boolean;
@@ -35,11 +40,14 @@ export interface OfflineContextValue {
   getTrackState: (ref?: string | OfflineTrackInput | null) => OfflineItemState;
   getAlbumState: (albumId?: number | null) => OfflineItemState;
   getPlaylistState: (playlistId?: number | null) => OfflineItemState;
+  getCrateState: (crateId?: string | null) => OfflineItemState;
   getAlbumRecord: (albumId?: number | null) => OfflineItemRecord | null;
   getPlaylistRecord: (playlistId?: number | null) => OfflineItemRecord | null;
+  getCrateRecord: (crateId?: string | null) => OfflineItemRecord | null;
   isTrackOffline: (ref?: string | OfflineTrackInput | null) => boolean;
   isAlbumOffline: (albumId?: number | null) => boolean;
   isPlaylistOffline: (playlistId?: number | null) => boolean;
+  isCrateOffline: (crateId?: string | null) => boolean;
   toggleTrackOffline: (
     input: OfflineTrackInput,
   ) => Promise<"enabled" | "removed">;
@@ -48,6 +56,9 @@ export interface OfflineContextValue {
   ) => Promise<"enabled" | "removed">;
   togglePlaylistOffline: (
     input: OfflinePlaylistInput,
+  ) => Promise<"enabled" | "removed">;
+  toggleCrateOffline: (
+    input: OfflineCrateInput,
   ) => Promise<"enabled" | "removed">;
   syncAll: () => Promise<void>;
   clearActiveProfile: () => Promise<void>;

@@ -5,6 +5,8 @@
 @import "tailwindcss";
 @source ".";
 @source "../../shared/ui";
+@source "../node_modules/@ashishgogula/coverflow/dist";
+@source "../../../node_modules/@ashishgogula/coverflow/dist";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -135,6 +137,20 @@ textarea {
   user-select: auto;
 }
 
+.item-action-target {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@media (hover: none) {
+  .item-action-target,
+  .item-action-target * {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+}
+
 /* ── Listen-only: gradient backgrounds ── */
 :root {
   --listen-viewport-height: 100vh;
@@ -158,6 +174,12 @@ textarea {
       var(--listen-mobile-bottom-nav-content-height)
   );
   --listen-mobile-player-height: 4.125rem;
+  --listen-desktop-player-height: 5.125rem;
+  --listen-desktop-player-bottom-offset: 0.75rem;
+  --listen-desktop-player-clearance: calc(
+    var(--listen-desktop-player-height) +
+      var(--listen-desktop-player-bottom-offset) * 2
+  );
   --listen-mobile-player-gap: 0rem;
   --listen-mobile-bottom-chrome-height: calc(
     var(--listen-mobile-bottom-nav-height) + var(--listen-mobile-player-height) +
@@ -274,30 +296,55 @@ textarea {
 }
 
 .listen-player-progress-glow {
-  background: var(--control-progress-glow-horizontal);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-action) 0%, transparent) 0%,
+    color-mix(in srgb, var(--accent-action) 8%, transparent) 44%,
+    color-mix(in srgb, var(--accent-action) 28%, transparent) 82%,
+    color-mix(in srgb, var(--accent-action) 55%, var(--text-primary)) 100%
+  );
 }
 
 .listen-player-progress-glow--vertical {
-  background: var(--control-progress-glow-vertical);
+  background: linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--accent-action) 0%, transparent) 0%,
+    color-mix(in srgb, var(--accent-action) 8%, transparent) 38%,
+    color-mix(in srgb, var(--accent-action) 28%, transparent) 78%,
+    color-mix(in srgb, var(--accent-action) 55%, var(--text-primary)) 100%
+  );
 }
 
 .listen-player-progress-fill {
-  background: var(--control-progress-fill-horizontal);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-action) 14%, transparent),
+    color-mix(in srgb, var(--accent-action) 56%, transparent),
+    color-mix(in srgb, var(--accent-action) 78%, var(--text-primary))
+  );
 }
 
 .listen-player-progress-fill--vertical {
-  background: var(--control-progress-fill-vertical);
+  background: linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--accent-action) 14%, transparent),
+    color-mix(in srgb, var(--accent-action) 56%, transparent),
+    color-mix(in srgb, var(--accent-action) 78%, var(--text-primary))
+  );
 }
 
 .listen-player-progress-thumb {
   background: var(--control-thumb);
-  box-shadow: var(--control-thumb-shadow);
+  box-shadow:
+    0 0 6px color-mix(in srgb, var(--accent-action) 62%, transparent),
+    0 0 12px color-mix(in srgb, var(--accent-action) 34%, transparent);
 }
 
 .listen-player-progress-thumb-active {
   border-color: color-mix(in srgb, var(--accent-action) 80%, transparent);
   background: var(--control-thumb);
-  box-shadow: var(--control-thumb-ring-shadow);
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--accent-action) 14%, transparent);
 }
 
 .listen-player-progress-tooltip {
@@ -543,7 +590,8 @@ html[data-keyboard-open] select {
   ) !important;
   color: var(--text-primary) !important;
   border: 1px solid var(--border-quiet) !important;
-  box-shadow: var(--map-popup-shadow) !important;
+  box-shadow: 0 10px 30px
+    color-mix(in srgb, var(--surface-glass-shadow) 93.75%, transparent) !important;
   border-radius: 8px !important;
 }
 .leaflet-popup-content {

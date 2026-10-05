@@ -2,7 +2,6 @@ import type {
   HomeDiscoveryPayload,
   HomeHeroArtist,
   HomeRecommendedTrack,
-  HomeSectionId,
   HomeUpcomingInsight,
   HomeUpcomingItem,
   ReplayMix,
@@ -65,10 +64,34 @@ export function buildHomePageViewModel(
       upcomingAlbumKeys,
     ),
     homeInsights: (upcoming?.insights || []).slice(0, 2),
-    recommendedTracks: (currentDiscovery.recommended_tracks || []).map(
-      (item: HomeRecommendedTrack) => toTrackRowData(item),
+    recommendedTracks: dedupeTrackRows(
+      (currentDiscovery.recommended_tracks || []).map(
+        (item: HomeRecommendedTrack) => toTrackRowData(item),
+      ),
     ),
   };
+}
+
+function trackRowIdentity(track: ReturnType<typeof toTrackRowData>): string {
+  return String(
+    track.library_track_id ??
+      track.global_track_uid ??
+      track.entity_uid ??
+      track.path ??
+      [track.artist, track.album, track.title].join(":"),
+  );
+}
+
+export function dedupeTrackRows(
+  tracks: ReturnType<typeof toTrackRowData>[],
+): ReturnType<typeof toTrackRowData>[] {
+  const seen = new Set<string>();
+  return tracks.filter((track) => {
+    const identity = trackRowIdentity(track);
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
 }
 
 export function toPlayerTrack(item: HomeRecommendedTrack): Track {
@@ -89,10 +112,6 @@ export function toPlayerTrack(item: HomeRecommendedTrack): Track {
           ) || undefined
         : undefined,
   });
-}
-
-export function homeSectionPath(sectionId: HomeSectionId): string {
-  return `/home/section/${sectionId}`;
 }
 
 export function homePlaylistPath(playlistId: string): string {

@@ -1,7 +1,8 @@
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
+import { SectionHeader } from "@crate/ui/domain/lists";
 
 import { EditorialPlaylistArtwork } from "@/components/playlists/EditorialPlaylistArtwork";
-import { SectionHeader } from "@/components/home/HomeSections";
 import { cn } from "@/lib/utils";
 
 import type { HomeListeningHistoryCard } from "./home-model";
@@ -15,24 +16,33 @@ const HISTORY_TONES = [
   "home-history-tone-6",
 ];
 
-function historyLabel(item: HomeListeningHistoryCard): string {
-  if (item.kind === "all_time") return "MY MOST LISTENED";
+function historyLabel(
+  item: HomeListeningHistoryCard,
+  t: TFunction,
+  locale: string,
+): string {
+  if (item.kind === "all_time") {
+    return t("home.history.allTimeLabel").toLocaleUpperCase(locale);
+  }
   return item.period_label;
 }
 
-function historyKicker(item: HomeListeningHistoryCard): string {
-  if (item.kind === "all_time") return "Crate History";
+function historyKicker(item: HomeListeningHistoryCard, t: TFunction): string {
+  if (item.kind === "all_time") return t("home.history.crateKicker");
   const date = new Date(`${item.period_start}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return "Listening History";
+  if (Number.isNaN(date.getTime())) return t("home.history.fallbackKicker");
   return String(date.getFullYear());
 }
 
-function historyDisplayTitle(item: HomeListeningHistoryCard): string {
+function historyDisplayTitle(
+  item: HomeListeningHistoryCard,
+  locale: string,
+): string {
   if (item.kind === "all_time") return item.title;
   if (item.title !== "My Most Listened") return item.title;
   const date = new Date(`${item.period_start}T12:00:00`);
   if (Number.isNaN(date.getTime())) return item.title;
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(locale, {
     month: "long",
     year: "numeric",
   });
@@ -89,7 +99,8 @@ function ListeningHistoryCard({
   index: number;
   onOpen: (item: HomeListeningHistoryCard) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language;
   const artists =
     item.subtitle || t("home.sections.listeningDna.defaultSubtitle");
 
@@ -100,8 +111,8 @@ function ListeningHistoryCard({
       className="group w-[min(42vw,13rem)] shrink-0 touch-manipulation text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-canvas lg:w-56"
     >
       <EditorialPlaylistArtwork
-        title={historyLabel(item)}
-        kicker={historyKicker(item)}
+        title={historyLabel(item, t, locale)}
+        kicker={historyKicker(item, t)}
         tracks={item.artwork_tracks}
         variant="history"
         className={cn(
@@ -116,12 +127,12 @@ function ListeningHistoryCard({
       />
       <div className="mt-2.5 flex min-h-[5.4rem] flex-col">
         <div className="truncate text-sm font-black tracking-[-0.035em] text-text-primary">
-          {historyDisplayTitle(item)}
+          {historyDisplayTitle(item, locale)}
         </div>
         <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-text-muted">
           {artists}
         </p>
-        <div className="home-history-meta mt-auto text-xs font-bold uppercase tracking-[0.14em]">
+        <div className="home-history-meta mt-auto text-xs font-bold uppercase tracking-caps">
           {t("common.playCount", { count: item.play_count })} ·{" "}
           {formatHistoryMinutes(item.minutes_listened)}
         </div>

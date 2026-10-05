@@ -1,9 +1,10 @@
-import { ListMusic, Play, Save, X } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, ListMusic, Play, Save } from "@crate/ui/icons";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { AppModal } from "@crate/ui/primitives/AppModal";
+import { Button } from "@crate/ui/shadcn/button";
 import { api } from "@/lib/api";
 
 interface SetlistTrack {
@@ -40,9 +41,9 @@ export function ArtistSetlistModal({
     setSaving(true);
     try {
       await api(`/api/artists/${artistId}/setlist-playlist`, "POST");
-      toast.success(t("artist.setlist.toasts.exported"));
+      notify.success(t("artist.setlist.toasts.exported"));
     } catch {
-      toast.error(t("artist.setlist.toasts.exportFailed"));
+      notify.error(t("artist.setlist.toasts.exportFailed"));
     } finally {
       setSaving(false);
     }
@@ -57,35 +58,26 @@ export function ArtistSetlistModal({
     <AppModal
       open={open}
       onClose={onClose}
+      title={
+        <span className="flex items-center gap-2">
+          <ListMusic
+            size={CRATE_ICON_SIZE.md}
+            className="shrink-0 text-accent-action"
+          />
+          {t("artist.setlist.title")}
+        </span>
+      }
+      description={`${artistName} · ${t("artist.setlist.songCount", {
+        count: setlist.length,
+      })}`}
+      closeLabel={t("common.close")}
+      headerClassName="border-text-primary/5 bg-transparent"
       maxWidthClassName="max-w-md"
       mobileSafeArea
       overlayClassName="bg-surface-canvas/58"
       panelClassName="listen-glass-panel flex min-h-0 flex-col overflow-hidden border-0 pb-4 sm:max-h-[92vh]"
     >
       <div className="flex min-h-0 flex-1 flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-text-primary/5 px-5 py-4">
-          <div className="flex items-center gap-3">
-            <ListMusic size={18} className="text-accent-action" />
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary">
-                {t("artist.setlist.title")}
-              </h3>
-              <p className="text-xs text-text-muted">
-                {artistName} ·{" "}
-                {t("artist.setlist.songCount", { count: setlist.length })}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-full p-1.5 text-text-primary/40 transition-colors hover:bg-text-primary/10 hover:text-text-primary"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* Track list */}
         <div className="flex-1 overflow-y-auto p-2 ">
           {setlist.map((track, i) => (
             <div
@@ -125,23 +117,25 @@ export function ArtistSetlistModal({
           ))}
         </div>
 
-        {/* Actions */}
         <div className="flex gap-2 border-t border-text-primary/5 px-5 py-4">
-          <button
+          <Button
+            variant="secondary"
             onClick={handlePlay}
-            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-accent-action/15 py-2.5 text-sm font-medium text-accent-action transition-colors hover:bg-accent-action/25"
+            className="flex-1 rounded-lg bg-accent-action/15 text-accent-action hover:bg-accent-action/25"
           >
-            <Play size={14} fill="currentColor" />
+            <Play size={CRATE_ICON_SIZE.xs} fill="currentColor" />
             {t("artist.setlist.play")}
-          </button>
-          <button
-            onClick={handleExport}
-            disabled={saving || !artistId}
-            className="flex items-center justify-center gap-2 rounded-lg border border-border-quiet px-4 py-2.5 text-sm text-text-primary transition-colors hover:bg-text-primary/5 disabled:opacity-40"
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => void handleExport()}
+            loading={saving}
+            disabled={!artistId}
+            className="rounded-lg"
           >
-            <Save size={14} />
+            {saving ? null : <Save size={CRATE_ICON_SIZE.xs} />}
             {saving ? t("common.saving") : t("artist.setlist.export")}
-          </button>
+          </Button>
         </div>
       </div>
     </AppModal>

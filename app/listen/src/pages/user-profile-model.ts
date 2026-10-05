@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next";
+import type { CrateBadgeTone } from "@crate/ui/primitives/CrateBadge";
 import type { PublicCrate } from "@/pages/crates-types";
 
 export interface RelationshipState {
@@ -108,18 +109,18 @@ export function affinityTone(band?: string) {
   }
 }
 
-export function badgeTone(tone: string) {
+export function badgeTone(tone: string): CrateBadgeTone {
   switch (tone) {
     case "gold":
-      return "user-profile-badge-gold";
+      return "warning";
     case "green":
-      return "user-profile-badge-green";
+      return "success";
     case "rose":
-      return "user-profile-badge-rose";
+      return "danger";
     case "cyan":
-      return "user-profile-badge-cyan";
+      return "accent";
     default:
-      return "user-profile-badge-neutral";
+      return "neutral";
   }
 }
 

@@ -1,4 +1,4 @@
-import { Loader2 } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
 
 import type { AuthUser } from "@/contexts/auth-context";
 import { PeopleSearch } from "@/pages/PeopleSearch";
@@ -37,7 +37,7 @@ export function PeopleContent({
       />
       {loading ? (
         <div className="flex items-center justify-center py-6 text-text-muted">
-          <Loader2 size={18} className="animate-spin" />
+          <Loader2 size={CRATE_ICON_SIZE.md} className="animate-spin" />
         </div>
       ) : null}
     </div>

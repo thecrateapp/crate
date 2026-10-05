@@ -1,182 +1,107 @@
-import { useReducer, useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  ArrowLeft,
+  CRATE_ICON_SIZE,
   ChevronDown,
   ChevronUp,
-  Copy,
   Disc3,
+  GripVertical,
   Loader2,
   Trash2,
-  Users,
-  X,
 } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { notify } from "@crate/ui/lib/notify";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
+import {
+  AppModal,
+  ModalBody,
+  ModalFooter,
+} from "@crate/ui/primitives/AppModal";
+import { IconButton } from "@crate/ui/primitives/IconButton";
+import { Button } from "@crate/ui/shadcn/button";
 
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { CrateAlbumPicker } from "@/components/CrateAlbumPicker";
+import {
+  CrateForm,
+  crateFormPayload,
+  crateFormValuesFromCrate,
+  isCrateFormValid,
+  type CrateFormValues,
+} from "@/components/crates/CrateForm";
 import type {
   CatalogAlbum,
   CrateAlbum,
   CrateDetail,
-  CrateMember,
 } from "@/pages/crates-types";
 
 interface CrateEditorProps {
-  crateId: string | null;
+  crateId: string;
   onBack: () => void;
-  onCreated: (crateId: string) => void;
   onDeleted: () => void;
 }
 
-interface CreateResponse {
-  id: string;
-}
+const EDITOR_FORM_ID = "crate-editor-form";
 
-interface InviteResponse {
-  join_url: string;
-}
-
-export function CrateEditor({
-  crateId,
-  onBack,
-  onCreated,
-  onDeleted,
-}: CrateEditorProps) {
+export function CrateEditor({ crateId, onBack, onDeleted }: CrateEditorProps) {
   const { t } = useTranslation();
   const {
     data: crate,
     loading,
     error,
-  } = useApi<CrateDetail>(crateId ? `/api/crates/${crateId}` : null);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [creating, setCreating] = useState(false);
-
-  if (crateId === null) {
-    async function createCrate(event: FormEvent<HTMLFormElement>) {
-      event.preventDefault();
-      const trimmedName = name.trim();
-      if (!trimmedName) return;
-
-      setCreating(true);
-      try {
-        const result = await api<CreateResponse>("/api/crates", "POST", {
-          name: trimmedName,
-          description: description.trim(),
-          is_collaborative: false,
-        });
-        toast.success(t("library.crates.created"));
-        onCreated(result.id);
-      } catch {
-        toast.error(t("library.crates.createFailed"));
-      } finally {
-        setCreating(false);
-      }
-    }
-
-    return (
-      <section className="mx-auto w-full max-w-2xl space-y-5">
-        <EditorHeader title={t("library.crates.createTitle")} onBack={onBack} />
-        <form onSubmit={createCrate} className="space-y-4">
-          <TextField
-            label={t("common.name")}
-            value={name}
-            onChange={setName}
-            maxLength={120}
-            required
-          />
-          <TextField
-            label={t("library.crates.description")}
-            value={description}
-            onChange={setDescription}
-            multiline
-            maxLength={2000}
-          />
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <SecondaryButton onClick={onBack}>
-              {t("common.cancel")}
-            </SecondaryButton>
-            <PrimaryButton disabled={creating || !name.trim()} type="submit">
-              {creating ? <Loader2 size={16} className="animate-spin" /> : null}
-              {t("library.crates.create")}
-            </PrimaryButton>
-          </div>
-        </form>
-      </section>
-    );
-  }
+  } = useApi<CrateDetail>(`/api/crates/${crateId}`);
 
   if (loading || !crate) {
     return (
-      <div className="space-y-4">
-        <EditorHeader title={t("library.crates.title")} onBack={onBack} />
-        {error ? (
-          <p
-            role="alert"
-            className="py-12 text-center text-sm text-state-danger"
-          >
-            {t("library.crates.loadFailed")}
-          </p>
-        ) : (
-          <div className="flex justify-center py-12">
-            <Loader2 size={24} className="animate-spin text-accent-action" />
-          </div>
-        )}
-      </div>
+      <AppModal
+        open
+        onClose={onBack}
+        size="xl"
+        title={t("library.crates.title")}
+        closeLabel={t("common.close")}
+        headerClassName="bg-transparent"
+        panelClassName="listen-glass-panel flex flex-col border-border-quiet"
+      >
+        <section className="flex min-h-0 flex-col">
+          <ModalBody className="p-5">
+            {error ? (
+              <p
+                role="alert"
+                className="py-12 text-center text-sm text-state-danger"
+              >
+                {t("library.crates.loadFailed")}
+              </p>
+            ) : (
+              <div className="flex justify-center py-12">
+                <Loader2
+                  size={CRATE_ICON_SIZE.xl}
+                  className="animate-spin text-accent-action"
+                />
+              </div>
+            )}
+          </ModalBody>
+        </section>
+      </AppModal>
     );
   }
 
-  // The form owns an editable draft; a changed server snapshot resets it.
   return (
     <CrateEditorForm
-      key={crateEditorSnapshotKey(crate)}
+      key={crate.id}
       crate={crate}
       onBack={onBack}
       onDeleted={onDeleted}
     />
   );
-}
-
-interface CrateDraft {
-  name: string;
-  description: string;
-  visibility: CrateDetail["visibility"];
-  collaborative: boolean;
-  collaborationSaved: boolean;
-  albums: CrateAlbum[];
-}
-
-type CrateDraftUpdate =
-  | Partial<CrateDraft>
-  | ((draft: CrateDraft) => Partial<CrateDraft>);
-
-function createCrateDraft(crate: CrateDetail): CrateDraft {
-  return {
-    name: crate.name,
-    description: crate.description ?? "",
-    visibility: crate.visibility,
-    collaborative: crate.is_collaborative,
-    collaborationSaved: crate.is_collaborative,
-    albums: crate.albums,
-  };
-}
-
-function crateDraftReducer(
-  draft: CrateDraft,
-  update: CrateDraftUpdate,
-): CrateDraft {
-  return {
-    ...draft,
-    ...(typeof update === "function" ? update(draft) : update),
-  };
-}
-
-function crateEditorSnapshotKey(crate: CrateDetail): string {
-  return JSON.stringify(crate) ?? crate.id;
 }
 
 function CrateEditorForm({
@@ -190,44 +115,30 @@ function CrateEditorForm({
 }) {
   const { t } = useTranslation();
   const isOwner = crate.access === "owner";
-  const [draft, updateDraft] = useReducer(
-    crateDraftReducer,
-    crate,
-    createCrateDraft,
+  const [values, setValues] = useState<CrateFormValues>(() =>
+    crateFormValuesFromCrate(crate),
   );
-  const {
-    name,
-    description,
-    visibility,
-    collaborative,
-    collaborationSaved,
-    albums,
-  } = draft;
+  const [albums, setAlbums] = useState<CrateAlbum[]>(crate.albums);
   const [saving, setSaving] = useState(false);
-  const [inviteLink, setInviteLink] = useState<string | null>(null);
-  const [inviteBusy, setInviteBusy] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState(false);
-  const membersUrl =
-    isOwner && collaborative ? `/api/crates/${crate.id}/members` : null;
-  const { data: members, refetch: refetchMembers } =
-    useApi<CrateMember[]>(membersUrl);
+  const [deleting, setDeleting] = useState(false);
+  const isOrdered = values.ordering !== "none";
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const trimmedName = name.trim();
-    if (!trimmedName) return;
+    if (!isCrateFormValid(values)) return;
 
     setSaving(true);
     try {
-      await api(`/api/crates/${crate.id}`, "PUT", {
-        name: trimmedName,
-        description: description.trim(),
-        ...(isOwner ? { visibility, is_collaborative: collaborative } : {}),
-      });
-      if (isOwner) updateDraft({ collaborationSaved: collaborative });
-      toast.success(t("library.crates.saved"));
+      await api(
+        `/api/crates/${crate.id}`,
+        "PUT",
+        crateFormPayload(values, isOwner),
+      );
+      notify.success(t("library.crates.saved"));
+      onBack();
     } catch {
-      toast.error(t("library.crates.saveFailed"));
+      notify.error(t("library.crates.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -243,10 +154,14 @@ function CrateEditorForm({
         "POST",
         { global_album_uid: uid },
       );
-      updateDraft((current) => ({ albums: [...current.albums, added] }));
-      toast.success(t("library.crates.albumAdded"));
-    } catch {
-      toast.error(t("library.crates.albumAddFailed"));
+      setAlbums((current) => [...current, added]);
+      notify.success(t("library.crates.albumAdded"));
+    } catch (error) {
+      notify.error(
+        (error as { status?: number }).status === 409
+          ? t("library.crates.albumAlreadyInCrate", { name: crate.name })
+          : t("library.crates.albumAddFailed"),
+      );
     }
   }
 
@@ -258,80 +173,66 @@ function CrateEditorForm({
         )}`,
         "DELETE",
       );
-      updateDraft((current) => ({
-        albums: current.albums.filter(
+      setAlbums((current) =>
+        current.filter(
           (item) => item.global_album_uid !== album.global_album_uid,
         ),
-      }));
+      );
     } catch {
-      toast.error(t("library.crates.albumRemoveFailed"));
+      notify.error(t("library.crates.albumRemoveFailed"));
     }
   }
 
-  async function moveAlbum(index: number, direction: -1 | 1) {
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= albums.length) return;
+  async function reorderAlbums(fromIndex: number, targetIndex: number) {
+    if (
+      fromIndex < 0 ||
+      targetIndex < 0 ||
+      fromIndex >= albums.length ||
+      targetIndex >= albums.length ||
+      fromIndex === targetIndex
+    ) {
+      return;
+    }
+
     const reordered = [...albums];
-    [reordered[index], reordered[targetIndex]] = [
-      reordered[targetIndex]!,
-      reordered[index]!,
-    ];
+    const [movedAlbum] = reordered.splice(fromIndex, 1);
+    if (!movedAlbum) return;
+    reordered.splice(targetIndex, 0, movedAlbum);
+
     try {
       await api(`/api/crates/${crate.id}/albums/order`, "PUT", {
         global_album_uids: reordered.map((album) => album.global_album_uid),
       });
-      updateDraft({
-        albums: reordered.map((album, position) => ({ ...album, position })),
-      });
+      setAlbums(reordered.map((album, position) => ({ ...album, position })));
     } catch {
-      toast.error(t("library.crates.reorderFailed"));
+      notify.error(t("library.crates.reorderFailed"));
     }
   }
 
-  async function createInvite() {
-    setInviteBusy(true);
-    try {
-      const invite = await api<InviteResponse>(
-        `/api/crates/${crate.id}/invites`,
-        "POST",
-        {},
-      );
-      setInviteLink(
-        new URL(invite.join_url, window.location.origin).toString(),
-      );
-    } catch {
-      toast.error(t("library.crates.inviteFailed"));
-    } finally {
-      setInviteBusy(false);
-    }
+  function moveAlbum(index: number, direction: -1 | 1) {
+    void reorderAlbums(index, index + direction);
   }
 
-  async function copyInvite() {
-    if (!inviteLink || !navigator.clipboard) return;
-    try {
-      await navigator.clipboard.writeText(inviteLink);
-      toast.success(t("share.toasts.linkCopied"));
-    } catch {
-      toast.error(t("share.toasts.copyFailed"));
-    }
-  }
-
-  async function removeMember(userId: number) {
-    try {
-      await api(`/api/crates/${crate.id}/members/${userId}`, "DELETE");
-      refetchMembers();
-    } catch {
-      toast.error(t("library.crates.memberRemoveFailed"));
-    }
+  function handleAlbumDragEnd({ active, over }: DragEndEvent) {
+    if (!over || active.id === over.id) return;
+    const fromIndex = albums.findIndex(
+      (album) => album.global_album_uid === String(active.id),
+    );
+    const targetIndex = albums.findIndex(
+      (album) => album.global_album_uid === String(over.id),
+    );
+    void reorderAlbums(fromIndex, targetIndex);
   }
 
   async function deleteCrate() {
+    setDeleting(true);
     try {
       await api(`/api/crates/${crate.id}`, "DELETE");
-      toast.success(t("library.crates.deleted"));
+      notify.success(t("library.crates.deleted"));
       onDeleted();
     } catch {
-      toast.error(t("library.crates.deleteFailed"));
+      notify.error(t("library.crates.deleteFailed"));
+      setDeleting(false);
     }
   }
 
@@ -340,224 +241,141 @@ function CrateEditorForm({
   );
 
   return (
-    <section className="mx-auto w-full max-w-3xl space-y-5">
-      <EditorHeader title={crate.name} onBack={onBack} />
+    <AppModal
+      open
+      onClose={onBack}
+      size="xl"
+      title={<span className="block truncate">{crate.name}</span>}
+      closeLabel={t("common.close")}
+      closeOnEscape={!deleteConfirmation}
+      headerClassName="bg-transparent"
+      panelClassName="listen-glass-panel flex flex-col border-border-quiet"
+    >
+      <section className="flex min-h-0 flex-col">
+        <ModalBody className="space-y-5 p-5">
+          <CrateForm
+            id={EDITOR_FORM_ID}
+            values={values}
+            isOwner={isOwner}
+            onChange={(patch) =>
+              setValues((current) => ({ ...current, ...patch }))
+            }
+            onSubmit={(event) => void save(event)}
+          />
 
-      <form onSubmit={save} className="space-y-4">
-        <TextField
-          label={t("common.name")}
-          value={name}
-          onChange={(value) => updateDraft({ name: value })}
-          maxLength={120}
-          required
-        />
-        <TextField
-          label={t("library.crates.description")}
-          value={description}
-          onChange={(value) => updateDraft({ description: value })}
-          multiline
-          maxLength={2000}
-        />
-
-        {isOwner && (
-          <div className="grid gap-4 rounded-xl border border-border-quiet bg-text-primary/[0.025] p-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-2 text-sm font-medium text-text-primary">
-              {t("library.crates.visibility")}
-              <select
-                aria-label={t("library.crates.visibility")}
-                value={visibility}
-                onChange={(event) =>
-                  updateDraft({
-                    visibility: event.target.value as "public" | "private",
-                  })
-                }
-                className="h-11 rounded-lg border border-border-quiet bg-text-primary/[0.04] px-3 text-sm text-text-primary outline-none focus:border-accent-action/60"
-              >
-                <option value="private">{t("library.crates.private")}</option>
-                <option value="public">{t("library.crates.public")}</option>
-              </select>
-            </label>
-            <label className="flex min-h-11 items-center gap-3 self-end rounded-lg bg-text-primary/[0.035] px-3 py-2 text-sm text-text-primary">
-              <input
-                type="checkbox"
-                checked={collaborative}
-                onChange={(event) => {
-                  updateDraft({
-                    collaborative: event.target.checked,
-                    collaborationSaved: false,
-                  });
-                  setInviteLink(null);
-                }}
-                className="size-4 accent-primary"
-              />
-              <Users size={16} className="text-accent-action" />
-              {t("library.crates.allowCollaboration")}
-            </label>
-          </div>
-        )}
-
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <SecondaryButton onClick={onBack}>
-            {t("common.cancel")}
-          </SecondaryButton>
-          <PrimaryButton disabled={saving || !name.trim()} type="submit">
-            {saving ? <Loader2 size={16} className="animate-spin" /> : null}
-            {t("common.save")}
-          </PrimaryButton>
-        </div>
-      </form>
-
-      {isOwner && collaborative && (
-        <section className="space-y-3 rounded-xl border border-border-quiet bg-text-primary/[0.025] p-4">
-          <div>
-            <h2 className="font-semibold text-text-primary">
-              {t("library.crates.collaborators")}
-            </h2>
-            <p className="mt-1 text-sm text-text-muted">
-              {t("library.crates.inviteDescription")}
-            </p>
-            {!collaborationSaved && (
-              <p className="mt-1 text-xs text-text-muted">
-                {t("library.crates.saveBeforeInvite")}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            disabled={inviteBusy || !collaborationSaved}
-            onClick={() => void createInvite()}
-            className="flex min-h-11 items-center gap-2 rounded-lg bg-text-primary/8 px-4 py-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-text-primary/12 disabled:opacity-50"
-          >
-            {inviteBusy ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Users size={16} />
-            )}
-            {t("library.crates.createInvite")}
-          </button>
-          {inviteLink && (
-            <div className="flex gap-2">
-              <input
-                aria-label={t("library.crates.inviteLink")}
-                readOnly
-                value={inviteLink}
-                className="h-10 min-w-0 flex-1 rounded-lg border border-border-quiet bg-text-primary/[0.04] px-3 text-sm text-text-muted"
-              />
-              <button
-                type="button"
-                aria-label={t("share.copyLink")}
-                onClick={() => void copyInvite()}
-                className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-text-primary/8 text-text-primary hover:bg-text-primary/12"
-              >
-                <Copy size={16} />
-              </button>
-            </div>
-          )}
-          {members?.map((member) => (
-            <div
-              key={member.user_id}
-              className="flex items-center justify-between gap-3 rounded-lg bg-text-primary/[0.035] px-3 py-2"
-            >
-              <span className="truncate text-sm text-text-primary">
-                {member.display_name || member.username || `#${member.user_id}`}
+          <section className="space-y-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="text-lg font-semibold text-text-primary">
+                {t("library.crates.albums")}
+              </h2>
+              <span className="text-sm text-text-muted">
+                {t("common.albumCountLabel", { count: albums.length })}
               </span>
-              <button
-                type="button"
-                aria-label={t("library.crates.removeMember", {
-                  name:
-                    member.display_name || member.username || member.user_id,
-                })}
-                onClick={() => void removeMember(member.user_id)}
-                className="flex size-9 shrink-0 items-center justify-center rounded-full text-text-muted hover:bg-text-primary/8 hover:text-state-danger"
-              >
-                <X size={16} />
-              </button>
             </div>
-          ))}
-        </section>
-      )}
-
-      <section className="space-y-3">
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 className="text-lg font-semibold text-text-primary">
-            {t("library.crates.albums")}
-          </h2>
-          <span className="text-sm text-text-muted">
-            {t("common.albumCountLabel", { count: albums.length })}
-          </span>
-        </div>
-        {albums.length > 0 ? (
-          <ol className="divide-y divide-text-primary/6 overflow-hidden rounded-xl border border-border-quiet bg-text-primary/[0.025]">
-            {albums.map((album, index) => (
-              <CrateAlbumRow
-                key={album.global_album_uid}
-                album={album}
-                index={index}
-                total={albums.length}
-                onMove={moveAlbum}
-                onRemove={() => void removeAlbum(album)}
-              />
-            ))}
-          </ol>
-        ) : (
-          <div className="rounded-xl border border-dashed border-border-quiet px-4 py-8 text-center text-sm text-text-muted">
-            {t("library.crates.noAlbums")}
-          </div>
-        )}
-        <CrateAlbumPicker
-          existingAlbumUids={existingAlbumUids}
-          onAdd={addAlbum}
-        />
-      </section>
-
-      {isOwner && (
-        <section className="border-t border-border-quiet pt-5">
-          {deleteConfirmation ? (
-            <div className="space-y-3 rounded-xl border border-state-danger/20 bg-state-danger/5 p-4">
-              <p className="text-sm text-text-primary">
-                {t("library.crates.deleteConfirmation", { name: crate.name })}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => void deleteCrate()}
-                  className="rounded-lg bg-state-danger px-4 py-2 text-sm font-medium text-state-danger-foreground hover:bg-state-danger/90"
+            {albums.length > 0 ? (
+              <ol className="divide-y divide-text-primary/6 overflow-hidden rounded-xl border border-border-quiet bg-text-primary/[0.025]">
+                <DndContext
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleAlbumDragEnd}
                 >
-                  {t("library.crates.confirmDelete")}
-                </button>
-                <SecondaryButton onClick={() => setDeleteConfirmation(false)}>
-                  {t("common.cancel")}
-                </SecondaryButton>
+                  <SortableContext
+                    items={albums.map((album) => album.global_album_uid)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {albums.map((album, index) => (
+                      <SortableCrateAlbumRow
+                        key={album.global_album_uid}
+                        album={album}
+                        index={index}
+                        total={albums.length}
+                        reorderable={isOrdered}
+                        onMove={moveAlbum}
+                        onRemove={() => void removeAlbum(album)}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              </ol>
+            ) : (
+              <div className="rounded-xl border border-dashed border-border-quiet px-4 py-8 text-center text-sm text-text-muted">
+                {t("library.crates.noAlbums")}
               </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setDeleteConfirmation(true)}
-              className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm text-state-danger transition-colors hover:bg-state-danger/8"
-            >
-              <Trash2 size={15} />
-              {t("library.crates.delete")}
-            </button>
+            )}
+            <CrateAlbumPicker
+              existingAlbumUids={existingAlbumUids}
+              onAdd={addAlbum}
+            />
+          </section>
+
+          {isOwner && (
+            <section className="border-t border-border-quiet pt-5">
+              <Button
+                variant="ghost"
+                onClick={() => setDeleteConfirmation(true)}
+                className="text-state-danger hover:text-state-danger"
+              >
+                <Trash2 size={CRATE_ICON_SIZE.sm} />
+                {t("library.crates.delete")}
+              </Button>
+              <ConfirmDialog
+                open={deleteConfirmation}
+                tone="danger"
+                pending={deleting}
+                title={t("library.crates.delete")}
+                body={t("library.crates.deleteConfirmation", {
+                  name: crate.name,
+                })}
+                confirmLabel={t("library.crates.confirmDelete")}
+                cancelLabel={t("common.cancel")}
+                closeLabel={t("common.close")}
+                onCancel={() => setDeleteConfirmation(false)}
+                onConfirm={() => void deleteCrate()}
+              />
+            </section>
           )}
-        </section>
-      )}
-    </section>
+        </ModalBody>
+        <ModalFooter className="flex items-center justify-end gap-3 bg-transparent px-5 py-4">
+          <Button variant="ghost" onClick={onBack}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            type="submit"
+            form={EDITOR_FORM_ID}
+            loading={saving}
+            disabled={!isCrateFormValid(values)}
+          >
+            {t("common.save")}
+          </Button>
+        </ModalFooter>
+      </section>
+    </AppModal>
   );
+}
+
+function SortableCrateAlbumRow(props: CrateAlbumRowProps) {
+  const sortable = useSortable({ id: props.album.global_album_uid });
+  return <CrateAlbumRow {...props} sortable={sortable} />;
+}
+
+interface CrateAlbumRowProps {
+  album: CrateAlbum;
+  index: number;
+  total: number;
+  reorderable: boolean;
+  onMove: (index: number, direction: -1 | 1) => void;
+  onRemove: () => void;
 }
 
 function CrateAlbumRow({
   album,
   index,
   total,
+  reorderable,
   onMove,
   onRemove,
-}: {
-  album: CrateAlbum;
-  index: number;
-  total: number;
-  onMove: (index: number, direction: -1 | 1) => void;
-  onRemove: () => void;
+  sortable,
+}: CrateAlbumRowProps & {
+  sortable: ReturnType<typeof useSortable>;
 }) {
   const { t } = useTranslation();
   const cover = albumCoverApiUrl(
@@ -569,8 +387,29 @@ function CrateAlbumRow({
     { size: 128 },
   );
 
+  const style = {
+    transform: CSS.Transform.toString(sortable.transform),
+    transition: sortable.transition,
+    opacity: sortable.isDragging ? 0.55 : 1,
+  };
+
   return (
-    <li className="flex items-center gap-3 px-3 py-2.5">
+    <li
+      ref={sortable.setNodeRef}
+      style={style}
+      className="flex items-center gap-3 px-3 py-2.5"
+    >
+      {reorderable ? (
+        <IconButton
+          {...sortable.attributes}
+          {...sortable.listeners}
+          label={t("library.crates.dragAlbum", { name: album.name })}
+          size="sm"
+          className="size-6 cursor-grab touch-none text-text-muted/60 hover:translate-y-0 hover:text-text-primary hover:drop-shadow-none active:cursor-grabbing"
+        >
+          <GripVertical size={CRATE_ICON_SIZE.sm} />
+        </IconButton>
+      ) : null}
       <div className="size-12 shrink-0 overflow-hidden rounded-md bg-text-primary/5">
         {album.has_cover ? (
           <CrateImage
@@ -581,7 +420,7 @@ function CrateAlbumRow({
           />
         ) : (
           <div className="flex size-full items-center justify-center text-text-primary/30">
-            <Disc3 size={20} />
+            <Disc3 size={CRATE_ICON_SIZE.lg} />
           </div>
         )}
       </div>
@@ -595,137 +434,35 @@ function CrateAlbumRow({
         </p>
       </div>
       <div className="flex shrink-0 items-center">
-        <button
-          type="button"
-          aria-label={t("library.crates.moveAlbumUp", { name: album.name })}
-          disabled={index === 0}
-          onClick={() => onMove(index, -1)}
-          className="flex size-9 items-center justify-center rounded-full text-text-muted hover:bg-text-primary/8 hover:text-text-primary disabled:opacity-25"
-        >
-          <ChevronUp size={17} />
-        </button>
-        <button
-          type="button"
-          aria-label={t("library.crates.moveAlbumDown", { name: album.name })}
-          disabled={index === total - 1}
-          onClick={() => onMove(index, 1)}
-          className="flex size-9 items-center justify-center rounded-full text-text-muted hover:bg-text-primary/8 hover:text-text-primary disabled:opacity-25"
-        >
-          <ChevronDown size={17} />
-        </button>
-        <button
-          type="button"
-          aria-label={t("library.crates.removeAlbum", { name: album.name })}
+        {reorderable ? (
+          <>
+            <IconButton
+              label={t("library.crates.moveAlbumUp", { name: album.name })}
+              className="size-9 disabled:opacity-25"
+              disabled={index === 0}
+              onClick={() => onMove(index, -1)}
+            >
+              <ChevronUp size={CRATE_ICON_SIZE.md} />
+            </IconButton>
+            <IconButton
+              label={t("library.crates.moveAlbumDown", { name: album.name })}
+              className="size-9 disabled:opacity-25"
+              disabled={index === total - 1}
+              onClick={() => onMove(index, 1)}
+            >
+              <ChevronDown size={CRATE_ICON_SIZE.md} />
+            </IconButton>
+          </>
+        ) : null}
+        <IconButton
+          label={t("library.crates.removeAlbum", { name: album.name })}
+          size="sm"
+          className="size-9 hover:text-state-danger hover:drop-shadow-none"
           onClick={onRemove}
-          className="flex size-9 items-center justify-center rounded-full text-text-muted hover:bg-text-primary/8 hover:text-state-danger"
         >
-          <Trash2 size={15} />
-        </button>
+          <Trash2 size={CRATE_ICON_SIZE.sm} />
+        </IconButton>
       </div>
     </li>
-  );
-}
-
-function EditorHeader({
-  title,
-  onBack,
-}: {
-  title: string;
-  onBack: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <header className="flex min-h-11 items-center gap-3">
-      <button
-        type="button"
-        aria-label={t("common.back")}
-        onClick={onBack}
-        className="flex size-10 shrink-0 items-center justify-center rounded-full text-text-muted hover:bg-text-primary/8 hover:text-text-primary"
-      >
-        <ArrowLeft size={18} />
-      </button>
-      <h1 className="min-w-0 truncate text-xl font-bold text-text-primary">
-        {title}
-      </h1>
-    </header>
-  );
-}
-
-function TextField({
-  label,
-  value,
-  onChange,
-  maxLength,
-  multiline = false,
-  required = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  maxLength: number;
-  multiline?: boolean;
-  required?: boolean;
-}) {
-  const className =
-    "w-full rounded-lg border border-border-quiet bg-text-primary/[0.04] px-3 py-2.5 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-accent-action/60";
-  return (
-    <label className="flex flex-col gap-2 text-sm font-medium text-text-primary">
-      {label}
-      {multiline ? (
-        <textarea
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          maxLength={maxLength}
-          rows={3}
-          className={`${className} resize-y`}
-        />
-      ) : (
-        <input
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          maxLength={maxLength}
-          required={required}
-          className={`${className} h-11`}
-        />
-      )}
-    </label>
-  );
-}
-
-function PrimaryButton({
-  children,
-  disabled,
-  type = "button",
-}: {
-  children: ReactNode;
-  disabled?: boolean;
-  type?: "button" | "submit";
-}) {
-  return (
-    <button
-      type={type}
-      disabled={disabled}
-      className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent-action px-4 py-2.5 text-sm font-semibold text-accent-action-foreground transition-colors hover:bg-accent-action/90 disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      {children}
-    </button>
-  );
-}
-
-function SecondaryButton({
-  children,
-  onClick,
-}: {
-  children: ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex min-h-11 items-center justify-center rounded-lg bg-text-primary/6 px-4 py-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-text-primary/10"
-    >
-      {children}
-    </button>
   );
 }

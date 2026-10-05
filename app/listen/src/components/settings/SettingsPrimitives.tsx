@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
+
+import { Switch } from "@crate/ui/primitives/Switch";
 
 export function Section({
   title,
@@ -10,7 +12,7 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="settings-section rounded-[12px] p-5 sm:p-6">
+    <section className="settings-section rounded-panel p-5 sm:p-6">
       <div className="mb-5">
         <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
         {description ? (
@@ -65,7 +67,6 @@ export function RangeRow({
         max={max}
         step={step}
         value={value}
-        disabled={disabled}
         onChange={(event) => onChange(Number(event.target.value))}
         className="settings-range w-full disabled:cursor-not-allowed"
       />
@@ -84,33 +85,27 @@ export function ToggleRow({
   checked: boolean;
   onChange: (checked: boolean) => void;
 }) {
+  const descriptionId = useId();
+
   return (
     <div className="flex items-start justify-between gap-4">
       <div>
         <div className="text-sm font-medium text-text-primary">{label}</div>
         {description ? (
-          <p className="mt-1 text-xs leading-5 text-text-muted">
+          <p
+            id={descriptionId}
+            className="mt-1 text-xs leading-5 text-text-muted"
+          >
             {description}
           </p>
         ) : null}
       </div>
-      <button
-        type="button"
+      <Switch
         aria-label={label}
-        aria-pressed={checked}
-        onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors ${
-          checked
-            ? "border-accent-action/50 bg-accent-action/25"
-            : "border-border-quiet/10 bg-text-primary/[0.03]"
-        }`}
-      >
-        <span
-          className={`inline-block size-5 rounded-full bg-text-primary shadow-sm transition-transform ${
-            checked ? "translate-x-6" : "translate-x-1"
-          }`}
-        />
-      </button>
+        aria-describedby={description ? descriptionId : undefined}
+        checked={checked}
+        onCheckedChange={onChange}
+      />
     </div>
   );
 }

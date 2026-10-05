@@ -45,3 +45,11 @@ export interface BandcampRadarItem extends BandcampItem {
 export function itemTitle(item: BandcampItem, fallback: string): string {
   return item.album_title || item.track_title || item.artist_name || fallback;
 }
+
+export function canImportBandcampItem(item: BandcampItem): boolean {
+  return (
+    item.owned === true &&
+    item.downloadable === true &&
+    item.latest_import_status !== "completed"
+  );
+}

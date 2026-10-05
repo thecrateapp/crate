@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Brain } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Brain } from "@crate/ui/icons";
 
 import type { EffectiveEq } from "@/hooks/use-effective-eq";
 
@@ -40,8 +40,8 @@ export function EqualizerSmartReadout({
   return (
     <div className="eq-smart-surface rounded-lg border border-accent-action/25 px-3 py-2">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-action/35 bg-accent-action/10 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.18em] text-accent-action">
-          <Brain size={10} />
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-action/35 bg-accent-action/10 px-2 py-0.5 text-xs font-semibold uppercase tracking-eyebrow text-accent-action">
+          <Brain size={CRATE_ICON_SIZE.nano} />
           Smart
         </span>
         <span className="text-xs font-semibold text-text-primary">{label}</span>

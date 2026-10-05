@@ -49,3 +49,57 @@ describe("CrateChip", () => {
     expect(screen.getByText("Tag").tagName).toBe("SPAN");
   });
 });
+
+describe("CrateBadge tones", () => {
+  it("applies state tone classes to chips", () => {
+    render(<CrateChip tone="success">Ok</CrateChip>);
+    const chip = screen.getByText("Ok");
+    expect(chip).toHaveClass(
+      "bg-state-success/10",
+      "text-state-success-text",
+      "text-badge",
+    );
+    expect(chip).toHaveAttribute("data-tone", "success");
+  });
+
+  it("applies tone classes to static pills", () => {
+    render(<CratePill tone="danger">Error</CratePill>);
+    expect(screen.getByText("Error")).toHaveClass("text-state-danger-text");
+  });
+
+  it("keeps the active style over the tone", () => {
+    render(
+      <CrateChip tone="warning" active>
+        Active
+      </CrateChip>,
+    );
+    expect(screen.getByText("Active")).not.toHaveClass(
+      "text-state-warning-text",
+    );
+  });
+
+  it("lets className override defaults", () => {
+    render(<CrateChip className="text-micro">Small</CrateChip>);
+    const chip = screen.getByText("Small");
+    expect(chip).toHaveClass("text-micro");
+    expect(chip).not.toHaveClass("text-badge");
+  });
+
+  it("exposes aria-pressed and a focus ring on interactive pills", () => {
+    const { rerender } = render(
+      <CratePill onClick={() => {}} active>
+        On
+      </CratePill>,
+    );
+    expect(screen.getByRole("button", { pressed: true })).toHaveClass(
+      "focus-visible:shadow-focus",
+    );
+    rerender(<CratePill onClick={() => {}}>On</CratePill>);
+    expect(screen.getByRole("button", { pressed: false })).toBeInTheDocument();
+  });
+
+  it("does not set aria-pressed on static pills", () => {
+    render(<CratePill active>Static</CratePill>);
+    expect(screen.getByText("Static")).not.toHaveAttribute("aria-pressed");
+  });
+});

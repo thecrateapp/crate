@@ -20,9 +20,18 @@ export function useDismissibleLayer({
   closeOnScroll = false,
 }: UseDismissibleLayerOptions) {
   const dismiss = useEffectEvent(onDismiss);
-  const isInside = useEffectEvent((target: Node | null) =>
-    refs.some((ref) => ref.current && target && ref.current.contains(target)),
-  );
+  const isInside = useEffectEvent((target: Node | null) => {
+    if (
+      refs.some((ref) => ref.current && target && ref.current.contains(target))
+    ) {
+      return true;
+    }
+
+    return (
+      target instanceof Element &&
+      Boolean(target.closest("[data-dismissible-layer-boundary]"))
+    );
+  });
   const suppressClickRef = useRef(false);
   const suppressClickTimerRef = useRef<number | undefined>(undefined);
 

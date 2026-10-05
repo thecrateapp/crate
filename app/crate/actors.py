@@ -211,6 +211,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "generate_system_playlist": TaskPoolConfig("fast", 1, 600, 0),
     "refresh_system_smart_playlists": TaskPoolConfig("maintenance", 3, 1800, 0),
     "persist_playlist_cover": TaskPoolConfig("fast", 0, 120, 1),
+    "crate_download": TaskPoolConfig("default", 0, 7200, 0),
     # Listen i18n
     "draft_i18n_translation": TaskPoolConfig("maintenance", 3, 900, 0),
 }

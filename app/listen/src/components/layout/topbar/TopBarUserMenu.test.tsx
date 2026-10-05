@@ -18,10 +18,6 @@ vi.mock("@crate/ui/lib/use-hover-capability", () => ({
   useHoverCapability: () => canHover,
 }));
 
-vi.mock("@/lib/input-capabilities", () => ({
-  isTouchDominantPointer: () => false,
-}));
-
 vi.mock("@/lib/platform", () => ({
   capacitorPlatform: "web",
   getListenAppId: () => "listen-web",
@@ -109,7 +105,7 @@ describe("TopBarUserMenu", () => {
     const menu = screen.getByRole("menu");
     expect(menu).toHaveClass(
       "listen-glass-panel",
-      "rounded-[12px]",
+      "rounded-panel",
       "z-app-context-menu",
     );
     expect(screen.getByText("Diego")).toBeInTheDocument();

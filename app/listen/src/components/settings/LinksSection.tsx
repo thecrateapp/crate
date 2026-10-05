@@ -2,7 +2,13 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
-import { BarChart3, LogOut, Upload, Users } from "@crate/ui/icons";
+import {
+  CRATE_ICON_SIZE,
+  BarChart3,
+  LogOut,
+  Upload,
+  Users,
+} from "@crate/ui/icons";
 
 import { Section } from "@/components/settings/SettingsPrimitives";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,27 +27,28 @@ export function LinksSection() {
           to={publicProfilePath}
           className="flex items-center gap-3 rounded-xl p-3 text-sm text-text-primary transition-colors hover:bg-text-primary/5"
         >
-          <Users size={18} className="text-text-muted" />{" "}
+          <Users size={CRATE_ICON_SIZE.md} className="text-text-muted" />{" "}
           {t("settings.links.profile")}
         </Link>
         <Link
           to="/people"
           className="flex items-center gap-3 rounded-xl p-3 text-sm text-text-primary transition-colors hover:bg-text-primary/5"
         >
-          <Users size={18} className="text-text-muted" />{" "}
+          <Users size={CRATE_ICON_SIZE.md} className="text-text-muted" />{" "}
           {t("settings.links.people")}
         </Link>
         <Link
           to="/upload"
           className="flex items-center gap-3 rounded-xl p-3 text-sm text-text-primary transition-colors hover:bg-text-primary/5"
         >
-          <Upload size={18} className="text-text-muted" /> {t("upload.badge")}
+          <Upload size={CRATE_ICON_SIZE.md} className="text-text-muted" />{" "}
+          {t("upload.badge")}
         </Link>
         <Link
           to="/stats"
           className="hidden items-center gap-3 rounded-xl p-3 text-sm text-text-primary transition-colors hover:bg-text-primary/5 md:flex"
         >
-          <BarChart3 size={18} className="text-text-muted" />{" "}
+          <BarChart3 size={CRATE_ICON_SIZE.md} className="text-text-muted" />{" "}
           {t("settings.links.stats")}
         </Link>
         <button
@@ -49,7 +56,7 @@ export function LinksSection() {
           onClick={logout}
           className="flex w-full items-center gap-3 rounded-xl p-3 text-left text-sm text-state-danger transition-colors hover:bg-text-primary/5"
         >
-          <LogOut size={18} /> {t("auth.logout")}
+          <LogOut size={CRATE_ICON_SIZE.md} /> {t("auth.logout")}
         </button>
       </div>
     </Section>

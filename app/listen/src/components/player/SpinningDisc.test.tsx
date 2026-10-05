@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/components/artwork/CrateImage", () => ({
@@ -11,6 +11,7 @@ vi.mock("@/components/artwork/CrateImage", () => ({
 }));
 
 import { SpinningDisc } from "@/components/player/SpinningDisc";
+import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 const bounds = {
   bottom: 200,
@@ -29,7 +30,7 @@ function renderDisc(props: Partial<Parameters<typeof SpinningDisc>[0]> = {}) {
   const onTogglePlay = vi.fn();
   const onPlaybackRateChange = vi.fn();
 
-  render(
+  renderWithListenProviders(
     <SpinningDisc
       currentTime={30}
       duration={120}

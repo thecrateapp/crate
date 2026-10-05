@@ -1,4 +1,5 @@
 import type { TrackInfo } from "@/lib/track-info";
+import { clamp } from "@/lib/utils";
 
 export interface MoodMap {
   [key: string]: number | null | undefined;
@@ -122,10 +123,6 @@ const KEY_INDEX: Record<string, number> = {
   b: 11,
   cb: 11,
 };
-
-export function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
 
 export function topMood(moods?: MoodMap | null): string | null {
   if (!moods) return null;

@@ -1,17 +1,21 @@
 import { useTranslation } from "react-i18next";
-import { Flame, Play, Repeat2, Search } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Flame, Repeat2, Search } from "@crate/ui/icons";
+import { PlayButton } from "@crate/ui/domain/media/PlayButton";
 
 import type { StatsPageController } from "@/pages/use-stats-page-controller";
 import { CrateImage } from "@/components/artwork/CrateImage";
+import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
+import type { PlaySource } from "@/contexts/PlayerContext";
 import {
   formatStatsMinutes,
+  localizedReplaySubtitle,
+  localizedReplayTitle,
   type ReplayMix,
   type StatsTrack,
 } from "@/components/stats/stats-model";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
 import { MiniStat, SignalCard } from "./StatsAnalyticsSections";
-import { TrackCover } from "./StatsCollectionPanels";
 import { statsTrackKey } from "./stats-collection-keys";
 
 const STATS_MOSAIC_CELL_IDS = [
@@ -33,9 +37,10 @@ export function StatsHeroSection({ page }: { page: StatsPageController }) {
         <ReplayCard
           replay={page.replay}
           items={page.replayItems}
+          rows={page.replayRows}
+          playSource={page.replaySource}
           loading={page.dashboardLoading}
           onPlay={page.playReplay}
-          onPlayTrack={page.playTopTrack}
         />
         <StatsSignalCards page={page} />
       </aside>
@@ -47,20 +52,20 @@ function StatsHeroCover({ page }: { page: StatsPageController }) {
   const { leadArtist, leadGenre, overview, period, t } = page;
 
   return (
-    <div className="stats-hero-surface relative min-h-[520px] overflow-hidden rounded-[12px] p-5 sm:p-7">
+    <div className="stats-hero-surface relative min-h-hero-2xl overflow-hidden rounded-panel p-5 sm:p-7">
       <StatsCoverMosaic tracks={page.coverTracks} />
       <div className="stats-hero-overlay absolute inset-0" />
-      <div className="relative z-10 flex min-h-[460px] flex-col justify-between">
+      <div className="relative z-10 flex min-h-hero-xl flex-col justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="stats-hero-period-muted rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.18em]">
+          <span className="stats-hero-period-muted rounded-full px-3 py-1 text-xs font-bold uppercase tracking-eyebrow">
             {period.label}
           </span>
-          <span className="stats-hero-period-accent rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.18em]">
+          <span className="stats-hero-period-accent rounded-full px-3 py-1 text-xs font-bold uppercase tracking-eyebrow">
             {period.title}
           </span>
         </div>
         <div>
-          <div className="stats-hero-title max-w-3xl text-[clamp(3.8rem,13vw,10rem)] font-black uppercase leading-[0.75] tracking-[-0.04em]">
+          <div className="stats-hero-title max-w-3xl text-[clamp(3.8rem,13vw,10rem)] font-black uppercase leading-[0.75] tracking-display">
             {leadGenre?.genre_name || leadArtist?.artist_name || "Crate"}
           </div>
           <div className="mt-5 grid max-w-3xl gap-3 sm:grid-cols-3">
@@ -133,10 +138,10 @@ function StatsSignalCards({ page }: { page: StatsPageController }) {
 function HeroMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="stats-hero-metric rounded-lg px-4 py-3 backdrop-blur">
-      <div className="stats-hero-metric-label text-xs font-black uppercase tracking-[0.2em]">
+      <div className="stats-hero-metric-label text-xs font-black uppercase tracking-eyebrow-wide">
         {label}
       </div>
-      <div className="stats-hero-metric-value mt-1 text-2xl font-black tracking-[-0.04em]">
+      <div className="stats-hero-metric-value mt-1 text-2xl font-black tracking-display">
         {value}
       </div>
     </div>
@@ -194,38 +199,43 @@ function ReplayCard({
   replay,
   items,
   loading,
+  rows,
+  playSource,
   onPlay,
-  onPlayTrack,
 }: {
   replay?: ReplayMix;
   items: StatsTrack[];
+  rows: TrackRowData[];
+  playSource: PlaySource;
   loading: boolean;
   onPlay: () => void;
-  onPlayTrack: (item: StatsTrack) => void;
 }) {
   const { t } = useTranslation();
+  const title = localizedReplayTitle(replay, t) || t("stats.replay.title");
   return (
-    <div className="stats-replay-card rounded-[12px] p-5">
+    <div className="stats-replay-card rounded-panel p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="stats-replay-badge inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.2em]">
-            <Repeat2 size={12} />
+          <div className="stats-replay-badge inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black uppercase tracking-eyebrow-wide">
+            <Repeat2 size={CRATE_ICON_SIZE.micro} />
             {t("stats.replay.title")}
           </div>
-          <h2 className="mt-3 text-2xl font-black tracking-[-0.06em] text-text-primary">
-            {replay?.title || t("stats.replay.title")}
+          <h2 className="mt-3 text-2xl font-black tracking-display-tight text-text-primary">
+            {title}
           </h2>
           <p className="mt-1 text-sm leading-6 text-text-muted">
-            {replay?.subtitle || t("stats.replay.defaultSubtitle")}
+            {localizedReplaySubtitle(replay, t) ||
+              t("stats.replay.defaultSubtitle")}
           </p>
         </div>
-        <button
+        <PlayButton
           onClick={onPlay}
           disabled={!items.length}
-          className="flex size-12 shrink-0 items-center justify-center rounded-full bg-accent-action text-accent-action-foreground shadow-xl shadow-primary/20 transition hover:scale-105 disabled:opacity-50"
-        >
-          <Play size={18} fill="currentColor" />
-        </button>
+          label={t("common.playItem", {
+            name: title,
+          })}
+          className="size-12"
+        />
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3">
@@ -239,34 +249,30 @@ function ReplayCard({
         />
       </div>
 
-      <div className="mt-5 space-y-2">
+      <div className="mt-5 space-y-1">
         {loading ? (
-          <div className="stats-card-empty rounded-lg border-dashed px-4 py-5 text-sm">
+          <div className="stats-card-empty rounded-lg border border-dashed px-4 py-5 text-sm">
             {t("stats.replay.loading")}
           </div>
         ) : items.length ? (
-          items.slice(0, 5).map((item, index) => (
-            <button
-              key={statsTrackKey(item)}
-              onClick={() => onPlayTrack(item)}
-              className="stats-replay-row flex w-full items-center gap-3 rounded-lg border-transparent px-3 py-2.5 text-left transition"
-            >
-              <TrackCover item={item} size="sm" />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-text-primary">
-                  {item.title}
-                </div>
-                <div className="truncate text-xs text-text-muted">
-                  {item.artist}
-                </div>
-              </div>
-              <div className="text-xs font-bold text-accent-action">
-                {index + 1}
-              </div>
-            </button>
-          ))
+          items
+            .slice(0, 5)
+            .map((item, index) => (
+              <TrackRow
+                key={statsTrackKey(item)}
+                track={rows[index]!}
+                rank={index + 1}
+                density="compact"
+                showCoverThumb
+                showArtist
+                showLike={false}
+                showDuration={false}
+                queueTracks={rows}
+                playSource={playSource}
+              />
+            ))
         ) : (
-          <div className="stats-card-empty rounded-lg border-dashed px-4 py-5 text-sm">
+          <div className="stats-card-empty rounded-lg border border-dashed px-4 py-5 text-sm">
             {t("stats.replay.empty")}
           </div>
         )}

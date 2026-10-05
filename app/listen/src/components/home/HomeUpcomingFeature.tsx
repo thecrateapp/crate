@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
+import { SectionHeader } from "@crate/ui/domain/lists";
 
-import { SectionHeader } from "./HomeSections";
 import type { HomeUpcomingItem, HomeUpcomingResponse } from "./home-model";
 import { HomeUpcomingFeature } from "./HomeUpcomingFeatureCard";
 import { HomeUpcomingPreviewPanel } from "./HomeUpcomingPreviewPanel";
@@ -22,7 +22,7 @@ function HomeUpcomingEmpty({
         actionLabel={t("home.radar.open")}
         onAction={onOpenUpcoming}
       />
-      <div className="home-upcoming-empty-card rounded-[12px] p-5">
+      <div className="home-upcoming-empty-card rounded-panel p-5">
         <h2 className="text-lg font-bold text-text-primary">
           {t(
             hasFollowedArtists

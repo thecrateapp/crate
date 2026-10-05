@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import {
   afterEach,
@@ -29,6 +30,7 @@ import type {
   HomeSuggestedAlbum,
 } from "@/components/home/home-model";
 import { artistHeroApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
+import { longPress, pressMenuKey } from "@/test/item-action-gestures";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 vi.mock("@/lib/library-routes", async (importOriginal) => {
@@ -94,13 +96,6 @@ beforeAll(() => {
     configurable: true,
     value: 0,
   });
-  if (!globalThis.ResizeObserver) {
-    globalThis.ResizeObserver = class ResizeObserver {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    };
-  }
 });
 
 beforeEach(() => {
@@ -284,13 +279,18 @@ describe("HomeTasteHero", () => {
     expect(
       screen.getByRole("heading", { name: "Converge" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Previous artist" }),
+    ).toHaveAttribute("data-variant", "ghost");
     expect(screen.getByRole("button", { name: "Previous artist" })).toHaveClass(
-      "bg-transparent",
-      "border-0",
+      "home-hero-nav-control-plain",
+    );
+    expect(screen.getByRole("button", { name: "Next artist" })).toHaveAttribute(
+      "data-variant",
+      "ghost",
     );
     expect(screen.getByRole("button", { name: "Next artist" })).toHaveClass(
-      "bg-transparent",
-      "border-0",
+      "home-hero-nav-control-plain",
     );
     expect(screen.getByRole("button", { name: "Show Botch" })).toHaveClass(
       "rounded-full",
@@ -378,7 +378,7 @@ describe("HomeTasteHero", () => {
     expect(screen.getByTestId("desktop-hero-content")).toHaveClass(
       "mx-auto",
       "w-full",
-      "max-w-[1480px]",
+      "max-w-content",
       "px-6",
     );
     expect(screen.getByTestId("desktop-hero-artwork")).toHaveClass(
@@ -467,7 +467,7 @@ describe("HomeTasteHero", () => {
     expect(hero).toHaveClass(
       "mx-auto",
       "w-full",
-      "max-w-[1480px]",
+      "max-w-content",
       "aspect-[1480/600]",
       "min-h-[clamp(480px,38dvh,600px)]",
     );
@@ -535,7 +535,7 @@ describe("HomeTasteHero", () => {
       "w-full",
     );
     expect(screen.getByTestId("desktop-hero-artwork")).not.toHaveClass(
-      "max-w-[1480px]",
+      "max-w-content",
       "w-auto",
       "max-w-none",
       "aspect-[21/9]",
@@ -943,6 +943,83 @@ describe("RecentEntityRow", () => {
     expect(within(playlistRow).queryByText("playlist")).toBeNull();
   });
 
+  it("opens the row menu with Enter on the nested menu button without navigating", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    renderWithListenProviders(
+      <RecentEntityRow
+        item={{
+          type: "album",
+          album_id: 42,
+          album_name: "El Cielo",
+          artist_name: "Dredg",
+        }}
+        onClick={onClick}
+      />,
+    );
+
+    const menuButton = screen.getByRole("button", { name: "More actions" });
+    expect(menuButton).toHaveAttribute("aria-expanded", "false");
+    expect(menuButton.closest("[role='button']")).toBeNull();
+
+    menuButton.focus();
+    await user.keyboard("{Enter}");
+
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+    expect(menuButton).toHaveAttribute("aria-expanded", "true");
+    expect(onClick).not.toHaveBeenCalled();
+
+    await user.keyboard("{Enter}");
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it("navigates with Enter on the row primary button", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    renderWithListenProviders(
+      <RecentEntityRow
+        item={{ type: "artist", artist_id: 7, artist_name: "Hum" }}
+        onClick={onClick}
+      />,
+    );
+
+    screen.getByRole("button", { name: /Hum/i }).focus();
+    await user.keyboard("{Enter}");
+
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  it("opens the row menu from context menu, menu key and long-press", async () => {
+    const item: HomeRecentItem = {
+      type: "album",
+      album_id: 42,
+      album_name: "El Cielo",
+      artist_name: "Dredg",
+    };
+    const first = renderWithListenProviders(
+      <RecentEntityRow item={item} onClick={vi.fn()} />,
+    );
+    fireEvent.contextMenu(screen.getByText("El Cielo").closest("article")!);
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+    first.unmount();
+
+    const second = renderWithListenProviders(
+      <RecentEntityRow item={item} onClick={vi.fn()} />,
+    );
+    pressMenuKey(screen.getByRole("button", { name: /El Cielo/i }));
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+    second.unmount();
+
+    mockMobilePointer();
+    renderWithListenProviders(
+      <RecentEntityRow item={item} onClick={vi.fn()} />,
+    );
+    await longPress(screen.getByText("El Cielo").closest("article")!);
+    expect(
+      await screen.findByRole("dialog", { name: "Actions menu" }),
+    ).toBeInTheDocument();
+  });
+
   it("renders remote favorite artists with global catalog routes and artwork", () => {
     renderWithListenProviders(
       <FavoriteArtistsSection
@@ -986,7 +1063,7 @@ describe("RecentEntityRow", () => {
     });
 
     const menu = await screen.findByRole("menu");
-    expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-[12px]");
+    expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-panel");
     expect(within(menu).getByText("El Cielo")).toBeInTheDocument();
     expect(within(menu).getByText("Dredg")).toBeInTheDocument();
     expect(
@@ -1118,7 +1195,7 @@ describe("RadioStationCard", () => {
 });
 
 describe("RadioStationsSection", () => {
-  it("uses the shared square-card rail fit", () => {
+  it("uses the shared columns rail fit", () => {
     const stations: HomeRadioStation[] = [
       {
         type: "artist",
@@ -1140,9 +1217,7 @@ describe("RadioStationsSection", () => {
       />,
     );
 
-    expect(container.querySelector('[data-rail-fit="square-card"]')).not.toBe(
-      null,
-    );
+    expect(container.querySelector('[data-rail-fit="columns"]')).not.toBe(null);
   });
 });
 

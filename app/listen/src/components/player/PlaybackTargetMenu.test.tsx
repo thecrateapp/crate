@@ -28,8 +28,8 @@ vi.mock("@/lib/playback-targets", async () => {
   };
 });
 
-vi.mock("sonner", () => ({
-  toast: {
+vi.mock("@crate/ui/lib/notify", () => ({
+  notify: {
     info: toastInfoMock,
   },
 }));

@@ -1,11 +1,21 @@
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Calendar, Disc3, MapPin, Play, RadioTower } from "@crate/ui/icons";
+import {
+  Calendar,
+  CRATE_ICON_SIZE,
+  Disc3,
+  MapPin,
+  Play,
+  RadioTower,
+} from "@crate/ui/icons";
+import { Button } from "@crate/ui/shadcn/button";
 
-import { CrateImage } from "@/components/artwork/CrateImage";
+import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 
 import type { HomeUpcomingItem } from "./home-model";
 import { buildUpcomingPresentation } from "./home-upcoming-model";
+
+const LAZY_IMAGE_PROPS = { loading: "lazy" } as const;
 
 function UpcomingFeatureMeta({
   item,
@@ -22,7 +32,7 @@ function UpcomingFeatureMeta({
     <div className="mb-4 flex flex-wrap gap-2">
       {date ? (
         <div className="home-upcoming-meta-card rounded-lg px-3 py-2 backdrop-blur">
-          <div className="home-upcoming-meta-label text-xs uppercase tracking-[0.16em]">
+          <div className="home-upcoming-meta-label text-xs uppercase tracking-kicker">
             {t("home.radar.meta.date")}
           </div>
           <div className="mt-1 text-sm font-semibold text-text-primary">
@@ -32,11 +42,14 @@ function UpcomingFeatureMeta({
       ) : null}
       {isShow && item.venue ? (
         <div className="home-upcoming-meta-card rounded-lg px-3 py-2 backdrop-blur">
-          <div className="home-upcoming-meta-label text-xs uppercase tracking-[0.16em]">
+          <div className="home-upcoming-meta-label text-xs uppercase tracking-kicker">
             {t("home.radar.meta.venue")}
           </div>
           <div className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-text-primary">
-            <MapPin size={12} className="text-accent-action" />
+            <MapPin
+              size={CRATE_ICON_SIZE.micro}
+              className="text-accent-action"
+            />
             {item.venue}
           </div>
         </div>
@@ -70,40 +83,50 @@ function UpcomingFeatureActions({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {isShow && onPlaySetlist ? (
-        <button
-          type="button"
+        <Button
+          size="sm"
+          shape="pill"
           onClick={() => onPlaySetlist(item)}
           disabled={!item.probable_setlist?.length}
-          className="inline-flex items-center gap-2 rounded-full bg-accent-action px-4 py-2 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-9 gap-2 px-4 shadow-none has-[>svg]:px-4"
         >
-          <Play size={15} className="fill-current" />
+          <Play size={CRATE_ICON_SIZE.sm} className="fill-current" />
           {t("radar.show.playSetlist")}
-        </button>
+        </Button>
       ) : null}
       {!isShow && releasePath ? (
-        <Link
-          to={releasePath}
-          className="inline-flex items-center gap-2 rounded-full bg-accent-action px-4 py-2 text-sm font-medium text-accent-action-foreground transition-colors hover:bg-accent-action/90"
+        <Button
+          asChild
+          size="sm"
+          shape="pill"
+          className="h-9 gap-2 px-4 shadow-none has-[>svg]:px-4"
         >
-          <Play size={15} className="fill-current" />
-          {t("home.radar.openAlbum")}
-        </Link>
+          <Link to={releasePath}>
+            <Play size={CRATE_ICON_SIZE.sm} className="fill-current" />
+            {t("home.radar.openAlbum")}
+          </Link>
+        </Button>
       ) : null}
-      <button
-        type="button"
+      <Button
+        variant="secondary"
+        size="sm"
+        shape="pill"
         onClick={onOpenUpcoming}
-        className="home-upcoming-secondary-action inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-text-primary transition-colors"
+        className="home-upcoming-secondary-action h-9 gap-2 px-4 has-[>svg]:px-4"
       >
-        <Calendar size={15} />
+        <Calendar size={CRATE_ICON_SIZE.sm} />
         {t("home.radar.viewRadar")}
-      </button>
+      </Button>
       {isShow ? (
-        <Link
-          to={artistPath}
-          className="home-upcoming-secondary-action inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-text-primary transition-colors"
+        <Button
+          asChild
+          variant="secondary"
+          size="sm"
+          shape="pill"
+          className="home-upcoming-secondary-action h-9 gap-2 px-4"
         >
-          {t("common.artist")}
-        </Link>
+          <Link to={artistPath}>{t("common.artist")}</Link>
+        </Button>
       ) : null}
     </div>
   );
@@ -122,28 +145,27 @@ export function HomeUpcomingFeature({
   const presentation = buildUpcomingPresentation(item, i18n.language);
 
   return (
-    <div className="home-upcoming-feature relative min-h-[270px] overflow-hidden rounded-[12px] p-5 sm:p-6">
+    <div className="home-upcoming-feature relative min-h-[270px] overflow-hidden rounded-panel p-5 sm:p-6">
       <div className="home-upcoming-feature-glow absolute inset-0" />
       {presentation.artistImage ? (
-        <CrateImage
-          src={presentation.artistImage}
+        <ArtworkSurface
+          source={presentation.artistImage}
           alt=""
-          loading="lazy"
-          className="absolute inset-0 size-full object-cover opacity-40 grayscale"
-          onError={(event) => {
-            (event.target as HTMLImageElement).style.display = "none";
-          }}
+          fallback={null}
+          imageProps={LAZY_IMAGE_PROPS}
+          imageClassName="object-cover"
+          className="absolute inset-0 opacity-40 grayscale"
         />
       ) : null}
       <div className="home-upcoming-feature-overlay absolute inset-0" />
 
       <div className="relative flex min-h-[222px] flex-col justify-between">
         <div>
-          <div className="home-upcoming-badge mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.18em]">
+          <div className="home-upcoming-badge mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium uppercase tracking-eyebrow">
             {presentation.isShow ? (
-              <RadioTower size={12} />
+              <RadioTower size={CRATE_ICON_SIZE.micro} />
             ) : (
-              <Disc3 size={12} />
+              <Disc3 size={CRATE_ICON_SIZE.micro} />
             )}
             {presentation.isShow
               ? t("home.radar.badge.nextShow")

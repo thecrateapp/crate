@@ -7,7 +7,7 @@ import {
 
 describe("social share colors", () => {
   it("maps every story color to a semantic CSS token", () => {
-    expect(Object.values(SOCIAL_SHARE_COLOR_TOKENS)).toHaveLength(13);
+    expect(Object.values(SOCIAL_SHARE_COLOR_TOKENS)).toHaveLength(14);
     expect(
       Object.values(SOCIAL_SHARE_COLOR_TOKENS).every((token) =>
         token.startsWith("--"),
@@ -30,6 +30,7 @@ describe("social share colors", () => {
 
     expect(colors.cardSurface).toBe("resolved(--surface-contrast)");
     expect(colors.cardInk).toBe("resolved(--text-on-contrast)");
+    expect(colors.accent).toBe("resolved(--accent-action)");
     expect(colors.accentGlow).toBe("resolved(--accent-action-glow-medium)");
   });
 });

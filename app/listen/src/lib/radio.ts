@@ -59,6 +59,7 @@ async function startSeededRadioSession(
     | "album"
     | "track"
     | "playlist"
+    | "crate"
     | "home-playlist"
     | "genre",
   seedValue: string,
@@ -363,6 +364,7 @@ export async function startShapedRadio(
             | "album"
             | "artist"
             | "playlist"
+            | "crate"
             | "home-playlist"
             | "genre"
             | "discovery",

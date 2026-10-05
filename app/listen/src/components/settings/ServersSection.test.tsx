@@ -20,7 +20,8 @@ const {
 }));
 
 vi.mock("@/lib/platform", () => ({ usesConfigurableServer: true }));
-vi.mock("@/lib/server-store", () => ({
+vi.mock("@/lib/server-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/server-store")>()),
   SERVER_STORE_EVENT: "crate-server-store-change",
   getCurrentServerId: getCurrentServerIdMock,
   getServers: getServersMock,
@@ -33,6 +34,8 @@ vi.mock("@/lib/api", () => ({
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({ logout: logoutMock }),
 }));
+
+import { I18nProvider } from "@/i18n";
 
 import { ServersSection } from "./ServersSection";
 
@@ -66,7 +69,9 @@ describe("ServersSection", () => {
   it("revokes the removed server snapshot without logging out the fallback", async () => {
     render(
       <MemoryRouter>
-        <ServersSection />
+        <I18nProvider initialLocale="en">
+          <ServersSection />
+        </I18nProvider>
       </MemoryRouter>,
     );
 
@@ -86,7 +91,9 @@ describe("ServersSection", () => {
     revokeServerSessionMock.mockRejectedValueOnce(new Error("offline"));
     render(
       <MemoryRouter>
-        <ServersSection />
+        <I18nProvider initialLocale="en">
+          <ServersSection />
+        </I18nProvider>
       </MemoryRouter>,
     );
 

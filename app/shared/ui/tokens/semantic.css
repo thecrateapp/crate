@@ -120,42 +120,11 @@
     var(--text-primary) 60%,
     transparent
   );
-  --control-progress-glow-horizontal: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--accent-action) 0%, transparent) 0%,
-    color-mix(in srgb, var(--accent-action) 8%, transparent) 44%,
-    color-mix(in srgb, var(--accent-action) 28%, transparent) 82%,
-    color-mix(in srgb, var(--accent-action) 55%, var(--text-primary)) 100%
-  );
-  --control-progress-glow-vertical: linear-gradient(
-    0deg,
-    color-mix(in srgb, var(--accent-action) 0%, transparent) 0%,
-    color-mix(in srgb, var(--accent-action) 8%, transparent) 38%,
-    color-mix(in srgb, var(--accent-action) 28%, transparent) 78%,
-    color-mix(in srgb, var(--accent-action) 55%, var(--text-primary)) 100%
-  );
-  --control-progress-fill-horizontal: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--accent-action) 14%, transparent),
-    color-mix(in srgb, var(--accent-action) 56%, transparent),
-    color-mix(in srgb, var(--accent-action) 78%, var(--text-primary))
-  );
-  --control-progress-fill-vertical: linear-gradient(
-    0deg,
-    color-mix(in srgb, var(--accent-action) 14%, transparent),
-    color-mix(in srgb, var(--accent-action) 56%, transparent),
-    color-mix(in srgb, var(--accent-action) 78%, var(--text-primary))
-  );
   --control-thumb: color-mix(
     in srgb,
     var(--accent-action) 30%,
     var(--text-primary)
   );
-  --control-thumb-shadow: 0 0 6px
-      color-mix(in srgb, var(--accent-action) 62%, transparent),
-    0 0 12px color-mix(in srgb, var(--accent-action) 34%, transparent);
-  --control-thumb-ring-shadow: 0 0 0 3px
-    color-mix(in srgb, var(--accent-action) 14%, transparent);
   --border-subtle: var(--color-border);
   --border-quiet: var(--surface-quiet);
   --border-quiet-subtle: var(--surface-quiet-subtle);
@@ -184,8 +153,7 @@
   --font-brand: "Poppins";
   --action-shadow: 0 14px 28px
     color-mix(in srgb, var(--accent-action) 22%, transparent);
-  --focus-shadow: 0 0 0 1px
-    color-mix(in srgb, var(--focus-ring) 8%, transparent);
+  --focus-shadow: 0 0 0 2px var(--focus-ring);
   --control-inset-shadow: inset 0 1px 0
     color-mix(in srgb, var(--text-primary) 4%, transparent);
   --icon-control-shadow: 0 8px 24px
@@ -292,6 +260,8 @@
   --color-text-quiet: var(--text-quiet);
   --color-text-hero: var(--text-hero);
   --color-text-accent: var(--text-accent);
+  --color-artwork-scrim: var(--artwork-scrim);
+  --color-artwork-foreground: var(--artwork-foreground);
   --color-surface-canvas: var(--surface-canvas);
   --color-surface-container: var(--surface-container);
   --color-surface-elevated: var(--surface-elevated);

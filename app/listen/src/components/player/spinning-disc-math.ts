@@ -1,13 +1,11 @@
+import { clamp } from "@/lib/utils";
+
 export const DISC_DEGREES_PER_SECOND = 120;
 export const JOG_SECONDS_PER_ROTATION = 2.5;
 export const JOG_SEEK_INTERVAL_MS = 110;
 export const JOG_RATE_UPDATE_INTERVAL_MS = 70;
 export const PLAYING_FORWARD_SYNC_TOLERANCE_SECONDS = 0.65;
 export const PLAYING_BACKWARD_SYNC_TOLERANCE_SECONDS = 1.6;
-
-export function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
 
 export function getPointerAngle(
   event: Pick<PointerEvent, "clientX" | "clientY">,

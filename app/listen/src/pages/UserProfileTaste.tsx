@@ -1,5 +1,7 @@
 import { useTranslation } from "react-i18next";
 
+import { CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import {
   badgeTone,
   formatMinutes,
@@ -8,11 +10,14 @@ import {
 
 function ProfileMiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="user-profile-stat rounded-xl px-3 py-2">
+    <div className="user-profile-stat min-w-0 rounded-xl px-3 py-2">
       <div className="truncate text-lg font-black text-text-primary">
         {value}
       </div>
-      <div className="mt-0.5 truncate text-xs font-bold uppercase tracking-[0.14em] text-text-muted">
+      <div
+        title={label}
+        className="mt-0.5 min-w-0 overflow-hidden text-ellipsis break-normal text-xs font-bold uppercase leading-4 tracking-wider text-text-muted"
+      >
         {label}
       </div>
     </div>
@@ -31,7 +36,7 @@ export function ProfileTasteSummary({ data }: { data: PublicProfile }) {
   return (
     <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_1fr]">
       <div className="user-profile-accent-panel rounded-xl p-4">
-        <div className="user-profile-accent-label text-xs font-bold uppercase tracking-[0.18em]">
+        <div className="user-profile-accent-label text-xs font-bold uppercase tracking-eyebrow">
           {t("userProfile.topSound")}
         </div>
         <div className="mt-2 truncate text-lg font-black text-text-primary">
@@ -71,21 +76,19 @@ function ProfileBadges({ badges }: { badges: PublicProfile["badges"] }) {
   const { t } = useTranslation();
   return (
     <div className="user-profile-card rounded-xl p-4">
-      <div className="text-xs font-bold uppercase tracking-[0.18em] text-text-muted">
+      <div className="text-xs font-bold uppercase tracking-eyebrow text-text-muted">
         {t("userProfile.badges.title")}
       </div>
       {badges.length ? (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {badges.map((badge) => (
-            <span
+            <CratePill
               key={badge.key}
-              className={
-                "rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-[0.12em] " +
-                badgeTone(badge.tone)
-              }
+              tone={badgeTone(badge.tone)}
+              className="gap-0 text-xs leading-4 font-bold uppercase tracking-label"
             >
               {badge.label}
-            </span>
+            </CratePill>
           ))}
         </div>
       ) : (

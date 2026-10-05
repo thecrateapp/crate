@@ -3,215 +3,55 @@ import {
   AlertCircle,
   ArrowDownToLine,
   ArrowDownToLineBold,
+  Heart,
+  HeartBold,
   Loader2,
   Pencil,
-  Play,
   Radio,
-  RefreshCw,
   Share2,
-  Shuffle,
-  Trash2,
   Users,
   type CrateIcon,
 } from "@crate/ui/icons";
 import type { ContextMenuEntry } from "@crate/ui/domain/actions";
 
-import type { Track } from "@/contexts/PlayerContext";
-import type { OfflineItemState } from "@/lib/offline";
-import type { PlaylistOfflinePresentation } from "@/pages/playlist-page-model";
-import type { PlaylistData } from "@/pages/playlist-types";
+import { buildPlaylistMenuItems } from "@/components/actions/playlist-actions";
 import type { PlaylistHeroSecondaryAction } from "@/components/playlists/PlaylistHeroSection";
+import type { OfflineItemState } from "@/lib/offline";
 
-export interface PlaylistActionMenuInput {
-  data: PlaylistData | undefined;
-  offlinePresentation: PlaylistOfflinePresentation;
-  offlineState: OfflineItemState;
-  offlineSupported: boolean;
-  playerTracks: Track[];
-  offlineIcon: CrateIcon;
-  handlePlay: () => void;
-  handleShuffle: () => void;
-  handlePlaylistRadio: () => void | Promise<void>;
-  handleRegenerate: () => void | Promise<void>;
-  handleShare: () => void;
-  handleToggleOffline: () => void | Promise<void>;
-  setDeleteOpen: (value: boolean) => void;
-  setEditorOpen: (value: boolean) => void;
-  setMembersOpen: (value: boolean) => void;
+type Handler = () => void | Promise<void>;
+
+export interface PlaylistPageOffline {
+  state: OfflineItemState;
+  presentation: { busy: boolean; buttonLabel: string };
+  supported: boolean;
+  isSmart: boolean;
+  onToggle: Handler;
+}
+
+export interface PlaylistPageActionInput {
   t: TFunction;
+  playDisabled: boolean;
+  onPlay: Handler;
+  onShuffle: Handler;
+  onRadio: Handler;
+  onShare: Handler;
+  offline?: PlaylistPageOffline;
+  follow?: { followed: boolean; pending: boolean; onToggle: Handler };
+  onCollaborators?: Handler;
+  onEdit?: Handler;
+  onRegenerate?: Handler;
+  onDelete?: Handler;
 }
 
-export function buildPlaylistSecondaryActions({
-  data,
-  offlinePresentation,
-  offlineState,
-  offlineSupported,
-  playerTracks,
-  offlineIcon,
-  handlePlaylistRadio,
-  handleShare,
-  handleToggleOffline,
-  setEditorOpen,
-  setMembersOpen,
-  t,
-}: PlaylistActionMenuInput): PlaylistHeroSecondaryAction[] {
-  if (!data) return [];
-
-  return [
-    {
-      key: "radio",
-      label: "Radio",
-      ariaLabel: t("playlist.actions.radio"),
-      icon: Radio,
-      disabled: playerTracks.length === 0,
-      onClick: () => void handlePlaylistRadio(),
-    },
-    {
-      key: "offline",
-      label: t("common.offline"),
-      ariaLabel:
-        offlineState === "ready"
-          ? t("playlist.offline.removeCopy")
-          : t("playlist.offline.makeAvailable"),
-      icon: offlineIcon,
-      iconClassName: offlinePresentation.busy ? "animate-spin" : undefined,
-      className:
-        offlineState === "ready"
-          ? "text-text-accent drop-shadow-accent-action"
-          : offlinePresentation.busy
-            ? "text-accent-action"
-            : offlineState === "error"
-              ? "text-state-warning-text/90"
-              : undefined,
-      disabled: !offlineSupported || data.is_smart || offlinePresentation.busy,
-      title: offlinePresentation.buttonLabel,
-      onClick: () => void handleToggleOffline(),
-    },
-    ...(data.is_collaborative
-      ? [
-          {
-            key: "collaborators",
-            label: t("playlist.actions.collabs"),
-            ariaLabel: t("playlist.actions.collaborators"),
-            icon: Users,
-            onClick: () => setMembersOpen(true),
-          } satisfies PlaylistHeroSecondaryAction,
-        ]
-      : []),
-    {
-      key: "edit",
-      label: t("common.edit"),
-      ariaLabel: t("common.edit"),
-      icon: Pencil,
-      onClick: () => setEditorOpen(true),
-    },
-    {
-      key: "share",
-      label: t("common.share"),
-      ariaLabel: t("common.share"),
-      icon: Share2,
-      onClick: handleShare,
-    },
-  ];
-}
-
-export function buildPlaylistMenuItems({
-  data,
-  offlinePresentation,
-  offlineState,
-  offlineSupported,
-  playerTracks,
-  offlineIcon,
-  handlePlay,
-  handleShuffle,
-  handlePlaylistRadio,
-  handleRegenerate,
-  handleShare,
-  handleToggleOffline,
-  setDeleteOpen,
-  setEditorOpen,
-  setMembersOpen,
-  t,
-}: PlaylistActionMenuInput): ContextMenuEntry[] {
-  if (!data) return [];
-
-  return [
-    {
-      key: "play",
-      label: t("playlist.actions.playPlaylist"),
-      icon: Play,
-      disabled: playerTracks.length === 0,
-      onSelect: handlePlay,
-    },
-    {
-      key: "shuffle",
-      label: t("playlist.actions.shufflePlaylist"),
-      icon: Shuffle,
-      disabled: playerTracks.length === 0,
-      onSelect: handleShuffle,
-    },
-    {
-      key: "radio",
-      label: t("playlist.actions.startRadio"),
-      icon: Radio,
-      disabled: playerTracks.length === 0,
-      onSelect: handlePlaylistRadio,
-    },
-    { type: "divider", key: "playlist-state-divider" },
-    {
-      key: "offline",
-      label: offlinePresentation.buttonLabel,
-      icon: offlineIcon,
-      active: offlineState === "ready",
-      disabled: !offlineSupported || data.is_smart || offlinePresentation.busy,
-      onSelect: handleToggleOffline,
-    },
-    ...(data.is_collaborative
-      ? [
-          {
-            key: "collaborators",
-            label: t("playlist.actions.collaborators"),
-            icon: Users,
-            onSelect: () => setMembersOpen(true),
-          } satisfies ContextMenuEntry,
-        ]
-      : []),
-    {
-      key: "edit",
-      label: t("playlist.actions.editPlaylist"),
-      icon: Pencil,
-      onSelect: () => setEditorOpen(true),
-    },
-    ...(data.is_smart
-      ? [
-          {
-            key: "regenerate",
-            label: t("playlist.actions.regenerate"),
-            icon: RefreshCw,
-            onSelect: handleRegenerate,
-          } satisfies ContextMenuEntry,
-        ]
-      : []),
-    {
-      key: "share",
-      label: t("playlist.actions.sharePlaylist"),
-      icon: Share2,
-      onSelect: handleShare,
-    },
-    { type: "divider", key: "playlist-danger-divider" },
-    {
-      key: "delete",
-      label: t("playlist.actions.deletePlaylist"),
-      icon: Trash2,
-      danger: true,
-      onSelect: () => setDeleteOpen(true),
-    },
-  ];
+export interface PlaylistPageActions {
+  offlineIcon: CrateIcon;
+  playlistMenuItems: ContextMenuEntry[];
+  secondaryActions: PlaylistHeroSecondaryAction[];
 }
 
 export function getPlaylistOfflineIcon(
   offlineState: OfflineItemState,
-  offlinePresentation: PlaylistOfflinePresentation,
+  offlinePresentation: { busy: boolean },
 ): CrateIcon {
   return offlineState === "ready"
     ? ArrowDownToLineBold
@@ -220,4 +60,132 @@ export function getPlaylistOfflineIcon(
       : offlineState === "error"
         ? AlertCircle
         : ArrowDownToLine;
+}
+
+function offlineDisabled(offline: PlaylistPageOffline) {
+  return !offline.supported || offline.isSmart || offline.presentation.busy;
+}
+
+export function buildPlaylistPageActions({
+  t,
+  playDisabled,
+  onPlay,
+  onShuffle,
+  onRadio,
+  onShare,
+  offline,
+  follow,
+  onCollaborators,
+  onEdit,
+  onRegenerate,
+  onDelete,
+}: PlaylistPageActionInput): PlaylistPageActions {
+  const offlineIcon = offline
+    ? getPlaylistOfflineIcon(offline.state, offline.presentation)
+    : ArrowDownToLine;
+
+  const playlistMenuItems = buildPlaylistMenuItems({
+    t,
+    playDisabled,
+    onPlay,
+    onShuffle,
+    onStartRadio: onRadio,
+    follow: follow
+      ? {
+          followed: follow.followed,
+          disabled: follow.pending,
+          onToggle: follow.onToggle,
+        }
+      : undefined,
+    offline: offline
+      ? {
+          label: offline.presentation.buttonLabel,
+          icon: offlineIcon,
+          active: offline.state === "ready",
+          disabled: offlineDisabled(offline),
+          onToggle: offline.onToggle,
+        }
+      : undefined,
+    onCollaborators,
+    onEdit,
+    onRegenerate,
+    onShare,
+    onDelete,
+  });
+
+  const secondaryActions: PlaylistHeroSecondaryAction[] = [
+    {
+      key: "radio",
+      label: t("radio.title"),
+      ariaLabel: t("playlist.actions.radio"),
+      icon: Radio,
+      disabled: playDisabled,
+      onClick: () => void onRadio(),
+    },
+  ];
+  if (offline) {
+    secondaryActions.push({
+      key: "offline",
+      label: t("common.offline"),
+      ariaLabel:
+        offline.state === "ready"
+          ? t("playlist.offline.removeCopy")
+          : t("playlist.offline.makeAvailable"),
+      icon: offlineIcon,
+      iconClassName: offline.presentation.busy ? "animate-spin" : undefined,
+      className:
+        offline.state === "ready"
+          ? "text-text-accent drop-shadow-accent-action"
+          : offline.presentation.busy
+            ? "text-accent-action"
+            : offline.state === "error"
+              ? "text-state-warning-text/90"
+              : undefined,
+      disabled: offlineDisabled(offline),
+      title: offline.presentation.buttonLabel,
+      onClick: () => void offline.onToggle(),
+    });
+  }
+  if (follow) {
+    secondaryActions.push({
+      key: "follow",
+      label: follow.followed ? t("common.following") : t("common.follow"),
+      ariaLabel: follow.followed
+        ? t("playlist.actions.removeFromLibrary")
+        : t("common.follow"),
+      icon: follow.pending ? Loader2 : follow.followed ? HeartBold : Heart,
+      iconClassName: follow.pending ? "animate-spin" : undefined,
+      active: follow.followed,
+      pulseIcon: follow.followed,
+      disabled: follow.pending,
+      onClick: () => void follow.onToggle(),
+    });
+  }
+  if (onCollaborators) {
+    secondaryActions.push({
+      key: "collaborators",
+      label: t("playlist.actions.collabs"),
+      ariaLabel: t("playlist.actions.collaborators"),
+      icon: Users,
+      onClick: () => void onCollaborators(),
+    });
+  }
+  if (onEdit) {
+    secondaryActions.push({
+      key: "edit",
+      label: t("common.edit"),
+      ariaLabel: t("common.edit"),
+      icon: Pencil,
+      onClick: () => void onEdit(),
+    });
+  }
+  secondaryActions.push({
+    key: "share",
+    label: t("common.share"),
+    ariaLabel: t("common.share"),
+    icon: Share2,
+    onClick: () => void onShare(),
+  });
+
+  return { offlineIcon, playlistMenuItems, secondaryActions };
 }

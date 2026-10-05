@@ -31,11 +31,6 @@ const MOBILE_NAV = [
 
 const COLLECTION_SECTIONS = [
   {
-    to: "/collection/playlists",
-    icon: ListMusic,
-    labelKey: "nav.collection.playlists",
-  },
-  {
     to: "/collection/artists",
     icon: Users,
     labelKey: "nav.collection.artists",
@@ -44,6 +39,11 @@ const COLLECTION_SECTIONS = [
     to: "/collection/crates",
     icon: Disc3,
     labelKey: "nav.collection.crates",
+  },
+  {
+    to: "/collection/playlists",
+    icon: ListMusic,
+    labelKey: "nav.collection.playlists",
   },
   { to: "/collection/albums", icon: Disc, labelKey: "nav.collection.albums" },
   {
@@ -88,7 +88,7 @@ export function MobileBottomNav({
     <>
       <nav
         className={`z-app-player fixed isolate flex items-center justify-around overflow-visible bg-transparent px-1.5 ${
-          hasTrack ? "rounded-b-[12px] border-t-0" : "rounded-[12px]"
+          hasTrack ? "rounded-b-panel border-t-0" : "rounded-panel"
         }`}
         style={{
           bottom:

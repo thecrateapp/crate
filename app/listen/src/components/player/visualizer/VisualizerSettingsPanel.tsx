@@ -1,3 +1,7 @@
+import { useTranslation } from "react-i18next";
+
+import { Switch } from "@crate/ui/primitives/Switch";
+
 import type { VisualizerConfigState } from "./useVisualizerConfig";
 
 interface VisualizerSettingsPanelProps {
@@ -8,21 +12,39 @@ interface VisualizerSettingsPanelProps {
 const SLIDERS = [
   {
     key: "separation" as const,
-    label: "Separation",
+    labelKey: "player.visualizer.separation",
     min: 0,
     max: 0.5,
     step: 0.01,
   },
-  { key: "glow" as const, label: "Glow", min: 0, max: 15, step: 0.5 },
-  { key: "scale" as const, label: "Scale", min: 0.2, max: 3, step: 0.1 },
+  {
+    key: "glow" as const,
+    labelKey: "player.visualizer.glow",
+    min: 0,
+    max: 15,
+    step: 0.5,
+  },
+  {
+    key: "scale" as const,
+    labelKey: "player.visualizer.scale",
+    min: 0.2,
+    max: 3,
+    step: 0.1,
+  },
   {
     key: "persistence" as const,
-    label: "Persistence",
+    labelKey: "player.visualizer.persistence",
     min: 0,
     max: 2,
     step: 0.1,
   },
-  { key: "octaves" as const, label: "Octaves", min: 1, max: 5, step: 1 },
+  {
+    key: "octaves" as const,
+    labelKey: "player.visualizer.octaves",
+    min: 1,
+    max: 5,
+    step: 1,
+  },
 ] as const;
 
 function Toggle({
@@ -35,20 +57,12 @@ function Toggle({
   onToggle: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Switch
+      size="sm"
       aria-label={label}
-      onClick={onToggle}
-      className={`h-5 w-9 rounded-full transition-colors ${
-        on ? "bg-accent-action" : "bg-border-interactive"
-      }`}
-    >
-      <div
-        className={` size-4 rounded-full bg-text-primary shadow transition-transform ${
-          on ? "translate-x-4.5" : "translate-x-0.5"
-        }`}
-      />
-    </button>
+      checked={on}
+      onCheckedChange={onToggle}
+    />
   );
 }
 
@@ -56,6 +70,7 @@ export function VisualizerSettingsPanel({
   config,
   className,
 }: VisualizerSettingsPanelProps) {
+  const { t } = useTranslation();
   const {
     surfaceMode,
     vizEnabled,
@@ -74,13 +89,14 @@ export function VisualizerSettingsPanel({
     <div className={`space-y-3 ${className ?? ""}`}>
       <div className="mb-1 flex items-center justify-between">
         <span className="text-xs font-bold uppercase tracking-wider text-text-muted">
-          Visualizer settings
+          {t("player.visualizerSettings")}
         </span>
         <button
+          type="button"
           onClick={resetConfig}
-          className="text-xs text-accent-action hover:underline"
+          className="text-xs link-accent"
         >
-          Reset
+          {t("player.visualizer.reset")}
         </button>
       </div>
 
@@ -89,9 +105,11 @@ export function VisualizerSettingsPanel({
           vizEnabled ? "" : "opacity-45"
         }`}
       >
-        <span className="text-xs text-text-muted">Album palette</span>
+        <span className="text-xs text-text-muted">
+          {t("player.visualizer.albumPalette")}
+        </span>
         <Toggle
-          label="Album palette"
+          label={t("player.visualizer.albumPalette")}
           on={useAlbumPalette}
           onToggle={toggleAlbumPalette}
         />
@@ -102,9 +120,11 @@ export function VisualizerSettingsPanel({
           vizEnabled ? "" : "opacity-45"
         }`}
       >
-        <span className="text-xs text-text-muted">Track adaptive</span>
+        <span className="text-xs text-text-muted">
+          {t("player.visualizer.trackAdaptive")}
+        </span>
         <Toggle
-          label="Track adaptive"
+          label={t("player.visualizer.trackAdaptive")}
           on={trackAdaptiveViz}
           onToggle={toggleTrackAdaptive}
         />
@@ -113,24 +133,26 @@ export function VisualizerSettingsPanel({
       <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-2 text-xs text-text-muted">
         {!vizEnabled
           ? surfaceMode === "cd"
-            ? "CD mode active"
-            : "Cover mode active"
+            ? t("player.visualizer.cdModeActive")
+            : t("player.visualizer.coverModeActive")
           : trackAdaptiveViz
             ? trackVizProfile.hasAnalysis
-              ? `Using track analysis${
-                  trackVizProfile.summary ? ` · ${trackVizProfile.summary}` : ""
-                }`
-              : "Adaptive on, waiting for track analysis"
-            : "Adaptive off, using your saved base settings"}
+              ? trackVizProfile.summary
+                ? t("player.visualizer.usingTrackAnalysisWithSummary", {
+                    summary: trackVizProfile.summary,
+                  })
+                : t("player.visualizer.usingTrackAnalysis")
+              : t("player.visualizer.waitingForAnalysis")
+            : t("player.visualizer.adaptiveOff")}
       </div>
 
-      {SLIDERS.map(({ key, label, min, max, step }) => (
+      {SLIDERS.map(({ key, labelKey, min, max, step }) => (
         <div
           key={key}
           className={`transition-opacity ${vizEnabled ? "" : "opacity-45"}`}
         >
           <div className="mb-1 flex justify-between text-xs">
-            <span className="text-text-subtle">{label}</span>
+            <span className="text-text-subtle">{t(labelKey)}</span>
             <div className="flex items-center gap-2 font-mono">
               {trackAdaptiveViz ? (
                 <span className="text-text-subtle">
@@ -144,7 +166,7 @@ export function VisualizerSettingsPanel({
           </div>
           <input
             type="range"
-            aria-label={label}
+            aria-label={t(labelKey)}
             min={min}
             max={max}
             step={step}

@@ -46,16 +46,35 @@ def merge_global_track_rows(
     local_rows: list[dict], global_rows: list[dict], *, limit: int
 ) -> list[dict]:
     merged: list[dict] = []
-    seen: set[str] = set()
+    index_by_key: dict[str, int] = {}
     for row in [*local_rows, *global_rows]:
-        key = _track_key(row)
-        if not key or key in seen:
+        keys = _track_identity_keys(row)
+        if not keys:
             continue
-        seen.add(key)
-        merged.append(row)
+        existing_index = next(
+            (index_by_key[key] for key in keys if key in index_by_key), None
+        )
+        if existing_index is not None:
+            existing = merged[existing_index]
+            if row.get("global_track_uid") and not existing.get("global_track_uid"):
+                merged[existing_index] = _with_global_identity(existing, row)
+            for key in _track_identity_keys(merged[existing_index]):
+                index_by_key.setdefault(key, existing_index)
+            continue
         if len(merged) >= limit:
-            return merged
+            continue
+        for key in keys:
+            index_by_key[key] = len(merged)
+        merged.append(row)
     return merged
+
+
+def _with_global_identity(local_row: dict, global_row: dict) -> dict:
+    enriched = dict(local_row)
+    for key in ("global_track_uid", "global_artist_uid", "global_album_uid"):
+        if global_row.get(key) and not enriched.get(key):
+            enriched[key] = global_row[key]
+    return enriched
 
 
 def global_suggested_albums(limit: int) -> list[dict]:
@@ -125,6 +144,14 @@ def _track_key(row: dict) -> str | None:
         if value is not None:
             return f"{key}:{value}"
     return None
+
+
+def _track_identity_keys(row: dict) -> list[str]:
+    return [
+        f"{key}:{row[key]}"
+        for key in ("global_track_uid", "track_entity_uid", "track_id", "track_path")
+        if row.get(key) is not None
+    ]
 
 
 __all__ = [

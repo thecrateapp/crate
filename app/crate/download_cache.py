@@ -20,8 +20,15 @@ DOWNLOAD_CACHE_VERSION = "1"
 _DEFAULT_MAX_BYTES = 50 * 1024**3
 _DEFAULT_ALBUM_TTL_SECONDS = 7 * 86400
 _DEFAULT_TRACK_TTL_SECONDS = 2 * 86400
+_DEFAULT_CRATE_TTL_SECONDS = _DEFAULT_ALBUM_TTL_SECONDS
 _DEFAULT_LOCK_TIMEOUT_SECONDS = 900
+_DEFAULT_STALE_TMP_SECONDS = 3 * 3600
+_DISK_FREE_MARGIN_BYTES = 512 * 1024**2
 _SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9._ -]+")
+
+
+class DownloadCacheCapacityError(RuntimeError):
+    """Raised when an artifact cannot fit in the download cache or on disk."""
 
 
 @dataclass(frozen=True)
@@ -86,6 +93,20 @@ def track_cache_ttl_seconds() -> int:
     return _parse_int(
         "CRATE_DOWNLOAD_CACHE_TRACK_TTL_SECONDS", _DEFAULT_TRACK_TTL_SECONDS
     )
+
+
+def crate_cache_ttl_seconds() -> int:
+    return _parse_int(
+        "CRATE_DOWNLOAD_CACHE_CRATE_TTL_SECONDS", _DEFAULT_CRATE_TTL_SECONDS
+    )
+
+
+def _cache_ttl_seconds_for_kind(kind: str) -> int:
+    if kind == "album":
+        return album_cache_ttl_seconds()
+    if kind == "crate":
+        return crate_cache_ttl_seconds()
+    return track_cache_ttl_seconds()
 
 
 def download_cache_max_bytes() -> int:
@@ -217,6 +238,29 @@ def track_download_cache_key(
     return _sha(material)
 
 
+def crate_download_cache_key(
+    crate: dict[str, Any], tracks: list[dict[str, Any]]
+) -> str:
+    material = {
+        "version": DOWNLOAD_CACHE_VERSION,
+        "kind": "crate",
+        "crate_id": str(crate.get("id")),
+        "name": crate.get("name"),
+        "tracks": [
+            {
+                "id": track.get("id"),
+                "path": track.get("path"),
+                "artist": track.get("artist"),
+                "album": track.get("album"),
+                "size": track.get("size"),
+                "updated_at": track.get("updated_at"),
+            }
+            for track in tracks
+        ],
+    }
+    return _sha(material)
+
+
 def _artifact_dir(kind: str, key: str) -> Path:
     return download_cache_root() / kind / key[:2] / key[2:4] / key
 
@@ -290,6 +334,20 @@ def get_cached_download(
     except Exception:
         pass
     return CachedDownload(key=key, path=path, filename=path.name, bytes=stat_size)
+
+
+def find_cached_download(
+    kind: str, key: str, *, ttl_seconds: int
+) -> tuple[CachedDownload, dict[str, Any]] | None:
+    manifest = _read_manifest(kind, key)
+    if not manifest or not manifest.get("filename"):
+        return None
+    cached = get_cached_download(
+        kind, key, str(manifest["filename"]), ttl_seconds=ttl_seconds
+    )
+    if cached is None:
+        return None
+    return cached, dict(manifest.get("metadata") or {})
 
 
 def cached_download_artifact_path(kind: str, key: str, filename: str) -> Path:
@@ -394,6 +452,59 @@ def store_cached_download(
         return None
 
 
+def remove_download_tmp_files(kind: str, key: str) -> int:
+    removed = 0
+    directory = _artifact_dir(kind, key)
+    if not directory.is_dir():
+        return 0
+    for tmp_path in directory.glob(".*.tmp"):
+        with contextlib.suppress(OSError):
+            tmp_path.unlink()
+            removed += 1
+    return removed
+
+
+def _sweep_stale_tmp_files(max_age_seconds: int) -> tuple[int, int]:
+    root = download_cache_root()
+    if not root.is_dir():
+        return 0, 0
+    cutoff = time.time() - max_age_seconds
+    removed = 0
+    bytes_removed = 0
+    for tmp_path in root.glob("*/*/*/*/.*.tmp"):
+        try:
+            stat = tmp_path.stat()
+            if stat.st_mtime > cutoff:
+                continue
+            tmp_path.unlink()
+        except OSError:
+            continue
+        removed += 1
+        bytes_removed += stat.st_size
+        with contextlib.suppress(OSError):
+            tmp_path.parent.rmdir()
+    return removed, bytes_removed
+
+
+def ensure_download_cache_capacity(expected_bytes: int) -> None:
+    max_bytes = download_cache_max_bytes()
+    if expected_bytes > max_bytes:
+        raise DownloadCacheCapacityError(
+            f"Download needs {expected_bytes} bytes, above the download cache "
+            f"limit of {max_bytes} bytes"
+        )
+    prune_download_cache(max_bytes=max(1, max_bytes - expected_bytes))
+    root = download_cache_root()
+    root.mkdir(parents=True, exist_ok=True)
+    free_bytes = shutil.disk_usage(root).free
+    if expected_bytes + _DISK_FREE_MARGIN_BYTES > free_bytes:
+        raise DownloadCacheCapacityError(
+            f"Not enough free disk space for the download: needs {expected_bytes} "
+            f"bytes plus a {_DISK_FREE_MARGIN_BYTES} byte margin, "
+            f"{free_bytes} bytes free"
+        )
+
+
 def remove_cached_download(kind: str, key: str) -> None:
     shutil.rmtree(_artifact_dir(kind, key), ignore_errors=True)
 
@@ -458,14 +569,11 @@ def prune_download_cache(*, max_bytes: int | None = None) -> dict[str, Any]:
         return {"removed": 0, "bytes_removed": 0, "bytes": 0, "limit": 0}
 
     now = time.time()
-    removed = 0
-    bytes_removed = 0
+    removed, bytes_removed = _sweep_stale_tmp_files(_DEFAULT_STALE_TMP_SECONDS)
     survivors: list[tuple[Path, Path, dict[str, Any], int]] = []
     for artifact_path, manifest_path, manifest in _iter_artifacts():
         kind = str(manifest.get("kind") or "")
-        ttl = (
-            album_cache_ttl_seconds() if kind == "album" else track_cache_ttl_seconds()
-        )
+        ttl = _cache_ttl_seconds_for_kind(kind)
         created_at = float(manifest.get("created_at") or 0)
         try:
             size = artifact_path.stat().st_size
@@ -511,13 +619,19 @@ def prune_download_cache(*, max_bytes: int | None = None) -> dict[str, Any]:
 
 __all__ = [
     "CachedDownload",
+    "DownloadCacheCapacityError",
     "album_cache_ttl_seconds",
     "album_download_cache_key",
     "cached_download_artifact_path",
+    "crate_cache_ttl_seconds",
+    "crate_download_cache_key",
     "download_cache_lock",
+    "ensure_download_cache_capacity",
+    "find_cached_download",
     "get_cached_download",
     "prune_download_cache",
     "register_cached_download",
+    "remove_download_tmp_files",
     "safe_download_filename",
     "store_cached_download",
     "track_cache_ttl_seconds",

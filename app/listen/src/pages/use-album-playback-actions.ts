@@ -1,5 +1,5 @@
 import { usePlayerActions } from "@/contexts/PlayerContext";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { fetchAlbumRadio } from "@/lib/radio";
 import { shuffleArray } from "@/lib/utils";
@@ -73,11 +73,11 @@ export function useAlbumPlaybackActions({
 
   async function handleAlbumRadio() {
     if (albumRadioSeed == null) {
-      toast.info(t("album.toasts.radioUnavailable"));
+      notify.info(t("album.toasts.radioUnavailable"));
       return;
     }
     if (isPreRelease) {
-      toast.info(t("album.toasts.radioPrerelease"));
+      notify.info(t("album.toasts.radioPrerelease"));
       return;
     }
     try {
@@ -87,18 +87,19 @@ export function useAlbumPlaybackActions({
         albumName: displayName,
       });
       if (!radio.tracks.length) {
-        toast.info(t("album.toasts.radioUnavailable"));
+        notify.info(t("album.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error(t("album.toasts.radioFailed"));
+      notify.error(t("album.toasts.radioFailed"));
     }
   }
 
   const handlePlayNextAlbum = () => {
+    if (playerTracks.length === 0) return;
     [...playerTracks].reverse().forEach((track) => playNext(track));
-    toast.success(t("album.toasts.queuedNext"));
+    notify.success(t("album.toasts.queuedNext"));
     closeAlbumMenu();
   };
 

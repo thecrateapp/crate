@@ -3,13 +3,15 @@ import { useTranslation } from "react-i18next";
 import { Heart, Loader2, Radar, RefreshCw } from "@crate/ui/icons";
 import type { LucideIcon } from "@crate/ui/icons";
 import type { ReactNode } from "react";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
+import { MediaGrid } from "@crate/ui/domain/lists";
+import { EmptyState } from "@crate/ui/domain/states";
+import { Button } from "@crate/ui/shadcn/button";
 import { api } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
-import { BandcampCard } from "./BandcampCard";
-import { BandcampListItem } from "./BandcampListItem";
+import { BandcampItem as BandcampItemView } from "@/components/bandcamp/BandcampItem";
 import type {
   BandcampCollectionResponse,
   BandcampConnectionStatus,
@@ -65,7 +67,7 @@ export function Bandcamp() {
     setBusyAction(busyKey);
     try {
       const response = await api<BandcampTaskResponse>(path, "POST");
-      toast.success(
+      notify.success(
         t("bandcamp.toasts.taskQueued", {
           task: taskLabel,
           taskId: response.task_id,
@@ -73,7 +75,9 @@ export function Bandcamp() {
       );
       refreshAll();
     } catch (error) {
-      toast.error((error as Error).message || t("bandcamp.toasts.queueFailed"));
+      notify.error(
+        (error as Error).message || t("bandcamp.toasts.queueFailed"),
+      );
     } finally {
       setBusyAction(null);
     }
@@ -89,12 +93,12 @@ export function Bandcamp() {
         "POST",
         { bandcamp_item_id: itemId, format: "flac" },
       );
-      toast.success(
+      notify.success(
         t("bandcamp.toasts.importQueued", { taskId: response.task_id }),
       );
       refreshAll();
     } catch (error) {
-      toast.error(
+      notify.error(
         (error as Error).message || t("bandcamp.toasts.importFailed"),
       );
     } finally {
@@ -112,12 +116,12 @@ export function Bandcamp() {
     t("bandcamp.connection.accountFallback");
 
   return (
-    <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-8 px-4 py-6 md:px-8">
-      <section className="bandcamp-page-surface relative overflow-hidden rounded-[12px] border border-text-primary/8 p-6 md:p-8">
+    <div className="mx-auto flex w-full max-w-content flex-col gap-8 sm:py-6">
+      <section className="bandcamp-page-surface relative overflow-hidden rounded-panel border border-text-primary/8 p-6 md:p-8">
         <div className="bandcamp-page-sheen pointer-events-none absolute inset-y-0 right-0 w-1/2" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full bg-accent-action/10 px-3 py-2 text-xs font-black uppercase tracking-[0.24em] text-accent-action">
+            <div className="inline-flex items-center gap-2 rounded-full bg-accent-action/10 px-3 py-2 text-xs font-black uppercase tracking-overline-wide text-accent-action">
               <BandcampLogo className=" size-3.5" />
               Bandcamp
             </div>
@@ -135,8 +139,8 @@ export function Bandcamp() {
             />
           </div>
           <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
+            <Button
+              shape="pill"
               disabled={!connected || busyAction !== null}
               onClick={() =>
                 queueTask(
@@ -145,7 +149,7 @@ export function Bandcamp() {
                   t("bandcamp.tasks.sync"),
                 )
               }
-              className="inline-flex h-11 items-center gap-2 rounded-full bg-accent-action px-5 text-sm font-black text-accent-action-foreground transition hover:bg-accent-action/90 disabled:opacity-50"
+              className="h-11 px-5 font-black shadow-none hover:bg-accent-action/90 has-[>svg]:px-5"
             >
               {busyAction === "sync" ? (
                 <Loader2 className=" size-4 animate-spin" />
@@ -153,9 +157,10 @@ export function Bandcamp() {
                 <RefreshCw className=" size-4" />
               )}
               {t("bandcamp.actions.sync")}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
+              shape="pill"
               disabled={!connected || busyAction !== null}
               onClick={() =>
                 queueTask(
@@ -164,11 +169,11 @@ export function Bandcamp() {
                   t("bandcamp.tasks.radar"),
                 )
               }
-              className="inline-flex h-11 items-center gap-2 rounded-full border border-text-primary/12 bg-text-primary/5 px-5 text-sm font-black text-text-primary transition hover:bg-text-primary/10 disabled:opacity-50"
+              className="h-11 border border-text-primary/12 bg-text-primary/5 px-5 font-black text-text-primary hover:bg-text-primary/10 hover:text-text-primary has-[>svg]:px-5"
             >
               <Radar className=" size-4" />
               {t("bandcamp.actions.refreshRadar")}
-            </button>
+            </Button>
           </div>
         </div>
       </section>
@@ -269,9 +274,9 @@ function StatCard({
   icon: LucideIcon | typeof BandcampLogo;
 }) {
   return (
-    <div className="rounded-[12px] border border-text-primary/8 bg-text-primary/[0.035] p-5">
+    <div className="rounded-panel border border-text-primary/8 bg-text-primary/[0.035] p-5">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-black uppercase tracking-[0.24em] text-text-muted">
+        <span className="text-xs font-black uppercase tracking-overline-wide text-text-muted">
           {label}
         </span>
         <Icon className=" size-4 text-accent-action" />
@@ -293,7 +298,7 @@ function Rail({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[12px] border border-text-primary/8 bg-surface-elevated/90 p-5">
+    <section className="rounded-panel border border-text-primary/8 bg-surface-elevated/90 p-5">
       <div className="mb-5">
         <h2 className="text-2xl font-black text-text-primary">{title}</h2>
         <p className="mt-1 text-sm text-text-muted">{subtitle}</p>
@@ -314,18 +319,20 @@ function ItemGrid({
   onImport: (item: BandcampItem) => void;
   empty: string;
 }) {
-  if (!items.length) return <Empty label={empty} />;
+  if (!items.length)
+    return <EmptyState variant="dashed" message={empty} className="py-6" />;
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <MediaGrid density="wide">
       {items.map((item) => (
-        <BandcampCard
+        <BandcampItemView
           key={`${item.id}-${item.item_url}`}
+          variant="tile"
           item={item}
           busyAction={busyAction}
           onImport={onImport}
         />
       ))}
-    </div>
+    </MediaGrid>
   );
 }
 
@@ -340,25 +347,19 @@ function ItemList({
   onImport: (item: BandcampItem) => void;
   empty: string;
 }) {
-  if (!items.length) return <Empty label={empty} />;
+  if (!items.length)
+    return <EmptyState variant="dashed" message={empty} className="py-6" />;
   return (
     <div className="space-y-3">
       {items.map((item) => (
-        <BandcampListItem
+        <BandcampItemView
           key={`${item.id}-${item.item_url}`}
+          variant="row"
           item={item}
           busyAction={busyAction}
           onImport={onImport}
         />
       ))}
-    </div>
-  );
-}
-
-function Empty({ label }: { label: string }) {
-  return (
-    <div className="rounded-lg border border-dashed border-border-quiet bg-surface-canvas/16 p-6 text-sm text-text-muted">
-      {label}
     </div>
   );
 }

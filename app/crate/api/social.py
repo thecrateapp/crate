@@ -136,7 +136,9 @@ def social_profile(request: Request, username: str):
         raise HTTPException(status_code=404, detail="User not found")
     target_user_id = profile["id"]
     profile["public_playlists"] = get_public_playlists_for_user(target_user_id)
-    profile["public_crates"] = get_public_crates_for_user(target_user_id)
+    profile["public_crates"] = get_public_crates_for_user(
+        target_user_id, viewer_id=viewer["id"]
+    )
     profile["relationship_state"] = get_relationship_state(viewer["id"], target_user_id)
     profile.update(get_affinity(viewer["id"], target_user_id))
     return profile
@@ -178,7 +180,9 @@ def social_profile_page(request: Request, username: str):
 
     target_user_id = profile["id"]
     profile["public_playlists"] = get_public_playlists_for_user(target_user_id)
-    profile["public_crates"] = get_public_crates_for_user(target_user_id)
+    profile["public_crates"] = get_public_crates_for_user(
+        target_user_id, viewer_id=viewer["id"]
+    )
     profile["relationship_state"] = get_relationship_state(viewer["id"], target_user_id)
     profile.update(get_affinity(viewer["id"], target_user_id))
     summary = get_profile_card_summary(target_user_id)

@@ -1,8 +1,11 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { MediaGrid } from "@crate/ui/domain/lists";
+import { BackLink } from "@crate/ui/domain/navigation/BackLink";
+import { PageHeader } from "@crate/ui/domain/navigation/PageHeader";
+import { EmptyState, ErrorState } from "@crate/ui/domain/states";
+import { notify } from "@crate/ui/lib/notify";
 
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
@@ -35,6 +38,7 @@ import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 import { toTrackRowData } from "@/lib/track-row-data";
 import { shuffleArray } from "@/lib/utils";
+import { dedupeTrackRows } from "@/pages/home-page-model";
 
 function toPlayerTrack(item: HomeRecommendedTrack): Track {
   return toPlayableTrack(item, {
@@ -80,7 +84,9 @@ export function HomeSection() {
   const recommendedTracks = useMemo(
     () =>
       data?.id === "recommended-tracks"
-        ? data.items.map((item): TrackRowData => toTrackRowData(item))
+        ? dedupeTrackRows(
+            data.items.map((item): TrackRowData => toTrackRowData(item)),
+          )
         : [],
     [data],
   );
@@ -90,7 +96,7 @@ export function HomeSection() {
       const playlist = await loadHomePlaylist(item.id);
       const queue = (playlist.tracks || []).map(toPlayerTrack);
       if (!queue.length) {
-        toast.info(t("home.playlists.warming"));
+        notify.info(t("home.playlists.warming"));
         return;
       }
       playAll(queue, 0, {
@@ -99,7 +105,7 @@ export function HomeSection() {
         id: playlist.id,
       });
     } catch {
-      toast.error(t("home.playlists.loadFailed"));
+      notify.error(t("home.playlists.loadFailed"));
     }
   }
 
@@ -108,7 +114,7 @@ export function HomeSection() {
       const playlist = await loadHomePlaylist(item.id);
       const queue = (playlist.tracks || []).map(toPlayerTrack);
       if (!queue.length) {
-        toast.info(t("home.playlists.warming"));
+        notify.info(t("home.playlists.warming"));
         return;
       }
       playAll(shuffleArray(queue), 0, {
@@ -117,7 +123,7 @@ export function HomeSection() {
         id: playlist.id,
       });
     } catch {
-      toast.error(t("home.playlists.loadFailed"));
+      notify.error(t("home.playlists.loadFailed"));
     }
   }
 
@@ -128,12 +134,12 @@ export function HomeSection() {
         playlistName: item.name,
       });
       if (!radio.tracks.length) {
-        toast.info(t("actions.playlist.toasts.radioUnavailable"));
+        notify.info(t("actions.playlist.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error(t("actions.playlist.toasts.radioFailed"));
+      notify.error(t("actions.playlist.toasts.radioFailed"));
     }
   }
 
@@ -154,7 +160,7 @@ export function HomeSection() {
           50,
         );
         if (!radio.tracks.length) {
-          toast.info(t("actions.artist.toasts.radioUnavailable"));
+          notify.info(t("actions.artist.toasts.radioUnavailable"));
           return;
         }
         playAll(radio.tracks, 0, radio.source);
@@ -167,13 +173,13 @@ export function HomeSection() {
           albumName: station.album_name || station.title,
         });
         if (!radio.tracks.length) {
-          toast.info(t("actions.album.toasts.radioUnavailable"));
+          notify.info(t("actions.album.toasts.radioUnavailable"));
           return;
         }
         playAll(radio.tracks, 0, radio.source);
       }
     } catch {
-      toast.error(t("home.radio.toasts.startFailed"));
+      notify.error(t("home.radio.toasts.startFailed"));
     }
   }
 
@@ -183,36 +189,32 @@ export function HomeSection() {
 
   if (!data) {
     return (
-      <div className="space-y-4 py-16 text-center">
-        <p className="text-sm text-text-muted">{t("home.section.notFound")}</p>
-      </div>
+      <ErrorState
+        kind="notFound"
+        message={t("home.section.notFound")}
+        backTo="/"
+        backLabel={t("common.back")}
+      />
     );
   }
 
   return (
     <div className="space-y-6">
-      <button
-        onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-2 text-sm text-text-muted transition-colors hover:text-text-primary"
-      >
-        <ArrowLeft size={16} />
-        {t("common.back")}
-      </button>
-
-      <div>
-        <h1 className="text-3xl font-bold text-text-primary">{data.title}</h1>
-        <p className="mt-2 text-sm text-text-muted">{data.subtitle}</p>
-      </div>
+      <PageHeader
+        back={
+          <BackLink label={t("common.back")} onClick={() => navigate(-1)} />
+        }
+        title={data.title}
+        subtitle={data.subtitle}
+      />
 
       {!data.items.length ? (
-        <div className="rounded-[12px] border border-border-quiet bg-text-primary/[0.03] px-5 py-12 text-center">
-          <p className="text-sm font-medium text-text-primary">
-            {t("home.section.empty.title")}
-          </p>
-          <p className="mx-auto mt-2 max-w-md text-sm text-text-muted">
-            {t("home.section.empty.description")}
-          </p>
-        </div>
+        <EmptyState
+          variant="panel"
+          icon={null}
+          title={t("home.section.empty.title")}
+          message={t("home.section.empty.description")}
+        />
       ) : null}
 
       {data.id === "recently-played" ? (
@@ -232,7 +234,7 @@ export function HomeSection() {
       ) : null}
 
       {data.id === "custom-mixes" ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+        <MediaGrid>
           {data.items.map((item) => (
             <CustomMixCard
               key={item.id}
@@ -244,11 +246,11 @@ export function HomeSection() {
               layout="grid"
             />
           ))}
-        </div>
+        </MediaGrid>
       ) : null}
 
       {data.id === "suggested-albums" || data.id === "upcoming-albums" ? (
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
+        <MediaGrid>
           {data.items.map((album) => (
             <AlbumCard
               key={`${
@@ -270,7 +272,7 @@ export function HomeSection() {
               layout="grid"
             />
           ))}
-        </div>
+        </MediaGrid>
       ) : null}
 
       {data.id === "recommended-tracks" ? (
@@ -295,7 +297,7 @@ export function HomeSection() {
       ) : null}
 
       {data.id === "radio-stations" ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        <MediaGrid>
           {data.items.map((station) => (
             <RadioStationCard
               key={`${station.type}-${
@@ -311,11 +313,11 @@ export function HomeSection() {
               layout="grid"
             />
           ))}
-        </div>
+        </MediaGrid>
       ) : null}
 
       {data.id === "favorite-artists" ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        <MediaGrid>
           {data.items.map((artist) => (
             <ArtistCard
               key={
@@ -333,11 +335,11 @@ export function HomeSection() {
               fillGrid
             />
           ))}
-        </div>
+        </MediaGrid>
       ) : null}
 
       {data.id === "core-tracks" ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        <MediaGrid>
           {data.items.map((item) => (
             <CoreTracksPlaylistCard
               key={item.id}
@@ -351,7 +353,7 @@ export function HomeSection() {
               layout="grid"
             />
           ))}
-        </div>
+        </MediaGrid>
       ) : null}
     </div>
   );

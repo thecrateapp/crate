@@ -41,10 +41,16 @@ describe("PlayerTrackMenu", () => {
     );
 
     expect(useApi).not.toHaveBeenCalledWith("/api/playlists");
-    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Más acciones" }));
 
     await waitFor(() => {
       expect(useApi).toHaveBeenCalledWith("/api/playlists");
+    });
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: "Añadir a playlist" }),
+    );
+
+    await waitFor(() => {
       expect(
         screen.getByRole("menuitem", { name: "Añadir a Favorites" }),
       ).toBeInTheDocument();

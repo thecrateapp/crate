@@ -1,11 +1,14 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router";
 
+import { MediaGrid } from "@crate/ui/domain/lists";
+import { EmptyState, LoadingState } from "@crate/ui/domain/states";
+import { Button } from "@crate/ui/shadcn/button";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { useApi } from "@/hooks/use-api";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
-import { EmptyState, Spinner } from "./LibraryPrimitives";
 import { CollectionSortDropdown } from "./LibraryCollectionSortDropdown";
 import {
   artistSortOptions,
@@ -38,16 +41,27 @@ export function LibraryArtistsTab() {
     });
   }, [artists, sort]);
 
-  if (loading) return <Spinner />;
+  if (loading) return <LoadingState label={t("common.loadingShort")} />;
   if (!artists || artists.length === 0) {
-    return <EmptyState message={t("library.artists.empty")} />;
+    return (
+      <EmptyState
+        variant="dashed"
+        title={t("library.artists.emptyTitle")}
+        description={t("library.artists.empty")}
+        action={
+          <Button asChild size="sm">
+            <Link to="/explore">{t("nav.explore")}</Link>
+          </Button>
+        }
+      />
+    );
   }
 
   return (
     <div className="space-y-4">
       {!isDesktop ? (
         <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-bold uppercase tracking-[0.16em] text-text-primary/40">
+          <span className="text-xs font-bold uppercase tracking-kicker text-text-primary/40">
             {t("library.sort.label")}
           </span>
           <CollectionSortDropdown
@@ -58,7 +72,7 @@ export function LibraryArtistsTab() {
           />
         </div>
       ) : null}
-      <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6">
+      <MediaGrid>
         {sortedArtists.map((artist) => (
           <ArtistCard
             key={
@@ -77,7 +91,7 @@ export function LibraryArtistsTab() {
             layout="grid"
           />
         ))}
-      </div>
+      </MediaGrid>
     </div>
   );
 }

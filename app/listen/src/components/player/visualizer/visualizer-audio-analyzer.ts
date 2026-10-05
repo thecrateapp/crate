@@ -1,3 +1,5 @@
+import { clamp } from "@/lib/utils";
+
 export interface AudioMetrics {
   freqAvg: number;
   timeAvg: number;
@@ -18,10 +20,6 @@ export interface AudioAnalysisOptions {
   time: number;
   beatResponse: number;
   beatDecay: number;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
 }
 
 function lerp(a: number, b: number, t: number) {

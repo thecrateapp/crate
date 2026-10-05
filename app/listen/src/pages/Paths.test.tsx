@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useApi } from "@/hooks/use-api";
@@ -19,6 +19,13 @@ vi.mock("@/lib/api", async (importOriginal) => {
     api: vi.fn(),
   };
 });
+
+vi.mock("@/contexts/LikedTracksContext", () => ({
+  useLikedTracks: () => ({
+    isLiked: () => false,
+    toggleTrackLike: vi.fn(),
+  }),
+}));
 
 const mockUseApi = vi.mocked(useApi);
 
@@ -99,6 +106,49 @@ describe("Music paths pages", () => {
     ).toHaveLength(2);
   });
 
+  it("shows a not-found state instead of loading forever for a missing path", () => {
+    mockUseApi.mockReturnValue({
+      data: null,
+      loading: false,
+      error: "Not found",
+      status: 404,
+      refetch: vi.fn(),
+    });
+
+    renderWithListenProviders(<PathDetail />, {
+      route: "/paths/404",
+      path: "/paths/:id",
+      locale: "es",
+    });
+
+    expect(screen.getByText("Ruta no encontrada")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Reintentar/ })).toBeNull();
+    expect(screen.getByRole("link", { name: /Rutas/ })).toHaveAttribute(
+      "href",
+      "/paths",
+    );
+  });
+
+  it("offers a retry when the path fails to load", () => {
+    const refetch = vi.fn();
+    mockUseApi.mockReturnValue({
+      data: null,
+      loading: false,
+      error: "Server error",
+      status: 500,
+      refetch,
+    });
+
+    renderWithListenProviders(<PathDetail />, {
+      route: "/paths/77",
+      path: "/paths/:id",
+      locale: "es",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Reintentar/ }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
   it("localizes the path detail chrome", () => {
     renderWithListenProviders(<PathDetail />, {
       route: "/paths/77",
@@ -114,5 +164,31 @@ describe("Music paths pages", () => {
     expect(
       screen.getByRole("button", { name: "Eliminar" }),
     ).toBeInTheDocument();
+  });
+
+  it("renders path steps as track rows with distance meta, playing from the step", async () => {
+    const playAll = vi.fn();
+    renderWithListenProviders(<PathDetail />, {
+      route: "/paths/77",
+      path: "/paths/:id",
+      playerActions: { playAll },
+    });
+
+    const row = screen.getByRole("row", { name: "Track Two" });
+    expect(row).toHaveClass("track-row");
+    expect(screen.getByText("0.200")).toBeInTheDocument();
+
+    fireEvent.click(row);
+    expect(playAll).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({ title: "Track One" }),
+        expect.objectContaining({ title: "Track Two" }),
+      ],
+      1,
+      { type: "playlist", name: "Punk to Post-hardcore", id: 77 },
+    );
+
+    fireEvent.contextMenu(row);
+    expect(await screen.findByText("Play now")).toBeInTheDocument();
   });
 });
