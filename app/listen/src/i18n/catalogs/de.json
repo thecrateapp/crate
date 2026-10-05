@@ -1701,7 +1701,7 @@
   "settings.account.bioPlaceholder": "Eine kurze Notiz darüber, was du hörst",
   "settings.account.saveProfile": "Profil speichern",
   "settings.account.connectedAccounts": "Verbundene Konten",
-  "settings.account.connectedAccountsDescription": "Verknüpfe Google oder Apple, damit dieses Profil Social Sign-in direkt aus Listen nutzen kann.",
+  "settings.account.connectedAccountsDescription": "Verknüpfe einen Anmeldeanbieter, damit dieses Profil Social Sign-in direkt aus Listen nutzen kann.",
   "settings.account.linked": "Mit diesem Konto verknüpft",
   "settings.account.notLinked": "Noch nicht verknüpft",
   "settings.account.link": "Verknüpfen",

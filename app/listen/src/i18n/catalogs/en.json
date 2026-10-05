@@ -1723,7 +1723,7 @@
   "settings.account.bioPlaceholder": "A short note about what you listen to",
   "settings.account.saveProfile": "Save profile",
   "settings.account.connectedAccounts": "Connected accounts",
-  "settings.account.connectedAccountsDescription": "Link Google or Apple so this profile can use social sign-in directly from Listen.",
+  "settings.account.connectedAccountsDescription": "Link a sign-in provider so this profile can use social sign-in directly from Listen.",
   "settings.account.linked": "Linked to this account",
   "settings.account.notLinked": "Not linked yet",
   "settings.account.link": "Link",

@@ -180,12 +180,12 @@ export function PlayerBarView({
       {!hidePlayerBarForMobileFullscreen ? (
         <div
           className={cn(
-            "fixed isolate h-[var(--listen-mobile-player-height)] overflow-visible transition-[bottom,left,right,height] duration-200 md:left-3 md:right-3 md:h-[82px]",
+            "fixed isolate h-[var(--listen-mobile-player-height)] overflow-visible transition-[bottom,left,right,height] duration-200 md:left-3 md:right-3 md:h-(--listen-desktop-player-height)",
             hasFloatingOverlayOpen ? "z-app-player-overlay" : "z-app-player",
           )}
           style={{
             bottom: isDesktop
-              ? 12
+              ? "var(--listen-desktop-player-bottom-offset)"
               : "calc(var(--listen-safe-bottom) + var(--listen-mobile-bottom-dock-inset) + var(--listen-mobile-bottom-nav-content-height))",
             left: isDesktop ? undefined : "max(1rem, var(--listen-safe-left))",
             right: isDesktop

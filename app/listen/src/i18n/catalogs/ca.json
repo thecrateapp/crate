@@ -1701,7 +1701,7 @@
   "settings.account.bioPlaceholder": "Una nota curta sobre el que escoltes",
   "settings.account.saveProfile": "Desa perfil",
   "settings.account.connectedAccounts": "Comptes connectats",
-  "settings.account.connectedAccountsDescription": "Vincula Google o Apple perquè aquest perfil pugui utilitzar l'inici de sessió social directament des de Listen.",
+  "settings.account.connectedAccountsDescription": "Vincula un proveïdor d'inici de sessió perquè aquest perfil pugui utilitzar l'inici de sessió social directament des de Listen.",
   "settings.account.linked": "Vinculat a aquest compte",
   "settings.account.notLinked": "Encara no vinculat",
   "settings.account.link": "Vincula",

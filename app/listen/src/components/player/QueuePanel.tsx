@@ -102,7 +102,7 @@ export const QueuePanel = memo(function QueuePanel({
       )}
 
       {/* Upcoming */}
-      <div className="flex-1 overflow-y-auto overscroll-contain">
+      <div className="flex-1 overflow-y-auto overscroll-contain pb-2">
         {upcoming.length > 0 && (
           <div className="px-4 pt-3">
             <p className="mb-2 text-xs font-bold uppercase tracking-wider text-text-muted">
@@ -169,7 +169,7 @@ export const QueuePanel = memo(function QueuePanel({
   }
 
   return (
-    <div className="listen-glass-panel listen-glass-panel--dock z-app-player-drawer fixed right-0 top-0 bottom-[72px] flex w-[360px] animate-in slide-in-from-right flex-col border-l border-border-quiet">
+    <div className="listen-glass-panel listen-glass-panel--dock z-app-player-drawer fixed right-0 top-0 bottom-(--listen-desktop-player-clearance) flex w-[360px] animate-in slide-in-from-right flex-col border-l border-border-quiet">
       {content}
     </div>
   );

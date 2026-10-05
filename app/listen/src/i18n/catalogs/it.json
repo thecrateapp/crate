@@ -1701,7 +1701,7 @@
   "settings.account.bioPlaceholder": "Una breve nota su ciò che ascolti",
   "settings.account.saveProfile": "Salva profilo",
   "settings.account.connectedAccounts": "Account collegati",
-  "settings.account.connectedAccountsDescription": "Collega Google o Apple così questo profilo può usare l'accesso social direttamente da Listen.",
+  "settings.account.connectedAccountsDescription": "Collega un provider di accesso così questo profilo può usare l'accesso social direttamente da Listen.",
   "settings.account.linked": "Collegato a questo account",
   "settings.account.notLinked": "Non ancora collegato",
   "settings.account.link": "Collega",

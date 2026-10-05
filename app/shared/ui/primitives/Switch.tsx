@@ -16,7 +16,7 @@ function Switch({ className, size = "md", ...props }: SwitchProps) {
       data-slot="switch"
       data-size={size}
       className={cn(
-        "peer relative inline-flex shrink-0 cursor-pointer items-center rounded-full border border-border-subtle bg-surface-control outline-none transition-[background-color,border-color,box-shadow] focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-accent-action data-[state=checked]:bg-accent-action aria-invalid:border-state-danger",
+        "peer relative inline-flex shrink-0 cursor-pointer items-center rounded-full border border-border-subtle bg-surface-control outline-none transition-[background-color,border-color,box-shadow] focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-accent-action data-[state=checked]:bg-accent-action aria-invalid:border-state-danger",
         size === "sm" ? "h-5 w-9" : "h-6 w-11",
         className,
       )}

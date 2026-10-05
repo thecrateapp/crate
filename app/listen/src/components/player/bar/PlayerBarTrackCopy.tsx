@@ -99,19 +99,19 @@ export function PlayerBarTrackCopy({
         <div className="relative mt-0.5 hidden h-[14px] lg:block">
           <p
             key={`src-${sourceLabel}`}
-            className="animate-fade-in truncate text-xs leading-tight text-text-muted"
+            className="animate-fade-in flex min-w-0 items-baseline gap-1 text-xs leading-tight text-text-muted"
           >
-            {t("player.playingFrom")}{" "}
+            <span className="shrink-0">{t("player.playingFrom")}</span>
             {displayPlaySource?.href && sourceLabel !== "Discovery Radio" ? (
               <button
                 type="button"
-                className="link-meta"
+                className="link-meta link-inset min-w-0 truncate text-left"
                 onClick={onOpenSource}
               >
                 {sourceLabel}
               </button>
             ) : (
-              sourceLabel
+              <span className="min-w-0 truncate">{sourceLabel}</span>
             )}
           </p>
         </div>

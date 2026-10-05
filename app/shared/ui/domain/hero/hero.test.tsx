@@ -166,6 +166,25 @@ describe("HeroActionBar", () => {
     expect(onRadio).toHaveBeenCalledTimes(1);
   });
 
+  it("offsets the focus ring on the accent primary action only", () => {
+    render(
+      <HeroActionBar
+        primaryActions={[
+          { key: "play", label: "Play" },
+          { key: "shuffle", label: "Shuffle", tone: "neutral" },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Play" })).toHaveClass(
+      "focus-visible:outline-offset-2",
+      "focus-visible:outline-focus-ring",
+    );
+    expect(screen.getByRole("button", { name: "Shuffle" })).toHaveClass(
+      "focus-visible:shadow-focus",
+    );
+  });
+
   it("marks loading primary actions busy", () => {
     render(
       <HeroActionBar

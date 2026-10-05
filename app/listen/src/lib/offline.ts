@@ -30,6 +30,7 @@ export {
   getOfflineCacheName,
   getOfflineItemKey,
   hydrateOfflineProfileState,
+  isOfflineMediaCacheName,
   loadOfflineNativeAssetIndex,
   loadOfflineSnapshot,
   normalizeOfflineSnapshot,

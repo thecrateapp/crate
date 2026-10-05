@@ -60,7 +60,7 @@ export const PlayButton = forwardRef<HTMLButtonElement, PlayButtonProps>(
         data-reveal={reveal}
         data-state={loading ? "loading" : playing ? "playing" : "idle"}
         className={cn(
-          "inline-flex shrink-0 items-center justify-center rounded-full bg-accent-action text-accent-action-foreground shadow-action outline-none transition-[transform,opacity,background-color,box-shadow] hover:scale-105 hover:bg-accent-action-hover focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50",
+          "inline-flex shrink-0 items-center justify-center rounded-full bg-accent-action text-accent-action-foreground shadow-action outline-none transition-[transform,opacity,background-color,box-shadow] hover:scale-105 hover:bg-accent-action-hover focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:pointer-events-none disabled:opacity-50",
           SIZE_CLASS_NAME[size],
           reveal === "hover" && !playing && !loading && HOVER_REVEAL_CLASS_NAME,
           className,

@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { ArtistBioProfile } from "./ArtistBioProfile";
+import { ArtistBioProfile, mergeArtistBioMembers } from "./ArtistBioProfile";
 
 describe("ArtistBioProfile", () => {
   it("renders the full multi-paragraph bio and grouped member tables", () => {
@@ -33,6 +33,49 @@ describe("ArtistBioProfile", () => {
     expect(
       screen.getByRole("table", { name: "Former members" }),
     ).toBeInTheDocument();
+  });
+
+  it("merges roles for the same member and period into a single row", () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    render(
+      <ArtistBioProfile
+        artistName="Kneecap"
+        bio=""
+        members={[
+          { name: "Mo Chara", roles: ["vocals"], begin: "2017" },
+          { name: "Mo Chara", roles: ["lyrics", "vocals"], begin: "2017" },
+          { name: "Mo Chara", roles: ["bass"], begin: "2010", end: "2012" },
+        ]}
+      />,
+    );
+
+    const current = screen.getByRole("table", { name: "Current members" });
+    const former = screen.getByRole("table", { name: "Former members" });
+    expect(current.querySelectorAll("tbody tr")).toHaveLength(1);
+    expect(current).toHaveTextContent("vocals, lyrics");
+    expect(former.querySelectorAll("tbody tr")).toHaveLength(1);
+    expect(former).toHaveTextContent("bass");
+    expect(
+      consoleError.mock.calls.some((call) =>
+        String(call[0]).includes("same key"),
+      ),
+    ).toBe(false);
+    consoleError.mockRestore();
+  });
+
+  it("keeps distinct periods for the same member as separate entries", () => {
+    expect(
+      mergeArtistBioMembers([
+        { name: "A", roles: ["drums"], begin: "2000", end: "2004" },
+        { name: "A", begin: "2000", end: "2004" },
+        { name: "A", roles: ["drums"], begin: "2008" },
+      ]),
+    ).toEqual([
+      { name: "A", roles: ["drums"], begin: "2000", end: "2004" },
+      { name: "A", roles: ["drums"], begin: "2008" },
+    ]);
   });
 
   it("formats partial and full member dates for readable table cells", () => {

@@ -2415,6 +2415,15 @@ button.genre-pill:hover {
     outline-offset: 2px;
   }
 
+  .link-meta.link-inset:focus-visible,
+  .link-accent.link-inset:focus-visible {
+    outline-color: transparent;
+    outline-offset: -2px;
+    background: color-mix(in srgb, currentColor 14%, transparent);
+    text-decoration: underline 2px currentColor;
+    text-underline-offset: 2px;
+  }
+
   .link-meta:hover::before,
   .link-accent:hover::before {
     animation: crateLinkBeamCore 2.4s infinite;

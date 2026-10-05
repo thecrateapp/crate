@@ -36,6 +36,12 @@ describe("Switch", () => {
     expect(screen.getByRole("switch")).toHaveClass(
       "h-5",
       "w-9",
+      "focus-visible:outline-solid",
+      "focus-visible:outline-2",
+      "focus-visible:outline-offset-2",
+      "focus-visible:outline-focus-ring",
+    );
+    expect(screen.getByRole("switch")).not.toHaveClass(
       "focus-visible:shadow-focus",
     );
   });

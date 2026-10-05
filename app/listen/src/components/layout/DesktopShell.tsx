@@ -55,7 +55,7 @@ export function DesktopShell({
       </div>
       <main
         className={`relative z-0 flex-1 ${sidebarW} overflow-x-hidden transition-[margin-left] duration-200 ${
-          hasTrack ? "pb-[90px]" : ""
+          hasTrack ? "pb-(--listen-desktop-player-clearance)" : ""
         }`}
       >
         <div

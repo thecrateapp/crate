@@ -270,7 +270,7 @@ export function AppModal({
   return createPortal(
     <dialog
       open
-      role={role === "alertdialog" ? "alertdialog" : undefined}
+      role={role}
       aria-modal="true"
       aria-label={labelledBy ? undefined : ariaLabel}
       aria-labelledby={labelledBy}

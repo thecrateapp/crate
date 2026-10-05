@@ -191,10 +191,11 @@ export function ArtistBioMembers({
   members: ArtistBioMember[];
   labels?: ArtistBioProfileLabels;
 }) {
-  const current = members.filter((member) => !member.end);
-  const former = members.filter((member) => member.end);
+  const merged = mergeArtistBioMembers(members);
+  const current = merged.filter((member) => !member.end);
+  const former = merged.filter((member) => member.end);
 
-  if (!members.length) return null;
+  if (!merged.length) return null;
 
   return (
     <div className="space-y-5">
@@ -215,6 +216,28 @@ export function ArtistBioMembers({
       ) : null}
     </div>
   );
+}
+
+function artistBioMemberKey(member: ArtistBioMember) {
+  return `${member.name}|${member.begin ?? ""}|${member.end ?? ""}`;
+}
+
+export function mergeArtistBioMembers(
+  members: ArtistBioMember[],
+): ArtistBioMember[] {
+  const merged = new Map<string, ArtistBioMember>();
+  for (const member of members) {
+    const key = artistBioMemberKey(member);
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, { ...member, roles: [...new Set(member.roles ?? [])] });
+      continue;
+    }
+    existing.roles = [
+      ...new Set([...(existing.roles ?? []), ...(member.roles ?? [])]),
+    ];
+  }
+  return [...merged.values()];
 }
 
 function ArtistBioMemberTable({
@@ -252,9 +275,7 @@ function ArtistBioMemberTable({
           </thead>
           <tbody className="divide-y divide-border-quiet-subtle">
             {members.map((member) => (
-              <tr
-                key={`${member.name}-${member.begin ?? ""}-${member.end ?? ""}`}
-              >
+              <tr key={artistBioMemberKey(member)}>
                 <td className="px-3 py-2 font-medium text-text-hero">
                   {member.name}
                 </td>

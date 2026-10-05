@@ -47,6 +47,16 @@ describe("runtime token bridge", () => {
     expect(surface).not.toMatch(/(?:^|\s)background:/);
   });
 
+  it("keeps an inset focus indicator for links inside truncating containers", () => {
+    const recipes = readTokenFile("recipes.css");
+    const inset = recipes.match(
+      /\.link-meta\.link-inset:focus-visible,\s*\.link-accent\.link-inset:focus-visible\s*\{(?<rules>[^}]*)\}/s,
+    )?.groups?.rules;
+
+    expect(inset).toMatch(/outline-offset:\s*-2px/);
+    expect(inset).toMatch(/text-decoration:\s*underline/);
+  });
+
   it("derives runtime defaults in the theme layer", () => {
     const themes = readTokenFile("themes.css");
 

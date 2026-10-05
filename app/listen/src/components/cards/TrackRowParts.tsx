@@ -209,7 +209,7 @@ function TrackRowArtistLink({
   return (
     <button
       type="button"
-      className="max-w-full truncate border-0 bg-transparent p-0 text-left align-bottom link-meta"
+      className="max-w-full truncate border-0 p-0 text-left align-bottom link-meta link-inset"
       onClick={(event) => {
         event.stopPropagation();
         navigate(
@@ -244,7 +244,7 @@ function TrackRowAlbumLink({
   return (
     <button
       type="button"
-      className="max-w-full truncate border-0 bg-transparent p-0 text-left align-bottom link-meta"
+      className="max-w-full truncate border-0 p-0 text-left align-bottom link-meta link-inset"
       onClick={(event) => {
         event.stopPropagation();
         navigate(

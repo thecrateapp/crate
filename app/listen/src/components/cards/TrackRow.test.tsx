@@ -517,6 +517,29 @@ describe("TrackRow playback behavior", () => {
     ).toHaveClass("track-row-playback-aura");
   });
 
+  it("uses the inset link focus recipe for artist and album links inside the truncated meta line", () => {
+    renderWithListenProviders(
+      <TrackRow
+        track={{
+          id: 1,
+          title: "Track One",
+          artist: "Artist",
+          artist_id: 3,
+          album: "Album",
+          album_id: 12,
+        }}
+        showArtist
+        showAlbum
+      />,
+    );
+
+    for (const name of ["Artist", "Album"]) {
+      const link = screen.getByRole("button", { name });
+      expect(link).toHaveClass("link-meta", "link-inset", "truncate");
+      expect(link.parentElement).toHaveClass("truncate");
+    }
+  });
+
   it("uses normalized global album artwork for catalog-only rows", () => {
     const track = toTrackRowData({
       id: "track-global-1",

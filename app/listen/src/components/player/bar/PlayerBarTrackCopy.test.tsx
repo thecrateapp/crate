@@ -37,8 +37,38 @@ describe("PlayerBarTrackCopy", () => {
     expect(copy.className).not.toMatch(/max-w-/);
     expect(copy.className).not.toMatch(/\[/);
     expect(copy.className).toBe(withoutSource);
-    expect(
-      screen.getByText(/A very long playlist name/).closest("p"),
-    ).toHaveClass("truncate");
+    const source = screen.getByText(/A very long playlist name/);
+    expect(source).toHaveClass("min-w-0", "truncate");
+    expect(source.closest("p")).toHaveClass("flex", "min-w-0");
+    expect(source.closest("p")).not.toHaveClass("truncate");
+    expect(screen.getByText("Playing from:")).toHaveClass("shrink-0");
+  });
+
+  it("truncates a linked play source inside the row instead of collapsing it", () => {
+    renderWithListenProviders(
+      <PlayerBarTrackCopy
+        displayTrack={{ id: "t1", title: "Song", artist: "Band" }}
+        displayCrossfadeTransition={null}
+        crossfadeProgress={0}
+        displayPlaySource={{
+          type: "playlist",
+          name: "A very long playlist name",
+          href: "/playlist/1",
+        }}
+        sourceLabel="A very long playlist name"
+        isDesktop
+        onOpenAlbum={vi.fn()}
+        onOpenArtist={vi.fn()}
+        onOpenSource={vi.fn()}
+      />,
+      { locale: "en" },
+    );
+
+    const link = screen.getByRole("button", {
+      name: "A very long playlist name",
+    });
+    expect(link).toHaveClass("link-meta", "link-inset", "min-w-0", "truncate");
+    expect(link.parentElement).toHaveClass("flex");
+    expect(screen.getByText("Playing from:")).toHaveClass("shrink-0");
   });
 });

@@ -40,6 +40,28 @@ describe("Button", () => {
     );
   });
 
+  it("offsets the focus ring on the accent-filled default action", () => {
+    render(<Button>Save</Button>);
+    const button = screen.getByRole("button");
+    expect(button).toHaveClass(
+      "focus-visible:outline-solid",
+      "focus-visible:outline-2",
+      "focus-visible:outline-offset-2",
+      "focus-visible:outline-focus-ring",
+    );
+    expect(button).not.toHaveClass("focus-visible:shadow-focus");
+  });
+
+  it("keeps the flush focus ring on non-filled variants", () => {
+    render(<Button variant="outline">Cancel</Button>);
+    const button = screen.getByRole("button");
+    expect(button).toHaveClass(
+      "focus-visible:border-border-focus",
+      "focus-visible:shadow-focus",
+    );
+    expect(button).not.toHaveClass("focus-visible:outline-offset-2");
+  });
+
   it("applies size data attribute", () => {
     render(<Button size="sm">Small</Button>);
     expect(screen.getByRole("button")).toHaveAttribute("data-size", "sm");

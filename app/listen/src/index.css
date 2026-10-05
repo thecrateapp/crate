@@ -174,6 +174,12 @@ textarea {
       var(--listen-mobile-bottom-nav-content-height)
   );
   --listen-mobile-player-height: 4.125rem;
+  --listen-desktop-player-height: 5.125rem;
+  --listen-desktop-player-bottom-offset: 0.75rem;
+  --listen-desktop-player-clearance: calc(
+    var(--listen-desktop-player-height) +
+      var(--listen-desktop-player-bottom-offset) * 2
+  );
   --listen-mobile-player-gap: 0rem;
   --listen-mobile-bottom-chrome-height: calc(
     var(--listen-mobile-bottom-nav-height) + var(--listen-mobile-player-height) +

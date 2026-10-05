@@ -1701,7 +1701,7 @@
   "settings.account.bioPlaceholder": "Entzuten duzunari buruzko ohar labur bat",
   "settings.account.saveProfile": "Gorde profila",
   "settings.account.connectedAccounts": "Konektatutako kontuak",
-  "settings.account.connectedAccountsDescription": "Lotu Google edo Apple profil honek Listenetik zuzenean saio-hasiera soziala erabil dezan.",
+  "settings.account.connectedAccountsDescription": "Lotu saio-hasierako hornitzaile bat profil honek Listenetik zuzenean saio-hasiera soziala erabil dezan.",
   "settings.account.linked": "Kontu honi lotuta",
   "settings.account.notLinked": "Oraindik lotu gabe",
   "settings.account.link": "Lotu",

@@ -80,9 +80,14 @@ describe("QueuePanel", () => {
     });
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(
-      screen.getByText("Queue").closest(".listen-glass-panel"),
-    ).toHaveClass("listen-glass-panel--dock");
+    const panel = screen.getByText("Queue").closest(".listen-glass-panel");
+    expect(panel).toHaveClass(
+      "listen-glass-panel--dock",
+      "bottom-(--listen-desktop-player-clearance)",
+    );
+    expect(screen.getByText("Next").closest(".overflow-y-auto")).toHaveClass(
+      "pb-2",
+    );
   });
 
   it("makes the local queue visibly readonly inside a Jam room", () => {

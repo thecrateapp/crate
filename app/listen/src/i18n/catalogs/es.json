@@ -1723,7 +1723,7 @@
   "settings.account.bioPlaceholder": "Una nota corta sobre lo que escuchas",
   "settings.account.saveProfile": "Guardar perfil",
   "settings.account.connectedAccounts": "Cuentas conectadas",
-  "settings.account.connectedAccountsDescription": "Vincula Google o Apple para iniciar sesión social directamente desde Listen.",
+  "settings.account.connectedAccountsDescription": "Vincula un proveedor de inicio de sesión para iniciar sesión social directamente desde Listen.",
   "settings.account.linked": "Vinculada a esta cuenta",
   "settings.account.notLinked": "Aún no vinculada",
   "settings.account.link": "Vincular",

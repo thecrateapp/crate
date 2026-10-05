@@ -27,7 +27,10 @@ describe("Checkbox", () => {
   it("has a focus ring", () => {
     render(<Checkbox aria-label="Focus" />);
     expect(screen.getByRole("checkbox")).toHaveClass(
-      "focus-visible:shadow-focus",
+      "focus-visible:outline-solid",
+      "focus-visible:outline-2",
+      "focus-visible:outline-offset-2",
+      "focus-visible:outline-focus-ring",
     );
   });
 });

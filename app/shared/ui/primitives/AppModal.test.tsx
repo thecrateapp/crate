@@ -367,7 +367,10 @@ describe("AppModal labelling and sizing", () => {
         Content
       </AppModal>,
     );
-    expect(screen.getByRole("dialog", { name: "Dialog" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Dialog" })).toHaveAttribute(
+      "role",
+      "dialog",
+    );
     expect(
       screen.getByRole("button", { name: "Close dialog backdrop" }),
     ).toBeInTheDocument();

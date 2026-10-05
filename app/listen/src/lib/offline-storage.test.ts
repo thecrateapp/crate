@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  getOfflineCacheName,
   getOfflineItemKey,
+  isOfflineMediaCacheName,
   loadOfflineSnapshot,
   normalizeOfflineSnapshot,
   saveOfflineSnapshot,
@@ -71,5 +73,12 @@ describe("offline storage", () => {
     expect(snapshot.items["track:entity-1"]?.readyAssetKeys).toEqual([
       "entity-1",
     ]);
+  });
+
+  it("identifies offline media caches so the dev service-worker reset keeps them", () => {
+    expect(isOfflineMediaCacheName(getOfflineCacheName("profile-1"))).toBe(
+      true,
+    );
+    expect(isOfflineMediaCacheName("crate-listen-v1")).toBe(false);
   });
 });

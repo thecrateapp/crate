@@ -194,7 +194,7 @@ export function PlaylistIdentitySection({
             type="button"
             aria-pressed={isCollaborative}
             className={cn(
-              "rounded-full px-3 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:shadow-focus",
+              "rounded-full px-3 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
               isCollaborative
                 ? "bg-accent-action text-accent-action-foreground"
                 : "bg-text-primary/5 text-text-muted",
