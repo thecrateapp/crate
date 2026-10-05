@@ -70,7 +70,7 @@ function CollapsedShowDetails({
       </span>
       <span className="mt-1 flex items-center gap-1 text-xs text-text-primary/40">
         <MapPin
-          size={CRATE_ICON_SIZE.micro}
+          size={CRATE_ICON_SIZE.nano}
           className="shrink-0 text-accent-action/60"
         />
         <span className="truncate">{item.venue}</span>

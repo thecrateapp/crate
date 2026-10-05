@@ -104,8 +104,23 @@ function syncClampedLabelTitle(element: HTMLElement, label: string) {
 }
 
 function ContextMenuItemLabel({ label }: { label: string }) {
+  const labelRef = useRef<HTMLSpanElement>(null);
+
+  useLayoutEffect(() => {
+    const element = labelRef.current;
+    if (!element) return;
+    syncClampedLabelTitle(element, label);
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() =>
+      syncClampedLabelTitle(element, label),
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [label]);
+
   return (
     <span
+      ref={labelRef}
       data-slot="context-menu-item-label"
       className="line-clamp-2 min-w-0 break-words"
       onPointerEnter={(event) =>

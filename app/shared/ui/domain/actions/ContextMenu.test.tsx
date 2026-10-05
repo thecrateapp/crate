@@ -1,7 +1,7 @@
 import { createRef } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Disc3, ListPlus, Play } from "@crate/ui/icons";
 
 import {
@@ -70,6 +70,10 @@ describe("ContextMenu", () => {
     isDesktop = true;
     canHover = true;
     mockNonTouchPointerEnvironment();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("renders the desktop menu with a media header", async () => {
@@ -476,6 +480,44 @@ describe("ContextMenu", () => {
     expect(screen.getByRole("menuitem", { name: /Play now/i })).toHaveClass(
       "focus-visible:shadow-focus",
     );
+  });
+
+  it("exposes the full clamped label without a pointer once the label is measured", () => {
+    const callbacks: ResizeObserverCallback[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          callbacks.push(callback);
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const longLabel = "Reproducir álbum aleatoriamente desde el principio";
+    render(
+      <ContextMenu
+        items={[
+          { key: "long", label: longLabel, icon: Play, onSelect: vi.fn() },
+        ]}
+        menuRef={createRef<HTMLDivElement>()}
+        onClose={vi.fn()}
+        open
+        position={{ x: 12, y: 12 }}
+      />,
+    );
+
+    const longText = screen.getByText(longLabel);
+    expect(longText).not.toHaveAttribute("title");
+    Object.defineProperty(longText, "scrollHeight", { value: 60 });
+    Object.defineProperty(longText, "clientHeight", { value: 40 });
+    act(() => {
+      for (const callback of callbacks) {
+        callback([], {} as ResizeObserver);
+      }
+    });
+
+    expect(longText).toHaveAttribute("title", longLabel);
   });
 
   it("wraps long labels to two lines and exposes the full label when clamped", () => {

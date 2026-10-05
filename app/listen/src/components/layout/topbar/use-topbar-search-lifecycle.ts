@@ -83,6 +83,22 @@ export function useTopBarSearchLifecycle({
     [clearCollapseTimer, collapseIfIdle],
   );
 
+  const collapseOnFocusExit = useCallback(
+    (nextFocus: EventTarget | null) => {
+      const leftSearch =
+        nextFocus instanceof Node &&
+        !containerRef.current?.contains(nextFocus) &&
+        !dropdownRef.current?.contains(nextFocus);
+      if (leftSearch && !queryRef.current.trim()) {
+        setShowDropdown(false);
+        scheduleCollapseIfIdle(false);
+        return;
+      }
+      scheduleCollapseIfIdle();
+    },
+    [queryRef, scheduleCollapseIfIdle, setShowDropdown],
+  );
+
   const openSearch = useCallback(
     (withDropdown = true) => {
       clearCollapseTimer();
@@ -157,6 +173,7 @@ export function useTopBarSearchLifecycle({
 
   return {
     closeSearch,
+    collapseOnFocusExit,
     containerRef,
     dropdownRef,
     dropdownStyle,

@@ -117,6 +117,7 @@ export function TopBarSearch() {
         openSearch: lifecycle.openSearch,
         focusInputSoon: lifecycle.focusInputSoon,
         scheduleCollapseIfIdle: lifecycle.scheduleCollapseIfIdle,
+        collapseOnFocusExit: lifecycle.collapseOnFocusExit,
         setQuery,
         setResults,
         setCompletedQuery,

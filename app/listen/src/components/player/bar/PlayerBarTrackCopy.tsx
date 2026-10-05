@@ -34,7 +34,7 @@ export function PlayerBarTrackCopy({
   );
 
   return (
-    <div className="min-w-0 flex-1">
+    <div className="min-w-0 flex-1 md:w-56 md:flex-initial">
       <div className="relative">
         {displayCrossfadeTransition ? (
           <>

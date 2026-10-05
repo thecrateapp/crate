@@ -125,7 +125,7 @@ function PlayerBarLikedIndicator({ liked }: { liked: boolean }) {
       className="listen-player-liked-indicator absolute -bottom-1 -right-1 flex size-4 items-center justify-center rounded-full backdrop-blur-md"
     >
       <HeartBold
-        size={CRATE_ICON_SIZE.micro}
+        size={CRATE_ICON_SIZE.nano}
         className="animate-crate-icon-active-pulse"
       />
     </span>

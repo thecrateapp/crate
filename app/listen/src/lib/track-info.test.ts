@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { mergeTrackQualityParts, resolveTrackInfoUrl } from "./track-info";
+import { formatBitrate } from "@/components/player/extended/info-tab-data";
+import {
+  bitrateToKbps,
+  getTrackQualityFromInfo,
+  mergeTrackQualityParts,
+  resolveTrackInfoUrl,
+  type TrackInfo,
+} from "./track-info";
 
 describe("resolveTrackInfoUrl", () => {
   it("uses global catalog info when globalTrackUid is available", () => {
@@ -55,5 +62,43 @@ describe("mergeTrackQualityParts", () => {
       sampleRate: 44100,
       bitDepth: 16,
     });
+  });
+});
+
+describe("bitrateToKbps", () => {
+  it("converts bps values from the track info endpoint to kbps", () => {
+    expect(bitrateToKbps(1_135_989)).toBe(1136);
+    expect(bitrateToKbps(320_000)).toBe(320);
+  });
+
+  it("keeps values that are already in kbps", () => {
+    expect(bitrateToKbps(320)).toBe(320);
+    expect(bitrateToKbps(1411)).toBe(1411);
+  });
+
+  it("ignores missing or invalid values", () => {
+    expect(bitrateToKbps(null)).toBeNull();
+    expect(bitrateToKbps(undefined)).toBeNull();
+    expect(bitrateToKbps(0)).toBeNull();
+    expect(bitrateToKbps(Number.NaN)).toBeNull();
+  });
+});
+
+describe("track info bitrate display", () => {
+  it("formats bps bitrates as kbps", () => {
+    expect(formatBitrate(1_135_989)).toBe("1136 kbps");
+    expect(formatBitrate(320)).toBe("320 kbps");
+    expect(formatBitrate(null)).toBeNull();
+  });
+
+  it("normalizes the info bitrate used by the quality badge", () => {
+    const quality = getTrackQualityFromInfo({
+      format: "mp3",
+      bitrate: 320_000,
+      sample_rate: 44_100,
+      bit_depth: null,
+    } as TrackInfo);
+
+    expect(quality.bitrate).toBe(320);
   });
 });

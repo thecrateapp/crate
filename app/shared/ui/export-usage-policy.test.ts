@@ -1,9 +1,10 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-const PACKAGE_ROOT = process.cwd();
+const PACKAGE_ROOT = dirname(fileURLToPath(import.meta.url));
 const CONSUMER_ROOTS = ["../../listen/src", "../../ui/src"].map((path) =>
   resolve(PACKAGE_ROOT, path),
 );

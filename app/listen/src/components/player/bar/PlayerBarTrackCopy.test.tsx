@@ -22,7 +22,7 @@ function renderCopy(sourceLabel: string | null) {
 }
 
 describe("PlayerBarTrackCopy", () => {
-  it("fills the reserved track slot so the playing-from line never pushes the actions", () => {
+  it("keeps a fixed desktop width so the actions sit right after the title at a stable position", () => {
     const { container, unmount } = renderCopy(null);
     const withoutSource = (container.firstElementChild as HTMLElement)
       .className;
@@ -33,9 +33,9 @@ describe("PlayerBarTrackCopy", () => {
     );
     const copy = withSourceContainer.firstElementChild as HTMLElement;
 
-    expect(copy).toHaveClass("min-w-0", "flex-1");
-    expect(copy.className).not.toMatch(/(?:^|\s)md:flex-none(?:\s|$)/);
+    expect(copy).toHaveClass("min-w-0", "flex-1", "md:w-56", "md:flex-initial");
     expect(copy.className).not.toMatch(/max-w-/);
+    expect(copy.className).not.toMatch(/\[/);
     expect(copy.className).toBe(withoutSource);
     expect(
       screen.getByText(/A very long playlist name/).closest("p"),

@@ -77,7 +77,6 @@ const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
     "tracking-[-0.12em]": 1,
   },
   "pages/StatsStorySections.tsx": { "tracking-[-0.07em]": 1 },
-  "pages/UserProfileTaste.tsx": { "tracking-[0.08em]": 1 },
 };
 
 const ICON_SIZE_BUDGET: Record<string, Record<string, number>> = {
@@ -141,16 +140,50 @@ function iconNames(source: string): string[] {
   );
 }
 
+function literalSizeAttribute(source: string, start: number): string | null {
+  let depth = 0;
+  let quote: string | null = null;
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index]!;
+    if (quote) {
+      if (char === quote) quote = null;
+    } else if (char === '"' || char === "'" || (depth > 0 && char === "`")) {
+      quote = char;
+    } else if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+    } else if (depth === 0 && char === ">") {
+      return null;
+    } else if (depth === 0 && /\s/.test(char)) {
+      const size = /^size=\{(\d+)\}/.exec(source.slice(index + 1, index + 16));
+      if (size) return size[1]!;
+    }
+  }
+  return null;
+}
+
 function literalIconSizes(source: string): string[] {
   const names = new Set(iconNames(source));
-  return Array.from(
-    source.matchAll(/<([A-Z]\w*)\b[^<>]*?\bsize=\{(\d+)\}/g),
-  ).flatMap(([, name, size]) =>
-    names.has(name!) || DYNAMIC_ICON.test(name!) ? [size!] : [],
-  );
+  return Array.from(source.matchAll(/<([A-Z]\w*)\b/g)).flatMap((match) => {
+    const name = match[1]!;
+    if (!names.has(name) && !DYNAMIC_ICON.test(name)) return [];
+    const size = literalSizeAttribute(source, match.index + match[0].length);
+    return size ? [size] : [];
+  });
 }
 
 describe("Listen design token policy", () => {
+  it("reads literal icon sizes past arrow functions and nested JSX props", () => {
+    const source = [
+      'import { Heart, Star } from "@crate/ui/icons";',
+      '<Heart onClick={() => x()} className="[&>svg]:block" size={13} />',
+      "<Star icon={<Heart size={9} />} size={CRATE_ICON_SIZE.sm} />",
+    ].join("\n");
+
+    expect(literalIconSizes(source)).toEqual(["13", "9"]);
+  });
+
   it("keeps arbitrary radius, z-index, shadow, type size and tracking values within the budget", () => {
     const findings = productionSourceFiles(SOURCE_ROOT).flatMap((path) => {
       const file = relative(SOURCE_ROOT, path);

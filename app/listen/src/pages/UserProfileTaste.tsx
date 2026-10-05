@@ -14,7 +14,10 @@ function ProfileMiniStat({ label, value }: { label: string; value: string }) {
       <div className="truncate text-lg font-black text-text-primary">
         {value}
       </div>
-      <div className="mt-0.5 break-words text-xs font-bold uppercase leading-4 tracking-[0.08em] text-text-muted">
+      <div
+        title={label}
+        className="mt-0.5 min-w-0 overflow-hidden text-ellipsis break-normal text-xs font-bold uppercase leading-4 tracking-wider text-text-muted"
+      >
         {label}
       </div>
     </div>

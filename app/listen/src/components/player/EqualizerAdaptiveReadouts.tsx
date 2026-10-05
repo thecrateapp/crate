@@ -102,7 +102,7 @@ export function GenreResolutionChip({
   if (!canonical) {
     return (
       <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-xs text-text-secondary">
-        <Tag size={CRATE_ICON_SIZE.micro} className="opacity-70" />
+        <Tag size={CRATE_ICON_SIZE.nano} className="opacity-70" />
         <span className="font-medium capitalize text-text-primary/80">
           {primaryName}
         </span>
@@ -116,7 +116,7 @@ export function GenreResolutionChip({
   if (!preset) {
     return (
       <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-xs text-text-secondary">
-        <Tag size={CRATE_ICON_SIZE.micro} className="opacity-70" />
+        <Tag size={CRATE_ICON_SIZE.nano} className="opacity-70" />
         <span className="font-medium capitalize text-text-primary/80">
           {primaryName}
         </span>
@@ -130,7 +130,7 @@ export function GenreResolutionChip({
   const isInherited = preset.source === "inherited";
   return (
     <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-accent-action/30 bg-accent-action/10 px-2.5 py-1.5 text-xs text-accent-action">
-      <Tag size={CRATE_ICON_SIZE.micro} />
+      <Tag size={CRATE_ICON_SIZE.nano} />
       <span className="font-medium capitalize">{primaryName}</span>
       <span className="opacity-70">
         {isInherited

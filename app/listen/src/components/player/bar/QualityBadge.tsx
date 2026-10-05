@@ -65,7 +65,7 @@ export function QualityBadge({
       className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-badge font-bold tracking-wider leading-none whitespace-nowrap border ${variantClass}`}
       title={title}
     >
-      {Icon && <Icon size={CRATE_ICON_SIZE.micro} />}
+      {Icon && <Icon size={CRATE_ICON_SIZE.nano} />}
       {badge.label}
     </span>
   );

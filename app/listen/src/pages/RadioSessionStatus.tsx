@@ -44,9 +44,9 @@ export function RadioSessionStatus({
         </span>
       </div>
       <div className="radio-session-muted mt-1.5 flex items-center gap-1 text-xs">
-        <ThumbsUp size={CRATE_ICON_SIZE.micro} />{" "}
+        <ThumbsUp size={CRATE_ICON_SIZE.nano} />{" "}
         {t("radio.feedback.likePrefix")}{" "}
-        <ThumbsDown size={CRATE_ICON_SIZE.micro} />{" "}
+        <ThumbsDown size={CRATE_ICON_SIZE.nano} />{" "}
         {t("radio.feedback.dislikeSuffix")}
       </div>
     </div>

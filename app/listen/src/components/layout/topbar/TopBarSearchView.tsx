@@ -32,6 +32,7 @@ type TopBarSearchInputProps = {
     openSearch: (withDropdown?: boolean) => void;
     focusInputSoon: () => void;
     scheduleCollapseIfIdle: (nextShowDropdown?: boolean) => void;
+    collapseOnFocusExit: (nextFocus: EventTarget | null) => void;
     setQuery: (value: string) => void;
     setResults: (value: TopBarSearchItem[]) => void;
     setCompletedQuery: (value: string | null) => void;
@@ -242,7 +243,7 @@ function TopBarSearchControls({
   const {
     openSearch,
     focusInputSoon,
-    scheduleCollapseIfIdle,
+    collapseOnFocusExit,
     setQuery,
     setResults,
     setCompletedQuery,
@@ -254,7 +255,7 @@ function TopBarSearchControls({
     <div
       data-state={searchOpen ? "open" : "closed"}
       className={cn(
-        "relative overflow-visible rounded-xl transition-[background-color,border-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
+        "relative overflow-visible rounded-xl focus-within:shadow-focus transition-[background-color,border-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
         isDesktop
           ? searchOpen
             ? "border border-text-primary/8 bg-surface-canvas/68 shadow-glass-hover"
@@ -270,6 +271,7 @@ function TopBarSearchControls({
           aria-expanded={searchOpen}
           data-state={searchOpen ? "open" : "closed"}
           onFocus={() => openSearch(true)}
+          onBlur={(event) => collapseOnFocusExit(event.relatedTarget)}
           onClick={() => {
             openSearch(true);
             focusInputSoon();
@@ -329,8 +331,8 @@ function TopBarSearchControls({
           onFocus={() => {
             openSearch(true);
           }}
-          onBlur={() => {
-            scheduleCollapseIfIdle();
+          onBlur={(event) => {
+            collapseOnFocusExit(event.relatedTarget);
           }}
           onKeyDown={handlers.handleKeyDown}
           placeholder={t("search.placeholder")}

@@ -116,7 +116,7 @@ export function Bandcamp() {
     t("bandcamp.connection.accountFallback");
 
   return (
-    <div className="mx-auto flex w-full max-w-content flex-col gap-8 py-6">
+    <div className="mx-auto flex w-full max-w-content flex-col gap-8 sm:py-6">
       <section className="bandcamp-page-surface relative overflow-hidden rounded-panel border border-text-primary/8 p-6 md:p-8">
         <div className="bandcamp-page-sheen pointer-events-none absolute inset-y-0 right-0 w-1/2" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
