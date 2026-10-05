@@ -7,6 +7,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     include: [
+      "*.test.ts",
       "icons/**/*.test.tsx",
       "lib/**/*.test.ts",
       "primitives/**/*.test.tsx",

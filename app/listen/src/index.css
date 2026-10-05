@@ -290,30 +290,55 @@ textarea {
 }
 
 .listen-player-progress-glow {
-  background: var(--control-progress-glow-horizontal);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-action) 0%, transparent) 0%,
+    color-mix(in srgb, var(--accent-action) 8%, transparent) 44%,
+    color-mix(in srgb, var(--accent-action) 28%, transparent) 82%,
+    color-mix(in srgb, var(--accent-action) 55%, var(--text-primary)) 100%
+  );
 }
 
 .listen-player-progress-glow--vertical {
-  background: var(--control-progress-glow-vertical);
+  background: linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--accent-action) 0%, transparent) 0%,
+    color-mix(in srgb, var(--accent-action) 8%, transparent) 38%,
+    color-mix(in srgb, var(--accent-action) 28%, transparent) 78%,
+    color-mix(in srgb, var(--accent-action) 55%, var(--text-primary)) 100%
+  );
 }
 
 .listen-player-progress-fill {
-  background: var(--control-progress-fill-horizontal);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-action) 14%, transparent),
+    color-mix(in srgb, var(--accent-action) 56%, transparent),
+    color-mix(in srgb, var(--accent-action) 78%, var(--text-primary))
+  );
 }
 
 .listen-player-progress-fill--vertical {
-  background: var(--control-progress-fill-vertical);
+  background: linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--accent-action) 14%, transparent),
+    color-mix(in srgb, var(--accent-action) 56%, transparent),
+    color-mix(in srgb, var(--accent-action) 78%, var(--text-primary))
+  );
 }
 
 .listen-player-progress-thumb {
   background: var(--control-thumb);
-  box-shadow: var(--control-thumb-shadow);
+  box-shadow:
+    0 0 6px color-mix(in srgb, var(--accent-action) 62%, transparent),
+    0 0 12px color-mix(in srgb, var(--accent-action) 34%, transparent);
 }
 
 .listen-player-progress-thumb-active {
   border-color: color-mix(in srgb, var(--accent-action) 80%, transparent);
   background: var(--control-thumb);
-  box-shadow: var(--control-thumb-ring-shadow);
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--accent-action) 14%, transparent);
 }
 
 .listen-player-progress-tooltip {
@@ -559,7 +584,8 @@ html[data-keyboard-open] select {
   ) !important;
   color: var(--text-primary) !important;
   border: 1px solid var(--border-quiet) !important;
-  box-shadow: var(--map-popup-shadow) !important;
+  box-shadow: 0 10px 30px
+    color-mix(in srgb, var(--surface-glass-shadow) 93.75%, transparent) !important;
   border-radius: 8px !important;
 }
 .leaflet-popup-content {

@@ -1,4 +1,10 @@
-import { ChevronDown, ChevronUp, Globe, X } from "@crate/ui/icons";
+import {
+  CRATE_ICON_SIZE,
+  ChevronDown,
+  ChevronUp,
+  Globe,
+  X,
+} from "@crate/ui/icons";
 import type { ReactNode } from "react";
 
 import {
@@ -359,7 +365,8 @@ function ArtistBioExternalLinks({
           }}
           className="inline-flex items-center gap-1.5 rounded-md border border-border-quiet px-2.5 py-1 text-xs text-text-muted-strong transition-colors hover:border-border-interactive hover:bg-surface-quiet-subtle hover:text-text-secondary-strong"
         >
-          <Globe size={11} /> {linkLabel(link.type, link.url)}
+          <Globe size={CRATE_ICON_SIZE.micro} />{" "}
+          {linkLabel(link.type, link.url)}
         </a>
       ))}
     </div>
@@ -450,7 +457,7 @@ export function ArtistBioProfile({
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-meta">
               {labels.biography}
             </h3>
-            <div className="space-y-4 text-sm leading-7 text-text-secondary-strong sm:text-[0.9375rem]">
+            <div className="space-y-4 text-sm leading-7 text-text-secondary-strong sm:text-body">
               {splitBioParagraphs(
                 bioExpanded ? bio : truncateArtistBio(bio, 500),
               ).map((paragraph) => (
@@ -467,11 +474,11 @@ export function ArtistBioProfile({
               >
                 {bioExpanded ? (
                   <>
-                    <ChevronUp size={12} /> {labels.less}
+                    <ChevronUp size={CRATE_ICON_SIZE.micro} /> {labels.less}
                   </>
                 ) : (
                   <>
-                    <ChevronDown size={12} /> {labels.more}
+                    <ChevronDown size={CRATE_ICON_SIZE.micro} /> {labels.more}
                   </>
                 )}
               </button>

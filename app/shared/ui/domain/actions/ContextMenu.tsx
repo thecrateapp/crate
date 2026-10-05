@@ -467,7 +467,10 @@ function ContextMenuDisclosure({
           )}
           <ContextMenuItemLabel label={entry.label} />
         </span>
-        <Indicator size={17} className="shrink-0 text-text-primary/45" />
+        <Indicator
+          size={CRATE_ICON_SIZE.md}
+          className="shrink-0 text-text-primary/45"
+        />
       </AppMenuButton>
       {entry.expanded && desktop && typeof document !== "undefined"
         ? createPortal(submenu, document.body)
@@ -572,7 +575,10 @@ function ContextMenuItems({
               <ContextMenuItemLabel label={entry.label} />
             </span>
             {entry.active ? (
-              <Check size={17} className="shrink-0 text-accent-action" />
+              <Check
+                size={CRATE_ICON_SIZE.md}
+                className="shrink-0 text-accent-action"
+              />
             ) : null}
           </AppMenuButton>
         );

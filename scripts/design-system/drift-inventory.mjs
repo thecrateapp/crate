@@ -52,6 +52,27 @@ const RAW_COLOR_ALLOWLIST = new Map([
       reviewBy: "2026-12-31",
     },
   ],
+  [
+    "app/listen/src/lib/social-share-story-canvas.ts",
+    {
+      pattern: /rgba\((?:0, 0, 0|255, 255, 255),/g,
+      owner: "listen-social",
+      reason:
+        "Canvas compositing uses neutral black and white overlays with computed alpha for cover shading, reflection masks and glass pills; themed surfaces are read from tokens.",
+      reviewBy: "2026-12-31",
+    },
+  ],
+  [
+    "app/listen/src/components/crates/CrateMembersModal.tsx",
+    {
+      pattern: /(?:darkColor|lightColor)="#(?:000000|ffffff)"/g,
+      utilityPattern: /\bbg-white\b/g,
+      owner: "listen-social",
+      reason:
+        "Invite QR codes stay black on white in every theme so phone scanners keep maximum contrast.",
+      reviewBy: "2026-12-31",
+    },
+  ],
 ]);
 const LEGACY_SEMANTIC_UTILITY_PATTERN =
   /(?<![A-Za-z0-9_-])(?:bg|text|border(?:-[trblxyse])?|fill|stroke|from|via|to)-(?:background|foreground|primary(?:-foreground)?|muted(?:-foreground)?|destructive(?:-foreground)?|card(?:-foreground)?|secondary(?:-foreground)?|accent(?:-foreground)?|border|input|ring|app-surface)(?![A-Za-z0-9_-])/g;
@@ -409,9 +430,19 @@ function collectFiles(directory, repoRoot, output) {
     const content = readFileSync(filePath, "utf8");
     const path = relative(repoRoot, filePath);
     const contentMetrics = analyzeContent(content);
+    const allowlistedColorUtilities = Math.min(
+      contentMetrics.hardcodedColorUtilities,
+      countMatches(
+        content,
+        RAW_COLOR_ALLOWLIST.get(path)?.utilityPattern ?? /$^/g,
+      ),
+    );
     output.push({
       path,
       ...contentMetrics,
+      hardcodedColorUtilities:
+        contentMetrics.hardcodedColorUtilities - allowlistedColorUtilities,
+      allowlistedColorUtilities,
       legacySemanticUtilities: FOUNDATION_TOKEN_PATH_PATTERN.test(path)
         ? 0
         : contentMetrics.legacySemanticUtilities,
@@ -448,6 +479,7 @@ export function buildDriftInventory(repoRoot = process.cwd()) {
       result.actionableRawColors += file.actionableRawColors;
       result.arbitraryUtilities += file.arbitraryUtilities;
       result.hardcodedColorUtilities += file.hardcodedColorUtilities;
+      result.allowlistedColorUtilities += file.allowlistedColorUtilities;
       result.inlineStyles += file.inlineStyles;
       result.directShadcnImports += file.directShadcnImports;
       return result;
@@ -461,6 +493,7 @@ export function buildDriftInventory(repoRoot = process.cwd()) {
       actionableRawColors: 0,
       arbitraryUtilities: 0,
       hardcodedColorUtilities: 0,
+      allowlistedColorUtilities: 0,
       inlineStyles: 0,
       directShadcnImports: 0,
     },
@@ -485,9 +518,53 @@ export function buildDriftInventory(repoRoot = process.cwd()) {
   };
 }
 
+function metricValue(value) {
+  return Array.isArray(value) ? value.length : value;
+}
+
+export function evaluateDriftBudget(inventory, budget) {
+  return Object.entries(budget).flatMap(([section, limits]) =>
+    Object.entries(limits).map(([metric, limit]) => {
+      const actual = metricValue(inventory[section]?.[metric]);
+      return { metric: `${section}.${metric}`, actual, limit };
+    }),
+  );
+}
+
+export function loadDriftBudget(repoRoot = process.cwd()) {
+  return JSON.parse(
+    readFileSync(
+      join(resolve(repoRoot), "scripts/design-system/drift-budget.json"),
+      "utf8",
+    ),
+  );
+}
+
 if (
   process.argv[1] &&
   resolve(process.argv[1]) === resolve(import.meta.filename)
 ) {
-  console.log(JSON.stringify(buildDriftInventory(), null, 2));
+  const inventory = buildDriftInventory();
+  if (!process.argv.includes("--check")) {
+    console.log(JSON.stringify(inventory, null, 2));
+  }
+
+  const results = evaluateDriftBudget(inventory, loadDriftBudget());
+  const exceeded = results.filter(
+    ({ actual, limit }) => typeof actual !== "number" || actual > limit,
+  );
+  const slack = results.filter(({ actual, limit }) => actual < limit);
+
+  slack.forEach(({ metric, actual, limit }) => {
+    console.error(
+      `drift budget: ${metric} dropped to ${actual} (budget ${limit}); lower it in scripts/design-system/drift-budget.json`,
+    );
+  });
+  exceeded.forEach(({ metric, actual, limit }) => {
+    console.error(
+      `drift budget exceeded: ${metric} is ${actual}, budget ${limit}`,
+    );
+  });
+  if (exceeded.length > 0) process.exit(1);
+  console.error(`drift budget: ${results.length} metrics within budget`);
 }
