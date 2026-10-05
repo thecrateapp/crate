@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from crate.genre_taxonomy import resolve_genre_slug, slugify_genre
@@ -62,7 +62,7 @@ def weighted_genre_split_sql(source_sql: str) -> str:
     """
 
 
-def format_weighted_genre_rows(rows: list[Mapping[str, Any]]) -> list[dict]:
+def format_weighted_genre_rows(rows: Sequence[Mapping[Any, Any]]) -> list[dict]:
     items: list[dict] = []
     for row in rows:
         name = str(row["genre_name"])

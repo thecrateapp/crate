@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
+
+log = logging.getLogger(__name__)
 
 ACTIVE_SESSION_WINDOW = timedelta(minutes=3)
 RECENT_SESSION_WINDOW = timedelta(days=7)
@@ -34,41 +37,41 @@ def _clean_device_part(value: str | None) -> str | None:
     return normalized
 
 
+_EMPTY_DEVICE_DETAILS: dict[str, str | None] = {
+    "client_name": None,
+    "client_version": None,
+    "os_name": None,
+    "os_version": None,
+    "device_brand": None,
+    "device_model": None,
+    "device_type": None,
+}
+
+
 @lru_cache(maxsize=1024)
+def _detect_device_details(user_agent: str) -> dict[str, str | None]:
+    from device_detector import DeviceDetector
+
+    device = DeviceDetector(user_agent).parse()
+    return {
+        "client_name": _clean_device_part(device.client_name()),
+        "client_version": _clean_device_part(device.client_version()),
+        "os_name": _clean_device_part(device.os_name()),
+        "os_version": _clean_device_part(device.os_version()),
+        "device_brand": _clean_device_part(device.device_brand()),
+        "device_model": _clean_device_part(device.device_model()),
+        "device_type": _clean_device_part(device.device_type()),
+    }
+
+
 def parse_device_details(user_agent: str | None) -> dict[str, str | None]:
     if not user_agent:
-        return {
-            "client_name": None,
-            "client_version": None,
-            "os_name": None,
-            "os_version": None,
-            "device_brand": None,
-            "device_model": None,
-            "device_type": None,
-        }
+        return dict(_EMPTY_DEVICE_DETAILS)
     try:
-        from device_detector import DeviceDetector
-
-        device = DeviceDetector(user_agent).parse()
-        return {
-            "client_name": _clean_device_part(device.client_name()),
-            "client_version": _clean_device_part(device.client_version()),
-            "os_name": _clean_device_part(device.os_name()),
-            "os_version": _clean_device_part(device.os_version()),
-            "device_brand": _clean_device_part(device.device_brand()),
-            "device_model": _clean_device_part(device.device_model()),
-            "device_type": _clean_device_part(device.device_type()),
-        }
+        return dict(_detect_device_details(user_agent))
     except Exception:
-        return {
-            "client_name": None,
-            "client_version": None,
-            "os_name": None,
-            "os_version": None,
-            "device_brand": None,
-            "device_model": None,
-            "device_type": None,
-        }
+        log.warning("Could not parse device details from user agent", exc_info=True)
+        return dict(_EMPTY_DEVICE_DETAILS)
 
 
 def _device_display_from_parts(parts: dict[str, str | None]) -> str | None:
