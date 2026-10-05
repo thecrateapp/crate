@@ -1735,7 +1735,6 @@
   "settings.servers.add": "Afegeix un altre servidor",
   "settings.servers.toasts.switched": "S'ha canviat a {name}",
   "settings.servers.toasts.removed": "{name} eliminat",
-  "player.toasts.addedToCollection": "Afegida a la col·lecció",
   "jam.toasts.remoteRoomEnded": "Aquesta sala de jam ha acabat",
   "jam.toasts.remoteRoomDeleted": "Aquesta sala de jam s'ha eliminat",
   "jam.connection.sessionInvalid": "La teva sessió ja no és vàlida. Torna a iniciar sessió per unir-te a aquesta sala.",

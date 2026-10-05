@@ -1,8 +1,13 @@
 import type { MouseEventHandler } from "react";
 
+import { useItemActionTarget } from "@/components/actions/ItemActionMenu";
 import { PlayerBarArtwork } from "@/components/player/bar/PlayerBarArtwork";
 import { PlayerBarTrackActions } from "@/components/player/bar/PlayerBarTrackActions";
 import { PlayerBarTrackCopy } from "@/components/player/bar/PlayerBarTrackCopy";
+import {
+  PlayerTrackMenuContent,
+  usePlayerTrackActionMenu,
+} from "@/components/player/bar/PlayerTrackMenu";
 import type { CrossfadeTransition } from "@/contexts/player-context";
 import type { PlaySource, Track } from "@/contexts/player-types";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
@@ -17,19 +22,11 @@ export interface PlayerBarTrackInfoProps {
   liked: boolean;
   isShapedRadioTrack: boolean;
   shapedRadioSessionId: string | null | undefined;
-  effectiveDisplayedDuration: number;
-  duration: number;
   onNavigate: (path: string) => void;
   onPrepareFullscreen: () => void;
   onOpenFullscreen: () => void;
-  onCoverTouchStart: () => void;
-  onCoverTouchMove: () => void;
-  onCoverTouchEnd: () => void;
-  isCoverLongPressTriggered: () => boolean;
-  resetCoverLongPress: () => void;
   onToggleLike: () => void;
   onNextTrack: () => void;
-  onAddToCollection: () => Promise<void>;
   onOverlayChange: (open: boolean) => void;
 }
 
@@ -43,21 +40,15 @@ export function PlayerBarTrackInfo({
   liked,
   isShapedRadioTrack,
   shapedRadioSessionId,
-  effectiveDisplayedDuration,
-  duration,
   onNavigate,
   onPrepareFullscreen,
   onOpenFullscreen,
-  onCoverTouchStart,
-  onCoverTouchMove,
-  onCoverTouchEnd,
-  isCoverLongPressTriggered,
-  resetCoverLongPress,
   onToggleLike,
   onNextTrack,
-  onAddToCollection,
   onOverlayChange,
 }: PlayerBarTrackInfoProps) {
+  const trackMenu = usePlayerTrackActionMenu(onOverlayChange);
+  const actionTarget = useItemActionTarget(trackMenu.actionMenu);
   const handleAlbumNavigation = () => {
     if (!isDesktop || !(displayTrack.globalAlbumUid || displayTrack.albumId)) {
       return;
@@ -111,67 +102,69 @@ export function PlayerBarTrackInfo({
   };
 
   return (
-    <div
-      role={isDesktop ? undefined : "button"}
-      tabIndex={isDesktop ? undefined : 0}
-      aria-label={isDesktop ? undefined : "Open fullscreen player"}
-      className="flex min-w-0 shrink-0 flex-1 touch-manipulation cursor-pointer items-center gap-3 rounded-xl md:w-[260px] md:flex-none md:cursor-default lg:w-[340px] xl:w-[min(34vw,520px)] 2xl:w-[min(38vw,680px)]"
-      onTouchStart={() => {
-        if (!isDesktop) onPrepareFullscreen();
-      }}
-      onClick={() => {
-        if (!isDesktop) {
-          if (isCoverLongPressTriggered()) {
-            resetCoverLongPress();
-            return;
+    <div className="flex min-w-0 shrink-0 flex-1 items-center gap-3 md:w-[260px] md:flex-none lg:w-[340px] xl:w-[min(34vw,520px)] 2xl:w-[min(38vw,680px)]">
+      <div
+        role={isDesktop ? undefined : "button"}
+        tabIndex={isDesktop ? undefined : 0}
+        aria-label={isDesktop ? undefined : "Open fullscreen player"}
+        className="item-action-target flex min-w-0 flex-1 touch-manipulation cursor-pointer items-center gap-3 rounded-xl md:flex-initial md:cursor-default"
+        onContextMenu={actionTarget.onContextMenu}
+        onPointerDown={actionTarget.onPointerDown}
+        onPointerMove={actionTarget.onPointerMove}
+        onPointerUp={actionTarget.onPointerUp}
+        onPointerCancel={actionTarget.onPointerCancel}
+        onPointerLeave={actionTarget.onPointerLeave}
+        onClickCapture={actionTarget.onClickCapture}
+        onTouchStart={() => {
+          if (!isDesktop) onPrepareFullscreen();
+        }}
+        onClick={() => {
+          if (!isDesktop) onOpenFullscreen();
+        }}
+        onKeyDown={(event) => {
+          actionTarget.onKeyDown(event);
+          if (event.defaultPrevented) return;
+          if (!isDesktop && (event.key === "Enter" || event.key === " ")) {
+            event.preventDefault();
+            onOpenFullscreen();
           }
-          onOpenFullscreen();
-        }
-      }}
-      onKeyDown={(event) => {
-        if (!isDesktop && (event.key === "Enter" || event.key === " ")) {
-          event.preventDefault();
-          onOpenFullscreen();
-        }
-      }}
-    >
-      <PlayerBarArtwork
-        displayTrack={displayTrack}
-        displayCrossfadeTransition={displayCrossfadeTransition}
-        crossfadeProgress={crossfadeProgress}
-        isDesktop={isDesktop}
-        liked={liked}
-        onOpenAlbum={handleAlbumNavigation}
-        onCoverTouchStart={onCoverTouchStart}
-        onCoverTouchMove={onCoverTouchMove}
-        onCoverTouchEnd={onCoverTouchEnd}
-      />
+        }}
+      >
+        <PlayerBarArtwork
+          displayTrack={displayTrack}
+          displayCrossfadeTransition={displayCrossfadeTransition}
+          crossfadeProgress={crossfadeProgress}
+          isDesktop={isDesktop}
+          liked={liked}
+          onOpenAlbum={handleAlbumNavigation}
+        />
 
-      <PlayerBarTrackCopy
-        displayTrack={displayTrack}
-        displayCrossfadeTransition={displayCrossfadeTransition}
-        crossfadeProgress={crossfadeProgress}
-        displayPlaySource={displayPlaySource}
-        sourceLabel={sourceLabel}
-        isDesktop={isDesktop}
-        onOpenAlbum={handleAlbumNavigation}
-        onOpenArtist={handleArtistNavigation}
-        onOpenSource={handleSourceNavigation}
-      />
+        <PlayerBarTrackCopy
+          displayTrack={displayTrack}
+          displayCrossfadeTransition={displayCrossfadeTransition}
+          crossfadeProgress={crossfadeProgress}
+          displayPlaySource={displayPlaySource}
+          sourceLabel={sourceLabel}
+          isDesktop={isDesktop}
+          onOpenAlbum={handleAlbumNavigation}
+          onOpenArtist={handleArtistNavigation}
+          onOpenSource={handleSourceNavigation}
+        />
+      </div>
 
       {isDesktop ? (
         <PlayerBarTrackActions
           displayTrack={displayTrack}
-          duration={duration}
-          effectiveDisplayedDuration={effectiveDisplayedDuration}
           isShapedRadioTrack={isShapedRadioTrack}
           liked={liked}
-          onAddToCollection={onAddToCollection}
           onNextTrack={onNextTrack}
-          onOverlayChange={onOverlayChange}
           onToggleLike={onToggleLike}
           shapedRadioSessionId={shapedRadioSessionId}
         />
+      ) : null}
+
+      {trackMenu.actionMenu.open ? (
+        <PlayerTrackMenuContent {...trackMenu} currentTrack={displayTrack} />
       ) : null}
     </div>
   );

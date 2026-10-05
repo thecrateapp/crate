@@ -21,10 +21,7 @@ import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { usePlayerBarActions } from "./bar/usePlayerBarActions";
 import { usePlayerBarComputedState } from "./bar/usePlayerBarComputedState";
 import { usePlayerBarDisplayState } from "./bar/usePlayerBarDisplayState";
-import {
-  usePlayerBarLongPressEffect,
-  usePlayerBarPlaybackPreferenceEffect,
-} from "./bar/usePlayerBarLifecycle";
+import { usePlayerBarPlaybackPreferenceEffect } from "./bar/usePlayerBarLifecycle";
 import { usePlayerBarGestures } from "./bar/usePlayerBarGestures";
 import { usePlayerBarRemotePlayback } from "./bar/usePlayerBarRemotePlayback";
 import { usePlayerBarSurfaceState } from "./bar/use-player-bar-surface-state";
@@ -195,29 +192,21 @@ export function usePlayerBarController() {
   });
 
   const {
-    clearCoverLongPressTimer,
-    handleAddToCollection,
-    handleCoverTouchEnd,
-    handleCoverTouchMove,
-    handleCoverTouchStart,
     handleCycleRepeat,
     handleToggleEqualizer,
     handleToggleExtendedPlayer,
     handleToggleLyrics,
     handleToggleQueue,
     handleToggleShuffle,
-    isCoverLongPressTriggered,
     openFullscreenPlayer,
     prepareEqualizerPopover,
     prepareExtendedPlayer,
     prepareFullscreenPlayer,
     prepareLyricsPanel,
     prepareQueuePanel,
-    resetCoverLongPress,
     toggleLike,
   } = usePlayerBarActions({
     displayTrack,
-    isDesktop,
     isRemoteConnectActive,
     jamQueueLocked,
     showQueue: surface.showQueue,
@@ -239,8 +228,6 @@ export function usePlayerBarController() {
     toggleShuffle,
     cycleRepeat,
   });
-
-  usePlayerBarLongPressEffect(clearCoverLongPressTimer);
 
   return {
     isDesktop,
@@ -277,14 +264,8 @@ export function usePlayerBarController() {
     duration,
     onPrepareFullscreen: prepareFullscreenPlayer,
     onOpenFullscreen: openFullscreenPlayer,
-    onCoverTouchStart: handleCoverTouchStart,
-    onCoverTouchMove: handleCoverTouchMove,
-    onCoverTouchEnd: handleCoverTouchEnd,
-    isCoverLongPressTriggered,
-    resetCoverLongPress,
     onToggleLike: () => void toggleLike(),
     onNextTrack: handleNextTrack,
-    onAddToCollection: handleAddToCollection,
     onOverlayChange: surface.setHasFloatingOverlayOpen,
     handleTouchStart,
     handleTouchEnd,

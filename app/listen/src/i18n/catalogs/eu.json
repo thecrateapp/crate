@@ -1735,7 +1735,6 @@
   "settings.servers.add": "Gehitu beste zerbitzari bat",
   "settings.servers.toasts.switched": "{name} zerbitzarira aldatu da",
   "settings.servers.toasts.removed": "{name} kendu da",
-  "player.toasts.addedToCollection": "Bildumara gehitu da",
   "jam.toasts.remoteRoomEnded": "Jam gela hau amaitu da",
   "jam.toasts.remoteRoomDeleted": "Jam gela hau ezabatu da",
   "jam.connection.sessionInvalid": "Zure saioa ez da baliozkoa jada. Hasi saioa berriro gela honetara sartzeko.",

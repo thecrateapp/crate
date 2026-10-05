@@ -1735,7 +1735,6 @@
   "settings.servers.add": "Aggiungi un altro server",
   "settings.servers.toasts.switched": "Passato a {name}",
   "settings.servers.toasts.removed": "{name} rimosso",
-  "player.toasts.addedToCollection": "Aggiunto alla collezione",
   "jam.toasts.remoteRoomEnded": "Questa stanza jam è terminata",
   "jam.toasts.remoteRoomDeleted": "Questa stanza jam è stata eliminata",
   "jam.connection.sessionInvalid": "La tua sessione non è più valida. Accedi di nuovo per entrare in questa stanza.",

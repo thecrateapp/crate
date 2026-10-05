@@ -1474,8 +1474,16 @@ describe("FullscreenPlayer", () => {
         expect(screen.getByLabelText("Like track")).toBeInTheDocument();
       });
 
+      const like = screen.getByLabelText("Like track");
+      expect(like).toHaveClass(
+        "border-border-subtle",
+        "bg-surface-control",
+        "active:bg-surface-control-hover",
+      );
+      expect(like).toHaveAttribute("aria-pressed", "false");
+      expect(screen.getByTestId("fullscreen-like-heart")).toBeInTheDocument();
+
       for (const button of [
-        screen.getByLabelText("Like track"),
         screen.getByLabelText("Equalizer"),
         screen.getByLabelText("Show album cover"),
       ]) {

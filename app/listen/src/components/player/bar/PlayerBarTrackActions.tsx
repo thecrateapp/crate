@@ -1,56 +1,45 @@
-import { Heart, HeartBold, CRATE_ICON_SIZE } from "@crate/ui/icons";
+import { useTranslation } from "react-i18next";
+import { CRATE_ICON_SIZE } from "@crate/ui/icons";
+import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 
-import { PlayerTrackMenu } from "@/components/player/bar/PlayerTrackMenu";
 import { RadioFeedback } from "@/components/player/RadioFeedback";
 import type { Track } from "@/contexts/player-types";
 
 interface PlayerBarTrackActionsProps {
   displayTrack: Track;
-  duration: number;
-  effectiveDisplayedDuration: number;
   isShapedRadioTrack: boolean;
   liked: boolean;
-  onAddToCollection: () => Promise<void>;
   onNextTrack: () => void;
-  onOverlayChange: (open: boolean) => void;
   onToggleLike: () => void;
   shapedRadioSessionId: string | null | undefined;
 }
 
 export function PlayerBarTrackActions({
   displayTrack,
-  duration,
-  effectiveDisplayedDuration,
   isShapedRadioTrack,
   liked,
-  onAddToCollection,
   onNextTrack,
-  onOverlayChange,
   onToggleLike,
   shapedRadioSessionId,
 }: PlayerBarTrackActionsProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="ml-1 flex shrink-0 items-center gap-0.5">
-      <button
-        type="button"
+      <FollowHeartButton
+        following={liked}
+        label={t("actions.track.like")}
+        labelActive={t("actions.track.unlike")}
+        title={t(liked ? "actions.track.unlike" : "actions.track.like")}
+        heartTestId="player-bar-like-heart"
+        particlesTestId="player-bar-like-particles"
+        iconSize={CRATE_ICON_SIZE.md}
+        className="size-7.5 shrink-0 rounded-full hover:-translate-y-px after:absolute after:top-1/2 after:left-1/2 after:size-11 after:-translate-x-1/2 after:-translate-y-1/2"
         onClick={(event) => {
           event.stopPropagation();
           onToggleLike();
         }}
-        className="shrink-0 p-1.5 transition-[color,filter,transform] hover:-translate-y-px"
-      >
-        {liked ? (
-          <HeartBold
-            size={CRATE_ICON_SIZE.md}
-            className="animate-crate-icon-active-pulse text-accent-action"
-          />
-        ) : (
-          <Heart
-            size={CRATE_ICON_SIZE.md}
-            className="text-text-muted hover:text-accent-action hover:drop-shadow-accent-action"
-          />
-        )}
-      </button>
+      />
 
       {isShapedRadioTrack && shapedRadioSessionId ? (
         <RadioFeedback
@@ -60,15 +49,6 @@ export function PlayerBarTrackActions({
           onDislike={onNextTrack}
         />
       ) : null}
-
-      <div onClick={(event) => event.stopPropagation()}>
-        <PlayerTrackMenu
-          currentTrack={displayTrack}
-          duration={effectiveDisplayedDuration || duration}
-          onOverlayChange={onOverlayChange}
-          onAddToCollection={onAddToCollection}
-        />
-      </div>
     </div>
   );
 }

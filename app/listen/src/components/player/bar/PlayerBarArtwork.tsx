@@ -19,9 +19,6 @@ interface PlayerBarArtworkProps {
   isDesktop: boolean;
   liked: boolean;
   onOpenAlbum: () => void;
-  onCoverTouchStart: () => void;
-  onCoverTouchMove: () => void;
-  onCoverTouchEnd: () => void;
 }
 
 interface ArtworkInteractionOptions {
@@ -139,9 +136,6 @@ export function PlayerBarArtwork({
   isDesktop,
   liked,
   onOpenAlbum,
-  onCoverTouchStart,
-  onCoverTouchMove,
-  onCoverTouchEnd,
 }: PlayerBarArtworkProps) {
   const hasAlbum = Boolean(displayTrack.globalAlbumUid || displayTrack.albumId);
   const interactionProps = getArtworkInteractionProps({
@@ -151,13 +145,7 @@ export function PlayerBarArtwork({
   });
 
   return (
-    <div
-      {...interactionProps}
-      onTouchStart={onCoverTouchStart}
-      onTouchMove={onCoverTouchMove}
-      onTouchEnd={onCoverTouchEnd}
-      onTouchCancel={onCoverTouchEnd}
-    >
+    <div {...interactionProps}>
       <PlayerBarArtworkImage
         displayTrack={displayTrack}
         displayCrossfadeTransition={displayCrossfadeTransition}

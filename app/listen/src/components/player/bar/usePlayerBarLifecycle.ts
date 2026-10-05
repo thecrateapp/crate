@@ -269,9 +269,3 @@ export function usePlayerBarExternalSurfaceEffects({
     setShowQueue,
   ]);
 }
-
-export function usePlayerBarLongPressEffect(
-  clearCoverLongPressTimer: () => void,
-) {
-  useEffect(() => clearCoverLongPressTimer, [clearCoverLongPressTimer]);
-}

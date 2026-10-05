@@ -11,7 +11,7 @@ const COMPONENT_DECLARATION =
   /export\s+(?:default\s+)?(?:async\s+)?(?:function\s*\*?|const|let|class)\s+([A-Z]\w*|use[A-Z]\w*)\b/g;
 const NAMED_EXPORT_LIST = /export\s*\{([^}]*)\}/g;
 
-const RAW_CONTROL_BUDGET = { button: 113, input: 10, textarea: 1 };
+const RAW_CONTROL_BUDGET = { button: 111, input: 10, textarea: 1 };
 
 const LOCAL_COPY_ALLOWLIST: Record<string, string> = {
   "components/actions/ItemActionMenu.tsx:ItemActionMenu":

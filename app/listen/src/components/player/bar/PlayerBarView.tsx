@@ -50,18 +50,11 @@ type PlayerBarViewProps = {
   sourceLabel: string | null;
   shapedRadioSessionId: string | null | undefined;
   effectiveDisplayedDuration: number;
-  duration: number;
   onNavigate: (path: string) => void;
   onPrepareFullscreen: () => void;
   onOpenFullscreen: () => void;
-  onCoverTouchStart: () => void;
-  onCoverTouchMove: () => void;
-  onCoverTouchEnd: () => void;
-  isCoverLongPressTriggered: () => boolean;
-  resetCoverLongPress: () => void;
   onToggleLike: () => void;
   onNextTrack: () => void;
-  onAddToCollection: () => Promise<void>;
   onOverlayChange: (open: boolean) => void;
   handleTouchStart: TouchEventHandler<HTMLDivElement>;
   handleTouchEnd: TouchEventHandler<HTMLDivElement>;
@@ -109,18 +102,11 @@ export function PlayerBarView({
   sourceLabel,
   shapedRadioSessionId,
   effectiveDisplayedDuration,
-  duration,
   onNavigate,
   onPrepareFullscreen,
   onOpenFullscreen,
-  onCoverTouchStart,
-  onCoverTouchMove,
-  onCoverTouchEnd,
-  isCoverLongPressTriggered,
-  resetCoverLongPress,
   onToggleLike,
   onNextTrack,
-  onAddToCollection,
   onOverlayChange,
   handleTouchStart,
   handleTouchEnd,
@@ -234,19 +220,11 @@ export function PlayerBarView({
               liked={liked}
               isShapedRadioTrack={isShapedRadioTrack}
               shapedRadioSessionId={shapedRadioSessionId}
-              effectiveDisplayedDuration={effectiveDisplayedDuration}
-              duration={duration}
               onNavigate={onNavigate}
               onPrepareFullscreen={onPrepareFullscreen}
               onOpenFullscreen={onOpenFullscreen}
-              onCoverTouchStart={onCoverTouchStart}
-              onCoverTouchMove={onCoverTouchMove}
-              onCoverTouchEnd={onCoverTouchEnd}
-              isCoverLongPressTriggered={isCoverLongPressTriggered}
-              resetCoverLongPress={resetCoverLongPress}
               onToggleLike={onToggleLike}
               onNextTrack={onNextTrack}
-              onAddToCollection={onAddToCollection}
               onOverlayChange={onOverlayChange}
             />
             <PlayerBarTransportControls
