@@ -87,3 +87,19 @@ describe("runtime token bridge", () => {
     expect(semantic).toContain("--focus-ring: var(--color-ring);");
   });
 });
+
+describe("z-index layers", () => {
+  const zIndex = (name: string) => {
+    const match = readTokenFile("z-index.css").match(
+      new RegExp(`--z-${name}:\\s*(\\d+);`),
+    );
+    return Number(match?.[1]);
+  };
+
+  it("keeps player-anchored popovers above the raised player bar and below menus", () => {
+    expect(zIndex("player-popover")).toBeGreaterThan(zIndex("player-overlay"));
+    expect(zIndex("player-popover")).toBeLessThan(zIndex("dropdown"));
+    expect(zIndex("player-popover")).toBeLessThan(zIndex("context-menu"));
+    expect(zIndex("player-popover")).toBeLessThan(zIndex("modal"));
+  });
+});
