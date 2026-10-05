@@ -2080,12 +2080,6 @@
   background: var(--text-secondary-soft);
 }
 
-.home-hero-genre {
-  border-color: var(--border-quiet);
-  background: var(--surface-canvas-raised);
-  color: var(--text-hero);
-}
-
 .home-hero-follow {
   color: var(--text-hero);
 }
@@ -2260,6 +2254,16 @@
       color-mix(in srgb, var(--text-primary) 11%, transparent),
       transparent 38%
     );
+}
+
+.genre-pill {
+  border-color: var(--border-quiet);
+  background: var(--surface-canvas-raised);
+  color: var(--text-primary);
+}
+
+button.genre-pill:hover {
+  border-color: var(--border-accent);
 }
 
 .explore-genre-card {

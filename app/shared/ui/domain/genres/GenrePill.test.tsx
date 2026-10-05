@@ -28,4 +28,24 @@ describe("GenrePill", () => {
 
     expect(screen.getByText("42%")).toHaveClass("text-badge");
   });
+
+  it("renders the name in primary text and keeps the percentage accented", () => {
+    render(<GenrePill item={{ name: "Shoegaze", share: 0.314 }} />);
+
+    const pill = screen.getByTitle("Shoegaze · 31%");
+    expect(pill).toHaveClass("genre-pill", "rounded-md", "border");
+    expect(pill.className).not.toContain("--active-text");
+    expect(screen.getByText("31%").className).toContain("--active-text");
+  });
+
+  it("renders a button when clickable", () => {
+    const onClick = vi.fn();
+    render(<GenrePill item={{ name: "Shoegaze" }} onClick={onClick} />);
+
+    screen.getByRole("button", { name: "shoegaze" }).click();
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "shoegaze" })).toHaveClass(
+      "genre-pill",
+    );
+  });
 });

@@ -56,7 +56,7 @@ export function HeroGenres({ hero }: { hero: HomeHeroArtist }) {
         <GenrePill
           key={genre.name}
           item={genre}
-          className="home-hero-genre max-w-[42vw] backdrop-blur-sm sm:max-w-none"
+          className="max-w-[42vw] backdrop-blur-sm sm:max-w-none"
         />
       ))}
     </div>

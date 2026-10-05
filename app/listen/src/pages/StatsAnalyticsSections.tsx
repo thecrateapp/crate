@@ -1,9 +1,16 @@
-import type { ComponentType } from "react";
+import { useCallback, useMemo, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router";
 import { Activity, CRATE_ICON_SIZE } from "@crate/ui/icons";
+import {
+  GenrePillRow,
+  type GenreProfileItem,
+} from "@crate/ui/domain/genres/GenrePill";
 
 import type { SoundProfile } from "@/pages/stats-page-model";
+import { genrePagePath } from "@/components/actions/genre-actions";
 import {
+  buildStatsGenreProfile,
   formatStatsPercent,
   type StatsGenre,
 } from "@/components/stats/stats-model";
@@ -47,7 +54,15 @@ export function SoundProfileCard({
   skipRate: number;
 }) {
   const { t } = useTranslation();
-  const genreLabels = normalizeGenreLabels(genres);
+  const navigate = useNavigate();
+  const genreProfile = useMemo(() => buildStatsGenreProfile(genres), [genres]);
+  const hasGenreLinks = genreProfile.some((genre) => genre.slug);
+  const openGenre = useCallback(
+    (genre: GenreProfileItem) => {
+      if (genre.slug) navigate(genrePagePath(genre.slug));
+    },
+    [navigate],
+  );
 
   return (
     <div className="stats-card rounded-panel p-5">
@@ -89,21 +104,18 @@ export function SoundProfileCard({
         />
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-2">
-        {genreLabels.map((genre) => (
-          <span
-            key={genre}
-            className="rounded-full border border-accent-action/20 bg-accent-action/10 px-3 py-1 text-xs font-bold text-accent-action"
-          >
-            {genre}
-          </span>
-        ))}
-        {!genreLabels.length ? (
-          <span className="text-sm text-text-muted">
-            {t("stats.soundProfile.genreEmpty")}
-          </span>
-        ) : null}
-      </div>
+      {genreProfile.length ? (
+        <GenrePillRow
+          items={genreProfile}
+          max={8}
+          className="mt-5"
+          onSelect={hasGenreLinks ? openGenre : undefined}
+        />
+      ) : (
+        <p className="mt-5 text-sm text-text-muted">
+          {t("stats.soundProfile.genreEmpty")}
+        </p>
+      )}
     </div>
   );
 }
@@ -126,19 +138,4 @@ function ProfileBar({ label, value }: { label: string; value: number }) {
       </div>
     </div>
   );
-}
-
-function normalizeGenreLabels(genres: StatsGenre[]): string[] {
-  const seen = new Set<string>();
-  const labels: string[] = [];
-  for (const genre of genres) {
-    for (const rawLabel of genre.genre_name.split(",")) {
-      const label = rawLabel.trim();
-      const key = label.toLowerCase();
-      if (!label || seen.has(key)) continue;
-      seen.add(key);
-      labels.push(label);
-    }
-  }
-  return labels.slice(0, 8);
 }
