@@ -1897,6 +1897,27 @@ class TestPlaylistCurationAPI:
 
 
 class TestAcquisitionAPI:
+    def test_tidal_download_accepts_atmos_quality_and_queues_it(self, test_app):
+        url = "https://tidal.com/album/123"
+
+        with (
+            patch("crate.api.tidal._require_tidal_manager"),
+            patch("crate.api.tidal.tidal.is_authenticated", return_value=True),
+            patch("crate.api.tidal.add_tidal_download", return_value=17),
+            patch(
+                "crate.api.tidal.create_task_dedup", return_value="task-17"
+            ) as create_task,
+            patch("crate.api.tidal.update_tidal_download"),
+        ):
+            response = test_app.post(
+                "/api/tidal/download",
+                json={"url": url, "quality": "atmos"},
+            )
+
+        assert response.status_code == 200
+        assert response.json() == {"task_id": "task-17", "download_id": 17}
+        assert create_task.call_args.args[1]["quality"] == "atmos"
+
     def test_acquisition_snapshot_collapses_tidal_and_soulseek_state(self, test_app):
         tidal_queue = [
             {

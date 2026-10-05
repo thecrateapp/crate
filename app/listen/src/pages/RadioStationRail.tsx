@@ -38,6 +38,12 @@ function RadioStationCard({
       onClick={() => onStart(station)}
       className="radio-station-card group relative aspect-square snap-start overflow-hidden rounded-xl text-left transition duration-300"
     >
+      {!imageUrl ? (
+        <div
+          className="radio-station-placeholder absolute inset-0"
+          data-station-type={station.type}
+        />
+      ) : null}
       {imageUrl ? (
         <CrateImage
           src={imageUrl}
@@ -45,15 +51,10 @@ function RadioStationCard({
           className="absolute inset-0 size-full object-cover opacity-85 transition duration-500 group-hover:scale-[1.04] group-hover:opacity-100"
           loading="lazy"
         />
-      ) : (
-        <div
-          className="radio-station-placeholder absolute inset-0"
-          data-station-type={station.type}
-        />
-      )}
+      ) : null}
       <div className="radio-station-overlay absolute inset-0" />
       <div className="absolute inset-x-3 top-3 flex items-center justify-between gap-2">
-        <span className="radio-station-type rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] backdrop-blur-md">
+        <span className="radio-station-type inline-flex w-fit max-w-full whitespace-nowrap rounded-full px-2 py-1 text-badge font-semibold uppercase tracking-[0.1em] backdrop-blur-md">
           {typeLabel}
         </span>
         <span className="radio-station-play flex size-8 items-center justify-center rounded-full opacity-0 transition duration-300 group-focus-within:opacity-100 group-hover:opacity-100">

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 
@@ -71,6 +72,251 @@ def test_run_quality_uses_quality_subcommand(monkeypatch):
         "--file",
         "/music/track.flac",
     ]
+
+
+def test_run_quality_batches_multiple_target_directories(monkeypatch):
+    from crate import crate_cli
+
+    crate_cli.supports_command.cache_clear()
+    crate_cli.has_subcommands.cache_clear()
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+
+    calls: list[list[str]] = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        if args == ["/usr/local/bin/crate-cli", "--help"]:
+            return SimpleNamespace(
+                returncode=0, stdout="Commands:\n  quality\n", stderr=""
+            )
+        return SimpleNamespace(returncode=0, stdout='{"tracks":[]}', stderr="")
+
+    monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
+
+    assert crate_cli.run_quality(
+        directory=["/music/Artist/Album One", "/music/Artist/Album Two"]
+    ) == {"tracks": []}
+    assert calls[-1] == [
+        "/usr/local/bin/crate-cli",
+        "quality",
+        "--dir",
+        "/music/Artist/Album One",
+        "/music/Artist/Album Two",
+        "--extensions",
+        "flac,mp3,m4a,ogg,opus,wav",
+    ]
+
+
+def test_run_quality_accepts_multiple_explicit_files(monkeypatch):
+    from crate import crate_cli
+
+    crate_cli.supports_command.cache_clear()
+    crate_cli.has_subcommands.cache_clear()
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+
+    calls: list[list[str]] = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        if args == ["/usr/local/bin/crate-cli", "--help"]:
+            return SimpleNamespace(
+                returncode=0, stdout="Commands:\n  quality\n", stderr=""
+            )
+        return SimpleNamespace(returncode=0, stdout='{"tracks":[]}', stderr="")
+
+    monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
+
+    assert crate_cli.run_quality(files=["/music/new-1.flac", "/music/new-2.flac"]) == {
+        "tracks": []
+    }
+    assert calls[-1] == [
+        "/usr/local/bin/crate-cli",
+        "quality",
+        "--file",
+        "/music/new-1.flac",
+        "/music/new-2.flac",
+    ]
+
+
+def test_run_quality_ignores_blank_explicit_files_and_falls_back_to_file(monkeypatch):
+    from crate import crate_cli
+
+    crate_cli.supports_command.cache_clear()
+    crate_cli.has_subcommands.cache_clear()
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+
+    calls: list[list[str]] = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        if args == ["/usr/local/bin/crate-cli", "--help"]:
+            return SimpleNamespace(
+                returncode=0, stdout="Commands:\n  quality\n", stderr=""
+            )
+        return SimpleNamespace(returncode=0, stdout='{"tracks":[]}', stderr="")
+
+    monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
+
+    assert crate_cli.run_quality(files="", file="/music/fallback.flac") == {
+        "tracks": []
+    }
+    assert calls[-1] == [
+        "/usr/local/bin/crate-cli",
+        "quality",
+        "--file",
+        "/music/fallback.flac",
+    ]
+
+
+def test_run_quality_ignores_blank_file_entries_and_falls_back_to_directory(
+    monkeypatch,
+):
+    from crate import crate_cli
+
+    crate_cli.supports_command.cache_clear()
+    crate_cli.has_subcommands.cache_clear()
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+
+    calls: list[list[str]] = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        if args == ["/usr/local/bin/crate-cli", "--help"]:
+            return SimpleNamespace(
+                returncode=0, stdout="Commands:\n  quality\n", stderr=""
+            )
+        return SimpleNamespace(returncode=0, stdout='{"tracks":[]}', stderr="")
+
+    monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
+
+    assert crate_cli.run_quality(files=["", "  "], directory="/music/Artist/Album") == {
+        "tracks": []
+    }
+    assert calls[-1] == [
+        "/usr/local/bin/crate-cli",
+        "quality",
+        "--dir",
+        "/music/Artist/Album",
+        "--extensions",
+        "flac,mp3,m4a,ogg,opus,wav",
+    ]
+
+
+def test_run_quality_ignores_blank_single_file_and_falls_back_to_directory(
+    monkeypatch,
+):
+    from crate import crate_cli
+
+    calls: list[list[str]] = []
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+    monkeypatch.setattr(crate_cli, "supports_command", lambda _command: True)
+    monkeypatch.setattr(
+        crate_cli.subprocess,
+        "run",
+        lambda args, **_kwargs: (
+            calls.append(args)
+            or SimpleNamespace(returncode=0, stdout='{"tracks":[]}', stderr="")
+        ),
+    )
+
+    assert crate_cli.run_quality(file=" ", directory="/music/Artist/Album") == {
+        "tracks": []
+    }
+    assert calls == [
+        [
+            "/usr/local/bin/crate-cli",
+            "quality",
+            "--dir",
+            "/music/Artist/Album",
+            "--extensions",
+            "flac,mp3,m4a,ogg,opus,wav",
+        ]
+    ]
+
+
+def test_run_quality_returns_none_when_only_blank_file_targets_are_given(monkeypatch):
+    from crate import crate_cli
+
+    calls = []
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+    monkeypatch.setattr(crate_cli, "supports_command", lambda _command: True)
+    monkeypatch.setattr(
+        crate_cli.subprocess, "run", lambda *args, **_kwargs: calls.append(args)
+    )
+
+    assert crate_cli.run_quality(file=" ") is None
+    assert crate_cli.run_quality(files=" ") is None
+    assert calls == []
+
+
+def test_run_quality_accepts_pathlike_targets_and_filters_blank_directories(
+    monkeypatch,
+):
+    from crate import crate_cli
+
+    crate_cli.supports_command.cache_clear()
+    crate_cli.has_subcommands.cache_clear()
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+
+    calls: list[list[str]] = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        if args == ["/usr/local/bin/crate-cli", "--help"]:
+            return SimpleNamespace(
+                returncode=0, stdout="Commands:\n  quality\n", stderr=""
+            )
+        return SimpleNamespace(returncode=0, stdout='{"tracks":[]}', stderr="")
+
+    monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
+
+    assert crate_cli.run_quality(directory=Path("/music/Artist/Album")) == {
+        "tracks": []
+    }
+    assert calls[-1] == [
+        "/usr/local/bin/crate-cli",
+        "quality",
+        "--dir",
+        Path("/music/Artist/Album"),
+        "--extensions",
+        "flac,mp3,m4a,ogg,opus,wav",
+    ]
+
+    assert crate_cli.run_quality(directory=[Path("/music/Artist"), ""]) == {
+        "tracks": []
+    }
+    assert calls[-1] == [
+        "/usr/local/bin/crate-cli",
+        "quality",
+        "--dir",
+        Path("/music/Artist"),
+        "--extensions",
+        "flac,mp3,m4a,ogg,opus,wav",
+    ]
+
+    assert crate_cli.run_quality(files=Path("/music/track.flac")) == {"tracks": []}
+    assert calls[-1] == [
+        "/usr/local/bin/crate-cli",
+        "quality",
+        "--file",
+        Path("/music/track.flac"),
+    ]
+
+
+def test_quality_timeout_seconds_uses_bounded_configured_value(monkeypatch):
+    from crate import crate_cli
+
+    monkeypatch.setenv("CRATE_CLI_QUALITY_TIMEOUT_SECONDS", "45")
+
+    assert crate_cli.quality_timeout_seconds() == 45
+
+
+def test_quality_timeout_seconds_rejects_non_positive_config(monkeypatch):
+    from crate import crate_cli
+
+    monkeypatch.setenv("CRATE_CLI_QUALITY_TIMEOUT_SECONDS", "0")
+
+    assert crate_cli.quality_timeout_seconds() == 1
 
 
 def test_run_diff_uses_diff_subcommand(monkeypatch):

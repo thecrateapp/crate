@@ -29,6 +29,7 @@ import {
   castSetVolume,
   isCastSessionActive,
 } from "@/lib/cast-sender";
+import { cancelPendingAudioOutputResume } from "@/lib/audio-output-interruption";
 import {
   cancelNativeMediaSessionResume,
   markNativeMediaSessionPlayingIntent,
@@ -70,6 +71,7 @@ export function usePlayerTransportControls({
   silenceGaplessEngine,
 }: UsePlayerTransportControlsParams) {
   const pauseLocal = useCallback(() => {
+    cancelPendingAudioOutputResume();
     void cancelNativeMediaSessionResume();
     cancelSoftInterruption();
     bufferingIntentRef.current = false;
@@ -91,6 +93,7 @@ export function usePlayerTransportControls({
 
   const resumeLocal = useCallback(() => {
     if (!queueRef.current.length) return;
+    cancelPendingAudioOutputResume();
     markNativeMediaSessionPlayingIntent();
     cancelSoftInterruption();
     bufferingIntentRef.current = true;
@@ -125,6 +128,9 @@ export function usePlayerTransportControls({
 
   const pause = useCallback(
     (options?: PlayerPauseOptions) => {
+      if (!options?.preserveAudioOutputResume) {
+        cancelPendingAudioOutputResume();
+      }
       if (!options?.preserveNativeResume) {
         void cancelNativeMediaSessionResume();
       }
@@ -172,6 +178,7 @@ export function usePlayerTransportControls({
 
   const resume = useCallback(() => {
     if (!queueRef.current.length) return;
+    cancelPendingAudioOutputResume();
     markNativeMediaSessionPlayingIntent();
     if (isCastSessionActive()) {
       void castPlay()

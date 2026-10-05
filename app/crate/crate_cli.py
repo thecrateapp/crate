@@ -5,6 +5,7 @@ import logging
 import os
 import shutil
 import subprocess
+from collections.abc import Sequence
 from functools import lru_cache
 from pathlib import Path
 
@@ -77,6 +78,11 @@ def _quality_timeout() -> int:
         return 300
 
 
+def quality_timeout_seconds() -> int:
+    """Return the configured bound for audio quality probes."""
+    return _quality_timeout()
+
+
 def _diff_timeout() -> int:
     try:
         return max(1, int(os.environ.get("CRATE_CLI_DIFF_TIMEOUT_SECONDS", "300")))
@@ -114,25 +120,39 @@ def run_scan(
 
 
 def run_quality(
-    directory: str = "",
-    file: str = "",
+    directory: str | os.PathLike[str] | Sequence[str | os.PathLike[str]] = "",
+    file: str | os.PathLike[str] = "",
     extensions: str = "flac,mp3,m4a,ogg,opus,wav",
     timeout: int | None = None,
+    files: str | os.PathLike[str] | Sequence[str | os.PathLike[str]] | None = None,
 ) -> dict | None:
     """Probe technical audio metadata with Rust CLI. Returns QualityResult or None."""
     binary = find_binary()
     if not binary or not supports_command("quality"):
         return None
     args = [binary, "quality"]
-    if file:
-        args.extend(["--file", file])
-    elif directory:
-        args.extend(["--dir", directory, "--extensions", extensions])
+    path_argument = (str, os.PathLike)
+    target_files = [files] if isinstance(files, path_argument) else list(files or [])
+    target_files = [target for target in target_files if str(target).strip()]
+    target_file = [file] if str(file or "").strip() else []
+    target_directories = (
+        [directory] if isinstance(directory, path_argument) else list(directory or [])
+    )
+    target_directories = [path for path in target_directories if str(path).strip()]
+    if target_files:
+        args.extend(["--file", *target_files])
+    elif target_file:
+        args.extend(["--file", *target_file])
+    elif target_directories:
+        args.extend(["--dir", *target_directories, "--extensions", extensions])
     else:
         return None
     try:
         result = subprocess.run(
-            args, capture_output=True, text=True, timeout=timeout or _quality_timeout()
+            args,
+            capture_output=True,
+            text=True,
+            timeout=timeout or quality_timeout_seconds(),
         )
         if result.returncode != 0:
             log.warning("crate-cli quality failed: %s", result.stderr[:200])

@@ -111,9 +111,11 @@ def _read_audio_quality_native(filepath: Path) -> dict[str, int | float | None] 
     }
 
 
-def read_audio_quality(filepath: Path) -> dict[str, int | float | None]:
+def read_audio_quality(
+    filepath: Path, *, use_native_probe: bool = True
+) -> dict[str, int | float | None]:
     """Read lightweight technical audio metadata from a file."""
-    native = _read_audio_quality_native(filepath)
+    native = _read_audio_quality_native(filepath) if use_native_probe else None
     if native:
         return native
 

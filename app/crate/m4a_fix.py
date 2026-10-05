@@ -5,6 +5,7 @@ lossless downloads to FLAC. More recently we've also seen:
 
 - extensionless ``tmp*`` MP4/AAC payloads
 - ``.flac`` files whose content is actually MP4/AAC
+- Dolby Atmos AC-4 streams stored in MP4 containers
 - raw FLAC streams saved with the wrong extension
 
 This module keeps the old M4A cleanup/remux helpers for compatibility, and
@@ -36,7 +37,7 @@ FINAL_AUDIO_SUFFIXES = {
 }
 MP4_LIKE_SUFFIXES = {".m4a", ".mp4", ".aac"}
 LOSSLESS_CODEC_NAMES = {"flac", "alac"}
-LOSSY_CODEC_NAMES = {"aac"}
+LOSSY_CODEC_NAMES = {"aac", "ac4"}
 UUID_STEM_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
     re.IGNORECASE,
@@ -445,7 +446,7 @@ def repair_tidal_artifacts(
     The main policy is:
 
     - recover real FLAC payloads to native ``.flac`` files
-    - optionally normalize valid AAC/ALAC MP4 payloads to ``.m4a``
+    - optionally normalize valid AAC/ALAC/AC-4 MP4 payloads to ``.m4a``
     - delete ``tmp*`` / invalid wrappers once the directory has usable final audio
     - report remaining lossy or junk files so callers can fallback or abort
     """

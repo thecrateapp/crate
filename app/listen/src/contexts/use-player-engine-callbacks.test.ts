@@ -8,7 +8,11 @@ import type { PlaySource, Track } from "@/contexts/player-types";
 import { PLAYER_TRACK_FINISHED_EVENT } from "@/contexts/player-events";
 import { usePlayerEngineCallbacks } from "@/contexts/use-player-engine-callbacks";
 
-const { isCastSessionActiveMock } = vi.hoisted(() => ({
+const { audioOutputInterruption, isCastSessionActiveMock } = vi.hoisted(() => ({
+  audioOutputInterruption: {
+    cancel: vi.fn(),
+    isPending: vi.fn(() => false),
+  },
   isCastSessionActiveMock: vi.fn(() => false),
 }));
 
@@ -29,6 +33,11 @@ vi.mock("@/lib/capacitor", () => ({
 
 vi.mock("@/lib/cast-sender", () => ({
   isCastSessionActive: isCastSessionActiveMock,
+}));
+
+vi.mock("@/lib/audio-output-interruption", () => ({
+  cancelPendingAudioOutputResume: audioOutputInterruption.cancel,
+  isAudioOutputInterruptionPending: audioOutputInterruption.isPending,
 }));
 
 const TRACK_A: Track = { id: "a", title: "A", artist: "Artist" };
@@ -86,6 +95,7 @@ describe("usePlayerEngineCallbacks", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     isCastSessionActiveMock.mockReturnValue(false);
+    audioOutputInterruption.isPending.mockReturnValue(false);
   });
 
   it("ignores late local engine callbacks while Cast owns playback", () => {
@@ -181,6 +191,35 @@ describe("usePlayerEngineCallbacks", () => {
       expect.objectContaining({ detail: { track: TRACK_A } }),
     );
     window.removeEventListener(PLAYER_TRACK_FINISHED_EVENT, listener);
+  });
+
+  it("cancels output recovery when the queue finishes naturally", () => {
+    const options = createOptions();
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onAllFinished?.();
+
+    expect(audioOutputInterruption.cancel).toHaveBeenCalledTimes(1);
+    expect(options.commitIsPlaying).toHaveBeenCalledWith(false);
+  });
+
+  it("invalidates an output candidate for a current-track playback error", () => {
+    const options = createOptions();
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onError?.("/stream/a", new Error("stream"));
+
+    expect(audioOutputInterruption.cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves a confirmed output interruption when playback reports an error", () => {
+    audioOutputInterruption.isPending.mockReturnValue(true);
+    const options = createOptions();
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onError?.("/stream/a", new Error("stream"));
+
+    expect(audioOutputInterruption.cancel).not.toHaveBeenCalled();
   });
 
   it("reports elapsed startup time after a play request is fulfilled", () => {

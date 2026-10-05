@@ -36,7 +36,7 @@ def _home_cache_ready_channel(cache_key: str) -> str:
     return f"{_HOME_CACHE_READY_CHANNEL_PREFIX}{cache_key}"
 
 
-def _get_or_compute_home_cache(
+def get_or_compute_home_cache(
     cache_key: str,
     *,
     max_age_seconds: int,
@@ -213,3 +213,7 @@ def _get_or_compute_home_cache(
                 current = _home_cache_singleflight_events.pop(cache_key, None)
                 if current is not None:
                     current.set()
+
+
+# Compatibility for callers that imported the original private helper.
+_get_or_compute_home_cache = get_or_compute_home_cache

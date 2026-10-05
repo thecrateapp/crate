@@ -11,6 +11,7 @@ const {
   castQueueNextMock,
   castSeekMock,
   castSetVolumeMock,
+  cancelPendingAudioOutputResumeMock,
   cancelNativeMediaSessionResumeMock,
   markNativeMediaSessionPlayingIntentMock,
   isCastSessionActiveMock,
@@ -27,6 +28,7 @@ const {
   castQueueNextMock: vi.fn(),
   castSeekMock: vi.fn(),
   castSetVolumeMock: vi.fn(),
+  cancelPendingAudioOutputResumeMock: vi.fn(),
   cancelNativeMediaSessionResumeMock: vi.fn(async () => {}),
   markNativeMediaSessionPlayingIntentMock: vi.fn(),
   isCastSessionActiveMock: vi.fn(),
@@ -98,6 +100,10 @@ vi.mock("@/lib/cast-sender", () => ({
 vi.mock("@/lib/native-media-session", () => ({
   cancelNativeMediaSessionResume: cancelNativeMediaSessionResumeMock,
   markNativeMediaSessionPlayingIntent: markNativeMediaSessionPlayingIntentMock,
+}));
+
+vi.mock("@/lib/audio-output-interruption", () => ({
+  cancelPendingAudioOutputResume: cancelPendingAudioOutputResumeMock,
 }));
 
 const TRACK: Track = {
@@ -627,6 +633,7 @@ describe("usePlayerQueueActions", () => {
     result.current.pause();
 
     expect(cancelNativeMediaSessionResumeMock).toHaveBeenCalledTimes(1);
+    expect(cancelPendingAudioOutputResumeMock).toHaveBeenCalledTimes(1);
   });
 
   it("preserves native resume only for the interruption-originated pause", () => {
@@ -636,6 +643,15 @@ describe("usePlayerQueueActions", () => {
     result.current.pause({ preserveNativeResume: true });
 
     expect(cancelNativeMediaSessionResumeMock).not.toHaveBeenCalled();
+  });
+
+  it("preserves output resume only for the interruption-originated pause", () => {
+    const params = createParams();
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.pause({ preserveAudioOutputResume: true });
+
+    expect(cancelPendingAudioOutputResumeMock).not.toHaveBeenCalled();
   });
 
   it("restores native resume permission for an explicit resume", () => {
