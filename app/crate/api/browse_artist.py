@@ -2108,7 +2108,13 @@ def api_external_artist_photo(
         return response
 
     if is_external_artist_artwork_missing(artist_name):
-        return Response(status_code=404, headers={"Cache-Control": "no-store"})
+        return Response(
+            status_code=404,
+            headers={
+                "Cache-Control": "public, max-age=86400",
+                "X-Crate-External-Artwork": "missing",
+            },
+        )
 
     return Response(
         status_code=404,
