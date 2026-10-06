@@ -53,7 +53,6 @@ dev: ## Start backend (Postgres + Redis + API + Worker + Readplane + Caddy) and 
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
 	@-pkill -f "vite.*app/site" 2>/dev/null || true
-	@-pkill -f "vite.*app/reference" 2>/dev/null || true
 	@docker rm -f $(DEV_CONTAINERS) >/dev/null 2>&1 || true
 	@sleep 0.5
 	@$(MAKE) --no-print-directory _ensure-dev-certs
@@ -149,7 +148,6 @@ dev-down: ## Stop everything (backend + frontends)
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
 	@-pkill -f "vite.*app/site" 2>/dev/null || true
-	@-pkill -f "vite.*app/reference" 2>/dev/null || true
 	@echo "$(GREEN)Everything stopped$(NC)"
 
 .PHONY: dev-logs
@@ -181,7 +179,6 @@ dev-rebuild: ## Rebuild and restart everything
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
 	@-pkill -f "vite.*app/site" 2>/dev/null || true
-	@-pkill -f "vite.*app/reference" 2>/dev/null || true
 	@docker rm -f $(DEV_CONTAINERS) >/dev/null 2>&1 || true
 	@sleep 0.5
 	@$(DC_DEV) up -d --build --force-recreate
@@ -217,7 +214,6 @@ dev-reset: ## Reset the dev environment (wipe data and stop everything)
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
 	@-pkill -f "vite.*app/site" 2>/dev/null || true
-	@-pkill -f "vite.*app/reference" 2>/dev/null || true
 	@echo "$(GREEN)Dev environment reset (data removed)$(NC)"
 
 # ===========================================================================
