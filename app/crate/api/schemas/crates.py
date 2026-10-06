@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from crate.api.schemas.browse import GenreProfileResponse
 from crate.api.schemas.common import OkResponse
 
 
@@ -91,6 +92,7 @@ class CrateSummaryResponse(BaseModel):
 class CrateDetailResponse(CrateSummaryResponse):
     owner_avatar: str | None = None
     albums: list[CrateAlbumResponse] = Field(default_factory=list)
+    genre_profile: list[GenreProfileResponse] = Field(default_factory=list)
 
 
 class CratePlaybackTrackResponse(BaseModel):

@@ -268,6 +268,70 @@ def get_crate_for_user(
         return _impl(current)
 
 
+def get_crate_genre_rows(
+    crate_id: str, *, limit: int = 6, session: Session | None = None
+) -> list[dict]:
+    """Aggregate local album genres, giving every Crate album the same weight."""
+
+    def _impl(current: Session) -> list[dict]:
+        rows = (
+            current.execute(
+                text(
+                    """
+                    WITH album_weights AS (
+                        SELECT
+                            genre.name,
+                            genre.slug,
+                            COALESCE(album_genre.weight, 0) AS weight,
+                            SUM(COALESCE(album_genre.weight, 0)) OVER (
+                                PARTITION BY album_genre.album_id
+                            ) AS album_total
+                        FROM crate_albums crate_album
+                        JOIN global_catalog_albums album
+                          ON album.global_album_uid = crate_album.global_album_uid
+                        JOIN album_genres album_genre
+                          ON album_genre.album_id = album.local_album_id
+                        JOIN genres genre
+                          ON genre.id = album_genre.genre_id
+                        WHERE crate_album.crate_id = CAST(:crate_id AS uuid)
+                    )
+                    SELECT
+                        name,
+                        slug,
+                        SUM(
+                            CASE WHEN album_total > 0 THEN weight / album_total ELSE 0 END
+                        )::float AS weight
+                    FROM album_weights
+                    GROUP BY name, slug
+                    ORDER BY weight DESC, name ASC
+                    LIMIT :limit
+                    """
+                ),
+                {"crate_id": crate_id, "limit": limit},
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(row) for row in rows]
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
+def get_crate_detail_for_user(
+    crate_id: str, user_id: int | None
+) -> tuple[dict | None, CrateAccess, list[dict]]:
+    """Return a Crate, its access level and genre rows in one read transaction."""
+
+    with read_scope() as current:
+        crate, access = get_crate_for_user(crate_id, user_id, session=current)
+        if crate is None:
+            return None, access, []
+        return crate, access, get_crate_genre_rows(crate_id, session=current)
+
+
 def get_crate_playback_tracks_for_user(
     crate_id: str,
     user_id: int,
@@ -825,7 +889,9 @@ __all__ = [
     "get_crate_access",
     "get_crate_download_source",
     "get_crate_download_source_for_user",
+    "get_crate_detail_for_user",
     "get_crate_for_user",
+    "get_crate_genre_rows",
     "get_crate_playback_tracks",
     "get_crate_playback_tracks_for_user",
     "get_crate_offline_tracks_for_user",

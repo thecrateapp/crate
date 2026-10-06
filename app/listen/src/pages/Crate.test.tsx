@@ -390,6 +390,20 @@ describe("Crate page", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows the Crate genre profile as percentage pills", () => {
+    mocks.detail = {
+      ...crate("owner"),
+      genre_profile: [
+        { name: "Post-Punk", slug: "post-punk", percent: 100 },
+        { name: "Noise Rock", slug: "noise-rock", percent: 33 },
+      ],
+    };
+    renderCrate();
+
+    expect(screen.getByTitle("Post-Punk · 100%")).toBeInTheDocument();
+    expect(screen.getByTitle("Noise Rock · 33%")).toBeInTheDocument();
+  });
+
   it("mirrors every Crate action in the More menu like the album page", async () => {
     const user = userEvent.setup();
     mocks.detail = crate("owner");

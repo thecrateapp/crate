@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router";
 import type { TFunction } from "i18next";
 import { CRATE_ICON_SIZE, Share2 } from "@crate/ui/icons";
+import { GenrePillRow } from "@crate/ui/domain/genres/GenrePill";
 import { PageHero, type HeroSecondaryAction } from "@crate/ui/domain/hero";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
@@ -16,6 +18,7 @@ import {
 } from "@/components/crates/crate-model";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
 import { UserProfileAvatar } from "@/pages/UserProfileAvatar";
+import { genreSlug } from "@/lib/utils";
 import type { CrateDetail } from "@/pages/crates-types";
 
 export const CRATE_SECONDARY_ACTION_CLASS =
@@ -37,6 +40,7 @@ export function CrateHero({
   contentClassName?: string;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const ownerName = crateOwnerName(crate) ?? t("people.unknownUser");
   const backgroundAlbum = albums.find((album) => album.has_cover);
   const backgroundUrl = backgroundAlbum ? coverUrl(backgroundAlbum, 512) : null;
@@ -110,6 +114,20 @@ export function CrateHero({
         description={crate.description || undefined}
         actions={actions}
       >
+        {crate.genre_profile?.length ? (
+          <GenrePillRow
+            items={crate.genre_profile}
+            max={6}
+            className="mt-3 hidden sm:flex"
+            onSelect={(item) =>
+              navigate(
+                `/explore?genre=${encodeURIComponent(
+                  item.slug || genreSlug(item.name),
+                )}`,
+              )
+            }
+          />
+        ) : null}
         <div aria-hidden="true" className="hidden lg:block lg:h-14" />
       </PageHero>
     </div>

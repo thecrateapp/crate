@@ -694,10 +694,17 @@ def test_crate_detail_uses_accessible_crate_query(monkeypatch):
     calls: list[tuple[str, int]] = []
     monkeypatch.setattr(
         crate_routes,
-        "get_crate_for_user",
+        "get_crate_detail_for_user",
         lambda crate_id, user_id: (
             calls.append((crate_id, user_id))
-            or ({"id": "crate-id", "albums": []}, "owner")
+            or (
+                {"id": "crate-id", "albums": []},
+                "owner",
+                [
+                    {"name": "post-punk", "slug": "post-punk", "weight": 1.5},
+                    {"name": "noise rock", "slug": "noise-rock", "weight": 0.5},
+                ],
+            )
         ),
     )
 
@@ -707,6 +714,10 @@ def test_crate_detail_uses_accessible_crate_query(monkeypatch):
 
     assert result["access"] == "owner"
     assert calls == [(str(crate_id), 1)]
+    assert [(genre["name"], genre["percent"]) for genre in result["genre_profile"]] == [
+        ("post-punk", 100),
+        ("noise rock", 33),
+    ]
 
 
 def test_crate_playback_uses_accessible_tracks_query(monkeypatch):
@@ -1465,3 +1476,84 @@ def test_crate_playback_endpoint_allows_authenticated_users_to_play_public_crate
 
     assert response.status_code == 200
     assert [track["global_track_uid"] for track in response.json()] == [track_uid]
+
+
+def _link_local_album_genres(album_uid: str, genres: dict[str, float]) -> None:
+    from crate.db.tx import transaction_scope
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO library_artists (name, slug)
+                VALUES ('API Test Artist', 'api-test-artist')
+                ON CONFLICT DO NOTHING
+                """
+            )
+        )
+        local_album_id = session.execute(
+            text(
+                """
+                INSERT INTO library_albums (artist, name, path, slug)
+                VALUES ('API Test Artist', :uid, :path, :uid)
+                RETURNING id
+                """
+            ),
+            {"uid": album_uid, "path": f"/music/api/{album_uid}"},
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                UPDATE global_catalog_albums
+                SET local_album_id = :local_album_id
+                WHERE global_album_uid = CAST(:uid AS uuid)
+                """
+            ),
+            {"local_album_id": local_album_id, "uid": album_uid},
+        )
+        for name, weight in genres.items():
+            genre_id = session.execute(
+                text(
+                    """
+                    INSERT INTO genres (name, slug)
+                    VALUES (:name, :slug)
+                    ON CONFLICT (name) DO UPDATE SET slug = EXCLUDED.slug
+                    RETURNING id
+                    """
+                ),
+                {"name": name, "slug": name.replace(" ", "-")},
+            ).scalar_one()
+            session.execute(
+                text(
+                    """
+                    INSERT INTO album_genres (album_id, genre_id, weight, source)
+                    VALUES (:album_id, :genre_id, :weight, 'tags')
+                    """
+                ),
+                {"album_id": local_album_id, "genre_id": genre_id, "weight": weight},
+            )
+
+
+def test_crate_detail_weights_every_local_album_equally_in_genre_profile(
+    pg_db, crate_api_client
+):
+    crate_id = _create_crate()
+    mixed_album = _seed_album("Mixed album")
+    focused_album = _seed_album("Focused album")
+    remote_album = _seed_album("Remote album")
+    _link_local_album_genres(mixed_album, {"post-punk": 1.0, "noise rock": 1.0})
+    _link_local_album_genres(focused_album, {"post-punk": 4.0})
+    for album_uid in (mixed_album, focused_album, remote_album):
+        crate_api_client.post(
+            f"/api/crates/{crate_id}/albums",
+            json={"global_album_uid": album_uid},
+            headers=_headers(1),
+        )
+
+    detail = crate_api_client.get(f"/api/crates/{crate_id}", headers=_headers(1))
+
+    assert detail.status_code == 200
+    assert [
+        (genre["name"], genre["share"], genre["percent"])
+        for genre in detail.json()["genre_profile"]
+    ] == [("post-punk", 0.75, 100), ("noise rock", 0.25, 33)]
