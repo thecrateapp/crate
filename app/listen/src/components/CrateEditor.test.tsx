@@ -30,6 +30,7 @@ vi.mock("@dnd-kit/core", () => ({
     mocks.dndOnDragEnd = onDragEnd;
     return children;
   },
+  DragOverlay: () => null,
   closestCenter: vi.fn(),
   KeyboardSensor: vi.fn(),
   PointerSensor: vi.fn(),

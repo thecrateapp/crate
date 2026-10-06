@@ -106,18 +106,50 @@ describe("z-index layers", () => {
     return Number(match?.[1]);
   };
 
-  it("keeps player-anchored popovers above the raised player bar and below menus", () => {
+  it("orders every layer from page chrome up to the debug overlay", () => {
+    const ordered = [
+      "header",
+      "sidebar",
+      "player-drawer",
+      "leaflet-popup",
+      "extended-player",
+      "player",
+      "fullscreen-player",
+      "player-overlay",
+      "player-popover",
+      "upcoming-overlay",
+      "modal",
+      "popover",
+      "dropdown",
+      "context-menu",
+      "drag-overlay",
+      "debug-overlay",
+    ];
+    const values = ordered.map(zIndex);
+
+    expect(values.every(Number.isFinite)).toBe(true);
+    expect(values).toEqual([...values].sort((a, b) => a - b));
+    expect(new Set(values).size).toBe(values.length);
+    expect(readTokenFile("z-index.css").match(/--z-[a-z-]+:/g)?.length).toBe(
+      ordered.length,
+    );
+  });
+
+  it("keeps player-anchored popovers above the raised player bar and below modals", () => {
     expect(zIndex("player-popover")).toBeGreaterThan(zIndex("player-overlay"));
-    expect(zIndex("player-popover")).toBeLessThan(zIndex("dropdown"));
-    expect(zIndex("player-popover")).toBeLessThan(zIndex("context-menu"));
     expect(zIndex("player-popover")).toBeLessThan(zIndex("modal"));
   });
 
-  it("keeps modal-hosted dropdowns above the modal layer", () => {
-    expect(zIndex("modal-dropdown")).toBeGreaterThan(zIndex("modal"));
-    expect(zIndex("modal-dropdown")).toBeGreaterThan(
-      zIndex("upcoming-overlay"),
-    );
-    expect(zIndex("modal-dropdown")).toBeLessThan(zIndex("debug-overlay"));
+  it("keeps every floating layer above modals and below the debug overlay", () => {
+    for (const layer of [
+      "popover",
+      "dropdown",
+      "context-menu",
+      "drag-overlay",
+    ]) {
+      expect(zIndex(layer)).toBeGreaterThan(zIndex("modal"));
+      expect(zIndex(layer)).toBeGreaterThan(zIndex("upcoming-overlay"));
+      expect(zIndex(layer)).toBeLessThan(zIndex("debug-overlay"));
+    }
   });
 });

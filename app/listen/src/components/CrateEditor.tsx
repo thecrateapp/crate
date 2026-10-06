@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
   CRATE_ICON_SIZE,
@@ -11,12 +12,14 @@ import {
 } from "@crate/ui/icons";
 import {
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
   closestCenter,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type Modifier,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -60,6 +63,11 @@ interface CrateEditorProps {
 }
 
 const EDITOR_FORM_ID = "crate-editor-form";
+
+const restrictToVerticalAxis: Modifier = ({ transform }) => ({
+  ...transform,
+  x: 0,
+});
 
 export function CrateEditor({ crateId, onBack, onDeleted }: CrateEditorProps) {
   const { t } = useTranslation();
@@ -131,7 +139,18 @@ function CrateEditorForm({
   const [saving, setSaving] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [draggingAlbumUid, setDraggingAlbumUid] = useState<string | null>(null);
   const isOrdered = values.ordering !== "none";
+
+  useEffect(() => {
+    if (draggingAlbumUid === null) return undefined;
+    const keepModalOpenOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") event.preventDefault();
+    };
+    window.addEventListener("keydown", keepModalOpenOnEscape, true);
+    return () =>
+      window.removeEventListener("keydown", keepModalOpenOnEscape, true);
+  }, [draggingAlbumUid]);
   const albumSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, {
@@ -229,6 +248,7 @@ function CrateEditorForm({
   }
 
   function handleAlbumDragEnd({ active, over }: DragEndEvent) {
+    setDraggingAlbumUid(null);
     if (!over || active.id === over.id) return;
     const fromIndex = albums.findIndex(
       (album) => album.global_album_uid === String(active.id),
@@ -251,6 +271,9 @@ function CrateEditorForm({
     }
   }
 
+  const draggingAlbum = albums.find(
+    (album) => album.global_album_uid === draggingAlbumUid,
+  );
   const existingAlbumUids = new Set(
     albums.map((album) => album.global_album_uid),
   );
@@ -292,7 +315,11 @@ function CrateEditorForm({
                 <DndContext
                   sensors={albumSensors}
                   collisionDetection={closestCenter}
+                  onDragStart={({ active }) =>
+                    setDraggingAlbumUid(String(active.id))
+                  }
                   onDragEnd={handleAlbumDragEnd}
+                  onDragCancel={() => setDraggingAlbumUid(null)}
                 >
                   <SortableContext
                     items={albums.map((album) => album.global_album_uid)}
@@ -310,6 +337,27 @@ function CrateEditorForm({
                       />
                     ))}
                   </SortableContext>
+                  {createPortal(
+                    <div className="relative z-app-drag-overlay">
+                      <DragOverlay
+                        wrapperElement="ol"
+                        modifiers={[restrictToVerticalAxis]}
+                        className="overflow-hidden rounded-xl border border-border-quiet bg-popover-surface shadow-popover backdrop-blur-xl"
+                      >
+                        {draggingAlbum ? (
+                          <CrateAlbumRow
+                            album={draggingAlbum}
+                            index={albums.indexOf(draggingAlbum)}
+                            total={albums.length}
+                            reorderable={isOrdered}
+                            onMove={moveAlbum}
+                            onRemove={() => undefined}
+                          />
+                        ) : null}
+                      </DragOverlay>
+                    </div>,
+                    document.body,
+                  )}
                 </DndContext>
               </ol>
             ) : (
@@ -391,7 +439,7 @@ function CrateAlbumRow({
   onRemove,
   sortable,
 }: CrateAlbumRowProps & {
-  sortable: ReturnType<typeof useSortable>;
+  sortable?: ReturnType<typeof useSortable>;
 }) {
   const { t } = useTranslation();
   const cover = albumCoverApiUrl(
@@ -403,22 +451,25 @@ function CrateAlbumRow({
     { size: 128 },
   );
 
-  const style = {
-    transform: CSS.Transform.toString(sortable.transform),
-    transition: sortable.transition,
-    opacity: sortable.isDragging ? 0.55 : 1,
-  };
+  const style = sortable
+    ? {
+        transform: CSS.Transform.toString(sortable.transform),
+        transition: sortable.transition,
+        opacity: sortable.isDragging ? 0.55 : 1,
+      }
+    : undefined;
 
   return (
     <li
-      ref={sortable.setNodeRef}
+      ref={sortable?.setNodeRef}
       style={style}
+      inert={sortable ? undefined : true}
       className="flex items-center gap-3 px-3 py-2.5"
     >
       {reorderable ? (
         <IconButton
-          {...sortable.attributes}
-          {...sortable.listeners}
+          {...sortable?.attributes}
+          {...sortable?.listeners}
           label={t("library.crates.dragAlbum", { name: album.name })}
           size="sm"
           className="size-6 cursor-grab touch-none text-text-muted/60 hover:translate-y-0 hover:text-text-primary hover:drop-shadow-none active:cursor-grabbing"

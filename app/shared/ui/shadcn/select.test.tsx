@@ -38,8 +38,7 @@ describe("Select", () => {
     const content = document.querySelector('[data-slot="select-content"]');
 
     expect(dialog).toHaveClass("z-app-modal");
-    expect(content).toHaveClass("z-app-modal-dropdown");
-    expect(content).not.toHaveClass("z-app-dropdown");
+    expect(content).toHaveClass("z-app-dropdown");
     expect(dialog?.contains(content)).toBe(false);
   });
 
