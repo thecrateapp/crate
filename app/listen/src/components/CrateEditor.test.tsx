@@ -7,12 +7,14 @@ const mocks = vi.hoisted(() => ({
   useApi: vi.fn(),
   api: vi.fn(),
   crate: null as unknown,
+  notify: { error: vi.fn(), success: vi.fn() },
   dndOnDragEnd: null as
     | ((event: { active: { id: string }; over: { id: string } | null }) => void)
     | null,
 }));
 
 vi.mock("@/hooks/use-api", () => ({ useApi: mocks.useApi }));
+vi.mock("@crate/ui/lib/notify", () => ({ notify: mocks.notify }));
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -57,6 +59,7 @@ vi.mock("@dnd-kit/utilities", () => ({
 }));
 
 import { CrateEditor } from "@/components/CrateEditor";
+import { cacheGet, cacheSet } from "@/lib/cache";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 import type { CrateDetail } from "@/pages/crates-types";
 
@@ -104,6 +107,8 @@ describe("CrateEditor", () => {
   beforeEach(() => {
     mocks.crate = crateDetail("Original name");
     mocks.api.mockReset();
+    mocks.notify.error.mockReset();
+    mocks.notify.success.mockReset();
     mocks.dndOnDragEnd = null;
     mocks.useApi.mockImplementation(() => ({
       data: mocks.crate,
@@ -139,6 +144,89 @@ describe("CrateEditor", () => {
     expect(
       screen.getByRole("searchbox", { name: "Search albums" }),
     ).toHaveValue("High");
+  });
+
+  it("shows the saved settings when a cached snapshot is revalidated", () => {
+    mocks.crate = { ...crateDetail("Original name"), is_ordered: false };
+    renderWithListenProviders(<CrateEditorHarness />, {
+      locale: "en",
+    });
+
+    expect(
+      screen.getByRole("combobox", { name: "Ordering" }),
+    ).toHaveTextContent("No order");
+
+    mocks.crate = {
+      ...crateDetail("Saved name"),
+      visibility: "public",
+      is_ordered: true,
+      sort_direction: "asc",
+      loop_enabled: true,
+      updated_at: "2026-10-06T10:00:00Z",
+    };
+    fireEvent.click(
+      screen.getByRole("button", { name: "Refresh crate snapshot" }),
+    );
+
+    expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue(
+      "Saved name",
+    );
+    expect(
+      screen.getByRole("combobox", { name: "Ordering" }),
+    ).toHaveTextContent("Ascending");
+    expect(
+      screen.getByRole("combobox", { name: "Visibility" }),
+    ).toHaveTextContent("Public");
+    expect(
+      screen.getByRole("checkbox", { name: "Loop playback" }),
+    ).toBeChecked();
+  });
+
+  it("drops the cached Crate after saving so reopening loads the saved ordering", async () => {
+    const user = userEvent.setup();
+    const onBack = vi.fn();
+    mocks.crate = { ...crateDetail("Original name"), is_ordered: false };
+    cacheSet(`/api/crates/${crateId}`, mocks.crate);
+    mocks.api.mockResolvedValue({ ok: true });
+    renderWithListenProviders(
+      <CrateEditor {...editorProps} onBack={onBack} />,
+      { locale: "en" },
+    );
+
+    await user.click(screen.getByRole("combobox", { name: "Ordering" }));
+    await user.click(screen.getByRole("option", { name: "Ascending" }));
+    fireEvent.submit(screen.getByTestId("crate-form"));
+
+    await waitFor(() => expect(onBack).toHaveBeenCalledOnce());
+    expect(mocks.api).toHaveBeenCalledWith(
+      `/api/crates/${crateId}`,
+      "PUT",
+      expect.objectContaining({ is_ordered: true, sort_direction: "asc" }),
+    );
+    expect(cacheGet(`/api/crates/${crateId}`)).toBeNull();
+  });
+
+  it("clears the pending state and reports a failed save", async () => {
+    const onBack = vi.fn();
+    mocks.api.mockRejectedValue(
+      Object.assign(new Error("Unprocessable"), { status: 422 }),
+    );
+    renderWithListenProviders(
+      <CrateEditor {...editorProps} onBack={onBack} />,
+      { locale: "en" },
+    );
+
+    fireEvent.submit(screen.getByTestId("crate-form"));
+
+    await waitFor(() =>
+      expect(mocks.notify.error).toHaveBeenCalledWith("Could not save Crate"),
+    );
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save" })).not.toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+    expect(onBack).not.toHaveBeenCalled();
   });
 
   it("hides reorder controls for unordered Crates", () => {

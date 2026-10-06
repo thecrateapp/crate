@@ -653,6 +653,39 @@ def test_crate_presentation_settings_can_be_updated(pg_db, crate_api_client):
     assert detail.json()["loop_enabled"] is True
 
 
+def test_editor_payload_persists_ordering_for_detail_and_list(pg_db, crate_api_client):
+    crate_id = _create_crate()
+    crate_api_client.put(
+        f"/api/crates/{crate_id}",
+        json={"is_ordered": False},
+        headers=_headers(1),
+    )
+
+    response = crate_api_client.put(
+        f"/api/crates/{crate_id}",
+        json={
+            "name": "API crate",
+            "description": "",
+            "visibility": "public",
+            "is_collaborative": False,
+            "is_ordered": True,
+            "sort_direction": "asc",
+            "loop_enabled": False,
+        },
+        headers=_headers(1),
+    )
+
+    assert response.status_code == 200
+    detail = crate_api_client.get(f"/api/crates/{crate_id}", headers=_headers(1))
+    assert detail.json()["is_ordered"] is True
+    assert detail.json()["sort_direction"] == "asc"
+    assert detail.json()["visibility"] == "public"
+    listed = crate_api_client.get("/api/me/crates", headers=_headers(1)).json()
+    saved = next(crate for crate in listed if crate["id"] == crate_id)
+    assert saved["is_ordered"] is True
+    assert saved["sort_direction"] == "asc"
+
+
 def test_crate_detail_uses_accessible_crate_query(monkeypatch):
     from types import SimpleNamespace
 

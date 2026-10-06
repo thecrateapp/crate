@@ -40,6 +40,7 @@ import { Button } from "@crate/ui/shadcn/button";
 
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
+import { cacheInvalidate } from "@/lib/cache";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { CrateAlbumPicker } from "@/components/CrateAlbumPicker";
@@ -135,12 +136,20 @@ function CrateEditorForm({
   const [values, setValues] = useState<CrateFormValues>(() =>
     crateFormValuesFromCrate(crate),
   );
+  const [valuesEdited, setValuesEdited] = useState(false);
   const [albums, setAlbums] = useState<CrateAlbum[]>(crate.albums);
+  const [syncedCrate, setSyncedCrate] = useState(crate);
   const [saving, setSaving] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [draggingAlbumUid, setDraggingAlbumUid] = useState<string | null>(null);
   const isOrdered = values.ordering !== "none";
+
+  if (crate !== syncedCrate) {
+    setSyncedCrate(crate);
+    setAlbums(crate.albums);
+    if (!valuesEdited) setValues(crateFormValuesFromCrate(crate));
+  }
 
   useEffect(() => {
     if (draggingAlbumUid === null) return undefined;
@@ -169,6 +178,7 @@ function CrateEditorForm({
         "PUT",
         crateFormPayload(values, isOwner),
       );
+      cacheInvalidate("crates");
       notify.success(t("library.crates.saved"));
       onBack();
     } catch {
@@ -295,9 +305,10 @@ function CrateEditorForm({
             id={EDITOR_FORM_ID}
             values={values}
             isOwner={isOwner}
-            onChange={(patch) =>
-              setValues((current) => ({ ...current, ...patch }))
-            }
+            onChange={(patch) => {
+              setValuesEdited(true);
+              setValues((current) => ({ ...current, ...patch }));
+            }}
             onSubmit={(event) => void save(event)}
           />
 
