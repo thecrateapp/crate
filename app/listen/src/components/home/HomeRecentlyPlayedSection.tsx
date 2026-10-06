@@ -39,7 +39,7 @@ export function RecentlyPlayedSection({
         {pages.map((pageItems, pageIndex) => (
           <div
             key={`recent-page-${pageIndex}`}
-            className="min-w-full snap-start"
+            className="w-full min-w-0 snap-start"
           >
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {pageItems.map((item) => (
