@@ -307,3 +307,62 @@ def test_home_upcoming_trims_preview_items_but_keeps_full_summary(monkeypatch):
     assert payload["summary"]["attending_count"] == 2
     assert payload["summary"]["insight_count"] == 1
     assert payload["insights"][0]["show_id"] == 100
+
+
+def test_home_upcoming_items_skip_past_releases_before_trimming(monkeypatch):
+    from datetime import timedelta
+
+    today = date.today()
+    past_releases = [
+        {
+            "id": index,
+            "artist_name": "Converge",
+            "album_title": f"Past {index}",
+            "release_date": (today - timedelta(days=index + 1)).isoformat(),
+        }
+        for index in range(15)
+    ]
+    future_release = {
+        "id": 99,
+        "artist_name": "Converge",
+        "album_title": "Future",
+        "release_date": (today + timedelta(days=10)).isoformat(),
+    }
+    show = {
+        "id": 200,
+        "artist_name": "Converge",
+        "date": (today + timedelta(days=20)).isoformat(),
+        "venue": "Sala",
+    }
+
+    monkeypatch.setattr(
+        "crate.db.home_builder_upcoming_feed.get_followed_artists",
+        lambda user_id: [{"artist_name": "Converge"}],
+    )
+    monkeypatch.setattr(
+        "crate.db.queries.user.get_upcoming_releases",
+        lambda *args, **kwargs: [*past_releases, future_release],
+    )
+    monkeypatch.setattr(
+        "crate.db.queries.user.get_upcoming_shows", lambda *args, **kwargs: [show]
+    )
+    monkeypatch.setattr(
+        "crate.db.queries.shows.get_attending_show_ids", lambda user_id, ids: set()
+    )
+    monkeypatch.setattr(
+        "crate.db.repositories.auth.get_user_by_id",
+        lambda user_id: {"latitude": None, "longitude": None, "show_radius_km": 60},
+    )
+    monkeypatch.setattr(
+        "crate.db.home_builder_upcoming_feed._build_upcoming_insights_home",
+        lambda user_id, shows, attending_show_ids: [],
+    )
+    monkeypatch.setattr(
+        "crate.db.home_builder_upcoming_feed._load_probable_setlists",
+        lambda _artist_names: {},
+    )
+
+    payload = _build_home_upcoming(1, lookup_limit=120, item_limit=12)
+
+    assert [item["title"] for item in payload["items"]] == ["Future", "Sala"]
+    assert payload["summary"]["release_count"] == 16
