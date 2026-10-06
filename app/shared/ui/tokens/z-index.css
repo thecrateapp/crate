@@ -8,13 +8,14 @@
   --z-extended-player: 1200;
   --z-fullscreen-player: 1420;
   --z-player: 1350;
-  --z-popover: 2200;
   --z-player-overlay: 2210;
-  --z-context-menu: 2300;
-  --z-dropdown: 2250;
-  --z-modal: 2400;
-  --z-upcoming-overlay: 2350;
   --z-player-popover: 2220;
+  --z-upcoming-overlay: 2350;
+  --z-modal: 2400;
+  --z-popover: 2450;
+  --z-dropdown: 2500;
+  --z-context-menu: 2550;
+  --z-drag-overlay: 2600;
   --z-debug-overlay: 9999;
 }
 
@@ -56,6 +57,9 @@
 }
 .z-app-player-popover {
   z-index: var(--z-player-popover);
+}
+.z-app-drag-overlay {
+  z-index: var(--z-drag-overlay);
 }
 .z-app-debug-overlay {
   z-index: var(--z-debug-overlay);
