@@ -154,6 +154,7 @@
   "actions.crate.play": "Reprodueix Crate",
   "actions.crate.shuffle": "Crate en aleatori",
   "actions.crate.edit": "Edita Crate",
+  "actions.crate.members": "Gestiona els membres",
   "actions.crate.radio": "Ràdio del Crate",
   "actions.crate.downloadZip": "Descarrega ZIP",
   "actions.crate.share": "Comparteix Crate",

@@ -1,3 +1,5 @@
+import type { GenreProfileItem } from "@crate/ui/domain/genres/GenrePill";
+
 export interface CrateAlbum {
   global_album_uid: string;
   position: number;
@@ -53,6 +55,7 @@ export type PublicCrate = Pick<
 export interface CrateDetail extends CrateSummary {
   albums: CrateAlbum[];
   owner_avatar?: string | null;
+  genre_profile?: GenreProfileItem[];
 }
 
 export interface CratePlaybackTrack {

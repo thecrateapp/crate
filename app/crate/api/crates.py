@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse
 
 from crate.api.auth import _require_auth
+from crate.api.browse_shared import build_genre_profile
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
@@ -43,7 +44,7 @@ from crate.db.queries.crates import (
     get_active_crate_invites,
     get_crate_access,
     get_crate_download_source_for_user,
-    get_crate_for_user,
+    get_crate_detail_for_user,
     get_crate_invite,
     get_crate_members,
     get_crate_playback_tracks_for_user,
@@ -233,10 +234,13 @@ def get_one(request: Request, crate_id: str):
     if resolved_id is None:
         raise HTTPException(status_code=404, detail="Crate not found")
     user = getattr(getattr(request, "state", None), "user", None)
-    crate, access = get_crate_for_user(resolved_id, int(user["id"]) if user else None)
+    crate, access, genre_rows = get_crate_detail_for_user(
+        resolved_id, int(user["id"]) if user else None
+    )
     if crate is None:
         raise HTTPException(status_code=404, detail="Crate not found")
     crate["access"] = access
+    crate["genre_profile"] = build_genre_profile(genre_rows)
     return crate
 
 

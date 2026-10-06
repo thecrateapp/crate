@@ -11,6 +11,7 @@ import {
   Radio,
   Share2,
   Shuffle,
+  Users,
 } from "@crate/ui/icons";
 
 import type {
@@ -30,6 +31,7 @@ export interface CrateActionInput {
   onPlay?: Handler;
   onShuffle?: Handler;
   onEdit?: Handler;
+  onManageMembers?: Handler;
   onStartRadio?: Handler;
   onMakeAvailableOffline?: Handler;
   onDownload?: Handler;
@@ -78,6 +80,16 @@ export function buildCrateMenuItems(
         label: t("actions.crate.edit"),
         icon: Pencil,
         onSelect: input.onEdit,
+      }),
+    );
+  }
+  if (input.onManageMembers) {
+    playback.push(
+      action({
+        key: "members",
+        label: t("actions.crate.members"),
+        icon: Users,
+        onSelect: input.onManageMembers,
       }),
     );
   }

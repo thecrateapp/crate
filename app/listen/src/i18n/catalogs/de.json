@@ -154,6 +154,7 @@
   "actions.crate.play": "Crate abspielen",
   "actions.crate.shuffle": "Zufällig abspielen",
   "actions.crate.edit": "Crate bearbeiten",
+  "actions.crate.members": "Mitglieder verwalten",
   "actions.crate.radio": "Crate-Radio",
   "actions.crate.downloadZip": "Als ZIP laden",
   "actions.crate.share": "Crate teilen",

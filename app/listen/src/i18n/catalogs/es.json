@@ -162,6 +162,7 @@
   "actions.crate.play": "Reproducir Crate",
   "actions.crate.shuffle": "Crate en aleatorio",
   "actions.crate.edit": "Editar Crate",
+  "actions.crate.members": "Gestionar miembros",
   "actions.crate.radio": "Radio del Crate",
   "actions.crate.downloadZip": "Descargar ZIP",
   "actions.crate.share": "Compartir Crate",

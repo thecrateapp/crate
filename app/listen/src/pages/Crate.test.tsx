@@ -272,7 +272,7 @@ describe("Crate page", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Year-end records" }),
     ).toBeVisible();
-    expect(screen.getByRole("button", { name: "Play" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Play Crate" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Shuffle" })).toBeVisible();
   });
 
@@ -390,6 +390,41 @@ describe("Crate page", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows the Crate genre profile as percentage pills", () => {
+    mocks.detail = {
+      ...crate("owner"),
+      genre_profile: [
+        { name: "Post-Punk", slug: "post-punk", percent: 100 },
+        { name: "Noise Rock", slug: "noise-rock", percent: 33 },
+      ],
+    };
+    renderCrate();
+
+    expect(screen.getByTitle("Post-Punk · 100%")).toBeInTheDocument();
+    expect(screen.getByTitle("Noise Rock · 33%")).toBeInTheDocument();
+  });
+
+  it("mirrors every Crate action in the More menu like the album page", async () => {
+    const user = userEvent.setup();
+    mocks.detail = crate("owner");
+    renderCrate();
+
+    await user.click(screen.getByRole("button", { name: "More" }));
+
+    expect(
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual([
+      "Play Crate",
+      "Shuffle Crate",
+      "Edit Crate",
+      "Manage members",
+      "Start Crate radio",
+      "Make available offline",
+      "Download Crate ZIP",
+      "Share Crate",
+    ]);
+  });
+
   it("opens the members modal from the collaborators action", async () => {
     const user = userEvent.setup();
     mocks.detail = crate("owner");
@@ -440,7 +475,7 @@ describe("Crate page", () => {
     const playAll = vi.fn();
     renderCrate({ playAll });
 
-    await user.click(screen.getByRole("button", { name: "Play" }));
+    await user.click(screen.getByRole("button", { name: "Play Crate" }));
 
     const [tracks, startIndex, source] = playAll.mock.calls[0]!;
     expect(tracks.map((track: { title: string }) => track.title)).toEqual([
@@ -456,6 +491,53 @@ describe("Crate page", () => {
     });
   });
 
+  it("plays only the front coverflow album from its play button", async () => {
+    const user = userEvent.setup();
+    const playAll = vi.fn();
+    renderCrate({ playAll });
+
+    await user.click(
+      await screen.findByRole("button", { name: "Play album: Blending" }),
+    );
+
+    const [tracks, startIndex, source] = playAll.mock.calls[0]!;
+    expect(tracks.map((track: { title: string }) => track.title)).toEqual([
+      "Track One",
+    ]);
+    expect(startIndex).toBe(0);
+    expect(source).toMatchObject({
+      type: "album",
+      name: "High Vis - Blending",
+    });
+  });
+
+  it("hides the coverflow album play button without playable tracks", async () => {
+    mocks.playback = [];
+    renderCrate();
+
+    expect(
+      await screen.findByRole("button", { name: "Play Crate" }),
+    ).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "Play album: Blending" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides the coverflow play button when the front album has no tracks", async () => {
+    mocks.playback = (mocks.playback as { global_album_uid: string }[]).filter(
+      (track) =>
+        track.global_album_uid !== "11111111-1111-4111-8111-111111111111",
+    );
+    renderCrate();
+
+    expect(
+      await screen.findByRole("button", { name: "Play Crate" }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Play album: Blending" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("applies the Crate loop setting to the player", async () => {
     const user = userEvent.setup();
     const playAll = vi.fn();
@@ -463,7 +545,7 @@ describe("Crate page", () => {
     mocks.detail = { ...crate(), loop_enabled: true };
     renderCrate({ playAll, setRepeatMode });
 
-    await user.click(screen.getByRole("button", { name: "Play" }));
+    await user.click(screen.getByRole("button", { name: "Play Crate" }));
 
     expect(setRepeatMode).toHaveBeenCalledWith("all");
   });
@@ -492,7 +574,9 @@ describe("Crate page", () => {
     mocks.playback = [];
     renderCrate();
 
-    expect(await screen.findByRole("button", { name: "Play" })).toBeDisabled();
+    expect(
+      await screen.findByRole("button", { name: "Play Crate" }),
+    ).toBeDisabled();
     expect(screen.getByRole("button", { name: "Shuffle" })).toBeDisabled();
   });
 
@@ -511,7 +595,7 @@ describe("Crate page", () => {
       "href",
       `/login?return_to=${encodeURIComponent(`/crate/${publicRef}`)}`,
     );
-    expect(screen.queryByRole("button", { name: "Play" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Play Crate" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Shuffle" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Follow" })).toBeNull();
     expect(
