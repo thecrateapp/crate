@@ -84,3 +84,49 @@ describe("Tauri HTTP resource cleanup", () => {
     ).toHaveLength(0);
   });
 });
+
+describe("Tauri HTTP request bodies", () => {
+  it("sends JSON PUT bodies to the native client and resolves the error response", async () => {
+    const payload = { name: "Crate", is_ordered: true, sort_direction: "asc" };
+    const errorBody = new TextEncoder().encode('{"detail":"Unprocessable"}');
+    let bodyRead = false;
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === "plugin:http|fetch") return 11;
+      if (command === "plugin:http|fetch_send") {
+        return {
+          status: 422,
+          statusText: "Unprocessable Entity",
+          headers: [["content-type", "application/json"]],
+          url: "https://api.example.test/api/crates/1",
+          rid: 22,
+        };
+      }
+      if (command === "plugin:http|fetch_read_body") {
+        if (bodyRead) return new Uint8Array([1]).buffer;
+        bodyRead = true;
+        return new Uint8Array([...errorBody, 0]).buffer;
+      }
+      return undefined;
+    });
+
+    const response = await tauriFetch("https://api.example.test/api/crates/1", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const [, { clientConfig }] = invokeMock.mock.calls.find(
+      ([command]) => command === "plugin:http|fetch",
+    )!;
+    expect(clientConfig.method).toBe("PUT");
+    expect(clientConfig.headers).toContainEqual([
+      "content-type",
+      "application/json",
+    ]);
+    expect(new TextDecoder().decode(new Uint8Array(clientConfig.data))).toBe(
+      JSON.stringify(payload),
+    );
+    expect(response.status).toBe(422);
+    await expect(response.text()).resolves.toBe('{"detail":"Unprocessable"}');
+  });
+});
