@@ -13,6 +13,7 @@
   --z-context-menu: 2300;
   --z-dropdown: 2250;
   --z-modal: 2400;
+  --z-modal-dropdown: 2450;
   --z-upcoming-overlay: 2350;
   --z-player-popover: 2220;
   --z-debug-overlay: 9999;
@@ -50,6 +51,9 @@
 }
 .z-app-modal {
   z-index: var(--z-modal);
+}
+.z-app-modal-dropdown {
+  z-index: var(--z-modal-dropdown);
 }
 .z-app-upcoming-overlay {
   z-index: var(--z-upcoming-overlay);

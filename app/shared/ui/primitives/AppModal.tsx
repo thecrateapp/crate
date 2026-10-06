@@ -115,7 +115,7 @@ export function AppModal({
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && closeOnEscape) {
+      if (event.key === "Escape" && closeOnEscape && !event.defaultPrevented) {
         onClose();
       }
       if (event.key !== "Tab") return;

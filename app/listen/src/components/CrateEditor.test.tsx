@@ -31,11 +31,16 @@ vi.mock("@dnd-kit/core", () => ({
     return children;
   },
   closestCenter: vi.fn(),
+  KeyboardSensor: vi.fn(),
+  PointerSensor: vi.fn(),
+  useSensor: () => ({}),
+  useSensors: (...sensors: unknown[]) => sensors,
 }));
 
 vi.mock("@dnd-kit/sortable", () => ({
   SortableContext: ({ children }: { children: unknown }) => children,
   verticalListSortingStrategy: {},
+  sortableKeyboardCoordinates: vi.fn(),
   useSortable: ({ id }: { id: string }) => ({
     attributes: { "data-sortable-id": id },
     listeners: {},

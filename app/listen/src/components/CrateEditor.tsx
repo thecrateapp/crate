@@ -9,9 +9,18 @@ import {
   Loader2,
   Trash2,
 } from "@crate/ui/icons";
-import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
 import {
   SortableContext,
+  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -123,6 +132,12 @@ function CrateEditorForm({
   const [deleteConfirmation, setDeleteConfirmation] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const isOrdered = values.ordering !== "none";
+  const albumSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -275,6 +290,7 @@ function CrateEditorForm({
             {albums.length > 0 ? (
               <ol className="divide-y divide-text-primary/6 overflow-hidden rounded-xl border border-border-quiet bg-text-primary/[0.025]">
                 <DndContext
+                  sensors={albumSensors}
                   collisionDetection={closestCenter}
                   onDragEnd={handleAlbumDragEnd}
                 >

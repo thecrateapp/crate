@@ -112,4 +112,12 @@ describe("z-index layers", () => {
     expect(zIndex("player-popover")).toBeLessThan(zIndex("context-menu"));
     expect(zIndex("player-popover")).toBeLessThan(zIndex("modal"));
   });
+
+  it("keeps modal-hosted dropdowns above the modal layer", () => {
+    expect(zIndex("modal-dropdown")).toBeGreaterThan(zIndex("modal"));
+    expect(zIndex("modal-dropdown")).toBeGreaterThan(
+      zIndex("upcoming-overlay"),
+    );
+    expect(zIndex("modal-dropdown")).toBeLessThan(zIndex("debug-overlay"));
+  });
 });
