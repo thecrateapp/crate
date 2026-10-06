@@ -21,7 +21,10 @@ import {
   Trash2,
   Users,
 } from "@crate/ui/icons";
-import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
+import type {
+  ContextMenuHeader,
+  ItemActionMenuEntry,
+} from "@crate/ui/domain/actions";
 import {
   HERO_PRIMARY_ACTION_CLASS,
   HERO_SECONDARY_ACTION_ACTIVE_CLASS,
@@ -46,6 +49,7 @@ import {
 import { useCrateDownload } from "@/components/crates/crate-download";
 import {
   buildCrateSharePayload,
+  crateOwnerName,
   cratePagePath,
   crateRef,
   isShareableCrate,
@@ -362,6 +366,7 @@ function AuthenticatedCrate() {
         actions={
           <CratePageActions
             crate={data}
+            albums={albums}
             canPlay={canPlay}
             canEdit={Boolean(canEdit)}
             canManageMembers={canManageMembers}
@@ -579,6 +584,7 @@ function CrateAlbumList({
 
 function CratePageActions({
   crate,
+  albums,
   canPlay,
   canEdit,
   canManageMembers,
@@ -600,6 +606,7 @@ function CratePageActions({
   onDownload,
 }: {
   crate: CrateDetail;
+  albums: NumberedCrateAlbum[];
   canPlay: boolean;
   canEdit: boolean;
   canManageMembers: boolean;
@@ -621,10 +628,39 @@ function CratePageActions({
   onDownload?: () => void;
 }) {
   const { t } = useTranslation();
-  const entries = useMemo(
-    () => buildCrateMenuItems({ crate, onDownload }, t),
-    [crate, onDownload, t],
+  const entries = buildCrateMenuItems(
+    {
+      crate,
+      onPlay: canPlay ? onPlay : undefined,
+      onShuffle: canPlay ? onShuffle : undefined,
+      onEdit: canEdit ? onEdit : undefined,
+      onManageMembers: canManageMembers ? onMembers : undefined,
+      onStartRadio: canPlay ? onRadio : undefined,
+      onMakeAvailableOffline: offlineSupported ? onOffline : undefined,
+      onDownload,
+      onShare,
+      onToggleFollow: canFollow ? onFollow : undefined,
+      followed,
+      followPending,
+      offlineActionLabel: offlineLabel,
+      offlineActionDisabled: offlineBusy,
+      offlineActionActive: offlineActive,
+    },
+    t,
   );
+  const coverAlbum = albums[0];
+  const menuHeader: ContextMenuHeader = {
+    type: "media",
+    title: crate.name,
+    subtitle: crateOwnerName(crate) ?? undefined,
+    detail: t("common.albumCountLabel", { count: albums.length }),
+    imageUrl: coverAlbum
+      ? authenticatedCrateCoverUrl(coverAlbum, 192) ?? undefined
+      : undefined,
+    imageAlt: crate.name,
+    imageShape: "square",
+    fallbackIcon: Disc3,
+  };
   const followLabel = followed ? t("common.following") : t("common.follow");
   const secondaryActions: HeroSecondaryAction[] = [];
   if (canPlay) {
@@ -690,11 +726,11 @@ function CratePageActions({
       primaryActions={[
         {
           key: "play",
-          label: t("player.play"),
+          label: t("actions.crate.play"),
           icon: <Play size={CRATE_ICON_SIZE.md} fill="currentColor" />,
           onClick: onPlay,
           disabled: !canPlay,
-          ariaLabel: t("player.play"),
+          ariaLabel: t("actions.crate.play"),
         },
         {
           key: "shuffle",
@@ -727,7 +763,11 @@ function CratePageActions({
         ) : null
       }
       secondaryActions={secondaryActions}
-      menu={entries.length > 0 ? { actions: entries } : undefined}
+      menu={
+        entries.length > 0
+          ? { actions: entries, header: menuHeader }
+          : undefined
+      }
     />
   );
 }

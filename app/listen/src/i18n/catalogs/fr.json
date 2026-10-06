@@ -154,6 +154,7 @@
   "actions.crate.play": "Lire le Crate",
   "actions.crate.shuffle": "Lecture aléatoire",
   "actions.crate.edit": "Modifier le Crate",
+  "actions.crate.members": "Gérer les membres",
   "actions.crate.radio": "Radio du Crate",
   "actions.crate.downloadZip": "Télécharger le ZIP",
   "actions.crate.share": "Partager le Crate",

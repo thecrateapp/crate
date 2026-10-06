@@ -272,7 +272,7 @@ describe("Crate page", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Year-end records" }),
     ).toBeVisible();
-    expect(screen.getByRole("button", { name: "Play" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Play Crate" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Shuffle" })).toBeVisible();
   });
 
@@ -390,6 +390,27 @@ describe("Crate page", () => {
     ).toBeInTheDocument();
   });
 
+  it("mirrors every Crate action in the More menu like the album page", async () => {
+    const user = userEvent.setup();
+    mocks.detail = crate("owner");
+    renderCrate();
+
+    await user.click(screen.getByRole("button", { name: "More" }));
+
+    expect(
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual([
+      "Play Crate",
+      "Shuffle Crate",
+      "Edit Crate",
+      "Manage members",
+      "Start Crate radio",
+      "Make available offline",
+      "Download Crate ZIP",
+      "Share Crate",
+    ]);
+  });
+
   it("opens the members modal from the collaborators action", async () => {
     const user = userEvent.setup();
     mocks.detail = crate("owner");
@@ -440,7 +461,7 @@ describe("Crate page", () => {
     const playAll = vi.fn();
     renderCrate({ playAll });
 
-    await user.click(screen.getByRole("button", { name: "Play" }));
+    await user.click(screen.getByRole("button", { name: "Play Crate" }));
 
     const [tracks, startIndex, source] = playAll.mock.calls[0]!;
     expect(tracks.map((track: { title: string }) => track.title)).toEqual([
@@ -463,7 +484,7 @@ describe("Crate page", () => {
     mocks.detail = { ...crate(), loop_enabled: true };
     renderCrate({ playAll, setRepeatMode });
 
-    await user.click(screen.getByRole("button", { name: "Play" }));
+    await user.click(screen.getByRole("button", { name: "Play Crate" }));
 
     expect(setRepeatMode).toHaveBeenCalledWith("all");
   });
@@ -492,7 +513,9 @@ describe("Crate page", () => {
     mocks.playback = [];
     renderCrate();
 
-    expect(await screen.findByRole("button", { name: "Play" })).toBeDisabled();
+    expect(
+      await screen.findByRole("button", { name: "Play Crate" }),
+    ).toBeDisabled();
     expect(screen.getByRole("button", { name: "Shuffle" })).toBeDisabled();
   });
 
@@ -511,7 +534,7 @@ describe("Crate page", () => {
       "href",
       `/login?return_to=${encodeURIComponent(`/crate/${publicRef}`)}`,
     );
-    expect(screen.queryByRole("button", { name: "Play" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Play Crate" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Shuffle" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Follow" })).toBeNull();
     expect(

@@ -162,6 +162,7 @@
   "actions.crate.play": "Play Crate",
   "actions.crate.shuffle": "Shuffle Crate",
   "actions.crate.edit": "Edit Crate",
+  "actions.crate.members": "Manage members",
   "actions.crate.radio": "Start Crate radio",
   "actions.crate.downloadZip": "Download Crate ZIP",
   "actions.crate.share": "Share Crate",
