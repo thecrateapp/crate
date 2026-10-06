@@ -31,6 +31,7 @@ export function CrateHero({
   followerCount,
   actions,
   contentClassName,
+  onPlayAlbum,
 }: {
   crate: CrateDetail;
   albums: NumberedCrateAlbum[];
@@ -38,6 +39,7 @@ export function CrateHero({
   followerCount: number;
   actions: ReactNode;
   contentClassName?: string;
+  onPlayAlbum?: (album: NumberedCrateAlbum) => void;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -84,6 +86,7 @@ export function CrateHero({
             crateName={crate.name}
             loopEnabled={crate.loop_enabled}
             coverUrl={coverUrl}
+            onPlayAlbum={onPlayAlbum}
           />
         }
         title={crate.name}

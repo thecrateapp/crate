@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CoverFlow, type RenderImageProps } from "@ashishgogula/coverflow";
 import { useTranslation } from "react-i18next";
+import { PlayButton } from "@crate/ui/domain/media/PlayButton";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import type { NumberedCrateAlbum } from "@/components/crates/crate-model";
@@ -17,6 +18,7 @@ interface CrateCoverFlowProps {
   crateName: string;
   loopEnabled?: boolean;
   coverUrl?: CrateCoverUrl;
+  onPlayAlbum?: (album: NumberedCrateAlbum) => void;
 }
 
 const LOOP_COPIES = 3;
@@ -59,6 +61,7 @@ export function CrateCoverFlow({
   crateName,
   loopEnabled = false,
   coverUrl = authenticatedCrateCoverUrl,
+  onPlayAlbum,
 }: CrateCoverFlowProps) {
   const { t } = useTranslation();
   const albumCount = albums.length;
@@ -171,6 +174,14 @@ export function CrateCoverFlow({
             renderImage={renderImage}
           />
         )}
+        {onPlayAlbum ? (
+          <PlayButton
+            size="lg"
+            label={`${t("actions.album.play")}: ${activeAlbum.name}`}
+            className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
+            onClick={() => onPlayAlbum(activeAlbum)}
+          />
+        ) : null}
       </div>
       <div
         aria-live="polite"

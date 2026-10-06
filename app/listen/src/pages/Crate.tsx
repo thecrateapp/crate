@@ -71,7 +71,7 @@ import { api } from "@/lib/api";
 import { cacheSet } from "@/lib/cache";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { loginPathWithReturnTo } from "@/lib/auth-route-policy";
-import { albumCoverApiUrl } from "@/lib/library-routes";
+import { albumCoverApiUrl, albumPagePath } from "@/lib/library-routes";
 import { publicCrateAlbumCoverUrl } from "@/lib/share-url";
 import { openShareSheet } from "@/lib/social-share";
 import { cn, shuffleArray } from "@/lib/utils";
@@ -298,6 +298,22 @@ function AuthenticatedCrate() {
     [crateId, refetch, t],
   );
 
+  function playCrateAlbum(album: NumberedCrateAlbum) {
+    const tracks = playerTracks.filter(
+      (track) => track.globalAlbumUid === album.global_album_uid,
+    );
+    if (tracks.length === 0) return;
+    playAll(tracks, 0, {
+      type: "album",
+      name: `${album.artist_name} - ${album.name}`,
+      href: albumPagePath({
+        globalAlbumUid: album.global_album_uid,
+        albumName: album.name,
+        artistName: album.artist_name,
+      }),
+    });
+  }
+
   function startCratePlayback(tracks: Track[]) {
     if (!data || tracks.length === 0) return;
     setRepeatMode(data.loop_enabled ? "all" : "off");
@@ -362,6 +378,7 @@ function AuthenticatedCrate() {
         albums={albums}
         coverUrl={authenticatedCrateCoverUrl}
         followerCount={crateFollow.followerCount}
+        onPlayAlbum={canPlay ? playCrateAlbum : undefined}
         contentClassName="pt-[var(--listen-mobile-page-top)] sm:pt-20"
         actions={
           <CratePageActions

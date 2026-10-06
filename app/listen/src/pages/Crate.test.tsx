@@ -491,6 +491,38 @@ describe("Crate page", () => {
     });
   });
 
+  it("plays only the front coverflow album from its play button", async () => {
+    const user = userEvent.setup();
+    const playAll = vi.fn();
+    renderCrate({ playAll });
+
+    await user.click(
+      await screen.findByRole("button", { name: "Play album: Blending" }),
+    );
+
+    const [tracks, startIndex, source] = playAll.mock.calls[0]!;
+    expect(tracks.map((track: { title: string }) => track.title)).toEqual([
+      "Track One",
+    ]);
+    expect(startIndex).toBe(0);
+    expect(source).toMatchObject({
+      type: "album",
+      name: "High Vis - Blending",
+    });
+  });
+
+  it("hides the coverflow album play button without playable tracks", async () => {
+    mocks.playback = [];
+    renderCrate();
+
+    expect(
+      await screen.findByRole("button", { name: "Play Crate" }),
+    ).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "Play album: Blending" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("applies the Crate loop setting to the player", async () => {
     const user = userEvent.setup();
     const playAll = vi.fn();
