@@ -36,4 +36,18 @@ describe("Listen layout policy", () => {
       expect(source).not.toMatch(/bottom-\[\d+px\]/);
     }
   });
+
+  it("keeps paged rail pages at the rail width so WebKit cannot grow them to their content", () => {
+    const read = (path: string) =>
+      readFileSync(resolve(process.cwd(), path), "utf8");
+
+    for (const rail of [
+      "src/components/home/HomeRecentlyPlayedSection.tsx",
+      "src/components/home/HomeDiscoveryRecommendations.tsx",
+    ]) {
+      const source = read(rail);
+      expect(source).toContain('className="w-full min-w-0 snap-start"');
+      expect(source).not.toContain("min-w-full");
+    }
+  });
 });

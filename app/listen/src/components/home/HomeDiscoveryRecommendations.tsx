@@ -43,7 +43,7 @@ export function RecommendedTracksSection({
         {pages.map((pageTracks, pageIndex) => (
           <div
             key={`recommended-page-${pageIndex}`}
-            className="min-w-full snap-start"
+            className="w-full min-w-0 snap-start"
           >
             <div className="grid gap-2 xl:grid-cols-3">
               {pageTracks.map((track) => (
