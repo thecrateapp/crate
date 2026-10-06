@@ -107,6 +107,23 @@ export function CrateCoverFlow({
 
   if (albumCount === 0 || !activeAlbum) return null;
 
+  function renderPlayButton(album: NumberedCrateAlbum) {
+    if (!onPlayAlbum || !playableAlbumUids?.has(album.global_album_uid)) {
+      return null;
+    }
+    return (
+      <PlayButton
+        size="lg"
+        label={`${t("actions.album.play")}: ${album.name}`}
+        className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
+        onClick={(event) => {
+          event.stopPropagation();
+          onPlayAlbum(album);
+        }}
+      />
+    );
+  }
+
   function renderImage(props: RenderImageProps) {
     const album = albums[images.indexOf(props.src)];
     return (
@@ -124,6 +141,7 @@ export function CrateCoverFlow({
         {isOrdered && album ? (
           <RankOverlay number={album.displayNumber} />
         ) : null}
+        {props.priority && album ? renderPlayButton(album) : null}
       </div>
     );
   }
@@ -158,6 +176,7 @@ export function CrateCoverFlow({
             {isOrdered ? (
               <RankOverlay number={activeAlbum.displayNumber} />
             ) : null}
+            {renderPlayButton(activeAlbum)}
           </div>
         ) : (
           <CoverFlow
@@ -176,14 +195,6 @@ export function CrateCoverFlow({
             renderImage={renderImage}
           />
         )}
-        {onPlayAlbum && playableAlbumUids?.has(activeAlbum.global_album_uid) ? (
-          <PlayButton
-            size="lg"
-            label={`${t("actions.album.play")}: ${activeAlbum.name}`}
-            className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
-            onClick={() => onPlayAlbum(activeAlbum)}
-          />
-        ) : null}
       </div>
       <div
         aria-live="polite"
