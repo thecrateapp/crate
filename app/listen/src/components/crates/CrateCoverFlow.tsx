@@ -19,6 +19,7 @@ interface CrateCoverFlowProps {
   loopEnabled?: boolean;
   coverUrl?: CrateCoverUrl;
   onPlayAlbum?: (album: NumberedCrateAlbum) => void;
+  playableAlbumUids?: ReadonlySet<string>;
 }
 
 const LOOP_COPIES = 3;
@@ -62,6 +63,7 @@ export function CrateCoverFlow({
   loopEnabled = false,
   coverUrl = authenticatedCrateCoverUrl,
   onPlayAlbum,
+  playableAlbumUids,
 }: CrateCoverFlowProps) {
   const { t } = useTranslation();
   const albumCount = albums.length;
@@ -174,7 +176,7 @@ export function CrateCoverFlow({
             renderImage={renderImage}
           />
         )}
-        {onPlayAlbum ? (
+        {onPlayAlbum && playableAlbumUids?.has(activeAlbum.global_album_uid) ? (
           <PlayButton
             size="lg"
             label={`${t("actions.album.play")}: ${activeAlbum.name}`}

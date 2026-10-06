@@ -32,6 +32,7 @@ export function CrateHero({
   actions,
   contentClassName,
   onPlayAlbum,
+  playableAlbumUids,
 }: {
   crate: CrateDetail;
   albums: NumberedCrateAlbum[];
@@ -40,6 +41,7 @@ export function CrateHero({
   actions: ReactNode;
   contentClassName?: string;
   onPlayAlbum?: (album: NumberedCrateAlbum) => void;
+  playableAlbumUids?: ReadonlySet<string>;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -87,6 +89,7 @@ export function CrateHero({
             loopEnabled={crate.loop_enabled}
             coverUrl={coverUrl}
             onPlayAlbum={onPlayAlbum}
+            playableAlbumUids={playableAlbumUids}
           />
         }
         title={crate.name}

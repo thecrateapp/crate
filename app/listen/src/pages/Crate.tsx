@@ -280,6 +280,15 @@ function AuthenticatedCrate() {
     [playbackData],
   );
   const canPlay = !playbackLoading && playerTracks.length > 0;
+  const playableAlbumUids = useMemo(
+    () =>
+      new Set(
+        playerTracks.flatMap((track) =>
+          track.globalAlbumUid ? [track.globalAlbumUid] : [],
+        ),
+      ),
+    [playerTracks],
+  );
   const removeAlbum = useCallback(
     async (album: CrateAlbum) => {
       if (!crateId) return;
@@ -378,7 +387,8 @@ function AuthenticatedCrate() {
         albums={albums}
         coverUrl={authenticatedCrateCoverUrl}
         followerCount={crateFollow.followerCount}
-        onPlayAlbum={canPlay ? playCrateAlbum : undefined}
+        onPlayAlbum={playCrateAlbum}
+        playableAlbumUids={playableAlbumUids}
         contentClassName="pt-[var(--listen-mobile-page-top)] sm:pt-20"
         actions={
           <CratePageActions

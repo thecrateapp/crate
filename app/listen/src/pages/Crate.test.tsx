@@ -523,6 +523,21 @@ describe("Crate page", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("hides the coverflow play button when the front album has no tracks", async () => {
+    mocks.playback = (mocks.playback as { global_album_uid: string }[]).filter(
+      (track) =>
+        track.global_album_uid !== "11111111-1111-4111-8111-111111111111",
+    );
+    renderCrate();
+
+    expect(
+      await screen.findByRole("button", { name: "Play Crate" }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Play album: Blending" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("applies the Crate loop setting to the player", async () => {
     const user = userEvent.setup();
     const playAll = vi.fn();
