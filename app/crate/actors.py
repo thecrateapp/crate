@@ -22,6 +22,7 @@ import dramatiq
 
 # Broker must be imported before actor registration
 import crate.broker  # noqa: F401
+from crate.db.repositories.tasks_shared import DB_HEAVY_TASKS
 
 log = logging.getLogger(__name__)
 
@@ -217,18 +218,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
 }
 
 # DB-heavy tasks — only one at a time via Redis mutex
-DB_HEAVY_TASK_TYPES = frozenset(
-    {
-        "library_sync",
-        "library_pipeline",
-        "wipe_library",
-        "rebuild_library",
-        "repair",
-        "repair_duplicate_tracks",
-        "migrate_storage_v2",
-        "fix_artist",
-    }
-)
+DB_HEAVY_TASK_TYPES = frozenset(DB_HEAVY_TASKS)
 
 
 # ── Heartbeat ─────────────────────────────────────────────────────

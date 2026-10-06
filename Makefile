@@ -1018,7 +1018,7 @@ cap-android-release: ## Build signed/shrunk Android APK+AAB for the exact releas
 # ===========================================================================
 
 TAURI_DIR := app/listen-desktop
-TAURI_RELEASE_VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || node -p "require('./$(TAURI_DIR)/src-tauri/tauri.conf.json').version")
+TAURI_RELEASE_VERSION ?= $(shell env -u GITHUB_ENV node $(TAURI_DIR)/scripts/desktop-version.mjs 2>/dev/null || node -p "require('./$(TAURI_DIR)/src-tauri/tauri.conf.json').version")
 TAURI_MACOS_OUTPUT_DIR ?= desktop-artifacts/$(TAURI_RELEASE_VERSION)-macos-testers
 TAURI_MACOS_SIGNING_IDENTITY ?= $(if $(APPLE_SIGNING_IDENTITY),$(APPLE_SIGNING_IDENTITY),-)
 TAURI_MACOS_ARM_APP := $(TAURI_DIR)/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Crate.app

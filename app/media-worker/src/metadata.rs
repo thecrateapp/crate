@@ -318,8 +318,7 @@ mod tests {
 
     #[test]
     fn vector_at_numbers() {
-        let v: Value =
-            serde_json::from_str(r#"{"bliss": {"vector": [0.1, 0.2, 0.3]}}"#).unwrap();
+        let v: Value = serde_json::from_str(r#"{"bliss": {"vector": [0.1, 0.2, 0.3]}}"#).unwrap();
         assert_eq!(
             vector_at(&v, &["bliss", "vector"]),
             Some("0.1,0.2,0.3".to_string())
@@ -338,8 +337,7 @@ mod tests {
 
     #[test]
     fn vector_at_mixed_types() {
-        let v: Value =
-            serde_json::from_str(r#"{"bliss": {"vector": [0.1, "0.2", 0.3]}}"#).unwrap();
+        let v: Value = serde_json::from_str(r#"{"bliss": {"vector": [0.1, "0.2", 0.3]}}"#).unwrap();
         assert_eq!(
             vector_at(&v, &["bliss", "vector"]),
             Some("0.1,0.2,0.3".to_string())
@@ -370,10 +368,7 @@ mod tests {
     fn image_mime_jpg() {
         assert_eq!(image_mime(Path::new("cover.jpg")), Some(MimeType::Jpeg));
         assert_eq!(image_mime(Path::new("cover.jpeg")), Some(MimeType::Jpeg));
-        assert_eq!(
-            image_mime(Path::new("cover.JPG")),
-            Some(MimeType::Jpeg)
-        );
+        assert_eq!(image_mime(Path::new("cover.JPG")), Some(MimeType::Jpeg));
     }
 
     #[test]
@@ -393,14 +388,8 @@ mod tests {
 
     #[test]
     fn image_mime_tiff() {
-        assert_eq!(
-            image_mime(Path::new("cover.tif")),
-            Some(MimeType::Tiff)
-        );
-        assert_eq!(
-            image_mime(Path::new("cover.tiff")),
-            Some(MimeType::Tiff)
-        );
+        assert_eq!(image_mime(Path::new("cover.tif")), Some(MimeType::Tiff));
+        assert_eq!(image_mime(Path::new("cover.tiff")), Some(MimeType::Tiff));
     }
 
     #[test]
@@ -511,10 +500,7 @@ mod tests {
 
     #[test]
     fn preferred_tag_type_unknown_no_fallback() {
-        assert_eq!(
-            preferred_tag_type(Path::new("song.xyz"), None),
-            None
-        );
+        assert_eq!(preferred_tag_type(Path::new("song.xyz"), None), None);
     }
 
     #[test]
@@ -817,6 +803,9 @@ mod tests {
 
         let track: Value = serde_json::from_str(r#"{"entity_uid":"t2"}"#).unwrap();
         let result = write_rich_tags(&path, &track, None, None);
-        assert!(result.is_err(), "Should fail for file with unknown extension");
+        assert!(
+            result.is_err(),
+            "Should fail for file with unknown extension"
+        );
     }
 }

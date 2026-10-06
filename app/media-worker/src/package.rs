@@ -151,7 +151,10 @@ pub fn build_album_package(job: PackageJob) -> PackageResult {
                         .unwrap_or(0);
                     result.ok = true;
                     if let Some(cache) = job.cache.as_ref() {
-                        progress.emit("cache_started", json!({"kind": "album", "output_path": job.output_path.clone()}));
+                        progress.emit(
+                            "cache_started",
+                            json!({"kind": "album", "output_path": job.output_path.clone()}),
+                        );
                         match finalize_download_cache(cache, &output_path, result.bytes) {
                             Ok(cache_result) => {
                                 progress.emit(
@@ -294,7 +297,10 @@ pub fn build_track_artifact(job: TrackArtifactJob) -> TrackArtifactResult {
                 .unwrap_or(0);
             result.ok = true;
             if let Some(cache) = job.cache.as_ref() {
-                progress.emit("cache_started", json!({"kind": "track", "output_path": job.output_path.clone()}));
+                progress.emit(
+                    "cache_started",
+                    json!({"kind": "track", "output_path": job.output_path.clone()}),
+                );
                 match finalize_download_cache(cache, &output_path, result.bytes) {
                     Ok(cache_result) => {
                         progress.emit(
@@ -463,7 +469,12 @@ fn add_source_entry(config: &mut SourceEntryConfig<'_>) -> Result<(), String> {
         .unwrap_or(fallback);
     let name = unique_name(&safe_entry_name(requested_name, fallback), config.names)
         .unwrap_or_else(|_| fallback.to_string());
-    let kind = config.entry.kind.as_deref().unwrap_or(config.default_kind).to_string();
+    let kind = config
+        .entry
+        .kind
+        .as_deref()
+        .unwrap_or(config.default_kind)
+        .to_string();
     *config.entry_index += 1;
     config.progress.check_cancelled()?;
     config.progress.emit(
@@ -494,7 +505,11 @@ fn add_source_entry(config: &mut SourceEntryConfig<'_>) -> Result<(), String> {
                 .ok_or_else(|| format!("rich package track {name} is missing metadata"))?;
             staged_path = Some(stage_track_copy(&source, root, &name, &should_cancel)?);
             config.progress.check_cancelled()?;
-            let artwork = config.entry.artwork_path.as_deref().or(config.primary_artwork_path);
+            let artwork = config
+                .entry
+                .artwork_path
+                .as_deref()
+                .or(config.primary_artwork_path);
             write_rich_tags(
                 staged_path.as_ref().expect("staged track exists"),
                 metadata,

@@ -98,11 +98,7 @@ fn test_analyze_error_files(#[case] filename: &str, #[case] content: &[u8]) {
     std::fs::write(&bad_path, content).unwrap();
 
     let result = analyze_track(&bad_path);
-    assert!(
-        result.error.is_some(),
-        "{} should produce error",
-        filename
-    );
+    assert!(result.error.is_some(), "{} should produce error", filename);
 }
 
 #[test]
