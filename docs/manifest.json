@@ -313,5 +313,35 @@
     "summary": "Reference notes for Crate enrichment sources and flow.",
     "keywords": ["enrichment", "metadata", "providers"],
     "order": 50
+  },
+  {
+    "sourcePath": "docs/technical/smart-mix-design.md",
+    "route": "/architecture/smart-mix",
+    "section": "architecture",
+    "title": "Smart Mix - diseño unificado",
+    "summary": "Contrato y arquitectura para terminar Smart Mix, crossfade Android nativo y VirtualDJ desde el WIP existente.",
+    "keywords": [
+      "smart mix",
+      "crossfade",
+      "android",
+      "virtualdj",
+      "implementation"
+    ],
+    "order": 99
+  },
+  {
+    "sourcePath": "docs/technical/smart-mix-implementation-plan.md",
+    "route": "/developer/smart-mix-continuation",
+    "section": "developer",
+    "title": "Smart Mix - plan de continuación",
+    "summary": "Tareas, dependencias, pruebas y gates para completar la feature unificada desde su estado WIP.",
+    "keywords": [
+      "smart mix",
+      "crossfade",
+      "android",
+      "virtualdj",
+      "implementation"
+    ],
+    "order": 45
   }
 ]

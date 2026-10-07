@@ -1,3 +1,9 @@
+> **SUSTITUIDO — 2026-09-09. Documento histórico, no usar para continuar el desarrollo.**
+> Las únicas guías vigentes de Smart Mix, crossfade Android nativo y VirtualDJ
+> son el [diseño unificado](../technical/smart-mix-design.md) y el
+> [plan de implementación](../technical/smart-mix-implementation-plan.md). Sus contratos, tareas y gates sustituyen
+> los de este documento, incluso cuando el texto histórico diga aprobado o completo.
+
 # Crate VirtualDJ Integration Implementation Plan
 
 > **For agents:** REQUIRED SUB-SKILL: Use viterbit-ai-tools:executing-plans to implement this plan task by task.
