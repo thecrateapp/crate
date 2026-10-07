@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 
-from crate.api.auth import _require_auth
+from crate.api.auth import _require_vdj_scope
 from crate.api.openapi_responses import COMMON_ERROR_RESPONSES
 from crate.api.schemas.smart_mix import (
     CompatibilityScoreResponse,
@@ -54,7 +54,7 @@ def track_mix_profile(
     entity_uid: UUID,
     detail: Literal["summary", "full"] = Query(default="summary"),
 ) -> MixProfileResponse:
-    _require_auth(request)
+    _require_vdj_scope(request, "vdj.smart_mix.read")
     include_beat_grid = detail == "full"
     profile = get_track_mix_profile_by_entity_uid(
         str(entity_uid),
@@ -80,7 +80,7 @@ def compatible_tracks(
     limit: int = Query(default=20, ge=1, le=100),
     planner_version: Literal["smart-mix-v1"] = Query(default="smart-mix-v1"),
 ) -> CompatibleTracksResponse:
-    _require_auth(request)
+    _require_vdj_scope(request, "vdj.smart_mix.read")
     seed, candidates = get_compatible_track_inputs(
         str(entity_uid),
         max_candidates=500,
@@ -135,7 +135,7 @@ def transition_plans(
     request: Request,
     payload: TransitionPlanBatchRequest = Body(...),
 ) -> TransitionPlanBatchResponse:
-    _require_auth(request)
+    _require_vdj_scope(request, "vdj.smart_mix.read")
     unique_edges = _deduplicate_edges(payload.edges)
     entity_uids = _ordered_entity_uids(unique_edges)
     profiles = get_track_mix_profiles_by_entity_uids(

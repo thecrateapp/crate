@@ -56,9 +56,13 @@ class TrackRefResponse(IdentityFieldsMixin):
     album: str
     path: str | None = None
     duration: float | int | None = None
+    year: str | int | None = None
+    genre: str | None = None
     bpm: float | None = None
     audio_key: str | None = None
     audio_scale: str | None = None
+    has_cover: bool | int | None = None
+    cover_url: str | None = None
     energy: float | None = None
     danceability: float | None = None
     valence: float | None = None

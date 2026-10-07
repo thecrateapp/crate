@@ -129,6 +129,31 @@ _login_failure_lock = RLock()
 _oauth_invite_lock = RLock()
 
 
+def _is_vdj_access_token_path(path: str) -> bool:
+    if path in {
+        "/api/search",
+        "/api/vdj/catalog/folders",
+        "/api/auth/media-access",
+        "/api/playback/transition-plans",
+        "/api/me/play-events",
+    }:
+        return True
+    if path.startswith("/api/vdj/catalog/folders/"):
+        return True
+    if not path.startswith("/api/tracks/by-entity/"):
+        return path.startswith("/api/vdj/tracks/by-entity/") and path.endswith(
+            ("/playback", "/stream")
+        )
+    return path.endswith(
+        (
+            "/mix-profile",
+            "/compatible",
+            "/playback",
+            "/stream",
+        )
+    )
+
+
 def _parse_allowed_email_domains() -> list[str]:
     raw = os.environ.get("CRATE_ALLOWED_EMAIL_DOMAINS") or os.environ.get(
         "ALLOWED_EMAIL_DOMAINS", ""
@@ -1434,6 +1459,42 @@ class AuthMiddleware:
             str(session_id) if session_id else None,
         )
 
+    def _resolve_access_token_user(self, token: str) -> dict | None:
+        from crate.db.repositories.access_tokens import resolve_access_token
+
+        resolved = resolve_access_token(token)
+        if not resolved:
+            return None
+        return {
+            "id": resolved["user_id"],
+            "email": resolved["email"],
+            "role": resolved.get("role", "user"),
+            "username": resolved.get("username"),
+            "name": resolved.get("name"),
+            "session_id": None,
+            "auth_type": "access_token",
+            "access_token_id": resolved["id"],
+            "scopes": resolved["scopes"],
+        }
+
+    def _resolve_access_token_user_by_id(self, token_id: int) -> dict | None:
+        from crate.db.repositories.access_tokens import resolve_access_token_by_id
+
+        resolved = resolve_access_token_by_id(token_id)
+        if not resolved:
+            return None
+        return {
+            "id": resolved["user_id"],
+            "email": resolved["email"],
+            "role": resolved.get("role", "user"),
+            "username": resolved.get("username"),
+            "name": resolved.get("name"),
+            "session_id": None,
+            "auth_type": "access_token",
+            "access_token_id": resolved["id"],
+            "scopes": resolved["scopes"],
+        }
+
     async def resolve_user(self, request: Request) -> dict | None:
         user = None
 
@@ -1447,7 +1508,12 @@ class AuthMiddleware:
             token = request.query_params.get("token")
         # 3. Cookie auth — try app-specific cookie first, then default
         if token:
-            user = await run_in_threadpool(self._resolve_token_user, token)
+            resolver = (
+                self._resolve_access_token_user
+                if token.startswith("crv_")
+                else self._resolve_token_user
+            )
+            user = await run_in_threadpool(resolver, token)
         else:
             media_ticket = request.query_params.get("media_ticket")
             if media_ticket:
@@ -1467,11 +1533,19 @@ class AuthMiddleware:
                     else None
                 )
                 if validated:
-                    user = await run_in_threadpool(
-                        self._resolve_session_user,
-                        validated.user_id,
-                        validated.session_id,
-                    )
+                    if validated.access_token_id is not None:
+                        user = await run_in_threadpool(
+                            self._resolve_access_token_user_by_id,
+                            validated.access_token_id,
+                        )
+                        if user and user.get("id") != validated.user_id:
+                            user = None
+                    else:
+                        user = await run_in_threadpool(
+                            self._resolve_session_user,
+                            validated.user_id,
+                            validated.session_id,
+                        )
 
         if not user and not token:
             for cookie_name in _auth_cookie_candidates(request):
@@ -1509,6 +1583,9 @@ class AuthMiddleware:
                     else "user",
                 }
 
+        if user and user.get("auth_type") == "access_token":
+            if not _is_vdj_access_token_path(request.url.path):
+                return None
         return user
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -1518,7 +1595,11 @@ class AuthMiddleware:
 
         request = Request(scope, receive=receive)
         scope.setdefault("state", {})
-        scope["state"]["user"] = await self.resolve_user(request)
+        user = await self.resolve_user(request)
+        if user and user.get("auth_type") == "access_token":
+            if not _is_vdj_access_token_path(request.url.path):
+                user = None
+        scope["state"]["user"] = user
         await self.app(scope, receive, send)
 
 
@@ -1526,6 +1607,18 @@ def _require_auth(request: Request) -> dict:
     user = getattr(request.state, "user", None)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
+    return user
+
+
+def _require_vdj_scope(request: Request, scope: str) -> dict:
+    user = _require_auth(request)
+    if user.get("auth_type") != "access_token":
+        return user
+    if scope not in set(user.get("scopes") or []):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access token is missing required scope: {scope}",
+        )
     return user
 
 

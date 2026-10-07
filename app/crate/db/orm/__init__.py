@@ -32,6 +32,7 @@ from crate.db.orm.bandcamp import (
     CredentialSecret,
     UserBandcampItem,
 )
+from crate.db.orm.access_tokens import UserAccessToken
 from crate.db.orm.library import LibraryAlbum, LibraryArtist, LibraryTrack
 from crate.db.orm.playlist import (
     Playlist,
@@ -91,4 +92,5 @@ __all__ = [
     "UserFollowedPlaylist",
     "UserGlobalTrackLike",
     "UserExternalIdentity",
+    "UserAccessToken",
 ]

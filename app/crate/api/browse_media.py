@@ -14,7 +14,7 @@ from crate.api._deps import (
     library_path,
     safe_path,
 )
-from crate.api.auth import _require_auth
+from crate.api.auth import _require_auth, _require_vdj_scope
 from crate.api.permissions import require_permission
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
@@ -158,7 +158,7 @@ def api_search(
     limit: int = 20,
     scope: str = "local",
 ):
-    user = _require_auth(request)
+    user = _require_vdj_scope(request, "vdj.catalog.read")
     q_stripped = q.strip()
     capped_limit = max(1, min(limit, 50))
     if len(q_stripped) < 2:
@@ -1102,11 +1102,42 @@ def api_playback_by_id(
 def api_stream_by_entity_uid(
     request: Request, entity_uid: str, delivery: str = Query("original")
 ):
-    _require_auth(request)
+    _require_vdj_scope(request, "vdj.media.read")
     track = get_track_delivery_row_by_entity_uid(entity_uid)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
     return _stream_track(request, track, delivery)
+
+
+@router.get(
+    "/api/vdj/tracks/by-entity/{entity_uid}/stream",
+    responses=_STREAM_RESPONSES,
+    summary="Stream a VirtualDJ track by entity UID",
+)
+def api_vdj_stream_by_entity_uid(
+    request: Request, entity_uid: str, delivery: str = Query("original")
+):
+    _require_vdj_scope(request, "vdj.media.read")
+    track = get_track_delivery_row_by_entity_uid(entity_uid)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    return _stream_track(request, track, delivery)
+
+
+@router.get(
+    "/api/vdj/tracks/by-entity/{entity_uid}/playback",
+    response_model=PlaybackResolutionResponse,
+    responses=_BROWSE_MEDIA_RESPONSES,
+    summary="Resolve a VirtualDJ track by entity UID",
+)
+def api_vdj_playback_by_entity_uid(
+    request: Request, entity_uid: str, delivery: str = Query("original")
+):
+    user = _require_vdj_scope(request, "vdj.media.read")
+    track = get_track_delivery_row_by_entity_uid(entity_uid)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    return _playback_payload_for_track(track, delivery, user_id=user["id"])
 
 
 @router.get(
@@ -1118,7 +1149,7 @@ def api_stream_by_entity_uid(
 def api_playback_by_entity_uid(
     request: Request, entity_uid: str, delivery: str = Query("original")
 ):
-    user = _require_auth(request)
+    user = _require_vdj_scope(request, "vdj.media.read")
     track = get_track_delivery_row_by_entity_uid(entity_uid)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
