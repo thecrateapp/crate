@@ -153,7 +153,7 @@ from crate.db.repositories.auth import (
 )
 from crate.db.repositories.auth_identities import link_oauth_user_identity
 from crate.db.repositories.library_contributions import list_user_album_contributions
-from crate.db.repositories.tasks import create_task
+from crate.db.repositories.tasks import create_task, create_task_dedup
 from crate.user_avatars import (
     AvatarProxyError,
     AvatarUnavailable,
@@ -2042,6 +2042,8 @@ def update_profile(request: Request, body: UpdateProfileRequest):
         raise
     if not updated:
         raise HTTPException(status_code=404, detail="User not found")
+    if "timezone" in fields:
+        create_task_dedup("refresh_user_listening_stats", {"user_id": user["id"]})
     # Re-issue the short-lived access token with updated display fields.
     expiry_hours = _access_expiry_hours(request)
     token = create_jwt(

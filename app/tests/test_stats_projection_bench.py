@@ -48,9 +48,26 @@ def _measure(label: str, results: dict):
         results[label] = {"ms": elapsed_ms, "queries": statements}
 
 
+def _mark_recent_day_dirty() -> None:
+    from sqlalchemy import text
+
+    from crate.db.tx import transaction_scope
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO user_listening_dirty_days (user_id, day)
+                SELECT 1, MAX(day) FROM user_daily_listening WHERE user_id = 1
+                """
+            )
+        )
+
+
 def test_stats_projection_baseline(pg_db):
     from crate.db.repositories.user_library_aggregate_runner import (
         recompute_user_listening_aggregates,
+        refresh_user_listening_aggregates,
     )
     from crate.db.user_stats_dashboard_surface import build_user_stats_dashboard
 
@@ -58,8 +75,11 @@ def test_stats_projection_baseline(pg_db):
     results: dict = {"events": events}
     with _measure("seed", results):
         seed_listening_history(events=events, days=4 * 365)
-    with _measure("refresh_aggregates", results):
+    with _measure("rebuild_projections", results):
         recompute_user_listening_aggregates(1)
+    _mark_recent_day_dirty()
+    with _measure("incremental_refresh_one_day", results):
+        refresh_user_listening_aggregates(1)
     for window in ("30d", "365d", "all_time"):
         with _measure(f"dashboard_{window}", results):
             payload = build_user_stats_dashboard(

@@ -27,6 +27,9 @@ from crate.db.queries.user_library_stats_month import (
     month_period_key,
 )
 from crate.db.repositories.tasks import create_task_dedup
+from crate.db.repositories.user_library_aggregate_runner import (
+    ensure_user_listening_aggregates,
+)
 from crate.db.tx import read_scope
 from crate.db.ui_snapshot_reads import get_ui_snapshot
 from crate.db.ui_snapshot_shared import decorate_snapshot
@@ -258,6 +261,7 @@ def refresh_user_stats_dashboard_snapshot(
         genres_limit=genres_limit,
         replay_limit=replay_limit,
     )
+    ensure_user_listening_aggregates(user_id)
     payload = build_user_stats_dashboard(**params)
     saved = upsert_ui_snapshot(
         "stats:dashboard",
