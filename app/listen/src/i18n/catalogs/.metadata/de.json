@@ -5407,6 +5407,22 @@
     "sourceHash": "sha256:13e9b87f59fa72cb70f553567b40b5ad755698935b6aba4cadb4251c1dcdab75",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "settings.account.timezone": {
+    "sourceHash": "sha256:bb0a38239f448a3416c29712e9e5b8da96277496002f22cdd7961c0d5d2bd6bc",
+    "reviewedAt": "2026-10-07T21:53:27.338Z"
+  },
+  "settings.account.timezoneDescription": {
+    "sourceHash": "sha256:141ac69a6074199a28137ad184dec5255251b439479cd97883e950db4559668c",
+    "reviewedAt": "2026-10-07T21:53:27.338Z"
+  },
+  "settings.account.timezoneUnset": {
+    "sourceHash": "sha256:e1e678a11cfb1caa5da25a9a0223f285697d090342e26039d46c2a9a0ea97f64",
+    "reviewedAt": "2026-10-07T21:53:27.338Z"
+  },
+  "settings.account.timezoneUseDevice": {
+    "sourceHash": "sha256:41805bea2f880c9c03051ebf90518810197970369354bee4179e51c58313d258",
+    "reviewedAt": "2026-10-07T21:53:27.338Z"
+  },
   "settings.account.title": {
     "sourceHash": "sha256:d7e15130a624a3190a1697b83c9d8fb292b70abf66a39edd4dd7823096fbd2f8",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -5450,6 +5466,14 @@
   "settings.account.toasts.profileUpdateFailed": {
     "sourceHash": "sha256:7af4fa7aec8d1a6bf3fb1551ebe1296b3e30ed2444d7c576039d0ca349173470",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "settings.account.toasts.timezoneUpdated": {
+    "sourceHash": "sha256:710cea79b50850ccaac271b9a1fb12f45411b616c8a93e05d33fe16fea725e42",
+    "reviewedAt": "2026-10-07T21:53:27.338Z"
+  },
+  "settings.account.toasts.timezoneUpdateFailed": {
+    "sourceHash": "sha256:f9272ae0b71a4562a860a94f8f87a8650475943364cbfb258931e7b47b0c84ea",
+    "reviewedAt": "2026-10-07T21:53:27.338Z"
   },
   "settings.account.toasts.unlinked": {
     "sourceHash": "sha256:4aa12aba6cb391db6ca42c13521699d6a11d33d67637809e6fa77c1e820557d8",
