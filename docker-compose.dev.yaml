@@ -118,6 +118,10 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=crate
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=api
+      # The VDJ pilot is enabled only in the local development stack.
+      - CRATE_VDJ_ENABLED=true
+      - CRATE_SMART_MIX_ENABLED=true
+      - CRATE_VDJ_AUTOMATION_ENABLED=false
       - DOMAIN=${DEV_DOMAIN:-dev.lespedants.org}
       - TIDAL_COUNTRY_CODE=${TIDAL_COUNTRY_CODE:-ES}
       - CRATE_BANDCAMP_WEB_CREDENTIAL_BRIDGE_ENABLED=${CRATE_BANDCAMP_WEB_CREDENTIAL_BRIDGE_ENABLED:-false}

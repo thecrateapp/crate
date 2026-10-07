@@ -32,6 +32,17 @@ def test_dev_caddy_routes_only_smart_mix_summaries_through_readplane():
     assert "method GET" in caddyfile
 
 
+def test_dev_caddy_routes_vdj_media_directly_to_fastapi():
+    caddyfile = (ROOT / "data/caddy/Caddyfile.readplane.dev").read_text()
+
+    assert "path_regexp vdj_media" in caddyfile
+    vdj_media = caddyfile.split("(vdj_media_api)", maxsplit=1)[1].split(
+        "(api_backend)", maxsplit=1
+    )[0]
+    assert "/api/vdj/tracks/by-entity/[^/]+/(?:playback|stream)$" in vdj_media
+    assert "reverse_proxy api:8585" in vdj_media
+
+
 def test_dynamic_and_admin_smart_mix_routes_stay_on_fastapi():
     caddyfile = (ROOT / "data/caddy/Caddyfile.readplane.dev").read_text()
 
@@ -52,6 +63,7 @@ def test_dynamic_and_admin_smart_mix_routes_stay_on_fastapi():
 
 def test_production_traefik_routes_canonical_catalog_gets_to_readplane():
     compose = yaml.safe_load((ROOT / "docker-compose.yaml").read_text())
+    api_labels = compose["services"]["crate-api"]["labels"]
     readplane = compose["services"]["crate-readplane"]
     labels = readplane["labels"]
 
@@ -61,6 +73,7 @@ def test_production_traefik_routes_canonical_catalog_gets_to_readplane():
     assert "Method(`GET`" in rule
     assert "PathPrefix(`/api/catalog/`)" in rule
     assert labels["traefik.http.routers.crate-readplane-interactive.priority"] > 0
+    assert api_labels["traefik.http.routers.crate-api-vdj-media.priority"] > 110
     assert (
         labels["traefik.http.services.crate-readplane.loadbalancer.server.port"] == 8686
     )
