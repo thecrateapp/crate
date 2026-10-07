@@ -118,12 +118,12 @@ describe("Crate story text", () => {
 
   it("falls back to English metadata when no labels are provided", () => {
     expect(buildCrateStoryMetadata(payload)).toBe("2 albums · 18 tracks");
-    expect(buildCrateStoryByline(payload)).toBe("Crate by Diego");
+    expect(buildCrateStoryByline(payload)).toBe("A selected Crate by Diego");
   });
 
   it("prefers the explicit owner and album count fields", () => {
     expect(buildCrateStoryByline({ ...payload, crateOwnerName: "Jane" })).toBe(
-      "Crate by Jane",
+      "A selected Crate by Jane",
     );
     expect(buildCrateStoryMetadata({ ...payload, crateAlbumCount: 12 })).toBe(
       "12 albums · 18 tracks",

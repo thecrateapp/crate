@@ -8,6 +8,10 @@ export const SQUARE_POST_SIZE = 1080;
 export const STORY_SAFE_TOP = 250;
 export const STORY_SAFE_BOTTOM = 280;
 export const CRATE_CARD_MAX_ALBUMS = 5;
+export const CRATE_STORY_MAX_ALBUMS = 10;
+export const CRATE_STORY_STYLES = ["bento", "podium", "chart"] as const;
+export type CrateStoryStyle = (typeof CRATE_STORY_STYLES)[number];
+export const DEFAULT_CRATE_STORY_STYLE: CrateStoryStyle = "bento";
 
 const FONT_STACK = "Poppins, ui-sans-serif, system-ui";
 const CARD_MARGIN = 72;
@@ -38,8 +42,11 @@ export function buildCrateStoryByline(
   labels?: ShareCardLabels,
 ): string {
   if (labels?.subtitle) return labels.subtitle;
-  const owner = payload.crateOwnerName?.trim() || payload.subtitle?.trim();
-  return owner ? `Crate by ${owner}` : "Crate";
+  const owner =
+    payload.crateOwnerInstagram?.trim() ||
+    payload.crateOwnerName?.trim() ||
+    payload.subtitle?.trim();
+  return owner ? `A selected Crate by ${owner}` : "Crate";
 }
 
 export function buildCrateStoryMetadata(
@@ -244,6 +251,17 @@ export function drawEditorialStoryCard(
   );
 }
 
+export function resolveCrateStoryStyle(payload: SharePayload): CrateStoryStyle {
+  const style = payload.crateStoryStyle;
+  return style && CRATE_STORY_STYLES.includes(style)
+    ? style
+    : DEFAULT_CRATE_STORY_STYLE;
+}
+
+const STORY_CONTENT_TOP = STORY_SAFE_TOP + 150;
+const STORY_CONTENT_BOTTOM = STORY_HEIGHT - STORY_SAFE_BOTTOM;
+const STORY_TEXT_SIZES = { titleSize: 84, bylineSize: 40, metaSize: 34 };
+
 export function drawCrateStoryCard(
   ctx: CanvasRenderingContext2D,
   payload: SharePayload,
@@ -252,44 +270,454 @@ export function drawCrateStoryCard(
   colors: SocialShareColors,
   labels?: ShareCardLabels,
 ) {
-  const albums = artworks.slice(0, CRATE_CARD_MAX_ALBUMS);
-  const composition = resolveCrateStoryComposition(payload);
+  const albums = artworks.slice(0, CRATE_STORY_MAX_ALBUMS);
   drawBrandRow(ctx, logo, colors, {
     x: CARD_MARGIN,
     y: STORY_SAFE_TOP + 24,
     width: STORY_WIDTH - CARD_MARGIN * 2,
     logoSize: 64,
     fontSize: 40,
-    kicker: labels?.kicker,
   });
 
-  let coversBottom: number;
   if (albums.length === 0) {
     drawGeneratedStoryArtwork(ctx, payload, 240, 420, 600, logo, colors);
-    coversBottom = 1020;
-  } else if (composition === "ranked-stack") {
-    coversBottom = drawRankedStoryCovers(ctx, albums, payload, colors);
-  } else {
-    coversBottom = drawCoverflowFan(ctx, albums, colors, {
-      cx: STORY_WIDTH / 2,
-      cy: 760,
-      scale: 1,
-      payload,
-    });
+    drawStoryTitle(ctx, payload, colors, labels, 1092);
+    return;
   }
 
-  const ranked = composition === "ranked-stack";
-  drawCrateTextBlock(ctx, payload, colors, labels, {
-    x: ranked ? CARD_MARGIN : STORY_WIDTH / 2,
-    align: ranked ? "left" : "center",
-    maxWidth: STORY_WIDTH - CARD_MARGIN * 2,
-    top: coversBottom + 72,
-    bottom: STORY_HEIGHT - STORY_SAFE_BOTTOM,
-    titleSize: 84,
-    bylineSize: 40,
-    metaSize: 34,
-    urlSize: 32,
+  const ranked = payload.crateIsOrdered === true;
+  const style = resolveCrateStoryStyle(payload);
+  if (style === "chart") {
+    drawChartStory(ctx, albums, payload, colors, labels, ranked);
+  } else if (style === "podium") {
+    drawPodiumStory(ctx, albums, payload, colors, labels, ranked);
+  } else {
+    drawBentoStory(ctx, albums, payload, colors, labels, ranked);
+  }
+}
+
+function drawStoryTitle(
+  ctx: CanvasRenderingContext2D,
+  payload: SharePayload,
+  colors: SocialShareColors,
+  labels: ShareCardLabels | undefined,
+  top: number,
+  options: { x?: number; maxWidth?: number; titleSize?: number } = {},
+): number {
+  return drawCrateTextBlock(ctx, payload, colors, labels, {
+    x: options.x ?? CARD_MARGIN,
+    align: "left",
+    maxWidth: options.maxWidth ?? STORY_WIDTH - CARD_MARGIN * 2,
+    top,
+    bottom: STORY_CONTENT_BOTTOM,
+    ...STORY_TEXT_SIZES,
+    titleSize: options.titleSize ?? STORY_TEXT_SIZES.titleSize,
+    urlSize: 0,
   });
+}
+
+function drawStoryTile(
+  ctx: CanvasRenderingContext2D,
+  album: CrateStoryArtwork,
+  x: number,
+  y: number,
+  size: number,
+  payload: SharePayload,
+  colors: SocialShareColors,
+  showRank: boolean,
+) {
+  const radius = Math.max(10, Math.round(size * 0.05));
+  drawShadowedArtwork(ctx, album, x, y, size, radius, payload, colors);
+  if (showRank) {
+    drawRankNumeral(ctx, formatRank(album.position), {
+      x,
+      y,
+      width: size,
+      height: size,
+      radius,
+    });
+  }
+}
+
+function drawRankNumeral(
+  ctx: CanvasRenderingContext2D,
+  label: string,
+  box: { x: number; y: number; width: number; height: number; radius: number },
+) {
+  const fontSize = Math.round(box.height * 0.72);
+  ctx.save();
+  roundedRect(ctx, box.x, box.y, box.width, box.height, box.radius);
+  ctx.clip();
+  ctx.font = `900 ${fontSize}px ${FONT_STACK}`;
+  ctx.letterSpacing = `${Math.round(fontSize * -0.07)}px`;
+  ctx.textAlign = "right";
+  ctx.textBaseline = "alphabetic";
+  ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
+  ctx.shadowBlur = Math.round(fontSize * 0.1);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+  ctx.fillText(
+    label,
+    box.x + box.width - fontSize * 0.01,
+    box.y + box.height + fontSize * 0.03,
+  );
+  ctx.restore();
+}
+
+function drawPodiumStory(
+  ctx: CanvasRenderingContext2D,
+  albums: CrateStoryArtwork[],
+  payload: SharePayload,
+  colors: SocialShareColors,
+  labels: ShareCardLabels | undefined,
+  ranked: boolean,
+) {
+  const [hero, ...rest] = albums;
+  if (!hero) return;
+  const heroSize = 500;
+  const heroX = STORY_WIDTH - CARD_MARGIN - heroSize;
+  const heroY = STORY_CONTENT_TOP;
+  drawStoryTile(ctx, hero, heroX, heroY, heroSize, payload, colors, ranked);
+  drawHeroCaption(ctx, hero, colors, {
+    x: CARD_MARGIN,
+    top: heroY,
+    width: heroX - CARD_MARGIN - 40,
+  });
+
+  let cursor = heroY + heroSize;
+  const rows = [
+    {
+      albums: rest.slice(0, 3),
+      columns: 3,
+      gap: 28,
+      spacing: 32,
+    },
+    {
+      albums: rest.slice(3, 9),
+      columns: 6,
+      gap: 16,
+      spacing: 22,
+    },
+  ];
+  rows.forEach(({ albums: row, columns, gap, spacing }) => {
+    if (row.length === 0) return;
+    const size =
+      (STORY_WIDTH - CARD_MARGIN * 2 - gap * (columns - 1)) / columns;
+    cursor += spacing;
+    row.forEach((album, index) => {
+      drawStoryTile(
+        ctx,
+        album,
+        CARD_MARGIN + index * (size + gap),
+        cursor,
+        size,
+        payload,
+        colors,
+        ranked,
+      );
+    });
+    cursor += size;
+  });
+
+  drawStoryTitle(ctx, payload, colors, labels, cursor + 52);
+}
+
+function drawHeroCaption(
+  ctx: CanvasRenderingContext2D,
+  hero: CrateStoryArtwork,
+  colors: SocialShareColors,
+  layout: { x: number; top: number; width: number },
+) {
+  const { x, top, width } = layout;
+  if (!hero.name) return;
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = colors.cardSurface;
+  ctx.font = `800 42px ${FONT_STACK}`;
+  const nameBottom = drawWrappedText(ctx, hero.name, x, top + 52, width, 50, 3);
+  if (hero.artistName) {
+    ctx.fillStyle = colors.cardMutedInk;
+    ctx.font = `600 32px ${FONT_STACK}`;
+    drawWrappedText(ctx, hero.artistName, x, nameBottom + 44, width, 40, 2);
+  }
+  ctx.restore();
+}
+
+const BENTO_COLUMNS = 4;
+const BENTO_SLOTS: ReadonlyArray<[number, number]> = [
+  [2, 0],
+  [3, 0],
+  [2, 1],
+  [3, 1],
+  [0, 2],
+  [1, 2],
+  [2, 2],
+  [3, 2],
+  [0, 3],
+];
+
+function drawBentoStory(
+  ctx: CanvasRenderingContext2D,
+  albums: CrateStoryArtwork[],
+  payload: SharePayload,
+  colors: SocialShareColors,
+  labels: ShareCardLabels | undefined,
+  ranked: boolean,
+) {
+  const margin = 60;
+  const gap = 16;
+  const cell =
+    (STORY_WIDTH - margin * 2 - gap * (BENTO_COLUMNS - 1)) / BENTO_COLUMNS;
+  const top = STORY_CONTENT_TOP + 10;
+  const cellX = (column: number) => margin + column * (cell + gap);
+  const cellY = (row: number) => top + row * (cell + gap);
+  const [hero, ...rest] = albums;
+  if (!hero) return;
+  const heroSize = cell * 2 + gap;
+  drawStoryTile(
+    ctx,
+    hero,
+    cellX(0),
+    cellY(0),
+    heroSize,
+    payload,
+    colors,
+    ranked,
+  );
+
+  let lastRow = 1;
+  let lastColumn = 1;
+  rest.slice(0, BENTO_SLOTS.length).forEach((album, index) => {
+    const slot = BENTO_SLOTS[index];
+    if (!slot) return;
+    const [column, row] = slot;
+    drawStoryTile(
+      ctx,
+      album,
+      cellX(column),
+      cellY(row),
+      cell,
+      payload,
+      colors,
+      ranked,
+    );
+    if (row > lastRow || (row === lastRow && column > lastColumn)) {
+      lastRow = row;
+      lastColumn = column;
+    }
+  });
+
+  const freeColumns = lastRow >= 2 ? BENTO_COLUMNS - 1 - lastColumn : 0;
+  const gridBottom = cellY(lastRow) + cell;
+  let contentBottom: number;
+  if (freeColumns >= 2) {
+    const x = cellX(lastColumn + 1) + 8;
+    const titleBottom = drawStoryTitle(
+      ctx,
+      payload,
+      colors,
+      labels,
+      gridBottom - 190,
+      { x, maxWidth: STORY_WIDTH - margin - x, titleSize: 72 },
+    );
+    contentBottom = Math.max(gridBottom, titleBottom);
+  } else {
+    contentBottom = drawStoryTitle(
+      ctx,
+      payload,
+      colors,
+      labels,
+      gridBottom + 56,
+    );
+  }
+  drawCompactAlbumList(ctx, albums, colors, ranked, {
+    x: margin,
+    top: contentBottom + 64,
+    width: STORY_WIDTH - margin * 2,
+  });
+}
+
+function drawCompactAlbumList(
+  ctx: CanvasRenderingContext2D,
+  albums: CrateStoryArtwork[],
+  colors: SocialShareColors,
+  ranked: boolean,
+  layout: { x: number; top: number; width: number },
+) {
+  const available = STORY_CONTENT_BOTTOM - layout.top;
+  const neededRows = Math.ceil(albums.length / 2);
+  const lineHeight = Math.min(48, Math.floor(available / neededRows));
+  const rows =
+    lineHeight >= 38
+      ? neededRows
+      : Math.min(neededRows, Math.floor(available / 38));
+  if (rows < 3) return;
+  const fontSize = Math.round(Math.max(lineHeight, 38) * 0.56);
+  const columnGap = 40;
+  const columnWidth = (layout.width - columnGap) / 2;
+  const rankWidth = ranked ? 64 : 0;
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  albums.slice(0, rows * 2).forEach((album, index) => {
+    const column = Math.floor(index / rows);
+    const row = index % rows;
+    const x = layout.x + column * (columnWidth + columnGap);
+    const y = layout.top + row * Math.max(lineHeight, 38) + fontSize;
+    if (ranked) {
+      ctx.fillStyle = colors.accent;
+      ctx.font = `800 ${fontSize}px ${FONT_STACK}`;
+      ctx.fillText(formatRank(album.position), x, y);
+    }
+    const textX = x + rankWidth;
+    const textWidth = columnWidth - rankWidth;
+    ctx.fillStyle = colors.cardSurface;
+    ctx.font = `700 ${fontSize}px ${FONT_STACK}`;
+    const title = truncateToWidth(ctx, album.name ?? "", textWidth);
+    ctx.fillText(title, textX, y);
+    const titleWidth = ctx.measureText(title).width;
+    const artistWidth = textWidth - titleWidth - 16;
+    if (album.artistName && artistWidth > 80) {
+      ctx.fillStyle = colors.cardMutedInk;
+      ctx.font = `500 ${fontSize}px ${FONT_STACK}`;
+      ctx.fillText(
+        truncateToWidth(ctx, album.artistName, artistWidth),
+        textX + titleWidth + 16,
+        y,
+      );
+    }
+  });
+  ctx.restore();
+}
+
+function drawChartStory(
+  ctx: CanvasRenderingContext2D,
+  albums: CrateStoryArtwork[],
+  payload: SharePayload,
+  colors: SocialShareColors,
+  labels: ShareCardLabels | undefined,
+  ranked: boolean,
+) {
+  const titleBottom = drawStoryTitle(
+    ctx,
+    payload,
+    colors,
+    labels,
+    STORY_CONTENT_TOP - 6,
+    { titleSize: 76 },
+  );
+  const [hero, ...rest] = albums;
+  if (!hero) return;
+  const left = CARD_MARGIN;
+  const width = STORY_WIDTH - CARD_MARGIN * 2;
+  let y = titleBottom + 44;
+
+  const rowGap = 10;
+  const heroGap = 18;
+  const heroHeight = 200;
+  const rowHeight = Math.max(
+    56,
+    Math.min(
+      80,
+      Math.floor(
+        (STORY_CONTENT_BOTTOM - y - heroHeight - heroGap - rowGap * 8) / 9,
+      ),
+    ),
+  );
+
+  ctx.save();
+  roundedRect(ctx, left, y, width, heroHeight, 24);
+  ctx.fillStyle = colors.accent;
+  ctx.globalAlpha = 0.12;
+  ctx.fill();
+  ctx.globalAlpha = 0.45;
+  ctx.strokeStyle = colors.accent;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+  drawChartRow(ctx, hero, colors, payload, {
+    box: { x: left, y, width, height: heroHeight, radius: 24 },
+    coverInset: 20,
+    titleSize: 44,
+    artistSize: 30,
+    ranked,
+  });
+  y += heroHeight + heroGap;
+
+  rest.forEach((album) => {
+    drawChartRow(ctx, album, colors, payload, {
+      box: { x: left, y, width, height: rowHeight, radius: 12 },
+      coverInset: 0,
+      titleSize: Math.round(rowHeight * 0.4),
+      artistSize: Math.round(rowHeight * 0.3),
+      ranked,
+    });
+    y += rowHeight + rowGap;
+  });
+}
+
+function drawChartRow(
+  ctx: CanvasRenderingContext2D,
+  album: CrateStoryArtwork,
+  colors: SocialShareColors,
+  payload: SharePayload,
+  layout: {
+    box: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      radius: number;
+    };
+    coverInset: number;
+    titleSize: number;
+    artistSize: number;
+    ranked: boolean;
+  },
+) {
+  const { box, coverInset, titleSize, artistSize, ranked } = layout;
+  if (ranked) drawRankNumeral(ctx, formatRank(album.position), box);
+  const coverSize = box.height - coverInset * 2;
+  const coverX = box.x + coverInset;
+  const coverY = box.y + coverInset;
+  drawShadowedArtwork(
+    ctx,
+    album,
+    coverX,
+    coverY,
+    coverSize,
+    Math.round(coverSize * 0.12),
+    payload,
+    colors,
+  );
+  const centerY = box.y + box.height / 2;
+  const textX = coverX + coverSize + 26;
+  const numeralReserve = ranked ? box.height * 1.25 : 24;
+  const textWidth = box.x + box.width - numeralReserve - textX;
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  const hasArtist = Boolean(album.artistName);
+  const titleBaseline = hasArtist
+    ? centerY - artistSize * 0.15
+    : centerY + titleSize * 0.35;
+  ctx.fillStyle = colors.cardSurface;
+  ctx.font = `700 ${titleSize}px ${FONT_STACK}`;
+  ctx.fillText(
+    truncateToWidth(ctx, album.name ?? "", textWidth),
+    textX,
+    titleBaseline,
+  );
+  if (hasArtist) {
+    ctx.fillStyle = colors.cardMutedInk;
+    ctx.font = `500 ${artistSize}px ${FONT_STACK}`;
+    ctx.fillText(
+      truncateToWidth(ctx, album.artistName ?? "", textWidth),
+      textX,
+      titleBaseline + artistSize * 1.35,
+    );
+  }
+  ctx.restore();
 }
 
 export function drawCrateSquareCard(
@@ -385,79 +813,6 @@ export function drawSquareEditorialCard(
       urlSize: 26,
     },
   );
-}
-
-function drawRankedStoryCovers(
-  ctx: CanvasRenderingContext2D,
-  albums: CrateStoryArtwork[],
-  payload: SharePayload,
-  colors: SocialShareColors,
-): number {
-  const [hero, ...rest] = albums;
-  const heroSize = 520;
-  const heroX = STORY_WIDTH - CARD_MARGIN - heroSize;
-  const heroY = 400;
-  if (!hero) return heroY + heroSize;
-  drawShadowedArtwork(ctx, hero, heroX, heroY, heroSize, 16, payload, colors);
-
-  const leftWidth = heroX - CARD_MARGIN - 40;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = colors.accent;
-  ctx.font = `800 300px ${FONT_STACK}`;
-  const numeral = formatRank(hero.position);
-  fitFont(ctx, numeral, leftWidth, 300, 160, "800");
-  ctx.fillText(numeral, CARD_MARGIN - 8, heroY + heroSize - 4);
-
-  if (hero.name) {
-    ctx.fillStyle = colors.cardSurface;
-    ctx.font = `800 42px ${FONT_STACK}`;
-    const nameBottom = drawWrappedText(
-      ctx,
-      hero.name,
-      CARD_MARGIN,
-      heroY + 52,
-      leftWidth,
-      50,
-      3,
-    );
-    if (hero.artistName) {
-      ctx.fillStyle = colors.cardMutedInk;
-      ctx.font = `600 32px ${FONT_STACK}`;
-      drawWrappedText(
-        ctx,
-        hero.artistName,
-        CARD_MARGIN,
-        nameBottom + 44,
-        leftWidth,
-        40,
-        2,
-      );
-    }
-  }
-
-  if (rest.length === 0) return heroY + heroSize;
-
-  const columns = 4;
-  const gap = 36;
-  const tileSize =
-    (STORY_WIDTH - CARD_MARGIN * 2 - gap * (columns - 1)) / columns;
-  const rowY = heroY + heroSize + 64;
-  const rowWidth = rest.length * tileSize + (rest.length - 1) * gap;
-  const startX = CARD_MARGIN + (STORY_WIDTH - CARD_MARGIN * 2 - rowWidth) / 2;
-  rest.forEach((album, index) => {
-    const x = startX + index * (tileSize + gap);
-    drawShadowedArtwork(ctx, album, x, rowY, tileSize, 12, payload, colors);
-    drawRankChip(
-      ctx,
-      formatRank(album.position),
-      x + 12,
-      rowY + tileSize - 12,
-      44,
-      colors,
-    );
-  });
-  return rowY + tileSize;
 }
 
 function drawRankedSquareCovers(
@@ -882,7 +1237,7 @@ function drawCrateTextBlock(
     metaSize: number;
     urlSize: number;
   },
-) {
+): number {
   const { x, align, maxWidth, top, bottom } = layout;
   ctx.save();
   ctx.textAlign = align;
@@ -936,6 +1291,10 @@ function drawCrateTextBlock(
     );
   }
 
+  if (layout.urlSize <= 0) {
+    ctx.restore();
+    return cursor;
+  }
   const urlY = Math.max(urlTop, cursor + layout.urlSize);
   drawUrlPill(ctx, payload, colors, labels, {
     x,
@@ -946,6 +1305,7 @@ function drawCrateTextBlock(
     fontSize: layout.urlSize,
   });
   ctx.restore();
+  return urlY + urlHeight;
 }
 
 function drawUrlPill(

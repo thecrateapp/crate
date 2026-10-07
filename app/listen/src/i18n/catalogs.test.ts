@@ -40,6 +40,7 @@ const fullyLocalizedPrefixes = [
   "settings.sleep.",
 ] as const;
 const completedSettingsEnglishFallbackAllowlist = new Set<string>([
+  "settings.account.instagram",
   "settings.playback.crossfade",
   "settings.sleep.modes.15min",
   "settings.sleep.modes.30min",
@@ -101,6 +102,7 @@ const fullyLocalizedNextCutPrefixes = [
   "share.",
 ] as const;
 const completedNextCutEnglishFallbackAllowlist = new Set<string>([
+  "share.storyStyle.podium.title",
   "jam.room.sessionFallback",
   "jam.room.roles.host",
   "jam.room.roles.collab",

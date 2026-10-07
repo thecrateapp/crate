@@ -14,23 +14,27 @@ export function AccountProfileForm({
   name,
   username,
   bio,
+  instagram,
   email,
   saving,
   profileUnchanged,
   setName,
   setUsername,
   setBio,
+  setInstagram,
   onSave,
 }: {
   name: string;
   username: string;
   bio: string;
+  instagram: string;
   email?: string | null;
   saving: boolean;
   profileUnchanged: boolean;
   setName: (value: string) => void;
   setUsername: (value: string) => void;
   setBio: (value: string) => void;
+  setInstagram: (value: string) => void;
   onSave: () => void;
 }) {
   const { t } = useTranslation();
@@ -64,6 +68,24 @@ export function AccountProfileForm({
           onChange={(e) => setUsername(e.target.value.replace(/\s+/g, "-"))}
           className={FIELD_CLASS_NAME}
           placeholder={t("settings.account.usernamePlaceholder")}
+        />
+      </FormField>
+      <FormField
+        label={t("settings.account.instagram")}
+        hint={t("settings.account.instagramDescription")}
+        className="gap-2"
+        labelClassName={FIELD_LABEL_CLASS_NAME}
+      >
+        <Input
+          id="settings-instagram"
+          type="text"
+          value={instagram}
+          onChange={(e) => setInstagram(e.target.value.replace(/\s+/g, ""))}
+          className={FIELD_CLASS_NAME}
+          placeholder={t("settings.account.instagramPlaceholder")}
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
         />
       </FormField>
       <FormField

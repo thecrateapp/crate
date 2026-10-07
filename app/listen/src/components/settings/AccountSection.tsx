@@ -32,6 +32,7 @@ export function AccountSection() {
   const [name, setName] = useState(user?.name || "");
   const [username, setUsername] = useState(user?.username || "");
   const [bio, setBio] = useState(user?.bio || "");
+  const [instagram, setInstagram] = useState(user?.instagram_handle || "");
   const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -50,7 +51,8 @@ export function AccountSection() {
     setName(user?.name || "");
     setUsername(user?.username || "");
     setBio(user?.bio || "");
-  }, [user?.bio, user?.name, user?.username]);
+    setInstagram(user?.instagram_handle || "");
+  }, [user?.bio, user?.instagram_handle, user?.name, user?.username]);
 
   useEffect(() => {
     api<Record<string, AuthProviderState>>("/api/auth/providers")
@@ -145,6 +147,7 @@ export function AccountSection() {
         name: name.trim(),
         username: username.trim() || null,
         bio: bio.trim() || null,
+        instagram_handle: instagram.trim(),
       });
       notify.success(t("settings.account.toasts.profileUpdated"));
       await refetch();
@@ -152,6 +155,8 @@ export function AccountSection() {
       const message = error instanceof Error ? error.message : "";
       if (message.includes("Username is already taken")) {
         notify.error(t("settings.account.toasts.usernameTaken"));
+      } else if (message.includes("Instagram handle")) {
+        notify.error(t("settings.account.toasts.instagramInvalid"));
       } else {
         notify.error(t("settings.account.toasts.profileUpdateFailed"));
       }
@@ -244,16 +249,19 @@ export function AccountSection() {
           name={name}
           username={username}
           bio={bio}
+          instagram={instagram}
           email={user?.email}
           saving={saving}
           profileUnchanged={
             name.trim() === (user?.name || "") &&
             username.trim() === (user?.username || "") &&
-            bio.trim() === (user?.bio || "")
+            bio.trim() === (user?.bio || "") &&
+            instagram.trim() === (user?.instagram_handle || "")
           }
           setName={setName}
           setUsername={setUsername}
           setBio={setBio}
+          setInstagram={setInstagram}
           onSave={handleSaveName}
         />
         <ConnectedAccounts

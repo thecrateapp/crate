@@ -21,6 +21,7 @@ _USER_UPDATABLE_FIELDS = frozenset(
         "name",
         "username",
         "bio",
+        "instagram_handle",
         "role",
         "status",
         "status_reason",

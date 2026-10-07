@@ -66,6 +66,7 @@ export function buildCrateSharePayload(
     crateAlbumCount: crate.album_count,
     crateIsOrdered: crate.is_ordered,
     crateOwnerName: crateOwnerName(crate),
+    crateOwnerInstagram: crate.owner_instagram_handle?.trim() || null,
     crateSortDirection: crate.sort_direction,
     crateTrackCount: crate.track_count,
   };

@@ -71,6 +71,7 @@ class CrateSummaryResponse(BaseModel):
     owner_id: int
     owner_username: str | None = None
     owner_name: str | None = None
+    owner_instagram_handle: str | None = None
     name: str
     description: str = ""
     visibility: Literal["private", "public"]

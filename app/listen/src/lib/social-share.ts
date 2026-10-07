@@ -1,6 +1,7 @@
 import { isNative } from "@/lib/capacitor-runtime";
 
 import { nativeSocialShare } from "./social-share-native";
+import type { CrateStoryStyle } from "./social-share-story-canvas";
 import {
   buildInstagramStoryCard,
   withTimeout,
@@ -40,6 +41,8 @@ export interface SharePayload {
   crateAlbums?: CrateShareAlbum[];
   crateAlbumCount?: number;
   crateIsOrdered?: boolean;
+  crateStoryStyle?: CrateStoryStyle;
+  crateOwnerInstagram?: string | null;
   crateOwnerName?: string | null;
   crateSortDirection?: "asc" | "desc";
   crateTrackCount?: number;
