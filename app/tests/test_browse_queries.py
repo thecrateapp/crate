@@ -1372,6 +1372,63 @@ class TestHybridSearch:
         assert "bliss_vector" not in results["tracks"][0]
         assert results["tracks"][0]["title"] == "Lean Result"
 
+    def test_search_all_hybrid_payload_includes_vdj_metadata_and_cover_url(self, pg_db):
+        from crate.db.queries.browse_media_search import search_all_hybrid
+        from crate.db.tx import transaction_scope
+
+        artist = "Metadata Search Artist"
+        album = "Metadata Search Album"
+        pg_db.upsert_artist({"name": artist})
+        album_id = pg_db.upsert_album(
+            {
+                "artist": artist,
+                "name": album,
+                "path": f"/music/{artist}/{album}",
+                "has_cover": 1,
+                "year": "2022",
+            }
+        )
+        pg_db.upsert_track(
+            {
+                "album_id": album_id,
+                "artist": artist,
+                "album": album,
+                "filename": "01-metadata.flac",
+                "title": "Metadata Result",
+                "path": f"/music/{artist}/{album}/01-metadata.flac",
+                "duration": 193.5,
+                "year": "2022",
+                "genre": "post-punk",
+            }
+        )
+
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    UPDATE library_tracks
+                    SET bpm = :bpm, audio_key = :audio_key, audio_scale = :audio_scale
+                    WHERE album_id = :album_id
+                    """
+                ),
+                {
+                    "album_id": album_id,
+                    "bpm": 95.0,
+                    "audio_key": "F#",
+                    "audio_scale": "minor",
+                },
+            )
+
+        track = search_all_hybrid("metadata result", 10)["tracks"][0]
+
+        assert track["year"] == "2022"
+        assert track["genre"] == "post-punk"
+        assert track["bpm"] == 95.0
+        assert track["audio_key"] == "F#"
+        assert track["audio_scale"] == "minor"
+        assert track["has_cover"] is True
+        assert track["cover_url"] == f"/api/vdj/albums/{album_id}/cover?size=512"
+
 
 # ══════════════════════════════════════════════════════════════════════
 # browse_media_mood
