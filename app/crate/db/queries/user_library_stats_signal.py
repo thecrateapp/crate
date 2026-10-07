@@ -421,6 +421,16 @@ def _highlights(session, user_id: int, period: StatsPeriod) -> dict:
             params,
         ).one()
         new_artists = {"count": int(row.count), "share": round(float(row.share), 4)}
+    artist_count = session.execute(
+        text(
+            f"""
+            SELECT COUNT(DISTINCT artist)::integer
+            FROM user_track_daily
+            WHERE user_id = :user_id AND artist != '' AND {period_day_filter(period)}
+            """
+        ),
+        params,
+    ).scalar_one()
     start_utc, end_utc = _period_utc_bounds(period)
     session_row = (
         session.execute(
@@ -459,6 +469,7 @@ def _highlights(session, user_id: int, period: StatsPeriod) -> dict:
         .first()
     )
     return {
+        "artist_count": int(artist_count or 0),
         "longest_streak": longest_streak,
         "current_streak": current_streak,
         "new_artists": new_artists,

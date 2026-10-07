@@ -80,6 +80,7 @@ def test_highlights_heatmap_and_music_age(history):
     payload = _dashboard("365d")
 
     highlights = payload["highlights"]
+    assert highlights["artist_count"] == 6
     assert highlights["longest_streak"]["days"] >= 1
     assert highlights["longest_session"]["track_count"] >= 1
     assert highlights["obsession"]["plays"] > 1

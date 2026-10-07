@@ -716,6 +716,7 @@ class StatsObsessionResponse(BaseModel):
 
 
 class StatsHighlightsResponse(BaseModel):
+    artist_count: int | None = None
     longest_streak: StatsStreakResponse | None = None
     current_streak: StatsStreakResponse | None = None
     new_artists: StatsNewArtistsResponse | None = None
