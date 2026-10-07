@@ -67,6 +67,7 @@ describe("ShareSheetHost", () => {
   const originalCanShare = navigator.canShare;
 
   beforeEach(() => {
+    window.localStorage.clear();
     mocks.buildInstagramStoryBlob.mockResolvedValue(
       new Blob(["story"], { type: "image/jpeg" }),
     );
@@ -172,15 +173,16 @@ describe("ShareSheetHost", () => {
 
     openPayload(cratePayload);
     await user.click(await screen.findByText("Instagram Story"));
+    await user.click(await screen.findByText("Wall"));
 
     await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
     const [shareData] = share.mock.calls[0] as unknown as [ShareData];
     expect(shareData.files?.[0]).toBeInstanceOf(File);
     expect(shareData.files?.[0]?.name).toBe("crate-year-end-records-story.jpg");
     expect(mocks.buildInstagramStoryBlob).toHaveBeenCalledWith(
-      cratePayload,
+      { ...cratePayload, crateStoryStyle: "bento" },
       expect.objectContaining({
-        subtitle: "Crate by Jane Doe",
+        subtitle: "A selected Crate by Jane Doe",
         metadata: "2 albums · 18 tracks",
         kicker: "Ranked",
       }),
@@ -188,6 +190,91 @@ describe("ShareSheetHost", () => {
     await waitFor(() =>
       expect(screen.queryByText("Share Crate")).not.toBeInTheDocument(),
     );
+  });
+
+  it("asks for a story style before sharing a Crate and remembers it", async () => {
+    const user = userEvent.setup();
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: vi.fn(async () => undefined),
+    });
+    Object.defineProperty(navigator, "canShare", {
+      configurable: true,
+      value: vi.fn(() => true),
+    });
+    renderWithListenProviders(<ShareSheetHost />);
+
+    openPayload(cratePayload);
+    await user.click(await screen.findByText("Instagram Story"));
+
+    expect(screen.getByText("Story style")).toBeInTheDocument();
+    expect(
+      ["Wall", "Podium", "Chart"].map(
+        (name) => screen.getByText(name).closest("button") !== null,
+      ),
+    ).toEqual([true, true, true]);
+    expect(screen.queryByText("WhatsApp")).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("Podium"));
+    await waitFor(() =>
+      expect(mocks.buildInstagramStoryBlob).toHaveBeenCalledWith(
+        { ...cratePayload, crateStoryStyle: "podium" },
+        expect.anything(),
+      ),
+    );
+
+    openPayload(cratePayload);
+    await user.click(await screen.findByText("Instagram Story"));
+    const styleNames = screen
+      .getAllByRole("button")
+      .map((button) => button.textContent ?? "")
+      .filter((text) => /^(Wall|Podium|Chart)/.test(text))
+      .map((text) => text.match(/^(Wall|Podium|Chart)/)?.[1]);
+    expect(styleNames).toEqual(["Podium", "Wall", "Chart"]);
+  });
+
+  it("goes back from the story style step to the share options", async () => {
+    const user = userEvent.setup();
+    renderWithListenProviders(<ShareSheetHost />);
+
+    openPayload(cratePayload);
+    await user.click(await screen.findByText("Instagram Story"));
+    await user.click(
+      screen.getByRole("button", { name: "Back to share options" }),
+    );
+
+    expect(screen.getByText("WhatsApp")).toBeInTheDocument();
+    expect(screen.queryByText("Story style")).not.toBeInTheDocument();
+  });
+
+  it("shares non-Crate stories without asking for a style", async () => {
+    const user = userEvent.setup();
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: vi.fn(async () => undefined),
+    });
+    Object.defineProperty(navigator, "canShare", {
+      configurable: true,
+      value: vi.fn(() => true),
+    });
+    const albumPayload: SharePayload = {
+      kind: "album",
+      title: "Blending",
+      subtitle: "High Vis",
+      url: "https://listen.example/share/album/1",
+    };
+    renderWithListenProviders(<ShareSheetHost />);
+
+    openPayload(albumPayload);
+    await user.click(await screen.findByText("Instagram Story"));
+
+    await waitFor(() =>
+      expect(mocks.buildInstagramStoryBlob).toHaveBeenCalledWith(
+        albumPayload,
+        expect.anything(),
+      ),
+    );
+    expect(screen.queryByText("Story style")).not.toBeInTheDocument();
   });
 
   it("downloads the square post when file sharing is unavailable", async () => {

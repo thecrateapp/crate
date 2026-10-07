@@ -11,6 +11,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router";
 import {
   ArrowDownToLine,
   ArrowDownToLineBold,
+  CrateBox,
   CRATE_ICON_SIZE,
   Disc3,
   Loader2,
@@ -468,7 +469,7 @@ function CrateUnavailable({
   return (
     <ErrorState
       kind="unavailable"
-      icon={Disc3}
+      icon={CrateBox}
       title={t("crate.page.notFound")}
       backTo={showBackLink ? "/collection?tab=crates" : undefined}
       backLabel={t("crate.page.backToCollection")}
@@ -686,7 +687,7 @@ function CratePageActions({
       : undefined,
     imageAlt: crate.name,
     imageShape: "square",
-    fallbackIcon: Disc3,
+    fallbackIcon: CrateBox,
   };
   const followLabel = followed ? t("common.following") : t("common.follow");
   const secondaryActions: HeroSecondaryAction[] = [];

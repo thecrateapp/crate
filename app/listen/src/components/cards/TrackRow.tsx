@@ -22,6 +22,8 @@ export type {
   TrackRowData,
   TrackRowProps,
 } from "@/components/cards/TrackRowModel";
+import { Clock } from "@crate/ui/icons";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export const TrackRow = memo(function TrackRow({
   track,
@@ -165,9 +167,9 @@ export const TrackRow = memo(function TrackRow({
             />
           ) : null}
           {model.disabled ? (
-            <span className="track-row-disabled-badge shrink-0 rounded-full px-2 py-0.5 text-xs uppercase tracking-caps">
+            <CrateBadge icon={Clock} tone="neutral">
               {t("trackRow.soon")}
-            </span>
+            </CrateBadge>
           ) : null}
         </div>
         <TrackRowDetails

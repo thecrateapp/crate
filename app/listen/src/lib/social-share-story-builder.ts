@@ -12,6 +12,7 @@ import {
 } from "./social-share-colors";
 import {
   CRATE_CARD_MAX_ALBUMS,
+  CRATE_STORY_MAX_ALBUMS,
   drawCrateArtworkBackground,
   drawCrateSquareCard,
   drawCrateStoryCard,
@@ -97,7 +98,10 @@ async function renderShareCard(
   const colors = readStoryColors();
   const isCrate = payload.kind === "crate";
   const crateAlbums = isCrate
-    ? (payload.crateAlbums ?? []).slice(0, CRATE_CARD_MAX_ALBUMS)
+    ? (payload.crateAlbums ?? []).slice(
+        0,
+        format === "story" ? CRATE_STORY_MAX_ALBUMS : CRATE_CARD_MAX_ALBUMS,
+      )
     : [];
 
   const [artwork, logo, ...crateArtworks] = await Promise.all([

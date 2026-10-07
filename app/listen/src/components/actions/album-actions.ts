@@ -7,7 +7,7 @@ import {
   ArrowDownToLine,
   ArrowDownToLineBold,
   Check,
-  Disc3,
+  CrateBox,
   Download,
   Heart,
   HeartBold,
@@ -128,7 +128,7 @@ export function buildAlbumMenuEntries(
       type: "disclosure",
       key: "crate",
       label: t("album.actions.addToCrate"),
-      icon: Disc3,
+      icon: CrateBox,
       expanded: options.cratePickerOpen,
       onToggle: options.onToggleCratePicker,
       items: [

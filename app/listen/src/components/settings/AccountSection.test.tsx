@@ -143,3 +143,42 @@ describe("AccountSection native OAuth linking", () => {
     expect(mocks.toastError).not.toHaveBeenCalled();
   });
 });
+
+describe("AccountSection profile", () => {
+  beforeEach(() => {
+    mocks.api.mockReset().mockImplementation((path: string) => {
+      if (path === "/api/auth/providers") return Promise.resolve({});
+      if (path === "/api/auth/config") return Promise.resolve({});
+      return Promise.resolve({});
+    });
+  });
+
+  it("saves the Instagram handle with the profile", async () => {
+    const user = userEvent.setup();
+    renderWithListenProviders(<AccountSection />, {
+      locale: "en",
+      auth: {
+        user: createMockAuthUser({
+          id: 7,
+          name: "Diego",
+          instagram_handle: null,
+        }),
+        refetch: vi.fn(async () => createMockAuthUser({ id: 7 })),
+      },
+    });
+
+    await user.type(
+      await screen.findByPlaceholderText("your.handle"),
+      "@diego.trecedoce",
+    );
+    await user.click(screen.getByRole("button", { name: "Save profile" }));
+
+    await waitFor(() =>
+      expect(mocks.api).toHaveBeenCalledWith(
+        "/api/auth/profile",
+        "PUT",
+        expect.objectContaining({ instagram_handle: "@diego.trecedoce" }),
+      ),
+    );
+  });
+});

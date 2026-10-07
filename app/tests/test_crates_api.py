@@ -1557,3 +1557,20 @@ def test_crate_detail_weights_every_local_album_equally_in_genre_profile(
         (genre["name"], genre["share"], genre["percent"])
         for genre in detail.json()["genre_profile"]
     ] == [("post-punk", 0.75, 100), ("noise rock", 0.25, 33)]
+
+
+def test_crate_detail_exposes_the_owner_instagram_handle(pg_db, crate_api_client):
+    from crate.db.tx import transaction_scope
+
+    owner_id = _create_user("instagram-owner@example.com")
+    with transaction_scope() as session:
+        session.execute(
+            text("UPDATE users SET instagram_handle = :handle WHERE id = :id"),
+            {"handle": "diego.trecedoce", "id": owner_id},
+        )
+    crate_id = _create_crate(owner_id=owner_id)
+
+    detail = crate_api_client.get(f"/api/crates/{crate_id}", headers=_headers(owner_id))
+
+    assert detail.status_code == 200
+    assert detail.json()["owner_instagram_handle"] == "diego.trecedoce"

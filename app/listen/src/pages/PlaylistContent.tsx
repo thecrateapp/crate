@@ -1,7 +1,7 @@
-import { Sparkles } from "@crate/ui/icons";
+import { Sparkles, Globe, Lock, Users } from "@crate/ui/icons";
 
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 import { PlaylistCollaboratorsModal } from "@/components/playlists/PlaylistCollaboratorsModal";
 import { PlaylistDeleteModal } from "@/components/playlists/PlaylistDeleteModal";
 import { PlaylistTrackList } from "@/components/playlists/PlaylistTrackList";
@@ -36,23 +36,17 @@ function PlaylistBadges({
     <>
       <OfflineBadge state={offlineState} />
       {data.is_smart ? (
-        <CrateChip
-          tone="accent"
-          icon={Sparkles}
-          className="py-0 text-xs font-medium"
-        >
-          {t("playlist.badges.smart")}
-        </CrateChip>
+        <CrateBadge icon={Sparkles}>{t("playlist.badges.smart")}</CrateBadge>
       ) : null}
-      <CrateChip tone="neutral" className="py-0 text-xs font-medium">
+      <CrateBadge icon={data.visibility === "public" ? Globe : Lock}>
         {data.visibility === "public"
           ? t("playlist.visibility.public")
           : t("playlist.visibility.private")}
-      </CrateChip>
+      </CrateBadge>
       {data.is_collaborative ? (
-        <CrateChip tone="accent" className="py-0 text-xs font-medium">
+        <CrateBadge icon={Users}>
           {t("playlist.badges.collaborative")}
-        </CrateChip>
+        </CrateBadge>
       ) : null}
     </>
   );

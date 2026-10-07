@@ -6,10 +6,12 @@ import {
   Loader2,
   UserPlus,
   UserRoundCheck,
+  UserCheck,
+  Star,
 } from "@crate/ui/icons";
 
 import { cn } from "@crate/ui/lib/cn";
-import { CratePill } from "@crate/ui/primitives/CrateBadge";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 import { IconButton } from "@crate/ui/primitives/IconButton";
 import { UserAvatar } from "@/components/social/UserAvatar";
 import { badgeTone, formatMinutes } from "@/pages/user-profile-model";
@@ -56,9 +58,6 @@ function affinityTone(band: AffinityBand) {
   if (band === "medium") return "profile-hover-affinity-medium";
   return "profile-hover-affinity-low";
 }
-
-const PROFILE_BADGE_CLASS_NAME =
-  "gap-0 px-2 text-xs leading-4 font-bold uppercase tracking-label";
 
 function mainBadge(card: ProfileCardPayload, t: TFunction) {
   return card.badges[0]?.label || t("profileHover.defaultBadge");
@@ -126,18 +125,15 @@ export function ProfileCardBody({
               </div>
             </div>
             {card.relationship_state.is_friend ? (
-              <CratePill
-                tone="accent"
-                className="gap-0 px-2 py-0.5 text-xs leading-4 font-bold uppercase tracking-kicker"
-              >
+              <CrateBadge icon={UserCheck}>
                 {t("profileHover.friend")}
-              </CratePill>
+              </CrateBadge>
             ) : null}
           </div>
 
-          <div className="profile-hover-main-badge mt-3 inline-flex rounded-full border px-2.5 py-1 text-xs font-black uppercase tracking-eyebrow">
+          <CrateBadge size="md" icon={Star} className="mt-3">
             {mainBadge(card, t)}
-          </div>
+          </CrateBadge>
         </div>
 
         <div className="text-right">
@@ -191,13 +187,13 @@ export function ProfileCardBody({
       {card.badges.length ? (
         <div className="relative mt-3 flex flex-wrap gap-1.5">
           {card.badges.map((badge) => (
-            <CratePill
+            <CrateBadge
               key={badge.key}
+              icon={Star}
               tone={badgeTone(badge.tone)}
-              className={PROFILE_BADGE_CLASS_NAME}
             >
               {badge.label}
-            </CratePill>
+            </CrateBadge>
           ))}
         </div>
       ) : null}

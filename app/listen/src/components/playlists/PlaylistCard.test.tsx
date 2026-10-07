@@ -27,7 +27,7 @@ function renderWithRoutes(element: ReactElement, options = {}) {
 }
 
 describe("PlaylistCard tile", () => {
-  it("uses the semantic canvas token for playlist badges", () => {
+  it("renders the playlist badge as an overlay crate badge", () => {
     renderWithListenProviders(
       <PlaylistCard
         name="Crate Selects"
@@ -37,7 +37,9 @@ describe("PlaylistCard tile", () => {
       />,
     );
 
-    expect(screen.getByText("Featured")).toHaveClass("bg-surface-canvas/85");
+    const badge = screen.getByText("Featured");
+    expect(badge).toHaveClass("crate-badge");
+    expect(badge).toHaveAttribute("data-surface", "overlay");
   });
 
   it("navigates from the primary button and keeps nested controls independent", async () => {

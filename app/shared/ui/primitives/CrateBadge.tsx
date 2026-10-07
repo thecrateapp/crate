@@ -1,5 +1,6 @@
 import { memo, type ComponentType, type ReactNode } from "react";
 
+import { CRATE_ICON_SIZE } from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
 
 export type CrateBadgeTone =
@@ -20,6 +21,62 @@ const TONE_CLASS_NAME: Record<CrateBadgeTone, string> = {
   danger: "border-state-danger/25 bg-state-danger/10 text-state-danger-text",
   accent: "border-accent-action/25 bg-accent-action/10 text-accent-action",
 };
+
+const ICON_TONE_CLASS_NAME: Record<CrateBadgeTone, string> = {
+  neutral: "text-text-muted",
+  info: "text-state-info",
+  success: "text-state-success-text",
+  warning: "text-state-warning-text",
+  danger: "text-state-danger-text",
+  accent: "text-accent-action",
+};
+
+export type CrateBadgeSize = "sm" | "md";
+
+export type CrateBadgeSurface = "default" | "overlay";
+
+interface CrateBadgeProps {
+  children: ReactNode;
+  icon?: ComponentType<{ size?: number; className?: string }>;
+  tone?: CrateBadgeTone;
+  size?: CrateBadgeSize;
+  surface?: CrateBadgeSurface;
+  title?: string;
+  className?: string;
+  iconClassName?: string;
+}
+
+export const CrateBadge = memo(function CrateBadge({
+  children,
+  icon: Icon,
+  tone = "accent",
+  size = "sm",
+  surface = "default",
+  title,
+  className,
+  iconClassName,
+}: CrateBadgeProps) {
+  return (
+    <span
+      title={title}
+      data-tone={tone}
+      data-surface={surface}
+      className={cn(
+        "crate-badge inline-flex min-w-0 max-w-full shrink-0 items-center gap-1.5 rounded-md border",
+        size === "md" ? "px-2.5 py-1 text-xs" : "px-2 py-1 text-badge",
+        className,
+      )}
+    >
+      {Icon ? (
+        <Icon
+          size={size === "md" ? CRATE_ICON_SIZE.xs : CRATE_ICON_SIZE.micro}
+          className={cn("shrink-0", ICON_TONE_CLASS_NAME[tone], iconClassName)}
+        />
+      ) : null}
+      {children}
+    </span>
+  );
+});
 
 interface CratePillProps {
   children: ReactNode;

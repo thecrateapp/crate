@@ -6,6 +6,7 @@ import { searchTrackToTrack, trackIdentity } from "@/pages/jam-session-utils";
 import { tracksMatch as playerTracksMatch } from "@/contexts/player-session";
 
 import type { JamQueuePanelProps } from "./JamQueueSections";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 type JamQueueToolbarProps = Pick<
   JamQueuePanelProps,
@@ -79,9 +80,9 @@ function JamQueueHeader({ t, queueMode, queueItems }: JamQueueHeaderProps) {
         </p>
       </div>
       <div className="flex items-center gap-2">
-        <div className="jam-chip rounded-full px-2.5 py-1 text-xs text-text-muted">
+        <CrateBadge size="md" icon={ListMusic}>
           {t("jam.room.queueTrackCount", { count: queueItems.length })}
-        </div>
+        </CrateBadge>
       </div>
     </div>
   );

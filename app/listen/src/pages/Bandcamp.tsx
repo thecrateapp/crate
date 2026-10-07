@@ -19,6 +19,7 @@ import type {
   BandcampRadarResponse,
   BandcampTaskResponse,
 } from "./bandcamp-model";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export function Bandcamp() {
   const { t } = useTranslation();
@@ -121,10 +122,9 @@ export function Bandcamp() {
         <div className="bandcamp-page-sheen pointer-events-none absolute inset-y-0 right-0 w-1/2" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full bg-accent-action/10 px-3 py-2 text-xs font-black uppercase tracking-overline-wide text-accent-action">
-              <BandcampLogo className=" size-3.5" />
+            <CrateBadge size="md" icon={BandcampLogo}>
               Bandcamp
-            </div>
+            </CrateBadge>
             <h1 className="mt-5 text-4xl font-black tracking-tight text-text-primary md:text-6xl">
               {t("bandcamp.title")}
             </h1>

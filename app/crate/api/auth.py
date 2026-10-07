@@ -1827,6 +1827,7 @@ def auth_me(request: Request):
         payload = _user_public(db_user)
         payload["username"] = db_user.get("username")
         payload["bio"] = db_user.get("bio")
+        payload["instagram_handle"] = db_user.get("instagram_handle")
         payload["session_id"] = user.get("session_id")
         payload["capabilities"] = sorted(get_user_capabilities(db_user))
         payload["connected_accounts"] = list_user_external_identities(user["id"])
@@ -2024,6 +2025,8 @@ def update_profile(request: Request, body: UpdateProfileRequest):
         fields["username"] = body.username
     if body.bio is not None:
         fields["bio"] = body.bio
+    if body.instagram_handle is not None:
+        fields["instagram_handle"] = body.instagram_handle or None
     if not fields:
         raise HTTPException(status_code=400, detail="No fields to update")
     try:

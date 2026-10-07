@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { CRATE_ICON_SIZE, Radio } from "@crate/ui/icons";
+import { Radio } from "@crate/ui/icons";
 
 import type { ContextMenuHeader } from "@crate/ui/domain/actions";
 import { useEntityMenu } from "@crate/ui/domain/entity/useEntityMenu";
@@ -20,6 +20,7 @@ import {
   radioTypeLabel,
   type RadioStationLike,
 } from "./radio-station-view";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 interface RadioStationCardProps {
   station: RadioStationLike;
@@ -116,10 +117,13 @@ export const RadioStationCard = memo(function RadioStationCard({
           />
         )}
         <span className="home-radio-overlay absolute inset-0" />
-        <span className="home-radio-badge absolute left-2.5 top-2.5 inline-flex max-w-[calc(100%-1.25rem)] items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-micro font-semibold uppercase tracking-[0.06em] backdrop-blur-md">
-          <Radio size={CRATE_ICON_SIZE.micro} className="shrink-0" />
+        <CrateBadge
+          surface="overlay"
+          icon={Radio}
+          className="absolute left-2.5 top-2.5 max-w-[calc(100%-1.25rem)] whitespace-nowrap"
+        >
           <span className="min-w-0 truncate">{typeLabel}</span>
-        </span>
+        </CrateBadge>
         <span className="absolute inset-x-0 bottom-0 block p-4">
           <span className="home-radio-title block truncate text-sm font-semibold">
             {title}

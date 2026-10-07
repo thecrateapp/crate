@@ -1,4 +1,4 @@
-import { CRATE_ICON_SIZE, BarChart3 } from "@crate/ui/icons";
+import { BarChart3 } from "@crate/ui/icons";
 
 import {
   useStatsPageController,
@@ -17,6 +17,7 @@ import {
 import { StatsStorySection } from "./StatsStorySections";
 import { StatsHeroSection } from "./StatsHeroSections";
 import { WindowPicker } from "@/components/stats/StatsPanels";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export function Stats() {
   const page = useStatsPageController();
@@ -70,10 +71,9 @@ function StatsHeader({ page }: { page: StatsPageController }) {
   return (
     <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <div className="stats-hero-badge inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black uppercase tracking-overline-wide">
-          <BarChart3 size={CRATE_ICON_SIZE.micro} />
+        <CrateBadge size="md" icon={BarChart3}>
           {t("stats.hero.badge")}
-        </div>
+        </CrateBadge>
         <h1 className="stats-hero-title mt-4 max-w-4xl text-[clamp(2.65rem,8vw,7.5rem)] font-black uppercase leading-[0.82] tracking-[-0.085em]">
           {heroTitle}
           <span className="stats-hero-title-accent block">

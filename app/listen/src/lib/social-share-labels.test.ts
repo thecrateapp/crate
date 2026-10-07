@@ -66,7 +66,7 @@ describe("social share labels", () => {
 
   it("builds localized card labels for Crates", () => {
     expect(buildShareCardLabels(i18n.t, crate)).toEqual({
-      subtitle: "Crate de Diego",
+      subtitle: "Un Crate seleccionado por Diego",
       metadata: "3 álbumes · 52 canciones",
       kicker: "Ranking",
       cta: "Escúchalo en Crate",
@@ -74,6 +74,17 @@ describe("social share labels", () => {
     expect(
       buildShareCardLabels(i18n.t, { ...crate, crateIsOrdered: false }).kicker,
     ).toBe("Selección");
+  });
+
+  it("credits the owner's Instagram handle on Crate cards but not in chat text", () => {
+    const withInstagram = { ...crate, crateOwnerInstagram: "diego.trecedoce" };
+
+    expect(buildShareCardLabels(i18n.t, withInstagram).subtitle).toBe(
+      "Un Crate seleccionado por diego.trecedoce",
+    );
+    expect(buildLocalizedShareText(i18n.t, withInstagram)).toBe(
+      "«Discos del año» — Crate de Diego · 3 álbumes",
+    );
   });
 
   it("builds localized card subtitles for tracks", () => {

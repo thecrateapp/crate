@@ -1,12 +1,13 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { CRATE_ICON_SIZE, Users } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Users, Gauge } from "@crate/ui/icons";
 import { EmptyState } from "@crate/ui/domain/states";
 import { Link } from "react-router";
 
 import type { StatsPageController } from "@/pages/use-stats-page-controller";
 import type { StatsAffinity } from "@/components/stats/stats-model";
 import { cn } from "@/lib/utils";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 const NARRATIVE_TONES = [
   "stats-narrative-tone-cool",
@@ -108,19 +109,16 @@ export function AffinityCard({
             </p>
           </div>
         </div>
-        <div className="stats-muted-pill rounded-full px-4 py-2 text-xs font-black uppercase tracking-eyebrow">
+        <CrateBadge size="md" icon={Gauge}>
           {t(bandKey, { defaultValue: bandFallback })}
-        </div>
+        </CrateBadge>
       </div>
       {reasons.length ? (
         <div className="mt-5 flex flex-wrap gap-2">
           {reasons.map((reason) => (
-            <span
-              key={reason}
-              className="stats-muted-chip rounded-full px-3 py-1.5 text-xs font-semibold"
-            >
+            <CrateBadge key={reason} size="md">
               {reason}
-            </span>
+            </CrateBadge>
           ))}
         </div>
       ) : null}

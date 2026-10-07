@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { CRATE_ICON_SIZE, Disc3 } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Clock, Disc3 } from "@crate/ui/icons";
 
 import {
   ItemActionMenu,
@@ -37,6 +37,7 @@ import {
 import { toPlayableTrack } from "@/lib/playable-track";
 import { cn } from "@/lib/utils";
 import { albumApiPath, albumPagePath } from "@/lib/library-routes";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export interface AlbumCardProps {
   artist: string;
@@ -231,9 +232,13 @@ export function AlbumCardArtworkBadges({
         className="absolute left-2 top-2 z-10"
       />
       {isPreRelease ? (
-        <span className="absolute bottom-2 left-2 z-10 rounded-full border border-accent-action/25 bg-surface-canvas/55 px-2 py-1 text-xs font-semibold uppercase tracking-caps text-accent-action backdrop-blur-sm">
+        <CrateBadge
+          surface="overlay"
+          icon={Clock}
+          className="absolute bottom-2 left-2 z-10"
+        >
           {t("radar.release.preRelease")}
-        </span>
+        </CrateBadge>
       ) : null}
     </>
   );

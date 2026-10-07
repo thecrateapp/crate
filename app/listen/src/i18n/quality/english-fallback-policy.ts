@@ -142,6 +142,8 @@ export const COMPLETED_ENGLISH_FALLBACK_ALLOWLIST = new Set<string>([
   "playlist.collaborators.collab",
   "playlistComposer.descriptionLabel",
   "playlistComposer.playlistLabel",
+  "share.storyStyle.podium.title",
+  "settings.account.instagram",
 ]);
 
 export function buildEnglishFallbackAllowlist(

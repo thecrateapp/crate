@@ -1164,7 +1164,9 @@ describe("RadioStationCard", () => {
     expect(screen.getByText("Converge")).toBeInTheDocument();
     expect(screen.queryByText("Based on your heavy rotation")).toBeNull();
     expect(container.querySelector(".home-radio-card")).toBeInTheDocument();
-    expect(container.querySelector(".home-radio-badge")).toBeInTheDocument();
+    expect(
+      container.querySelector('.crate-badge[data-surface="overlay"]'),
+    ).toBeInTheDocument();
   });
 
   it("uses global artist artwork for remote radio stations", () => {

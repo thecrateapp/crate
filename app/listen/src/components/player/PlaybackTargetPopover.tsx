@@ -16,6 +16,7 @@ import type {
 } from "@/lib/playback-targets";
 
 import { PlaybackTargetIcon } from "./PlaybackTargetIcon";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export function PlaybackTargetPopover({
   popoverRef,
@@ -226,18 +227,12 @@ function PlaybackTargetRow({
           </span>
         ) : null}
       </span>
-      <span
-        className={cn(
-          "mt-0.5 shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium",
-          target.active
-            ? "border-border-interactive bg-surface-control text-accent-action"
-            : target.available
-              ? "border-border-quiet bg-surface-control text-text-secondary"
-              : "border-border-quiet bg-surface-canvas text-text-subtle",
-        )}
+      <CrateBadge
+        icon={target.active ? Check : undefined}
+        className={cn("mt-0.5", !target.available && "text-text-subtle")}
       >
         {badgeText}
-      </span>
+      </CrateBadge>
     </button>
   );
 }

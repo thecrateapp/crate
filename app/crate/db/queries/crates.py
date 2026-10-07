@@ -21,6 +21,7 @@ _CRATE_LIST_SCOPES: dict[str, str] = {
             c.*,
             owner.username AS owner_username,
             owner.name AS owner_name,
+            owner.instagram_handle AS owner_instagram_handle,
             CASE WHEN c.owner_id = :user_id THEN 'owner' ELSE 'collaborator' END
                 AS access,
             NULL::timestamptz AS followed_at
@@ -42,6 +43,7 @@ _CRATE_LIST_SCOPES: dict[str, str] = {
             c.*,
             owner.username AS owner_username,
             owner.name AS owner_name,
+            owner.instagram_handle AS owner_instagram_handle,
             NULL::text AS access,
             NULL::timestamptz AS followed_at
         FROM crates c
@@ -54,6 +56,7 @@ _CRATE_LIST_SCOPES: dict[str, str] = {
             c.*,
             owner.username AS owner_username,
             owner.name AS owner_name,
+            owner.instagram_handle AS owner_instagram_handle,
             NULL::text AS access,
             follower.followed_at
         FROM crate_followers follower
@@ -121,6 +124,7 @@ def get_crate(
                         c.short_code,
                         c.owner_id,
                         owner.username AS owner_username,
+                        owner.instagram_handle AS owner_instagram_handle,
                         owner.name AS owner_name,
                         owner.avatar AS owner_avatar,
                         c.name,
@@ -630,6 +634,7 @@ def _list_crates(
                         visible.short_code,
                         visible.owner_id,
                         visible.owner_username,
+                        visible.owner_instagram_handle,
                         visible.owner_name,
                         visible.name,
                         visible.description,

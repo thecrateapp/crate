@@ -35,7 +35,8 @@ export function buildShareCardLabels(
 ): ShareCardLabels {
   const cta = t("share.card.cta");
   if (payload.kind === "crate") {
-    const owner = shareOwnerName(payload);
+    const cardOwner =
+      payload.crateOwnerInstagram?.trim() || shareOwnerName(payload);
     const albumLabel = t("common.albumCountLabel", {
       count: shareAlbumCount(payload),
     });
@@ -44,7 +45,9 @@ export function buildShareCardLabels(
         ? t("common.trackCountLabel", { count: payload.crateTrackCount })
         : null;
     return {
-      subtitle: owner ? t("share.card.crateBy", { owner }) : "Crate",
+      subtitle: cardOwner
+        ? t("share.card.crateBy", { owner: cardOwner })
+        : "Crate",
       metadata: trackLabel ? `${albumLabel} · ${trackLabel}` : albumLabel,
       kicker: payload.crateIsOrdered
         ? t("share.card.ranked")

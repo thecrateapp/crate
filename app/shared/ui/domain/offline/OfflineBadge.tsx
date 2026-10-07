@@ -10,6 +10,7 @@ import {
   type OfflineItemState,
 } from "@crate/ui/lib/offline";
 import { cn } from "@crate/ui/lib/cn";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 interface OfflineBadgeProps {
   state: OfflineItemState;
@@ -52,57 +53,30 @@ export function OfflineBadge({
         )}
       >
         {icon}
-        {!compact ? (
-          <span className="text-xs font-medium tracking-wide">{label}</span>
-        ) : null}
+        {!compact ? <span className="text-xs font-medium">{label}</span> : null}
       </span>
     );
   }
 
-  if (state === "ready") {
-    return (
-      <span
-        className={cn(
-          "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium uppercase tracking-wide",
-          "border-[var(--status-ready-border)] bg-[var(--status-ready-bg)] text-[var(--status-ready-text)]",
-          className,
-        )}
-      >
-        <ArrowDownToLineBold size={compact ? 11 : 12} />
-        {!compact ? label : null}
-      </span>
-    );
-  }
-
-  if (state === "error") {
-    return (
-      <span
-        className={cn(
-          "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium uppercase tracking-wide",
-          "border-[var(--status-error-border)] bg-[var(--status-error-bg)] text-[var(--status-error-text)]",
-          className,
-        )}
-      >
-        <AlertCircle size={compact ? 11 : 12} />
-        {!compact ? label : null}
-      </span>
-    );
-  }
+  const badgeIcon =
+    state === "ready"
+      ? ArrowDownToLineBold
+      : state === "error"
+        ? AlertCircle
+        : state === "queued"
+          ? ArrowDownToLine
+          : Loader2;
 
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium uppercase tracking-wide",
-        "border-[var(--active-border)] bg-[var(--active-bg)] text-accent-action",
-        className,
-      )}
+    <CrateBadge
+      icon={badgeIcon}
+      tone={state === "error" ? "danger" : "accent"}
+      surface={compact ? "overlay" : "default"}
+      title={compact && label ? label : undefined}
+      className={cn(compact && "px-1.5", className)}
+      iconClassName={badgeIcon === Loader2 ? "animate-spin" : undefined}
     >
-      {state === "queued" ? (
-        <ArrowDownToLine size={compact ? 11 : 12} />
-      ) : (
-        <Loader2 size={compact ? 11 : 12} className="animate-spin" />
-      )}
       {!compact ? label : null}
-    </span>
+    </CrateBadge>
   );
 }

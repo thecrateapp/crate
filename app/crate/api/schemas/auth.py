@@ -1,9 +1,10 @@
 """Schema models for authentication and user management endpoints."""
 
+import re
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from crate.api.schemas.common import IdentityFieldsMixin, OkResponse
 
@@ -86,10 +87,38 @@ class AuthInviteRequest(BaseModel):
     max_uses: int | None = 1
 
 
+_INSTAGRAM_HANDLE_RE = re.compile(r"^[A-Za-z0-9._]{1,30}$")
+_INSTAGRAM_URL_PREFIX_RE = re.compile(
+    r"^(?:https?://)?(?:www\.)?instagram\.com(?:/|$)", re.IGNORECASE
+)
+_INSTAGRAM_DOMAIN_RE = re.compile(r"instagram\.com", re.IGNORECASE)
+
+
+def normalize_instagram_handle(value: str) -> str:
+    raw = value.strip()
+    if not raw:
+        return ""
+    handle = _INSTAGRAM_URL_PREFIX_RE.sub("", raw)
+    handle = handle.split("?", 1)[0].strip("/").lstrip("@")
+    if not any(char.isalnum() for char in handle) or _INSTAGRAM_DOMAIN_RE.search(
+        handle
+    ):
+        raise ValueError("Instagram handle must include a username")
+    if not _INSTAGRAM_HANDLE_RE.fullmatch(handle):
+        raise ValueError("Instagram handle can only use letters, numbers, . and _")
+    return handle
+
+
 class UpdateProfileRequest(BaseModel):
     name: str | None = None
     username: str | None = None
     bio: str | None = None
+    instagram_handle: str | None = None
+
+    @field_validator("instagram_handle")
+    @classmethod
+    def _validate_instagram_handle(cls, value: str | None) -> str | None:
+        return None if value is None else normalize_instagram_handle(value)
 
 
 class ChangePasswordRequest(BaseModel):
@@ -189,6 +218,7 @@ class AuthRefreshResponse(BaseModel):
 class AuthMeResponse(AuthUserPublicResponse):
     username: str | None = None
     bio: str | None = None
+    instagram_handle: str | None = None
     session_id: str | None = None
     capabilities: list[str] = Field(default_factory=list)
     connected_accounts: list[AuthExternalIdentityResponse] = Field(default_factory=list)

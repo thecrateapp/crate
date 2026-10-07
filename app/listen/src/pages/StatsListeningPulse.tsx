@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { CalendarDays } from "@crate/ui/icons";
+import { CalendarDays, Clock } from "@crate/ui/icons";
 
 import {
   formatStatsMinutes,
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { PanelEmpty, PanelLoading } from "./StatsCollectionPanels";
 import { formatWeekdayLabel } from "./stats-time-formatters";
 import { MiniStat } from "./StatsAnalyticsPrimitives";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export function ListeningPulseCard({
   story,
@@ -135,9 +136,9 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
             {t("stats.rhythm.dailySignalDescription")}
           </p>
         </div>
-        <div className="stats-muted-pill rounded-full px-3 py-1 text-xs font-black uppercase tracking-caps">
+        <CrateBadge icon={CalendarDays}>
           {t("stats.rhythm.dayCount", { count: visible.length })}
-        </div>
+        </CrateBadge>
       </div>
 
       <div className="stats-pulse-plot relative h-36 rounded-xl">
@@ -233,9 +234,9 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
                       {formatShortWeekday(point.day, i18n.language)}
                     </div>
                   </div>
-                  <div className="rounded-full border border-accent-action/20 bg-accent-action/10 px-2.5 py-1 text-xs font-black text-accent-action">
+                  <CrateBadge size="md" icon={Clock}>
                     {formatStatsMinutes(point.minutes_listened)}
-                  </div>
+                  </CrateBadge>
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   <TooltipMetric

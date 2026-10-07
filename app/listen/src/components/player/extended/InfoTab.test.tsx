@@ -86,7 +86,7 @@ describe("InfoTab", () => {
     expect(
       container.querySelector('.info-tab-metric-fill[data-tone="warm"]'),
     ).toBeInTheDocument();
-    expect(screen.getByText("Focused 80%")).toHaveClass("info-tab-mood-pill");
+    expect(screen.getByText("Focused 80%")).toHaveClass("crate-badge");
     expect(container.innerHTML).not.toContain("rgba(");
     expect(container.innerHTML).not.toContain("border-white");
     expect(container.innerHTML).not.toContain("text-white");

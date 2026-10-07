@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { CratePill, CrateChip } from "./CrateBadge";
+import { CrateBadge, CratePill, CrateChip } from "./CrateBadge";
+import { Sparkles } from "@crate/ui/icons";
 
 describe("CratePill", () => {
   it("renders children", () => {
@@ -101,5 +102,47 @@ describe("CrateBadge tones", () => {
   it("does not set aria-pressed on static pills", () => {
     render(<CratePill active>Static</CratePill>);
     expect(screen.getByText("Static")).not.toHaveAttribute("aria-pressed");
+  });
+});
+
+describe("CrateBadge", () => {
+  it("renders a rectangular badge with primary text", () => {
+    render(<CrateBadge>Next show</CrateBadge>);
+    const badge = screen.getByText("Next show");
+    expect(badge).toHaveClass("crate-badge", "rounded-md", "text-badge");
+    expect(badge.className).not.toMatch(/uppercase|tracking-|rounded-full/);
+    expect(badge.className).not.toContain("text-accent-action");
+  });
+
+  it("puts the tone color on the icon only", () => {
+    const { container } = render(
+      <CrateBadge icon={Sparkles} tone="warning">
+        Crate DNA
+      </CrateBadge>,
+    );
+    const badge = screen.getByText("Crate DNA");
+    expect(badge).toHaveAttribute("data-tone", "warning");
+    expect(badge.className).not.toContain("text-state-warning-text");
+    expect(container.querySelector("svg")).toHaveClass(
+      "text-state-warning-text",
+    );
+  });
+
+  it("defaults the icon to the accent color", () => {
+    const { container } = render(
+      <CrateBadge icon={Sparkles}>Crate DNA</CrateBadge>,
+    );
+    expect(container.querySelector("svg")).toHaveClass("text-accent-action");
+  });
+
+  it("supports the larger size and the overlay surface", () => {
+    render(
+      <CrateBadge size="md" surface="overlay">
+        Pre-release
+      </CrateBadge>,
+    );
+    const badge = screen.getByText("Pre-release");
+    expect(badge).toHaveClass("text-xs");
+    expect(badge).toHaveAttribute("data-surface", "overlay");
   });
 });

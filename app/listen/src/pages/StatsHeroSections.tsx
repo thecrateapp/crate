@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { CRATE_ICON_SIZE, Flame, Repeat2, Search } from "@crate/ui/icons";
+import { Flame, Repeat2, Search, CalendarDays } from "@crate/ui/icons";
 import { PlayButton } from "@crate/ui/domain/media/PlayButton";
 
 import type { StatsPageController } from "@/pages/use-stats-page-controller";
@@ -17,6 +17,7 @@ import { albumCoverApiUrl } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
 import { MiniStat, SignalCard } from "./StatsAnalyticsSections";
 import { statsTrackKey } from "./stats-collection-keys";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 const STATS_MOSAIC_CELL_IDS = [
   "top-left",
@@ -57,12 +58,12 @@ function StatsHeroCover({ page }: { page: StatsPageController }) {
       <div className="stats-hero-overlay absolute inset-0" />
       <div className="relative z-10 flex min-h-hero-xl flex-col justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="stats-hero-period-muted rounded-full px-3 py-1 text-xs font-bold uppercase tracking-eyebrow">
+          <CrateBadge size="md" surface="overlay">
             {period.label}
-          </span>
-          <span className="stats-hero-period-accent rounded-full px-3 py-1 text-xs font-bold uppercase tracking-eyebrow">
+          </CrateBadge>
+          <CrateBadge size="md" surface="overlay" icon={CalendarDays}>
             {period.title}
-          </span>
+          </CrateBadge>
         </div>
         <div>
           <div className="stats-hero-title max-w-3xl text-[clamp(3.8rem,13vw,10rem)] font-black uppercase leading-[0.75] tracking-display">
@@ -216,10 +217,9 @@ function ReplayCard({
     <div className="stats-replay-card rounded-panel p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="stats-replay-badge inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black uppercase tracking-eyebrow-wide">
-            <Repeat2 size={CRATE_ICON_SIZE.micro} />
+          <CrateBadge size="md" icon={Repeat2}>
             {t("stats.replay.title")}
-          </div>
+          </CrateBadge>
           <h2 className="mt-3 text-2xl font-black tracking-display-tight text-text-primary">
             {title}
           </h2>

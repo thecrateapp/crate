@@ -62,7 +62,6 @@ const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
     "tracking-[-0.09em]": 1,
     "tracking-[0.13em]": 1,
   },
-  "components/radio/RadioStationCard.tsx": { "tracking-[0.06em]": 1 },
   "components/settings/ServersSection.tsx": { "text-[0.75rem]": 1 },
   "components/social/ProfileHoverCardContent.tsx": { "text-[8rem]": 1 },
   "components/upcoming/UpcomingShowCollapsedView.tsx": { "text-[1.25rem]": 1 },

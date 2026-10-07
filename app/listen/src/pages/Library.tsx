@@ -7,7 +7,7 @@ import {
   Heart,
   Users,
   Disc,
-  Disc3,
+  CrateBox,
   ListMusic,
 } from "@crate/ui/icons";
 import { useApi } from "@/hooks/use-api";
@@ -50,7 +50,7 @@ interface MeStats {
 
 const tabs: { key: Tab; labelKey: string; icon: TabIcon }[] = [
   { key: "artists", labelKey: "nav.collection.artists", icon: Users },
-  { key: "crates", labelKey: "nav.collection.crates", icon: Disc3 },
+  { key: "crates", labelKey: "nav.collection.crates", icon: CrateBox },
   { key: "playlists", labelKey: "nav.collection.playlists", icon: ListMusic },
   { key: "albums", labelKey: "nav.collection.albums", icon: Disc },
   { key: "liked", labelKey: "library.tabs.liked", icon: Heart },

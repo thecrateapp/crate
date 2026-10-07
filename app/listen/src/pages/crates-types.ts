@@ -15,6 +15,7 @@ export interface CrateSummary {
   public_ref?: string | null;
   owner_id: number;
   owner_username?: string | null;
+  owner_instagram_handle?: string | null;
   owner_name?: string | null;
   name: string;
   description: string;
