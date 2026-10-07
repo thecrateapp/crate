@@ -8,7 +8,11 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 
-from crate.db.queries.user_library_shared import _STATS_WINDOWS, normalize_stats_window
+from crate.db.queries.user_library_shared import (
+    _STATS_WINDOWS,
+    normalize_stats_window,
+    year_from_window,
+)
 from crate.db.tx import read_scope
 
 
@@ -64,6 +68,8 @@ def resolve_stats_period(
     today: date | None = None,
 ) -> StatsPeriod:
     today = today or datetime.now(ZoneInfo(timezone_name)).date()
+    if year is None:
+        year = year_from_window(window)
     if month:
         try:
             start = date.fromisoformat(f"{month}-01")

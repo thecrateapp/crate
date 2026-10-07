@@ -623,6 +623,156 @@ class StatsAffinityResponse(BaseModel):
     affinity_reasons: list[str] = Field(default_factory=list)
 
 
+class StatsTodayResponse(BaseModel):
+    day: str
+    timezone: str
+    minutes: float
+    plays: int
+
+
+class StatsTrackRefResponse(BaseModel):
+    track_id: int | None = None
+    title: str | None = None
+    artist: str | None = None
+    album: str | None = None
+    album_id: int | None = None
+    album_slug: str | None = None
+    global_album_uid: str | None = None
+    artist_id: int | None = None
+    artist_slug: str | None = None
+
+
+class StatsAlbumRefResponse(BaseModel):
+    album: str | None = None
+    artist: str | None = None
+    plays: int | None = None
+    album_id: int | None = None
+    album_slug: str | None = None
+    global_album_uid: str | None = None
+
+
+class StatsTapePointResponse(BaseModel):
+    bucket: str
+    minutes: float
+    plays: int
+
+
+class StatsTapeMoodResponse(BaseModel):
+    bucket: str
+    energy: float | None = None
+    valence: float | None = None
+
+
+class StatsTapePeakResponse(BaseModel):
+    kind: str
+    bucket: str
+    day: str
+    value: float
+    track: StatsTrackRefResponse | None = None
+    artist: str | None = None
+
+
+class StatsTapeMonthResponse(BaseModel):
+    month: str
+    minutes: float
+    plays: int
+    top_artist: str | None = None
+    top_album: StatsAlbumRefResponse | None = None
+
+
+class StatsTapeResponse(BaseModel):
+    granularity: str
+    start: str
+    end: str
+    points: list[StatsTapePointResponse] = Field(default_factory=list)
+    mood: list[StatsTapeMoodResponse] = Field(default_factory=list)
+    peaks: list[StatsTapePeakResponse] = Field(default_factory=list)
+    months: list[StatsTapeMonthResponse] = Field(default_factory=list)
+
+
+class StatsStreakResponse(BaseModel):
+    days: int
+    start: str | None = None
+    end: str | None = None
+
+
+class StatsNewArtistsResponse(BaseModel):
+    count: int
+    share: float
+
+
+class StatsSessionResponse(BaseModel):
+    minutes: float
+    started_at: str | None = None
+    ended_at: str | None = None
+    track_count: int
+
+
+class StatsObsessionResponse(BaseModel):
+    day: str
+    plays: int
+    minutes: float
+    track: StatsTrackRefResponse
+
+
+class StatsHighlightsResponse(BaseModel):
+    longest_streak: StatsStreakResponse | None = None
+    current_streak: StatsStreakResponse | None = None
+    new_artists: StatsNewArtistsResponse | None = None
+    longest_session: StatsSessionResponse | None = None
+    obsession: StatsObsessionResponse | None = None
+
+
+class StatsArtistOfPeriodResponse(BaseModel):
+    artist_name: str
+    artist_id: int | None = None
+    artist_slug: str | None = None
+    global_artist_uid: str | None = None
+    plays: int
+    minutes: float
+    active_days: int
+    first_day_in_period: str | None = None
+    first_ever_day: str | None = None
+    top_album: StatsAlbumRefResponse | None = None
+
+
+class StatsHeatmapPeakResponse(BaseModel):
+    weekday: int
+    hour: int
+
+
+class StatsHeatmapResponse(BaseModel):
+    cells: list[list[float]] = Field(default_factory=list)
+    peak: StatsHeatmapPeakResponse | None = None
+    night_share: float = 0
+
+
+class StatsDecadeShareResponse(BaseModel):
+    decade: int
+    share: float
+
+
+class StatsOldestAlbumResponse(BaseModel):
+    album: str
+    artist: str | None = None
+    album_id: int | None = None
+    album_slug: str | None = None
+    year: int
+
+
+class StatsMusicAgeResponse(BaseModel):
+    median_year: int
+    decades: list[StatsDecadeShareResponse] = Field(default_factory=list)
+    oldest_album: StatsOldestAlbumResponse | None = None
+
+
+class StatsGenreTrendResponse(BaseModel):
+    genre_name: str
+    slug: str | None = None
+    share: float
+    delta_vs_previous: float | None = None
+
+
 class StatsDashboardResponse(BaseModel):
     window: str
     subject: StatsSubjectResponse | None = None
@@ -635,6 +785,16 @@ class StatsDashboardResponse(BaseModel):
     replay: ReplayMixResponse
     story: StatsStoryResponse
     viewer_affinity: StatsAffinityResponse | None = None
+    timezone: str | None = None
+    provisional: bool | None = None
+    computed_until: str | None = None
+    metrics_version: str | None = None
+    tape: StatsTapeResponse | None = None
+    highlights: StatsHighlightsResponse | None = None
+    artist_of_period: StatsArtistOfPeriodResponse | None = None
+    heatmap: StatsHeatmapResponse | None = None
+    music_age: StatsMusicAgeResponse | None = None
+    genre_trend: list[StatsGenreTrendResponse] = Field(default_factory=list)
 
 
 class HomeArtworkRefResponse(IdentityFieldsMixin):

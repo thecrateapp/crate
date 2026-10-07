@@ -52,21 +52,31 @@ def user_listening_timezone(session, user_id: int) -> str:
     return value or "UTC"
 
 
-def mark_listening_day_dirty(session, user_id: int, ended_at) -> None:
+def mark_listening_day_dirty(session, user_id: int, ended_at) -> date | None:
+    day = session.execute(
+        text(
+            """
+            SELECT (CAST(:ended_at AS timestamptz)
+                       AT TIME ZONE COALESCE(NULLIF(timezone, ''), 'UTC'))::date
+            FROM users
+            WHERE id = :user_id
+            """
+        ),
+        {"user_id": user_id, "ended_at": ended_at},
+    ).scalar_one_or_none()
+    if day is None:
+        return None
     session.execute(
         text(
             """
             INSERT INTO user_listening_dirty_days (user_id, day)
-            SELECT u.id,
-                   (CAST(:ended_at AS timestamptz)
-                       AT TIME ZONE COALESCE(NULLIF(u.timezone, ''), 'UTC'))::date
-            FROM users u
-            WHERE u.id = :user_id
+            VALUES (:user_id, :day)
             ON CONFLICT (user_id, day) DO NOTHING
             """
         ),
-        {"user_id": user_id, "ended_at": ended_at},
+        {"user_id": user_id, "day": day},
     )
+    return day
 
 
 def _day_bounds(days: list[date], tz: str) -> tuple[datetime, datetime]:
@@ -425,11 +435,39 @@ def window_start_day(days: int | None, tz: str) -> date | None:
     return local_today(tz) - timedelta(days=days - 1)
 
 
+def stat_window_specs(tz: str) -> list[tuple[str, date | None, date | None]]:
+    today = local_today(tz)
+    specs: list[tuple[str, date | None, date | None]] = [
+        (window, window_start_day(days, tz), None)
+        for window, days in _STATS_WINDOWS.items()
+    ]
+    for year in (today.year, today.year - 1):
+        specs.append((f"year:{year}", date(year, 1, 1), date(year + 1, 1, 1)))
+    return specs
+
+
 def _rebuild_window_stats(session, user_id: int, tz: str) -> None:
-    for window, days in _STATS_WINDOWS.items():
-        start_day = window_start_day(days, tz)
-        cutoff = "" if start_day is None else " AND day >= :start_day"
-        params = {"user_id": user_id, "window": window, "start_day": start_day}
+    specs = stat_window_specs(tz)
+    for table, _insert_sql in _WINDOW_STATS_SQL:
+        session.execute(
+            text(
+                f"DELETE FROM {table} WHERE user_id = :user_id "
+                "AND stat_window LIKE 'year:%' AND stat_window != ALL(:windows)"
+            ),
+            {"user_id": user_id, "windows": [spec[0] for spec in specs]},
+        )
+    for window, start_day, end_day in specs:
+        clauses = []
+        if start_day is not None:
+            clauses.append(" AND day >= :start_day")
+        if end_day is not None:
+            clauses.append(" AND day < :end_day")
+        params = {
+            "user_id": user_id,
+            "window": window,
+            "start_day": start_day,
+            "end_day": end_day,
+        }
         for table, insert_sql in _WINDOW_STATS_SQL:
             session.execute(
                 text(
@@ -437,7 +475,7 @@ def _rebuild_window_stats(session, user_id: int, tz: str) -> None:
                 ),
                 params,
             )
-            session.execute(text(insert_sql.format(cutoff=cutoff)), params)
+            session.execute(text(insert_sql.format(cutoff="".join(clauses))), params)
 
 
 def _save_state(session, user_id: int, tz: str, *, rebuilt: bool) -> None:
@@ -542,6 +580,7 @@ __all__ = [
     "local_today",
     "mark_listening_day_dirty",
     "rebuild_user_listening_projections",
+    "stat_window_specs",
     "refresh_user_listening_projections",
     "user_listening_projections_pending",
     "user_listening_timezone",

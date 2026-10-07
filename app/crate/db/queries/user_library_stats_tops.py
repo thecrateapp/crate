@@ -5,7 +5,10 @@ from datetime import date, datetime
 
 from sqlalchemy import text
 
-from crate.db.queries.user_library_shared import normalize_stats_window
+from crate.db.queries.user_library_shared import (
+    normalize_user_stats_window,
+    year_from_window,
+)
 from crate.db.queries.user_library_stats_genres import (
     format_weighted_genre_rows,
     weighted_genre_split_sql,
@@ -18,7 +21,7 @@ def _global_stats_refs_enabled() -> bool:
 
 
 def get_top_tracks(user_id: int, window: str = "30d", limit: int = 20) -> list[dict]:
-    normalized = normalize_stats_window(window)
+    normalized = normalize_user_stats_window(window)
     allow_global_catalog = _global_stats_refs_enabled()
     with read_scope() as session:
         rows = (
@@ -116,7 +119,7 @@ def get_top_tracks(user_id: int, window: str = "30d", limit: int = 20) -> list[d
 
 
 def get_top_artists(user_id: int, window: str = "30d", limit: int = 20) -> list[dict]:
-    normalized = normalize_stats_window(window)
+    normalized = normalize_user_stats_window(window)
     allow_global_catalog = _global_stats_refs_enabled()
     with read_scope() as session:
         rows = (
@@ -168,7 +171,7 @@ def get_top_artists(user_id: int, window: str = "30d", limit: int = 20) -> list[
 
 
 def get_top_albums(user_id: int, window: str = "30d", limit: int = 20) -> list[dict]:
-    normalized = normalize_stats_window(window)
+    normalized = normalize_user_stats_window(window)
     allow_global_catalog = _global_stats_refs_enabled()
     with read_scope() as session:
         rows = (
@@ -243,7 +246,7 @@ def get_top_albums(user_id: int, window: str = "30d", limit: int = 20) -> list[d
 
 
 def get_top_genres(user_id: int, window: str = "30d", limit: int = 20) -> list[dict]:
-    normalized = normalize_stats_window(window)
+    normalized = normalize_user_stats_window(window)
     with read_scope() as session:
         rows = (
             session.execute(
@@ -271,7 +274,7 @@ def get_top_genres(user_id: int, window: str = "30d", limit: int = 20) -> list[d
 
 
 def get_replay_mix(user_id: int, window: str = "30d", limit: int = 30) -> dict:
-    normalized = normalize_stats_window(window)
+    normalized = normalize_user_stats_window(window)
     allow_global_catalog = _global_stats_refs_enabled()
     with read_scope() as session:
         rows = (
@@ -407,7 +410,17 @@ def get_replay_mix(user_id: int, window: str = "30d", limit: int = 30) -> dict:
         if item.get("bliss_vector") is not None:
             item["bliss_vector"] = list(item["bliss_vector"])
 
-    copy_key, title, subtitle = _REPLAY_COPY.get(normalized, _REPLAY_COPY["all_time"])
+    year = year_from_window(normalized)
+    if year is not None:
+        copy_key, title, subtitle = (
+            "calendarYear",
+            f"Your {year} replay",
+            f"The tracks that defined {year}.",
+        )
+    else:
+        copy_key, title, subtitle = _REPLAY_COPY.get(
+            normalized, _REPLAY_COPY["all_time"]
+        )
 
     total_minutes = round(
         sum(float(item.get("minutes_listened") or 0) for item in items), 1

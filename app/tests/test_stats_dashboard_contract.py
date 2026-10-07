@@ -24,7 +24,9 @@ def _missing_keys(payload: dict) -> list[str]:
         f"top_level.{key}" for key in _CONTRACT["top_level"] if key not in payload
     ]
     for section, keys in _CONTRACT.items():
-        if section == "top_level":
+        if section in ("top_level", "nullable"):
+            continue
+        if section in _CONTRACT.get("nullable", []) and payload.get(section) is None:
             continue
         value = payload.get(section) or {}
         missing.extend(f"{section}.{key}" for key in keys if key not in value)

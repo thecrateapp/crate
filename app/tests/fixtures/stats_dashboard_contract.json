@@ -8,7 +8,17 @@
     "top_albums",
     "top_genres",
     "replay",
-    "story"
+    "story",
+    "timezone",
+    "provisional",
+    "computed_until",
+    "metrics_version",
+    "tape",
+    "highlights",
+    "artist_of_period",
+    "heatmap",
+    "music_age",
+    "genre_trend"
   ],
   "overview": [
     "window",
@@ -43,5 +53,22 @@
     "rhythm",
     "audio_profile",
     "monthly_snapshots"
-  ]
+  ],
+  "nullable": [
+    "tape",
+    "highlights",
+    "artist_of_period",
+    "heatmap",
+    "music_age"
+  ],
+  "tape": ["granularity", "start", "end", "points", "mood", "peaks", "months"],
+  "highlights": [
+    "longest_streak",
+    "current_streak",
+    "new_artists",
+    "longest_session",
+    "obsession"
+  ],
+  "heatmap": ["cells", "peak", "night_share"],
+  "music_age": ["median_year", "decades", "oldest_album"]
 }

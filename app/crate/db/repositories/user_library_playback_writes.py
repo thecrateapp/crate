@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 from crate.db.cache_store import get_cache, set_cache
 from crate.db.jobs.user_listening_projections import mark_listening_day_dirty
+from crate.db.repositories.user_listening_today import add_listening_today
 from crate.db.repositories.tasks import create_task_dedup
 from crate.db.repositories.user_library_shared import (
     emit_user_domain_event,
@@ -282,7 +283,12 @@ def record_play_event(
         if row is None:
             raise RuntimeError("Play event insert did not return an id")
         event_id = row["id"]
-        mark_listening_day_dirty(session, user_id, ended_at)
+        local_day = mark_listening_day_dirty(session, user_id, ended_at)
+        if local_day is not None:
+            register_after_commit(
+                session,
+                lambda: add_listening_today(user_id, local_day, played_seconds or 0),
+            )
 
         emit_user_domain_event(
             session,
