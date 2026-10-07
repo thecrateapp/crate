@@ -523,7 +523,7 @@ services:
       - ./app/crate:/app/crate:ro
       - ./app/tests:/app/tests:ro
       - ./app/config.yaml:/app/config.yaml:ro
-      - ./test-music:/music
+      - ./test-music:/music:ro
       - dev_data:/data
     networks:
       - crate-dev

@@ -71,7 +71,10 @@ pub fn finalize_download_cache(
         ));
     }
     if !artifact_path.is_file() {
-        return Err(format!("cache artifact not found: {}", artifact_path.display()));
+        return Err(format!(
+            "cache artifact not found: {}",
+            artifact_path.display()
+        ));
     }
 
     let manifest_path = artifact_path
@@ -242,12 +245,18 @@ fn cache_sort_key(manifest: &Value) -> f64 {
 
 fn write_json_atomic(path: &Path, value: &Value) -> Result<(), String> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|err| format!("create cache manifest directory {}: {err}", parent.display()))?;
+        fs::create_dir_all(parent).map_err(|err| {
+            format!(
+                "create cache manifest directory {}: {err}",
+                parent.display()
+            )
+        })?;
     }
     let tmp_path = path.with_file_name(format!(
         ".{}.{}.tmp",
-        path.file_name().and_then(|value| value.to_str()).unwrap_or("manifest.json"),
+        path.file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("manifest.json"),
         std::process::id()
     ));
     let body = serde_json::to_string_pretty(value)
@@ -323,5 +332,4 @@ mod tests {
         assert!(!old_dir.exists());
         assert_eq!(result.pruned.removed, 1);
     }
-
 }

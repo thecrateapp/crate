@@ -53,7 +53,6 @@ dev: ## Start backend (Postgres + Redis + API + Worker + Readplane + Caddy) and 
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
 	@-pkill -f "vite.*app/site" 2>/dev/null || true
-	@-pkill -f "vite.*app/reference" 2>/dev/null || true
 	@docker rm -f $(DEV_CONTAINERS) >/dev/null 2>&1 || true
 	@sleep 0.5
 	@$(MAKE) --no-print-directory _ensure-dev-certs
@@ -149,7 +148,6 @@ dev-down: ## Stop everything (backend + frontends)
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
 	@-pkill -f "vite.*app/site" 2>/dev/null || true
-	@-pkill -f "vite.*app/reference" 2>/dev/null || true
 	@echo "$(GREEN)Everything stopped$(NC)"
 
 .PHONY: dev-logs
@@ -181,7 +179,6 @@ dev-rebuild: ## Rebuild and restart everything
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
 	@-pkill -f "vite.*app/site" 2>/dev/null || true
-	@-pkill -f "vite.*app/reference" 2>/dev/null || true
 	@docker rm -f $(DEV_CONTAINERS) >/dev/null 2>&1 || true
 	@sleep 0.5
 	@$(DC_DEV) up -d --build --force-recreate
@@ -217,7 +214,6 @@ dev-reset: ## Reset the dev environment (wipe data and stop everything)
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
 	@-pkill -f "vite.*app/site" 2>/dev/null || true
-	@-pkill -f "vite.*app/reference" 2>/dev/null || true
 	@echo "$(GREEN)Dev environment reset (data removed)$(NC)"
 
 # ===========================================================================
@@ -1022,7 +1018,7 @@ cap-android-release: ## Build signed/shrunk Android APK+AAB for the exact releas
 # ===========================================================================
 
 TAURI_DIR := app/listen-desktop
-TAURI_RELEASE_VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || node -p "require('./$(TAURI_DIR)/src-tauri/tauri.conf.json').version")
+TAURI_RELEASE_VERSION ?= $(shell env -u GITHUB_ENV node $(TAURI_DIR)/scripts/desktop-version.mjs 2>/dev/null || node -p "require('./$(TAURI_DIR)/src-tauri/tauri.conf.json').version")
 TAURI_MACOS_OUTPUT_DIR ?= desktop-artifacts/$(TAURI_RELEASE_VERSION)-macos-testers
 TAURI_MACOS_SIGNING_IDENTITY ?= $(if $(APPLE_SIGNING_IDENTITY),$(APPLE_SIGNING_IDENTITY),-)
 TAURI_MACOS_ARM_APP := $(TAURI_DIR)/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Crate.app

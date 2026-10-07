@@ -177,10 +177,6 @@
     "./domain/filters/FilterBar": {
       "types": "./domain/filters/FilterBar.tsx",
       "default": "./domain/filters/FilterBar.tsx"
-    },
-    "./charts/*": {
-      "types": "./charts/*.ts",
-      "default": "./charts/*.ts"
     }
   },
   "publishConfig": {
@@ -349,10 +345,6 @@
       "./domain/filters/FilterBar": {
         "types": "./dist/domain/filters/FilterBar.d.ts",
         "default": "./dist/domain/filters/FilterBar.js"
-      },
-      "./charts/*": {
-        "types": "./dist/charts/*.d.ts",
-        "default": "./dist/charts/*.js"
       }
     },
     "main": "./dist/lib/cn.js",

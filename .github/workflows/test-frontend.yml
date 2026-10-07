@@ -83,6 +83,7 @@ jobs:
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
           VITE_SENTRY_TRACES_SAMPLE_RATE: ${{ vars.SENTRY_PUBLIC_SITE_TRACES_SAMPLE_RATE || '0.02' }}
         run: |
+          npm run check:docs --prefix app/docs
           npm test --prefix app/docs
           npm run build --prefix app/docs
 
@@ -100,6 +101,9 @@ jobs:
 
       - name: Type check Cast receiver
         run: npm run --workspace=app/cast-receiver typecheck
+
+      - name: Lint Cast receiver
+        run: npm run --workspace=app/cast-receiver lint
 
       - name: Test Cast receiver
         run: npm run --workspace=app/cast-receiver test
@@ -120,6 +124,9 @@ jobs:
       - name: Type check admin UI
         run: npm run --workspace=app/ui typecheck
 
+      - name: Lint admin UI
+        run: npm run --workspace=app/ui lint
+
       - name: Test admin UI (crate-ui)
         run: npm run --workspace=app/ui test
 
@@ -135,6 +142,9 @@ jobs:
 
       - name: Type check listen app
         run: npm run --workspace=app/listen typecheck
+
+      - name: Lint listen app
+        run: npm run --workspace=app/listen lint
 
       - name: Check Listen i18n catalogs
         run: npm run --workspace=app/listen i18n:check

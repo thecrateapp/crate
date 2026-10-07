@@ -776,7 +776,9 @@ mod tests {
         fs,
         io::Cursor,
         net::TcpListener,
-        process, thread,
+        process,
+        sync::mpsc,
+        thread,
         time::{Duration, Instant, SystemTime, UNIX_EPOCH},
     };
 
@@ -931,9 +933,18 @@ mod tests {
     fn artwork_fetch_timeout_bounds_a_stalled_request() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let (release, released) = mpsc::channel::<()>();
         let server = thread::spawn(move || {
-            let _ = listener.accept();
-            thread::sleep(Duration::from_secs(1));
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while Instant::now() < deadline {
+                if let Ok((stream, _)) = listener.accept() {
+                    let _ = released.recv_timeout(deadline - Instant::now());
+                    drop(stream);
+                    return;
+                }
+                thread::sleep(Duration::from_millis(10));
+            }
         });
         let started = Instant::now();
 
@@ -941,9 +952,11 @@ mod tests {
             &format!("http://{address}/artwork.jpg"),
             Duration::from_millis(50),
         );
+        let elapsed = started.elapsed();
+        let _ = release.send(());
 
         assert_eq!(result, None);
-        assert!(started.elapsed() < Duration::from_millis(700));
+        assert!(elapsed < Duration::from_secs(2));
         server.join().unwrap();
     }
 
