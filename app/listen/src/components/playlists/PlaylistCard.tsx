@@ -25,7 +25,7 @@ import {
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import { IconButton } from "@crate/ui/primitives/IconButton";
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 import { action } from "@/components/actions/shared";
 import { usePlaylistActionMenu } from "@/components/actions/playlist-actions";
 import {
@@ -290,9 +290,13 @@ function PlaylistTileArtwork({
         className={className}
       />
       {badge ? (
-        <span className="absolute bottom-2 left-2 rounded-full border border-accent-action/20 bg-surface-canvas/85 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-accent-action backdrop-blur-md">
+        <CrateBadge
+          surface="overlay"
+          icon={Sparkles}
+          className="absolute bottom-2 left-2"
+        >
           {badge}
-        </span>
+        </CrateBadge>
       ) : null}
     </>
   );
@@ -535,15 +539,7 @@ function PlaylistRow(props: PlaylistCardProps) {
       title={name}
       titleAccessory={
         <>
-          {badge ? (
-            <CrateChip
-              tone="accent"
-              icon={Sparkles}
-              className="shrink-0 py-0 text-xs font-medium"
-            >
-              {badge}
-            </CrateChip>
-          ) : null}
+          {badge ? <CrateBadge icon={Sparkles}>{badge}</CrateBadge> : null}
           <OfflineBadge state={offlineState} compact />
         </>
       }

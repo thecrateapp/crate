@@ -7,6 +7,7 @@ import {
   Pin,
   Trash2,
   Users,
+  Pause,
 } from "@crate/ui/icons";
 import type { TFunction } from "i18next";
 
@@ -26,6 +27,7 @@ import {
 } from "@/pages/jam-session-utils";
 
 import { JamAvatarBubble } from "./JamAvatarBubble";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export const JamRoomCard = memo(function JamRoomCard({
   listedRoom,
@@ -189,34 +191,21 @@ function RoomCardBadges({
 }) {
   return (
     <span className="mt-2 flex flex-wrap gap-1.5 text-xs">
-      <span className="jam-chip inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-text-muted">
-        {room.visibility === "public" ? (
-          <Globe2 size={CRATE_ICON_SIZE.micro} />
-        ) : (
-          <Lock size={CRATE_ICON_SIZE.micro} />
-        )}
+      <CrateBadge icon={room.visibility === "public" ? Globe2 : Lock}>
         {mode === "member"
           ? t("jam.roomCard.yourRoom")
           : t("jam.visibility.public")}
-      </span>
+      </CrateBadge>
       {room.is_permanent ? (
-        <span className="jam-accent-chip inline-flex items-center gap-1 rounded-full px-2 py-0.5">
-          <Pin size={CRATE_ICON_SIZE.micro} />
-          {t("jam.roomCard.permanent")}
-        </span>
+        <CrateBadge icon={Pin}>{t("jam.roomCard.permanent")}</CrateBadge>
       ) : null}
       {room.status !== "active" ? (
-        <span className="jam-warning-chip inline-flex items-center gap-1 rounded-full px-2 py-0.5">
+        <CrateBadge icon={Pause} tone="warning">
           {t("jam.roomCard.paused")}
-        </span>
+        </CrateBadge>
       ) : null}
       {(room.tags || []).slice(0, 5).map((tag) => (
-        <span
-          key={`${room.id}-${tag}`}
-          className="jam-chip rounded-full px-2 py-0.5 text-text-muted"
-        >
-          {tag}
-        </span>
+        <CrateBadge key={`${room.id}-${tag}`}>{tag}</CrateBadge>
       ))}
     </span>
   );

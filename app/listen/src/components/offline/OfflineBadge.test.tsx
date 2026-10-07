@@ -27,4 +27,14 @@ describe("OfflineBadge", () => {
     const { container } = render(<OfflineBadge state="downloading" subtle />);
     expect(container.querySelector("svg")).toBeInTheDocument();
   });
+
+  it("renders a rectangular badge with the status color on the icon", () => {
+    const { container } = render(<OfflineBadge state="error" />);
+    const badge = container.firstElementChild;
+    expect(badge).toHaveClass("crate-badge", "rounded-md");
+    expect(badge?.className).not.toMatch(/uppercase|rounded-full/);
+    expect(container.querySelector("svg")).toHaveClass(
+      "text-state-danger-text",
+    );
+  });
 });

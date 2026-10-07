@@ -15,6 +15,7 @@ import { formatDuration } from "@/lib/utils";
 import type { JamQueueItem } from "@/pages/jam-reducer";
 
 import { HeroActionButton } from "./JamHeroButtons";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export interface JamNowPlayingProps {
   t: TFunction;
@@ -193,12 +194,12 @@ function JamGuestPlaybackStatus({
             ? t("jam.room.catchingUp")
             : t("jam.room.waitingForHost")
       }
-      className="jam-chip inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs text-text-muted"
     >
-      <Zap size={CRATE_ICON_SIZE.sm} className="jam-accent-text" />
-      {syncStatus === "synced"
-        ? t("jam.room.synced")
-        : t("jam.room.waitingForHost")}
+      <CrateBadge size="md" icon={Zap}>
+        {syncStatus === "synced"
+          ? t("jam.room.synced")
+          : t("jam.room.waitingForHost")}
+      </CrateBadge>
     </div>
   );
 }

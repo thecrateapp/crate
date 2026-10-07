@@ -22,6 +22,7 @@ import {
   buildOfflineLibraryGroups,
   type OfflineLibraryGroup,
 } from "@/pages/offline-library-model";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 function sourceForGroup(group: OfflineLibraryGroup) {
   const { item } = group;
@@ -50,10 +51,9 @@ export function OfflineLibrary() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-8 px-5 py-8 text-text-primary sm:px-8">
       <header className="space-y-3">
-        <div className="inline-flex items-center gap-2 rounded-full border border-accent-action/25 bg-accent-action/10 px-3 py-1.5 text-xs font-semibold text-accent-action">
-          <HardDrive size={CRATE_ICON_SIZE.xs} aria-hidden="true" />
+        <CrateBadge size="md" icon={HardDrive}>
           {t("offline.access.status")}
-        </div>
+        </CrateBadge>
         <div>
           <h1 className="text-3xl font-bold">{t("offline.access.title")}</h1>
           <p className="mt-2 text-sm text-text-muted">

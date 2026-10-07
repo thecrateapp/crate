@@ -4,8 +4,9 @@ import {
   CRATE_ICON_SIZE,
   UserPlus,
   UserRoundCheck,
+  UserCheck,
 } from "@crate/ui/icons";
-import { CratePill } from "@crate/ui/primitives/CrateBadge";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 import { Button } from "@crate/ui/shadcn/button";
 import { useTranslation } from "react-i18next";
 
@@ -82,12 +83,9 @@ function UserProfileHeader({
               {displayName}
             </h1>
             {data.relationship_state.is_friend && !isOwnProfile ? (
-              <CratePill
-                tone="accent"
-                className="gap-0 text-xs leading-4 font-medium"
-              >
+              <CrateBadge size="md" icon={UserCheck}>
                 {t("people.friends")}
-              </CratePill>
+              </CrateBadge>
             ) : null}
           </div>
           <div className="mt-1 text-sm text-text-muted">

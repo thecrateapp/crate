@@ -4,7 +4,7 @@ import { useParams } from "react-router";
 import { Sparkles } from "@crate/ui/icons";
 import { EmptyState, ErrorState } from "@crate/ui/domain/states";
 import { notify } from "@crate/ui/lib/notify";
-import { CratePill } from "@crate/ui/primitives/CrateBadge";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { CoreTracksArtwork } from "@/components/home/CoreTracksArtwork";
@@ -245,13 +245,9 @@ export function HomePlaylist() {
         description={data.description}
         metaItems={playlistMetaItems}
         badges={
-          <CratePill
-            tone="accent"
-            icon={Sparkles}
-            className="w-fit gap-2 px-3 text-xs font-medium uppercase tracking-wider"
-          >
+          <CrateBadge size="md" icon={Sparkles} className="w-fit">
             {data.badge}
-          </CratePill>
+          </CrateBadge>
         }
         artwork={renderArtwork}
         onPlay={handlePlay}

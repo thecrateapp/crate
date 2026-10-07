@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { CratePill } from "@crate/ui/primitives/CrateBadge";
+import { Check, Disc3, RadioTower } from "@crate/ui/icons";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
@@ -55,12 +56,7 @@ export function UpcomingPreviewRow({
             {item.type === "show" ? item.artist : item.title}
           </span>
           {item.user_attending && item.type === "show" ? (
-            <CratePill
-              tone="accent"
-              className="px-2 py-0.5 text-xs font-medium"
-            >
-              {t("radar.show.going")}
-            </CratePill>
+            <CrateBadge icon={Check}>{t("radar.show.going")}</CrateBadge>
           ) : null}
         </div>
         <div className="truncate text-xs text-text-muted">
@@ -69,14 +65,14 @@ export function UpcomingPreviewRow({
             : `${item.artist} · ${item.title}`}
         </div>
       </div>
-      <CratePill
-        tone="accent"
-        className="relative shrink-0 px-2 py-1 text-xs font-medium uppercase tracking-caps"
+      <CrateBadge
+        icon={item.type === "show" ? RadioTower : Disc3}
+        className="relative"
       >
         {item.type === "show"
           ? t("home.radar.itemType.show")
           : t("home.radar.itemType.release")}
-      </CratePill>
+      </CrateBadge>
     </button>
   );
 }

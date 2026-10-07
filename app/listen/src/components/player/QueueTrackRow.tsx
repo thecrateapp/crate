@@ -1,6 +1,6 @@
 import { memo, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { X } from "@crate/ui/icons";
+import { X, Sparkles } from "@crate/ui/icons";
 
 import type { ItemActionMenuEntry } from "@/components/actions/ItemActionMenu";
 import { trackToMenuData } from "@/components/actions/shared";
@@ -8,6 +8,7 @@ import { TrackRow } from "@/components/cards/TrackRow";
 import type { Track } from "@/contexts/PlayerContext";
 import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export const QueueTrackRow = memo(function QueueTrackRow({
   track,
@@ -55,9 +56,7 @@ export const QueueTrackRow = memo(function QueueTrackRow({
   const meta = useMemo(
     () =>
       track.isSuggested ? (
-        <span className="rounded-full border border-accent-action/20 bg-accent-action/10 px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-accent-action">
-          {t("player.queue.suggested")}
-        </span>
+        <CrateBadge icon={Sparkles}>{t("player.queue.suggested")}</CrateBadge>
       ) : undefined,
     [track.isSuggested, t],
   );

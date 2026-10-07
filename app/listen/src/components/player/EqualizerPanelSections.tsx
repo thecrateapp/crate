@@ -15,7 +15,7 @@ import { useEqualizer } from "@/hooks/use-equalizer";
 import { type EqPresetName } from "@/lib/equalizer";
 import { EqBands } from "@crate/ui/domain/player/EqBands";
 import { Checkbox } from "@crate/ui/primitives/Checkbox";
-import { CratePill } from "@crate/ui/primitives/CrateBadge";
+import { CrateBadge, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { IconButton } from "@crate/ui/primitives/IconButton";
 import { Button } from "@crate/ui/shadcn/button";
 import { EqualizerSmartReadout } from "@/components/player/EqualizerSmartReadout";
@@ -26,8 +26,6 @@ import {
 
 const PANEL_CLOSE_BUTTON_CLASS_NAME =
   "size-9 text-text-muted hover:translate-y-0 hover:text-text-primary hover:drop-shadow-none";
-const MODE_BADGE_CLASS_NAME =
-  "gap-1 border-accent-action/40 px-2 py-0.5 text-xs";
 const TRACK_PRESET_ACTION_CLASS_NAME =
   "h-auto gap-1 border px-2.5 py-0.5 font-normal has-[>svg]:px-2.5 [&_svg:not([class*='size-'])]:size-3";
 
@@ -191,34 +189,26 @@ function EqualizerModeBadge({
 }) {
   if (smart) {
     return (
-      <CratePill tone="accent" icon={Brain} className={MODE_BADGE_CLASS_NAME}>
-        {t("player.equalizer.smartCurve")}
-      </CratePill>
+      <CrateBadge icon={Brain}>{t("player.equalizer.smartCurve")}</CrateBadge>
     );
   }
   if (adaptive) {
     return (
-      <CratePill
-        tone="accent"
-        icon={Sparkles}
-        className={MODE_BADGE_CLASS_NAME}
-      >
+      <CrateBadge icon={Sparkles}>
         {t("player.equalizer.adaptiveActive")}
-      </CratePill>
+      </CrateBadge>
     );
   }
   if (genreAdaptive) {
     return (
-      <CratePill tone="accent" icon={Tag} className={MODE_BADGE_CLASS_NAME}>
-        {t("player.equalizer.genreActive")}
-      </CratePill>
+      <CrateBadge icon={Tag}>{t("player.equalizer.genreActive")}</CrateBadge>
     );
   }
   if (preset === "custom") {
     return (
-      <CratePill tone="neutral" className="px-2 py-0.5 text-xs">
+      <CrateBadge icon={SlidersHorizontal} tone="neutral">
         {t("player.equalizer.custom")}
-      </CratePill>
+      </CrateBadge>
     );
   }
   return <span />;

@@ -1,8 +1,8 @@
 import type { TFunction } from "i18next";
-import { CRATE_ICON_SIZE, Copy, UserMinus, Users } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Copy, UserMinus, Users, Star } from "@crate/ui/icons";
 
 import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
-import { CratePill } from "@crate/ui/primitives/CrateBadge";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 import { Button } from "@crate/ui/shadcn/button";
 import { QrCodeImage } from "@crate/ui/primitives/QrCodeImage";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
@@ -133,11 +133,14 @@ export function PlaylistCollaboratorsModal({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <CratePill tone="neutral">
+                  <CrateBadge
+                    icon={member.role === "owner" ? Star : Users}
+                    tone={member.role === "owner" ? "accent" : "neutral"}
+                  >
                     {member.role === "owner"
                       ? t("playlist.collaborators.owner")
                       : t("playlist.collaborators.collab")}
-                  </CratePill>
+                  </CrateBadge>
                   {isOwner && member.role !== "owner" && !isCurrentUser ? (
                     <Button
                       variant="danger-soft"

@@ -18,7 +18,7 @@ lib/              API client, cache, SSE, routes, playback engines, offline, Cap
 lib/gapless5/     Vendored Gapless-5 (locally patched; excluded from coverage and react-doctor)
 i18n/             I18nProvider, catalogs/{en,es,fr,de,it,ca,eu}.json, quality/ checks
 test/             renderWithListenProviders, gesture helpers
-*-policy.test.ts  Source-scanning policy tests (components, tokens, radius, toasts, layout, genre pills)
+*-policy.test.ts  Source-scanning policy tests (components, tokens, radius, toasts, layout, genre pills, badges)
 ```
 
 ## Player architecture
@@ -56,7 +56,7 @@ test/             renderWithListenProviders, gesture helpers
 - Toasts: `notify` from `@crate/ui/lib/notify`. Importing `sonner` directly fails `toast-policy.test.ts`.
 - Icons: `@crate/ui/icons`, sized with `CRATE_ICON_SIZE`. `lucide-react` is not a Listen dependency (bundle test enforces it).
 - Prefer `@crate/ui` primitives over raw `<button>`/`<input>` (budgeted in `component-policy.test.ts`; raw buttons need an explicit `type`). Do not redefine a `@crate/ui` component name locally.
-- No arbitrary radius/z-index/shadow/text-size values beyond the budget (`design-token-policy.test.ts`, `radius-policy.test.ts`). Genre chips go through `GenrePill`.
+- No arbitrary radius/z-index/shadow/text-size values beyond the budget (`design-token-policy.test.ts`, `radius-policy.test.ts`). Genre chips go through `GenrePill`; every other badge goes through `CrateBadge` (`@crate/ui/primitives/CrateBadge`): rectangular, white text, sentence case, the tone colors only the icon (`badge-policy.test.ts`).
 - Charts: Nivo only.
 
 ## i18n (hard rule)

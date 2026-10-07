@@ -9,10 +9,13 @@ import {
   Plus,
   Radio,
   Zap,
+  Pause,
+  Tag,
 } from "@crate/ui/icons";
 
 import type { JamRoomHeroProps } from "./JamRoomHeroSections";
 import { HeroActionButton, HeroPrimaryButton } from "./JamHeroButtons";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 type JamRoomHeaderProps = Pick<
   JamRoomHeroProps,
@@ -76,29 +79,22 @@ function JamRoomMetaBadges({ t, room, queueMode }: JamRoomMetaBadgesProps) {
   return (
     <div className="mt-1 flex flex-wrap items-center gap-2.5">
       <h1 className="text-3xl font-bold text-text-primary">{room.name}</h1>
-      <div className="jam-accent-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium">
-        <Zap size={CRATE_ICON_SIZE.micro} />
+      <CrateBadge size="md" icon={Zap}>
         {queueMode === "auto_dj"
           ? t("jam.room.autoDjMode")
           : queueMode === "auto"
             ? t("jam.room.autoMode")
             : t("jam.room.djMode")}
-      </div>
-      <div className="jam-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-text-muted">
-        {room.visibility === "public" ? (
-          <Globe2 size={CRATE_ICON_SIZE.micro} />
-        ) : (
-          <Lock size={CRATE_ICON_SIZE.micro} />
-        )}
+      </CrateBadge>
+      <CrateBadge size="md" icon={room.visibility === "public" ? Globe2 : Lock}>
         {room.visibility === "public"
           ? t("jam.room.publicRoom")
           : t("jam.visibility.inviteOnly")}
-      </div>
+      </CrateBadge>
       {room.is_permanent ? (
-        <div className="jam-accent-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium">
-          <Pin size={CRATE_ICON_SIZE.micro} />
+        <CrateBadge size="md" icon={Pin}>
           {t("jam.roomCard.permanent")}
-        </div>
+        </CrateBadge>
       ) : null}
     </div>
   );
@@ -111,39 +107,43 @@ function JamRoomConnectionBadges(props: JamRoomConnectionBadgesProps) {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2">
       {isConnected ? (
-        <div className="jam-success-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium">
-          <Radio size={CRATE_ICON_SIZE.micro} className="jam-success-text" />
+        <CrateBadge size="md" icon={Radio} tone="success">
           {t("jam.room.connected")}
-        </div>
+        </CrateBadge>
       ) : (
-        <div className="jam-warning-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium">
-          {connectionProblem && !connectionProblem.includes("Retrying") ? (
-            <Radio size={CRATE_ICON_SIZE.micro} />
-          ) : (
-            <Loader2 size={CRATE_ICON_SIZE.micro} className="animate-spin" />
-          )}
+        <CrateBadge
+          size="md"
+          icon={
+            connectionProblem && !connectionProblem.includes("Retrying")
+              ? Radio
+              : Loader2
+          }
+          iconClassName={
+            connectionProblem && !connectionProblem.includes("Retrying")
+              ? undefined
+              : "animate-spin"
+          }
+          tone="warning"
+        >
           {connectionProblem || t("jam.room.connecting")}
-        </div>
+        </CrateBadge>
       )}
       {!roomIsActive ? (
-        <div className="jam-warning-chip inline-flex rounded-full px-3 py-1 text-xs font-medium">
+        <CrateBadge size="md" icon={Pause} tone="warning">
           {t("jam.room.ended")}
-        </div>
+        </CrateBadge>
       ) : null}
       {queueMode === "auto_dj" && (room.genre_filters || []).length ? (
-        <div className="jam-info-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium">
+        <CrateBadge size="md" icon={Tag} tone="info">
           {t("jam.room.autoDjGenres", {
             genres: (room.genre_filters || []).join(", "),
           })}
-        </div>
+        </CrateBadge>
       ) : null}
       {(room.tags || []).map((tag) => (
-        <div
-          key={tag}
-          className="jam-chip inline-flex rounded-full px-3 py-1 text-xs font-medium text-text-muted"
-        >
+        <CrateBadge key={tag} size="md">
           {tag}
-        </div>
+        </CrateBadge>
       ))}
     </div>
   );

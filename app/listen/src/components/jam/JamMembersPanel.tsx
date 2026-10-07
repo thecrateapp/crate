@@ -6,6 +6,8 @@ import { JamAvatarBubble } from "@/components/jam/JamAvatarBubble";
 import type { JamRoom, JamTrackRequest } from "@/pages/jam-reducer";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
 import { displayName } from "@/pages/jam-session-utils";
+import { Star, Users } from "@crate/ui/icons";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export interface JamMembersPanelProps {
   t: TFunction;
@@ -111,11 +113,15 @@ export function JamMembersPanel({
                 </div>
               </div>
             </div>
-            <div className="jam-chip rounded-full px-2.5 py-1 text-xs text-text-muted">
+            <CrateBadge
+              size="md"
+              icon={member.user_id === room.host_user_id ? Star : Users}
+              tone={member.user_id === room.host_user_id ? "accent" : "neutral"}
+            >
               {member.user_id === room.host_user_id
                 ? t("jam.room.roles.host")
                 : t("jam.room.roles.collab")}
-            </div>
+            </CrateBadge>
           </UserProfileLink>
         ))}
       </div>

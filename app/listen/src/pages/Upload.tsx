@@ -14,6 +14,7 @@ import { Button } from "@crate/ui/shadcn/button";
 
 import { ApiError, api } from "@/lib/api";
 import { formatBytes } from "@/lib/utils";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 interface UploadResponse {
   task_id: string;
@@ -169,10 +170,9 @@ export function Upload() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="space-y-2">
-        <div className="inline-flex items-center gap-2 rounded-full border border-border-quiet bg-text-primary/[0.04] px-3 py-1 text-xs uppercase tracking-wider text-text-muted">
-          <UploadIcon size={CRATE_ICON_SIZE.micro} />
+        <CrateBadge size="md" icon={UploadIcon}>
           {t("upload.badge")}
-        </div>
+        </CrateBadge>
         <h1 className="text-3xl font-bold text-text-primary">
           {t("upload.title")}
         </h1>

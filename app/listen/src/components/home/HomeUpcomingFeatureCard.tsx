@@ -14,6 +14,7 @@ import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 
 import type { HomeUpcomingItem } from "./home-model";
 import { buildUpcomingPresentation } from "./home-upcoming-model";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 const LAZY_IMAGE_PROPS = { loading: "lazy" } as const;
 
@@ -161,16 +162,15 @@ export function HomeUpcomingFeature({
 
       <div className="relative flex min-h-[222px] flex-col justify-between">
         <div>
-          <div className="home-upcoming-badge mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium uppercase tracking-eyebrow">
-            {presentation.isShow ? (
-              <RadioTower size={CRATE_ICON_SIZE.micro} />
-            ) : (
-              <Disc3 size={CRATE_ICON_SIZE.micro} />
-            )}
+          <CrateBadge
+            size="md"
+            icon={presentation.isShow ? RadioTower : Disc3}
+            className="mb-4"
+          >
             {presentation.isShow
               ? t("home.radar.badge.nextShow")
               : t("home.radar.badge.nextRelease")}
-          </div>
+          </CrateBadge>
 
           <h2 className="max-w-3xl text-3xl font-extrabold leading-none tracking-tight text-text-primary sm:text-4xl">
             {presentation.isShow ? item.artist : item.title}

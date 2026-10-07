@@ -8,6 +8,7 @@ import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 
 import type { ReplayMix, ReplayTrack } from "./home-model";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 function replayCoverUrl(item: ReplayTrack): string | undefined {
   if (item.album_id == null && !item.global_album_uid) return undefined;
@@ -78,10 +79,9 @@ export function HomeReplaySection({
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
         <div className="home-replay-card overflow-hidden rounded-panel p-5">
-          <div className="home-replay-badge inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium uppercase tracking-eyebrow">
-            <Sparkles size={CRATE_ICON_SIZE.micro} />
+          <CrateBadge size="md" icon={Sparkles}>
             {t("home.sections.listeningDna.title")}
-          </div>
+          </CrateBadge>
           <h2 className="mt-4 text-2xl font-bold text-text-primary">
             {replay?.title || t("home.replay.thisMonth")}
           </h2>

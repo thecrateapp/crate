@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { Track } from "@/contexts/player-types";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
 import type { TrackInfo } from "@/lib/track-info";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export function InfoTabHeroIdentity({
   info,
@@ -93,12 +94,9 @@ export function InfoTabHeroIdentity({
       {audioSummary.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {audioSummary.map((item) => (
-            <span
-              key={item}
-              className="info-tab-audio-pill rounded-full px-2.5 py-1 text-xs font-medium uppercase tracking-caps text-text-secondary"
-            >
+            <CrateBadge key={item} size="md">
               {item}
-            </span>
+            </CrateBadge>
           ))}
         </div>
       ) : null}

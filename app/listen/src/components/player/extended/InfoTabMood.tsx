@@ -5,6 +5,7 @@ import type { TrackInfo } from "@/lib/track-info";
 
 import { MetricBar, SectionCard } from "./InfoTabPrimitives";
 import type { MoodEntry } from "./info-tab-data";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export function InfoTabMood({
   info,
@@ -27,12 +28,9 @@ export function InfoTabMood({
       {topMoods.length ? (
         <div className="flex flex-wrap gap-2">
           {topMoods.map((mood) => (
-            <span
-              key={mood.label}
-              className="info-tab-mood-pill rounded-full px-3 py-1 text-xs font-medium uppercase tracking-caps"
-            >
+            <CrateBadge key={mood.label} size="md">
               {mood.label} {Math.round(mood.value * 100)}%
-            </span>
+            </CrateBadge>
           ))}
         </div>
       ) : null}

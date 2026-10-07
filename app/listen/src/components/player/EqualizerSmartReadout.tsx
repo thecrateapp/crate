@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
-import { CRATE_ICON_SIZE, Brain } from "@crate/ui/icons";
+import { Brain } from "@crate/ui/icons";
 
 import type { EffectiveEq } from "@/hooks/use-effective-eq";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 interface EqualizerSmartReadoutProps {
   eq: EffectiveEq | null;
@@ -40,10 +41,9 @@ export function EqualizerSmartReadout({
   return (
     <div className="eq-smart-surface rounded-lg border border-accent-action/25 px-3 py-2">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-action/35 bg-accent-action/10 px-2 py-0.5 text-xs font-semibold uppercase tracking-eyebrow text-accent-action">
-          <Brain size={CRATE_ICON_SIZE.nano} />
-          Smart
-        </span>
+        <CrateBadge icon={Brain}>
+          {t("player.equalizer.smart.label")}
+        </CrateBadge>
         <span className="text-xs font-semibold text-text-primary">{label}</span>
       </div>
       {detail ? (

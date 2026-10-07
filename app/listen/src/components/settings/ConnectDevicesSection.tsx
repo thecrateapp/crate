@@ -6,9 +6,12 @@ import {
   Loader2,
   LogOut,
   MonitorSpeaker,
+  Check,
+  Activity,
+  Clock,
 } from "@crate/ui/icons";
 import { notify } from "@crate/ui/lib/notify";
-import { CratePill } from "@crate/ui/primitives/CrateBadge";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 import { Switch } from "@crate/ui/primitives/Switch";
 import { Button } from "@crate/ui/shadcn/button";
 
@@ -42,8 +45,6 @@ interface ConnectDevice {
 interface ConnectDeviceListResponse {
   devices: ConnectDevice[];
 }
-
-const DEVICE_BADGE_CLASS_NAME = "px-2 py-0.5 text-xs font-medium";
 
 const RECENT_DEVICE_WINDOW_MS = 5 * 60 * 1000;
 
@@ -232,19 +233,16 @@ function ConnectDevicesSectionContent() {
                       <span className="truncate">{label}</span>
                     </div>
                     {isCurrent ? (
-                      <CratePill
-                        tone="accent"
-                        className={DEVICE_BADGE_CLASS_NAME}
-                      >
+                      <CrateBadge icon={Check}>
                         {t("common.current")}
-                      </CratePill>
+                      </CrateBadge>
                     ) : null}
-                    <CratePill
+                    <CrateBadge
+                      icon={device.active ? Activity : Clock}
                       tone={device.active ? "success" : "neutral"}
-                      className={DEVICE_BADGE_CLASS_NAME}
                     >
                       {device.active ? t("common.active") : t("common.recent")}
-                    </CratePill>
+                    </CrateBadge>
                   </div>
                   <div className="mt-1 text-xs text-text-muted">
                     {t("settings.connectDevices.lastSeen", {
