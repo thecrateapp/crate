@@ -39,6 +39,7 @@ export function usePlaylistListRowPlayback({
         playAll(queue, 0, {
           type: "playlist",
           name,
+          id: playlistId,
           radio:
             playlistId != null
               ? { seedType: "playlist", seedId: playlistId }

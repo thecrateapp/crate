@@ -1326,6 +1326,15 @@ def home_section_detail(
     return section
 
 
+def _context_playlist_id(body: RecordPlayEventRequest) -> int | None:
+    if body.context_playlist_id is not None:
+        return body.context_playlist_id
+    source_id = (body.play_source_id or "").strip()
+    if body.play_source_type == "playlist" and source_id.isdigit():
+        return int(source_id)
+    return None
+
+
 @router.post(
     "/play-events",
     response_model=PlayEventRecordedResponse,
@@ -1369,7 +1378,7 @@ def record_play_event_endpoint(request: Request, body: RecordPlayEventRequest):
         play_source_name=body.play_source_name,
         context_artist=body.context_artist,
         context_album=body.context_album,
-        context_playlist_id=body.context_playlist_id,
+        context_playlist_id=_context_playlist_id(body),
         device_type=body.device_type,
         app_platform=body.app_platform,
         content_origin=content_origin,

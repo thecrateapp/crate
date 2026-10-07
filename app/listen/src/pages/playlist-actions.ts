@@ -120,6 +120,7 @@ export function buildPlaylistActions({
     playAll(playerTracks, 0, {
       type: "playlist",
       name: data?.name || "Playlist",
+      id: data?.id,
       href: data ? `/playlists/${data.id}` : undefined,
       radio: data ? { seedType: "playlist", seedId: data.id } : undefined,
     });
@@ -134,6 +135,7 @@ export function buildPlaylistActions({
     playAll(playerTracks, startIndex, {
       type: "playlist",
       name: data.name || "Playlist",
+      id: data.id,
       href: `/playlists/${data.id}`,
       radio: { seedType: "playlist", seedId: data.id },
     });
@@ -144,6 +146,7 @@ export function buildPlaylistActions({
     playAll(shuffleArray(playerTracks), 0, {
       type: "playlist",
       name: data?.name || "Playlist",
+      id: data?.id,
       href: data ? `/playlists/${data.id}` : undefined,
       radio: data ? { seedType: "playlist", seedId: data.id } : undefined,
     });
