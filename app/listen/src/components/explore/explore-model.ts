@@ -205,6 +205,7 @@ export async function loadSystemPlaylistTracks(playlistId: number): Promise<{
   source: {
     type: "playlist";
     name: string;
+    id: number;
     radio: { seedType: "playlist"; seedId: number };
   };
 }> {
@@ -233,6 +234,7 @@ export async function loadSystemPlaylistTracks(playlistId: number): Promise<{
     source: {
       type: "playlist",
       name: data.name,
+      id: playlistId,
       radio: { seedType: "playlist", seedId: playlistId },
     },
   };

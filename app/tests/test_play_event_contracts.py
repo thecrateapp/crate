@@ -63,6 +63,49 @@ class TestPlayEventContract:
             source_node_uid=None,
         )
 
+    def test_play_event_endpoint_derives_playlist_context_from_source_id(
+        self, test_app
+    ):
+        payload = {
+            "client_event_id": "evt_playlist_15",
+            "track_id": 12,
+            "title": "Digital Bath",
+            "artist": "Deftones",
+            "album": "White Pony",
+            "started_at": "2026-10-01T10:00:00Z",
+            "ended_at": "2026-10-01T10:04:00Z",
+            "played_seconds": 240,
+            "play_source_type": "playlist",
+            "play_source_id": "15",
+            "play_source_name": "Deftones",
+        }
+
+        with patch("crate.api.me.record_play_event", return_value=78) as mock_record:
+            resp = test_app.post("/api/me/play-events", json=payload)
+
+        assert resp.status_code == 200
+        assert mock_record.call_args.kwargs["context_playlist_id"] == 15
+
+    def test_play_event_endpoint_ignores_non_numeric_playlist_sources(self, test_app):
+        payload = {
+            "client_event_id": "evt_setlist",
+            "track_id": 12,
+            "title": "Every You Every Me",
+            "artist": "Placebo",
+            "album": "Without You I'm Nothing",
+            "started_at": "2026-10-01T10:00:00Z",
+            "ended_at": "2026-10-01T10:03:00Z",
+            "played_seconds": 180,
+            "play_source_type": "playlist",
+            "play_source_name": "Setlist probable de Placebo",
+        }
+
+        with patch("crate.api.me.record_play_event", return_value=79) as mock_record:
+            resp = test_app.post("/api/me/play-events", json=payload)
+
+        assert resp.status_code == 200
+        assert mock_record.call_args.kwargs["context_playlist_id"] is None
+
     def test_play_event_endpoint_preserves_global_track_uid(self, test_app):
         payload = {
             "client_event_id": "evt_high_vis_001",
