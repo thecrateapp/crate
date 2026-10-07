@@ -1270,3 +1270,185 @@ def test_full_reconciliation_run_failure_is_persisted(pg_db):
     assert run["status"] == "failed"
     assert run["error"] == "projection failed"
     assert run["completed_at"] is not None
+
+
+def test_full_match_recompute_splits_a_mis_tagged_mix_without_claiming_its_mbid(
+    pg_db,
+):
+    from crate.db.tx import read_scope, transaction_scope
+    from crate.federation.global_reconciliation import (
+        reconcile_local_catalog,
+        reconcile_local_catalog_batch,
+    )
+
+    shared_mbid = "e9f2bc5c-c2be-4d67-a71a-c159e3e3e314"
+    for artist in ("Various Artists", "The Future Sound Of London"):
+        pg_db.upsert_artist({"name": artist, "entity_uid": str(uuid.uuid4())})
+    for artist, album, number, title in (
+        (
+            "Various Artists",
+            "Accelerator Deluxe",
+            4,
+            "Papua New Guinea (Dumb Child Of Q Mix)",
+        ),
+        (
+            "The Future Sound Of London",
+            "Papua New Guinea",
+            5,
+            "Papua New Guinea (Graham Massey Mix)",
+        ),
+    ):
+        album_id = pg_db.upsert_album(
+            {
+                "artist": artist,
+                "name": album,
+                "path": f"/music/{artist}/{album}",
+                "entity_uid": str(uuid.uuid4()),
+                "year": "1992",
+                "track_count": 1,
+            }
+        )
+        pg_db.upsert_track(
+            {
+                "album_id": album_id,
+                "artist": "The Future Sound Of London",
+                "album": album,
+                "filename": f"{number:02d} - {title}.flac",
+                "title": title,
+                "path": f"/music/{artist}/{album}/{number:02d} - {title}.flac",
+                "entity_uid": str(uuid.uuid4()),
+                "musicbrainz_trackid": shared_mbid,
+                "duration": 228.0,
+                "disc_number": 1,
+                "track_number": number,
+                "format": "flac",
+                "size": 1024,
+            }
+        )
+    with read_scope() as session:
+        compilation_track_id, mix_track_id = [
+            row[0]
+            for row in session.execute(
+                text(
+                    """
+                    SELECT id FROM library_tracks
+                    WHERE musicbrainz_trackid = :mbid
+                    ORDER BY title
+                    """
+                ),
+                {"mbid": shared_mbid},
+            )
+        ]
+    reconcile_local_catalog()
+
+    with transaction_scope() as session:
+        merged_uid = session.execute(
+            text(
+                """
+                SELECT global_track_uid::text
+                FROM global_catalog_tracks
+                WHERE musicbrainz_recording_mbid = :mbid
+                """
+            ),
+            {"mbid": shared_mbid},
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                UPDATE global_catalog_sources
+                SET global_entity_uid = CAST(:merged_uid AS uuid)
+                WHERE entity_type = 'track' AND local_id = ANY(:track_ids)
+                """
+            ),
+            {
+                "merged_uid": merged_uid,
+                "track_ids": [compilation_track_id, mix_track_id],
+            },
+        )
+        compilation_artist_uid = str(uuid.uuid4())
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_artists (
+                    global_artist_uid, canonical_name, sort_name, normalized_name
+                ) VALUES (
+                    CAST(:uid AS uuid), 'Various Artists', 'Various Artists',
+                    'various artists'
+                )
+                """
+            ),
+            {"uid": compilation_artist_uid},
+        )
+        updated = session.execute(
+            text(
+                """
+                UPDATE global_catalog_tracks
+                SET global_artist_uid = CAST(:artist_uid AS uuid),
+                    canonical_title = 'Papua New Guinea (Dumb Child Of Q Mix)',
+                    normalized_title = 'papua new guinea dumb child of q mix',
+                    album_name = 'Accelerator Deluxe',
+                    track_number = 4
+                WHERE global_track_uid = CAST(:merged_uid AS uuid)
+                """
+            ),
+            {"merged_uid": merged_uid, "artist_uid": compilation_artist_uid},
+        )
+        assert updated.rowcount == 1
+        session.execute(
+            text("DELETE FROM library_tracks WHERE id = :track_id"),
+            {"track_id": compilation_track_id},
+        )
+        session.execute(
+            text(
+                """
+                UPDATE global_catalog_sources
+                SET source_deleted_at = NOW(), source_stale = true
+                WHERE entity_type = 'track' AND local_id = :track_id
+                """
+            ),
+            {"track_id": compilation_track_id},
+        )
+
+    def recompute_all():
+        cursor = None
+        while True:
+            batch = reconcile_local_catalog_batch(
+                batch_size=1,
+                cursor=cursor,
+                recompute_matches=True,
+            )
+            if batch["completed"]:
+                return
+            cursor = batch["next_cursor"]
+
+    def papua_tracks():
+        with read_scope() as session:
+            return [
+                dict(row)
+                for row in session.execute(
+                    text(
+                        """
+                        SELECT canonical_title, musicbrainz_recording_mbid
+                        FROM global_catalog_tracks
+                        WHERE canonical_title LIKE 'Papua New Guinea%'
+                        ORDER BY canonical_title
+                        """
+                    )
+                ).mappings()
+            ]
+
+    recompute_all()
+    assert papua_tracks() == [
+        {
+            "canonical_title": "Papua New Guinea (Graham Massey Mix)",
+            "musicbrainz_recording_mbid": None,
+        }
+    ]
+
+    recompute_all()
+    assert papua_tracks() == [
+        {
+            "canonical_title": "Papua New Guinea (Graham Massey Mix)",
+            "musicbrainz_recording_mbid": shared_mbid,
+        }
+    ]
