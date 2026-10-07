@@ -3,6 +3,7 @@ import {
   Dislike as SolarDislike,
   HeadphonesRoundSound as SolarHeadphonesRoundSound,
   Heart as SolarHeart,
+  InboxArchive as SolarInboxArchive,
   Like as SolarLike,
   Microphone as SolarMicrophone,
   Microphone2 as SolarMicrophone2,
@@ -39,6 +40,7 @@ export const AudioLines = createIcon(SolarSoundwave, "AudioLines");
 export const Cast = createIcon(SolarScreencast, "Cast");
 export const Collection = createIcon(SolarCassette2, "Collection");
 export const CompactDisc = createIcon(SolarVinylRecord, "CompactDisc");
+export const CrateBox = createIcon(SolarInboxArchive, "CrateBox");
 export const Disc = createIcon(SolarVinylRecord, "Disc");
 export const Disc3 = createIcon(SolarVinylRecord, "Disc3");
 export const Heart = createIcon(SolarHeart, "Heart");

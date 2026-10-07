@@ -1,9 +1,9 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  CRATE_ICON_SIZE,
   ChevronLeft,
   ChevronRight,
-  Disc3,
+  CrateBox,
+  CRATE_ICON_SIZE,
   Lock,
 } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
@@ -112,7 +112,7 @@ function useCrateCardModel({
       imageUrl: cover ?? undefined,
       imageAlt: crate.name,
       imageShape: "square",
-      fallbackIcon: Disc3,
+      fallbackIcon: CrateBox,
     }),
     [albumCountLabel, cover, crate.name, ownerName],
   );
@@ -177,7 +177,7 @@ function CrateCover({
     />
   ) : (
     <div className="flex size-full items-center justify-center text-accent-action/70">
-      <Disc3 size={iconSize} />
+      <CrateBox size={iconSize} />
     </div>
   );
 }

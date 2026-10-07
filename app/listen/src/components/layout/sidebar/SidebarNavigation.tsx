@@ -7,9 +7,9 @@ import {
   Activity,
   ChevronRight,
   Collection,
+  CrateBox,
   CRATE_ICON_SIZE,
   Disc,
-  Disc3,
   Heart,
   ListMusic,
   Music,
@@ -35,7 +35,7 @@ const COLLECTION_ITEMS = [
   },
   {
     to: "/library?tab=crates",
-    icon: Disc3,
+    icon: CrateBox,
     labelKey: "nav.collection.crates",
   },
   {

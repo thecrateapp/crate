@@ -10,9 +10,9 @@ import { MobileActionSheet } from "@crate/ui/domain/actions";
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 import {
   Collection,
+  CrateBox,
   CRATE_ICON_SIZE,
   Disc,
-  Disc3,
   Heart,
   Home,
   ListMusic,
@@ -37,7 +37,7 @@ const COLLECTION_SECTIONS = [
   },
   {
     to: "/collection/crates",
-    icon: Disc3,
+    icon: CrateBox,
     labelKey: "nav.collection.crates",
   },
   {

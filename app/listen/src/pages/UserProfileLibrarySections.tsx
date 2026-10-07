@@ -1,5 +1,10 @@
 import { Link } from "react-router";
-import { CRATE_ICON_SIZE, Disc3, Music4, PackagePlus } from "@crate/ui/icons";
+import {
+  CrateBox,
+  CRATE_ICON_SIZE,
+  Music4,
+  PackagePlus,
+} from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
@@ -99,7 +104,10 @@ function UserProfileCrates({ data }: { data: PublicProfile }) {
   return (
     <div className="user-profile-card rounded-panel p-5 sm:p-6">
       <div className="flex items-center gap-2">
-        <Disc3 size={CRATE_ICON_SIZE.sm} className="user-profile-accent-icon" />
+        <CrateBox
+          size={CRATE_ICON_SIZE.sm}
+          className="user-profile-accent-icon"
+        />
         <h2 className="text-lg font-semibold text-text-primary">
           {t("userProfile.crates.title")}
         </h2>
@@ -154,7 +162,7 @@ function UserProfileCrateRow({ crate }: { crate: PublicCrate }) {
           />
         ) : (
           <div className="user-profile-accent-panel user-profile-accent-icon flex size-14 items-center justify-center rounded-xl">
-            <Disc3 size={CRATE_ICON_SIZE.lg} />
+            <CrateBox size={CRATE_ICON_SIZE.lg} />
           </div>
         )}
         <div className="min-w-0 flex-1">
