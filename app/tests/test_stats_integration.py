@@ -284,7 +284,11 @@ class TestStatsStory:
         )
 
         from crate.db.queries.user_library_stats_story import get_stats_story
+        from crate.db.repositories.user_library_aggregate_runner import (
+            refresh_user_listening_aggregates,
+        )
 
+        refresh_user_listening_aggregates(TEST_USER_ID)
         story = get_stats_story(TEST_USER_ID, window="30d")
 
         assert story["window"] == "30d"
