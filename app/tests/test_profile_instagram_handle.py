@@ -14,14 +14,31 @@ from tests.conftest import PG_AVAILABLE
         ("  @diego_13  ", "diego_13"),
         ("https://www.instagram.com/diego.trecedoce/", "diego.trecedoce"),
         ("instagram.com/diego.trecedoce?igsh=abc", "diego.trecedoce"),
+        ("instagram.com/diego.trecedoce", "diego.trecedoce"),
         ("", ""),
+        ("   ", ""),
     ],
 )
 def test_normalize_instagram_handle(raw, expected):
     assert normalize_instagram_handle(raw) == expected
 
 
-@pytest.mark.parametrize("raw", ["diego trecedoce", "diego!", "a" * 31])
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "diego trecedoce",
+        "diego!",
+        "a" * 31,
+        "instagram.com",
+        "www.instagram.com",
+        "https://www.instagram.com/",
+        "instagram.com/?igsh=abc",
+        ".",
+        "@",
+        "._.",
+        "m.instagram.com",
+    ],
+)
 def test_update_profile_rejects_invalid_instagram_handles(raw):
     with pytest.raises(ValueError):
         UpdateProfileRequest(instagram_handle=raw)

@@ -89,14 +89,22 @@ class AuthInviteRequest(BaseModel):
 
 _INSTAGRAM_HANDLE_RE = re.compile(r"^[A-Za-z0-9._]{1,30}$")
 _INSTAGRAM_URL_PREFIX_RE = re.compile(
-    r"^(?:https?://)?(?:www\.)?instagram\.com/", re.IGNORECASE
+    r"^(?:https?://)?(?:www\.)?instagram\.com(?:/|$)", re.IGNORECASE
 )
+_INSTAGRAM_DOMAIN_RE = re.compile(r"instagram\.com", re.IGNORECASE)
 
 
 def normalize_instagram_handle(value: str) -> str:
-    handle = _INSTAGRAM_URL_PREFIX_RE.sub("", value.strip())
+    raw = value.strip()
+    if not raw:
+        return ""
+    handle = _INSTAGRAM_URL_PREFIX_RE.sub("", raw)
     handle = handle.split("?", 1)[0].strip("/").lstrip("@")
-    if handle and not _INSTAGRAM_HANDLE_RE.fullmatch(handle):
+    if not any(char.isalnum() for char in handle) or _INSTAGRAM_DOMAIN_RE.search(
+        handle
+    ):
+        raise ValueError("Instagram handle must include a username")
+    if not _INSTAGRAM_HANDLE_RE.fullmatch(handle):
         raise ValueError("Instagram handle can only use letters, numbers, . and _")
     return handle
 
