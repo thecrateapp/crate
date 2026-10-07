@@ -81,8 +81,6 @@
     transparent
   );
   --surface-card: color-mix(in srgb, var(--text-primary) 3%, transparent);
-  --state-info-border: color-mix(in srgb, var(--state-info) 20%, transparent);
-  --state-info-surface: color-mix(in srgb, var(--state-info) 10%, transparent);
   --text-secondary-strong: color-mix(
     in srgb,
     var(--text-primary) 70%,

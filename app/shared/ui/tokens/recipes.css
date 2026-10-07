@@ -722,8 +722,8 @@
 }
 
 .jam-info-chip {
-  border-color: var(--state-info-border);
-  background: var(--state-info-surface);
+  border-color: color-mix(in srgb, var(--state-info) 20%, transparent);
+  background: color-mix(in srgb, var(--state-info) 10%, transparent);
   color: var(--jam-info-text);
 }
 
