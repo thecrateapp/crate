@@ -197,13 +197,37 @@ def get_access_token_by_secret(
     return _row_to_dict(row) if row else None
 
 
+def _touch_last_used(token_id: int, now: datetime) -> None:
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE user_access_tokens
+                SET last_used_at = :now
+                WHERE id = (
+                    SELECT id
+                    FROM user_access_tokens
+                    WHERE id = :token_id
+                      AND (last_used_at IS NULL OR last_used_at <= :stale_before)
+                    FOR UPDATE SKIP LOCKED
+                )
+                """
+            ),
+            {
+                "token_id": token_id,
+                "now": now,
+                "stale_before": now - LAST_USED_UPDATE_INTERVAL,
+            },
+        )
+
+
 def resolve_access_token(
     secret: str,
     *,
     now: datetime | None = None,
 ) -> dict[str, Any] | None:
     checked_at = now or datetime.now(timezone.utc)
-    with transaction_scope() as session:
+    with read_scope() as session:
         row = (
             session.execute(
                 text(
@@ -212,7 +236,6 @@ def resolve_access_token(
                         " AND t.revoked_at IS NULL"
                         " AND (t.expires_at IS NULL OR t.expires_at > :now)"
                     )
-                    + " FOR UPDATE"
                 ),
                 {"token_digest": _digest(secret), "now": checked_at},
             )
@@ -222,37 +245,29 @@ def resolve_access_token(
         if row is None:
             return None
 
-        result = _row_to_dict(row)
-        if (
-            result["last_used_at"] is None
-            or result["last_used_at"] <= checked_at - LAST_USED_UPDATE_INTERVAL
-        ):
-            session.execute(
-                text(
-                    """
-                    UPDATE user_access_tokens
-                    SET last_used_at = :now
-                    WHERE id = :token_id
-                    """
-                ),
-                {"token_id": result["id"], "now": checked_at},
-            )
-            result["last_used_at"] = checked_at
-
         from crate.db.repositories.auth_users import get_user_by_id
 
+        result = _row_to_dict(row)
         user = get_user_by_id(result["user_id"], session=session)
-        if not user or user.get("status", "active") != "active":
-            return None
-        result.update(
-            {
-                "email": user["email"],
-                "role": user.get("role", "user"),
-                "username": user.get("username"),
-                "name": user.get("name"),
-            }
-        )
-        return result
+    if not user or user.get("status", "active") != "active":
+        return None
+
+    if (
+        result["last_used_at"] is None
+        or result["last_used_at"] <= checked_at - LAST_USED_UPDATE_INTERVAL
+    ):
+        _touch_last_used(result["id"], checked_at)
+        result["last_used_at"] = checked_at
+
+    result.update(
+        {
+            "email": user["email"],
+            "role": user.get("role", "user"),
+            "username": user.get("username"),
+            "name": user.get("name"),
+        }
+    )
+    return result
 
 
 def resolve_access_token_by_id(

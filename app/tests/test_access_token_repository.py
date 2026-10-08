@@ -123,3 +123,112 @@ def test_access_token_lookup_isolated_by_secret_and_user(pg_db):
 
     assert get_access_token(other["id"], created["id"]) is None
     assert get_access_token(owner["id"], created["id"])["id"] == created["id"]
+
+
+def _last_used_at(token_id: int):
+    from crate.db.tx import read_scope
+
+    with read_scope() as session:
+        return session.execute(
+            text("SELECT last_used_at FROM user_access_tokens WHERE id = :id"),
+            {"id": token_id},
+        ).scalar_one()
+
+
+def test_resolve_access_token_updates_last_used_only_outside_the_window(pg_db):
+    from crate.db.repositories.access_tokens import (
+        create_access_token,
+        resolve_access_token,
+    )
+
+    user = pg_db.create_user("vdj-token-last-used@test.com")
+    created = create_access_token(
+        user_id=user["id"], name="Laptop", scopes=["vdj.catalog.read"]
+    )
+    first_use = datetime.now(timezone.utc)
+
+    assert (
+        resolve_access_token(created["token"], now=first_use)["user_id"] == user["id"]
+    )
+    assert _last_used_at(created["id"]) == first_use
+
+    resolve_access_token(created["token"], now=first_use + timedelta(minutes=1))
+    assert _last_used_at(created["id"]) == first_use
+
+    later = first_use + timedelta(minutes=6)
+    resolve_access_token(created["token"], now=later)
+    assert _last_used_at(created["id"]) == later
+
+
+@pytest.mark.parametrize("minutes_since_last_use", [0, 6])
+def test_resolve_access_token_does_not_wait_for_a_row_lock(
+    pg_db, minutes_since_last_use
+):
+    import threading
+
+    from crate.db.repositories.access_tokens import (
+        create_access_token,
+        resolve_access_token,
+    )
+    from crate.db.tx import transaction_scope
+
+    user = pg_db.create_user("vdj-token-no-lock@test.com")
+    created = create_access_token(
+        user_id=user["id"], name="Laptop", scopes=["vdj.catalog.read"]
+    )
+    last_use = datetime.now(timezone.utc)
+    resolve_access_token(created["token"], now=last_use)
+    resolve_at = last_use + timedelta(minutes=minutes_since_last_use)
+
+    resolved: dict = {}
+    locked = threading.Event()
+    release = threading.Event()
+
+    def hold_row_lock():
+        with transaction_scope() as session:
+            session.execute(
+                text("SELECT id FROM user_access_tokens WHERE id = :id FOR UPDATE"),
+                {"id": created["id"]},
+            )
+            locked.set()
+            release.wait(timeout=10)
+
+    holder = threading.Thread(target=hold_row_lock)
+    holder.start()
+    try:
+        assert locked.wait(timeout=10)
+
+        def resolve_while_locked():
+            try:
+                resolved["token"] = resolve_access_token(
+                    created["token"], now=resolve_at
+                )
+            except Exception as exc:
+                resolved["error"] = exc
+
+        worker = threading.Thread(target=resolve_while_locked)
+        worker.start()
+        worker.join(timeout=5)
+        assert not worker.is_alive()
+        assert "error" not in resolved, resolved.get("error")
+        assert resolved["token"]["id"] == created["id"]
+    finally:
+        release.set()
+        holder.join(timeout=10)
+
+
+def test_revocation_is_effective_on_the_next_resolution(pg_db):
+    from crate.db.repositories.access_tokens import (
+        create_access_token,
+        resolve_access_token,
+        revoke_access_token,
+    )
+
+    user = pg_db.create_user("vdj-token-revoked-next@test.com")
+    created = create_access_token(
+        user_id=user["id"], name="Laptop", scopes=["vdj.catalog.read"]
+    )
+    assert resolve_access_token(created["token"]) is not None
+
+    assert revoke_access_token(user["id"], created["id"]) is True
+    assert resolve_access_token(created["token"]) is None
