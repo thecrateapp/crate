@@ -4,7 +4,9 @@ import type { Track } from "@/contexts/PlayerContext";
 import { toPlayableTrack } from "@/lib/playable-track";
 
 export type StatsWindow = "7d" | "30d" | "90d" | "365d" | "all_time";
-export type StatsPeriodKey = StatsWindow | `month:${string}`;
+export type StatsYearWindow = `year:${number}`;
+export type StatsSelection = StatsWindow | StatsYearWindow;
+export type StatsPeriodKey = StatsSelection | `month:${string}`;
 
 export interface StatsOverview {
   window: StatsPeriodKey;
@@ -257,6 +259,136 @@ export interface StatsSnapshot {
   generation_ms?: number;
 }
 
+export interface StatsTrackRef {
+  track_id?: number | null;
+  title?: string | null;
+  artist?: string | null;
+  album?: string | null;
+  album_id?: number | null;
+  album_slug?: string | null;
+  global_album_uid?: string | null;
+  artist_id?: number | null;
+  artist_slug?: string | null;
+}
+
+export interface StatsAlbumRef {
+  album?: string | null;
+  artist?: string | null;
+  plays?: number | null;
+  album_id?: number | null;
+  album_slug?: string | null;
+  global_album_uid?: string | null;
+}
+
+export interface StatsTapePoint {
+  bucket: string;
+  minutes: number;
+  plays: number;
+}
+
+export interface StatsTapeMood {
+  bucket: string;
+  energy?: number | null;
+  valence?: number | null;
+}
+
+export interface StatsTapePeak {
+  kind: "obsession" | "longest_day" | "discovery" | string;
+  bucket: string;
+  day: string;
+  value: number;
+  track?: StatsTrackRef | null;
+  artist?: string | null;
+}
+
+export interface StatsTapeMonth {
+  month: string;
+  minutes: number;
+  plays: number;
+  top_artist?: string | null;
+  top_album?: StatsAlbumRef | null;
+}
+
+export interface StatsTape {
+  granularity: "day" | "week";
+  start: string;
+  end: string;
+  points: StatsTapePoint[];
+  mood: StatsTapeMood[];
+  peaks: StatsTapePeak[];
+  months: StatsTapeMonth[];
+}
+
+export interface StatsStreak {
+  days: number;
+  start?: string | null;
+  end?: string | null;
+}
+
+export interface StatsHighlights {
+  artist_count?: number | null;
+  longest_streak?: StatsStreak | null;
+  current_streak?: StatsStreak | null;
+  new_artists?: { count: number; share: number } | null;
+  longest_session?: {
+    minutes: number;
+    started_at?: string | null;
+    ended_at?: string | null;
+    track_count: number;
+  } | null;
+  obsession?: {
+    day: string;
+    plays: number;
+    minutes: number;
+    track: StatsTrackRef;
+  } | null;
+}
+
+export interface StatsArtistOfPeriod {
+  artist_name: string;
+  artist_id?: number | null;
+  artist_slug?: string | null;
+  global_artist_uid?: string | null;
+  plays: number;
+  minutes: number;
+  active_days: number;
+  first_day_in_period?: string | null;
+  first_ever_day?: string | null;
+  top_album?: StatsAlbumRef | null;
+}
+
+export interface StatsHeatmap {
+  cells: number[][];
+  peak?: { weekday: number; hour: number } | null;
+  night_share: number;
+}
+
+export interface StatsMusicAge {
+  median_year: number;
+  decades: { decade: number; share: number }[];
+  oldest_album?: {
+    album: string;
+    artist?: string | null;
+    album_id?: number | null;
+    album_slug?: string | null;
+    year: number;
+  } | null;
+}
+
+export interface StatsGenreTrend {
+  genre_name: string;
+  slug?: string | null;
+  share: number;
+  delta_vs_previous?: number | null;
+}
+
+export interface StatsToday {
+  day: string;
+  timezone: string;
+  minutes: number;
+  plays: number;
+}
+
 export interface StatsDashboard {
   window: StatsPeriodKey;
   subject?: StatsSubject | null;
@@ -270,34 +402,27 @@ export interface StatsDashboard {
   story?: StatsStory;
   viewer_affinity?: StatsAffinity | null;
   snapshot?: StatsSnapshot;
+  timezone?: string | null;
+  provisional?: boolean | null;
+  computed_until?: string | null;
+  metrics_version?: string | null;
+  tape?: StatsTape | null;
+  highlights?: StatsHighlights | null;
+  artist_of_period?: StatsArtistOfPeriod | null;
+  heatmap?: StatsHeatmap | null;
+  music_age?: StatsMusicAge | null;
+  genre_trend?: StatsGenreTrend[];
 }
-
-export interface RecapHighlight {
-  title: string;
-  body: string;
-}
-
-type RecapTranslate = (
-  key: string,
-  values?: Record<string, string | number>,
-) => string;
-
-export const STATS_WINDOW_OPTIONS: { value: StatsWindow; label: string }[] = [
-  { value: "7d", label: "stats.window.short.7d" },
-  { value: "30d", label: "stats.window.short.30d" },
-  { value: "90d", label: "stats.window.short.90d" },
-  { value: "365d", label: "stats.window.short.365d" },
-  { value: "all_time", label: "stats.window.short.allTime" },
-];
 
 export function formatStatsMinutes(minutes: number): string {
   if (!Number.isFinite(minutes) || minutes <= 0) return "0m";
-  if (minutes >= 60) {
-    const hours = Math.floor(minutes / 60);
-    const remaining = Math.round(minutes % 60);
+  const rounded = Math.round(minutes);
+  if (rounded >= 60) {
+    const hours = Math.floor(rounded / 60);
+    const remaining = rounded % 60;
     return remaining > 0 ? `${hours}h ${remaining}m` : `${hours}h`;
   }
-  return `${Math.round(minutes)}m`;
+  return `${rounded}m`;
 }
 
 export function formatStatsPercent(value: number): string {
@@ -337,85 +462,37 @@ export function statsTrackRowData(item: StatsTrack): TrackRowData {
   };
 }
 
+type ReplayTranslate = (
+  key: string,
+  values?: Record<string, string | number>,
+) => string;
+
+function replayYear(replay: ReplayMix): string {
+  return /^year:(\d{4})$/.exec(replay.window)?.[1] ?? "";
+}
+
 export function localizedReplayTitle(
   replay: ReplayMix | undefined,
-  t: RecapTranslate,
+  t: ReplayTranslate,
 ): string | undefined {
   if (replay?.title_key) {
-    return t(replay.title_key, { defaultValue: replay.title });
+    return t(replay.title_key, {
+      defaultValue: replay.title,
+      year: replayYear(replay),
+    });
   }
   return replay?.title || undefined;
 }
 
 export function localizedReplaySubtitle(
   replay: ReplayMix | undefined,
-  t: RecapTranslate,
+  t: ReplayTranslate,
 ): string | undefined {
   if (replay?.subtitle_key) {
-    return t(replay.subtitle_key, { defaultValue: replay.subtitle });
+    return t(replay.subtitle_key, {
+      defaultValue: replay.subtitle,
+      year: replayYear(replay),
+    });
   }
   return replay?.subtitle || undefined;
-}
-
-export function buildRecapHighlights(
-  overview: StatsOverview | undefined,
-  replay: ReplayMix | undefined,
-  topArtists: StatsArtist[],
-  topTracks: StatsTrack[],
-  t: RecapTranslate,
-): RecapHighlight[] {
-  const highlights: RecapHighlight[] = [];
-
-  if (overview?.top_artist?.artist_name) {
-    highlights.push({
-      title: t("stats.recap.topArtistTitle", {
-        artist: overview.top_artist.artist_name,
-      }),
-      body: t("stats.recap.topArtistBody", {
-        count: overview.top_artist.play_count,
-        minutes: formatStatsMinutes(overview.top_artist.minutes_listened),
-      }),
-    });
-  }
-
-  if (topTracks[0] && topTracks[0].play_count > 0) {
-    highlights.push({
-      title: t("stats.recap.topTrackTitle", { track: topTracks[0].title }),
-      body: t("stats.recap.topTrackBody", {
-        artist: topTracks[0].artist,
-        count: topTracks[0].play_count,
-      }),
-    });
-  }
-
-  if (overview && overview.play_count > 0) {
-    const cadence =
-      overview.active_days >= 20
-        ? t("stats.recap.cadenceDaily")
-        : overview.active_days >= 10
-          ? t("stats.recap.cadenceSteady")
-          : t("stats.recap.cadenceTakingShape");
-    highlights.push({
-      title: t("stats.recap.minutesTitle", {
-        minutes: formatStatsMinutes(overview.minutes_listened),
-      }),
-      body: t("stats.recap.minutesBody", {
-        cadence,
-        count: overview.complete_play_count,
-      }),
-    });
-  }
-
-  if (replay?.track_count && replay.track_count > 0) {
-    highlights.push({
-      title: t("stats.recap.replayTitle", { count: replay.track_count }),
-      body: topArtists.length
-        ? t("stats.recap.replayArtistsBody", {
-            count: Math.min(topArtists.length, 8),
-          })
-        : t("stats.recap.replayReadyBody"),
-    });
-  }
-
-  return highlights.slice(0, 3);
 }

@@ -105,13 +105,6 @@ const filesToForbiddenCopy: Record<string, string[]> = {
     "Loading profile card",
     "Could not load this profile right now.",
   ],
-  "components/stats/StatsPanels.tsx": [
-    "Loading...",
-    "Minutes",
-    " minutes",
-    "Loading trend data...",
-    "Start listening and your daily curve will appear here.",
-  ],
   "components/stats/stats-model.ts": [
     "led this window",
     "kept coming back",

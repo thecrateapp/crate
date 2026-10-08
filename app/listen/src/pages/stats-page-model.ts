@@ -1,4 +1,8 @@
-import type { StatsTrack, StatsWindow } from "@/components/stats/stats-model";
+import type {
+  StatsSelection,
+  StatsTrack,
+  StatsWindow,
+} from "@/components/stats/stats-model";
 
 export const WINDOW_COPY_KEYS: Record<
   StatsWindow,
@@ -35,6 +39,55 @@ export function normalizeWindowParam(value: string | null): StatsWindow {
   return STATS_WINDOWS.includes(value as StatsWindow)
     ? (value as StatsWindow)
     : "30d";
+}
+
+const YEAR_WINDOW = /^year:(\d{4})$/;
+
+export function selectionYear(selection: string | null): number | null {
+  const match = YEAR_WINDOW.exec(selection ?? "");
+  return match ? Number(match[1]) : null;
+}
+
+export function normalizeSelectionParam(
+  value: string | null,
+  currentYear: number,
+): StatsSelection {
+  if (value === "year") return `year:${currentYear}`;
+  const year = selectionYear(value);
+  if (year !== null) {
+    return year >= 1970 && year <= currentYear ? `year:${year}` : "30d";
+  }
+  return normalizeWindowParam(value);
+}
+
+export interface StatsSelectionOption {
+  value: StatsSelection;
+  label: string;
+}
+
+export function statsSelectionOptions(
+  currentYear: number,
+  { calendarYear }: { calendarYear: boolean },
+): StatsSelectionOption[] {
+  return [
+    { value: "30d", label: "stats.period.30d" },
+    { value: "90d", label: "stats.period.90d" },
+    calendarYear
+      ? { value: `year:${currentYear}`, label: String(currentYear) }
+      : { value: "365d", label: "stats.period.365d" },
+    { value: "all_time", label: "stats.period.allTime" },
+  ];
+}
+
+export function selectionDays(selection: StatsSelection): number | null {
+  const days: Record<StatsWindow, number | null> = {
+    "7d": 7,
+    "30d": 30,
+    "90d": 90,
+    "365d": 365,
+    all_time: null,
+  };
+  return selection in days ? days[selection as StatsWindow] : null;
 }
 
 export function normalizeMonthParam(value: string | null): string | null {
