@@ -3,7 +3,7 @@
 use rayon::prelude::*;
 use realfft::RealFftPlanner;
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 #[cfg(feature = "ml")]
 use std::sync::Arc;
@@ -22,6 +22,8 @@ const TARGET_SAMPLE_RATE: u32 = 22050;
 const FFT_SIZE: usize = 2048;
 const HOP_SIZE: usize = 512;
 const MEASUREMENT_WINDOW_MS: u64 = 5_000;
+const FULL_SCAN_HEAD_SECONDS: u32 = 600;
+const FULL_SCAN_TAIL_SECONDS: u32 = 120;
 
 #[derive(Serialize)]
 pub struct AnalysisResult {
@@ -57,7 +59,15 @@ pub struct BatchAnalysisResult {
     pub failed: usize,
 }
 
-fn decode_audio(path: &Path) -> Result<(Vec<f32>, u32, Option<LoudnessSummary>), String> {
+fn decode_audio(path: &Path) -> Result<DecodedAudio, String> {
+    decode_audio_bounded(path, FULL_SCAN_HEAD_SECONDS, FULL_SCAN_TAIL_SECONDS)
+}
+
+pub fn decode_audio_bounded(
+    path: &Path,
+    head_seconds: u32,
+    tail_seconds: u32,
+) -> Result<DecodedAudio, String> {
     let file = std::fs::File::open(path).map_err(|e| format!("open: {}", e))?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
@@ -90,7 +100,10 @@ fn decode_audio(path: &Path) -> Result<(Vec<f32>, u32, Option<LoudnessSummary>),
         .make(&track.codec_params, &DecoderOptions::default())
         .map_err(|e| format!("decoder: {}", e))?;
 
-    let mut all_samples: Vec<f32> = Vec::new();
+    let mut capture = MonoCapture::new(
+        head_seconds as usize * sample_rate as usize,
+        tail_seconds as usize * sample_rate as usize,
+    );
     let mut meter = LoudnessMeter::new(channels, sample_rate);
 
     loop {
@@ -134,40 +147,115 @@ fn decode_audio(path: &Path) -> Result<(Vec<f32>, u32, Option<LoudnessSummary>),
                 for ch in 0..channels {
                     sum += samples[frame * channels + ch];
                 }
-                all_samples.push(sum / channels as f32);
+                capture.push(sum / channels as f32);
             }
         } else {
-            all_samples.extend_from_slice(samples);
+            samples.iter().for_each(|sample| capture.push(*sample));
         }
     }
 
     let loudness = meter.map(LoudnessMeter::finish);
 
-    // Resample to target rate if needed (simple linear interpolation)
-    if sample_rate != TARGET_SAMPLE_RATE && !all_samples.is_empty() {
-        let ratio = TARGET_SAMPLE_RATE as f64 / sample_rate as f64;
-        let new_len = (all_samples.len() as f64 * ratio) as usize;
-        let mut resampled = Vec::with_capacity(new_len);
-        for i in 0..new_len {
-            let src_pos = i as f64 / ratio;
-            let idx = src_pos as usize;
-            let frac = (src_pos - idx as f64) as f32;
-            if idx + 1 < all_samples.len() {
-                resampled.push(all_samples[idx] * (1.0 - frac) + all_samples[idx + 1] * frac);
-            } else if idx < all_samples.len() {
-                resampled.push(all_samples[idx]);
-            }
+    let total_frames = capture.total_frames;
+    let (head, tail) = capture.finish();
+    let target_rate = if head.is_empty() {
+        sample_rate
+    } else {
+        TARGET_SAMPLE_RATE
+    };
+    Ok(DecodedAudio {
+        head: resample_linear(&head, sample_rate, target_rate),
+        tail: tail.map(|(samples, start_frame)| {
+            (
+                resample_linear(&samples, sample_rate, target_rate),
+                start_frame as u64 * 1_000 / u64::from(sample_rate),
+            )
+        }),
+        sample_rate: target_rate,
+        duration_ms: total_frames as u64 * 1_000 / u64::from(sample_rate),
+        loudness,
+    })
+}
+
+pub struct DecodedAudio {
+    pub head: Vec<f32>,
+    pub tail: Option<(Vec<f32>, u64)>,
+    pub sample_rate: u32,
+    pub duration_ms: u64,
+    pub loudness: Option<LoudnessSummary>,
+}
+
+struct MonoCapture {
+    head: Vec<f32>,
+    tail: VecDeque<f32>,
+    head_frames: usize,
+    tail_frames: usize,
+    dropped_frames: usize,
+    total_frames: usize,
+}
+
+impl MonoCapture {
+    fn new(head_frames: usize, tail_frames: usize) -> Self {
+        Self {
+            head: Vec::new(),
+            tail: VecDeque::new(),
+            head_frames,
+            tail_frames,
+            dropped_frames: 0,
+            total_frames: 0,
         }
-        return Ok((resampled, TARGET_SAMPLE_RATE, loudness));
     }
 
-    Ok((all_samples, sample_rate, loudness))
+    fn push(&mut self, sample: f32) {
+        self.total_frames += 1;
+        if self.head.len() < self.head_frames {
+            self.head.push(sample);
+            return;
+        }
+        self.tail.push_back(sample);
+        if self.tail.len() > self.tail_frames {
+            self.tail.pop_front();
+            self.dropped_frames += 1;
+        }
+    }
+
+    fn finish(mut self) -> (Vec<f32>, Option<(Vec<f32>, usize)>) {
+        if self.dropped_frames == 0 {
+            self.head.extend(self.tail);
+            return (self.head, None);
+        }
+        let start_frame = self.head_frames + self.dropped_frames;
+        (
+            self.head,
+            Some((self.tail.into_iter().collect(), start_frame)),
+        )
+    }
+}
+
+fn resample_linear(samples: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
+    if from_rate == to_rate || samples.is_empty() {
+        return samples.to_vec();
+    }
+    let ratio = to_rate as f64 / from_rate as f64;
+    let new_len = (samples.len() as f64 * ratio) as usize;
+    let mut resampled = Vec::with_capacity(new_len);
+    for i in 0..new_len {
+        let src_pos = i as f64 / ratio;
+        let idx = src_pos as usize;
+        let frac = (src_pos - idx as f64) as f32;
+        if idx + 1 < samples.len() {
+            resampled.push(samples[idx] * (1.0 - frac) + samples[idx + 1] * frac);
+        } else if idx < samples.len() {
+            resampled.push(samples[idx]);
+        }
+    }
+    resampled
 }
 
 /// Decode audio and return the original (pre-resample) mono samples + original sample rate.
 /// Used when we need to resample to 32kHz for PANNs (not 22050).
 #[cfg(feature = "ml")]
-fn decode_audio_original(path: &Path) -> Result<(Vec<f32>, u32), String> {
+fn decode_audio_original(path: &Path, max_seconds: usize) -> Result<(Vec<f32>, u32), String> {
     let file = std::fs::File::open(path).map_err(|e| format!("open: {}", e))?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
@@ -201,8 +289,9 @@ fn decode_audio_original(path: &Path) -> Result<(Vec<f32>, u32), String> {
         .map_err(|e| format!("decoder: {}", e))?;
 
     let mut all_samples: Vec<f32> = Vec::new();
+    let max_samples = max_seconds * sample_rate as usize;
 
-    loop {
+    while all_samples.len() < max_samples {
         let packet = match format.next_packet() {
             Ok(p) => p,
             Err(symphonia::core::errors::Error::IoError(ref e))
@@ -783,11 +872,26 @@ pub fn analyze_smart_mix_samples_with_loudness(
     sample_rate: u32,
     loudness: Option<&LoudnessSummary>,
 ) -> SmartMixProfileResult {
-    let duration_ms = if sample_rate == 0 {
+    analyze_smart_mix_segments(samples, None, sample_rate, None, loudness)
+}
+
+pub struct AudioTail<'a> {
+    pub samples: &'a [f32],
+    pub start_ms: u64,
+}
+
+pub fn analyze_smart_mix_segments(
+    samples: &[f32],
+    tail: Option<AudioTail<'_>>,
+    sample_rate: u32,
+    total_duration_ms: Option<u64>,
+    loudness: Option<&LoudnessSummary>,
+) -> SmartMixProfileResult {
+    let duration_ms = total_duration_ms.unwrap_or(if sample_rate == 0 {
         0
     } else {
         samples.len() as u64 * 1_000 / u64::from(sample_rate)
-    };
+    });
     if sample_rate == 0 || samples.len() < sample_rate as usize * 2 {
         return SmartMixProfileResult::unavailable(duration_ms);
     }
@@ -804,16 +908,28 @@ pub fn analyze_smart_mix_samples_with_loudness(
         downbeat_features(&beat_frames, &beat_grid_ms, &onsets, bpm_confidence);
     let (key, scale, key_confidence) = detect_key(samples, sample_rate);
     let camelot = to_camelot(&key, &scale).map(str::to_owned);
-    let (active_start_ms, intro_cue_ms, outro_cue_ms, active_end_ms) =
+    let (active_start_ms, intro_cue_ms, mut outro_cue_ms, mut active_end_ms) =
         detect_mix_cues(samples, sample_rate, &beat_grid_ms);
     let intro = signal_features(
         window_samples(samples, sample_rate, intro_cue_ms, false),
         sample_rate,
     );
-    let outro = signal_features(
-        window_samples(samples, sample_rate, active_end_ms, true),
-        sample_rate,
-    );
+    let outro = match &tail {
+        Some(tail) => {
+            let (_, _, tail_outro_ms, tail_end_ms) =
+                detect_mix_cues(tail.samples, sample_rate, &[]);
+            outro_cue_ms = tail_outro_ms.map(|position| position + tail.start_ms);
+            active_end_ms = tail_end_ms.map(|position| position + tail.start_ms);
+            signal_features(
+                window_samples(tail.samples, sample_rate, tail_end_ms, true),
+                sample_rate,
+            )
+        }
+        None => signal_features(
+            window_samples(samples, sample_rate, active_end_ms, true),
+            sample_rate,
+        ),
+    };
     let global = signal_features(samples, sample_rate);
     let intro_lufs = loudness.zip(intro_cue_ms).and_then(|(summary, start_ms)| {
         summary.window_lufs(start_ms, start_ms + MEASUREMENT_WINDOW_MS)
@@ -821,7 +937,8 @@ pub fn analyze_smart_mix_samples_with_loudness(
     let outro_lufs = loudness.zip(active_end_ms).and_then(|(summary, end_ms)| {
         summary.window_lufs(end_ms.saturating_sub(MEASUREMENT_WINDOW_MS), end_ms)
     });
-    let quality = if beat_grid_ms.len() >= 12
+    let quality = if tail.is_none()
+        && beat_grid_ms.len() >= 12
         && bpm_confidence >= 0.75
         && tempo_stability >= 0.8
         && downbeat_anchor_ms.is_some()
@@ -878,7 +995,7 @@ pub fn analyze_track_with_ml(path: &Path, panns: Option<&crate::ml::PannsModel>)
     }
 
     if let Some(model) = panns {
-        match decode_audio_original(path) {
+        match decode_audio_original(path, crate::ml::PANNS_DURATION) {
             Ok((orig_samples, orig_sr)) => {
                 let waveform_32k = crate::ml::resample_linear(
                     &orig_samples,
@@ -914,7 +1031,7 @@ pub fn analyze_track_with_ml(path: &Path, panns: Option<&crate::ml::PannsModel>)
 }
 
 pub fn analyze_track(path: &Path) -> AnalysisResult {
-    let (samples, sample_rate, measured_loudness) = match decode_audio(path) {
+    let decoded = match decode_audio(path) {
         Ok(r) => r,
         Err(e) => {
             return AnalysisResult {
@@ -936,6 +1053,14 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
             }
         }
     };
+
+    let DecodedAudio {
+        head: samples,
+        tail,
+        sample_rate,
+        duration_ms,
+        loudness: measured_loudness,
+    } = decoded;
 
     if samples.is_empty() {
         return AnalysisResult {
@@ -963,9 +1088,14 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
     let dynamic_range = compute_dynamic_range(&samples);
     let bpm = estimate_bpm(&samples, sample_rate);
     let (key, scale, _) = detect_key(&samples, sample_rate);
-    let mix_profile = Some(analyze_smart_mix_samples_with_loudness(
+    let mix_profile = Some(analyze_smart_mix_segments(
         &samples,
+        tail.as_ref().map(|(samples, start_ms)| AudioTail {
+            samples,
+            start_ms: *start_ms,
+        }),
         sample_rate,
+        Some(duration_ms),
         measured_loudness.as_ref(),
     ));
 

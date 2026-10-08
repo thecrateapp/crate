@@ -1,6 +1,9 @@
 #![cfg(feature = "analysis")]
 
-use crate_cli::analyze::{analyze_smart_mix_samples, analyze_smart_mix_samples_with_loudness};
+use crate_cli::analyze::{
+    analyze_smart_mix_samples, analyze_smart_mix_samples_with_loudness, analyze_smart_mix_segments,
+    decode_audio_bounded, AudioTail,
+};
 use crate_cli::loudness::LoudnessMeter;
 
 const SAMPLE_RATE: u32 = 22_050;
@@ -119,4 +122,80 @@ fn measured_profile_publishes_bs1770_loudness_and_true_peak() {
     assert!(profile.intro_lufs.is_some());
     assert!(profile.outro_lufs.is_some());
     assert!(profile.true_peak_dbfs.unwrap() <= 0.5);
+}
+
+fn write_wav(path: &std::path::Path, samples: &[f32]) {
+    let data_len = (samples.len() * 2) as u32;
+    let mut bytes = Vec::with_capacity(44 + data_len as usize);
+    bytes.extend_from_slice(b"RIFF");
+    bytes.extend_from_slice(&(36 + data_len).to_le_bytes());
+    bytes.extend_from_slice(b"WAVEfmt ");
+    bytes.extend_from_slice(&16_u32.to_le_bytes());
+    bytes.extend_from_slice(&1_u16.to_le_bytes());
+    bytes.extend_from_slice(&1_u16.to_le_bytes());
+    bytes.extend_from_slice(&SAMPLE_RATE.to_le_bytes());
+    bytes.extend_from_slice(&(SAMPLE_RATE * 2).to_le_bytes());
+    bytes.extend_from_slice(&2_u16.to_le_bytes());
+    bytes.extend_from_slice(&16_u16.to_le_bytes());
+    bytes.extend_from_slice(b"data");
+    bytes.extend_from_slice(&data_len.to_le_bytes());
+    for sample in samples {
+        let value = (sample.clamp(-1.0, 1.0) * 32_767.0) as i16;
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+    std::fs::write(path, bytes).unwrap();
+}
+
+#[test]
+fn long_tracks_keep_only_a_bounded_head_and_tail() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("long.wav");
+    write_wav(&path, &click_track(124.0, 124.0, 40.0, 0.0, 3.0));
+
+    let decoded = decode_audio_bounded(&path, 10, 10).unwrap();
+
+    assert_eq!(decoded.duration_ms, 40_000);
+    assert_eq!(decoded.head.len(), 10 * SAMPLE_RATE as usize);
+    let (tail, tail_start_ms) = decoded.tail.as_ref().expect("tail segment");
+    assert_eq!(tail.len(), 10 * SAMPLE_RATE as usize);
+    assert_eq!(*tail_start_ms, 30_000);
+    assert!(decoded.loudness.as_ref().unwrap().integrated_lufs.is_some());
+
+    let profile = analyze_smart_mix_segments(
+        &decoded.head,
+        Some(AudioTail {
+            samples: tail,
+            start_ms: *tail_start_ms,
+        }),
+        decoded.sample_rate,
+        Some(decoded.duration_ms),
+        decoded.loudness.as_ref(),
+    );
+
+    assert_eq!(profile.duration_ms, 40_000);
+    assert_eq!(profile.quality, "partial");
+    assert!(profile
+        .beat_grid_ms
+        .iter()
+        .all(|position| *position <= 10_000));
+    let active_end_ms = profile.active_end_ms.unwrap();
+    assert!(
+        (36_000..=37_500).contains(&active_end_ms),
+        "{active_end_ms}"
+    );
+    assert!(profile.outro_cue_ms.unwrap() > 30_000);
+    assert!(profile.outro_lufs.is_some());
+}
+
+#[test]
+fn short_tracks_are_still_scanned_in_full() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("short.wav");
+    write_wav(&path, &click_track(124.0, 124.0, 15.0, 0.0, 0.0));
+
+    let decoded = decode_audio_bounded(&path, 10, 10).unwrap();
+
+    assert!(decoded.tail.is_none());
+    assert_eq!(decoded.head.len(), 15 * SAMPLE_RATE as usize);
+    assert_eq!(decoded.duration_ms, 15_000);
 }
