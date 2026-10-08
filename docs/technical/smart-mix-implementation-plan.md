@@ -60,34 +60,35 @@ Los paquetes P02–P05 entregan primero contratos e implementación backend veri
 
 ### 1.2 Trazabilidad de hallazgos
 
-| ID  | Hallazgo reproducido o carencia comprobada                                                                     | Paquetes que lo cierran   |
-| --- | -------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| R01 | Cue176s + fade12s sobre track180s genera transición fuera de pista                                             | SM03, A02                 |
-| R02 | Downmix oculta peak estéreo; RMS publicado como LUFS                                                           | SM01–SM02, A03            |
-| R03 | Idempotencia impide partial Python → full Rust                                                                 | SM04                      |
-| R04 | Fuente se revisa después de analizar; done antiguo excluido de backfill nuevo                                  | SM04–SM05                 |
-| R05 | Planning bloquea startup, también hace red en offline y no tiene deadline                                      | A01                       |
-| R06 | Standby ready antes de seek, trigger global tardío, envelope por ticks de main                                 | A02–A03                   |
-| R07 | Capabilities sin integrar y contrato desconocido no vacío aceptado                                             | P01, V01–V02              |
-| R08 | PAT catalog-only permite escribir play-events                                                                  | P02, P06                  |
-| R09 | Proxy prod/home envía PAT opaco a verificador JWT Go                                                           | P03, X02                  |
-| R10 | Caché devuelve éxito ante401/403/cancel; callbacks obsoletos sobreviven                                        | V01–V03                   |
-| R11 | Parsers JSON manuales, Unicode/body sin cubrir; sanitizer no enlaza                                            | V01, V09                  |
-| R12 | Catálogo plano/truncado, géneros normalizados excluidos, covers relativos                                      | P04, V03–V04              |
-| R13 | C solo spike; el ejecutor propio no es viable con el SDK (sin eventos, sin timer, grid de VDJ distinto)        | V06 (Crate Automix)       |
-| R14 | Sin matriz física/host, settings completos, packaging/soak                                                     | A04–A08, V07–V10, X01–X04 |
-| R15 | `GET /api/admin/smart-mix/status` cuenta ~48K `library_tracks` en cada request                                 | SM05                      |
-| R16 | Planes: get/set de caché por edge (hasta 64 round trips) y `DELETE LIKE` en request                            | SM06                      |
-| R17 | Compatibles aplican `LIMIT 500` antes de filtrar elegibilidad                                                  | SM06                      |
-| R18 | Catálogo VDJ recorre y ordena `library_tracks` por página con OFFSET sin límite                                | P04                       |
-| R19 | Respuesta de catálogo expone `path`; búsqueda PAT admite `scope=federated`; allowlist por sufijo sin método    | P02, P04                  |
-| R20 | `policy.py` usa techo −0.1 dBFS; el diseño fija ≤−1 dBTP                                                       | SM03, A03                 |
-| R21 | Spike: origen de producción por defecto, sin login, redacción de logs sin efecto, carrera al cancelar búsqueda | V02–V03                   |
-| R22 | Tests C++ con `assert` no comprueban nada en Release                                                           | V01                       |
-| R23 | Online Source y AutoStart exigen licencia Pro de VirtualDJ; no estaba en los documentos                        | V02, V10                  |
-| R24 | El SDK no tiene subcarpetas ni paginación; P04/V03 asumían jerarquía y cursores                                | P04, V03                  |
-| R25 | VDJ persiste la URL de cover y analiza las pistas con su propio grid/key                                       | V03, V05, V06             |
-| R26 | Cambiar el nombre del plugin dejó huérfanas sus entradas en `database.xml`                                     | V02, V10                  |
+| ID  | Hallazgo reproducido o carencia comprobada                                                                         | Paquetes que lo cierran   |
+| --- | ------------------------------------------------------------------------------------------------------------------ | ------------------------- |
+| R01 | Cue176s + fade12s sobre track180s genera transición fuera de pista                                                 | SM03, A02                 |
+| R02 | Downmix oculta peak estéreo; RMS publicado como LUFS                                                               | SM01–SM02, A03            |
+| R03 | Idempotencia impide partial Python → full Rust                                                                     | SM04                      |
+| R04 | Fuente se revisa después de analizar; done antiguo excluido de backfill nuevo                                      | SM04–SM05                 |
+| R05 | Planning bloquea startup, también hace red en offline y no tiene deadline                                          | A01                       |
+| R06 | Standby ready antes de seek, trigger global tardío, envelope por ticks de main                                     | A02–A03                   |
+| R07 | Capabilities sin integrar y contrato desconocido no vacío aceptado                                                 | P01, V01–V02              |
+| R08 | PAT catalog-only permite escribir play-events                                                                      | P02, P06                  |
+| R09 | Proxy prod/home envía PAT opaco a verificador JWT Go                                                               | P03, X02                  |
+| R10 | Caché devuelve éxito ante401/403/cancel; callbacks obsoletos sobreviven                                            | V01–V03                   |
+| R11 | Parsers JSON manuales, Unicode/body sin cubrir; sanitizer no enlaza                                                | V01, V09                  |
+| R12 | Catálogo plano/truncado, géneros normalizados excluidos, covers relativos                                          | P04, V03–V04              |
+| R13 | C solo spike; el ejecutor propio no es viable con el SDK (sin eventos, sin timer, grid de VDJ distinto)            | V06 (Crate Automix)       |
+| R14 | Sin matriz física/host, settings completos, packaging/soak                                                         | A04–A08, V07–V10, X01–X04 |
+| R15 | `GET /api/admin/smart-mix/status` cuenta ~48K `library_tracks` en cada request                                     | SM05                      |
+| R16 | Planes: get/set de caché por edge (hasta 64 round trips) y `DELETE LIKE` en request                                | SM06                      |
+| R17 | Compatibles aplican `LIMIT 500` antes de filtrar elegibilidad                                                      | SM06                      |
+| R18 | Catálogo VDJ recorre y ordena `library_tracks` por página con OFFSET sin límite                                    | P04                       |
+| R19 | Respuesta de catálogo expone `path`; búsqueda PAT admite `scope=federated`; allowlist por sufijo sin método        | P02, P04                  |
+| R20 | `policy.py` usa techo −0.1 dBFS; el diseño fija ≤−1 dBTP                                                           | SM03, A03                 |
+| R21 | Spike: origen de producción por defecto, sin login, redacción de logs sin efecto, carrera al cancelar búsqueda     | V02–V03                   |
+| R22 | Tests C++ con `assert` no comprueban nada en Release                                                               | V01                       |
+| R23 | Online Source y AutoStart exigen licencia Pro de VirtualDJ; no estaba en los documentos                            | V02, V10                  |
+| R24 | El SDK no tiene subcarpetas ni paginación; P04/V03 asumían jerarquía y cursores                                    | P04, V03                  |
+| R25 | VDJ persiste la URL de cover y analiza las pistas con su propio grid/key                                           | V03, V05, V06             |
+| R26 | Cambiar el nombre del plugin dejó huérfanas sus entradas en `database.xml`                                         | V02, V10                  |
+| R27 | Android aplica la ganancia del plan como constante durante el fade y salta a unidad al terminar (escalón de ~3 dB) | A03                       |
 
 ## 2. Preparación y verificación comunes
 
@@ -696,13 +697,13 @@ Evidencia 2026-10-08, rama antes de integrar main (el resultado posterior al mer
 | Vitest Listen/Admin Smart Mix                      | 61/61 y 2/2                                  |                                            |
 | C++ headless / con SDK local                       | 14/14 y 16/16 CTests                         | Sanitizers no enlazan; Release sin asserts |
 
-| Paquete     | Estado inicial | Commit / comandos / artefactos / siguiente bloqueo           |
-| ----------- | -------------- | ------------------------------------------------------------ |
-| C00/P01–P06 | Pendiente      | Baseline anterior preservado; registrar evidencia nueva aquí |
-| SM01–SM07   | Pendiente      | Hay implementación parcial anterior, descrita en el diseño   |
-| A01–A08     | Pendiente      | Adaptive WIP; campos tempo/phase/bass sin ejecutar           |
-| V01–V10     | Pendiente      | Core/spike WIP;14CTests no acreditan host                    |
-| X01–X04     | Pendiente      | Sin aceptación/release conjunta                              |
+| Paquete     | Estado inicial | Commit / comandos / artefactos / siguiente bloqueo                                                                                                                                                                                                                                                                                                                          |
+| ----------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C00/P01–P06 | En curso       | P01: versiones centralizadas en `smart_mix/versions.py` y Rust (`572f06b9`); migraciones 104/105 tras el merge. P02 pasos 1–3: allowlist por método, scope de play events, búsqueda PAT local, sin `path` en catálogo, auth sin `FOR UPDATE` (`770ced11`, `0ecf37f9`, `55296480`, `7d5fa812`). Pendiente: rama PAT de `/api/auth/me`, `path` en `/api/search`, UI de tokens |
+| SM01–SM07   | En curso       | SM03: ventana acotada en ambas pistas, fase con los dos grids, techo −1 dBTP sin boost no acreditado (`f47ee91e`); planner v2 en servidor, Listen, Android y VDJ con fixture compartido (`7841daed`); 3881 tests de planner. Siguiente: SM01                                                                                                                                |
+| A01–A08     | En curso       | A01: deadline 1 s con abort, offline sin peticiones, 3 edges con generaciones (`53d28608`); la cola nativa arranca sin esperar planes y los instala por revisión (`beebff6a`); Vitest 267 en contextos, Gradle 60. Siguiente: A02                                                                                                                                           |
+| V01–V10     | Pendiente      | Core/spike WIP;14CTests no acreditan host                                                                                                                                                                                                                                                                                                                                   |
+| X01–X04     | Pendiente      | Sin aceptación/release conjunta                                                                                                                                                                                                                                                                                                                                             |
 
 Al iniciar una tarea se expande su fila individual: `pendiente → en curso → verificado` o `bloqueado` con causa concreta y próximo paso. Anotar qué gates faltan, no porcentajes subjetivos de progreso.
 
