@@ -202,3 +202,28 @@ def test_first_plays_track_discovery_days(pg_db):
             )
         ).scalar_one()
     assert first_day == "2026-01-03"
+
+
+def test_concurrent_first_builds_for_one_user_do_not_collide(pg_db):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    from crate.db.repositories.user_library_aggregate_runner import (
+        ensure_user_listening_aggregates,
+    )
+
+    seed_listening_history(events=600, days=90)
+    workers = 4
+    barrier = Barrier(workers)
+
+    def _ensure() -> None:
+        barrier.wait()
+        ensure_user_listening_aggregates(1)
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for future in [pool.submit(_ensure) for _ in range(workers)]:
+            future.result()
+
+    built = _snapshot()
+    recompute_user_listening_aggregates(1)
+    assert _snapshot() == built

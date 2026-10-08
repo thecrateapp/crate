@@ -496,7 +496,15 @@ def _save_state(session, user_id: int, tz: str, *, rebuilt: bool) -> None:
     )
 
 
+def _lock_user_projections(session, user_id: int) -> None:
+    session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"),
+        {"lock_key": f"user-listening-projections:{user_id}"},
+    )
+
+
 def rebuild_user_listening_projections(session, user_id: int) -> dict:
+    _lock_user_projections(session, user_id)
     tz = user_listening_timezone(session, user_id)
     session.execute(
         text("DELETE FROM user_listening_dirty_days WHERE user_id = :user_id"),
@@ -511,6 +519,7 @@ def rebuild_user_listening_projections(session, user_id: int) -> dict:
 
 
 def refresh_user_listening_projections(session, user_id: int) -> dict:
+    _lock_user_projections(session, user_id)
     tz = user_listening_timezone(session, user_id)
     state_tz = session.execute(
         text(
