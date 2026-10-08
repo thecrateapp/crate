@@ -9,10 +9,10 @@ import numpy as np
 from crate.smart_mix.camelot import to_camelot
 from crate.smart_mix.cue_detection import detect_mix_cues
 from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
+from crate.smart_mix.versions import ANALYZER_VERSION
 
 
 ANALYZER_NAME = "crate-python"
-ANALYZER_VERSION = "smart-mix-v1"
 TARGET_SAMPLE_RATE = 22_050
 HOP_LENGTH = 256
 WINDOW_SECONDS = 5.0

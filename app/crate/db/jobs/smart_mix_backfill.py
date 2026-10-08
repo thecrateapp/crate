@@ -9,10 +9,11 @@ from typing import Any, Sequence
 from sqlalchemy import text
 
 from crate.db.tx import optional_scope
+from crate.smart_mix.versions import ANALYZER_VERSION
 
 
 SMART_MIX_PIPELINE = "smart_mix"
-SMART_MIX_ANALYZER_VERSION = "smart-mix-v1"
+SMART_MIX_ANALYZER_VERSION = ANALYZER_VERSION
 MAX_BACKFILL_BATCH_SIZE = 100
 DEFAULT_MAX_ATTEMPTS = 3
 

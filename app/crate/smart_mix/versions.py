@@ -1,0 +1,20 @@
+from __future__ import annotations
+
+from crate.smart_mix.beat_grid import FORMAT_NAME as BEAT_GRID_FORMAT
+from crate.smart_mix.policy import PLANNER_POLICY_V1
+
+API_CONTRACT_VERSION = "2026-08"
+PROFILE_SCHEMA_VERSION = 1
+ANALYZER_VERSION = "smart-mix-v1"
+PLANNER_IDENTIFIER = PLANNER_POLICY_V1.identifier
+PLANNER_POLICY_VERSION = PLANNER_POLICY_V1.version
+
+
+__all__ = [
+    "ANALYZER_VERSION",
+    "API_CONTRACT_VERSION",
+    "BEAT_GRID_FORMAT",
+    "PLANNER_IDENTIFIER",
+    "PLANNER_POLICY_VERSION",
+    "PROFILE_SCHEMA_VERSION",
+]

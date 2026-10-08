@@ -29,10 +29,11 @@ from crate.db.repositories.library_analysis_writes import (
 )
 from crate.db.tx import read_scope, transaction_scope
 from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
+from crate.smart_mix.versions import ANALYZER_VERSION
 
 
 SMART_MIX_PIPELINE = "smart_mix"
-SMART_MIX_ANALYZER_VERSION = "smart-mix-v1"
+SMART_MIX_ANALYZER_VERSION = ANALYZER_VERSION
 log = logging.getLogger(__name__)
 
 

@@ -37,6 +37,7 @@ from crate.smart_mix.models import (
     TransitionPlan,
 )
 from crate.smart_mix.planner import plan_transition
+from crate.smart_mix.versions import PLANNER_IDENTIFIER
 
 
 router = APIRouter(prefix="/api", tags=["smart-mix"])
@@ -239,7 +240,7 @@ def _plan_cache_key(
     incoming: TrackMixProfile | None,
 ) -> str:
     cache_identity = {
-        "plannerVersion": "smart-mix-v1",
+        "plannerVersion": PLANNER_IDENTIFIER,
         "outgoingTrackEntityUid": str(edge.outgoing_track_entity_uid),
         "outgoingProfileRevision": (
             outgoing.profile_revision if outgoing is not None else "missing"

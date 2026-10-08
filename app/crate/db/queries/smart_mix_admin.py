@@ -5,10 +5,11 @@ from __future__ import annotations
 from sqlalchemy import text
 
 from crate.db.tx import read_scope
+from crate.smart_mix.versions import ANALYZER_VERSION
 
 
 SMART_MIX_PROFILE_VERSION = 1
-SMART_MIX_ANALYZER_VERSION = "smart-mix-v1"
+SMART_MIX_ANALYZER_VERSION = ANALYZER_VERSION
 
 
 def get_smart_mix_admin_status() -> dict:

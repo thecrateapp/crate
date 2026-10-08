@@ -4,6 +4,7 @@ use std::fmt::{Display, Formatter};
 use serde::Serialize;
 
 pub const FORMAT_NAME: &str = "delta-ms-v1";
+pub const ANALYZER_VERSION: &str = "smart-mix-v1";
 pub const FORMAT_VERSION: u8 = 1;
 pub const MAX_BEAT_COUNT: usize = 100_000;
 pub const MAX_GRID_DURATION_MS: u64 = 24 * 60 * 60 * 1_000;
@@ -45,7 +46,7 @@ impl SmartMixProfileResult {
         Self {
             schema_version: 1,
             analyzer: "crate-rust".to_string(),
-            analyzer_version: "smart-mix-v1".to_string(),
+            analyzer_version: ANALYZER_VERSION.to_string(),
             duration_ms,
             quality: "unavailable".to_string(),
             bpm: None,

@@ -14,7 +14,7 @@ use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 
-use crate::mix_profile::{to_camelot, SmartMixProfileResult};
+use crate::mix_profile::{to_camelot, SmartMixProfileResult, ANALYZER_VERSION};
 use crate::{collect_audio_files, parse_extensions};
 
 const TARGET_SAMPLE_RATE: u32 = 22050;
@@ -803,7 +803,7 @@ pub fn analyze_smart_mix_samples(samples: &[f32], sample_rate: u32) -> SmartMixP
     SmartMixProfileResult {
         schema_version: 1,
         analyzer: "crate-rust".to_string(),
-        analyzer_version: "smart-mix-v1".to_string(),
+        analyzer_version: ANALYZER_VERSION.to_string(),
         duration_ms,
         quality: quality.to_string(),
         bpm,
