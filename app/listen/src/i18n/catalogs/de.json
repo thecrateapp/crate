@@ -1878,6 +1878,7 @@
   "stats.listening.title": "Wie du hörst",
   "stats.musicAge.title": "Musikalisches Alter",
   "stats.musicAge.oldest": "Deine älteste Platte in diesem Zeitraum: {album} ({year}).",
+  "stats.musicAge.decadeTop": "{decade}er, {share} % deines Hörens. Top-Album: {album} von {artist}",
   "stats.discoveries.title": "Entdeckungen",
   "stats.discoveries.since": "Zuerst gehört: {date}",
   "stats.discoveries.empty": "In diesem Zeitraum noch keine neuen Künstler.",

@@ -1886,6 +1886,7 @@
   "stats.listening.title": "Cómo escuchas",
   "stats.musicAge.title": "Edad musical",
   "stats.musicAge.oldest": "Tu disco más antiguo de este periodo: {album} ({year}).",
+  "stats.musicAge.decadeTop": "Años {decade}, {share}% de tu escucha. Disco más escuchado: {album} de {artist}",
   "stats.discoveries.title": "Descubrimientos",
   "stats.discoveries.since": "Primera escucha: {date}",
   "stats.discoveries.empty": "Todavía no hay artistas nuevos en este periodo.",

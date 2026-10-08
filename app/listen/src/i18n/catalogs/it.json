@@ -1878,6 +1878,7 @@
   "stats.listening.title": "Come ascolti",
   "stats.musicAge.title": "Età musicale",
   "stats.musicAge.oldest": "Il tuo disco più vecchio di questo periodo: {album} ({year}).",
+  "stats.musicAge.decadeTop": "Anni {decade}, {share}% del tuo ascolto. Disco più ascoltato: {album} di {artist}",
   "stats.discoveries.title": "Scoperte",
   "stats.discoveries.since": "Primo ascolto: {date}",
   "stats.discoveries.empty": "Ancora nessun nuovo artista in questo periodo.",

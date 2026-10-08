@@ -53,7 +53,19 @@ def _signal_dashboard() -> dict:
             },
             "music_age": {
                 "median_year": 2009,
-                "decades": [{"decade": 2000, "share": 1.0}],
+                "decades": [
+                    {
+                        "decade": 2000,
+                        "share": 1.0,
+                        "top_album": {
+                            "album": "Jane Doe",
+                            "artist": "Converge",
+                            "album_id": 18,
+                            "album_slug": "converge-jane-doe",
+                            "year": 2001,
+                        },
+                    }
+                ],
             },
             "genre_trend": [
                 {"genre_name": "metalcore", "share": 0.34, "delta_vs_previous": 0.02}
@@ -77,6 +89,7 @@ def test_dashboard_returns_the_signal_sections(test_app):
     assert data["tape"]["peaks"][0]["track"]["title"] == "Spectral Wound"
     assert data["highlights"]["longest_streak"]["days"] == 47
     assert data["music_age"]["median_year"] == 2009
+    assert data["music_age"]["decades"][0]["top_album"]["album"] == "Jane Doe"
     assert data["genre_trend"][0]["delta_vs_previous"] == 0.02
 
 

@@ -1878,6 +1878,7 @@
   "stats.listening.title": "Nola entzuten duzun",
   "stats.musicAge.title": "Adin musikala",
   "stats.musicAge.oldest": "Aldi honetako zure disko zaharrena: {album} ({year}).",
+  "stats.musicAge.decadeTop": "{decade}ko hamarkada, zure entzunaldien %{share}. Disko entzunena: {album} ({artist})",
   "stats.discoveries.title": "Aurkikuntzak",
   "stats.discoveries.since": "Lehen entzunaldia: {date}",
   "stats.discoveries.empty": "Oraindik ez dago artista berririk aldi honetan.",

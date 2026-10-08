@@ -1878,6 +1878,7 @@
   "stats.listening.title": "Com escoltes",
   "stats.musicAge.title": "Edat musical",
   "stats.musicAge.oldest": "El teu disc més antic d'aquest període: {album} ({year}).",
+  "stats.musicAge.decadeTop": "Anys {decade}, {share}% de la teva escolta. Disc més escoltat: {album} de {artist}",
   "stats.discoveries.title": "Descobriments",
   "stats.discoveries.since": "Primera escolta: {date}",
   "stats.discoveries.empty": "Encara no hi ha artistes nous en aquest període.",

@@ -1878,6 +1878,7 @@
   "stats.listening.title": "Ta façon d'écouter",
   "stats.musicAge.title": "Âge musical",
   "stats.musicAge.oldest": "Ton disque le plus ancien de la période : {album} ({year}).",
+  "stats.musicAge.decadeTop": "Années {decade}, {share} % de ton écoute. Disque phare : {album} de {artist}",
   "stats.discoveries.title": "Découvertes",
   "stats.discoveries.since": "Première écoute : {date}",
   "stats.discoveries.empty": "Pas encore de nouveaux artistes sur cette période.",

@@ -3,10 +3,16 @@ import { Link } from "react-router";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import type {
+  StatsDecadeAlbum,
   StatsMusicAge,
   StatsStoryArtistSignal,
 } from "@/components/stats/stats-model";
-import { artistPagePath, artistPhotoApiUrl } from "@/lib/library-routes";
+import {
+  albumCoverApiUrl,
+  albumPagePath,
+  artistPagePath,
+  artistPhotoApiUrl,
+} from "@/lib/library-routes";
 
 function formatDay(value: string | null | undefined, locale: string) {
   if (!value) return "";
@@ -19,7 +25,24 @@ function formatDay(value: string | null | undefined, locale: string) {
   });
 }
 
-export function StatsMusicAgeCard({ musicAge }: { musicAge: StatsMusicAge }) {
+function decadeAlbumRoute(album: StatsDecadeAlbum) {
+  return {
+    albumId: album.album_id ?? undefined,
+    albumSlug: album.album_slug ?? undefined,
+    artistName: album.artist ?? undefined,
+    albumName: album.album,
+  };
+}
+
+export function StatsDecadeColumns({
+  musicAge,
+  linked = false,
+  className,
+}: {
+  musicAge: StatsMusicAge;
+  linked?: boolean;
+  className?: string;
+}) {
   const { t } = useTranslation();
   const maxShare = Math.max(
     0.01,
@@ -27,25 +50,70 @@ export function StatsMusicAgeCard({ musicAge }: { musicAge: StatsMusicAge }) {
   );
   const medianDecade = Math.floor(musicAge.median_year / 10) * 10;
   return (
-    <div className="stats-card rounded-panel p-5">
-      <h3 className="text-sm font-semibold text-accent-action">
-        {t("stats.musicAge.title")}
-      </h3>
-      <div className="stats-closing-value">{musicAge.median_year}</div>
-      <div className="stats-decades" aria-hidden="true">
-        {musicAge.decades.map((item, index) => (
-          <div key={item.decade} className="stats-decade">
+    <div
+      className={className ? `stats-decades ${className}` : "stats-decades"}
+      aria-hidden={linked ? undefined : "true"}
+    >
+      {musicAge.decades.map((item, index) => {
+        const album = item.top_album;
+        const share = Math.round(item.share * 100);
+        const hot = item.decade === medianDecade ? "true" : undefined;
+        const content = (
+          <>
+            {album ? (
+              <CrateImage
+                src={albumCoverApiUrl(decadeAlbumRoute(album), { size: 256 })}
+                alt=""
+                className="stats-decade-cover"
+                loading="lazy"
+              />
+            ) : null}
             <i
-              data-hot={item.decade === medianDecade ? "true" : undefined}
               style={{
                 height: `${Math.max(4, (item.share / maxShare) * 100)}%`,
                 animationDelay: `${index * 120}ms`,
               }}
             />
-            <span>{`${String(item.decade).slice(2)}s`}</span>
+            <span className="stats-decade-label">
+              <b>{`${String(item.decade).slice(2)}s`}</b>
+              {`${share}%`}
+            </span>
+          </>
+        );
+        return linked && album ? (
+          <Link
+            key={item.decade}
+            to={albumPagePath(decadeAlbumRoute(album))}
+            className="stats-decade"
+            data-hot={hot}
+            aria-label={t("stats.musicAge.decadeTop", {
+              decade: item.decade,
+              share,
+              album: album.album,
+              artist: album.artist ?? "",
+            })}
+          >
+            {content}
+          </Link>
+        ) : (
+          <div key={item.decade} className="stats-decade" data-hot={hot}>
+            {content}
           </div>
-        ))}
-      </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function StatsMusicAgeCard({ musicAge }: { musicAge: StatsMusicAge }) {
+  const { t } = useTranslation();
+  return (
+    <div className="stats-card rounded-panel p-5">
+      <h3 className="text-sm font-semibold text-accent-action">
+        {t("stats.musicAge.title")}
+      </h3>
+      <div className="stats-closing-value">{musicAge.median_year}</div>
+      <StatsDecadeColumns musicAge={musicAge} linked />
       {musicAge.oldest_album ? (
         <p className="mt-3 text-sm leading-6 text-text-secondary">
           {t("stats.musicAge.oldest", {

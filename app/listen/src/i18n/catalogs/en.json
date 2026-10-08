@@ -1886,6 +1886,7 @@
   "stats.listening.title": "How you listen",
   "stats.musicAge.title": "Music age",
   "stats.musicAge.oldest": "Your oldest record this period: {album} ({year}).",
+  "stats.musicAge.decadeTop": "{decade}s, {share}% of your listening. Top record: {album} by {artist}",
   "stats.discoveries.title": "Discoveries",
   "stats.discoveries.since": "First played {date}",
   "stats.discoveries.empty": "No new artists in this period yet.",

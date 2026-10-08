@@ -7,6 +7,7 @@ import { Button } from "@crate/ui/shadcn/button";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { CountUpNumber } from "@/components/stats/CountUpNumber";
+import { StatsDecadeColumns } from "@/components/stats/StatsClosingCards";
 import {
   formatStatsMinutes,
   type StatsDashboard,
@@ -277,8 +278,6 @@ function buildChapters(
 
   const age = dashboard.music_age;
   if (age) {
-    const maxShare = Math.max(0.01, ...age.decades.map((item) => item.share));
-    const medianDecade = Math.floor(age.median_year / 10) * 10;
     chapters.push({
       key: "age",
       label: t("stats.musicAge.title"),
@@ -290,23 +289,10 @@ function buildChapters(
           <p className="stats-digging-copy">
             {t("stats.digging.age.body", { year: age.median_year })}
           </p>
-          <div
-            className="stats-decades stats-digging-decades"
-            aria-hidden="true"
-          >
-            {age.decades.map((item, position) => (
-              <div key={item.decade} className="stats-decade">
-                <i
-                  data-hot={item.decade === medianDecade ? "true" : undefined}
-                  style={{
-                    height: `${Math.max(4, (item.share / maxShare) * 100)}%`,
-                    animationDelay: `${position * 120}ms`,
-                  }}
-                />
-                <span>{`${String(item.decade).slice(2)}s`}</span>
-              </div>
-            ))}
-          </div>
+          <StatsDecadeColumns
+            musicAge={age}
+            className="stats-digging-decades"
+          />
         </div>
       ),
     });

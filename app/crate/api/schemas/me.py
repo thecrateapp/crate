@@ -750,12 +750,7 @@ class StatsHeatmapResponse(BaseModel):
     night_share: float = 0
 
 
-class StatsDecadeShareResponse(BaseModel):
-    decade: int
-    share: float
-
-
-class StatsOldestAlbumResponse(BaseModel):
+class StatsYearAlbumResponse(BaseModel):
     album: str
     artist: str | None = None
     album_id: int | None = None
@@ -763,10 +758,16 @@ class StatsOldestAlbumResponse(BaseModel):
     year: int
 
 
+class StatsDecadeShareResponse(BaseModel):
+    decade: int
+    share: float
+    top_album: StatsYearAlbumResponse | None = None
+
+
 class StatsMusicAgeResponse(BaseModel):
     median_year: int
     decades: list[StatsDecadeShareResponse] = Field(default_factory=list)
-    oldest_album: StatsOldestAlbumResponse | None = None
+    oldest_album: StatsYearAlbumResponse | None = None
 
 
 class StatsGenreTrendResponse(BaseModel):
