@@ -276,9 +276,9 @@ def _draft() -> TrackMixProfileDraft:
 
 
 def test_rust_payload_carries_measurement_provenance_into_the_draft() -> None:
-    from crate.db.jobs.analysis_storage import _draft_from_payload
+    from crate.smart_mix.models import mix_profile_draft_from_payload
 
-    draft = _draft_from_payload(
+    draft = mix_profile_draft_from_payload(
         {
             "analyzer": "crate-rust",
             "analyzerVersion": "smart-mix-v1",

@@ -68,7 +68,7 @@ def test_analyze_mix_profile_extracts_stable_beats_and_downbeat(
         accent_downbeats=True,
     )
 
-    from crate.audio_analysis import analyze_mix_profile
+    from crate.smart_mix.analyzer import analyze_mix_profile
 
     profile = analyze_mix_profile(track)
 
@@ -100,7 +100,7 @@ def test_analyze_mix_profile_marks_drifting_tempo_as_unstable(
         duration_seconds=24.0,
     )
 
-    from crate.audio_analysis import analyze_mix_profile
+    from crate.smart_mix.analyzer import analyze_mix_profile
 
     profile = analyze_mix_profile(track)
 
@@ -121,7 +121,7 @@ def test_analyze_mix_profile_cues_and_windows_avoid_boundary_silence(
         outro_gain=2.5,
     )
 
-    from crate.audio_analysis import analyze_mix_profile
+    from crate.smart_mix.analyzer import analyze_mix_profile
 
     profile = analyze_mix_profile(track)
 
@@ -147,7 +147,7 @@ def test_python_fallback_never_publishes_unmeasured_loudness(tmp_path: Path) -> 
         outro_gain=2.5,
     )
 
-    from crate.audio_analysis import analyze_mix_profile
+    from crate.smart_mix.analyzer import analyze_mix_profile
     from crate.smart_mix.versions import ANALYZER_VERSION
 
     profile = analyze_mix_profile(track)
@@ -164,7 +164,7 @@ def test_analyze_mix_profile_retains_key_confidence(tmp_path: Path) -> None:
     track = tmp_path / "a-minor.wav"
     _write_a_minor_chord(track)
 
-    from crate.audio_analysis import analyze_mix_profile
+    from crate.smart_mix.analyzer import analyze_mix_profile
 
     profile = analyze_mix_profile(track)
 
@@ -187,7 +187,7 @@ def test_analyze_mix_profile_reads_the_outro_beyond_legacy_window(
         outro_gain=3.0,
     )
 
-    from crate.audio_analysis import analyze_mix_profile
+    from crate.smart_mix.analyzer import analyze_mix_profile
 
     profile = analyze_mix_profile(track)
 
@@ -207,10 +207,57 @@ def test_analyze_mix_profile_degrades_noise_without_reliable_downbeat(
     audio = rng.normal(0.0, 0.05, round(10.0 * SAMPLE_RATE))
     wavfile.write(track, SAMPLE_RATE, (audio * 32767).astype(np.int16))
 
-    from crate.audio_analysis import analyze_mix_profile
+    from crate.smart_mix.analyzer import analyze_mix_profile
 
     profile = analyze_mix_profile(track)
 
     assert profile.quality == "partial"
     assert profile.downbeat_anchor_ms is None
     assert profile.time_signature is None
+
+
+def test_backfill_analysis_prefers_the_rust_profile(
+    monkeypatch, tmp_path: Path
+) -> None:
+    import crate.audio_analysis as audio_analysis
+
+    monkeypatch.setattr(
+        audio_analysis,
+        "_analyze_rust",
+        lambda _path: {
+            "mix_profile": {
+                "analyzer": "crate-rust",
+                "analyzerVersion": "smart-mix-audio-v2",
+                "durationMs": 180_000,
+                "quality": "full",
+                "measurementVersion": "bs1770-v1",
+                "integratedLufs": -9.0,
+            }
+        },
+    )
+
+    draft = audio_analysis.analyze_mix_profile(tmp_path / "track.flac")
+
+    assert draft.analyzer == "crate-rust"
+    assert draft.measurement_version == "bs1770-v1"
+    assert draft.integrated_lufs == -9.0
+
+
+def test_backfill_analysis_falls_back_to_python_without_crate_cli(
+    monkeypatch, tmp_path: Path
+) -> None:
+    import crate.audio_analysis as audio_analysis
+
+    track = tmp_path / "fallback.wav"
+    _write_click_track(
+        track,
+        bpm=120.0,
+        duration_seconds=12.0,
+        leading_silence_seconds=0.0,
+        trailing_silence_seconds=0.0,
+    )
+    monkeypatch.setattr(audio_analysis, "_analyze_rust", lambda _path: None)
+
+    draft = audio_analysis.analyze_mix_profile(track)
+
+    assert draft.analyzer == "crate-python"

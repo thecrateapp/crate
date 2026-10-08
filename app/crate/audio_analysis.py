@@ -60,7 +60,12 @@ FRAME_STEP = 4  # analyze every Nth frame for spectral features
 def analyze_mix_profile(filepath: str | Path):
     """Analyze full-track signals used by the versioned Smart Mix profile."""
     from crate.smart_mix.analyzer import analyze_mix_profile as analyze
+    from crate.smart_mix.models import mix_profile_draft_from_payload
 
+    rust_result = _analyze_rust(str(filepath))
+    payload = rust_result.get("mix_profile") if rust_result else None
+    if isinstance(payload, dict):
+        return mix_profile_draft_from_payload(payload)
     return analyze(filepath)
 
 

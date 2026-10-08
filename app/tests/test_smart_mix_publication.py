@@ -60,6 +60,45 @@ def test_partial_result_never_replaces_a_full_profile_of_the_same_source(
     assert stored.quality is MixProfileQuality.FULL
 
 
+def test_older_analyzer_never_replaces_a_current_generation_profile(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    path, track_id = _track(tmp_path, "rolling-deploy")
+    publish_smart_mix_profile(capture_smart_mix_source(track_id, path), _draft())
+
+    outcome = publish_smart_mix_profile(
+        capture_smart_mix_source(track_id, path),
+        replace(_draft(analyzer="crate-rust"), analyzer_version="smart-mix-v1"),
+    )
+
+    assert outcome is SmartMixPublication.UNCHANGED
+    stored = get_track_mix_profile(track_id)
+    assert stored is not None
+    assert stored.analyzer_version == ANALYZER_VERSION
+
+
+def test_current_generation_replaces_an_older_analyzer_profile(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    path, track_id = _track(tmp_path, "generation-upgrade")
+    publish_smart_mix_profile(
+        capture_smart_mix_source(track_id, path),
+        replace(_draft(), analyzer_version="smart-mix-v1"),
+    )
+
+    outcome = publish_smart_mix_profile(
+        capture_smart_mix_source(track_id, path),
+        _draft(quality=MixProfileQuality.PARTIAL),
+    )
+
+    assert outcome is SmartMixPublication.PUBLISHED
+    stored = get_track_mix_profile(track_id)
+    assert stored is not None
+    assert stored.analyzer_version == ANALYZER_VERSION
+
+
 def test_changed_source_during_analysis_discards_the_draft(
     pg_db, tmp_path: Path
 ) -> None:

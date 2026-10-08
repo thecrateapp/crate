@@ -31,7 +31,11 @@ from crate.db.repositories.library_analysis_writes import (
 )
 from crate.db.repositories.smart_mix import ANY_PROFILE_REVISION
 from crate.db.tx import read_scope, transaction_scope
-from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
+from crate.smart_mix.models import (
+    MixProfileQuality,
+    TrackMixProfileDraft,
+    mix_profile_draft_from_payload,
+)
 from crate.smart_mix.versions import ANALYZER_VERSION, PROFILE_SCHEMA_VERSION
 
 
@@ -390,7 +394,7 @@ def store_analysis_results(results: list[tuple[int, str, dict]]) -> None:
                         _publish_smart_mix_profile(
                             session,
                             capture,
-                            _draft_from_payload(payload),
+                            mix_profile_draft_from_payload(payload),
                         )
                 except Exception as exc:
                     log.warning(
@@ -575,6 +579,12 @@ def _replaces_current_profile(
     if current is None:
         return True
     if (
+        current.analyzer_version == ANALYZER_VERSION
+        and current.quality != MixProfileQuality.UNAVAILABLE
+        and draft.analyzer_version != ANALYZER_VERSION
+    ):
+        return False
+    if (
         current.profile_version != PROFILE_SCHEMA_VERSION
         or current.source_revision != source_revision
         or current.analyzer_version != draft.analyzer_version
@@ -742,47 +752,6 @@ def _set_smart_mix_state(
             """
         ),
         params,
-    )
-
-
-def _draft_from_payload(payload: dict[str, Any]) -> TrackMixProfileDraft:
-    def value(snake_case: str, camel_case: str) -> Any:
-        return payload.get(snake_case, payload.get(camel_case))
-
-    return TrackMixProfileDraft(
-        analyzer=str(value("analyzer", "analyzer") or "crate-rust"),
-        analyzer_version=str(
-            value("analyzer_version", "analyzerVersion") or SMART_MIX_ANALYZER_VERSION
-        ),
-        duration_ms=int(value("duration_ms", "durationMs") or 0),
-        quality=value("quality", "quality") or MixProfileQuality.PARTIAL,
-        bpm=value("bpm", "bpm"),
-        bpm_confidence=value("bpm_confidence", "bpmConfidence"),
-        tempo_stability=value("tempo_stability", "tempoStability"),
-        beat_anchor_ms=value("beat_anchor_ms", "beatAnchorMs"),
-        downbeat_anchor_ms=value("downbeat_anchor_ms", "downbeatAnchorMs"),
-        time_signature=value("time_signature", "timeSignature"),
-        beat_grid_ms=tuple(value("beat_grid_ms", "beatGridMs") or ()),
-        key=value("key", "key"),
-        scale=value("scale", "scale"),
-        camelot=value("camelot", "camelot"),
-        key_confidence=value("key_confidence", "keyConfidence"),
-        intro_cue_ms=value("intro_cue_ms", "introCueMs"),
-        outro_cue_ms=value("outro_cue_ms", "outroCueMs"),
-        intro_lufs=value("intro_lufs", "introLufs"),
-        outro_lufs=value("outro_lufs", "outroLufs"),
-        true_peak_dbfs=value("true_peak_dbfs", "truePeakDbfs"),
-        intro_energy=value("intro_energy", "introEnergy"),
-        outro_energy=value("outro_energy", "outroEnergy"),
-        intro_spectral_density=value("intro_spectral_density", "introSpectralDensity"),
-        outro_spectral_density=value("outro_spectral_density", "outroSpectralDensity"),
-        global_energy=value("global_energy", "globalEnergy"),
-        danceability=value("danceability", "danceability"),
-        valence=value("valence", "valence"),
-        active_start_ms=value("active_start_ms", "activeStartMs"),
-        active_end_ms=value("active_end_ms", "activeEndMs"),
-        integrated_lufs=value("integrated_lufs", "integratedLufs"),
-        measurement_version=value("measurement_version", "measurementVersion"),
     )
 
 

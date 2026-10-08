@@ -65,7 +65,7 @@ def test_python_and_rust_mix_profiles_stay_within_tolerance(tmp_path: Path) -> N
         trailing_silence_seconds=1.0,
     )
 
-    from crate.audio_analysis import analyze_mix_profile
+    from crate.smart_mix.analyzer import analyze_mix_profile
 
     python_profile = analyze_mix_profile(track)
     result = subprocess.run(

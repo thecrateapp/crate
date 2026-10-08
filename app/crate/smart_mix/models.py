@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
+
+from crate.smart_mix.versions import ANALYZER_VERSION
 
 
 class MixProfileQuality(StrEnum):
@@ -357,6 +360,47 @@ class TransitionPlan:
                 else None
             ),
         }
+
+
+def mix_profile_draft_from_payload(payload: Mapping[str, Any]) -> TrackMixProfileDraft:
+    def value(snake_case: str, camel_case: str) -> Any:
+        return payload.get(snake_case, payload.get(camel_case))
+
+    return TrackMixProfileDraft(
+        analyzer=str(value("analyzer", "analyzer") or "crate-rust"),
+        analyzer_version=str(
+            value("analyzer_version", "analyzerVersion") or ANALYZER_VERSION
+        ),
+        duration_ms=int(value("duration_ms", "durationMs") or 0),
+        quality=value("quality", "quality") or MixProfileQuality.PARTIAL,
+        bpm=value("bpm", "bpm"),
+        bpm_confidence=value("bpm_confidence", "bpmConfidence"),
+        tempo_stability=value("tempo_stability", "tempoStability"),
+        beat_anchor_ms=value("beat_anchor_ms", "beatAnchorMs"),
+        downbeat_anchor_ms=value("downbeat_anchor_ms", "downbeatAnchorMs"),
+        time_signature=value("time_signature", "timeSignature"),
+        beat_grid_ms=tuple(value("beat_grid_ms", "beatGridMs") or ()),
+        key=value("key", "key"),
+        scale=value("scale", "scale"),
+        camelot=value("camelot", "camelot"),
+        key_confidence=value("key_confidence", "keyConfidence"),
+        intro_cue_ms=value("intro_cue_ms", "introCueMs"),
+        outro_cue_ms=value("outro_cue_ms", "outroCueMs"),
+        intro_lufs=value("intro_lufs", "introLufs"),
+        outro_lufs=value("outro_lufs", "outroLufs"),
+        true_peak_dbfs=value("true_peak_dbfs", "truePeakDbfs"),
+        intro_energy=value("intro_energy", "introEnergy"),
+        outro_energy=value("outro_energy", "outroEnergy"),
+        intro_spectral_density=value("intro_spectral_density", "introSpectralDensity"),
+        outro_spectral_density=value("outro_spectral_density", "outroSpectralDensity"),
+        global_energy=value("global_energy", "globalEnergy"),
+        danceability=value("danceability", "danceability"),
+        valence=value("valence", "valence"),
+        active_start_ms=value("active_start_ms", "activeStartMs"),
+        active_end_ms=value("active_end_ms", "activeEndMs"),
+        integrated_lufs=value("integrated_lufs", "integratedLufs"),
+        measurement_version=value("measurement_version", "measurementVersion"),
+    )
 
 
 def _validate_measurements(profile: Any) -> None:
