@@ -5,6 +5,17 @@
 	tls /certs/dev-stack.pem /certs/dev-stack-key.pem
 }
 
+(smart_mix_full) {
+	@smart_mix_full {
+		method GET
+		path /api/tracks/by-entity/*/mix-profile
+		query detail=full
+	}
+	handle @smart_mix_full {
+		reverse_proxy api:8585
+	}
+}
+
 (readplane_listen) {
 	@readplane_listen {
 		method GET
@@ -29,6 +40,43 @@
 	}
 }
 
+(vdj_api) {
+	@vdj_auth header_regexp Authorization ^Bearer[[:space:]]+crv_
+	handle @vdj_auth {
+		reverse_proxy api:8585
+	}
+}
+
+(public_album_cover_api) {
+	@public_album_cover {
+		method GET
+		path_regexp album_cover ^/api/albums/(?:by-entity/)?[^/]+/cover$
+	}
+	handle @public_album_cover {
+		reverse_proxy api:8585
+	}
+}
+
+(vdj_album_cover_api) {
+	@vdj_album_cover {
+		method GET HEAD
+		path_regexp vdj_album_cover ^/api/vdj/albums/[0-9]+/cover$
+	}
+	handle @vdj_album_cover {
+		reverse_proxy api:8585
+	}
+}
+
+(vdj_media_api) {
+	@vdj_media {
+		method GET HEAD
+		path_regexp vdj_media ^/api/vdj/tracks/by-entity/[^/]+/(?:playback|stream)$
+	}
+	handle @vdj_media {
+		reverse_proxy api:8585
+	}
+}
+
 (api_backend) {
 	@api_backend {
 		path /api/*
@@ -42,6 +90,7 @@ https://admin.dev.lespedants.org {
 	import local_tls
 	route {
 		import auth_api
+		import vdj_api
 		import api_backend
 		handle {
 			reverse_proxy host.docker.internal:5173
@@ -53,6 +102,9 @@ https://listen.dev.lespedants.org {
 	import local_tls
 	route {
 		import auth_api
+		import vdj_api
+		import vdj_media_api
+		import smart_mix_full
 		import readplane_listen
 		import api_backend
 		handle {
@@ -85,6 +137,11 @@ https://api.dev.lespedants.org {
 	import local_tls
 	route {
 		import auth_api
+		import vdj_api
+		import smart_mix_full
+		import vdj_album_cover_api
+		import vdj_media_api
+		import public_album_cover_api
 		import readplane_listen
 		handle {
 			reverse_proxy api:8585

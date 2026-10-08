@@ -7,7 +7,7 @@ import { cancelNativePlaybackRecoveryIntent } from "@/lib/native-playback-intent
 const mocks = vi.hoisted(() => ({
   refreshAuthToken: vi.fn(),
   shouldUseAndroidNativePlayer: vi.fn(() => true),
-  toStartupEngineTracks: vi.fn(),
+  toStartupEngineQueueSnapshot: vi.fn(),
   loadQueue: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -22,7 +22,7 @@ vi.mock("@/lib/android-native-engine", () => ({
 }));
 
 vi.mock("@/contexts/player-engine-adapter", () => ({
-  toStartupEngineTracks: mocks.toStartupEngineTracks,
+  toStartupEngineQueueSnapshot: mocks.toStartupEngineQueueSnapshot,
 }));
 
 vi.mock("@crate/ui/lib/notify", () => ({
@@ -72,8 +72,10 @@ describe("useNativeBufferingRecovery", () => {
         currentTrackRef: { current: queue[0] },
         effectiveCrossfadeMsRef: { current: 0 },
         lastNonZeroVolumeRef: { current: 1 },
+        playSourceRef: { current: null },
         queueRef: { current: queue },
         repeatRef: { current: "off" },
+        shuffleRef: { current: false },
       }),
     );
 
@@ -111,8 +113,10 @@ describe("useNativeBufferingRecovery", () => {
         currentTrackRef: { current: queue[0] },
         effectiveCrossfadeMsRef: { current: 0 },
         lastNonZeroVolumeRef: { current: 1 },
+        playSourceRef: { current: null },
         queueRef: { current: queue },
         repeatRef: { current: "off" },
+        shuffleRef: { current: false },
       }),
     );
 
@@ -161,8 +165,10 @@ describe("useNativeBufferingRecovery", () => {
         currentTrackRef: { current: queue[0] },
         effectiveCrossfadeMsRef: { current: 0 },
         lastNonZeroVolumeRef: { current: 1 },
+        playSourceRef: { current: null },
         queueRef: { current: queue },
         repeatRef: { current: "off" },
+        shuffleRef: { current: false },
       }),
     );
 
@@ -180,7 +186,7 @@ describe("useNativeBufferingRecovery", () => {
   it("does not load an autoplay queue after playback recovery is cancelled", async () => {
     const queue = [{ id: "track-1", title: "Track" }] as Track[];
     let resolveTracks!: (tracks: []) => void;
-    mocks.toStartupEngineTracks.mockReturnValue(
+    mocks.toStartupEngineQueueSnapshot.mockReturnValue(
       new Promise<[]>((resolve) => {
         resolveTracks = resolve;
       }),
@@ -196,8 +202,10 @@ describe("useNativeBufferingRecovery", () => {
         currentTrackRef: { current: queue[0] },
         effectiveCrossfadeMsRef: { current: 0 },
         lastNonZeroVolumeRef: { current: 1 },
+        playSourceRef: { current: null },
         queueRef: { current: queue },
         repeatRef: { current: "off" },
+        shuffleRef: { current: false },
       }),
     );
 
@@ -206,7 +214,9 @@ describe("useNativeBufferingRecovery", () => {
       probeStatus: "resume-authorization",
       autoplay: true,
     });
-    await waitFor(() => expect(mocks.toStartupEngineTracks).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mocks.toStartupEngineQueueSnapshot).toHaveBeenCalled(),
+    );
 
     cancelNativePlaybackRecoveryIntent();
     resolveTracks([]);
@@ -218,7 +228,7 @@ describe("useNativeBufferingRecovery", () => {
   it("unlocks a cancelled recovery so the same request can retry", async () => {
     const queue = [{ id: "track-1", title: "Track" }] as Track[];
     let resolveTracks!: (tracks: []) => void;
-    mocks.toStartupEngineTracks.mockReturnValueOnce(
+    mocks.toStartupEngineQueueSnapshot.mockReturnValueOnce(
       new Promise<[]>((resolve) => {
         resolveTracks = resolve;
       }),
@@ -234,8 +244,10 @@ describe("useNativeBufferingRecovery", () => {
         currentTrackRef: { current: queue[0] },
         effectiveCrossfadeMsRef: { current: 0 },
         lastNonZeroVolumeRef: { current: 1 },
+        playSourceRef: { current: null },
         queueRef: { current: queue },
         repeatRef: { current: "off" },
+        shuffleRef: { current: false },
       }),
     );
     const options = {
@@ -245,12 +257,14 @@ describe("useNativeBufferingRecovery", () => {
     };
 
     const first = result.current.recoverNativeBuffering(options);
-    await waitFor(() => expect(mocks.toStartupEngineTracks).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mocks.toStartupEngineQueueSnapshot).toHaveBeenCalled(),
+    );
     cancelNativePlaybackRecoveryIntent("pause");
     resolveTracks([]);
     await expect(first).resolves.toBe(false);
 
-    mocks.toStartupEngineTracks.mockResolvedValueOnce([]);
+    mocks.toStartupEngineQueueSnapshot.mockResolvedValueOnce([]);
     await expect(result.current.recoverNativeBuffering(options)).resolves.toBe(
       true,
     );
@@ -262,7 +276,7 @@ describe("useNativeBufferingRecovery", () => {
       { id: "track-1", title: "One" },
       { id: "track-2", title: "Two" },
     ] as Track[];
-    mocks.toStartupEngineTracks.mockResolvedValue([]);
+    mocks.toStartupEngineQueueSnapshot.mockResolvedValue({});
     const { result } = renderHook(() =>
       useNativeBufferingRecovery({
         beginSoftInterruption: vi.fn(),
@@ -274,8 +288,10 @@ describe("useNativeBufferingRecovery", () => {
         currentTrackRef: { current: queue[0] },
         effectiveCrossfadeMsRef: { current: 0 },
         lastNonZeroVolumeRef: { current: 1 },
+        playSourceRef: { current: null },
         queueRef: { current: queue },
         repeatRef: { current: "off" },
+        shuffleRef: { current: false },
       }),
     );
 
@@ -287,18 +303,15 @@ describe("useNativeBufferingRecovery", () => {
       positionMs: 23_000,
     });
 
-    expect(mocks.toStartupEngineTracks).toHaveBeenCalledWith(
-      queue,
-      1,
-      undefined,
-      { target: "android-native" },
-    );
-    expect(mocks.loadQueue).toHaveBeenCalledWith(
+    expect(mocks.toStartupEngineQueueSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({
+        tracks: queue,
         currentIndex: 1,
         positionMs: 23_000,
         autoplay: false,
+        target: "android-native",
       }),
     );
+    expect(mocks.loadQueue).toHaveBeenCalledOnce();
   });
 });

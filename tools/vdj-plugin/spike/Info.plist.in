@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>English</string>
+  <key>CFBundleExecutable</key>
+  <string>@CRATE_VDJ_BUNDLE_EXECUTABLE@</string>
+  <key>CFBundleIdentifier</key>
+  <string>@CRATE_VDJ_BUNDLE_IDENTIFIER@</string>
+  <key>CFBundleIconFile</key>
+  <string>crate-icon.png</string>
+  <key>CFBundleIconName</key>
+  <string>crate-icon</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>@CRATE_VDJ_BUNDLE_NAME@</string>
+  <key>CFBundleDisplayName</key>
+  <string>@CRATE_VDJ_BUNDLE_NAME@</string>
+  <key>CFBundlePackageType</key>
+  <string>BNDL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>0.1.0</string>
+  <key>CFBundleVersion</key>
+  <string>0.1.0</string>
+  <key>NSHumanReadableCopyright</key>
+  <string>Crate</string>
+</dict>
+</plist>

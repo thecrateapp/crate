@@ -1,7 +1,10 @@
 import { useCallback, useRef } from "react";
 
-import type { RepeatMode, Track } from "@/contexts/player-types";
-import { toStartupEngineTracks } from "@/contexts/player-engine-adapter";
+import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
+import {
+  toStartupEngineQueueSnapshot,
+  toStartupEngineTracks,
+} from "@/contexts/player-engine-adapter";
 import { clampIndex } from "@/contexts/player-queue-helpers";
 import {
   loadQueue as gpLoadQueue,
@@ -21,6 +24,8 @@ import { createQueueRevision } from "@/lib/playback-engine";
 
 interface UsePlayerEngineQueueSyncParams {
   repeatRef: { current: RepeatMode };
+  playSourceRef: { current: PlaySource | null };
+  shuffleRef: { current: boolean };
   isPlayingRef: { current: boolean };
   effectiveCrossfadeMsRef: { current: number };
   bufferingIntentRef: { current: boolean };
@@ -52,6 +57,8 @@ function stopNativeEngineIfAvailable(context: string) {
 
 export function usePlayerEngineQueueSync({
   repeatRef,
+  playSourceRef,
+  shuffleRef,
   isPlayingRef,
   effectiveCrossfadeMsRef,
   bufferingIntentRef,
@@ -136,23 +143,22 @@ export function usePlayerEngineQueueSync({
           );
         });
         void (async () => {
-          const engineTracks = await toStartupEngineTracks(
-            nextQueue,
-            nextIndex,
-            undefined,
-            { target: "android-native" },
-          );
-          if (!isCurrentSync()) return;
-          return androidNativeEngine.loadQueue({
-            revision: createQueueRevision(),
-            tracks: engineTracks,
+          const revision = createQueueRevision();
+          const snapshot = await toStartupEngineQueueSnapshot({
+            revision,
+            tracks: nextQueue,
             currentIndex: nextIndex,
             positionMs,
             autoplay,
             repeat: repeatRef.current,
             crossfadeMs: effectiveCrossfadeMsRef.current,
             volume: 1,
+            playSource: playSourceRef.current,
+            shuffle: shuffleRef.current,
+            target: "android-native",
           });
+          if (!isCurrentSync()) return;
+          return androidNativeEngine.loadQueue(snapshot);
         })().catch((error) => {
           if (!isCurrentSync()) return;
           console.error("[native-player] failed to sync queue:", error);
@@ -233,9 +239,11 @@ export function usePlayerEngineQueueSync({
       engineTrackMapRef,
       isPlayingRef,
       markSeekPosition,
+      playSourceRef,
       pullFromEngine,
       rememberActiveTrack,
       repeatRef,
+      shuffleRef,
     ],
   );
 

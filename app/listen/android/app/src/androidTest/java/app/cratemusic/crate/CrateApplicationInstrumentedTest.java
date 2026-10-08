@@ -24,8 +24,8 @@ public class CrateApplicationInstrumentedTest {
 
     @Test
     public void restoredPlaybackItemHasAnOpaqueLocalConfiguration() {
-        CrateNativePlaybackService.NativeTrack track =
-            new CrateNativePlaybackService.NativeTrack(
+        NativeTrack track =
+            new NativeTrack(
                 "track-1",
                 "",
                 "",

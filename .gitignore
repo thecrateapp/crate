@@ -27,6 +27,7 @@ test-music-federation/
 
 # Node
 node_modules/
+build/
 dist/
 coverage/
 **/coverage/

@@ -90,3 +90,88 @@ def test_l1_hit_respects_stricter_requested_max_age(monkeypatch):
     )
 
     assert cache_store.get_cache("key", max_age_seconds=10) is None
+
+
+def test_smart_mix_plan_cache_uses_revision_key_and_bounded_ttl(monkeypatch):
+    from crate.db import cache_store
+
+    reads: list[tuple[str, int | None]] = []
+    writes: list[tuple[str, dict, int | None]] = []
+    monkeypatch.setattr(
+        cache_store,
+        "get_cache",
+        lambda key, max_age_seconds=None: (
+            reads.append((key, max_age_seconds)) or {"mode": "adaptive"}
+        ),
+    )
+    monkeypatch.setattr(
+        cache_store,
+        "set_cache",
+        lambda key, value, ttl=None: writes.append((key, value, ttl)),
+    )
+    monkeypatch.setattr(
+        cache_store,
+        "_maybe_prune_smart_mix_plan_cache",
+        lambda: None,
+    )
+
+    assert cache_store.get_smart_mix_plan_cache("revision-key") == {"mode": "adaptive"}
+    cache_store.set_smart_mix_plan_cache("revision-key", {"mode": "beatmatch"})
+
+    expected_key = "smart-mix:transition-plan:v1:revision-key"
+    assert reads == [(expected_key, cache_store.SMART_MIX_PLAN_CACHE_TTL_SECONDS)]
+    assert writes == [
+        (
+            expected_key,
+            {"mode": "beatmatch"},
+            cache_store.SMART_MIX_PLAN_CACHE_TTL_SECONDS,
+        )
+    ]
+
+
+def test_smart_mix_plan_cache_prunes_only_expired_revisioned_entries(
+    pg_db,
+    monkeypatch,
+):
+    del pg_db
+    from sqlalchemy import text
+
+    from crate.db import cache_store
+    from crate.db.tx import read_scope, transaction_scope
+
+    prefix = cache_store.SMART_MIX_PLAN_CACHE_PREFIX
+    keys = {
+        "expired": f"{prefix}expired",
+        "fresh": f"{prefix}fresh",
+        "unrelated": "unrelated:expired",
+    }
+    with transaction_scope() as session:
+        session.execute(
+            text("DELETE FROM cache WHERE key = ANY(:keys)"),
+            {"keys": list(keys.values())},
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO cache (key, value_json, updated_at)
+                VALUES
+                    (:expired, '{}'::jsonb, NOW() - INTERVAL '7 hours'),
+                    (:fresh, '{}'::jsonb, NOW()),
+                    (:unrelated, '{}'::jsonb, NOW() - INTERVAL '7 hours')
+                """
+            ),
+            keys,
+        )
+
+    monkeypatch.setattr(cache_store, "_smart_mix_plan_last_prune_at", 0.0)
+    monkeypatch.setattr(cache_store.time, "monotonic", lambda: 10_000.0)
+    cache_store._maybe_prune_smart_mix_plan_cache()
+
+    with read_scope() as session:
+        remaining = set(
+            session.execute(
+                text("SELECT key FROM cache WHERE key = ANY(:keys)"),
+                {"keys": list(keys.values())},
+            ).scalars()
+        )
+    assert remaining == {keys["fresh"], keys["unrelated"]}

@@ -22,6 +22,7 @@ import {
   OpsPanel,
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
+import { SmartMixCoverage } from "@/components/SmartMixCoverage";
 import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { Button } from "@crate/ui/shadcn/button";
 import {
@@ -641,6 +642,14 @@ export function Analysis() {
             </div>
           </div>
         </div>
+      </OpsPanel>
+
+      <OpsPanel
+        icon={AudioWaveform}
+        title="Smart Mix"
+        description="Versioned transition-analysis coverage and bounded backfill controls."
+      >
+        <SmartMixCoverage />
       </OpsPanel>
 
       <OpsPanel

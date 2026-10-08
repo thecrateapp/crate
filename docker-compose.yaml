@@ -374,6 +374,18 @@ services:
       traefik.http.routers.crate-api.rule: Host(`api.${DOMAIN}`)
       traefik.http.routers.crate-api.entryPoints: websecure
       traefik.http.routers.crate-api.middlewares: crate-api-compress@docker
+      traefik.http.routers.crate-api-vdj-artwork.rule: Host(`api.${DOMAIN}`) && (Method(`GET`) || Method(`HEAD`)) && PathPrefix(`/api/vdj/albums/`)
+      traefik.http.routers.crate-api-vdj-artwork.entryPoints: websecure
+      traefik.http.routers.crate-api-vdj-artwork.priority: 130
+      traefik.http.routers.crate-api-vdj-artwork.service: crate-api
+      traefik.http.routers.crate-api-vdj-artwork.tls: true
+      traefik.http.routers.crate-api-vdj-artwork.tls.certresolver: letsencrypt
+      traefik.http.routers.crate-api-vdj-media.rule: Host(`api.${DOMAIN}`) && (Method(`GET`) || Method(`HEAD`)) && PathPrefix(`/api/vdj/tracks/`)
+      traefik.http.routers.crate-api-vdj-media.entryPoints: websecure
+      traefik.http.routers.crate-api-vdj-media.priority: 140
+      traefik.http.routers.crate-api-vdj-media.service: crate-api
+      traefik.http.routers.crate-api-vdj-media.tls: true
+      traefik.http.routers.crate-api-vdj-media.tls.certresolver: letsencrypt
       traefik.http.services.crate-api.loadbalancer.server.port: 8585
       traefik.http.routers.crate-api.tls: true
       traefik.http.routers.crate-api.tls.certresolver: letsencrypt

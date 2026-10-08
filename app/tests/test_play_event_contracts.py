@@ -151,3 +151,62 @@ class TestPlayEventContract:
         resp = test_app.post("/api/me/play-events", json=payload)
 
         assert resp.status_code == 422
+
+
+def _access_token_user(scopes: list[str]):
+    async def resolve(_middleware, _request):
+        return {
+            "id": 7,
+            "email": "dj@example.test",
+            "role": "user",
+            "auth_type": "access_token",
+            "access_token_id": 42,
+            "scopes": scopes,
+        }
+
+    return resolve
+
+
+_VDJ_PLAY_EVENT = {
+    "client_event_id": "vdj_evt_1",
+    "track_entity_uid": "0b5d2c8e-6f1a-4d3b-9c7e-2a1f4e8d6b90",
+    "title": "Noah",
+    "artist": "Birds In Row",
+    "started_at": "2026-10-08T10:00:00Z",
+    "ended_at": "2026-10-08T10:03:00Z",
+    "played_seconds": 180.0,
+    "track_duration_seconds": 193.5,
+    "completion_ratio": 0.93,
+    "was_skipped": False,
+    "was_completed": True,
+}
+
+
+class TestAccessTokenPlayEvents:
+    def test_access_token_without_play_event_scope_cannot_write(self, test_app):
+        with (
+            patch(
+                "crate.api.auth.AuthMiddleware.resolve_user",
+                _access_token_user(["vdj.catalog.read", "vdj.media.read"]),
+            ),
+            patch("crate.api.me.record_play_event") as mock_record,
+        ):
+            resp = test_app.post("/api/me/play-events", json=_VDJ_PLAY_EVENT)
+
+        assert resp.status_code == 403
+        assert "vdj.play_events.write" in resp.json()["detail"]
+        mock_record.assert_not_called()
+
+    def test_access_token_with_play_event_scope_records_event(self, test_app):
+        with (
+            patch(
+                "crate.api.auth.AuthMiddleware.resolve_user",
+                _access_token_user(["vdj.play_events.write"]),
+            ),
+            patch("crate.api.me.record_play_event", return_value=91) as mock_record,
+        ):
+            resp = test_app.post("/api/me/play-events", json=_VDJ_PLAY_EVENT)
+
+        assert resp.status_code == 200
+        assert resp.json() == {"ok": True, "id": 91}
+        assert mock_record.call_args.args == (7,)

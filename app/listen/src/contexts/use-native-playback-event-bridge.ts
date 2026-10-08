@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { CrossfadeTransition } from "@/contexts/player-context";
 import type { Track } from "@/contexts/player-types";
 import { subscribeNativePlayerEvents } from "@/contexts/subscribe-native-player-events";
 import {
@@ -12,8 +13,10 @@ import type {
   EngineEventName,
   EnginePositionEvent,
   EngineState,
+  EngineTransitionEvent,
   NativeEventMetadata,
 } from "@/lib/playback-engine";
+import { resolveNativeCrossfadeTransition } from "@/lib/native-transition-visual";
 import {
   nativePlaybackErrorMessage,
   persistNativePlaybackDiagnostic,
@@ -187,7 +190,9 @@ export interface UseNativePlaybackEventBridgeParams {
   clearNativeBufferingWatchdog: () => void;
   commitIsBuffering: (isBuffering: boolean) => void;
   commitIsPlaying: (isPlaying: boolean) => void;
+  crossfadeTimerRef: MutableValueRef<number | null>;
   currentIndexRef: ValueRef<number>;
+  durationRef: ValueRef<number>;
   flushCurrentPlayEvent: (
     reason: "completed" | "skipped",
     track?: Track,
@@ -199,6 +204,7 @@ export interface UseNativePlaybackEventBridgeParams {
     nativeError: EngineEventMap["error"],
   ) => boolean;
   scheduleNativeBufferingWatchdog: () => void;
+  setCrossfadeTransition: (transition: CrossfadeTransition | null) => void;
 }
 
 export function useNativePlaybackEventBridge({
@@ -210,13 +216,16 @@ export function useNativePlaybackEventBridge({
   clearNativeBufferingWatchdog,
   commitIsBuffering,
   commitIsPlaying,
+  crossfadeTimerRef,
   currentIndexRef,
+  durationRef,
   flushCurrentPlayEvent,
   isNativeEventStale,
   queueRef,
   recoverNativeBuffering,
   retryNativePlaybackAfterAuthError,
   scheduleNativeBufferingWatchdog,
+  setCrossfadeTransition,
 }: UseNativePlaybackEventBridgeParams) {
   const { t } = useTranslation();
   const tRef = useRef(t);
@@ -252,6 +261,38 @@ export function useNativePlaybackEventBridge({
           isNativeEventStale,
         )
       ) {
+        return;
+      }
+      if (eventName === "transitionStarted") {
+        const transition = resolveNativeCrossfadeTransition(
+          payload as EngineTransitionEvent,
+          queueRef.current,
+          performance.now(),
+          durationRef.current,
+        );
+        if (!transition) return;
+        if (crossfadeTimerRef.current != null) {
+          window.clearTimeout(crossfadeTimerRef.current);
+        }
+        setCrossfadeTransition(transition);
+        crossfadeTimerRef.current = window.setTimeout(() => {
+          setCrossfadeTransition(null);
+          crossfadeTimerRef.current = null;
+        }, transition.durationMs);
+        return;
+      }
+      if (eventName === "transitionProgress") {
+        return;
+      }
+      if (
+        eventName === "transitionEnded" ||
+        eventName === "transitionCancelled"
+      ) {
+        if (crossfadeTimerRef.current != null) {
+          window.clearTimeout(crossfadeTimerRef.current);
+          crossfadeTimerRef.current = null;
+        }
+        setCrossfadeTransition(null);
         return;
       }
       if (eventName === "bufferingChanged") {
@@ -336,12 +377,15 @@ export function useNativePlaybackEventBridge({
       clearNativeBufferingWatchdog,
       commitIsBuffering,
       commitIsPlaying,
+      crossfadeTimerRef,
       currentIndexRef,
+      durationRef,
       flushCurrentPlayEvent,
       isNativeEventStale,
       queueRef,
       retryNativePlaybackAfterAuthError,
       scheduleNativeBufferingWatchdog,
+      setCrossfadeTransition,
     ],
   );
 
@@ -389,6 +433,22 @@ export function useNativePlaybackEventBridge({
       trackChanged: (event) => {
         if (disposed) return;
         applyNativeTrackChange(event);
+      },
+      transitionStarted: (event) => {
+        if (disposed) return;
+        handleNativeEvent("transitionStarted", event);
+      },
+      transitionProgress: (event) => {
+        if (disposed) return;
+        handleNativeEvent("transitionProgress", event);
+      },
+      transitionEnded: (event) => {
+        if (disposed) return;
+        handleNativeEvent("transitionEnded", event);
+      },
+      transitionCancelled: (event) => {
+        if (disposed) return;
+        handleNativeEvent("transitionCancelled", event);
       },
       bufferingChanged: (event) => {
         if (disposed) return;

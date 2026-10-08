@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 
-import type { Track } from "@/contexts/player-types";
+import type { PlaySource, Track } from "@/contexts/player-types";
 import { clampIndex } from "@/contexts/player-queue-helpers";
 import { getTrackCacheKey } from "@/contexts/player-utils";
 import {
@@ -9,6 +9,7 @@ import {
 } from "@/contexts/player-next-track-resolution";
 import {
   toFreshEngineTrack,
+  toStartupEngineQueueSnapshot,
   toStartupEngineTracks,
 } from "@/contexts/player-engine-adapter";
 import {
@@ -35,8 +36,10 @@ interface UsePlayerTrackRecoveryOptions {
   currentTimeRef: Ref<number>;
   effectiveCrossfadeMsRef: Ref<number>;
   lastNonZeroVolumeRef: Ref<number>;
+  playSourceRef: Ref<PlaySource | null>;
   queueRef: Ref<Track[]>;
   repeatRef: Ref<"off" | "one" | "all">;
+  shuffleRef: Ref<boolean>;
 }
 
 export interface PlayerTrackRecoveryRuntime {
@@ -66,8 +69,10 @@ export function usePlayerTrackRecovery({
   currentTimeRef,
   effectiveCrossfadeMsRef,
   lastNonZeroVolumeRef,
+  playSourceRef,
   queueRef,
   repeatRef,
+  shuffleRef,
 }: UsePlayerTrackRecoveryOptions): PlayerTrackRecoveryRuntime {
   const recoverActiveTrackRef = useRef<() => Promise<boolean>>(
     async () => false,
@@ -83,26 +88,30 @@ export function usePlayerTrackRecovery({
     );
     const positionMs = Math.max(0, Math.round(currentTimeRef.current * 1000));
     const nativePlayerActive = shouldUseAndroidNativePlayer();
-    const engineTracks = await toStartupEngineTracks(
-      recoveryQueue,
-      recoveryIndex,
-      undefined,
-      nativePlayerActive ? { target: "android-native" } : undefined,
-    );
 
     if (nativePlayerActive) {
-      await androidNativeEngine.loadQueue({
-        revision: createQueueRevision(),
-        tracks: engineTracks,
+      const revision = createQueueRevision();
+      const snapshot = await toStartupEngineQueueSnapshot({
+        revision,
+        tracks: recoveryQueue,
         currentIndex: recoveryIndex,
         positionMs,
         autoplay: true,
         repeat: repeatRef.current,
         crossfadeMs: effectiveCrossfadeMsRef.current,
         volume: lastNonZeroVolumeRef.current,
+        playSource: playSourceRef.current,
+        shuffle: shuffleRef.current,
+        target: "android-native",
       });
+      await androidNativeEngine.loadQueue(snapshot);
       return true;
     }
+
+    const engineTracks = await toStartupEngineTracks(
+      recoveryQueue,
+      recoveryIndex,
+    );
 
     gpLoadQueue(
       buildEngineUrls(
@@ -123,8 +132,10 @@ export function usePlayerTrackRecovery({
     currentTimeRef,
     effectiveCrossfadeMsRef,
     lastNonZeroVolumeRef,
+    playSourceRef,
     queueRef,
     repeatRef,
+    shuffleRef,
   ]);
 
   useEffect(() => {

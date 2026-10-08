@@ -97,13 +97,13 @@ public class NativePlaybackContractTest {
 
     @Test
     public void nativeAuthorizationIsScopedToEachExplicitHttpsOrigin() {
-        CrateNativePlaybackService.NativeTrack crateTrack = nativeTrack(
+        NativeTrack crateTrack = nativeTrack(
             "https://api.example/api/tracks/1/stream",
             "Bearer stream-secret",
             "https://api.example/api/albums/1/cover",
             "Bearer artwork-secret"
         );
-        CrateNativePlaybackService.NativeTrack externalTrack = nativeTrack(
+        NativeTrack externalTrack = nativeTrack(
             "https://cdn.example/audio.flac",
             "",
             "https://covers.example/cover.jpg",
@@ -127,7 +127,7 @@ public class NativePlaybackContractTest {
 
     @Test
     public void nativeAuthorizationRejectsPlainHttpOrigins() {
-        CrateNativePlaybackService.NativeTrack track = nativeTrack(
+        NativeTrack track = nativeTrack(
             "http://api.example/api/tracks/1/stream",
             "Bearer stream-secret",
             "http://api.example/api/albums/1/cover",
@@ -146,13 +146,13 @@ public class NativePlaybackContractTest {
         );
     }
 
-    private static CrateNativePlaybackService.NativeTrack nativeTrack(
+    private static NativeTrack nativeTrack(
         String url,
         String authorization,
         String artwork,
         String artworkAuthorization
     ) {
-        return new CrateNativePlaybackService.NativeTrack(
+        return new NativeTrack(
             "track-1",
             url,
             authorization,

@@ -1,0 +1,183 @@
+{
+  "plannerVersion": 2,
+  "cases": [
+    {
+      "name": "late_outro_cue_moves_to_an_earlier_beat",
+      "context": {
+        "source": "radio",
+        "preferred_duration_ms": 12000
+      },
+      "outgoing": {
+        "outro_cue_ms": 176000
+      },
+      "incoming": {},
+      "expected": {
+        "plannerVersion": 2,
+        "outgoingTrackEntityUid": "11111111-1111-4111-8111-111111111111",
+        "incomingTrackEntityUid": "22222222-2222-4222-8222-222222222222",
+        "mode": "beatmatch",
+        "durationMs": 12000,
+        "outgoingCueMs": 168000,
+        "incomingCueMs": 8000,
+        "incomingTempoRatio": 1.0,
+        "beatPhaseOffsetMs": 0,
+        "handoffProgress": 0.5,
+        "outgoingGainDb": -4.0103,
+        "incomingGainDb": -4.0103,
+        "curve": "equal-power",
+        "bassHandoff": "balanced",
+        "confidence": 0.925,
+        "fallbackReason": null
+      }
+    },
+    {
+      "name": "short_incoming_shortens_the_fade",
+      "context": {
+        "source": "radio",
+        "preferred_duration_ms": 12000
+      },
+      "outgoing": {},
+      "incoming": {
+        "duration_ms": 25000,
+        "intro_cue_ms": 0
+      },
+      "expected": {
+        "plannerVersion": 2,
+        "outgoingTrackEntityUid": "11111111-1111-4111-8111-111111111111",
+        "incomingTrackEntityUid": "22222222-2222-4222-8222-222222222222",
+        "mode": "beatmatch",
+        "durationMs": 12000,
+        "outgoingCueMs": 165000,
+        "incomingCueMs": 0,
+        "incomingTempoRatio": 1.0,
+        "beatPhaseOffsetMs": 0,
+        "handoffProgress": 0.5,
+        "outgoingGainDb": -4.0103,
+        "incomingGainDb": -4.0103,
+        "curve": "equal-power",
+        "bassHandoff": "balanced",
+        "confidence": 0.925,
+        "fallbackReason": null
+      }
+    },
+    {
+      "name": "impossible_window_degrades_to_short_cut",
+      "context": {
+        "source": "radio",
+        "preferred_duration_ms": 12000
+      },
+      "outgoing": {
+        "duration_ms": 2000,
+        "outro_cue_ms": 1900
+      },
+      "incoming": {
+        "duration_ms": 1500,
+        "intro_cue_ms": 0
+      },
+      "expected": {
+        "plannerVersion": 2,
+        "outgoingTrackEntityUid": "11111111-1111-4111-8111-111111111111",
+        "incomingTrackEntityUid": "22222222-2222-4222-8222-222222222222",
+        "mode": "adaptive",
+        "durationMs": 350,
+        "outgoingCueMs": 1650,
+        "incomingCueMs": 0,
+        "incomingTempoRatio": 1.0,
+        "beatPhaseOffsetMs": 0,
+        "handoffProgress": 0.5,
+        "outgoingGainDb": 0.0,
+        "incomingGainDb": 0.0,
+        "curve": "equal-power",
+        "bassHandoff": "none",
+        "confidence": 0.0,
+        "fallbackReason": "insufficient_window"
+      }
+    },
+    {
+      "name": "tempo_adjusted_beatmatch",
+      "context": {
+        "source": "playlist",
+        "preferred_duration_ms": 8000
+      },
+      "outgoing": {},
+      "incoming": {
+        "bpm": 124.0
+      },
+      "expected": {
+        "plannerVersion": 2,
+        "outgoingTrackEntityUid": "11111111-1111-4111-8111-111111111111",
+        "incomingTrackEntityUid": "22222222-2222-4222-8222-222222222222",
+        "mode": "beatmatch",
+        "durationMs": 8000,
+        "outgoingCueMs": 165000,
+        "incomingCueMs": 7758,
+        "incomingTempoRatio": 0.967742,
+        "beatPhaseOffsetMs": 0,
+        "handoffProgress": 0.5,
+        "outgoingGainDb": -4.0103,
+        "incomingGainDb": -4.0103,
+        "curve": "equal-power",
+        "bassHandoff": "balanced",
+        "confidence": 0.849731,
+        "fallbackReason": null
+      }
+    },
+    {
+      "name": "low_confidence_adaptive",
+      "context": {
+        "source": "shuffle",
+        "preferred_duration_ms": 6000
+      },
+      "outgoing": {},
+      "incoming": {
+        "bpm_confidence": 0.4
+      },
+      "expected": {
+        "plannerVersion": 2,
+        "outgoingTrackEntityUid": "11111111-1111-4111-8111-111111111111",
+        "incomingTrackEntityUid": "22222222-2222-4222-8222-222222222222",
+        "mode": "adaptive",
+        "durationMs": 6000,
+        "outgoingCueMs": 165000,
+        "incomingCueMs": 8000,
+        "incomingTempoRatio": 1.0,
+        "beatPhaseOffsetMs": 0,
+        "handoffProgress": 0.5,
+        "outgoingGainDb": -4.0103,
+        "incomingGainDb": -4.0103,
+        "curve": "equal-power",
+        "bassHandoff": "none",
+        "confidence": 0.848333,
+        "fallbackReason": "low_confidence"
+      }
+    },
+    {
+      "name": "album_stays_gapless",
+      "context": {
+        "source": "album",
+        "preferred_duration_ms": 6000
+      },
+      "outgoing": {},
+      "incoming": {},
+      "expected": {
+        "plannerVersion": 2,
+        "outgoingTrackEntityUid": "11111111-1111-4111-8111-111111111111",
+        "incomingTrackEntityUid": "22222222-2222-4222-8222-222222222222",
+        "mode": "gapless",
+        "durationMs": 0,
+        "outgoingCueMs": 180000,
+        "incomingCueMs": 0,
+        "incomingTempoRatio": 1.0,
+        "beatPhaseOffsetMs": 0,
+        "handoffProgress": 0.5,
+        "outgoingGainDb": 0.0,
+        "incomingGainDb": 0.0,
+        "curve": "equal-power",
+        "bassHandoff": "none",
+        "confidence": 1.0,
+        "fallbackReason": null
+      }
+    }
+  ],
+  "description": "Planner v2 outputs for profiles built from app/tests/test_smart_mix_planner.py::_profile with the listed overrides. Native and web clients parse these plans as-is."
+}

@@ -34,6 +34,25 @@ export interface EngineTrack {
   eqGains?: number[];
 }
 
+export interface EngineTransitionPlan {
+  plannerVersion: number;
+  outgoingTrackId: string;
+  incomingTrackId: string;
+  mode: "gapless" | "adaptive" | "beatmatch";
+  durationMs: number;
+  outgoingCueMs?: number;
+  incomingCueMs?: number;
+  incomingTempoRatio?: number;
+  beatPhaseOffsetMs?: number;
+  handoffProgress: number;
+  outgoingGainDb: number;
+  incomingGainDb: number;
+  curve: "equal-power";
+  bassHandoff: "none" | "balanced";
+  confidence: number;
+  fallbackReason?: string;
+}
+
 export interface EngineQueueSnapshot {
   revision: string;
   tracks: EngineTrack[];
@@ -43,6 +62,8 @@ export interface EngineQueueSnapshot {
   repeat: EngineRepeatMode;
   crossfadeMs: number;
   volume: number;
+  transitionPlans?: EngineTransitionPlan[];
+  pendingTransitionPlans?: Promise<EngineTransitionPlan[] | undefined>;
 }
 
 export interface EngineState extends NativeEventMetadata {
@@ -93,6 +114,12 @@ export interface EngineErrorEvent extends NativeEventMetadata {
   httpStatus?: number;
 }
 
+export interface EngineTransitionCancelledEvent extends NativeEventMetadata {
+  revision: string;
+  reason: string;
+  afterHandoff: boolean;
+}
+
 export interface EngineEventMap {
   ready: EngineState;
   stateChanged: EngineState;
@@ -102,6 +129,7 @@ export interface EngineEventMap {
   transitionStarted: EngineTransitionEvent;
   transitionProgress: EngineTransitionEvent;
   transitionEnded: EngineTransitionEvent;
+  transitionCancelled: EngineTransitionCancelledEvent;
   bufferingChanged: NativeEventMetadata & {
     revision: string;
     isBuffering: boolean;

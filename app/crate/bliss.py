@@ -24,36 +24,13 @@ from crate.db.queries.bliss import (
     get_similar_artist_tracks_for_radio,
     get_track_with_artist,
 )
+from crate.smart_mix.camelot import (
+    CamelotRelationship,
+    camelot_relationship,
+    to_camelot,
+)
 
 log = logging.getLogger(__name__)
-
-# Camelot wheel mapping: (key, scale) -> camelot position
-CAMELOT = {
-    ("C", "major"): "8B",
-    ("A", "minor"): "8A",
-    ("G", "major"): "9B",
-    ("E", "minor"): "9A",
-    ("D", "major"): "10B",
-    ("B", "minor"): "10A",
-    ("A", "major"): "11B",
-    ("F#", "minor"): "11A",
-    ("E", "major"): "12B",
-    ("C#", "minor"): "12A",
-    ("B", "major"): "1B",
-    ("G#", "minor"): "1A",
-    ("F#", "major"): "2B",
-    ("D#", "minor"): "2A",
-    ("C#", "major"): "3B",
-    ("A#", "minor"): "3A",
-    ("G#", "major"): "4B",
-    ("F", "minor"): "4A",
-    ("D#", "major"): "5B",
-    ("C", "minor"): "5A",
-    ("A#", "major"): "6B",
-    ("G", "minor"): "6A",
-    ("F", "major"): "7B",
-    ("D", "minor"): "7A",
-}
 
 _LOW_SIGNAL_TITLE_RE = re.compile(
     r"\b("
@@ -90,18 +67,19 @@ def _key_compatibility(
     """Return 1.0 for same key, 0.8 for adjacent on Camelot wheel, 0.3 otherwise."""
     if not key_a or not scale_a or not key_b or not scale_b:
         return 0.5  # neutral when data missing
-    pos_a = CAMELOT.get((key_a, scale_a))
-    pos_b = CAMELOT.get((key_b, scale_b))
-    if not pos_a or not pos_b:
+    try:
+        relationship = camelot_relationship(
+            to_camelot(key_a, scale_a),
+            to_camelot(key_b, scale_b),
+        )
+    except ValueError:
         return 0.5
-    if pos_a == pos_b:
+    if relationship is CamelotRelationship.SAME:
         return 1.0
-    # Adjacent: same number different letter, or +/-1 number same letter
-    num_a, letter_a = int(pos_a[:-1]), pos_a[-1]
-    num_b, letter_b = int(pos_b[:-1]), pos_b[-1]
-    if letter_a == letter_b and abs(num_a - num_b) in (1, 11):
-        return 0.8
-    if num_a == num_b and letter_a != letter_b:
+    if relationship in {
+        CamelotRelationship.ADJACENT,
+        CamelotRelationship.RELATIVE,
+    }:
         return 0.8
     return 0.3
 

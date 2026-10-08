@@ -1,10 +1,11 @@
-import type { Track } from "@/contexts/player-types";
+import type { PlaySource, Track } from "@/contexts/player-types";
 import {
   getOfflineStreamUrl,
   getStreamUrl,
   type StreamUrlOptions,
 } from "@/contexts/player-utils";
 import {
+  api,
   ensureFreshAuthToken,
   ensureMediaAccessUrl,
   getApiBase,
@@ -13,12 +14,55 @@ import {
   resolveMaybeApiStreamUrl,
 } from "@/lib/api";
 import { fetchTrackPlayback } from "@/lib/track-playback";
-import type { EngineTrack } from "@/lib/playback-engine";
+import type {
+  EngineQueueSnapshot,
+  EngineRepeatMode,
+  EngineTrack,
+} from "@/lib/playback-engine";
 import { getEffectivePlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
 import {
   setPlaybackDeliveryProvenance,
   setPlaybackSession,
 } from "@/lib/playback-provenance";
+import {
+  getSmartMixCapabilities,
+  SmartMixTransitionPlanner,
+  subscribeSmartMixCapabilities,
+} from "@/lib/smart-mix";
+
+const smartMixTransitionPlanner = new SmartMixTransitionPlanner(api);
+
+subscribeSmartMixCapabilities((capabilities) => {
+  if (!capabilities.available || !capabilities.androidNativeCrossfade) {
+    smartMixTransitionPlanner.cancel();
+  }
+});
+
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () =>
+    smartMixTransitionPlanner.invalidate(),
+  );
+}
+
+function isNetworkAvailable(): boolean {
+  return typeof navigator === "undefined" || navigator.onLine !== false;
+}
+
+export interface StartupEngineQueueOptions {
+  revision: string;
+  tracks: Track[];
+  currentIndex: number;
+  positionMs: number;
+  autoplay: boolean;
+  repeat: EngineRepeatMode;
+  crossfadeMs: number;
+  volume: number;
+  playSource: PlaySource | null;
+  shuffle: boolean;
+  target: NonNullable<StreamUrlOptions["target"]>;
+  eqGainsByTrackId?: Map<string, number[]>;
+  offline?: boolean;
+}
 
 export function toEngineTrack(
   track: Track,
@@ -191,6 +235,67 @@ export async function toStartupEngineTracks(
     }),
   );
   return engineTracks;
+}
+
+export async function toStartupEngineQueueSnapshot(
+  options: StartupEngineQueueOptions,
+): Promise<EngineQueueSnapshot> {
+  const streamOptions = { target: options.target };
+  if (options.tracks.some((track) => !track.offlineOnly)) {
+    await ensureFreshAuthToken();
+  }
+  const transitionPlansPromise =
+    options.target === "android-native"
+      ? smartMixTransitionPlanner.plan({
+          revision: options.revision,
+          tracks: options.tracks,
+          currentIndex: options.currentIndex,
+          playSource: options.playSource,
+          shuffle: options.shuffle,
+          offline:
+            options.offline ??
+            hasOfflineTransitionWindow(
+              options.tracks,
+              options.currentIndex,
+              streamOptions,
+            ),
+          preferredDurationMs: options.crossfadeMs,
+          capabilities: getSmartMixCapabilities(),
+          networkAvailable: isNetworkAvailable(),
+          identity: getApiBase(),
+        })
+      : Promise.resolve(undefined);
+  const engineTracks = await toStartupEngineTracks(
+    options.tracks,
+    options.currentIndex,
+    options.eqGainsByTrackId,
+    streamOptions,
+  );
+
+  return {
+    revision: options.revision,
+    tracks: engineTracks,
+    currentIndex: options.currentIndex,
+    positionMs: options.positionMs,
+    autoplay: options.autoplay,
+    repeat: options.repeat,
+    crossfadeMs: options.crossfadeMs,
+    volume: options.volume,
+    pendingTransitionPlans: transitionPlansPromise,
+  };
+}
+
+function hasOfflineTransitionWindow(
+  tracks: Track[],
+  currentIndex: number,
+  options: StreamUrlOptions,
+): boolean {
+  const start = Math.max(0, Math.trunc(currentIndex));
+  const window = tracks.slice(start, start + 3);
+  return (
+    window.length > 0 &&
+    window.every((track) => getOfflineStreamUrl(track, options) !== null)
+  );
 }
 
 function hasFreshRemoteStream(track: Track): boolean {

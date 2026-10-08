@@ -53,6 +53,110 @@ def test_album_id_and_entity_routes_use_same_canonical_asset(monkeypatch, tmp_pa
     assert all(kwargs["requested_size"] == 320 for _asset, kwargs in delivered)
 
 
+def test_vdj_album_cover_route_uses_canonical_asset_without_svg_placeholder(
+    monkeypatch, tmp_path
+):
+    from crate.api import browse_album
+
+    album_dir = tmp_path / "Artist" / "Album"
+    album_dir.mkdir(parents=True)
+    cover = album_dir / "cover.jpg"
+    cover.write_bytes(b"cover")
+    album = {
+        "id": 7,
+        "entity_uid": "album-entity",
+        "artist": "Artist",
+        "name": "Album",
+    }
+    delivered = []
+    monkeypatch.setattr(browse_album, "get_library_album_by_id", lambda _id: album)
+    monkeypatch.setattr(browse_album, "get_library_artist", lambda _name: {})
+    monkeypatch.setattr(browse_album, "library_path", lambda: tmp_path)
+    monkeypatch.setattr(
+        browse_album, "resolve_album_dir", lambda *_args, **_kwargs: album_dir
+    )
+    monkeypatch.setattr(
+        browse_album,
+        "deliver_artwork",
+        lambda asset, **kwargs: (
+            delivered.append((asset, kwargs)) or SimpleNamespace(status_code=200)
+        ),
+    )
+
+    response = browse_album.api_vdj_cover_by_id(7, size=512, image_format="webp")
+
+    assert response.status_code == 200
+    assert len(delivered) == 1
+    asset, options = delivered[0]
+    assert asset.kind == "album-cover"
+    assert asset.entity_key == "album-entity"
+    assert options["local_original"] == cover
+    assert options["requested_size"] == 512
+    assert options["missing_response"].status_code == 404
+    assert options["missing_response"].headers["X-Crate-Artwork"] == "missing"
+
+
+def test_vdj_album_cover_route_returns_not_found_without_real_source(
+    monkeypatch, tmp_path
+):
+    from crate.api import browse_album
+
+    album_dir = tmp_path / "Artist" / "Album"
+    album_dir.mkdir(parents=True)
+    album = {
+        "id": 7,
+        "entity_uid": "album-entity",
+        "artist": "Artist",
+        "name": "Album",
+    }
+    monkeypatch.setattr(browse_album, "get_library_album_by_id", lambda _id: album)
+    monkeypatch.setattr(browse_album, "get_library_artist", lambda _name: {})
+    monkeypatch.setattr(browse_album, "library_path", lambda: tmp_path)
+    monkeypatch.setattr(
+        browse_album, "resolve_album_dir", lambda *_args, **_kwargs: album_dir
+    )
+
+    response = browse_album.api_vdj_cover_by_id(7)
+
+    assert response.status_code == 404
+    assert response.headers["X-Crate-Artwork"] == "missing"
+
+
+def test_vdj_album_cover_route_can_serve_materialized_variant_without_music_source(
+    monkeypatch, tmp_path
+):
+    from crate.api import browse_album
+
+    album = {
+        "id": 7,
+        "entity_uid": "album-entity",
+        "artist": "Artist",
+        "name": "Album",
+    }
+    delivered = []
+    monkeypatch.setattr(browse_album, "get_library_album_by_id", lambda _id: album)
+    monkeypatch.setattr(browse_album, "get_library_artist", lambda _name: {})
+    monkeypatch.setattr(browse_album, "library_path", lambda: tmp_path)
+    monkeypatch.setattr(
+        browse_album, "resolve_album_dir", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(browse_album, "find_album_dir", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        browse_album,
+        "deliver_artwork",
+        lambda asset, **kwargs: (
+            delivered.append((asset, kwargs)) or SimpleNamespace(status_code=200)
+        ),
+    )
+
+    response = browse_album.api_vdj_cover_by_id(7, size=512)
+
+    assert response.status_code == 200
+    assert len(delivered) == 1
+    assert delivered[0][0].entity_key == "album-entity"
+    assert delivered[0][1]["local_original"] is None
+
+
 def test_artist_id_and_entity_routes_use_same_canonical_asset(monkeypatch, tmp_path):
     from crate.api import browse_artist
 

@@ -148,6 +148,7 @@ export function usePlayerQueueActions({
     currentIndexRef,
     jamQueueLockedRef,
     repeatRef,
+    shuffleRef,
     bufferingIntentRef,
     pendingRestoreTimeRef,
     resumeAfterReloadRef,
