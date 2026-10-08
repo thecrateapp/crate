@@ -46,17 +46,17 @@ Cada release se cierra con su propio gate y se puede desplegar detrás de flags 
 | Release                                        | Paquetes                                                                                                                          | Gate de cierre                                                                                                                                                                                 |
 | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | R1 — Smart Mix correcto en Android adaptive    | C00, P01 (versiones, contratos y migraciones), SM01–SM05, SM06 (claves de caché, elegibilidad antes del límite, R15–R17), A01–A05 | Suites automáticas verdes; R01–R06 y R15–R17 con regresión; reanálisis v2 en curso con status correcto; adaptive sin clipping ni underrun en un dispositivo de referencia (subconjunto de A06) |
-| R2 — VirtualDJ A (fuente local) en macOS arm64 | P02 (incluida UI de tokens en Listen), P03 (routing prod/home/dev y flags, sin lease), P04, P05, V01–V04                          | Conectar, buscar, navegar, cargar, seek tras TTL y revocar en VirtualDJ real macOS arm64; paquete instalable sin origen por defecto                                                            |
-| R3 — VirtualDJ B y plataformas                 | V05, SM07, V09 (filtros DJ y CI nativo), V10 (Windows x64 y macOS Intel)                                                          | Perfiles, compatibles y planes validados visibles en el plugin; paquetes de las tres plataformas; benchmarks de SM07 registrados                                                               |
-| R4 — Ejecución avanzada                        | A06 (matriz completa), A07, A08, P03 (lease), V06, X01–X04                                                                        | Gates de §7 del diseño para beatmatch, bass y VDJ C; soak y rollback                                                                                                                           |
+| R2 — VirtualDJ A (fuente local) en macOS arm64 | VH01, P02 (incluida UI de tokens en Listen), P03 (routing prod/home/dev y flags), P04, P05, V01–V04                               | Conectar, buscar, navegar carpetas, cargar, seek y revocar en VirtualDJ Pro real macOS arm64; paquete instalable sin origen por defecto                                                        |
+| R3 — VirtualDJ B, Crate Automix y plataformas  | V05, V06, SM07, V09 (filtros DJ y CI nativo), V10 (Windows x64 y macOS Intel)                                                     | Compatibles y metadata Crate visibles; Crate Automix alimenta la cola nativa sin enviar comandos de mezcla; paquetes de las tres plataformas; benchmarks de SM07 registrados                   |
+| R4 — Android avanzado y release conjunta       | A06 (matriz completa), A07, A08, X01–X04                                                                                          | Gates de §7 del diseño para beatmatch y bass; soak y rollback                                                                                                                                  |
 
-**Backlog fuera de R1–R4.** Entra en una release solo editando esta tabla con una decisión explícita: P06 y V07 (cues privados, radio, presencia en VDJ; la corrección de scope de play events sigue en P02), V08 (caché de audio cifrada, offline y prefetch; la materialización por carga que V04 necesite si el SDK no renueva tickets sigue en V04), recorrido federado de SM06, wrapper de compatibilidad v1 sin consumidor distribuido demostrado, y paridad PAT en el readplane de Go.
+**Backlog fuera de R1–R4.** Entra en una release solo editando esta tabla con una decisión explícita: P06 y V07 (radio como fuente de Crate Automix y presencia; los cues privados se retiran para VDJ porque VDJ ya persiste cues por pista online; la corrección de scope de play events sigue en P02 y su cliente nativo en V06), V08 (caché de audio cifrada, offline y prefetch, solo si VH01 confirma rutas locales en `GetStreamUrl`), OAuth integrado del SDK, recorrido federado de SM06, wrapper de compatibilidad v1 sin consumidor distribuido demostrado, y paridad PAT en el readplane de Go.
 
-Dependencias no implícitas: P01 precede a todas las modificaciones de contrato/migración. P02/P03 pueden avanzar junto con SM02–SM05. A01 puede corregir red usando fixtures tras P01; integración Android final requiere SM06. V01 usa P01; V02 usa P02/P03; V03 usa P04; V04 usa P05; V05 usa SM05/SM06; V06 usa V05/P03; V07 usa P06; V08 usa V04/V05; V09 integra resultados; V10 usa X03; X04 usa V10. P06 resuelve cues persistidos usando interfaces/fixtures que SM03/SM06 entregaron antes: no hay dependencia circular.
+Dependencias no implícitas: P01 precede a todas las modificaciones de contrato/migración. P02/P03 pueden avanzar junto con SM02–SM05. A01 puede corregir red usando fixtures tras P01; integración Android final requiere SM06. VH01 precede a V03, V04 y V06 y puede ejecutarse en cuanto exista el plugin de sondeo. V01 usa P01; V02 usa P02/P03; V03 usa P04 y VH01; V04 usa P05 y VH01; V05 usa SM06; V06 usa V05 y VH01; V09 integra resultados; V10 usa X03; X04 usa V10.
 
-Los paquetes P02–P05 entregan primero contratos e implementación backend verificados con integración automatizada. El estado `backend-listo` desbloquea V02/V03/V04/V06 aunque el gate host conjunto esté pendiente. El estado posterior `integrado-en-host` se registra en la tarea V correspondiente y X03: no se exige cerrarla para empezar el consumidor. V04 resuelve la entrega por carga, incluida una materialización privada acotada si el SDK no renueva tickets; V08 añade retención/offline/prefetch. Ninguna carga básica depende de completar C.
+Los paquetes P02–P05 entregan primero contratos e implementación backend verificados con integración automatizada. El estado `backend-listo` desbloquea V02/V03/V04 aunque el gate host conjunto esté pendiente. El estado posterior `integrado-en-host` se registra en la tarea V correspondiente y X03.
 
-**Propiedad de cambios compartidos:** P04 implementa SQL/API de catálogo y filtros, V03/V09 sus consumidores. P05 implementa tickets/media, V04/V08 la integración host. P06 implementa cues/radio/presencia/events, V07 el cliente. SM06 implementa planner/cache/summary y P06 conecta cues privados reales. P01 asigna la cadena de migraciones; ningún agente reserva un número por adelantado. X02 une CI; V09 mantiene el job nativo y X02 no crea otro pipeline equivalente.
+**Propiedad de cambios compartidos:** P04 implementa SQL/API de carpetas y la sintaxis de filtros, V03/V09 sus consumidores. P05 implementa tickets/media, V04 la integración host. SM06 implementa planner/cache/summary. P01 asigna la cadena de migraciones; ningún agente reserva un número por adelantado. X02 une CI; V09 mantiene el job nativo y X02 no crea otro pipeline equivalente.
 
 ### 1.2 Trazabilidad de hallazgos
 
@@ -74,7 +74,7 @@ Los paquetes P02–P05 entregan primero contratos e implementación backend veri
 | R10 | Caché devuelve éxito ante401/403/cancel; callbacks obsoletos sobreviven                                        | V01–V03                   |
 | R11 | Parsers JSON manuales, Unicode/body sin cubrir; sanitizer no enlaza                                            | V01, V09                  |
 | R12 | Catálogo plano/truncado, géneros normalizados excluidos, covers relativos                                      | P04, V03–V04              |
-| R13 | C solo spike; faltan estados/takeover/lease, B no presenta todo                                                | P03, V05–V06              |
+| R13 | C solo spike; el ejecutor propio no es viable con el SDK (sin eventos, sin timer, grid de VDJ distinto)        | V06 (Crate Automix)       |
 | R14 | Sin matriz física/host, settings completos, packaging/soak                                                     | A04–A08, V07–V10, X01–X04 |
 | R15 | `GET /api/admin/smart-mix/status` cuenta ~48K `library_tracks` en cada request                                 | SM05                      |
 | R16 | Planes: get/set de caché por edge (hasta 64 round trips) y `DELETE LIKE` en request                            | SM06                      |
@@ -84,6 +84,10 @@ Los paquetes P02–P05 entregan primero contratos e implementación backend veri
 | R20 | `policy.py` usa techo −0.1 dBFS; el diseño fija ≤−1 dBTP                                                       | SM03, A03                 |
 | R21 | Spike: origen de producción por defecto, sin login, redacción de logs sin efecto, carrera al cancelar búsqueda | V02–V03                   |
 | R22 | Tests C++ con `assert` no comprueban nada en Release                                                           | V01                       |
+| R23 | Online Source y AutoStart exigen licencia Pro de VirtualDJ; no estaba en los documentos                        | V02, V10                  |
+| R24 | El SDK no tiene subcarpetas ni paginación; P04/V03 asumían jerarquía y cursores                                | P04, V03                  |
+| R25 | VDJ persiste la URL de cover y analiza las pistas con su propio grid/key                                       | V03, V05, V06             |
+| R26 | Cambiar el nombre del plugin dejó huérfanas sus entradas en `database.xml`                                     | V02, V10                  |
 
 ## 2. Preparación y verificación comunes
 
@@ -122,7 +126,7 @@ Los targets existentes `make cap-android-smart-mix-artifacts` y su variante loca
 
 Cada paquete comienza con un test focalizado de regresión/contrato que falle, implementa el cambio mínimo, ejecuta sus verificaciones y registra commit/evidencia en el plan canónico. El WIP existente se revisa y completa; los tests unitarios aislados verdes no completan por sí solos un gate manual/SDK.
 
-**Responsabilidad entre paquetes:** P04 es dueño del backend de filtros y cursores; P06 es dueño del backend de cues/radio/eventos/presencia. V07 implementa sus clientes nativos; V09 implementa el cliente de filtros y la integración CI/bench correspondiente. Los contratos y fixtures se comparten, pero estas responsabilidades no se duplican en dos tareas.
+**Responsabilidad entre paquetes:** P04 es dueño del backend de carpetas y filtros; P06 (backlog) del backend de radio/presencia. V09 implementa el cliente de filtros y la integración CI/bench. Los contratos y fixtures se comparten, pero estas responsabilidades no se duplican en dos tareas.
 
 ### P01 — Fijar contratos integrados, linaje de migraciones y manifiesto de evidencia
 
@@ -158,37 +162,37 @@ Cada paquete comienza con un test focalizado de regresión/contrato que falle, i
 
 ### P03 — Hacer consistente el routing y los kill switches efectivos
 
-**Depende de:** P01, P02; la finalización de automatización también depende del executor nativo.
+**Depende de:** P01, P02.
 
-**Archivos:** modificar `app/crate/config.py`, `app/crate/api/auth.py`, `app/crate/api/capabilities.py`, rutas VDJ protegidas, `docker-compose.yaml`, `docker-compose.home.yaml`, `docker-compose.dev.yaml`, `data/caddy/Caddyfile.readplane.dev`, `app/tests/test_readplane_catalog_routing.py`, `app/tests/test_vdj_capabilities.py`; crear `app/crate/api/dj.py` y `app/crate/api/schemas/dj.py` para la lease, `app/tests/test_vdj_feature_gates.py` y `app/tests/test_vdj_proxy_contract.py`. Tocar auth/rutas Go sólo si la decisión medida del readplane exige paridad posteriormente.
+**Archivos:** modificar `app/crate/config.py`, `app/crate/api/auth.py`, `app/crate/api/capabilities.py`, rutas VDJ protegidas, `docker-compose.yaml`, `docker-compose.home.yaml`, `docker-compose.dev.yaml`, `data/caddy/Caddyfile.readplane.dev`, `app/tests/test_readplane_catalog_routing.py`, `app/tests/test_vdj_capabilities.py`; crear `app/tests/test_vdj_feature_gates.py` y `app/tests/test_vdj_proxy_contract.py`. Tocar auth/rutas Go sólo si la decisión medida del readplane exige paridad posteriormente.
 
 1. Añadir bypass PAT y routing de aliases tickets/media antes del readplane en las tres formas de despliegue. Probar PAT opacos válidos/inválidos, JWT, cookies de sesión, artwork sin autenticación, tickets de ruta exacta, HEAD y Range. Cubrir search/profile/auth-me canónicos y la política configurada de disponibilidad de FastAPI/readplane.
 2. Ejecutar peticiones reales al proxy contra fixtures aisladas de FastAPI/readplane. Mantener las aserciones de configuración como comprobaciones económicas, pero no tratarlas como prueba de routing/autorización. Distinguir credenciales inválidas de backend no disponible.
 3. Aplicar flags VDJ/asistente en operaciones del servidor, conservando identidad normal de Listen/Android y reproducción ajena a VDJ. Aplicar el flag independiente a autorización de automatización; probar combinaciones de flags/scopes y clientes que conservan caché, además del resultado de `/capabilities`.
-4. Implementar `GET /api/vdj/automation-lease`, scope `vdj.automation.execute`, TTL de 15 segundos y refresco de cliente cada 5 segundos, compartido con el executor nativo. Responder `Cache-Control: no-store`, sin persistencia/stale fallback; una lease ID reutilizada conserva deadline original y no renueva autorización. Verificar replay, expiración, armado y comprobación previa a cada comando con reloj simulado; medir el límite real de observación/cancelación en la matriz manual. Nunca hacer red en callback de audio. Probar apagado del flag, revocación, fallo de refresco y expiración en cada fase activa; permitir diagnóstico/revocación de tokens para recuperación, prohibir nuevos comandos automáticos y ceder a manual sin stop/reset brusco.
+4. Exponer en `/api/capabilities` el estado efectivo del flag de automatización y del scope `vdj.automation.execute` para el token, con el mismo valor que aplica el servidor. No hay lease: Crate Automix consulta este estado antes de cada pista que encola (diseño §6.3). Probar flag apagado, scope ausente, revocación y token sin automatización con una respuesta sin caché.
 5. Medir p50/p95/p99 de FastAPI para search, resumen de perfil, contexto compatible, batch de planes y autorización de stream con tamaño de catálogo y concurrencia representativos. Si cumple los SLO existentes, registrar FastAPI como ruta soportada VDJ. Si no, implementar paridad Go con las mismas fixtures antes de cambiar routing; no reescribir el readplane incondicionalmente. Compartir evidencia con V09, responsable de integración cliente/CI/bench.
 
 **Verificaciones (desde `app/`, servicios aislados):** `python -m pytest -q tests/test_readplane_catalog_routing.py tests/test_vdj_proxy_contract.py tests/test_vdj_feature_gates.py tests/test_vdj_capabilities.py`; si cambia routing/auth Go, desde `app/readplane/`, `go test ./internal/auth ./internal/routes ./internal/catalog ./internal/contract`. Registrar escenarios reales de cambio de flag en la evidencia del executor nativo.
 
-**Terminado cuando:** prod/home/dev aceptan las mismas clases válidas de credenciales y rechazan las mismas inválidas; deshabilitar VDJ/automatización tiene comportamiento aplicable en servidor y cliente conectado, con límite de latencia y limitación offline documentados.
+**Terminado cuando:** prod/home/dev aceptan las mismas clases válidas de credenciales y rechazan las mismas inválidas; deshabilitar VDJ o la automatización tiene efecto en el servidor y en el siguiente refresco de capabilities del plugin.
 
-### P04 — Completar jerarquía local de catálogo y backend de búsqueda DJ
+### P04 — Carpetas VDJ de un nivel y búsqueda DJ con sintaxis de filtros
 
-**Depende de:** P01, P02. Puede ejecutarse en paralelo a P03. P04 es el único dueño backend de filtros/cursores; V09 consume el contrato y cubre cliente/CI/bench.
+**Depende de:** P01, P02. Puede ejecutarse en paralelo a P03. P04 es el único dueño backend de carpetas y filtros; V09 consume el contrato y cubre cliente/CI/bench.
 
-**Archivos:** modificar WIP `app/crate/api/vdj_catalog.py`, `app/crate/api/schemas/vdj_catalog.py`, `app/crate/db/queries/vdj_catalog.py`, `app/crate/api/browse_media.py`, `app/crate/api/schemas/media.py`, `app/crate/db/queries/browse_media_search.py`, `app/tests/test_vdj_catalog.py`, `app/tests/test_browse_queries.py`, `app/tests/test_browse_schemas.py`; crear `app/tests/test_vdj_search_filters.py`, `app/tests/test_vdj_search_pagination.py`, `app/tests/test_vdj_catalog_queries.py`. Añadir índices justificados por mediciones en `app/crate/db/migrations/versions/` sólo cuando P01 asigne revisión real. Coordinar `tools/vdj-plugin/src/client/catalog_client.cpp` y `search_client.cpp` con el paquete nativo.
+**Archivos:** modificar WIP `app/crate/api/vdj_catalog.py`, `app/crate/api/schemas/vdj_catalog.py`, `app/crate/db/queries/vdj_catalog.py`, `app/crate/api/browse_media.py`, `app/crate/api/schemas/media.py`, `app/crate/db/queries/browse_media_search.py`, `app/tests/test_vdj_catalog.py`, `app/tests/test_browse_queries.py`, `app/tests/test_browse_schemas.py`; crear `app/tests/test_vdj_search_filters.py` y `app/tests/test_vdj_catalog_queries.py`. Añadir índices justificados por mediciones en `app/crate/db/migrations/versions/` sólo cuando P01 asigne revisión real. Coordinar `tools/vdj-plugin/src/client/catalog_client.cpp` y `search_client.cpp` con el paquete nativo.
 
-1. Sustituir listas planas de pistas por carpetas jerárquicas, preservando orden de playlists, identidad de entidades, propiedad/membresía y disponibilidad local. Definir respuestas acotadas para carpetas vacías/eliminadas y metadata/artwork ausentes.
+1. Carpetas de un nivel según el diseño §6.5, porque el SDK no admite subcarpetas: una por playlist autorizada (orden preservado, partes numeradas de 500 si es más larga), Géneros, Moods, Escuchado recientemente y Compatibles. Respetar propiedad/membresía y disponibilidad local; respuestas acotadas para carpetas vacías/eliminadas y metadata ausente. Quitar `path` de la respuesta.
 2. Unificar selección y filtrado de género para que las pistas clasificadas únicamente mediante `album_genres` sigan apareciendo. Probar SQL real con datos aislados para géneros raw, heredados, normalizados y ausentes; cubrir moods y referencias por entidad de recently-played.
-3. Implementar cursores ligados a carpeta/query/filtros/orden/contexto de visibilidad, desempates deterministas y política documentada para cambios de catálogo. Probar múltiples páginas, cambios concurrentes, cursores de playlists no autorizadas, reutilización entre carpetas, manipulación, longitud/offset excesivos y versiones desconocidas. Reemplazar el OFFSET base64 ilimitado actual, no cambiar únicamente su codificación.
-4. Añadir los filtros DJ aceptados y proyección `fields=dj` al contrato existente de búsqueda con páginas acotadas. Exigir scope local a los PAT VDJ en servidor. Mantener respuesta/orden legacy cuando no se indiquen opciones DJ y comprobar regresiones de Listen.
-5. Ejecutar planes de query/latencia representativos antes de añadir índices. Evitar agregar todo el historial de escucha para carpetas ordinarias; cargar sólo la jerarquía/página solicitada.
+3. Sustituir el OFFSET sin límite por consultas acotadas a 500 pistas por carpeta o parte, con orden determinista. Sin cursores: el SDK no puede pedir páginas siguientes.
+4. Añadir a la búsqueda la sintaxis de filtros dentro del texto (`artist:`, `album:`, `bpm:120-128`, `key:8A`, `energy:`, `analyzed:no`) y la proyección `fields=dj`, con máximo 50 resultados. Exigir scope local a los PAT VDJ en servidor. Mantener respuesta/orden legacy cuando no hay sintaxis DJ y comprobar regresiones de Listen.
+5. Ejecutar planes de query/latencia representativos con 48K pistas antes de añadir índices. No agregar todo el historial de escucha para carpetas ordinarias; cargar solo la carpeta solicitada.
 
-**Verificaciones (desde `app/`, PG aislada):** `python -m pytest -q tests/test_vdj_catalog.py tests/test_vdj_catalog_queries.py tests/test_vdj_search_filters.py tests/test_vdj_search_pagination.py tests/test_browse_queries.py tests/test_browse_schemas.py tests/test_catalog_local_browse.py`.
+**Verificaciones (desde `app/`, PG aislada):** `python -m pytest -q tests/test_vdj_catalog.py tests/test_vdj_catalog_queries.py tests/test_vdj_search_filters.py tests/test_browse_queries.py tests/test_browse_schemas.py tests/test_catalog_local_browse.py`.
 
-**Terminado cuando:** el plugin permite elegir artista/álbum/playlist/género/mood y recorrer sus pistas locales reales entre páginas; metadata normalizada y visibilidad coinciden con search; el SQL está cubierto por tests con DB y permanece acotado al tamaño realista del catálogo.
+**Terminado cuando:** el plugin recorre playlists, géneros, moods, recientes y compatibles, y encuentra artistas y álbumes mediante la búsqueda con sintaxis de filtros; metadata normalizada y visibilidad coinciden con search; el SQL está cubierto por tests con DB y acotado a 500 pistas por respuesta.
 
-### P05 — Demostrar entrega media, refresco, ranges y revocación
+### P05 — Demostrar entrega media, ranges y revocación
 
 **Depende de:** P01, P02, P03; la finalización de carga en deck real depende del paquete nativo de media/caché.
 
@@ -197,14 +201,14 @@ Cada paquete comienza con un test focalizado de regresión/contrato que falle, i
 1. Probar emisión y uso real del ticket conjuntamente: ruta/audiencia exactas, propietario, expiración, revocación, suspensión, cambio de scope, fallo de almacenamiento, número acotado de targets y ausencia de credenciales en diagnósticos. Confirmar que los tickets de sesión Listen conservan su comportamiento.
 2. Alinear payload de resolución, alias media y resolver del plugin en política de entrega, estado preparing, identidad local y origen permitido. Validar headers/status en lugar de aceptar cualquier body no vacío. La API conserva acceso de sólo lectura al filesystem musical; las escrituras de preparación siguen en tareas worker.
 3. Servir y verificar GET/HEAD, rangos completos/parciales/sufijos, rangos inválidos, seeking, archivos grandes y transferencias interrumpidas a través del proxy real. Cubrir expiración/revocación antes de la primera petición y entre ranges. Especificar que una respuesta ya autorizada puede terminar; no prometer recuperación de bytes entregados.
-4. Implementar un único refresco acotado de ticket justo antes de usarlo mediante el transporte nativo verificado. Probar pause/seek tras TTL, carga lenta y error temporal de red en VirtualDJ real. Si el SDK no permite refrescar, terminar la vía aceptada de carga/caché cifrada acotada con pinning de deck activo y aislamiento cuenta/nodo antes de declarar listo Online Source.
+4. Fijar el TTL del ticket VDJ para que cubra la descarga inicial completa (valor inicial 15 minutos, ajustado con la medición de VH01), manteniendo ruta exacta, identidad del token y revocación por request. Si VH01 muestra requests Range tras caducar el ticket, implementar el mecanismo que el gate valide antes de cerrar A.
 5. Verificar simultáneamente continuidad de la pista cargada y denegación de cargas nuevas sin autorización. Coordinar cancelación de prefetch y ausencia de tickets en cachés/spools persistentes; redactar PAT, tickets y URLs firmadas en todas las rutas de éxito/error.
 
 **Verificaciones (desde `app/`, servicios aislados):** `python -m pytest -q tests/test_media_access_tickets.py tests/test_vdj_stream_scope.py tests/test_vdj_media_contract.py tests/test_artwork_route_delivery.py`. Ejecutar tests nativos de streams/caché y registrar escenarios SDK reales de seek/expiración/revocación/carga offline en la matriz de release.
 
 **Terminado cuando:** una pista autenticada carga y permite seeking con credenciales de vida acotada, las credenciales expiradas/revocadas no autorizan nuevas peticiones y la continuidad del audio ya cargado queda demostrada sin credenciales duraderas en URLs.
 
-**Contrato adicional de P05:** artwork público sin cambio; artwork protegido requiere ampliar audiencia/tipos de ticket PAT actualmente limitados a stream y verificar scope/ruta en emisión y entrega. Añadir tests de audiencia equivocada, path diferente, token revocado y scope ausente. Además, resolver `offlineEligibleUntil` según §2.4 del diseño; probar límites 24h/expiración PAT, revisión de fuente/owner, ausencia de permiso al desactivar caché y falta de media scope. El SDK gate de V04 determina refresh o materialización por carga. V08 reutiliza este contrato para offline y retención, sin emitir otra autorización de larga duración.
+**Contrato adicional de P05:** los covers de álbum son públicos y VDJ persiste su URL: el plugin recibe URLs absolutas sin ticket y no se amplían los tickets PAT a artwork. `offlineEligibleUntil` queda en el backlog con V08.
 
 ### P06 — Completar backend de cues, radio, now-playing y telemetría idempotente
 
@@ -448,11 +452,11 @@ En este bloque, `JAVA` abrevia `app/listen/android/app/src/main/java/app/cratemu
 
 **DoD:** bass es una opción entregada y probada, sin clipping ni regresión de fase/EQ; no basta parsear el campo o dejarlo permanentemente oculto.
 
-## 6. VirtualDJ — V01 a V10
+## 6. VirtualDJ — VH01 y V01 a V10
 
-Las tareas backend/auth/profile/planner del plan canónico son los únicos propietarios de sus contratos; no se implementa un backend paralelo en estas tareas nativas. P01 fija contratos; P02/P03 cubren auth/lease; P04 catálogo/filtros; P05 media; P06 radio/cues/eventos. SM05/SM06 son la dependencia del contrato funcional de perfiles/planner. Las rutas son relativas al worktree Smart Mix inspeccionado; las nuevas se marcan Crear. Cada paso es un checkpoint RED/GREEN/refactor; los resultados se registran en la tabla de evidencia del plan canónico. No se crean nuevos documentos de diseño/plan por fase.
+El diseño §6.1 recoge lo que permiten el SDK (versión oficial de 2021-10-03) y el host VirtualDJ 8.5, con su evidencia. Las tareas siguientes se ajustan a esa superficie. P01 fija contratos; P02/P03 auth y flags; P04 carpetas y filtros; P05 media; SM06 ranking y perfiles. Cada paso es un checkpoint RED/GREEN/refactor; los resultados se registran en §8.
 
-Comandos comunes de verificación nativa, al fijar baseline y tras cambios relevantes:
+Comandos comunes de verificación nativa:
 
 ```sh
 cmake -S tools/vdj-plugin -B build/vdj-headless -DCRATE_VDJ_BUILD_REAL_PLUGIN=OFF -DCRATE_VDJ_BUILD_TESTS=ON
@@ -460,170 +464,155 @@ cmake --build build/vdj-headless --parallel 4
 ctest --test-dir build/vdj-headless --output-on-failure
 ```
 
-Baseline esperado: 14 tests verdes; las tareas aumentarán ese número. Los nuevos targets deben registrarse en CTest. Los tests en Release conservan assertions o usan un framework cuyos checks no desaparezcan con `NDEBUG`. Los builds SDK usan `VIRTUALDJ_SDK_ROOT` privado; headers/samples SDK, credenciales y bundles generados no se incorporan a Git.
+Baseline: 14 tests verdes en headless y 16 con el SDK local. Los nuevos targets deben registrarse en CTest. Los tests en Release usan checks que no desaparecen con `NDEBUG`. Los builds SDK usan `VIRTUALDJ_SDK_ROOT` privado; headers/samples SDK, credenciales y bundles generados no se incorporan a Git.
+
+### VH01 — Gate de host: comprobar en VirtualDJ lo que el SDK no documenta
+
+**Dependencias:** ninguna; bloquea V03, V04 y V06. **Requiere:** VirtualDJ Pro en macOS arm64 abierto por una persona durante unos 15 minutos.
+
+**Crear:** `tools/vdj-plugin/probe/host_probe.cpp` (target de desarrollo, excluido de los paquetes) y `tools/vdj-plugin/probe/README.md` con el guion. El probe es una Online Source que registra en un log local, sin tokens ni URLs firmadas, cada callback con hilo, duración y resultado.
+
+Comprobaciones, cada una con resultado registrado en §8:
+
+1. Hilo de `OnSearch`, `GetFolder` y `GetStreamUrl`, y si `GetFolder` admite `S_FALSE` + `finish()`.
+2. Si VDJ vuelve a llamar a `GetStreamUrl` al hacer seek, recargar o perder la red, y qué requests HTTP hace (GET completo, Range, HEAD) contra un servidor local de prueba, incluido un ticket que caduca a mitad de descarga.
+3. Si `GetStreamUrl` acepta una ruta local o `file://`.
+4. Si `IVdjSubfoldersList::add` con un identificador o nombre jerárquico genera subcarpetas.
+5. Cómo se ve el login con `IsLogged`/`OnLogin`, y si desde `OnLogin` se puede abrir una ventana nativa.
+6. Si `SendCommand`/`GetInfo` funcionan desde un hilo propio del plugin.
+7. Si `automix_add_next` y `playlist_add` aceptan `netsearch://plugin-<nombre>/<uid>` y la pista se carga y se mezcla en automix.
+8. Si la Online Source sigue cargada con el navegador en otra carpeta durante una sesión larga.
+9. Si `Release` termina limpio con una búsqueda y un hilo en curso, y tras reiniciar VDJ.
+10. Formato de `get_filepath` en un deck con pista Crate (confirmar `netsearch://plugin-Crate/<uid>`).
+
+**DoD:** las diez comprobaciones tienen resultado y versión de VDJ registrados. Si una contradice el diseño §6, se actualizan el diseño y las tareas afectadas antes de implementarlas.
 
 ### V01 — Core como frontera fiable de producción
 
 **Dependencias:** P01. **Estado:** core existente; correcciones pendientes.
 
-**Modificar:** `tools/vdj-plugin/CMakeLists.txt`, `include/crate_vdj/{http_client,models,contract_negotiator,credential_store}.hpp`, `src/core/{models,search_results,catalog_results,contract_negotiator,credential_store}.cpp`, `src/client/curl_http_client.cpp`, `src/mapping/{mix_profile,compatible_tracks}.cpp` y tests client/auth existentes. Las rutas abreviadas de esta lista están dentro de `tools/vdj-plugin/`.
+**Modificar:** `tools/vdj-plugin/CMakeLists.txt`, `include/crate_vdj/{http_client,models,contract_negotiator,credential_store}.hpp`, `src/core/{models,search_results,catalog_results,contract_negotiator,credential_store}.cpp`, `src/client/curl_http_client.cpp`, `src/mapping/{mix_profile,compatible_tracks}.cpp` y tests client/auth existentes.
 **Crear:** `tools/vdj-plugin/src/core/json_mapping.cpp`, `tools/vdj-plugin/include/crate_vdj/json_mapping.hpp`, `tools/vdj-plugin/tests/client/json_mapping_test.cpp`, `tools/vdj-plugin/tests/security/redaction_test.cpp`.
 
-1. RED: regresiones de contrato desconocido no vacío, Assistant incompatible con Source válido, escapes Unicode/pares sustitutos, null opcional, límites numéricos, nesting malformado y body excesivo. Reproducir con `ctest --test-dir build/vdj-headless -R 'contract_negotiator|json_mapping|redaction' --output-on-failure` tras configurar/compilar.
-2. GREEN: elegir un parser JSON mantenido, fijar versión en CMake/lock de dependencias y sustituir readers duplicados por parsing acotado y validadores tipados. Los fixtures compartidos fijan intencionalmente camelCase/snake_case del wire. Limitar body libcurl antes de append, rechazar origen/redirect/status inesperados y comprobar cancelación antes de petición y antes de entregar resultado.
-3. GREEN: declarar y comparar rangos compatibles en requirements, modelar disponibilidad y flags independientes. Generar versión runtime/package desde un valor. Corregir categorías de error y redacción central sin emitir responses crudos ni URLs firmadas.
-4. RED/GREEN: reproducir el enlace fallido de sanitizers en build separado y propagar flags de link a ejecutables/modules consumidores; instrumentar adaptadores/tests. Ejecutar `cmake -S tools/vdj-plugin -B build/vdj-sanitizers -DCRATE_VDJ_BUILD_TESTS=ON -DCRATE_VDJ_ENABLE_SANITIZERS=ON`, compilar y ejecutar su CTest. Esperado: enlace correcto y sin hallazgos ASan/UBSan. Añadir comprobación Release que demuestre que un test fallido sigue observándose.
-5. Refactorizar interfaces duplicadas sin consumidores solo tras tests verdes; commit `fix(vdj): harden native contracts and test tooling`.
+1. RED: contrato desconocido no vacío, escapes Unicode/pares sustitutos, null opcional, límites numéricos, nesting malformado y body excesivo.
+2. GREEN: un parser JSON mantenido fijado en CMake; límite de body en libcurl antes de añadir bytes; `CURLOPT_NOSIGNAL`, `curl_global_init` explícito y reutilización de handles; rechazo de origen/redirect/status inesperados.
+3. GREEN: negociación por rangos de contrato, disponibilidad y flags independientes; versión runtime/paquete desde un único valor; redacción central de secretos con tests.
+4. RED/GREEN: propagar los flags de sanitizer a los ejecutables de test y sustituir `assert` por checks que funcionen en Release.
+5. Commit `fix(vdj): harden native contracts and test tooling`.
 
-**DoD:** repros conocidos cubiertos y verdes; límites de parser/transporte fijados en código; builds normal/sanitizer correctos; inventario de dependencias/licencias actualizado.
+**DoD:** repros conocidos cubiertos y verdes; builds normal, Release y sanitizer correctos; inventario de dependencias y licencias actualizado.
 
-### V02 — Conexión segura de usuarios y ambos binarios
+### V02 — Conexión del usuario en un solo binario
 
-**Dependencias:** V01, P02 y P03. **Estado:** API y stores de plataforma en WIP; handshake/configuración UI pendientes.
+**Dependencias:** V01, P02 y P03. **Estado:** stores de credenciales en WIP; sin login.
 
-**Modificar:** `tools/vdj-plugin/src/auth/credential_store_macos.mm`, `tools/vdj-plugin/src/auth/credential_store_windows.cpp`, `tools/vdj-plugin/include/crate_vdj/core.hpp`, `tools/vdj-plugin/CMakeLists.txt`. P02/P03 son dueños de cambios en `app/crate/api/{access_tokens,capabilities}.py` y schemas; V02 consume sus contratos.
+**Modificar:** `tools/vdj-plugin/src/auth/credential_store_macos.mm`, `tools/vdj-plugin/src/auth/credential_store_windows.cpp`, `tools/vdj-plugin/include/crate_vdj/core.hpp`, `tools/vdj-plugin/CMakeLists.txt`.
 **Crear:** `tools/vdj-plugin/src/client/capability_client.cpp`, `tools/vdj-plugin/src/core/connection_settings.cpp`, `tools/vdj-plugin/include/crate_vdj/connection_settings.hpp`, `tools/vdj-plugin/src/platform/connection_dialog_macos.mm`, `tools/vdj-plugin/src/platform/connection_dialog_windows.cpp`, `tools/vdj-plugin/tests/auth/connection_session_test.cpp`, `tools/vdj-plugin/tests/client/capability_client_test.cpp`.
 
-1. RED: origen, fallo de conexión/verificación, sustitución/rotación, dos usuarios/nodos, lectores concurrentes, handshake caducado sin red, desactivación opcional y ausencia de fallback en texto plano. La suite backend de P02/P03 prueba que un PAT no gestiona tokens ni accede a rutas ajenas.
-2. GREEN: diálogo nativo accesible con origen/token/estado; persistir solo settings sin secretos. Normalizar origen, verificar nodo/usuario, guardar token en almacén OS y después habilitar operaciones privadas. Eliminar origen de producción implícito: una instalación no configurada queda desconectada. La CA de desarrollo es explícita y limitada a su origen; TLS sigue verificado.
-3. GREEN: implementar sesión/handshake independiente por binario y recarga segura de credenciales. Refresco de capabilities acotado y flags independientes. General consume `/api/vdj/automation-lease` (scope `vdj.automation.execute`, propuesta TTL15s/refresco5s); si caduca, no permite nuevas operaciones, también sin red. P03 implementa endpoint/tests; no crear un mecanismo de permiso paralelo.
-4. Ejecutar tests nativos auth/capability y, desde `app`, `pytest -q tests/test_access_token_repository.py tests/test_access_token_api.py tests/test_access_token_auth.py tests/test_vdj_capabilities.py`. Probar conectar/sustituir/desconectar en macOS y Windows; inspeccionar logs/caché con tokens sintéticos.
-5. Commit `feat(vdj): connect and negotiate scoped sessions`.
+1. RED: sin configurar no hay red; origen inválido; token inválido, revocado o sin scopes; contrato incompatible; rotación; cambio de servidor; errores de escritura del almacén de credenciales.
+2. GREEN: `IsLogged`/`OnLogin`/`OnLogout`; `OnLogin` abre el diálogo nativo con origen y token según el resultado de VH01. Guardar el token solo en Keychain o Credential Manager, con cuenta por origen normalizado; propagar errores de escritura; leer la credencial una vez por sesión, no en cada request.
+3. GREEN: handshake con `/api/auth/me` y `/api/capabilities`, refresco periódico acotado y flags independientes de A, B y Crate Automix.
+4. Fijar el nombre del plugin en `Crate` y documentarlo como contrato permanente; mostrar en el diálogo que el plugin requiere VirtualDJ Pro.
+5. Tests nativos auth/capability y, desde `app`, `pytest -q tests/test_access_token_repository.py tests/test_access_token_api.py tests/test_access_token_auth.py tests/test_vdj_capabilities.py`. Probar conectar, sustituir y desconectar en macOS.
+6. Commit `feat(vdj): connect and negotiate scoped sessions`.
 
-**DoD:** ningún binario depende de globals del otro; configuración sobrevive reinicios; errores auth piden reconexión útil; desactivar B/C mantiene A compatible; no se hacen peticiones de producción sin configurar.
+**DoD:** sin origen por defecto; configuración sobrevive reinicios; errores de auth piden reconexión; desactivar B o Crate Automix mantiene A.
 
-### V03 — Sustituir el spike y completar navegación
+### V03 — Sustituir el spike y completar la navegación
 
-**Dependencias:** V01, V02 y P04. **Estado:** callbacks search/catalog/compatible en spike; lifecycle y cobertura completa pendientes.
+**Dependencias:** V01, V02, P04 y VH01. **Estado:** callbacks de búsqueda, carpetas y compatibles en el spike.
 
-**Modificar:** `tools/vdj-plugin/CMakeLists.txt`, `tools/vdj-plugin/spike/control_spike.cpp`, `tools/vdj-plugin/src/client/{search_client,catalog_client}.cpp`, `tools/vdj-plugin/src/cache/sqlite_metadata_cache.cpp`, `tools/vdj-plugin/include/crate_vdj/metadata_cache.hpp`. P04 modifica `app/crate/api/vdj_catalog.py`, schemas, queries y tests backend; V03 verifica su consumo.
-**Crear:** `tools/vdj-plugin/src/sdk/online_source_plugin.cpp`, `tools/vdj-plugin/src/online_source/online_source.cpp`, `tools/vdj-plugin/include/crate_vdj/online_source.hpp`, `tools/vdj-plugin/src/core/request_coordinator.cpp`, `tools/vdj-plugin/include/crate_vdj/request_coordinator.hpp`, `tools/vdj-plugin/tests/sdk/online_source_lifecycle_test.cpp`, `tools/vdj-plugin/tests/online_source/catalog_pagination_test.cpp`.
+**Modificar:** `tools/vdj-plugin/CMakeLists.txt`, `tools/vdj-plugin/src/client/{search_client,catalog_client}.cpp`, `tools/vdj-plugin/src/cache/sqlite_metadata_cache.cpp`, `tools/vdj-plugin/include/crate_vdj/metadata_cache.hpp`.
+**Crear:** `tools/vdj-plugin/src/sdk/online_source_plugin.cpp`, `tools/vdj-plugin/src/online_source/online_source.cpp`, `tools/vdj-plugin/include/crate_vdj/online_source.hpp`, `tools/vdj-plugin/src/core/request_coordinator.cpp`, `tools/vdj-plugin/include/crate_vdj/request_coordinator.hpp`, `tools/vdj-plugin/tests/sdk/online_source_lifecycle_test.cpp`.
 
-1. RED: búsqueda A/B solapada, cancelación entre fin de red y publicación, carpetas lentas, callback tras unload, `finish` único, saturación de cola e instancias independientes. Inyectar HTTP/clock/cache y ejercitar el adaptador real, no otra implementación simplificada.
-2. GREEN: extraer factory/adaptador de producción. Implementar pool/coordinador acotados, ownership por generación, publicación y cierre conforme a semánticas SDK probadas. Probe opt-in fuera de packaging; logs/cache fuera de callbacks SDK.
-3. RED/GREEN: conectar navegación artistas/álbumes y resultados de búsqueda de estos tipos; mantener playlists/géneros/moods/recently played. Añadir nodos/páginas de continuación para alcanzar >500 pistas sin fetch ilimitado. Consumir rechazo de cursor manipulado o de otro scope, y conservar orden con la política snapshot/cursor de P04.
-4. RED/GREEN: stale solo ante fallos transitorios admitidos; 401/403/cancel/version siguen siendo errores. Fake clock que pruebe stale real, no un hit fresh inmediato. Cubrir límites bytes/entradas, corrupción, mismo SQLite abierto por ambos binarios, migración y separación de usuarios/nodos. Llevar el estado stale a presentación.
-5. Ejecutar `ctest --test-dir build/vdj-headless -R 'online_source|catalog|search|cache' --output-on-failure` y, desde `app`, `pytest -q tests/test_vdj_catalog.py tests/test_browse_queries.py tests/test_browse_schemas.py`. En host, cambiar rápido consultas/carpetas, cancelar y unload/reload mientras suenan dos decks; medir callbacks.
-6. Commits por partes verificadas, finalizando con `feat(vdj): ship cancellable local catalog source`.
+1. RED: búsquedas solapadas, cancelación entre fin de red y publicación, `finish` único, callback tras unload, carpeta lenta. Ejercitar el adaptador de producción con el SDK falso.
+2. GREEN: adaptador de producción con coordinador de generaciones; búsqueda asíncrona; carpetas asíncronas o servidas desde caché según VH01. Corregir la carrera de `OnSearchCancel`.
+3. RED/GREEN: carpetas de un nivel de P04; sintaxis de filtros de búsqueda; menú contextual "Más de este artista" y "Este álbum" que lanzan esa búsqueda; covers como URL absoluta pública en todas las rutas (búsqueda, carpetas, compatibles).
+4. RED/GREEN: caché de metadata con stale solo ante transporte o 5xx; 401/403/cancel/version siguen siendo errores; migración de SQLite dentro de transacción; separación por origen y cuenta.
+5. `ctest --test-dir build/vdj-headless -R 'online_source|catalog|search|cache' --output-on-failure` y, desde `app`, `pytest -q tests/test_vdj_catalog.py tests/test_browse_queries.py tests/test_browse_schemas.py`. En host: búsquedas rápidas, cancelación, unload/reload con dos decks sonando.
+6. Commits por partes, finalizando con `feat(vdj): ship cancellable local catalog source`.
 
-**DoD:** A permite recorrer todo el catálogo local con trabajo acotado; tests del lifecycle usan producción; cancelación no publica resultados viejos; host responde y descarga el plugin limpiamente.
+**DoD:** A recorre playlists, géneros, moods, recientes y compatibles, y encuentra artistas y álbumes por búsqueda; la cancelación no publica resultados viejos; el host descarga el plugin limpiamente.
 
-### V04 — Artwork y media probados en decks reales
+### V04 — Media probada en decks reales
 
-**Dependencias:** V02, V03 y P05. **Estado:** resolver genera URL; falta evidencia completa de reproducción/seek en host.
+**Dependencias:** V02, V03, P05 y VH01. **Estado:** el resolver genera la URL; ticket de 60 s sin refresh.
 
-**Modificar:** `tools/vdj-plugin/src/client/{stream_resolver,media_access_client}.cpp`, `tools/vdj-plugin/src/sdk/online_source_plugin.cpp`, `tools/vdj-plugin/tests/client/stream_resolver_test.cpp`. P05 es dueño de `app/crate/api/{browse_album,browse_media,media_access}.py`, `app/crate/media_access.py` y sus tests de entrega/tickets.
-**Crear:** `tools/vdj-plugin/src/client/artwork_resolver.cpp`, `tools/vdj-plugin/include/crate_vdj/artwork_resolver.hpp`, `tools/vdj-plugin/tests/client/artwork_resolver_test.cpp`, `tools/vdj-plugin/tests/sdk/media_delivery_contract_test.cpp`.
+**Modificar:** `tools/vdj-plugin/src/client/{stream_resolver,media_access_client}.cpp`, `tools/vdj-plugin/src/sdk/online_source_plugin.cpp`, `tools/vdj-plugin/tests/client/stream_resolver_test.cpp`.
+**Crear:** `tools/vdj-plugin/tests/sdk/media_delivery_contract_test.cpp`.
 
-1. RED: validar payload de playback completo/UID/localidad, autorización fallida, destino/redirect de otro origen, URLs de artwork absolutas en cada camino, artwork ausente, URL firmada no persistida, revocación y media borrada.
-2. GREEN: consumir los servicios compartidos mediante rutas piloto; pedir autorización de ruta específica para artwork/streams y devolver URLs absolutas validadas. Caché solo de identidad/metadatos neutros. No resolver limitaciones de headers haciendo público el artwork privado.
-3. RED/GREEN: probar Range/seek reales, HEAD si el host lo necesita, ticket caducado en ranges posteriores, reautorización acotada y 416. Audio ya cargado continúa manualmente mientras nuevas autorizaciones se deniegan tras revocación. Cubrir cambio de credenciales durante carga.
-4. Fake server prueba transporte libcurl real sin producción. Ejecutar tests nativos media y, desde `app`, `pytest -q tests/test_media_access_tickets.py tests/test_vdj_stream_scope.py tests/test_artwork_route_delivery.py`. El test live queda OFF por defecto y rechaza producción salvo elección explícita del usuario.
-5. Gate host: desde Online Music/búsqueda/carpeta/contexto, arrastrar dos pistas Crate diferentes, mostrar artwork, reproducir, hacer seek tras caducar ticket, cortar red, revocar token y probar una carga nueva. Registrar host/OS/arch/API, resultados y latencia. Devolver una URL no supera este gate.
-6. Commit `feat(vdj): validate authorized deck media delivery`.
+1. RED: payload de playback completo (UID, localidad, formato, estado preparing), autorización fallida, redirect a otro origen, media borrada, revocación.
+2. GREEN: validar el payload antes de emitir el ticket; URL con ticket de TTL según P05; deadline en `GetStreamUrl`; sin persistir la URL.
+3. RED/GREEN según VH01: si hay requests Range tras caducar el ticket, implementar el mecanismo validado por el gate.
+4. Gate host: cargar dos pistas Crate distintas (incluida FLAC), reproducir, seek, cortar red, revocar el token y probar una carga nueva. Registrar versión, arquitectura y resultados.
+5. Commit `feat(vdj): validate authorized deck media delivery`.
 
-**DoD:** A funciona en host real con imágenes, reproducción, seek y reauth correctos; tests prueban fronteras de acceso; reinicio/unload no deja workers media activos.
+**DoD:** A funciona en host real con reproducción, seek y revocación correctos; reinicio y unload no dejan workers activos.
 
-**Gate de entrega en V04:** si el host no renueva tickets, probar primero referencia local/file y construir spool por carga cifrado/materialización privada limitada a decks activos, usando los límites del diseño. Esta base se implementa aquí antes de cerrar A; V08 añade persistencia/offline/prefetch posteriormente. Si el host no admite ninguna vía, V04 sigue bloqueada y se revisa el diseño; no se declara resuelto invocando una V08 dependiente de C.
+### V05 — Asistente con el ranking de Crate
 
-### V05 — Completar Assistant y planes inmutables
+**Dependencias:** V03 y SM06. **Estado:** carpeta Compatibles conectada; mapper de perfiles sin usar.
 
-**Dependencias:** V01–V04, SM05 y SM06. **Estado:** carpeta compatible conectada; mapper de perfiles existente; cliente/validador de planes ausentes.
+**Modificar:** `tools/vdj-plugin/src/client/smart_mix_client.cpp`, `tools/vdj-plugin/src/mapping/{mix_profile,compatible_tracks}.cpp`, `tools/vdj-plugin/src/online_source/compatible_tracks.cpp`.
+**Crear:** `tools/vdj-plugin/tests/online_source/smart_mix_presentation_test.cpp`.
 
-**Modificar:** `tools/vdj-plugin/src/client/smart_mix_client.cpp`, `tools/vdj-plugin/src/mapping/{mix_profile,compatible_tracks}.cpp`, `tools/vdj-plugin/src/online_source/compatible_tracks.cpp`, adaptador Online Source de producción y tests existentes Smart Mix/compatible.
-**Crear:** `tools/vdj-plugin/src/client/transition_plan_client.cpp`, `tools/vdj-plugin/include/crate_vdj/transition_plan.hpp`, `tools/vdj-plugin/src/automation/transition_plan_validator.cpp`, `tools/vdj-plugin/tests/automation/transition_plan_validator_test.cpp`, `tools/vdj-plugin/tests/online_source/smart_mix_presentation_test.cpp`.
+1. RED: BPM y key de Crate en los campos del SDK; Camelot, energía y confianza en `comment` con formato fijo y localizado; perfil ausente no rompe la pista; versión de perfil incompatible desactiva la presentación; orden igual al del servidor; semilla del menú contextual frente a pista cargada.
+2. GREEN: conectar el cliente de perfiles a la presentación; "Abrir en Crate" desde el menú contextual. El plugin no consume `TransitionPlan`.
+3. `ctest --test-dir build/vdj-headless -R 'smart_mix|compatible' --output-on-failure`. En host: compatibles desde la pista cargada con dos y cuatro decks.
+4. Commit `feat(vdj): present Crate compatibility in VirtualDJ`.
 
-1. RED: presentación de perfil/cues/confianza desde fixtures wire summary; perfil ausente conserva playback normal; versión incompatible desactiva ayuda; orden/breakdown igual al servidor; semilla de contexto consumida una vez y semilla manual no sustituida por otro deck.
-2. GREEN: conectar SmartMixClient a presentación real y Open in Crate funcional; localizar labels/errores. Mostrar resumen de transición mediante contexto/superficie SDK validada, sin recuperar la UI SideView aplazada.
-3. RED: fixtures de plan rechazan UIDs/revisiones/modos/planner/schema incorrectos, capacidad no soportada, valores no finitos, cues/duración/gain/tempo/phase fuera de límites y generaciones de carga/contexto obsoletas. Distinguir fallback musical válido de contrato inválido.
-4. GREEN: cliente de planes y validador puro con elegibilidad/fallback tipado; plan inmutable, conservando procedencia necesaria para C. Un análisis opcional ausente no crea bucles de reintento ni impide playback normal.
-5. Ejecutar `ctest --test-dir build/vdj-headless -R 'smart_mix|compatible|transition_plan' --output-on-failure` y, desde `app`, `pytest -q tests/test_smart_mix_api.py tests/test_smart_mix_models.py tests/test_smart_mix_planner.py`. Host: verificar perfil/cues visibles, navegación de contexto y semilla desde pista cargada con dos/cuatro decks.
-6. Commit `feat(vdj): complete Smart Mix assistant and plan validation`.
+**DoD:** B es visible en el plugin real y no contradice el análisis propio de VDJ.
 
-**DoD:** B es visible en el plugin real; los fixtures demuestran significado de perfil/plan compartido con Android; C dispone de intenciones inmutables validadas.
+### V06 — Crate Automix y play events
 
-### V06 — Implementar y demostrar Automation protegida
+**Dependencias:** V05, P03 y VH01 (comprobaciones 6, 7 y 8). **Estado:** solo los comandos fijos del spike para el deck 1.
 
-**Dependencias:** V05 y P03; frontera de hilos/comandos SDK medida. **Estado:** únicamente comandos fijos del probe para deck 1.
+**Crear:** `tools/vdj-plugin/src/automix/{deck_poller,automix_feeder,play_event_reporter}.cpp`, `tools/vdj-plugin/include/crate_vdj/automix.hpp`, `tools/vdj-plugin/tests/automix/{deck_poller,automix_feeder,play_event_reporter}_test.cpp`.
 
-**Crear:** `tools/vdj-plugin/include/crate_vdj/{vdj_state,vdj_commands,automation_state_machine}.hpp`, `tools/vdj-plugin/src/automation/{vdj_state_reader,vdj_command_port,automation_state_machine,general_automation_plugin,transition_metrics}.cpp`, `tools/vdj-plugin/src/sdk/general_plugin.cpp`, `tools/vdj-plugin/tests/automation/{vdj_state_reader,vdj_command_port,automation_state_machine,transition_metrics}_test.cpp`, `tools/vdj-plugin/tests/sdk/general_automation_lifecycle_test.cpp`.
-**Modificar:** `tools/vdj-plugin/CMakeLists.txt`, `tools/vdj-plugin/include/crate_vdj/core.hpp`. P03 sigue siendo dueño de config/capabilities y lease; V06 consume su contrato.
+1. RED: polling acotado de `get_filepath`, `is_audible` y `get_time` por deck con valores desconocidos o parciales; identificación de pistas Crate por `netsearch://plugin-Crate/<uid>`; dos y cuatro decks.
+2. GREEN: un único worker serializa las llamadas VDJScript, por el mecanismo que valide VH01.
+3. RED/GREEN: el feeder mantiene 2 pistas de antelación en la cola de automix con los verbos validados, las sustituye si cambia la pista que suena, comprueba capabilities, flag y scope antes de cada adición y deja de añadir al desactivarse. Nunca envía comandos de crossfader, tempo, EQ ni play.
+4. RED/GREEN: play events al endpoint existente con `client_event_id` estable, umbral audible y spool acotado sin credenciales.
+5. Host: automix con pistas Crate durante una sesión de al menos una hora, intervención manual, flag apagado a mitad y pérdida de red.
+6. Commits por partes hasta `feat(vdj): feed VirtualDJ automix from Crate`.
 
-1. RED/GREEN: mapear IDs reales de decks, filepath/entity, revisión de carga, readiness, reproducción/audibilidad, BPM/phase/crossfader y señales manuales mediante consultas host. Cubrir valores desconocidos/obsoletos/parciales y dos/cuatro decks. La allowlist VDJScript genera comandos localmente desde intenciones tipadas.
-2. RED: trazas de máquina de estados para todos los modos/fases, deck ocupado, cambio de plan/perfil antes de comando, carga lenta/deadline de readiness, comando rechazado, lease caducado/kill switch, intervención durante precarga/sync/crossfade, acknowledgment tardío y unload/restart. Inyectar clock monotónico y generación de ejecución.
-3. GREEN: General resuelve por separado identidad de decks y solicita planes; sin globals entre bundles. Adquirir ownership solo de operaciones iniciadas por el plugin. Ejecutar un paso acotado, observar estado esperado y revalidar identidad/perfil/lease antes de continuar. No recuperar un deck tocado manualmente.
-4. Gate obligatorio antes de habilitar C: demostrar cómo se cancelan comandos host `auto_*` en curso y cómo vuelve el control sin sobrescribir tempo/fader manual. Medir por separado detección manual y cancelación host. Si un verbo no cumple el límite de seguridad, sustituir su mapping o declarar temporalmente no soportado ese modo hasta resolverlo; no basta detener un worker C++.
-5. Conectar assisted/automatic opt-in a settings de General, mostrar estado/fallback. Desactivar C con lease obsoleto/deshabilitado preservando audio manual. Diagnósticos/métricas fuera de callbacks, cardinalidad acotada y sin rutas/secretos.
-6. Ejecutar tests `automation|general_automation` en builds normal/sanitizer; realizar precarga/sync/crossfade reales con intervención, kill switch y pérdida de red. Fijar y registrar SLOs medidos de callbacks/cancelación/transición; no prometer precisión de sample sin evidencia.
-7. Commits por partes verificadas hasta `feat(vdj): execute guarded Smart Mix transitions`.
+**DoD:** Crate Automix alimenta la cola nativa sin comandos de mezcla, se detiene limpiamente y registra play events una sola vez.
 
-**DoD:** C ejecuta transiciones completas derivadas del backend y supera intervención manual en todas las fases de hosts soportados; desactivación del servidor con efecto acotado documentado; trabajo rechazado/tardío preserva playback manual.
+### V07 — Radio y presencia (backlog)
 
-### V07 — Integrar radio, cues privados y telemetría
+Entra con P06 cuando se decida en §1.1: radio de Crate como fuente del feeder de V06 y presencia now-playing. Los cues privados quedan retirados para VDJ. Referencia: diseño §6.8.
 
-**Dependencias:** P06, V05 y V06 para integración basada en decks. **Estado:** extensiones conservadas, clientes nativos pendientes.
+### V08 — Caché de audio cifrada y prefetch (backlog)
 
-**Crear:** `tools/vdj-plugin/src/client/{radio_client,cue_client,now_playing_client,play_event_client}.cpp`, `tools/vdj-plugin/src/online_source/radio_source.cpp`, `tools/vdj-plugin/src/automation/cue_sync.cpp`, `tools/vdj-plugin/tests/client/{radio_client,cue_sync,telemetry_client}_test.cpp`.
-**Modificar:** adaptador nativo, settings de plataforma y contratos/fixtures nativos compartidos.
-**Propietario backend:** P06 crea/actualiza rutas, scopes, modelos, repositorios, migraciones y tests radio/cues/presencia/eventos. V07 no crea `app/crate/api/dj.py`, servicios ni migraciones paralelos: integra el contrato que entrega P06 y reporta incompatibilidades a esa tarea.
+Solo si VH01 confirma que `GetStreamUrl` acepta rutas locales. Referencia: diseño §2.4 y §6.8.
 
-1. RED/GREEN: cliente de `/api/radio/start`, `/api/radio/next`, `/api/radio/feedback` y `/api/radio/session/{session_id}` con scope y ownership explícitos del contrato P06. Validar candidatos locales, caducidad, cancelación, idempotencia de feedback cuando corresponda y reinicio explícito de sesión caducada. No copiar ranking ni lógica de sesiones.
-2. RED/GREEN: consumir GET/PUT/DELETE de `/api/dj/tracks/by-entity/{uid}/cues` propuesto en P06 con revisión esperada, revisión del perfil fuente y ámbito privado. Probar conflicto, política de recarga/merge, delete, usuarios separados y lectura cacheada sin retrasar carga de deck. Aplicar cues en VDJ con comandos host validados sin sobrescribir cambios manuales silenciosamente. Los cues automáticos globales permanecen independientes.
-3. RED/GREEN: cliente de `/api/dj/now-playing` de P06 por usuario/deck, cada 30s y TTL servidor90s. Consumir `/api/me/play-events` con umbral audible e idempotency key. La idempotencia persistida es responsabilidad del backend P06: un spool correcto por sí solo no la acredita. Distinguir pista precargada/silenciosa de pista audible y reproducción solapada en decks.
-4. Acotar reintentos/spool por cantidad/edad, limpiar al cambiar identidad y excluir URLs firmadas/tickets. Fallos de red no afectan timing de decks. Cubrir reinicio durante flush, duplicación de acknowledgment y orden de feedback/cues al reconectar.
-5. Ejecutar tests nativos client y la suite entregada por P06 desde `app`: `pytest -q tests/test_radio_contracts.py tests/test_smart_mix_api.py tests/test_dj_cue_points.py tests/test_dj_now_playing.py tests/test_dj_play_events.py tests/test_play_event_contracts.py`. Probar edición de cues, reconexión y caducidad de radio en host real.
-6. Commit de cada cliente/extensión con mensajes `feat(vdj): ...`. Registrar las tres como requeridas; una capacidad deshabilitada pendiente de gate no cuenta como extensión terminada.
+### V09 — Filtros DJ, medición y verificación continua
 
-**DoD:** integración sobre el único backend P06, sin radio/planner duplicados; cues privados revision-safe, presencia best effort acotada y efectos persistidos únicos de play events comprobados ante reintentos.
+**Dependencias:** P04 y V01–V06; la CI puede empezar tras V01.
 
-### V08 — Caché cifrada acotada y prefetch
+**Modificar:** `.github/workflows/test-backend.yml`, `Makefile`, `tools/vdj-plugin/CMakeLists.txt`, cliente de búsqueda.
+**Crear:** `tools/vdj-plugin/src/client/search_syntax.cpp`, `tools/vdj-plugin/tests/client/search_syntax_test.cpp`, `.github/workflows/vdj-plugin.yml` y harness de medición bajo `tools/vdj-plugin/tests/performance/`.
 
-**Dependencias:** V04 y V05; reutilizar identidad y transporte ya probados. P06/V07 aportan eventos cuando se conecten. La carga/caché básica no depende de C/V06. **Estado:** caché de metadatos existente; audio cache/prefetch ausentes.
+1. RED/GREEN: el plugin pasa la sintaxis de filtros de P04 sin reinterpretarla y muestra errores de sintaxis como resultado vacío con mensaje.
+2. Jobs de PR: headless Linux/macOS, sanitizer, Release, dependencias/licencias/secretos sin SDK privado; `make vdj-test` y `make vdj-build`; build Windows del core sin firma.
+3. Medir p50/p95/p99 de search, carpetas, compatibles y autorización de stream contra FastAPI con dataset de 48K pistas. Readplane solo si falla el SLO registrado.
 
-**Crear:** `tools/vdj-plugin/src/cache/{audio_cache,prefetch_queue,audio_materialization}.cpp`, `tools/vdj-plugin/include/crate_vdj/audio_cache.hpp`, `tools/vdj-plugin/tests/cache/{audio_cache,offline_playback,prefetch_queue}_test.cpp`.
-**Modificar:** resolver de stream, credenciales de plataforma, settings nativos, manifiesto de dependencias CMake y packaging. Campos de permisos offline/cache vienen de P05, sin contrato media paralelo. Implementar límites§2.4 del diseño: presupuesto físico total 5GiB incluye temporales/parciales/ciphertext, reservas previas; conceder carga manual offline solo dentro de offlineEligibleUntil vinculado a token/owner/nodo/fuente, sin ampliar lease C. Validar restauración, reloj y revocación observada.
+**DoD:** CI reproducible cubre el código nativo real; filtros sin regresión de Listen; rendimiento medido.
 
-1. Gate y RED: verificar en los hosts soportados que GetStreamUrl entrega la referencia privada local/file elegida y permite seek. Registrar cifrado en reposo y comportamiento temporal en claro antes de implementarlo; no introducir daemon/IPC oculto.
-2. RED/GREEN: elegir cifrado autenticado auditado, fijar dependencia y guardar claves por nodo/cuenta solo en almacén OS. Autenticar metadatos/contenido/revisión; limitar bytes/edad; escritura/finalización atómica, rechazo de corrupción, LRU y limpieza tras crash. Las nuevas cargas requieren autorización/política adecuada a modo online/offline; revocación observada online deniega cargas nuevas y limpia material sin pin.
-3. RED/GREEN: prefetch máximo de las tres siguientes con concurrencia pequeña, cancelación al cambiar cola/perfil/usuario/origen y sin expulsar decks activos. Ticket/URL solo en memoria; descarga parcial no se publica como cache reproducible. Progreso por bytes reales fuera de callbacks con I/O.
-4. RED/GREEN: material temporal descifrado, si el host lo requiere, limitado a cargas con pin, permisos privados OS, ausente en metadatos/logs y limpio tras unload/crash. No afirmar retirada de bytes ya cargados ni borrado seguro garantizado en SSD.
-5. Ejecutar `ctest --test-dir build/vdj-headless -R 'audio_cache|offline_playback|prefetch' --output-on-failure`; verificar límite de bytes, disco lleno, ciphertext corrupto, restos tras reinicio, cambio de usuario, cancelación y seek offline en dos decks reales. Mantener opt-in y OFF por defecto hasta superar gates; estar deshabilitado no acredita entregable completo.
-6. Commit `feat(vdj): add bounded encrypted cache and prefetch`.
+### V10 — Paquetes y cierre de gates host
 
-**DoD:** offline/prefetch opcional funciona mediante entrega host probada, semántica explícita de seguridad/disponibilidad, almacenamiento acotado y sin expulsión de decks activos.
-
-### V09 — Integrar filtros DJ, medición y verificación continua
-
-**Dependencias:** P04 y V01–V08; la infraestructura CI puede empezar tras V01. **Estado:** filtros nativos, CI de release y decisión readplane medida pendientes.
-
-**Modificar:** `.github/workflows/test-backend.yml`, `Makefile`, `tools/vdj-plugin/CMakeLists.txt`, cliente de búsqueda y UI nativa de filtros.
-**Crear:** `tools/vdj-plugin/src/client/search_filters.cpp`, `tools/vdj-plugin/tests/client/search_filters_test.cpp`, `.github/workflows/vdj-plugin.yml` y harness/scripts de medición nativos bajo `tools/vdj-plugin/tests/performance/`.
-**Propietario backend:** P04 implementa filtros, cursores, `fields=dj`, índices necesarios y suites `test_vdj_search_filters.py`, `test_vdj_search_pagination.py` y medición de queries. Las tareas P02–P06 mantienen tests auth/media/observabilidad/routing. V09 conecta cliente/UI/CI y mide el sistema entregado; no vuelve a implementar filtros, queries, endpoints ni migraciones. Si la medición requiere readplane, la tarea backend correspondiente entrega la paridad antes de activarlo.
-
-1. RED/GREEN: consumir filtros BPM/Camelot/energía/analysis-required y cursor/`fields=dj` aditivos de P04. Mapear estado UI a request y resultados; respetar máximo50 de búsqueda. Cubrir análisis ausente, error de cursor/scope, orden estable, cambio de filtros con cancelación y fallback de versión no soportada. Verificar junto a P04 que Listen sin filtros permanece igual.
-2. Añadir jobs PR de contratos backend, Linux headless/CTest, macOS headless, sanitizer y checks de dependencias/licencias/secretos sin SDK privado. Targets `make vdj-test` y `make vdj-build`; probar Release también. Build Windows core sin credenciales de firma. Los mocks de stores no sustituyen gates separados de integración OS.
-3. Incorporar a CTest por defecto fake-server transport (TLS/origin/redirect/body-size/cancel/expiry/range) y lifecycle del adaptador real. Tests live opt-in y limitados al entorno. Usar métricas con labels acotados de resultado/modo/clase de versión, sin track/user IDs.
-4. Medir FastAPI-only search/profile/compatible/plan/authorization p50/p95/p99 mediante harness cliente, fixtures del backend a escala de producción y concurrencia realista. Registrar hardware/dataset/cache, SLOs y decisión en el plan canónico. Una biblioteca de desarrollo pequeña no demuestra capacidad para el catálogo completo.
-5. Readplane solo si falla el SLO registrado: exigir a su tarea backend fixtures iguales de allowlist/revocación/tickets/cursor/orden/errores. V09 integra esos fixtures y matrices en CI, sin implementar otra capa Go de auth. Hasta la paridad, VDJ debe dirigirse determinísticamente a FastAPI en cada topología de despliegue, no solo en el overlay Caddy local.
-6. Ejecutar suites backend/nativas pertinentes y contratos de routing. Commit separado de integración de filtros, CI y decisión medida de routing.
-
-**DoD:** CI reproducible cubre el código nativo real; filtros funcionan sin regresión de Listen; afirmaciones de rendimiento/routing cuentan con mediciones y paridad de autorización acreditada por las tareas backend responsables.
-
-### V10 — Releases independientes y cierre de gates host
-
-**Dependencias:** V01–V09 y X03 para cerrar; los builds de empaquetado pueden prepararse en paralelo a X03. V10 no depende de X04, que realiza el rollout final. Los pilotos A/B pueden publicarse antes con C deshabilitado, sin cerrar el plan global.
+**Dependencias:** V01–V06 y X03.
 
 **Crear:** `tools/vdj-plugin/packaging/manifest.json`, scripts bajo `tools/vdj-plugin/packaging/`, `.github/workflows/vdj-plugin-release.yml`.
-**Modificar:** `tools/vdj-plugin/CMakeLists.txt`, `tools/vdj-plugin/README.md`, `Makefile` y workflow existente del stack para fixtures de compatibilidad. Evidencias técnicas y rollout permanecen en `docs/technical/smart-mix-design.md` y `docs/technical/smart-mix-implementation-plan.md`; registrar exactamente estas dos fuentes canónicas en el manifiesto documental. Release notes/artefactos generados son outputs, no nuevos documentos de diseño/plan.
+**Modificar:** `tools/vdj-plugin/CMakeLists.txt`, `tools/vdj-plugin/README.md`, `Makefile`.
 
-1. RED/GREEN: manifiesto valida SemVer plugin, contrato Crate mínimo/máximo probado, schemas/analyzer/planner, builds/arquitecturas VirtualDJ y gates de capacidades. Versión de binario y manifiesto desde un origen único. `vdj-v*` publica plugin independiente; Crate `v*` ejecuta compatibilidad sin incrementar su versión.
-2. Generar DLLs Windows x64 firmadas y bundles macOS Intel/arm64 firmados/notarizados, con SDK/firma privados solo en jobs de release. Empaquetar A+B y C por separado en una distribución versionada; upgrade/rollback/uninstall conservan configuración compatible. Excluir `ControlSpike`, headers/samples SDK y credenciales locales. Generar checksums/SBOM/inventario de licencias.
-3. Añadir `make vdj-package`; ejecutar matrices CMake/CTest normal/sanitizer/Release antes de firmar. Verificar exports, metadata/iconos de bundle, directorios de instalación y carga independiente de ambos binarios. Probar stores OS sin depender exclusivamente de dobles.
-4. Consumir evidencia de la matriz host y soak de X03; repetir sobre paquetes firmados instalación/upgrade, carga de ambos binarios, credenciales, media y takeover. Repetir otras pruebas únicamente si packaging cambia comportamiento o aparece una regresión; distinguir core, SDK falso, harness API y host efectivo.
-5. Preparar artefactos y verificar configuración para el rollout de X04: gates independientes de A/B/C, rollback de binarios y rutas FastAPI soportadas. X04 ejecuta beta/ampliación; V10 no repite ese despliegue como prerrequisito de sí misma.
-6. Revisar todas las extensiones retenidas y resolver gates fallidos; una casilla pendiente no es una exclusión aprobada. Commit de configuración release y evidencia final en el plan canónico.
+1. Manifest con SemVer del plugin, contratos Crate mínimo y máximo probados, versiones de VDJ probadas y requisito de licencia Pro.
+2. Bundle macOS arm64 y x86_64 (o universal) instalado en `PluginsMacArm/OnlineSources` o `Plugins64/OnlineSources` según arquitectura, y DLL Windows x64 en `Plugins64/OnlineSources`. Excluir spike, probe, headers SDK y credenciales. Checksums, SBOM e inventario de licencias.
+3. Firma: macOS necesita Developer ID y notarización para distribuirse fuera de la máquina de desarrollo; hoy no hay secretos de firma de Apple. Hasta tenerlos, el paquete macOS es solo para pruebas internas y se documenta así. Windows: firma Authenticode si hay certificado; si no, se documenta.
+4. `make vdj-package`; verificar exports, metadata, carpeta de instalación y carga en host de cada paquete.
+5. Consumir la evidencia de X03 y repetir sobre los paquetes: instalación, actualización, credenciales, media y Crate Automix.
 
-**DoD:** artefactos firmados instalables multi-plataforma, compatibilidad de versiones independientes, A+B+C completo en host real, gates de extensiones cerrados, soak y rollout reversible; la feature Smart Mix unificada solo se cierra con los gates Android y servidor también verdes.
+**DoD:** paquetes instalables por plataforma con requisitos documentados (Pro, arquitectura, firma); A, B y Crate Automix verificados en host real.
 
 ## 7. Integración, aceptación y operación — X01 a X04
 
@@ -657,20 +646,20 @@ Baseline esperado: 14 tests verdes; las tareas aumentarán ese número. Los nuev
 2. Android: al menos 20 transiciones por caso funcional y ≥1000 transiciones para la tasa agregada por configuración que se pretenda certificar. Informar `fallos/N` y límite superior Wilson95%; exigir límite superior <0.5%, aumentando muestra si es necesario. No deducir una tasa de20 casos. Memoria compara p95RSS estable y máximo tras warmup contra single deck; ambas≤1.5× bajo mismo escenario y sin crecimiento sostenido.
 3. Fase: ≥200 transiciones beatmatch por configuración certificada, múltiples pares/tempos/drift; reportar p50/p95/max e intervalo de incertidumbre. p95≤20ms sobre audio válido, true peak≤−1dBTP y cero clipped samples. Una captura inválida repite el escenario, no se cuenta como éxito.
 4. VirtualDJ: Windowsx64, macIntel y macarm64; versión mínima/máxima soportadas que se fijan en manifest antes de probar;2/4 decks, búsqueda/folders/media/seek trasTTL, reconexión, authrotate/revoke, user/origin switch, caché, cues/radio, takeover en cada fase y unload/restart. Soak4h por plataforma soportada; medir cola de workers y memoria estable.
-5. Para C, registrar reconocimiento de takeover, cancelación efectiva del comando programado por host y efecto de lease. Objetivo inicial reconocer/cancelar scheduling propio≤100ms en contextos de control soportados; cualquier comando sobre un deck ya cedido es fallo. No anunciar sample-accuracy. Si el SDK no permite cumplirlo, corregir mapping/modo y repetir antes de certificar C.
+5. Para Crate Automix, registrar que el plugin no envía comandos de mezcla, que la cola mantiene la antelación configurada con 2 y 4 decks, y cuánto tarda en dejar de añadir pistas tras apagar el flag o revocar el token.
 6. Ensayar disable independiente C/VDJ/beatmatch/adaptive y rollback a binarios compatibles. Nuevo trabajo se cancela/deniega; audio audible y controles manuales se mantienen. Probar recuperación/rearme consciente y no degradar DB automáticamente.
 
 **DoD:** toda celda anunciada soportada tiene evidencia real con resultado; fallo en una plataforma/modo no se oculta agregando éxitos de otra. Los gates inviables se registran pendientes y elevan una decisión concreta en los mismos documentos.
 
 ### Matriz mínima de escenarios
 
-| Superficie   | Casos obligatorios                                                                                                                                                                |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Audio        | Mono/estéreo contrafase/correlacionado, silencio/intro corto/outro corto, variable tempo,44.1/48/96k, MP3/AAC/FLAC soportados, tracks largos                                      |
-| Android      | Referencia Pixel y Xiaomi13/equivalente; altavoz, auriculares cable/USB, Bluetooth y coche/AndroidAuto; focus/duck/calls; foreground/background/lockscreen/Doze/process death     |
-| Red/media    | Local descargado, stream autenticado, lento/offline, timeout de plan, ticket expirado en seek/range, token/session renovado/revocado, source file reemplazada                     |
-| Cola/usuario | Álbum gapless, shuffle/radio/playlist, repeat-one, next/seek/pause en cada fase, cambio de cola/cues/origen/cuenta, opt-out persistente                                           |
-| VDJ          | A+B sin C instalado y C independiente;2/4 decks; deck no-Crate/ocupado; manual takeover; gates/lease; request cancel/replacement; unload/restart; caché/audio opt-in y permisosSO |
+| Superficie   | Casos obligatorios                                                                                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Audio        | Mono/estéreo contrafase/correlacionado, silencio/intro corto/outro corto, variable tempo,44.1/48/96k, MP3/AAC/FLAC soportados, tracks largos                                   |
+| Android      | Referencia Pixel y Xiaomi13/equivalente; altavoz, auriculares cable/USB, Bluetooth y coche/AndroidAuto; focus/duck/calls; foreground/background/lockscreen/Doze/process death  |
+| Red/media    | Local descargado, stream autenticado, lento/offline, timeout de plan, ticket expirado en seek/range, token/session renovado/revocado, source file reemplazada                  |
+| Cola/usuario | Álbum gapless, shuffle/radio/playlist, repeat-one, next/seek/pause en cada fase, cambio de cola/cues/origen/cuenta, opt-out persistente                                        |
+| VDJ          | Licencia Pro; 2 y 4 decks; deck con pista no Crate; búsqueda cancelada y sustituida; unload/restart; Crate Automix con intervención manual y flag apagado; revocación de token |
 
 ### X04 — Rollout progresivo y cierre único
 
@@ -724,6 +713,10 @@ Al iniciar una tarea se expande su fila individual: `pendiente → en curso → 
 | 2026-09-09 | Dos decks Android primero; busPCM solo por gate físico fallido                                    | A06/A07 deciden con captura, no por preferencia arquitectónica       |
 | 2026-09-09 | VDJ A+B y C en dos binarios sin daemon/IPC                                                        | Negociación y estado independientes; SDKhost es gate                 |
 | 2026-09-09 | Todos los entregables anteriores conservados; hitos incrementales                                 | Apagar una opción no cierra trabajo faltante                         |
+| 2026-10-08 | Releases R1–R4 cerrables por separado y backlog explícito                                         | Ningún entregable bloquea a otra release                             |
+| 2026-10-08 | VDJ se ajusta al SDK de 2021: un nivel de carpetas, sin cursores, ticket en URL, covers públicos  | P04, P05, V03 y V04 reescritos; VH01 cierra lo no documentado        |
+| 2026-10-08 | C pasa a Crate Automix sobre el automix nativo de VDJ; sin lease ni ejecutor propio               | P03 sin lease; V06 reescrito; cues privados retirados para VDJ       |
+| 2026-10-08 | Un solo binario Online Source con nombre permanente `Crate`; requisito de licencia Pro            | V02 y V10; segundo binario solo si VH01 lo exige                     |
 
 Una revisión que cambie una decisión debe indicar motivo, evidencia, impacto en contratos/capabilities/migración y tareas afectadas. Toda guía antigua permanece histórica incluso si sus checkboxes dicen completa.
 
