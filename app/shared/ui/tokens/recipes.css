@@ -2387,12 +2387,36 @@ button.genre-pill:hover {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent 50%, var(--surface-canvas)),
+  background: linear-gradient(180deg, transparent 55%, var(--surface-card)),
+    linear-gradient(
+      180deg,
+      transparent 45%,
+      color-mix(in srgb, var(--surface-canvas) 70%, transparent) 80%,
+      var(--surface-canvas)
+    ),
     linear-gradient(
       0deg,
       color-mix(in srgb, var(--accent-action) 25%, transparent),
       transparent 50%
     );
+}
+
+@media (min-width: 768px) {
+  .stats-artist-of-period-photo::after {
+    background: linear-gradient(90deg, transparent 60%, var(--surface-card)),
+      linear-gradient(
+        90deg,
+        transparent 35%,
+        color-mix(in srgb, var(--surface-canvas) 55%, transparent) 70%,
+        color-mix(in srgb, var(--surface-canvas) 90%, transparent) 90%,
+        var(--surface-canvas)
+      ),
+      linear-gradient(
+        0deg,
+        color-mix(in srgb, var(--accent-action) 25%, transparent),
+        transparent 50%
+      );
+  }
 }
 
 .stats-artist-of-period-rank {
