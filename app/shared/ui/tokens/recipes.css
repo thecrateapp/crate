@@ -489,13 +489,9 @@
     );
 }
 
-.home-replay-metric-card {
-  border: 1px solid var(--border-quiet);
-  background: var(--surface-card);
-}
-
-.home-replay-metric-label {
-  color: var(--text-muted);
+.stats-mini-tape {
+  height: 6rem;
+  margin-block: 1.5rem;
 }
 
 .home-upcoming-empty-card {

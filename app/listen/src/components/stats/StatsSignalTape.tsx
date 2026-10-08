@@ -22,14 +22,18 @@ import {
 } from "@/components/stats/stats-tape-model";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 
-function localToday(): string {
+export function localToday(): string {
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
-const TapeBars = memo(function TapeBars({ model }: { model: TapeModel }) {
+export const TapeBars = memo(function TapeBars({
+  model,
+}: {
+  model: TapeModel;
+}) {
   return (
     <svg
       viewBox={`0 0 ${TAPE_WIDTH} ${TAPE_HEIGHT}`}

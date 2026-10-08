@@ -18,6 +18,7 @@ import { usePlayerActions, type PlaySource } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
 import { usePendingStatsSnapshotRefresh } from "@/hooks/use-pending-stats-snapshot-refresh";
 import {
+  STATS_DASHBOARD_LIMITS,
   buildSoundProfile,
   formatMonthTitle,
   normalizeMonthParam,
@@ -143,7 +144,7 @@ export function useStatsPageController(): StatsPageController {
     loading: dashboardLoading,
     refetch: refetchDashboard,
   } = useApi<StatsDashboard>(
-    `${statsEndpoint}?${periodQuery}&tracks_limit=12&artists_limit=10&albums_limit=12&genres_limit=10&replay_limit=36`,
+    `${statsEndpoint}?${periodQuery}&${STATS_DASHBOARD_LIMITS}`,
   );
   const { data: today } = useApi<StatsToday>(
     !isGlobalStats && !isUserStats ? "/api/me/stats/today" : null,

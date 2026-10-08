@@ -45,12 +45,53 @@ describe("HomeReplaySection", () => {
       />,
     );
 
-    expect(screen.getAllByText("Crate DNA").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Crate DNA")).toHaveLength(1);
+    expect(screen.getByText("Open Crate DNA")).toBeInTheDocument();
     expect(screen.getByText("Replay June 2026")).toBeInTheDocument();
     expect(screen.getByText("Play month replay")).toBeInTheDocument();
     expect(screen.getByText("Month replay")).toBeInTheDocument();
+    expect(screen.getByText("Tracks")).toBeInTheDocument();
     expect(container.querySelector(".home-replay-card")).toBeInTheDocument();
     expect(container.querySelector(".home-replay-panel")).toBeInTheDocument();
+    expect(container.querySelector(".stats-mini-tape")).not.toBeInTheDocument();
+  });
+
+  it("leads with the 30-day signal when the stats snapshot is ready", () => {
+    const { container } = renderWithListenProviders(
+      <HomeReplaySection
+        replay={replay}
+        replayPreview={replay.items}
+        signal={{
+          days: 30,
+          minutes: 4143,
+          plays: 1384,
+          artists: 31,
+          tape: {
+            granularity: "day",
+            start: "2026-06-01",
+            end: "2026-06-03",
+            points: [
+              { bucket: "2026-06-01", minutes: 40, plays: 10 },
+              { bucket: "2026-06-02", minutes: 90, plays: 22 },
+            ],
+            mood: [],
+            peaks: [],
+            months: [],
+          },
+        }}
+        onOpenStats={() => undefined}
+        onPlayReplay={() => undefined}
+        onPlayTrack={() => undefined}
+      />,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "30 days of signal" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("4,143")).toBeInTheDocument();
+    expect(screen.getByText("1,384")).toBeInTheDocument();
+    expect(screen.getByText("artists")).toBeInTheDocument();
+    expect(container.querySelector(".stats-mini-tape svg rect")).not.toBeNull();
   });
 
   it("renders replay tracks as canonical rows with a menu", async () => {
