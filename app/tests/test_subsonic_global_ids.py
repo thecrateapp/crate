@@ -61,3 +61,16 @@ def test_subsonic_id_codec_rejects_wrong_type_invalid_uuid_and_unknown_prefix(
 
     assert error.value.code == 70
     assert error.value.message == "Invalid Subsonic entity ID"
+
+
+def test_subsonic_playlist_cover_id_codec_is_typed_and_validated():
+    from crate.subsonic.global_ids import (
+        SubsonicIdError,
+        decode_subsonic_playlist_id,
+        encode_subsonic_playlist_id,
+    )
+
+    assert decode_subsonic_playlist_id("pl-42") == 42
+    assert encode_subsonic_playlist_id(42) == "pl-42"
+    with pytest.raises(SubsonicIdError):
+        decode_subsonic_playlist_id("pl-0")

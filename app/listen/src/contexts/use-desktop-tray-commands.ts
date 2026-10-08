@@ -1,5 +1,6 @@
 import { useEffect, type MutableRefObject } from "react";
 
+import type { PlayerPauseOptions } from "@/contexts/player-context";
 import type { Track } from "@/contexts/player-types";
 import {
   DESKTOP_TRAY_COMMAND_EVENT,
@@ -9,7 +10,7 @@ import {
 
 interface UseDesktopTrayCommandsParams {
   isPlayingRef: MutableRefObject<boolean>;
-  pause: () => void;
+  pause: (options?: PlayerPauseOptions) => void;
   resume: () => void;
   previous: () => void;
   next: () => void;
@@ -27,7 +28,7 @@ export function useDesktopTrayCommands({
       const command = (event as CustomEvent<DesktopTrayCommand>).detail;
       if (command === "play_pause") {
         if (isPlayingRef.current) {
-          pause();
+          pause({ immediate: true });
         } else {
           resume();
         }
@@ -38,7 +39,7 @@ export function useDesktopTrayCommands({
         return;
       }
       if (command === "pause") {
-        pause();
+        pause({ immediate: true });
         return;
       }
       if (command === "previous") {

@@ -69,6 +69,10 @@ def run_worker(config: dict):
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
+    from crate.observability import init_sentry, resolve_service_name
+
+    init_sentry(resolve_service_name("workers"))
+
     from crate.utils import init_musicbrainz
 
     queues = _normalise_queues(config.get("worker_queues"))
@@ -592,6 +596,9 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "recompose_artist_hero",
             "derive_artist_hero",
             "backfill_artist_heroes",
+            "migrate_artist_heroes",
+            "migrate_artist_hero",
+            "rollback_artist_hero",
             "backfill_artwork_variants",
             "cleanup_artwork_variants",
             "repair_artwork_variants",
@@ -622,6 +629,8 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "process_new_content",
             "compute_completeness",
             "refresh_probable_setlist",
+            "normalize_artist_bios",
+            "research_artist_bio",
         ),
     ),
     (
@@ -643,6 +652,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         (
             "bandcamp_connect_credentials",
             "bandcamp_sync_collection",
+            "bandcamp_discover_refresh",
             "bandcamp_import_purchase",
             "bandcamp_radar_refresh",
             "bandcamp_backfill_entity_urls",
@@ -722,6 +732,16 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "warmup_stream_variants",
             "cleanup_stream_variants",
         ),
+    ),
+    (
+        "crate.worker_handlers.crate_download",
+        "CRATE_DOWNLOAD_TASK_HANDLERS",
+        ("crate_download",),
+    ),
+    (
+        "crate.worker_handlers.cast_spectrum",
+        "CAST_SPECTRUM_TASK_HANDLERS",
+        ("generate_cast_spectrum",),
     ),
 )
 

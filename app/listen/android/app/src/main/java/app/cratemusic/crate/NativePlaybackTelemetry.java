@@ -70,18 +70,20 @@ final class NativePlaybackTelemetry {
     }
 
     private void bufferLatestPositionEvent(BufferedEvent event) {
-        for (int index = bufferedEvents.size() - 1; index >= 0; index--) {
-            BufferedEvent bufferedEvent = bufferedEvents.get(index);
-            if ("positionChanged".equals(bufferedEvent.eventName)) {
-                bufferedEvents.set(index, event);
-                return;
-            }
-        }
-        bufferEvent(event);
+        CrateNativePlaybackService.coalesceLatestPositionEvent(
+            bufferedEvents,
+            event,
+            candidate -> "positionChanged".equals(candidate.eventName)
+        );
+        trimBufferedEvents();
     }
 
     private void bufferEvent(BufferedEvent event) {
         bufferedEvents.add(event);
+        trimBufferedEvents();
+    }
+
+    private void trimBufferedEvents() {
         while (bufferedEvents.size() > maxBufferedEvents) {
             bufferedEvents.remove(0);
         }

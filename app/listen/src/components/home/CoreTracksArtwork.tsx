@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { artistPhotoApiUrl } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
 import { EditorialPlaylistArtwork } from "@/components/playlists/EditorialPlaylistArtwork";
@@ -33,16 +35,17 @@ export function CoreTracksArtwork({
   item: CoreTracksLike;
   className?: string;
 }) {
+  const { t } = useTranslation();
   const photoUrl = coreArtistPhoto(item);
 
   return (
     <EditorialPlaylistArtwork
       title={item.name}
-      kicker="Artist Set"
+      kicker={t("home.sections.artistSets.kicker")}
       tracks={item.artwork_tracks}
       backgroundImageUrl={photoUrl}
       variant="core"
-      className={cn("rounded-xl bg-white/5", className)}
+      className={cn("rounded-xl bg-text-primary/5", className)}
     />
   );
 }

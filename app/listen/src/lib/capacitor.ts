@@ -1,10 +1,13 @@
 export {
   beginNativeOAuth,
   clearPendingOAuthNext,
+  consumePendingOAuthProviderError,
   consumeOAuthCallbackUrl,
   consumePendingOAuthNext,
   getOAuthCallbackPayload,
   persistOAuthCallbackPayload,
+  retryPendingNativeOAuthCallback,
+  storePendingOAuthProviderError,
 } from "@/lib/capacitor-oauth";
 export { initCapacitor } from "@/lib/capacitor-init";
 export {

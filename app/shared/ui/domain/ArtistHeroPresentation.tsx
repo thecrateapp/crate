@@ -31,13 +31,13 @@ export function ArtistHeroPresentation({
   const mobile = composition === "mobile";
   const copy = (
     <>
-      <p className="text-[10px] font-semibold uppercase leading-none tracking-[0.3em] text-primary sm:text-xs">
+      <p className="text-xs font-semibold uppercase leading-none tracking-[0.3em] text-accent-action sm:text-xs">
         {kicker}
       </p>
       <h1
         data-testid="hero-result-artist-name"
         className={cn(
-          "mt-1 max-w-[16ch] text-balance font-black leading-[0.96] tracking-[-0.04em] text-white",
+          "mt-1 max-w-[16ch] text-balance font-black leading-[0.96] tracking-display text-text-primary",
           mobile
             ? "text-4xl min-[390px]:text-5xl"
             : "text-[52px] lg:text-[56px]",
@@ -54,7 +54,7 @@ export function ArtistHeroPresentation({
     <div
       data-testid={`${composition}-hero-presentation`}
       className={cn(
-        "pointer-events-none absolute inset-0 text-white",
+        "pointer-events-none absolute inset-0 text-text-primary",
         className,
       )}
     >
@@ -62,7 +62,7 @@ export function ArtistHeroPresentation({
         <div className="absolute inset-x-0 top-0">
           <div
             data-testid="desktop-hero-intro-layout"
-            className="mx-auto w-full max-w-[1480px] px-6 pt-[92px]"
+            className="mx-auto w-full max-w-content px-6 pt-[92px]"
           >
             {intro}
           </div>
@@ -98,7 +98,7 @@ export function ArtistHeroPresentation({
         >
           <div
             data-testid="desktop-hero-content"
-            className="mx-auto w-full max-w-[1480px] px-6"
+            className="mx-auto w-full max-w-content px-6"
           >
             {copy}
           </div>

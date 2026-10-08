@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
   type HTMLAttributes,
@@ -9,14 +10,37 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { X } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, X } from "@crate/ui/icons";
 
 import { cn } from "@crate/ui/lib/cn";
+import { useSheetDrag } from "@crate/ui/lib/use-sheet-drag";
 
-interface AppModalProps {
+export type AppModalSize = "sm" | "md" | "lg" | "xl";
+
+const MODAL_SIZE_CLASS_NAMES: Record<AppModalSize, string> = {
+  sm: "sm:max-w-md",
+  md: "sm:max-w-lg",
+  lg: "sm:max-w-2xl",
+  xl: "sm:max-w-4xl",
+};
+
+const DEFAULT_MAX_WIDTH_CLASS_NAME = MODAL_SIZE_CLASS_NAMES.lg;
+
+export interface AppModalProps {
   open: boolean;
   onClose: () => void;
-  children: ReactNode;
+  children?: ReactNode;
+  title?: ReactNode;
+  description?: ReactNode;
+  size?: AppModalSize;
+  role?: "dialog" | "alertdialog";
+  ariaLabel?: string;
+  ariaLabelledBy?: string;
+  ariaDescribedBy?: string;
+  closeLabel?: string;
+  closeDisabled?: boolean;
+  backdropLabel?: string;
+  headerClassName?: string;
   maxWidthClassName?: string;
   panelClassName?: string;
   overlayClassName?: string;
@@ -39,39 +63,22 @@ const FOCUSABLE_SELECTOR = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
-const SHEET_DRAG_ACTIVATION_PX = 8;
-
-function getTouchClientY(event: TouchEvent): number | null {
-  return event.touches[0]?.clientY ?? event.changedTouches[0]?.clientY ?? null;
-}
-
-function getScrollableAncestor(
-  target: EventTarget | null,
-  boundary: HTMLElement,
-): HTMLElement | null {
-  if (!(target instanceof Node)) return null;
-
-  let node: HTMLElement | null =
-    target instanceof HTMLElement ? target : target.parentElement;
-
-  while (node && node !== boundary) {
-    const style = window.getComputedStyle(node);
-    const canScrollY =
-      /(auto|scroll|overlay)/.test(style.overflowY) &&
-      node.scrollHeight > node.clientHeight;
-
-    if (canScrollY) return node;
-    node = node.parentElement;
-  }
-
-  return null;
-}
-
 export function AppModal({
   open,
   onClose,
   children,
-  maxWidthClassName = "sm:max-w-2xl",
+  title,
+  description,
+  size,
+  role = "dialog",
+  ariaLabel = "Dialog",
+  ariaLabelledBy,
+  ariaDescribedBy,
+  closeLabel,
+  closeDisabled = false,
+  backdropLabel = "Close dialog backdrop",
+  headerClassName,
+  maxWidthClassName,
   panelClassName,
   overlayClassName,
   closeOnOverlay = true,
@@ -80,6 +87,16 @@ export function AppModal({
   mobileSafeArea = false,
 }: AppModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  const hasTitle = title != null && title !== false;
+  const hasDescription = description != null && description !== false;
+  const labelledBy = ariaLabelledBy ?? (hasTitle ? titleId : undefined);
+  const describedBy =
+    ariaDescribedBy ?? (hasTitle && hasDescription ? descriptionId : undefined);
+  const resolvedMaxWidthClassName =
+    maxWidthClassName ??
+    (size ? MODAL_SIZE_CLASS_NAMES[size] : DEFAULT_MAX_WIDTH_CLASS_NAME);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -98,7 +115,7 @@ export function AppModal({
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && closeOnEscape) {
+      if (event.key === "Escape" && closeOnEscape && !event.defaultPrevented) {
         onClose();
       }
       if (event.key !== "Tab") return;
@@ -174,129 +191,36 @@ export function AppModal({
     };
   }, [open]);
 
-  // Swipe-to-dismiss (mobile bottom sheet — drag handle only)
   const [isEntering, setIsEntering] = useState(open);
-  const [isDragging, setIsDragging] = useState(false);
   const [isDragClosing, setIsDragClosing] = useState(false);
-  const [swipeY, setSwipeY] = useState(0);
-  const swipeYRef = useRef(0);
-  const swipeStartRef = useRef<number | null>(null);
-  const pointerDragIdRef = useRef<number | null>(null);
-  const pendingTouchStartYRef = useRef<number | null>(null);
-  const pendingTouchTargetRef = useRef<EventTarget | null>(null);
-  const dragHandleRef = useRef<HTMLDivElement>(null);
   const dragCloseTimerRef = useRef<number | null>(null);
-  const setDragOffset = useCallback((offset: number) => {
-    swipeYRef.current = offset;
-    setSwipeY(offset);
-  }, []);
-  const getPanelHeight = useCallback(() => {
-    const height = panelRef.current?.getBoundingClientRect().height ?? 0;
-    return height > 0 ? height : 240;
-  }, []);
-  const requestDragClose = useCallback(() => {
-    if (isDragClosing) return;
-    setIsDragging(false);
-    setIsDragClosing(true);
-    setDragOffset(getPanelHeight() + 24);
-    dragCloseTimerRef.current = window.setTimeout(() => {
-      onClose();
-    }, 180);
-  }, [getPanelHeight, isDragClosing, onClose, setDragOffset]);
-  const beginDrag = useCallback(
-    (clientY: number) => {
-      swipeStartRef.current = clientY;
-      setIsEntering(false);
-      setIsDragging(true);
-      setDragOffset(0);
+  const isDragClosingRef = useRef(false);
+  const {
+    dragHandleRef,
+    dragHandleProps,
+    swipeY,
+    isDragging,
+    setIsDragging,
+    setDragOffset,
+    getDismissOffset,
+  } = useSheetDrag({
+    panelRef,
+    enabled: open,
+    onDragStart: () => setIsEntering(false),
+    onDismiss: () => {
+      if (isDragClosingRef.current) return;
+      isDragClosingRef.current = true;
+      setIsDragging(false);
+      setIsDragClosing(true);
+      setDragOffset(getDismissOffset());
+      dragCloseTimerRef.current = window.setTimeout(() => {
+        onClose();
+      }, 180);
     },
-    [setDragOffset],
-  );
-
-  const updateDrag = useCallback(
-    (clientY: number) => {
-      if (swipeStartRef.current === null) return;
-      const dy = clientY - swipeStartRef.current;
-      setDragOffset(dy > 0 ? Math.min(dy, getPanelHeight() + 24) : 0);
-    },
-    [getPanelHeight, setDragOffset],
-  );
-
-  const canStartDragFromTarget = useCallback((target: EventTarget | null) => {
-    const panel = panelRef.current;
-    if (!panel || !(target instanceof Node) || !panel.contains(target)) {
-      return false;
-    }
-    if (dragHandleRef.current?.contains(target)) return true;
-
-    const scrollable = getScrollableAncestor(target, panel);
-    return !scrollable || scrollable.scrollTop <= 0;
-  }, []);
-
-  const handlePointerDragMove = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (swipeStartRef.current === null) return;
-      event.preventDefault();
-      event.stopPropagation();
-      updateDrag(event.clientY);
-    },
-    [updateDrag],
-  );
-
-  const onSwipeEnd = useCallback(() => {
-    if (swipeStartRef.current === null) return;
-    const shouldDismiss = swipeYRef.current >= getPanelHeight() / 2;
-    swipeStartRef.current = null;
-    if (shouldDismiss) {
-      requestDragClose();
-      return;
-    }
-    setIsDragging(false);
-    setDragOffset(0);
-  }, [getPanelHeight, requestDragClose, setDragOffset]);
-  const onSwipeCancel = useCallback(() => {
-    setIsDragging(false);
-    setDragOffset(0);
-    swipeStartRef.current = null;
-    pointerDragIdRef.current = null;
-    pendingTouchStartYRef.current = null;
-    pendingTouchTargetRef.current = null;
-  }, [setDragOffset]);
-
-  const onPointerSwipeStart = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (event.pointerType === "mouse" && event.button !== 0) return;
-      event.preventDefault();
-      event.stopPropagation();
-      pointerDragIdRef.current = event.pointerId;
-      beginDrag(event.clientY);
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-    },
-    [beginDrag],
-  );
-
-  const onPointerSwipeMove = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (pointerDragIdRef.current !== event.pointerId) return;
-      handlePointerDragMove(event);
-    },
-    [handlePointerDragMove],
-  );
-
-  const onPointerSwipeEnd = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (pointerDragIdRef.current !== event.pointerId) return;
-      pointerDragIdRef.current = null;
-      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      }
-      onSwipeEnd();
-    },
-    [onSwipeEnd],
-  );
+  });
   const isDismissedRef = useRef(false);
   const handleOverlayPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
+    (event: ReactPointerEvent<HTMLButtonElement>) => {
       if (!closeOnOverlay) return;
       event.preventDefault();
       event.stopPropagation();
@@ -307,7 +231,7 @@ export function AppModal({
   );
 
   const handleOverlayClick = useCallback(
-    (event: ReactMouseEvent<HTMLDivElement>) => {
+    (event: ReactMouseEvent<HTMLButtonElement>) => {
       if (!closeOnOverlay) return;
       if (isDismissedRef.current) {
         isDismissedRef.current = false;
@@ -324,84 +248,14 @@ export function AppModal({
 
   useEffect(() => {
     if (open) {
+      isDragClosingRef.current = false;
       setIsEntering(true);
       setIsDragging(false);
       setIsDragClosing(false);
       setDragOffset(0);
       return;
     }
-  }, [open, setDragOffset]);
-
-  useEffect(() => {
-    if (!open) return;
-    const panel = panelRef.current;
-    if (!panel) return;
-
-    const handleNativeTouchStart = (event: TouchEvent) => {
-      const clientY = getTouchClientY(event);
-      if (clientY === null) return;
-      pendingTouchStartYRef.current = clientY;
-      pendingTouchTargetRef.current = event.target;
-    };
-
-    const handleNativeTouchMove = (event: TouchEvent) => {
-      const startY = pendingTouchStartYRef.current;
-      if (startY === null) return;
-
-      const clientY = getTouchClientY(event);
-      if (clientY === null) return;
-
-      const dy = clientY - startY;
-      if (swipeStartRef.current === null) {
-        if (dy <= SHEET_DRAG_ACTIVATION_PX) return;
-        if (!canStartDragFromTarget(pendingTouchTargetRef.current)) return;
-        beginDrag(startY);
-      }
-
-      if (event.cancelable) {
-        event.preventDefault();
-      }
-      event.stopPropagation();
-      updateDrag(clientY);
-    };
-
-    const handleNativeTouchEnd = () => {
-      pendingTouchStartYRef.current = null;
-      pendingTouchTargetRef.current = null;
-      if (swipeStartRef.current !== null) {
-        onSwipeEnd();
-      }
-    };
-
-    const handleNativeTouchCancel = () => {
-      pendingTouchStartYRef.current = null;
-      pendingTouchTargetRef.current = null;
-      onSwipeCancel();
-    };
-
-    panel.addEventListener("touchstart", handleNativeTouchStart, {
-      passive: true,
-    });
-    panel.addEventListener("touchmove", handleNativeTouchMove, {
-      passive: false,
-    });
-    panel.addEventListener("touchend", handleNativeTouchEnd);
-    panel.addEventListener("touchcancel", handleNativeTouchCancel);
-
-    return () => {
-      panel.removeEventListener("touchstart", handleNativeTouchStart);
-      panel.removeEventListener("touchmove", handleNativeTouchMove);
-      panel.removeEventListener("touchend", handleNativeTouchEnd);
-      panel.removeEventListener("touchcancel", handleNativeTouchCancel);
-    };
-  }, [
-    beginDrag,
-    canStartDragFromTarget,
-    onSwipeCancel,
-    onSwipeEnd,
-    open,
-    updateDrag,
-  ]);
+  }, [open, setDragOffset, setIsDragging]);
 
   useEffect(() => {
     return () => {
@@ -414,21 +268,33 @@ export function AppModal({
   if (!open) return null;
 
   return createPortal(
-    <div
-      role="dialog"
+    <dialog
+      open
+      role={role}
       aria-modal="true"
+      aria-label={labelledBy ? undefined : ariaLabel}
+      aria-labelledby={labelledBy}
+      aria-describedby={describedBy}
+      tabIndex={-1}
       className={cn(
-        "z-app-modal fixed inset-0 flex items-end justify-center bg-black/72 p-0 backdrop-blur-md animate-fade-in sm:items-center sm:p-6",
+        "z-app-modal fixed inset-0 m-0 flex h-full max-h-none w-full max-w-none items-end justify-center border-0 bg-surface-canvas/72 p-0 text-inherit backdrop-blur-md animate-fade-in sm:items-center sm:p-6",
         overlayClassName,
       )}
-      onClick={handleOverlayClick}
-      onPointerDown={handleOverlayPointerDown}
     >
+      <button
+        type="button"
+        aria-label={backdropLabel}
+        tabIndex={-1}
+        className="absolute inset-0 h-full w-full cursor-default border-0 bg-transparent p-0"
+        onClick={handleOverlayClick}
+        onPointerDown={handleOverlayPointerDown}
+      />
       <div
         ref={panelRef}
+        data-app-modal-panel="true"
         tabIndex={-1}
         className={cn(
-          "bg-modal-surface w-full overflow-hidden overscroll-contain rounded-t-3xl border border-white/10 shadow-2xl sm:rounded-3xl",
+          "bg-modal-surface relative z-10 w-full overflow-hidden overscroll-contain rounded-t-3xl border border-border-quiet shadow-2xl sm:rounded-3xl",
           isDragClosing
             ? undefined
             : isEntering && !isDragging
@@ -437,7 +303,7 @@ export function AppModal({
           mobileSafeArea
             ? "max-h-[calc(var(--listen-viewport-height)-var(--listen-safe-top)-0.75rem)] pb-[var(--listen-safe-bottom)] sm:max-h-[92vh] sm:pb-0"
             : "max-h-[92vh]",
-          maxWidthClassName,
+          resolvedMaxWidthClassName,
           panelClassName,
         )}
         style={{
@@ -452,7 +318,6 @@ export function AppModal({
           event.stopPropagation();
         }}
       >
-        {/* Drag handle — visible on mobile only */}
         <div
           ref={dragHandleRef}
           data-mobile-sheet-drag-handle="true"
@@ -460,16 +325,40 @@ export function AppModal({
             "flex justify-center sm:hidden",
             mobileSafeArea ? "touch-none pt-4 pb-3" : "touch-none pt-2 pb-1",
           )}
-          onPointerDown={onPointerSwipeStart}
-          onPointerMove={onPointerSwipeMove}
-          onPointerUp={onPointerSwipeEnd}
-          onPointerCancel={onSwipeCancel}
+          {...dragHandleProps}
         >
-          <div className="w-10 h-1 rounded-full bg-white/20" />
+          <div className="w-10 h-1 rounded-full bg-text-primary/20" />
         </div>
+        {hasTitle ? (
+          <ModalHeader
+            className={cn(
+              "flex items-center justify-between gap-4 px-5 py-4",
+              headerClassName,
+            )}
+          >
+            <div className="min-w-0">
+              <h2
+                id={titleId}
+                className="text-lg font-semibold text-text-primary"
+              >
+                {title}
+              </h2>
+              {hasDescription ? (
+                <p id={descriptionId} className="text-xs text-text-muted">
+                  {description}
+                </p>
+              ) : null}
+            </div>
+            <ModalCloseButton
+              onClick={onClose}
+              disabled={closeDisabled}
+              label={closeLabel}
+            />
+          </ModalHeader>
+        ) : null}
         {children}
       </div>
-    </div>,
+    </dialog>,
     document.body,
   );
 }
@@ -483,7 +372,7 @@ export function ModalHeader({
     <div
       {...props}
       className={cn(
-        "sticky top-0 z-10 border-b border-white/10 bg-modal-surface backdrop-blur-xl",
+        "sticky top-0 z-10 border-b border-border-quiet bg-modal-surface backdrop-blur-xl",
         className,
       )}
     >
@@ -516,7 +405,7 @@ export function ModalFooter({
     <div
       {...props}
       className={cn(
-        "sticky bottom-0 z-10 border-t border-white/10 bg-modal-surface backdrop-blur-xl",
+        "sticky bottom-0 z-10 border-t border-border-quiet bg-modal-surface backdrop-blur-xl",
         className,
       )}
     >
@@ -525,29 +414,31 @@ export function ModalFooter({
   );
 }
 
-interface ModalCloseButtonProps {
+export interface ModalCloseButtonProps {
   onClick: () => void;
   disabled?: boolean;
   className?: string;
+  label?: string;
 }
 
 export function ModalCloseButton({
   onClick,
   disabled = false,
   className,
+  label = "Close",
 }: ModalCloseButtonProps) {
   return (
     <button
       type="button"
-      aria-label="Close"
+      aria-label={label}
       className={cn(
-        "flex size-10 items-center justify-center text-white/55 transition-colors hover:text-white focus-visible:text-white focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50",
+        "flex size-10 items-center justify-center rounded-full text-text-primary/55 transition-[color,box-shadow] hover:text-text-primary focus-visible:text-text-primary focus-visible:shadow-focus focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50",
         className,
       )}
       onClick={onClick}
       disabled={disabled}
     >
-      <X size={24} />
+      <X size={CRATE_ICON_SIZE.xl} />
     </button>
   );
 }

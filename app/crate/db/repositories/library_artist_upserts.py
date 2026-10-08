@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import cast
 
 from sqlalchemy import case, false, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from crate.entity_ids import artist_entity_uid
@@ -78,8 +80,8 @@ def _select_existing_artist(
 def _update_existing_artist(
     session: Session,
     *,
-    artist_id: int,
-    canonical_name: str,
+    existing_id: int | None,
+    existing_name: str,
     existing_slug: str | None,
     existing_storage_id,
     existing_entity_uid,
@@ -92,17 +94,21 @@ def _update_existing_artist(
     now: datetime,
 ) -> str:
     slug = existing_slug or allocate_unique_slug(
-        session, LibraryArtist, build_artist_slug(canonical_name)
+        session, LibraryArtist, build_artist_slug(existing_name)
     )
     requested_entity_uid = coerce_uuid_or_none(data.get("entity_uid"))
     entity_uid = (
         existing_entity_uid
         or requested_entity_uid
-        or artist_entity_uid(name=canonical_name, mbid=data.get("mbid"))
+        or artist_entity_uid(name=existing_name, mbid=data.get("mbid"))
     )
-    session.execute(
+    result = session.execute(
         update(LibraryArtist)
-        .where(LibraryArtist.id == artist_id)
+        .where(
+            LibraryArtist.id == existing_id
+            if existing_id is not None
+            else LibraryArtist.name == existing_name
+        )
         .values(
             storage_id=existing_storage_id or requested_storage_id,
             entity_uid=entity_uid,
@@ -120,12 +126,14 @@ def _update_existing_artist(
             updated_at=now,
         )
     )
+    if cast(CursorResult, result).rowcount != 1:
+        raise RuntimeError("Expected to update one existing artist row")
     upsert_entity_identity_key(
         session,
         entity_type="artist",
         entity_uid=entity_uid,
         key_type="name",
-        key_value=canonical_name,
+        key_value=existing_name,
         is_primary=True,
     )
     upsert_entity_identity_key(
@@ -153,7 +161,7 @@ def _update_existing_artist(
             key_value=data.get("spotify_id"),
         )
     enqueue_local_dirty_source("artist", str(entity_uid), "upsert", session=session)
-    return canonical_name
+    return existing_name
 
 
 def upsert_artist(data: dict, *, session: Session | None = None) -> str:
@@ -174,8 +182,8 @@ def upsert_artist(data: dict, *, session: Session | None = None) -> str:
         )
         if existing:
             (
-                artist_id,
-                canonical_name,
+                existing_id,
+                existing_name,
                 existing_slug,
                 existing_storage_id,
                 existing_entity_uid,
@@ -185,8 +193,10 @@ def upsert_artist(data: dict, *, session: Session | None = None) -> str:
             ) = existing
             return _update_existing_artist(
                 s,
-                artist_id=int(artist_id),
-                canonical_name=canonical_name or requested_name,
+                existing_id=existing_id,
+                existing_name=(
+                    existing_name if existing_name is not None else requested_name
+                ),
                 existing_slug=existing_slug,
                 existing_storage_id=existing_storage_id,
                 existing_entity_uid=existing_entity_uid,
@@ -270,8 +280,8 @@ def upsert_artist(data: dict, *, session: Session | None = None) -> str:
             if not existing:
                 raise
             (
-                artist_id,
-                canonical_name,
+                existing_id,
+                existing_name,
                 existing_slug,
                 existing_storage_id,
                 existing_entity_uid,
@@ -281,8 +291,10 @@ def upsert_artist(data: dict, *, session: Session | None = None) -> str:
             ) = existing
             return _update_existing_artist(
                 s,
-                artist_id=int(artist_id),
-                canonical_name=canonical_name or requested_name,
+                existing_id=existing_id,
+                existing_name=(
+                    existing_name if existing_name is not None else requested_name
+                ),
                 existing_slug=existing_slug,
                 existing_storage_id=existing_storage_id,
                 existing_entity_uid=existing_entity_uid,

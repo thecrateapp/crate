@@ -64,6 +64,33 @@ def test_discovery_seed_keeps_structured_context(monkeypatch):
     assert context["discovery_excluded_artist_keys"] == ["artist 0"]
 
 
+def test_crate_seed_uses_crate_tracks_for_contextual_radio(monkeypatch):
+    from crate import radio_engine
+
+    context = {
+        "seed_artists": ["Artist"],
+        "seed_track_ids": [10],
+        "seed_song_keys": ["artist::track"],
+    }
+    monkeypatch.setattr(
+        radio_engine,
+        "get_crate_seed_context",
+        lambda user_id, crate_id, session=None: (
+            [_vector(0.4), _vector(0.6)],
+            "Year-end records",
+            context,
+        ),
+    )
+
+    resolved = radio_engine._resolve_seed(7, "crate", "crate-id")
+
+    assert resolved is not None
+    seed, label, resolved_context = resolved
+    assert seed == _vector(0.5)
+    assert label == "Year-end records"
+    assert resolved_context == context
+
+
 def test_start_radio_releases_database_sessions_before_scoring(monkeypatch):
     from crate import radio_engine
 

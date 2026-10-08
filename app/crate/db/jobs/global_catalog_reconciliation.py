@@ -44,6 +44,7 @@ from crate.slugs import build_artist_slug, build_public_album_slug
 
 _GLOBAL_UID_NAMESPACE = uuid.UUID("e43655c7-8af2-4c5a-92f6-a5126dff7f84")
 _RECONCILIATION_ENTITY_TYPES = ("artist", "album", "track")
+_DEPENDENCY_RETRY_SECONDS = 3600
 log = logging.getLogger(__name__)
 
 
@@ -216,6 +217,11 @@ def reconcile_dirty_catalog_sources(*, limit: int = 500) -> dict[str, int]:
                     str(exc),
                     requested_at=dirty["requested_at"],
                     claimed_at=dirty["claimed_at"],
+                    retry_after_seconds=(
+                        _DEPENDENCY_RETRY_SECONDS
+                        if "waiting for its canonical artist" in str(exc)
+                        else None
+                    ),
                     session=session,
                 )
             failed += 1
@@ -2177,6 +2183,37 @@ def _upsert_album(
     )
 
 
+def _unclaimed_recording_mbid(
+    session,
+    recording_mbid: str | None,
+    global_uid: str,
+) -> str | None:
+    if not recording_mbid:
+        return recording_mbid
+    owner = session.execute(
+        text(
+            """
+            SELECT global_track_uid::text
+            FROM global_catalog_tracks
+            WHERE musicbrainz_recording_mbid = :recording_mbid
+              AND global_track_uid <> CAST(:global_uid AS uuid)
+            LIMIT 1
+            """
+        ),
+        {"recording_mbid": recording_mbid, "global_uid": global_uid},
+    ).scalar_one_or_none()
+    if owner is None:
+        return recording_mbid
+    log.warning(
+        "Recording MBID %s already belongs to global track %s; "
+        "storing global track %s without it",
+        recording_mbid,
+        owner,
+        global_uid,
+    )
+    return None
+
+
 def _upsert_track(
     session,
     source: dict[str, Any],
@@ -2269,7 +2306,9 @@ def _upsert_track(
             "disc_number": payload["disc_number"],
             "track_number": payload["track_number"],
             "duration_seconds": payload["duration_seconds"],
-            "musicbrainz_recording_mbid": payload["musicbrainz_recording_mbid"],
+            "musicbrainz_recording_mbid": _unclaimed_recording_mbid(
+                session, payload["musicbrainz_recording_mbid"], global_uid
+            ),
             "local_id": source["local_id"],
             "local_entity_uid": source["local_entity_uid"],
             "display_source_json": _json(_source_ref(source)),
@@ -2613,7 +2652,9 @@ def _upsert_remote_track(
             "disc_number": payload["disc_number"],
             "track_number": payload["track_number"],
             "duration_seconds": payload["duration_seconds"],
-            "musicbrainz_recording_mbid": payload["musicbrainz_recording_mbid"],
+            "musicbrainz_recording_mbid": _unclaimed_recording_mbid(
+                session, payload["musicbrainz_recording_mbid"], global_uid
+            ),
             "isrc": payload["isrc"],
             "display_source_json": _json(_source_ref(source)),
             "availability_json": _json({"local": False, "remote": True}),

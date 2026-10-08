@@ -262,6 +262,7 @@ public class NativeMixControllerTest {
             "Artist",
             "Album",
             "",
+            "",
             180000,
             null
         );

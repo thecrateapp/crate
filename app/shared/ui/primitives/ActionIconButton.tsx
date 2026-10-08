@@ -6,29 +6,19 @@ import {
 } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
+import {
+  iconButtonToneClassName,
+  type IconButtonTone,
+} from "@crate/ui/primitives/IconButton";
 
-type ActionTone = "default" | "primary" | "danger";
+type ActionTone = IconButtonTone;
 type ActionVariant = "row" | "card";
 
-function actionToneClassName(tone: ActionTone, disabled: boolean) {
-  if (disabled) {
-    return "pointer-events-none text-[var(--idle-text-subtle)]";
-  }
-
-  if (tone === "primary") {
-    return "text-primary hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.45)]";
-  }
-
-  if (tone === "danger") {
-    return "text-[var(--status-danger-text)] hover:text-[var(--status-danger-text)] hover:drop-shadow-[0_0_8px_rgba(248,113,113,0.35)]";
-  }
-
-  return "text-[var(--idle-text-muted)] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]";
-}
+const actionToneClassName = iconButtonToneClassName;
 
 function actionVariantClassName(variant: ActionVariant) {
   if (variant === "card") {
-    return "h-9 min-h-11 w-9 min-w-11 border border-[var(--idle-border)] bg-black/55 shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-md md:min-h-0 md:min-w-0";
+    return "h-9 min-h-11 w-9 min-w-11 border border-border-subtle bg-surface-icon-control shadow-icon-control backdrop-blur-md md:min-h-0 md:min-w-0";
   }
 
   return "h-10 min-h-11 w-10 min-w-11 md:min-h-0 md:min-w-0";
@@ -64,7 +54,7 @@ export const ActionIconButton = forwardRef<
       type={type}
       disabled={disabled}
       className={cn(
-        "flex items-center justify-center rounded-full transition-[color,filter,transform] hover:-translate-y-px [&_svg:not([class*='size-'])]:size-[18px]",
+        "flex items-center justify-center rounded-full outline-none transition-[color,filter,transform,box-shadow] hover:-translate-y-px focus-visible:shadow-focus [&_svg:not([class*='size-'])]:size-[18px]",
         actionVariantClassName(variant),
         actionToneClassName(active ? "primary" : tone, disabled),
         active && "animate-crate-icon-active-pulse",
@@ -100,7 +90,7 @@ export function ActionIconLink({
       href={href || "#"}
       aria-disabled={disabled || !href}
       className={cn(
-        "flex items-center justify-center rounded-full transition-[color,filter,transform] hover:-translate-y-px [&_svg:not([class*='size-'])]:size-[18px]",
+        "flex items-center justify-center rounded-full outline-none transition-[color,filter,transform,box-shadow] hover:-translate-y-px focus-visible:shadow-focus [&_svg:not([class*='size-'])]:size-[18px]",
         actionVariantClassName(variant),
         actionToneClassName(active ? "primary" : tone, disabled || !href),
         active && "animate-crate-icon-active-pulse",

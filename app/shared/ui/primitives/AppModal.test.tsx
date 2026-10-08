@@ -30,7 +30,9 @@ describe("AppModal", () => {
         Content
       </AppModal>,
     );
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(dialog.tagName).toBe("DIALOG");
     expect(screen.getByText("Content")).toBeInTheDocument();
   });
 
@@ -77,7 +79,9 @@ describe("AppModal", () => {
         Content
       </AppModal>,
     );
-    await userEvent.click(screen.getByRole("dialog"));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Close dialog backdrop" }),
+    );
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -88,7 +92,9 @@ describe("AppModal", () => {
         Content
       </AppModal>,
     );
-    const overlay = screen.getByRole("dialog");
+    const overlay = screen.getByRole("button", {
+      name: "Close dialog backdrop",
+    });
     fireEvent.pointerDown(overlay);
     fireEvent.click(overlay);
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -102,7 +108,9 @@ describe("AppModal", () => {
       </AppModal>,
     );
     const dialog = screen.getByRole("dialog");
-    const panel = dialog.querySelector("[tabindex='-1']") as HTMLElement;
+    const panel = dialog.querySelector(
+      "[data-app-modal-panel='true']",
+    ) as HTMLElement;
     const handle = dialog.querySelector(
       "[data-mobile-sheet-drag-handle='true']",
     ) as HTMLElement;
@@ -135,7 +143,9 @@ describe("AppModal", () => {
       </AppModal>,
     );
     const dialog = screen.getByRole("dialog");
-    const panel = dialog.querySelector("[tabindex='-1']") as HTMLElement;
+    const panel = dialog.querySelector(
+      "[data-app-modal-panel='true']",
+    ) as HTMLElement;
     const handle = dialog.querySelector(
       "[data-mobile-sheet-drag-handle='true']",
     ) as HTMLElement;
@@ -168,7 +178,9 @@ describe("AppModal", () => {
       </AppModal>,
     );
     const dialog = screen.getByRole("dialog");
-    const panel = dialog.querySelector("[tabindex='-1']") as HTMLElement;
+    const panel = dialog.querySelector(
+      "[data-app-modal-panel='true']",
+    ) as HTMLElement;
     const handle = dialog.querySelector(
       "[data-mobile-sheet-drag-handle='true']",
     ) as HTMLElement;
@@ -215,7 +227,9 @@ describe("AppModal", () => {
       </AppModal>,
     );
     const dialog = screen.getByRole("dialog");
-    const panel = dialog.querySelector("[tabindex='-1']") as HTMLElement;
+    const panel = dialog.querySelector(
+      "[data-app-modal-panel='true']",
+    ) as HTMLElement;
     vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
       bottom: 280,
       height: 240,
@@ -247,7 +261,9 @@ describe("AppModal", () => {
       </AppModal>,
     );
     const dialog = screen.getByRole("dialog");
-    const panel = dialog.querySelector("[tabindex='-1']") as HTMLElement;
+    const panel = dialog.querySelector(
+      "[data-app-modal-panel='true']",
+    ) as HTMLElement;
     vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
       bottom: 280,
       height: 240,
@@ -291,7 +307,9 @@ describe("AppModal", () => {
         Content
       </AppModal>,
     );
-    await userEvent.click(screen.getByRole("dialog"));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Close dialog backdrop" }),
+    );
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -304,6 +322,19 @@ describe("AppModal", () => {
     );
     const event = new KeyboardEvent("keydown", { key: "Escape" });
     window.dispatchEvent(event);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("handles a bubbling Escape event exactly once", () => {
+    const onClose = vi.fn();
+    render(
+      <AppModal open onClose={onClose}>
+        Content
+      </AppModal>,
+    );
+
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -326,6 +357,123 @@ describe("AppModal", () => {
       </AppModal>,
     );
     expect(screen.getByText("Content")).toHaveClass("max-w-4xl");
+  });
+});
+
+describe("AppModal labelling and sizing", () => {
+  it("keeps the English default aria-label without a title", () => {
+    render(
+      <AppModal open onClose={() => {}}>
+        Content
+      </AppModal>,
+    );
+    expect(screen.getByRole("dialog", { name: "Dialog" })).toHaveAttribute(
+      "role",
+      "dialog",
+    );
+    expect(
+      screen.getByRole("button", { name: "Close dialog backdrop" }),
+    ).toBeInTheDocument();
+  });
+
+  it("accepts translated aria and backdrop labels", () => {
+    render(
+      <AppModal
+        open
+        onClose={() => {}}
+        ariaLabel="Diálogo"
+        backdropLabel="Cerrar fondo"
+      >
+        Content
+      </AppModal>,
+    );
+    expect(screen.getByRole("dialog", { name: "Diálogo" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Cerrar fondo" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the standard header wired with aria-labelledby and aria-describedby", async () => {
+    const onClose = vi.fn();
+    render(
+      <AppModal
+        open
+        onClose={onClose}
+        title="Nueva playlist"
+        description="Elige un nombre"
+        closeLabel="Cerrar"
+      >
+        Body
+      </AppModal>,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Nueva playlist" });
+    const heading = screen.getByRole("heading", {
+      level: 2,
+      name: "Nueva playlist",
+    });
+    expect(dialog).toHaveAttribute("aria-labelledby", heading.id);
+    expect(dialog).not.toHaveAttribute("aria-label");
+    expect(dialog).toHaveAccessibleDescription("Elige un nombre");
+
+    await userEvent.click(screen.getByRole("button", { name: "Cerrar" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables the header close button when closeDisabled is set", () => {
+    render(
+      <AppModal open onClose={() => {}} title="Saving" closeDisabled>
+        Body
+      </AppModal>,
+    );
+    expect(screen.getByRole("button", { name: "Close" })).toBeDisabled();
+  });
+
+  it("honours an explicit aria-labelledby", () => {
+    render(
+      <AppModal open onClose={() => {}} ariaLabelledBy="external-title">
+        <h2 id="external-title">Custom header</h2>
+      </AppModal>,
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Custom header" }),
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    ["sm", "sm:max-w-md"],
+    ["md", "sm:max-w-lg"],
+    ["lg", "sm:max-w-2xl"],
+    ["xl", "sm:max-w-4xl"],
+  ] as const)("maps size %s to %s", (size, className) => {
+    render(
+      <AppModal open onClose={() => {}} size={size}>
+        Content
+      </AppModal>,
+    );
+    expect(screen.getByText("Content")).toHaveClass(className);
+  });
+
+  it("defaults to sm:max-w-2xl and lets maxWidthClassName win over size", () => {
+    const { rerender } = render(
+      <AppModal open onClose={() => {}}>
+        Content
+      </AppModal>,
+    );
+    expect(screen.getByText("Content")).toHaveClass("sm:max-w-2xl");
+
+    rerender(
+      <AppModal
+        open
+        onClose={() => {}}
+        size="sm"
+        maxWidthClassName="sm:max-w-[30rem]"
+      >
+        Content
+      </AppModal>,
+    );
+    expect(screen.getByText("Content")).toHaveClass("sm:max-w-[30rem]");
+    expect(screen.getByText("Content")).not.toHaveClass("sm:max-w-md");
   });
 });
 
@@ -361,5 +509,11 @@ describe("ModalCloseButton", () => {
   it("is disabled when disabled prop is true", () => {
     render(<ModalCloseButton onClick={() => {}} disabled />);
     expect(screen.getByRole("button", { name: /Close/i })).toBeDisabled();
+  });
+
+  it("accepts a translated label and shows the focus ring token", () => {
+    render(<ModalCloseButton onClick={() => {}} label="Cerrar" />);
+    const button = screen.getByRole("button", { name: "Cerrar" });
+    expect(button).toHaveClass("focus-visible:shadow-focus");
   });
 });

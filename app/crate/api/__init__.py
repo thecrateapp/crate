@@ -3,7 +3,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -238,6 +238,11 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    from crate.observability.access_log import install_open_subsonic_access_log_filter
+    from crate.observability import init_sentry
+
+    install_open_subsonic_access_log_filter()
+    init_sentry("api")
     app = FastAPI(
         title="Crate",
         version="0.1.0",
@@ -245,6 +250,19 @@ def create_app() -> FastAPI:
         default_response_class=DateAwareJSONResponse,
     )
     app.openapi = lambda: custom_openapi(app)
+
+    from crate.subsonic.errors import OpenSubsonicError
+    from crate.subsonic.protocol import render_response
+
+    @app.exception_handler(OpenSubsonicError)
+    async def subsonic_error_handler(request: Request, error: OpenSubsonicError):
+        from crate.subsonic.capabilities import selected_engine
+
+        default_format = "json" if selected_engine() == "legacy" else "xml"
+        response_format = request.query_params.get("f", default_format)
+        if response_format not in {"json", "xml"}:
+            response_format = "xml"
+        return render_response(error=error, response_format=response_format)
 
     @app.middleware("http")
     async def security_headers_middleware(request, call_next):
@@ -414,10 +432,12 @@ def create_app() -> FastAPI:
         TraceMiddleware,
         install_trace_id_log_record_factory,
     )
+    from crate.api.cast_cors import CastReceiverCorsMiddleware
 
     app.add_middleware(AuthMiddleware)
     app.add_middleware(CacheInvalidationMiddleware)
     app.add_middleware(MetricsMiddleware)
+    app.add_middleware(CastReceiverCorsMiddleware)
     install_trace_id_log_record_factory()
     app.add_middleware(TraceMiddleware)
 
@@ -427,6 +447,7 @@ def create_app() -> FastAPI:
     from crate.api.media_access import router as media_access_router
     from crate.api.browse import router as browse_router
     from crate.api.tags import router as tags_router
+    from crate.api.artist_research import router as artist_research_router
     from crate.api.scanner import router as scanner_router
     from crate.api.matcher import router as matcher_router
     from crate.api.duplicates import router as duplicates_router
@@ -445,6 +466,7 @@ def create_app() -> FastAPI:
     )
     from crate.api.settings import router as settings_router
     from crate.api.playlists import router as playlists_router
+    from crate.api.crates import me_router as crates_me_router, router as crates_router
     from crate.api.offline import router as offline_router
     from crate.api.curation import router as curation_router
     from crate.api.system_playlists import router as system_playlists_router
@@ -467,7 +489,7 @@ def create_app() -> FastAPI:
     from crate.api.cache_events import router as cache_events_router
     from crate.api.social import router as social_router
     from crate.api.jam import router as jam_router
-    from crate.api.subsonic import router as subsonic_router
+    from crate.api.subsonic import create_subsonic_router
     from crate.api.paths import router as paths_router
     from crate.api.admin_ops import router as admin_ops_router
     from crate.api.playback_admin import router as playback_admin_router
@@ -513,6 +535,8 @@ def create_app() -> FastAPI:
     app.include_router(management_admin_router)
     app.include_router(settings_router)
     app.include_router(playlists_router)
+    app.include_router(crates_router)
+    app.include_router(crates_me_router)
     app.include_router(curation_router)
     app.include_router(system_playlists_router)
     app.include_router(genres_router)
@@ -525,7 +549,7 @@ def create_app() -> FastAPI:
     app.include_router(scanner_router)
     app.include_router(matcher_router)
     app.include_router(duplicates_router)
-    app.include_router(subsonic_router)
+    app.include_router(create_subsonic_router())
     app.include_router(federation_router)
     app.include_router(internal_federation_router)
     app.include_router(federation_remote_router)
@@ -533,6 +557,7 @@ def create_app() -> FastAPI:
     app.include_router(smart_mix_admin_router)
     app.include_router(vdj_catalog_router)
     app.include_router(catalog_router)
+    app.include_router(artist_research_router)
     app.include_router(browse_router)
     app.include_router(tags_router)
     app.include_router(organizer_router)

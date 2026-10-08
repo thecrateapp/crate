@@ -13,6 +13,12 @@ export {
   ItemActionMenu,
   ItemActionMenuButton,
 } from "./ItemActionMenu";
+export {
+  isItemActionMenuKey,
+  useItemActionTarget,
+  type ItemActionTargetProps,
+  type UseItemActionTargetOptions,
+} from "./useItemActionTarget";
 export type {
   ItemActionMenuEntry,
   ItemActionMenuProps,

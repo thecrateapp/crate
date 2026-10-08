@@ -104,10 +104,30 @@ const loaders: Record<string, MarkdownLoader> = {
     import(
       "../../../docs/technical/09-playback-realtime-and-subsonic.md?raw"
     ).then((module) => module.default),
+  "docs/technical/opensubsonic.md": () =>
+    import("../../../docs/technical/opensubsonic.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/tauri-desktop-support.md": () =>
+    import("../../../docs/technical/tauri-desktop-support.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/operators/cast-receiver.md": () =>
+    import("../../../docs/operators/cast-receiver.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/testing/cast-release-checklist.md": () =>
+    import("../../../docs/testing/cast-release-checklist.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/10-development-deployment-and-operations.md": () =>
     import(
       "../../../docs/technical/10-development-deployment-and-operations.md?raw"
     ).then((module) => module.default),
+  "docs/technical/artist-hero-theming-rollout.md": () =>
+    import("../../../docs/technical/artist-hero-theming-rollout.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/artwork-delivery.md": () =>
     import("../../../docs/technical/artwork-delivery.md?raw").then(
       (module) => module.default,
@@ -172,6 +192,10 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/local-media-delivery-slos.md?raw").then(
       (module) => module.default,
     ),
+  "docs/technical/listen-design-system-visual-qa.md": () =>
+    import(
+      "../../../docs/technical/listen-design-system-visual-qa.md?raw"
+    ).then((module) => module.default),
   "docs/technical/ops-runbook.md": () =>
     import("../../../docs/technical/ops-runbook.md?raw").then(
       (module) => module.default,

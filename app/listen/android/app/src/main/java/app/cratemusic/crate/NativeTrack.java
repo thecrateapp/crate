@@ -12,6 +12,7 @@ final class NativeTrack {
     final String artist;
     final String album;
     final String artwork;
+    final String artworkAuthorization;
     final long durationMs;
     @Nullable
     final float[] eqGains;
@@ -24,6 +25,7 @@ final class NativeTrack {
         String artist,
         String album,
         String artwork,
+        String artworkAuthorization,
         long durationMs,
         @Nullable float[] eqGains
     ) {
@@ -34,6 +36,7 @@ final class NativeTrack {
         this.artist = valueOrDefault(artist, "");
         this.album = valueOrDefault(album, "");
         this.artwork = valueOrDefault(artwork, "");
+        this.artworkAuthorization = valueOrDefault(artworkAuthorization, "");
         this.durationMs = Math.max(0L, durationMs);
         this.eqGains = eqGains == null ? null : eqGains.clone();
     }

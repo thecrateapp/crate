@@ -4,10 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 import mutagen
 import requests
 
+from crate.artist_hero_publication import (
+    ArtistHeroArtifactIdentity,
+    ArtistHeroComposition,
+    resolve_artist_hero_artifact_source_path,
+)
 from crate.artwork_variants import ArtworkAsset
 from crate.audio import get_audio_files
 from crate.config import load_config
@@ -16,9 +22,11 @@ from crate.db.repositories.library import (
     get_library_artist,
     get_library_artist_by_entity_uid,
 )
+from crate.db.repositories.playlists_collection_reads import get_playlist_cover_path
 from crate.db.queries.genres_taxonomy import get_genre_taxonomy_cover_path
 from crate.external_artist_artwork import external_artist_artwork_path_from_key
 from crate.genre_covers import genre_cover_abspath
+from crate.playlist_covers import playlist_cover_abspath
 from crate.release_covers import release_cover_abspath
 from crate.storage_layout import resolve_album_dir, resolve_artist_dir
 from crate.utils import COVER_NAMES, PHOTO_NAMES
@@ -202,8 +210,31 @@ def _artist_source(
 
 
 def _artist_hero_source(asset: ArtworkAsset) -> ArtworkSource | None:
-    entity_uid, separator, composition = asset.entity_key.rpartition(":")
-    if not separator or composition not in {"desktop", "mobile"}:
+    identity_parts = asset.entity_key.split(":", 2)
+    if len(identity_parts) == 3:
+        entity_uid, composition, render_revision = identity_parts
+        if composition not in {"desktop", "mobile"}:
+            return None
+        try:
+            identity = ArtistHeroArtifactIdentity(
+                artist_entity_uid=entity_uid,
+                composition=cast(ArtistHeroComposition, composition),
+                render_revision=render_revision,
+            )
+        except ValueError:
+            return None
+        source_path = resolve_artist_hero_artifact_source_path(identity)
+        if source_path is None:
+            return None
+        source = _file_source(source_path)
+        if source is None:
+            return None
+        return ArtworkSource(source.content, source.media_type, "revision-artifact")
+
+    if len(identity_parts) != 2:
+        return None
+    entity_uid, composition = identity_parts
+    if composition not in {"desktop", "mobile"}:
         return None
     artist = get_library_artist_by_entity_uid(entity_uid)
     if not artist:
@@ -255,6 +286,15 @@ def _release_source(
     return ArtworkSource(response.content, content_type, "provider")
 
 
+def _playlist_source(asset: ArtworkAsset) -> ArtworkSource | None:
+    try:
+        playlist_id = int(asset.entity_key)
+    except ValueError:
+        return None
+    cover_path = playlist_cover_abspath(get_playlist_cover_path(playlist_id))
+    return _file_source(cover_path) if cover_path is not None else None
+
+
 def resolve_artwork_source(
     asset: ArtworkAsset, *, allow_provider: bool = True
 ) -> ArtworkSource | None:
@@ -271,6 +311,8 @@ def resolve_artwork_source(
         source = _file_source(absolute) if absolute is not None else None
     elif asset.kind == "release-cover":
         source = _release_source(asset, allow_provider=allow_provider)
+    elif asset.kind == "playlist-cover":
+        source = _playlist_source(asset)
     elif asset.kind == "external-artist":
         path = external_artist_artwork_path_from_key(asset.entity_key)
         source = _file_source(path) if path is not None else None

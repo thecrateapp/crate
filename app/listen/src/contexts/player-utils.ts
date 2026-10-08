@@ -1,34 +1,28 @@
-import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
+import type { RepeatMode, Track } from "@/contexts/player-types";
 import { apiStreamUrl, getApiBase } from "@/lib/api";
 import { isNative } from "@/lib/capacitor-runtime";
 import { recordDevLog, redactUrl } from "@/lib/dev-logs";
 import { trackStreamApiPath } from "@/lib/library-routes";
-import {
-  isMobileAudioRuntime,
-  stableMobileAudioPipeline,
-} from "@/lib/mobile-audio-mode";
 import { getOfflineNativePlaybackUrl } from "@/lib/offline";
 import { getEffectivePlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
-import {
-  legacySmartTransitionSeconds,
-  SMART_TRANSITION_BALANCED_SECONDS,
-  SMART_TRANSITION_LONG_SECONDS,
-  SMART_TRANSITION_MIXED_QUEUE_SECONDS,
-  SMART_TRANSITION_SHORT_SECONDS,
-} from "@/lib/smart-mix";
 
-export const STORAGE_KEY = "listen-player-state";
-export const RECENTLY_PLAYED_KEY = "listen-recently-played";
-export const MAX_RECENT = 10;
-export const ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS = 1;
-export const ANDROID_MEDIA_SESSION_HANDOFF_SECONDS = 0.15;
 export {
+  ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS,
+  ANDROID_MEDIA_SESSION_HANDOFF_SECONDS,
   SMART_TRANSITION_BALANCED_SECONDS,
   SMART_TRANSITION_LONG_SECONDS,
   SMART_TRANSITION_MIXED_QUEUE_SECONDS,
   SMART_TRANSITION_SHORT_SECONDS,
-};
+  areTracksFromSameAlbum,
+  getEffectiveCrossfadeSeconds,
+  isContinuousAlbumTransition,
+} from "./player-smart-transition";
 
+export const STORAGE_KEY = "listen-player-state:v1";
+export const RECENTLY_PLAYED_KEY = "listen-recently-played:v1";
+export const LEGACY_STORAGE_KEY = "listen-player-state";
+export const LEGACY_RECENTLY_PLAYED_KEY = "listen-recently-played";
+export const MAX_RECENT = 10;
 export function getStoredVolume(): number {
   if (isNative) return 1;
   try {
@@ -61,7 +55,11 @@ export interface StoredQueue {
 
 export function getStoredQueue(): StoredQueue {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const currentRaw = localStorage.getItem(STORAGE_KEY);
+    const fromLegacy = currentRaw === null;
+    const raw = fromLegacy
+      ? localStorage.getItem(LEGACY_STORAGE_KEY)
+      : currentRaw;
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed.queue) && parsed.queue.length > 0) {
@@ -69,7 +67,7 @@ export function getStoredQueue(): StoredQueue {
         const unshuffledQueue = Array.isArray(parsed.unshuffledQueue)
           ? parsed.unshuffledQueue.map(normalizeStoredTrack)
           : null;
-        return {
+        const storedQueue = {
           queue,
           currentIndex: parsed.currentIndex ?? 0,
           currentTime: parsed.currentTime ?? 0,
@@ -78,6 +76,15 @@ export function getStoredQueue(): StoredQueue {
           unshuffledQueue,
           savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : null,
         };
+        if (fromLegacy) {
+          try {
+            localStorage.setItem(STORAGE_KEY, raw);
+            localStorage.removeItem(LEGACY_STORAGE_KEY);
+          } catch {
+            // Migration is best effort; the restored queue remains usable.
+          }
+        }
+        return storedQueue;
       }
     }
   } catch {
@@ -182,8 +189,24 @@ function canonicalMediaUrl(url: string | null | undefined): string | undefined {
 
 export function getStoredRecentlyPlayed(): Track[] {
   try {
-    const raw = localStorage.getItem(RECENTLY_PLAYED_KEY);
-    if (raw) return JSON.parse(raw);
+    const currentRaw = localStorage.getItem(RECENTLY_PLAYED_KEY);
+    const fromLegacy = currentRaw === null;
+    const raw = fromLegacy
+      ? localStorage.getItem(LEGACY_RECENTLY_PLAYED_KEY)
+      : currentRaw;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      if (fromLegacy) {
+        try {
+          localStorage.setItem(RECENTLY_PLAYED_KEY, raw);
+          localStorage.removeItem(LEGACY_RECENTLY_PLAYED_KEY);
+        } catch {
+          // Migration is best effort; the restored history remains usable.
+        }
+      }
+      return parsed;
+    }
   } catch {
     /* ignore */
   }
@@ -276,21 +299,6 @@ export function getTrackCacheKey(track: Track): string {
   ].join("::");
 }
 
-export function areTracksFromSameAlbum(
-  currentTrack: Track | undefined,
-  nextTrack: Track | null | undefined,
-): boolean {
-  if (!currentTrack || !nextTrack) return false;
-  return (
-    !!currentTrack.album &&
-    !!nextTrack.album &&
-    !!currentTrack.artist &&
-    !!nextTrack.artist &&
-    currentTrack.album === nextTrack.album &&
-    currentTrack.artist === nextTrack.artist
-  );
-}
-
 export function getPredictableNextTrack(
   queue: Track[],
   currentIndex: number,
@@ -309,78 +317,4 @@ export function getPredictableNextTrack(
   }
 
   return null;
-}
-
-export function isContinuousAlbumTransition(
-  currentTrack: Track | undefined,
-  nextTrack: Track | null,
-  playSource: PlaySource | null,
-  shuffle: boolean,
-): boolean {
-  if (!currentTrack || !nextTrack) return false;
-  if (shuffle) return false;
-  if (playSource?.type !== "album") return false;
-  return areTracksFromSameAlbum(currentTrack, nextTrack);
-}
-
-export function getEffectiveCrossfadeSeconds(
-  currentTrack: Track | undefined,
-  nextTrack: Track | null,
-  playSource: PlaySource | null,
-  shuffle: boolean,
-  configuredSeconds: number,
-  smartCrossfadeEnabled: boolean,
-  options: {
-    androidNative?: boolean;
-    html5OnlyPlayback?: boolean;
-    mobileEnhancedAudio?: boolean;
-  } = {},
-): number {
-  if (
-    isMobileAudioRuntime ||
-    options.androidNative ||
-    options.html5OnlyPlayback
-  ) {
-    return 0;
-  }
-  const clampedSeconds = Math.max(0, configuredSeconds || 0);
-  const continuousAlbumTransition = isContinuousAlbumTransition(
-    currentTrack,
-    nextTrack,
-    playSource,
-    shuffle,
-  );
-  const mobileHtml5Pipeline =
-    (options.androidNative || stableMobileAudioPipeline) &&
-    !options.mobileEnhancedAudio;
-  const shouldMaskHtml5Gap = options.html5OnlyPlayback ?? mobileHtml5Pipeline;
-
-  if (smartCrossfadeEnabled && continuousAlbumTransition) {
-    if (shouldMaskHtml5Gap) {
-      return Math.min(
-        clampedSeconds > 0
-          ? clampedSeconds
-          : ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS,
-        ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS,
-      );
-    }
-  }
-  if (clampedSeconds <= 0) {
-    if (shouldMaskHtml5Gap && nextTrack) {
-      return continuousAlbumTransition
-        ? ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS
-        : ANDROID_MEDIA_SESSION_HANDOFF_SECONDS;
-    }
-    return 0;
-  }
-  if (!smartCrossfadeEnabled) return clampedSeconds;
-  if (continuousAlbumTransition) {
-    return shouldMaskHtml5Gap
-      ? Math.min(clampedSeconds, ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS)
-      : 0;
-  }
-  return Math.min(
-    clampedSeconds,
-    legacySmartTransitionSeconds(currentTrack, nextTrack, playSource, shuffle),
-  );
 }

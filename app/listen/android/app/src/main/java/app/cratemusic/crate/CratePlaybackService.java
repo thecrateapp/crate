@@ -52,12 +52,16 @@ public class CratePlaybackService extends Service {
     private MediaSession mediaSession;
     private PowerManager.WakeLock wakeLock;
     private WifiManager.WifiLock wifiLock;
-    private Bitmap artworkBitmap;
+    // Written on the artwork executor thread, read on the main thread
+    // (and vice versa for `artwork`) with no other synchronization between
+    // them — volatile guarantees the visibility the JMM doesn't otherwise
+    // promise here.
+    private volatile Bitmap artworkBitmap;
 
     private String title = "Crate";
     private String artist = "";
     private String album = "";
-    private String artwork = "";
+    private volatile String artwork = "";
     private boolean isPlaying = false;
     private long positionMs = 0L;
     private long durationMs = 0L;

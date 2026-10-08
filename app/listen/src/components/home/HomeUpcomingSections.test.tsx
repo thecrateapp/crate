@@ -51,7 +51,7 @@ const MULTIPLE_PREVIEW_ITEMS: HomeUpcomingItem[] = [
 
 describe("HomeUpcomingSection", () => {
   it("uses Radar as the visible destination name", () => {
-    renderWithRouter(
+    const { container } = renderWithRouter(
       <HomeUpcomingSection
         previewItems={PREVIEW_ITEMS}
         summary={{
@@ -70,6 +70,10 @@ describe("HomeUpcomingSection", () => {
       screen.getByRole("button", { name: "Open Radar" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Upcoming")).not.toBeInTheDocument();
+    expect(
+      container.querySelector(".home-upcoming-feature"),
+    ).toBeInTheDocument();
+    expect(container.querySelector(".home-upcoming-panel")).toBeInTheDocument();
   });
 
   it("does not repeat the featured event in the next-up list", () => {
@@ -93,6 +97,27 @@ describe("HomeUpcomingSection", () => {
     expect(
       screen.getByText("Follow some artists to unlock Radar"),
     ).toBeInTheDocument();
+  });
+
+  it("explains that Radar has no signals when followed artists have no events", () => {
+    renderWithRouter(
+      <HomeUpcomingSection
+        previewItems={[]}
+        summary={{
+          followed_artists: 100,
+          show_count: 0,
+          release_count: 0,
+          attending_count: 0,
+          insight_count: 0,
+        }}
+        onOpenUpcoming={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("No new Radar signals yet")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Follow some artists to unlock Radar"),
+    ).not.toBeInTheDocument();
   });
 });
 

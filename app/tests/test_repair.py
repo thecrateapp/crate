@@ -4,6 +4,8 @@ from unittest.mock import MagicMock, patch
 from pathlib import Path
 import tempfile
 
+import pytest
+
 APP_ROOT = Path(__file__).resolve().parents[1]
 CRATE_ROOT = APP_ROOT / "crate"
 
@@ -278,6 +280,37 @@ class TestFieldNormalization:
             repair.repair(report, dry_run=True)
             issue_arg = mock_fix.call_args[0][0]
             assert issue_arg["details"] == {"artist": "Dead Band"}
+
+
+class TestStaleArtistLifecycleRepair:
+    @pytest.mark.parametrize("check", ["stale_artists", "zombie_artists"])
+    def test_stale_identity_is_skipped_instead_of_failed(self, check):
+        from crate.artist_lifecycle import ArtistIdentityChangedError
+        from crate.repair import LibraryRepair
+
+        repair = LibraryRepair({"library_path": "/tmp/fake_lib"})
+        report = {
+            "issues": [
+                {
+                    "check": check,
+                    "auto_fixable": True,
+                    "details": {"artist": "Changed Artist"},
+                }
+            ]
+        }
+
+        with patch(
+            "crate.repair.delete_artist",
+            side_effect=ArtistIdentityChangedError("stale artist"),
+        ):
+            result = repair.repair(report, dry_run=False, auto_only=False)
+
+        assert result["summary"]["skipped"] == 1
+        assert result["summary"]["failed"] == 0
+        assert result["item_results"][0]["outcome"] == "skipped"
+        assert result["item_results"][0]["details"] == {
+            "error": "stale artist identity"
+        }
 
 
 class TestDuplicateTrackRepair:
@@ -1133,6 +1166,82 @@ class TestDuplicateFoldersRepair:
         assert result is not None
         assert not result["applied"]
         assert result["action"] == "merge_duplicate_folders"
+
+
+class TestCanonicalMismatchRepair:
+    def test_rename_runs_through_artist_merge_lifecycle(self):
+        from crate.repair import LibraryRepair
+
+        repair = LibraryRepair({"library_path": "/tmp/fake"})
+        issue = {
+            "details": {
+                "artist": "Source Artist",
+                "tag_name": "Canonical Artist",
+                "folder": "source-artist",
+            }
+        }
+
+        with (
+            patch("crate.repair.rename_artist", return_value=True) as mock_rename,
+            patch(
+                "crate.repair.run_artist_merge",
+                side_effect=lambda _name, operation: operation(),
+            ) as mock_lifecycle,
+            patch("crate.repair.log_audit"),
+        ):
+            result = repair._fix_canonical_mismatch(issue, dry_run=False)
+
+        assert result is not None
+        assert result["applied"] is True
+        mock_lifecycle.assert_called_once()
+        mock_rename.assert_called_once_with(
+            "Source Artist", "Canonical Artist", "source-artist"
+        )
+
+    def test_dry_run_does_not_start_artist_merge_lifecycle(self):
+        from crate.repair import LibraryRepair
+
+        repair = LibraryRepair({"library_path": "/tmp/fake"})
+        issue = {
+            "details": {
+                "artist": "Source Artist",
+                "tag_name": "Canonical Artist",
+            }
+        }
+
+        with patch("crate.repair.run_artist_merge") as mock_lifecycle:
+            result = repair._fix_canonical_mismatch(issue, dry_run=True)
+
+        assert result is not None
+        assert result["applied"] is False
+        mock_lifecycle.assert_not_called()
+
+    def test_stale_artist_identity_is_reported_as_not_applied(self):
+        from crate.artist_lifecycle import ArtistIdentityChangedError
+        from crate.repair import LibraryRepair
+
+        repair = LibraryRepair({"library_path": "/tmp/fake"})
+        issue = {
+            "details": {
+                "artist": "Source Artist",
+                "tag_name": "Canonical Artist",
+                "folder": "source-artist",
+            }
+        }
+
+        with (
+            patch(
+                "crate.repair.run_artist_merge",
+                side_effect=ArtistIdentityChangedError("stale artist"),
+            ),
+            patch("crate.repair.log_audit") as mock_audit,
+        ):
+            result = repair._fix_canonical_mismatch(issue, dry_run=False)
+
+        assert result is not None
+        assert result["applied"] is False
+        assert result["details"]["error"] == "stale artist identity"
+        mock_audit.assert_not_called()
 
 
 class TestRepairOrchestration:

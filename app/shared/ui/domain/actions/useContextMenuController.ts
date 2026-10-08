@@ -197,13 +197,17 @@ export function useContextMenuController<
       return;
 
     const updatePosition = () => {
-      const rect = menuRef.current?.getBoundingClientRect();
-      if (!rect) return;
+      const menu = menuRef.current;
+      if (!menu) return;
+      const rect = menu.getBoundingClientRect();
 
       setPosition(
         calculateMenuPosition({
           anchorPosition,
-          menuRect: rect,
+          menuRect: {
+            width: menu.offsetWidth || rect.width,
+            height: menu.offsetHeight || rect.height,
+          },
           rawPosition,
           viewport: {
             width: Math.min(

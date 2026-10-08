@@ -9,36 +9,9 @@ import {
 import { createPortal } from "react-dom";
 
 import { cn } from "@crate/ui/lib/cn";
+import { useSheetDrag } from "@crate/ui/lib/use-sheet-drag";
 
 import type { MobileActionSheetProps } from "./types";
-
-const SHEET_DRAG_ACTIVATION_PX = 8;
-
-function getTouchClientY(event: TouchEvent): number | null {
-  return event.touches[0]?.clientY ?? event.changedTouches[0]?.clientY ?? null;
-}
-
-function getScrollableAncestor(
-  target: EventTarget | null,
-  boundary: HTMLElement,
-): HTMLElement | null {
-  if (!(target instanceof Node)) return null;
-
-  let node: HTMLElement | null =
-    target instanceof HTMLElement ? target : target.parentElement;
-
-  while (node && node !== boundary) {
-    const style = window.getComputedStyle(node);
-    const canScrollY =
-      /(auto|scroll|overlay)/.test(style.overflowY) &&
-      node.scrollHeight > node.clientHeight;
-
-    if (canScrollY) return node;
-    node = node.parentElement;
-  }
-
-  return null;
-}
 
 export function MobileActionSheet({
   children,
@@ -46,32 +19,44 @@ export function MobileActionSheet({
   onClose,
   open,
   className,
+  ariaLabel = "Action sheet",
+  surfaceClassName,
 }: MobileActionSheetProps) {
   const [shouldRender, setShouldRender] = useState(open);
   const [isClosing, setIsClosing] = useState(false);
   const [isEntering, setIsEntering] = useState(open);
-  const [isDragging, setIsDragging] = useState(false);
-  const [swipeY, setSwipeY] = useState(0);
   const internalPanelRef = useRef<HTMLDivElement>(null);
   const resolvedPanelRef = panelRef ?? internalPanelRef;
-  const swipeYRef = useRef(0);
-  const swipeStartRef = useRef<number | null>(null);
-  const pointerDragIdRef = useRef<number | null>(null);
-  const pendingTouchStartYRef = useRef<number | null>(null);
-  const pendingTouchTargetRef = useRef<EventTarget | null>(null);
-  const dragHandleRef = useRef<HTMLDivElement>(null);
   const closeScheduledRef = useRef(false);
   const isDismissedRef = useRef(false);
   const shouldSuppressNextClickRef = useRef(false);
   const isMountedRef = useRef(true);
 
+  const {
+    dragHandleRef,
+    dragHandleProps,
+    swipeY,
+    isDragging,
+    setIsDragging,
+    setDragOffset,
+    getDismissOffset,
+    resetDrag,
+  } = useSheetDrag({
+    panelRef: resolvedPanelRef,
+    enabled: shouldRender,
+    onDragStart: () => setIsEntering(false),
+    onDismiss: () => requestDragClose(),
+  });
+
   const isPanelTarget = useCallback(
     (target: EventTarget | null) => {
       if (target == null) return false;
       const node = target as Node;
-      return resolvedPanelRef.current
-        ? resolvedPanelRef.current.contains(node)
-        : false;
+      if (resolvedPanelRef.current?.contains(node)) return true;
+      return (
+        target instanceof Element &&
+        Boolean(target.closest("[data-dismissible-layer-boundary]"))
+      );
     },
     [resolvedPanelRef],
   );
@@ -89,8 +74,7 @@ export function MobileActionSheet({
       setIsClosing(false);
       setIsEntering(true);
       setIsDragging(false);
-      setSwipeY(0);
-      swipeYRef.current = 0;
+      setDragOffset(0);
       closeScheduledRef.current = false;
       return;
     }
@@ -101,7 +85,7 @@ export function MobileActionSheet({
     }, 180);
 
     return () => window.clearTimeout(timer);
-  }, [open]);
+  }, [open, setDragOffset, setIsDragging]);
 
   useEffect(() => {
     if (!shouldRender) return;
@@ -125,17 +109,6 @@ export function MobileActionSheet({
     };
   }, [shouldRender]);
 
-  const setDragOffset = useCallback((offset: number) => {
-    swipeYRef.current = offset;
-    setSwipeY(offset);
-  }, []);
-
-  const getPanelHeight = useCallback(() => {
-    const height =
-      resolvedPanelRef.current?.getBoundingClientRect().height ?? 0;
-    return height > 0 ? height : 240;
-  }, [resolvedPanelRef]);
-
   const requestClose = useCallback(() => {
     if (isClosing || closeScheduledRef.current) return;
     closeScheduledRef.current = true;
@@ -149,14 +122,14 @@ export function MobileActionSheet({
         onClose();
       }
     }, 140);
-  }, [isClosing, onClose, setDragOffset]);
+  }, [isClosing, onClose, setDragOffset, setIsDragging]);
 
   const requestDragClose = useCallback(() => {
     if (isClosing || closeScheduledRef.current) return;
     closeScheduledRef.current = true;
     setIsDragging(false);
     setIsClosing(true);
-    setDragOffset(getPanelHeight() + 24);
+    setDragOffset(getDismissOffset());
     shouldSuppressNextClickRef.current = true;
     window.setTimeout(() => {
       if (isMountedRef.current) {
@@ -164,7 +137,7 @@ export function MobileActionSheet({
         onClose();
       }
     }, 180);
-  }, [getPanelHeight, isClosing, onClose, setDragOffset]);
+  }, [getDismissOffset, isClosing, onClose, setDragOffset, setIsDragging]);
 
   const suppressAndRequestClose = useCallback(() => {
     shouldSuppressNextClickRef.current = true;
@@ -186,63 +159,8 @@ export function MobileActionSheet({
       event.stopPropagation();
       suppressAndRequestClose();
     },
-    [suppressAndRequestClose],
+    [isPanelTarget, suppressAndRequestClose],
   );
-
-  const beginDrag = useCallback(
-    (clientY: number) => {
-      swipeStartRef.current = clientY;
-      setIsEntering(false);
-      setIsDragging(true);
-      setDragOffset(0);
-    },
-    [setDragOffset],
-  );
-
-  const updateDrag = useCallback(
-    (clientY: number) => {
-      if (swipeStartRef.current === null) return;
-      const dy = clientY - swipeStartRef.current;
-      setDragOffset(dy > 0 ? Math.min(dy, getPanelHeight() + 24) : 0);
-    },
-    [getPanelHeight, setDragOffset],
-  );
-
-  const canStartDragFromTarget = useCallback(
-    (target: EventTarget | null) => {
-      const panel = resolvedPanelRef.current;
-      if (!panel || !(target instanceof Node) || !panel.contains(target)) {
-        return false;
-      }
-      if (dragHandleRef.current?.contains(target)) return true;
-
-      const scrollable = getScrollableAncestor(target, panel);
-      return !scrollable || scrollable.scrollTop <= 0;
-    },
-    [resolvedPanelRef],
-  );
-
-  const handlePointerDragMove = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (swipeStartRef.current === null) return;
-      event.preventDefault();
-      event.stopPropagation();
-      updateDrag(event.clientY);
-    },
-    [updateDrag],
-  );
-
-  const onSwipeEnd = useCallback(() => {
-    if (swipeStartRef.current === null) return;
-    const shouldDismiss = swipeYRef.current >= getPanelHeight() / 2;
-    swipeStartRef.current = null;
-    if (shouldDismiss) {
-      requestDragClose();
-      return;
-    }
-    setIsDragging(false);
-    setDragOffset(0);
-  }, [getPanelHeight, requestDragClose, setDragOffset]);
 
   const handlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -254,142 +172,37 @@ export function MobileActionSheet({
     [isPanelTarget, suppressAndRequestClose],
   );
 
-  const handleContentTouchCancel = useCallback(() => {
-    setIsDragging(false);
-    setDragOffset(0);
-    swipeStartRef.current = null;
-    pointerDragIdRef.current = null;
-    pendingTouchStartYRef.current = null;
-    pendingTouchTargetRef.current = null;
-  }, [setDragOffset]);
-
-  const handlePanelPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (event.pointerType === "mouse" && event.button !== 0) return;
-      event.preventDefault();
-      event.stopPropagation();
-      pointerDragIdRef.current = event.pointerId;
-      beginDrag(event.clientY);
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-    },
-    [beginDrag],
-  );
-
-  const handlePanelPointerMove = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (pointerDragIdRef.current !== event.pointerId) return;
-      handlePointerDragMove(event);
-    },
-    [handlePointerDragMove],
-  );
-
-  const handlePanelPointerEnd = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (pointerDragIdRef.current !== event.pointerId) return;
-      pointerDragIdRef.current = null;
-      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      }
-      onSwipeEnd();
-    },
-    [onSwipeEnd],
-  );
-
-  useEffect(() => {
-    if (!shouldRender) return;
-    const panel = resolvedPanelRef.current;
-    if (!panel) return;
-
-    const handleNativeTouchStart = (event: TouchEvent) => {
-      const clientY = getTouchClientY(event);
-      if (clientY === null) return;
-      pendingTouchStartYRef.current = clientY;
-      pendingTouchTargetRef.current = event.target;
-    };
-
-    const handleNativeTouchMove = (event: TouchEvent) => {
-      const startY = pendingTouchStartYRef.current;
-      if (startY === null) return;
-
-      const clientY = getTouchClientY(event);
-      if (clientY === null) return;
-
-      const dy = clientY - startY;
-      if (swipeStartRef.current === null) {
-        if (dy <= SHEET_DRAG_ACTIVATION_PX) return;
-        if (!canStartDragFromTarget(pendingTouchTargetRef.current)) return;
-        beginDrag(startY);
-      }
-
-      if (event.cancelable) {
-        event.preventDefault();
-      }
-      event.stopPropagation();
-      updateDrag(clientY);
-    };
-
-    const handleNativeTouchEnd = () => {
-      pendingTouchStartYRef.current = null;
-      pendingTouchTargetRef.current = null;
-      if (swipeStartRef.current !== null) {
-        onSwipeEnd();
-      }
-    };
-
-    const handleNativeTouchCancel = () => {
-      pendingTouchStartYRef.current = null;
-      pendingTouchTargetRef.current = null;
-      handleContentTouchCancel();
-    };
-
-    panel.addEventListener("touchstart", handleNativeTouchStart, {
-      passive: true,
-    });
-    panel.addEventListener("touchmove", handleNativeTouchMove, {
-      passive: false,
-    });
-    panel.addEventListener("touchend", handleNativeTouchEnd);
-    panel.addEventListener("touchcancel", handleNativeTouchCancel);
-
-    return () => {
-      panel.removeEventListener("touchstart", handleNativeTouchStart);
-      panel.removeEventListener("touchmove", handleNativeTouchMove);
-      panel.removeEventListener("touchend", handleNativeTouchEnd);
-      panel.removeEventListener("touchcancel", handleNativeTouchCancel);
-    };
-  }, [
-    beginDrag,
-    canStartDragFromTarget,
-    handleContentTouchCancel,
-    onSwipeEnd,
-    resolvedPanelRef,
-    shouldRender,
-    updateDrag,
-  ]);
-
   if (!shouldRender) return null;
 
   return createPortal(
     <div
       role="dialog"
       aria-modal="true"
+      aria-label={ariaLabel}
+      tabIndex={-1}
       className={cn(
-        "fixed inset-0 flex items-end justify-center bg-black/58 p-0 backdrop-blur-md z-app-modal",
+        "fixed inset-0 flex items-end justify-center bg-surface-canvas/58 p-0 backdrop-blur-md z-app-modal",
         isClosing ? "animate-fade-out" : "animate-fade-in",
       )}
       onClickCapture={handleOverlayClick}
       onPointerDownCapture={handlePointerDown}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        suppressAndRequestClose();
+      }}
       onTouchEnd={(event) => {
         if (isPanelTarget(event.target)) return;
-        setIsDragging(false);
-        setDragOffset(0);
-        swipeStartRef.current = null;
+        resetDrag();
       }}
     >
       <div
         ref={resolvedPanelRef}
+        data-dismissible-layer-boundary="true"
         className={cn(
-          "listen-glass-panel fixed inset-x-0 overflow-hidden overscroll-contain rounded-t-3xl border border-white/10 shadow-2xl",
+          "listen-glass-panel",
+          surfaceClassName,
+          "fixed inset-x-0 overflow-hidden overscroll-contain rounded-t-3xl border border-border-quiet shadow-2xl",
           isClosing && swipeY === 0
             ? "animate-sheet-down"
             : isEntering && !isDragging
@@ -418,12 +231,9 @@ export function MobileActionSheet({
           ref={dragHandleRef}
           data-mobile-sheet-drag-handle="true"
           className="touch-none pt-3 pb-2"
-          onPointerDown={handlePanelPointerDown}
-          onPointerMove={handlePanelPointerMove}
-          onPointerUp={handlePanelPointerEnd}
-          onPointerCancel={handleContentTouchCancel}
+          {...dragHandleProps}
         >
-          <div className="mx-auto h-1.25 w-14 rounded-full bg-white/22 transition-opacity duration-150 group-hover:opacity-90" />
+          <div className="mx-auto h-1.25 w-14 rounded-full bg-text-primary/22 transition-opacity duration-150 group-hover:opacity-90" />
         </div>
         <div className="max-h-[inherit] overflow-y-auto overscroll-contain">
           {children}

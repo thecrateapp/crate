@@ -64,7 +64,10 @@ def run_projector_loop(
                             "Warmed home discovery snapshots for %d recent user(s)",
                             warmed,
                         )
-        except Exception:
+        except Exception as error:
+            from crate.observability.sentry import capture_background_exception
+
+            capture_background_exception(error, "projector.iteration")
             log.debug("Snapshot projector failed", exc_info=True)
         stop_event.wait(interval)
     log.info("Projector loop stopped")
@@ -78,6 +81,9 @@ def run_projector(
 ) -> None:
     """Run the projector as its own long-lived process."""
     del config
+    from crate.observability import init_sentry
+
+    init_sentry("projector")
     init_db()
 
     stop_event = threading.Event()

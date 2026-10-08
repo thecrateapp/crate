@@ -42,6 +42,7 @@ const {
   getSecureSessionValue,
   removeSecureSessionValue,
   setAuthTokens,
+  setAuthTokensForServer,
   setSecureSessionValue,
   waitForPendingSecureSessionWrites,
 } = vi.hoisted(() => ({
@@ -49,12 +50,15 @@ const {
   getSecureSessionValue: vi.fn(),
   removeSecureSessionValue: vi.fn(),
   setAuthTokens: vi.fn(),
+  setAuthTokensForServer: vi.fn(() => true),
   setSecureSessionValue: vi.fn(),
   waitForPendingSecureSessionWrites: vi.fn(),
 }));
 vi.mock("@/lib/api", () => ({
   api: apiMock,
+  apiForServer: apiMock,
   setAuthTokens,
+  setAuthTokensForServer,
 }));
 vi.mock("@/lib/native-secure-session", () => ({
   getSecureSessionValue,
@@ -62,7 +66,11 @@ vi.mock("@/lib/native-secure-session", () => ({
   setSecureSessionValue,
 }));
 vi.mock("@/lib/server-store", () => ({
+  SERVER_STORE_EVENT: "crate-server-store-change",
   waitForPendingSecureSessionWrites,
+  getCurrentServerId: () => "server-a",
+  getServers: () => [{ id: "server-a" }],
+  setCurrentServerId: () => {},
 }));
 
 import {
@@ -80,20 +88,19 @@ describe("capacitor OAuth callback helpers", () => {
     getSecureSessionValue.mockReset();
     removeSecureSessionValue.mockReset();
     setAuthTokens.mockReset();
+    setAuthTokensForServer.mockReset().mockReturnValue(true);
     setSecureSessionValue.mockReset();
     waitForPendingSecureSessionWrites.mockReset();
     waitForPendingSecureSessionWrites.mockResolvedValue(undefined);
   });
 
-  it("stores token and pending next for native OAuth callbacks", async () => {
+  it("rejects desktop token callbacks without an expected state", async () => {
     const result = await consumeOAuthCallbackUrl(
       "cratemusic://oauth/callback?token=abc123&next=%2Fmixes",
     );
 
-    expect(result).toEqual({ handled: true, next: "/mixes" });
-    expect(setAuthTokens).toHaveBeenCalledWith("abc123", undefined, undefined);
-    expect(consumePendingOAuthNext()).toBe("/mixes");
-    expect(consumePendingOAuthNext()).toBeNull();
+    expect(result).toEqual({ handled: false, next: "/" });
+    expect(setAuthTokens).not.toHaveBeenCalled();
   });
 
   it("rejects arbitrary HTTPS callback hosts", async () => {
@@ -103,19 +110,6 @@ describe("capacitor OAuth callback helpers", () => {
 
     expect(result).toEqual({ handled: false, next: "/" });
     expect(setAuthTokens).not.toHaveBeenCalled();
-  });
-
-  it("stores refresh token when the native callback includes one", async () => {
-    const result = await consumeOAuthCallbackUrl(
-      "cratemusic://oauth/callback?token=abc123&refresh_token=refresh456&next=%2Fmixes",
-    );
-
-    expect(result).toEqual({ handled: true, next: "/mixes" });
-    expect(setAuthTokens).toHaveBeenCalledWith(
-      "abc123",
-      "refresh456",
-      undefined,
-    );
   });
 
   it("ignores unrelated URLs", async () => {
@@ -137,6 +131,7 @@ describe("capacitor OAuth callback helpers", () => {
 
     expect(result).toBe("https://accounts.example/authorize");
     expect(apiMock).toHaveBeenCalledWith(
+      "server-a",
       "/api/auth/oauth/google/start",
       "POST",
       expect.objectContaining({
@@ -162,17 +157,39 @@ describe("capacitor OAuth callback helpers", () => {
     await beginNativeOAuth("google", "/stats");
 
     expect(apiMock).toHaveBeenCalledWith(
+      "server-a",
       "/api/auth/oauth/google/start",
       "POST",
       expect.objectContaining({
         return_to: "cratemusic-dbg://oauth/callback",
       }),
     );
+
+    getSecureSessionValue.mockResolvedValue(
+      JSON.stringify({
+        verifier: "v".repeat(43),
+        next: "/stats",
+        createdAt: Date.now(),
+        serverId: "server-a",
+      }),
+    );
+    apiMock.mockResolvedValue({ token: "access-token" });
+    removeSecureSessionValue.mockResolvedValue(undefined);
+
     await expect(
       consumeOAuthCallbackUrl(
-        `cratemusic-dbg://oauth/callback?token=debug-token&next=%2Fstats`,
+        `cratemusic-dbg://oauth/callback?code=one-time-code-token&state=${"s".repeat(
+          43,
+        )}`,
       ),
     ).resolves.toEqual({ handled: true, next: "/stats" });
+    expect(
+      await consumeOAuthCallbackUrl(
+        `cratemusic://oauth/callback?code=one-time-code-token&state=${"s".repeat(
+          43,
+        )}`,
+      ),
+    ).toEqual({ handled: false, next: "/" });
   });
 
   it("exchanges a one-time callback code and always deletes its verifier", async () => {
@@ -181,6 +198,7 @@ describe("capacitor OAuth callback helpers", () => {
         verifier: "v".repeat(43),
         next: "/stats",
         createdAt: Date.now(),
+        serverId: "server-a",
       }),
     );
     apiMock.mockResolvedValue({
@@ -197,12 +215,18 @@ describe("capacitor OAuth callback helpers", () => {
     );
 
     expect(result).toEqual({ handled: true, next: "/stats" });
-    expect(apiMock).toHaveBeenCalledWith("/api/auth/native/exchange", "POST", {
-      code: "one-time-code-token",
-      code_verifier: "v".repeat(43),
-      state: "s".repeat(43),
-    });
-    expect(setAuthTokens).toHaveBeenCalledWith(
+    expect(apiMock).toHaveBeenCalledWith(
+      "server-a",
+      "/api/auth/native/exchange",
+      "POST",
+      {
+        code: "one-time-code-token",
+        code_verifier: "v".repeat(43),
+        state: "s".repeat(43),
+      },
+    );
+    expect(setAuthTokensForServer).toHaveBeenCalledWith(
+      "server-a",
       "access-token",
       "refresh-token",
       "2030-01-01T00:00:00Z",
@@ -213,12 +237,49 @@ describe("capacitor OAuth callback helpers", () => {
     );
   });
 
-  it("deletes the verifier when native code exchange fails", async () => {
+  it("releases the active callback when pending-record cleanup fails", async () => {
+    const state = "s".repeat(43);
+    const callbackUrl = `cratemusic://oauth/callback?code=one-time-code-token&state=${state}`;
+    const pendingKey = "crate.oauth.pending-callback";
+    const record = JSON.stringify({
+      verifier: "v".repeat(43),
+      next: "/stats",
+      createdAt: Date.now(),
+      serverId: "server-a",
+    });
+    let pendingReads = 0;
+    getSecureSessionValue.mockImplementation(async (key: string) => {
+      if (key === pendingKey) {
+        pendingReads += 1;
+        if (pendingReads === 2) {
+          throw new Error("keychain cleanup unavailable");
+        }
+        return null;
+      }
+      return record;
+    });
+    setSecureSessionValue.mockResolvedValue(undefined);
+    removeSecureSessionValue.mockResolvedValue(undefined);
+    apiMock.mockResolvedValue({ token: "access-token" });
+
+    await expect(consumeOAuthCallbackUrl(callbackUrl)).resolves.toEqual({
+      handled: true,
+      next: "/stats",
+    });
+    await expect(consumeOAuthCallbackUrl(callbackUrl)).resolves.toEqual({
+      handled: true,
+      next: "/stats",
+    });
+    expect(apiMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the verifier when native code exchange fails transiently", async () => {
     getSecureSessionValue.mockResolvedValue(
       JSON.stringify({
         verifier: "v".repeat(43),
         next: "/",
         createdAt: Date.now(),
+        serverId: "server-a",
       }),
     );
     apiMock.mockRejectedValue(new Error("exchange failed"));
@@ -230,18 +291,17 @@ describe("capacitor OAuth callback helpers", () => {
       )}`,
     );
 
-    expect(result).toEqual({ handled: false, next: "/" });
-    expect(removeSecureSessionValue).toHaveBeenCalledWith(
-      `crate.oauth.${"s".repeat(43)}`,
-    );
+    expect(result).toEqual({ handled: false, next: "/", retryable: true });
+    expect(removeSecureSessionValue).not.toHaveBeenCalled();
   });
 
-  it("rejects the callback when the exchanged session cannot be persisted", async () => {
+  it("keeps the callback retryable when the exchanged session cannot be persisted", async () => {
     getSecureSessionValue.mockResolvedValue(
       JSON.stringify({
         verifier: "v".repeat(43),
         next: "/stats",
         createdAt: Date.now(),
+        serverId: "server-a",
       }),
     );
     apiMock.mockResolvedValue({
@@ -259,8 +319,14 @@ describe("capacitor OAuth callback helpers", () => {
       )}`,
     );
 
-    expect(result).toEqual({ handled: false, next: "/" });
-    expect(setAuthTokens).toHaveBeenLastCalledWith(null, null, null);
+    expect(result).toEqual({ handled: false, next: "/", retryable: true });
+    expect(setAuthTokensForServer).toHaveBeenLastCalledWith(
+      "server-a",
+      null,
+      null,
+      null,
+    );
+    expect(removeSecureSessionValue).not.toHaveBeenCalled();
   });
 
   it("parses token and next from plain search params too", () => {

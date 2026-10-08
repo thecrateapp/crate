@@ -58,6 +58,7 @@ def test_external_artist_identity_is_hashed():
         ("album-cover", 320, 384),
         ("album-cover", 640, 768),
         ("album-cover", 2048, 1024),
+        ("playlist-cover", 2048, 1024),
         ("artist-photo", None, 1024),
         ("external-artist", None, 768),
         ("artist-background", None, 2048),

@@ -196,14 +196,6 @@ export function buildArtistAlbumCover(
   );
 }
 
-export function artistGenreSlug(name: string) {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/[\s-]+/g, "-");
-}
-
 export function sortArtistAlbumsByYear(albums: ArtistAlbum[]) {
   return [...albums].sort((a, b) => {
     const yearA = parseInt(a.year) || 0;

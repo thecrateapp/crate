@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import { renderWithListenProviders as render } from "@/test/render-with-listen-providers";
 import { CoreTracksArtwork } from "./CoreTracksArtwork";
 
 describe("CoreTracksArtwork", () => {

@@ -2,15 +2,19 @@ import { useMemo, useState, type ChangeEvent } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
+  Archive,
+  CheckCircle2,
+  CRATE_ICON_SIZE,
   Loader2,
   Music,
   Upload as UploadIcon,
-  Archive,
-  CheckCircle2,
 } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
+import { Button } from "@crate/ui/shadcn/button";
 
 import { ApiError, api } from "@/lib/api";
+import { formatBytes } from "@/lib/utils";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 interface UploadResponse {
   task_id: string;
@@ -36,20 +40,6 @@ interface UploadMusicFilesOptions {
 }
 
 const CHUNKED_UPLOAD_THRESHOLD_BYTES = 80 * 1024 * 1024;
-
-function formatBytes(bytes: number): string {
-  if (!bytes) return "0 B";
-  const units = ["B", "KB", "MB", "GB"];
-  let value = bytes;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${
-    units[unitIndex]
-  }`;
-}
 
 function totalFileBytes(files: File[]): number {
   return files.reduce((sum, file) => sum + file.size, 0);
@@ -99,6 +89,8 @@ async function chunkedUpload(
         `${file.name}.part-${chunkIndex}`,
       );
 
+      // Chunks are sent in order so the server can commit a deterministic upload.
+      // react-doctor-disable-next-line async-await-in-loop
       await api(
         `/api/acquisition/upload/chunked/${init.upload_id}/chunk`,
         "POST",
@@ -165,10 +157,10 @@ export function Upload() {
         onProgress: setUploadProgress,
       });
       setLastUpload(response);
-      toast.success(t("upload.toasts.queued"));
+      notify.success(t("upload.toasts.queued"));
       setFiles([]);
     } catch (error) {
-      toast.error(uploadErrorMessage(error, t));
+      notify.error(uploadErrorMessage(error, t));
     } finally {
       setSubmitting(false);
       setUploadProgress(null);
@@ -178,29 +170,28 @@ export function Upload() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="space-y-2">
-        <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-wider text-muted-foreground">
-          <UploadIcon size={12} />
+        <CrateBadge size="md" icon={UploadIcon}>
           {t("upload.badge")}
-        </div>
-        <h1 className="text-3xl font-bold text-foreground">
+        </CrateBadge>
+        <h1 className="text-3xl font-bold text-text-primary">
           {t("upload.title")}
         </h1>
-        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+        <p className="max-w-2xl text-sm leading-6 text-text-muted">
           {t("upload.subtitle")}
         </p>
       </div>
 
-      <div className="rounded-[12px] border border-white/10 bg-white/[0.04] p-6">
+      <div className="rounded-panel border border-border-quiet bg-text-primary/[0.04] p-6">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div className="space-y-4">
-            <label className="flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-white/15 bg-white/[0.03] px-6 py-10 text-center transition-colors hover:border-primary/40 hover:bg-white/[0.05]">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/15 text-primary">
-                <UploadIcon size={24} />
+            <label className="flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-text-primary/15 bg-text-primary/[0.03] px-6 py-10 text-center transition-colors hover:border-accent-action/40 hover:bg-text-primary/[0.05]">
+              <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-accent-action/15 text-accent-action">
+                <UploadIcon size={CRATE_ICON_SIZE.xl} />
               </div>
-              <div className="text-base font-semibold text-foreground">
+              <div className="text-base font-semibold text-text-primary">
                 {t("upload.dropzone.title")}
               </div>
-              <div className="mt-2 text-sm text-muted-foreground">
+              <div className="mt-2 text-sm text-text-muted">
                 {t("upload.dropzone.formats")}
               </div>
               <input
@@ -213,13 +204,13 @@ export function Upload() {
             </label>
 
             {files.length > 0 ? (
-              <div className="space-y-2 rounded-xl border border-white/10 bg-[var(--gradient-bg-50)] p-4">
+              <div className="space-y-2 border-t border-border-quiet bg-surface-canvas/50 pt-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <div className="text-sm font-semibold text-foreground">
+                    <div className="text-sm font-semibold text-text-primary">
                       {t("upload.ready.title")}
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-text-muted">
                       {t("upload.selectedFiles", {
                         count: files.length,
                         size: formatBytes(totalBytes),
@@ -227,8 +218,9 @@ export function Upload() {
                     </div>
                   </div>
                   <button
+                    type="button"
                     onClick={() => setFiles([])}
-                    className="text-xs text-muted-foreground transition-colors hover:text-white/70"
+                    className="link-meta text-xs"
                   >
                     {t("common.clear")}
                   </button>
@@ -237,17 +229,23 @@ export function Upload() {
                   {files.map((file) => (
                     <div
                       key={`${file.name}-${file.size}-${file.lastModified}`}
-                      className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white/75"
+                      className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-text-primary/75"
                     >
                       {file.name.toLowerCase().endsWith(".zip") ? (
-                        <Archive size={14} className="shrink-0 text-primary" />
+                        <Archive
+                          size={CRATE_ICON_SIZE.xs}
+                          className="shrink-0 text-accent-action"
+                        />
                       ) : (
-                        <Music size={14} className="shrink-0 text-primary" />
+                        <Music
+                          size={CRATE_ICON_SIZE.xs}
+                          className="shrink-0 text-accent-action"
+                        />
                       )}
                       <span className="min-w-0 flex-1 truncate">
                         {file.name}
                       </span>
-                      <span className="text-[11px] text-white/40">
+                      <span className="text-xs text-text-primary/40">
                         {formatBytes(file.size)}
                       </span>
                     </div>
@@ -257,26 +255,27 @@ export function Upload() {
             ) : null}
           </div>
 
-          <div className="space-y-4 rounded-xl border border-white/10 bg-[var(--gradient-bg-50)] p-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="space-y-4 border-l border-border-quiet pl-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-text-muted">
               {t("upload.next.title")}
             </h2>
-            <ul className="space-y-3 text-sm leading-6 text-muted-foreground">
+            <ul className="space-y-3 text-sm leading-6 text-text-muted">
               <li>{t("upload.next.import")}</li>
               <li>{t("upload.next.enrichment")}</li>
               <li>{t("upload.next.liked")}</li>
               <li>{t("upload.next.saved")}</li>
               <li>{t("upload.next.attributed")}</li>
             </ul>
-            <button
+            <Button
+              shape="pill"
               onClick={handleSubmit}
               disabled={submitting || files.length === 0}
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-auto w-full px-4 py-3 font-semibold shadow-none hover:bg-accent-action [&_svg:not([class*='size-'])]:size-4 has-[>svg]:px-4"
             >
               {submitting ? (
-                <Loader2 size={16} className="animate-spin" />
+                <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
               ) : (
-                <UploadIcon size={16} />
+                <UploadIcon size={CRATE_ICON_SIZE.sm} />
               )}
               {uploadProgress
                 ? t("upload.progress", {
@@ -284,14 +283,14 @@ export function Upload() {
                     total: uploadProgress.total,
                   })
                 : t("upload.import")}
-            </button>
+            </Button>
             {lastUpload ? (
-              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+              <div className="border-l-2 border-state-success/40 bg-state-success/10 px-4 py-3 text-sm text-state-success-text">
                 <div className="flex items-center gap-2 font-medium">
-                  <CheckCircle2 size={15} />
+                  <CheckCircle2 size={CRATE_ICON_SIZE.sm} />
                   {t("upload.status.queued")}
                 </div>
-                <div className="mt-1 text-xs text-emerald-100/80">
+                <div className="mt-1 text-xs text-state-success-text/80">
                   {t("upload.status.processing", {
                     taskId: lastUpload.task_id,
                     count: lastUpload.file_count,

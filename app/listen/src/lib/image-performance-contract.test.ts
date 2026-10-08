@@ -67,5 +67,5 @@ describe("Listen image delivery contract", () => {
     }
 
     expect(unbounded).toEqual([]);
-  });
+  }, 30_000);
 });

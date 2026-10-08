@@ -24,6 +24,7 @@ const {
   mockSendEvent,
   mockJamConnected,
   mockDndContext,
+  mockPublicShareUrl,
 } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
   mockParams: { roomId: undefined as string | undefined },
@@ -43,6 +44,9 @@ const {
         }) => void)
       | null,
   },
+  mockPublicShareUrl: vi.fn((path: string) =>
+    /^https?:\/\//i.test(path) ? path : `https://listen.example.test${path}`,
+  ),
 }));
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
@@ -77,6 +81,12 @@ vi.mock("@/lib/api", () => ({
   isUsableMediaAssetUrl: () => true,
   requiresMediaAccessTicket: () => false,
   resolveMaybeApiAssetUrl: (value: string | null | undefined) => value,
+}));
+
+vi.mock("@/lib/share-url", () => ({
+  publicShareUrl: mockPublicShareUrl,
+  inviteShareUrl: (invite: { join_url: string; public_url?: string | null }) =>
+    mockPublicShareUrl(invite.public_url ?? invite.join_url),
 }));
 
 vi.mock("@/hooks/use-api", () => ({
@@ -237,7 +247,7 @@ async function openRoomActionsMenu() {
 describe("JamSession lobby (no roomId)", () => {
   it("renders the lobby heading, create form, and open rooms section", () => {
     mockUseApiData.value = makeRoomsResponse([]);
-    renderWithListenProviders(<JamSession />);
+    const { container } = renderWithListenProviders(<JamSession />);
 
     expect(
       screen.getByRole("heading", { name: "Jam sessions" }),
@@ -248,6 +258,8 @@ describe("JamSession lobby (no roomId)", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Open rooms")).toBeInTheDocument();
     expect(screen.getByText("Join from invite")).toBeInTheDocument();
+    expect(container.querySelector(".jam-lobby-header")).toBeInTheDocument();
+    expect(container.querySelector(".jam-panel")).toBeInTheDocument();
   });
 
   it("localizes the lobby chrome", () => {
@@ -747,7 +759,9 @@ describe("JamSession active room - host", () => {
   });
 
   it("localizes the active room chrome", async () => {
-    renderWithListenProviders(<JamSession />, { locale: "es" });
+    const { container } = renderWithListenProviders(<JamSession />, {
+      locale: "es",
+    });
 
     expect(screen.getByText("Sala Jam")).toBeInTheDocument();
     expect(screen.getByText("Conectando con la sala...")).toBeInTheDocument();
@@ -764,6 +778,11 @@ describe("JamSession active room - host", () => {
     expect(
       screen.getByPlaceholderText("Busca pistas para añadir a esta sala"),
     ).toBeInTheDocument();
+    expect(container.querySelector(".jam-room-header")).toBeInTheDocument();
+    expect(container.querySelector(".jam-now-playing")).toBeInTheDocument();
+    expect(container.querySelector(".jam-members-panel")).toBeInTheDocument();
+    expect(container.querySelector(".jam-queue-panel")).toBeInTheDocument();
+    expect(container.querySelector(".jam-activity-panel")).toBeInTheDocument();
 
     await openRoomActionsMenu();
     await userEvent.click(
@@ -813,8 +832,9 @@ describe("JamSession active room - host", () => {
   it("shows the queue mode badge in the room header", () => {
     renderWithListenProviders(<JamSession />);
 
-    expect(screen.getByText("DJ mode").closest("div")).toHaveClass(
-      "rounded-full",
+    expect(screen.getByText("DJ mode")).toHaveClass(
+      "crate-badge",
+      "rounded-md",
     );
   });
 
@@ -915,6 +935,7 @@ describe("JamSession active room - host", () => {
       token: "inv-token",
       join_url: "/jam/invite/inv-token",
       qr_value: "/api/qr?value=...",
+      public_url: "https://music.custom.test/jam/invite/inv-token",
     };
     mockApiCall.mockResolvedValueOnce(invite);
     renderWithListenProviders(<JamSession />);
@@ -932,6 +953,12 @@ describe("JamSession active room - host", () => {
       );
     });
     expect(screen.getByText("Invite to room")).toBeInTheDocument();
+    expect(mockPublicShareUrl).toHaveBeenCalledWith(
+      "https://music.custom.test/jam/invite/inv-token",
+    );
+    expect(
+      screen.getByText("https://music.custom.test/jam/invite/inv-token"),
+    ).toBeInTheDocument();
   });
 
   it("opens metadata modal and saves room profile", async () => {

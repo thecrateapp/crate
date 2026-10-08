@@ -26,6 +26,11 @@ the repository or an uploaded artifact. A tag build fails before Gradle when a
 secret is absent. Gradle independently fails every release task if its signing
 or version environment is incomplete.
 
+The public GitHub Actions variables `CAST_RECEIVER_APP_ID` and
+`CAST_CUSTOM_RECEIVER_ENABLED` configure both the Capacitor web bundle and the
+native Google Cast SDK. Tagged releases require the registered 8-character app
+ID and `CAST_CUSTOM_RECEIVER_ENABLED=true`.
+
 ## Release identity
 
 Every production APK and AAB must use the `crate-release` key and match this
@@ -62,8 +67,16 @@ export CRATE_ANDROID_KEYSTORE_FILE=/absolute/path/to/release.jks
 export CRATE_ANDROID_KEYSTORE_PASSWORD='...'
 export CRATE_ANDROID_KEY_ALIAS='...'
 export CRATE_ANDROID_KEY_PASSWORD='...'
+export CRATE_CAST_RECEIVER_APP_ID='ABCD1234'
 make cap-android-release CAP_ANDROID_RELEASE_TAG=v2.4.0-beta
 ```
+
+The Gradle build writes the Cast application ID into
+`crate_cast_receiver_app_id`, which is consumed by the native discovery
+provider. `CC1AD845` is accepted only as the local Default Media Receiver
+fallback; tagged release automation fails unless it supplies and enables the
+registered Crate receiver ID. The Listen web bundle is built with the matching
+`VITE_CAST_RECEIVER_APP_ID`.
 
 Artifacts are copied to `artifacts/capacitor/android/`. Never commit the
 keystore, passwords, generated APK/AAB, R8 mapping or native symbols.

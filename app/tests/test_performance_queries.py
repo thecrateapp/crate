@@ -190,3 +190,65 @@ def test_perf_browse_related_albums_not_n_plus_one(pg_db):
         )
     finally:
         event.remove(sa_engine, "before_cursor_execute", _count)
+
+
+def test_perf_opensubsonic_search_stays_within_query_budget(pg_db):
+    """Search remains a fixed four-query plan with production-like result rows."""
+    artist_name = "OpenSubsonicQueryBudget"
+    pg_db.upsert_artist({"name": artist_name})
+    album_id = pg_db.upsert_album(
+        {
+            "artist": artist_name,
+            "name": "Query Budget Album",
+            "path": f"/music/{artist_name}/Query Budget Album",
+            "track_count": 25,
+            "total_size": 25_600,
+            "total_duration": 4_500.0,
+            "formats": ["flac"],
+        }
+    )
+
+    for index in range(25):
+        pg_db.upsert_track(
+            {
+                "album_id": album_id,
+                "artist": artist_name,
+                "album": "Query Budget Album",
+                "filename": f"{index:02d}-budget.flac",
+                "title": f"Budget Track {index:02d}",
+                "path": f"/music/{artist_name}/Query Budget Album/{index:02d}-budget.flac",
+                "duration": 180.0,
+                "size": 1024,
+                "format": "flac",
+            }
+        )
+
+    from crate.federation.global_reconciliation import reconcile_local_catalog
+
+    reconcile_local_catalog()
+
+    from crate.db import engine as db_engine
+    from crate.db.queries.subsonic_global import search_global_catalog
+
+    sa_engine = db_engine.get_engine()
+    counts = []
+
+    @event.listens_for(sa_engine, "before_cursor_execute")
+    def _count(conn, cursor, statement, parameters, context, executemany):
+        counts.append(statement)
+
+    try:
+        result = search_global_catalog(
+            artist_name,
+            artist_limit=20,
+            album_limit=20,
+            track_limit=20,
+            include_track_total=True,
+        )
+        assert len(result["tracks"]) == 20
+        assert len(counts) <= 4, (
+            f"OpenSubsonic search executed {len(counts)} statements for 25 rows; "
+            "expected at most one query per result kind plus total count"
+        )
+    finally:
+        event.remove(sa_engine, "before_cursor_execute", _count)

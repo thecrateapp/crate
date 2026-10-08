@@ -47,6 +47,7 @@ describe("useDesktopTrayCommands", () => {
     dispatchDesktopTrayCommand("play_pause");
 
     expect(controls.pause).toHaveBeenCalledTimes(1);
+    expect(controls.pause).toHaveBeenCalledWith({ immediate: true });
     expect(controls.resume).not.toHaveBeenCalled();
   });
 
@@ -58,6 +59,7 @@ describe("useDesktopTrayCommands", () => {
 
     expect(controls.resume).toHaveBeenCalledTimes(1);
     expect(controls.pause).toHaveBeenCalledTimes(1);
+    expect(controls.pause).toHaveBeenCalledWith({ immediate: true });
   });
 
   it("routes previous and next tray commands", () => {
@@ -108,6 +110,7 @@ describe("useDesktopTrayNowPlaying", () => {
       artist: "Deftones",
       album: "Deftones",
       artwork: "https://api.example.test/cover.jpg",
+      mediaId: "server-1:track-1",
       isPlaying: true,
       position: 12,
       duration: 260,
@@ -119,6 +122,7 @@ describe("useDesktopTrayNowPlaying", () => {
         artist: "Deftones",
         album: "Deftones",
         artwork: "https://api.example.test/cover.jpg",
+        mediaId: "server-1:track-1",
         isPlaying: true,
         position: 12,
         duration: 260,
@@ -158,6 +162,7 @@ describe("useDesktopTrayNowPlaying", () => {
       artist: "Deftones",
       album: "Deftones",
       artwork: "https://api.example.test/cover.jpg?token=secret",
+      mediaId: "server-1:track-1",
       isPlaying: true,
       position: 12,
       duration: 260,
@@ -169,6 +174,7 @@ describe("useDesktopTrayNowPlaying", () => {
         artist: "Deftones",
         album: "Deftones",
         artwork: null,
+        mediaId: "server-1:track-1",
         isPlaying: true,
         position: 12,
         duration: 260,
@@ -189,6 +195,7 @@ describe("useDesktopTrayNowPlaying", () => {
           artist: "Deftones",
           album: "Deftones",
           artwork: "file:///tmp/crate-cover.jpg",
+          mediaId: "server-1:track-1",
           isPlaying: true,
           position: 12,
           duration: 260,

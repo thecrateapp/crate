@@ -127,3 +127,15 @@ def test_local_like_dual_writes_without_double_counting(pg_db):
 
     assert [item["global_track_uid"] for item in get_liked_tracks(1)] == [track_uid]
     assert get_user_global_library_counts(1)["liked_tracks"] == 1
+
+
+def test_starred_local_global_tracks_include_album_cover_art(pg_db):
+    from crate.db.repositories.user_library_preferences import like_track
+    from crate.subsonic.services.preferences import get_starred
+
+    track_uid, _ = _seed_track(pg_db, local=True)
+    assert like_track(1, global_track_uid=track_uid) is True
+
+    song = get_starred(1)["song"][0]
+
+    assert song["coverArt"] == song["albumId"]

@@ -44,3 +44,34 @@ def test_projector_loop_runs_bounded_outbox_retention(monkeypatch):
     )
 
     assert cleaned == [(7, 1000)]
+
+
+def test_projector_loop_reports_iteration_failures(monkeypatch):
+    from crate import domain_event_relay, projector_daemon
+
+    captured: list[tuple[Exception, str]] = []
+    monkeypatch.setattr(
+        domain_event_relay,
+        "relay_domain_events",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("redis unavailable")),
+    )
+    monkeypatch.setattr(
+        "crate.observability.sentry.capture_background_exception",
+        lambda error, operation: captured.append((error, operation)),
+        raising=False,
+    )
+
+    class _StopAfterOneIteration:
+        stopped = False
+
+        def is_set(self):
+            return self.stopped
+
+        def wait(self, _interval):
+            self.stopped = True
+
+    projector_daemon.run_projector_loop(_StopAfterOneIteration())
+
+    assert len(captured) == 1
+    assert str(captured[0][0]) == "redis unavailable"
+    assert captured[0][1] == "projector.iteration"

@@ -96,6 +96,21 @@ describe("RadioPage", () => {
     expect(screen.queryByText("Based on your heavy rotation")).toBeNull();
   });
 
+  it("consumes semantic classes for the radio surface", async () => {
+    const { container } = renderWithListenProviders(<RadioPage />, {
+      route: "/radio",
+      path: "/radio",
+    });
+
+    expect(await screen.findByText("Converge")).toBeInTheDocument();
+    expect(container.firstElementChild).toHaveClass("radio-page");
+    expect(container.querySelector(".radio-page-hero")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Converge/i }).closest("article"),
+    ).toHaveClass("home-radio-card");
+    expect(screen.getByRole("searchbox")).toHaveClass("radio-seed-input");
+  });
+
   it("localizes radio chrome", async () => {
     renderWithListenProviders(<RadioPage />, {
       route: "/radio",

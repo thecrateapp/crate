@@ -1,7 +1,11 @@
 import { act, fireEvent, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { useState } from "react";
+import { useLocation } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useArtistActionEntries } from "@/components/actions/artist-actions";
+import { longPress, pressMenuKey } from "@/test/item-action-gestures";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 import { ArtistCard } from "./ArtistCard";
@@ -20,16 +24,54 @@ vi.mock("@/lib/api", async (importOriginal) => {
   };
 });
 
+vi.mock("@/components/actions/artist-actions", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("@/components/actions/artist-actions")
+    >();
+  return {
+    ...actual,
+    useArtistActionEntries: vi.fn(actual.useArtistActionEntries),
+  };
+});
+
 const { toggleArtistFollowMock } = vi.hoisted(() => ({
-  toggleArtistFollowMock: vi.fn(async () => true),
+  toggleArtistFollowMock: vi
+    .fn<
+      (
+        artistId?: number,
+        globalArtistUid?: string,
+        name?: string,
+      ) => Promise<boolean>
+    >()
+    .mockResolvedValue(true),
 }));
 
-vi.mock("@/contexts/ArtistFollowsContext", () => ({
-  useArtistFollows: () => ({
-    isFollowing: () => false,
-    toggleArtistFollow: toggleArtistFollowMock,
-  }),
-}));
+vi.mock("@/contexts/ArtistFollowsContext", async () => {
+  const { useState: useFollowState } = await import("react");
+
+  return {
+    useArtistFollows: () => {
+      const [following, setFollowing] = useFollowState(false);
+      return {
+        isFollowing: () => following,
+        toggleArtistFollow: async (
+          artistId?: number,
+          globalArtistUid?: string,
+          name?: string,
+        ) => {
+          const next = await toggleArtistFollowMock(
+            artistId,
+            globalArtistUid,
+            name,
+          );
+          setFollowing(next);
+          return next;
+        },
+      };
+    },
+  };
+});
 
 function mockPointerEnvironment(desktop: boolean) {
   Object.defineProperty(window, "matchMedia", {
@@ -48,6 +90,10 @@ function mockPointerEnvironment(desktop: boolean) {
   });
 }
 
+function LocationProbe() {
+  return <output data-testid="location-probe">{useLocation().pathname}</output>;
+}
+
 beforeAll(() => {
   Object.defineProperty(navigator, "maxTouchPoints", {
     configurable: true,
@@ -64,6 +110,276 @@ beforeEach(() => {
 });
 
 describe("ArtistCard", () => {
+  it("does not nest inline action buttons inside the navigation target", () => {
+    mockPointerEnvironment(true);
+
+    const { container } = renderWithListenProviders(
+      <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />,
+    );
+
+    expect(container.querySelector("a button")).toBeNull();
+    expect(screen.getByRole("link", { name: "Open Dredg" })).toHaveAttribute(
+      "href",
+      "/artists/dredg",
+    );
+    expect(
+      screen.getByRole("button", { name: "Follow Dredg" }),
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    { interaction: "click", key: null },
+    { interaction: "Enter", key: "{Enter}" },
+  ])("navigates through the card target with $interaction", async ({ key }) => {
+    const user = userEvent.setup();
+    renderWithListenProviders(
+      <>
+        <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />
+        <LocationProbe />
+      </>,
+    );
+
+    const target = screen.getByRole("link", { name: "Open Dredg" });
+    if (key) {
+      target.focus();
+      await user.keyboard(key);
+    } else {
+      await user.click(target);
+    }
+
+    expect(screen.getByTestId("location-probe")).toHaveTextContent(
+      "/artists/dredg",
+    );
+  });
+
+  it("keeps Space as a non-navigation key for the card link", async () => {
+    const user = userEvent.setup();
+    renderWithListenProviders(
+      <>
+        <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />
+        <LocationProbe />
+      </>,
+    );
+
+    screen.getByRole("link", { name: "Open Dredg" }).focus();
+    await user.keyboard(" ");
+
+    expect(screen.getByTestId("location-probe")).toHaveTextContent("/");
+  });
+
+  it("does not navigate when an inline action is activated", () => {
+    mockPointerEnvironment(true);
+    renderWithListenProviders(
+      <>
+        <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />
+        <LocationProbe />
+      </>,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Play top tracks from Dredg" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Follow Dredg" }));
+
+    expect(screen.getByTestId("location-probe")).toHaveTextContent("/");
+  });
+
+  it("keeps the optimistic follow state after rerendering the card", async () => {
+    mockPointerEnvironment(true);
+    toggleArtistFollowMock.mockResolvedValueOnce(true);
+
+    function RerenderHarness() {
+      const [, setRenderCount] = useState(0);
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => setRenderCount((count) => count + 1)}
+          >
+            Rerender card
+          </button>
+          <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />
+        </>
+      );
+    }
+
+    renderWithListenProviders(<RerenderHarness />);
+
+    const followButton = screen.getByRole("button", { name: "Follow Dredg" });
+    expect(followButton).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(followButton);
+
+    const unfollowButton = await screen.findByRole("button", {
+      name: "Unfollow Dredg",
+    });
+    expect(toggleArtistFollowMock).toHaveBeenCalledWith(1, undefined, "Dredg");
+    expect(unfollowButton).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Rerender card" }));
+    expect(
+      screen.getByRole("button", { name: "Unfollow Dredg" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("keeps hover actions anchored to the circular artwork", () => {
+    mockPointerEnvironment(true);
+
+    renderWithListenProviders(
+      <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />,
+    );
+
+    const followButton = screen.getByRole("button", { name: "Follow Dredg" });
+    const overlay = followButton.closest("[data-slot='entity-overlay']");
+
+    expect(overlay).toBeInTheDocument();
+    expect(overlay).toHaveClass("aspect-square", "rounded-full");
+    expect(overlay?.closest("article")).toHaveAttribute("data-shape", "circle");
+  });
+
+  it("renders artist tiles without a more-actions button and builds the menu lazily on right click", async () => {
+    vi.mocked(useArtistActionEntries).mockClear();
+    renderWithListenProviders(
+      <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "More actions" }),
+    ).not.toBeInTheDocument();
+    expect(useArtistActionEntries).not.toHaveBeenCalled();
+
+    fireEvent.contextMenu(
+      screen.getByRole("link", { name: "Open Dredg" }).closest("article")!,
+    );
+
+    expect(
+      await screen.findByRole("menuitem", { name: "Share artist" }),
+    ).toBeInTheDocument();
+    expect(useArtistActionEntries).toHaveBeenCalled();
+  });
+
+  it("keeps the circle tile flush without a card backdrop", () => {
+    renderWithListenProviders(
+      <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />,
+    );
+
+    const link = screen.getByRole("link", { name: "Open Dredg" });
+    expect(link).toHaveClass("p-0");
+    expect(link.className).not.toContain("hover:bg-text-primary/5");
+  });
+
+  it("keeps the more-actions button on artist rows", async () => {
+    const user = userEvent.setup();
+    renderWithListenProviders(
+      <>
+        <ArtistCard
+          variant="row"
+          name="Dredg"
+          artistId={1}
+          artistSlug="dredg"
+        />
+        <LocationProbe />
+      </>,
+    );
+
+    const menuButton = screen.getByRole("button", { name: "More actions" });
+    menuButton.focus();
+    await user.keyboard("{Enter}");
+
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+    expect(menuButton).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("location-probe")).toHaveTextContent("/");
+  });
+
+  it("opens the artist menu with the ContextMenu key and touch long-press", async () => {
+    const first = renderWithListenProviders(
+      <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />,
+    );
+    pressMenuKey(screen.getByRole("link", { name: "Open Dredg" }));
+    expect(
+      await screen.findByRole("menuitem", { name: "Play top tracks" }),
+    ).toBeInTheDocument();
+    first.unmount();
+
+    renderWithListenProviders(
+      <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />,
+    );
+    await longPress(screen.getByText("Dredg").closest("article")!);
+    const sheet = await screen.findByRole("dialog", { name: "Actions menu" });
+    expect(
+      within(sheet).getByRole("menuitem", { name: "Follow artist" }),
+    ).toBeInTheDocument();
+  });
+
+  it("hides the action menu trigger for external artists", () => {
+    renderWithListenProviders(
+      <ArtistCard
+        name="Chelsea Wolfe"
+        href="https://www.last.fm/music/Chelsea+Wolfe"
+        external
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "More actions" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders the row variant with rank, meta and the artist menu", async () => {
+    renderWithListenProviders(
+      <ArtistCard
+        variant="row"
+        rank={3}
+        meta="12 plays"
+        name="Dredg"
+        artistId={1}
+        artistSlug="dredg"
+      />,
+    );
+
+    const row = screen.getByText("Dredg").closest("article")!;
+    expect(row).toHaveAttribute("data-density", "default");
+    expect(within(row).getByText("3")).toBeInTheDocument();
+    expect(within(row).getByText("12 plays")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Dredg" })).toHaveAttribute(
+      "href",
+      "/artists/dredg",
+    );
+
+    fireEvent.contextMenu(row);
+    expect(
+      await screen.findByRole("menuitem", { name: "Share artist" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the editorial variant as a larger circular tile", () => {
+    renderWithListenProviders(
+      <ArtistCard variant="editorial" name="Dredg" artistId={1} />,
+    );
+
+    expect(screen.getByAltText("Dredg")).toHaveAttribute("sizes", "156px");
+    expect(screen.getByText("Dredg").closest("article")).toHaveAttribute(
+      "data-shape",
+      "circle",
+    );
+  });
+
+  it("does not add inline actions to external artist links", () => {
+    mockPointerEnvironment(true);
+
+    renderWithListenProviders(
+      <ArtistCard
+        name="Dredg"
+        artistId={1}
+        href="https://www.last.fm/music/Dredg"
+        external
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Follow Dredg" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("renders responsive WebP candidates for generated artist photos", () => {
     renderWithListenProviders(
       <ArtistCard name="High Vis" artistId={9} layout="grid" />,
@@ -74,7 +390,7 @@ describe("ArtistCard", () => {
     expect(image.getAttribute("srcset")).toMatch(/size=160[^,]* 160w/);
     expect(image.getAttribute("srcset")).toMatch(/size=320[^,]* 320w/);
     expect(image.getAttribute("srcset")).toMatch(/format=webp/);
-    expect(screen.getByText("High Vis").closest('[role="button"]')).toHaveClass(
+    expect(screen.getByText("High Vis").closest("article")).toHaveClass(
       "listen-deferred-grid-item",
     );
   });
@@ -370,13 +686,13 @@ describe("ArtistCard", () => {
       />,
     );
 
-    const card = screen.getByText("Dredg").closest('[role="button"]');
+    const card = screen.getByText("Dredg").closest("article");
     expect(card).not.toBeNull();
 
     fireEvent.contextMenu(card!, { clientX: 160, clientY: 120 });
 
     const menu = await screen.findByRole("menu");
-    expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-[12px]");
+    expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-panel");
     expect(within(menu).getByText("Dredg")).toBeInTheDocument();
     expect(within(menu).getByAltText("Dredg")).toHaveAttribute(
       "src",
@@ -396,7 +712,7 @@ describe("ArtistCard", () => {
       screen.queryByRole("button", { name: "Follow Dredg" }),
     ).not.toBeInTheDocument();
 
-    const card = screen.getByText("Dredg").closest('[role="button"]');
+    const card = screen.getByText("Dredg").closest("article");
     expect(card).not.toBeNull();
 
     fireEvent.contextMenu(card!, { clientX: 160, clientY: 120 });

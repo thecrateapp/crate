@@ -6,18 +6,25 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import {
   PlaylistCreateModal,
   type PlaylistComposerTrack,
 } from "@/components/playlists/PlaylistCreateModal";
+import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
 import {
   hasTrackReference,
   toTrackReferencePayload,
 } from "@/lib/track-reference";
+
+export interface PlaylistOption {
+  id: number;
+  name: string;
+}
 
 interface OpenPlaylistComposerOptions {
   name?: string;
@@ -29,6 +36,9 @@ interface OpenPlaylistComposerOptions {
 
 interface PlaylistComposerContextValue {
   openCreatePlaylist: (options?: OpenPlaylistComposerOptions) => void;
+  playlistOptions: PlaylistOption[];
+  ensurePlaylistOptionsLoaded: () => void;
+  refreshPlaylistOptions: () => void;
 }
 
 const PlaylistComposerContext = createContext<
@@ -40,6 +50,7 @@ export function PlaylistComposerProvider({
 }: {
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -52,6 +63,21 @@ export function PlaylistComposerProvider({
   const [initialTracks, setInitialTracks] = useState<PlaylistComposerTrack[]>(
     [],
   );
+  const [playlistOptionsEnabled, setPlaylistOptionsEnabled] = useState(false);
+  const { data: playlistData, refetch: refetchPlaylistOptions } = useApi<
+    PlaylistOption[]
+  >(playlistOptionsEnabled ? "/api/playlists" : null);
+  const playlistOptions = useMemo(() => playlistData ?? [], [playlistData]);
+  const ensurePlaylistOptionsLoaded = useCallback(() => {
+    setPlaylistOptionsEnabled(true);
+  }, []);
+  const refreshPlaylistOptions = useCallback(() => {
+    if (!playlistOptionsEnabled) {
+      setPlaylistOptionsEnabled(true);
+      return;
+    }
+    refetchPlaylistOptions();
+  }, [playlistOptionsEnabled, refetchPlaylistOptions]);
 
   const openCreatePlaylist = useCallback(
     (options?: OpenPlaylistComposerOptions) => {
@@ -84,15 +110,19 @@ export function PlaylistComposerProvider({
           is_collaborative: payload.isCollaborative,
         });
 
-        const tracksPayload = payload.tracks
-          .filter((track) => hasTrackReference(track))
-          .map((track) =>
+        const tracksPayload = payload.tracks.reduce<
+          ReturnType<typeof toTrackReferencePayload>[]
+        >((tracks, track) => {
+          if (!hasTrackReference(track)) return tracks;
+          tracks.push(
             toTrackReferencePayload({
               ...track,
               album: track.album || "",
               duration: track.duration || 0,
             }),
           );
+          return tracks;
+        }, []);
 
         if (tracksPayload.length > 0) {
           await api(`/api/playlists/${created.id}/tracks`, "POST", {
@@ -100,16 +130,17 @@ export function PlaylistComposerProvider({
           });
         }
 
+        refreshPlaylistOptions();
         setOpen(false);
-        toast.success("Playlist created");
+        notify.success(t("playlistComposer.toasts.created"));
         navigate(`/playlist/${created.id}`);
       } catch {
-        toast.error("Failed to create playlist");
+        notify.error(t("playlistComposer.toasts.createFailed"));
       } finally {
         setSubmitting(false);
       }
     },
-    [navigate],
+    [navigate, refreshPlaylistOptions, t],
   );
 
   const handleClose = useCallback(() => {
@@ -117,8 +148,18 @@ export function PlaylistComposerProvider({
   }, [submitting]);
 
   const contextValue = useMemo(
-    () => ({ openCreatePlaylist }),
-    [openCreatePlaylist],
+    () => ({
+      openCreatePlaylist,
+      playlistOptions,
+      ensurePlaylistOptionsLoaded,
+      refreshPlaylistOptions,
+    }),
+    [
+      ensurePlaylistOptionsLoaded,
+      openCreatePlaylist,
+      playlistOptions,
+      refreshPlaylistOptions,
+    ],
   );
 
   return (
@@ -140,11 +181,15 @@ export function PlaylistComposerProvider({
 }
 
 export function usePlaylistComposer() {
-  const value = useContext(PlaylistComposerContext);
+  const value = useOptionalPlaylistComposer();
   if (!value) {
     throw new Error(
       "usePlaylistComposer must be used within PlaylistComposerProvider",
     );
   }
   return value;
+}
+
+export function useOptionalPlaylistComposer() {
+  return useContext(PlaylistComposerContext);
 }

@@ -53,6 +53,7 @@ export interface Track {
   isSuggested?: boolean;
   suggestionSource?: "playlist";
   origin?: TrackOrigin;
+  offlineOnly?: boolean;
   remote?: RemoteTrackRef;
 }
 
@@ -63,6 +64,7 @@ type RadioSeedType =
   | "album"
   | "artist"
   | "playlist"
+  | "crate"
   | "home-playlist"
   | "genre"
   | "discovery";
@@ -77,7 +79,7 @@ interface RadioSession {
 }
 
 export interface PlaySource {
-  type: "album" | "playlist" | "radio" | "track" | "queue";
+  type: "album" | "crate" | "playlist" | "radio" | "track" | "queue";
   name: string;
   id?: string | number | null;
   href?: string | null;

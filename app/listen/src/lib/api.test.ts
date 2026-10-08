@@ -5,6 +5,11 @@ const { redirectToLoginMock } = vi.hoisted(() => {
   return { redirectToLoginMock };
 });
 
+const { captureApiErrorMock } = vi.hoisted(() => {
+  const captureApiErrorMock = vi.fn();
+  return { captureApiErrorMock };
+});
+
 vi.mock("@/lib/auth-route-policy", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@/lib/auth-route-policy")>();
@@ -16,6 +21,7 @@ vi.mock("@/lib/auth-route-policy", async (importOriginal) => {
 
 vi.mock("@/lib/platform", () => ({
   usesConfigurableServer: false,
+  usesSecureSessionStore: false,
   isTauriRuntime: false,
   getListenAppId: () => "listen-web",
 }));
@@ -23,6 +29,11 @@ vi.mock("@/lib/platform", () => ({
 vi.mock("@/lib/listen-device", () => ({
   getListenDeviceFingerprint: () => "fp123",
   getListenDeviceLabel: () => "Test Device",
+}));
+
+vi.mock("@/lib/sentry", () => ({
+  captureApiError: captureApiErrorMock,
+  setSentryUser: vi.fn(),
 }));
 
 import {
@@ -42,11 +53,16 @@ import {
   shouldRedirectToLoginOnUnauthorized,
   ensureFreshAuthToken,
   refreshAuthToken,
+  revokeServerSession,
   apiFetch,
   api,
   AUTH_TOKEN_EVENT,
   ApiError,
 } from "@/lib/api";
+import {
+  getOfflineIdentityForServer,
+  persistVerifiedOfflineIdentity,
+} from "@/lib/offline-identity";
 
 function mockFetchResponse(status: number, body?: unknown): Response {
   const ok = status >= 200 && status < 300;
@@ -80,8 +96,10 @@ function mockJsonResponse(body: unknown): Response {
 
 beforeEach(() => {
   localStorage.clear();
+  setAuthToken(null);
   vi.restoreAllMocks();
   redirectToLoginMock.mockClear();
+  captureApiErrorMock.mockClear();
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -101,6 +119,61 @@ describe("apiUrl", () => {
 
   it("preserves query params", () => {
     expect(apiUrl("/api/search?q=test")).toBe("/api/search?q=test");
+  });
+});
+
+describe("revokeServerSession", () => {
+  it("uses the captured server URL and bearer token with a bounded request", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(mockFetchResponse(204));
+
+    await revokeServerSession({
+      url: "https://a.example.test/",
+      token: "token-a",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://a.example.test/api/auth/logout",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "omit",
+        headers: { Authorization: "Bearer token-a" },
+        signal: expect.any(AbortSignal),
+      }),
+    );
+  });
+
+  it("does not issue a request when the captured server has no token", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    await revokeServerSession({
+      url: "https://a.example.test",
+      token: null,
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("authoritative refresh rejection", () => {
+  it("tombstones the local offline identity after the refresh endpoint rejects it", async () => {
+    persistVerifiedOfflineIdentity({
+      serverId: "web",
+      serverUrl: window.location.origin,
+      userId: 42,
+      profileKey: "web-profile-42",
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: false,
+      status: 401,
+    } as Response);
+
+    await expect(refreshAuthToken()).resolves.toBe(false);
+
+    expect(
+      getOfflineIdentityForServer("web", window.location.origin),
+    ).toBeNull();
   });
 });
 
@@ -307,8 +380,8 @@ describe("apiWsUrl", () => {
 // ═══════════════════════════════════════════════════════════════════
 
 describe("auth tokens", () => {
-  it("getAuthToken reads from localStorage", () => {
-    localStorage.setItem("listen-auth-token", "abc");
+  it("getAuthToken reads from in-memory web session", () => {
+    setAuthToken("abc");
     expect(getAuthToken()).toBe("abc");
   });
 
@@ -316,11 +389,8 @@ describe("auth tokens", () => {
     expect(getAuthToken()).toBeNull();
   });
 
-  it("getAuthTokenExpiresAt reads from localStorage", () => {
-    localStorage.setItem(
-      "listen-auth-token-expires-at",
-      "2025-01-01T00:00:00.000Z",
-    );
+  it("getAuthTokenExpiresAt reads from in-memory web session", () => {
+    setAuthToken("abc", "2025-01-01T00:00:00.000Z");
     expect(getAuthTokenExpiresAt()).toBe("2025-01-01T00:00:00.000Z");
   });
 
@@ -826,6 +896,32 @@ describe("apiFetch", () => {
     await apiFetch("/api/protected");
     expect(redirectToLoginMock).toHaveBeenCalled();
   });
+
+  it("reports final apiFetch HTTP failures", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(mockFetchResponse(503));
+
+    await apiFetch("/api/health", { method: "POST" });
+
+    expect(captureApiErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 503 }),
+      expect.objectContaining({
+        method: "POST",
+        url: "/api/health",
+        status: 503,
+      }),
+    );
+  });
+
+  it("reports apiFetch network failures and rethrows them", async () => {
+    const error = new TypeError("Failed to fetch");
+    vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(error);
+
+    await expect(apiFetch("/api/health")).rejects.toBe(error);
+    expect(captureApiErrorMock).toHaveBeenCalledWith(error, {
+      method: "GET",
+      url: "/api/health",
+    });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -841,9 +937,15 @@ describe("native (configurable server) mode", () => {
     vi.resetModules();
     vi.doMock("@/lib/platform", () => ({
       usesConfigurableServer: true,
+      usesSecureSessionStore: true,
       isTauriRuntime: false,
       isCapacitorRuntime: true,
       getListenAppId: () => "listen-capacitor",
+    }));
+    vi.doMock("@/lib/native-secure-session", () => ({
+      getSecureSessionValue: vi.fn(async () => null),
+      setSecureSessionValue: vi.fn(async () => undefined),
+      removeSecureSessionValue: vi.fn(async () => undefined),
     }));
     vi.doMock("@/lib/listen-device", () => ({
       getListenDeviceFingerprint: () => "fp-native",
@@ -912,6 +1014,30 @@ describe("native (configurable server) mode", () => {
     );
     return s;
   }
+
+  it("keeps a server-scoped OAuth request on its originating server", async () => {
+    const serverA = setupServer("https://api-a.example.com", "secret-a");
+    const serverB = serverStore.addServer("https://api-b.example.com");
+    serverStore.setCurrentServerId(serverB.id);
+    serverStore.setCurrentServerToken("secret-b");
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(mockJsonResponse({ ok: true }));
+
+    await apiMod.apiForServer(serverA.id, "/api/auth/native/exchange", "POST", {
+      code: "one-time-code",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api-a.example.com/api/auth/native/exchange",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.not.objectContaining({
+          Authorization: expect.anything(),
+        }),
+      }),
+    );
+  });
 
   describe("getApiBase", () => {
     it("returns empty when no server configured", () => {
@@ -1275,6 +1401,75 @@ describe("native (configurable server) mode", () => {
           server.id,
         ),
       ).toBe("fresh-artwork-ticket");
+    });
+
+    it("waits for targets queued behind an in-flight refresh", async () => {
+      setupServer();
+      mediaAccess.clearMediaAccessTickets();
+      const expiresAt = new Date(Date.now() + 60_000).toISOString();
+      let resolveFirst: ((response: Response) => void) | undefined;
+      let resolveSecond: ((response: Response) => void) | undefined;
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementationOnce(
+          () =>
+            new Promise<Response>((resolve) => {
+              resolveFirst = resolve;
+            }),
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise<Response>((resolve) => {
+              resolveSecond = resolve;
+            }),
+        );
+
+      const first = apiMod.refreshMediaAccessTickets([
+        { audience: "artwork", path: "/api/albums/1/cover" },
+      ]);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+      let secondSettled = false;
+      const second = apiMod
+        .refreshMediaAccessTickets([
+          { audience: "artwork", path: "/api/albums/2/cover" },
+        ])
+        .then((result) => {
+          secondSettled = true;
+          return result;
+        });
+      await Promise.resolve();
+      expect(secondSettled).toBe(false);
+
+      resolveFirst?.(
+        mockJsonResponse({
+          tickets: [
+            {
+              audience: "artwork",
+              path: "/api/albums/1/cover",
+              ticket: "first-ticket",
+              expires_at: expiresAt,
+            },
+          ],
+        }),
+      );
+      await expect(first).resolves.toBe(true);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      expect(secondSettled).toBe(false);
+
+      resolveSecond?.(
+        mockJsonResponse({
+          tickets: [
+            {
+              audience: "artwork",
+              path: "/api/albums/2/cover",
+              ticket: "second-ticket",
+              expires_at: expiresAt,
+            },
+          ],
+        }),
+      );
+      await expect(second).resolves.toBe(true);
     });
 
     it("waits for a cold exact-path ticket before returning a protected URL", async () => {

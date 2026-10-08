@@ -104,6 +104,7 @@ public class NativeQueueStateTest {
             "Artist",
             "Album",
             "https://api.example/artwork?token=secret",
+            "",
             1234L,
             null
         );
@@ -149,6 +150,7 @@ public class NativeQueueStateTest {
             id,
             "Artist",
             "Album",
+            "",
             "",
             1000L,
             null

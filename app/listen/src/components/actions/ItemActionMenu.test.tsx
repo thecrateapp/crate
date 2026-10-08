@@ -256,7 +256,7 @@ describe("ItemActionMenu desktop menu", () => {
     expect(screen.getByRole("menu")).toHaveClass(
       "listen-glass-panel",
       "w-72",
-      "rounded-[12px]",
+      "rounded-panel",
       "z-app-context-menu",
     );
   });

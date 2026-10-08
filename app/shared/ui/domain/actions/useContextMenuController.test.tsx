@@ -126,6 +126,36 @@ describe("useContextMenuController", () => {
     expect(result.current.position).toEqual({ x: 600, y: 168 });
   });
 
+  it("clamps with the untransformed menu size while the pop-in animation scales it", () => {
+    Object.defineProperty(document.documentElement, "clientWidth", {
+      configurable: true,
+      value: 1024,
+    });
+    const { result } = renderHook(() =>
+      useContextMenuController<HTMLButtonElement>({ placement: "bottom-end" }),
+    );
+    const menu = document.createElement("div");
+    menu.getBoundingClientRect = () =>
+      ({ width: 288 * 0.92, height: 200 * 0.92 }) as DOMRect;
+    Object.defineProperty(menu, "offsetWidth", { value: 288 });
+    Object.defineProperty(menu, "offsetHeight", { value: 200 });
+    result.current.menuRef.current = menu;
+
+    act(() => {
+      result.current.openFromTrigger({
+        currentTarget: Object.assign(document.createElement("button"), {
+          getBoundingClientRect: () =>
+            ({ top: 120, right: 1020, bottom: 160 }) as DOMRect,
+        }),
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      } as unknown as React.MouseEvent<HTMLButtonElement>);
+    });
+
+    expect(result.current.position).toEqual({ x: 724, y: 168 });
+    expect(result.current.position!.x + 288).toBeLessThanOrEqual(1024 - 8);
+  });
+
   it("does not manage dismissal when the owner delegates it", () => {
     const { result } = renderHook(() =>
       useContextMenuController({ manageDismissal: false }),

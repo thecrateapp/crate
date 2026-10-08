@@ -1,0 +1,58 @@
+import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { notify } from "@crate/ui/lib/notify";
+
+import { usePlayerActions } from "@/contexts/PlayerContext";
+import { api } from "@/lib/api";
+import { shuffleArray } from "@/lib/utils";
+import {
+  toPlayerTracks,
+  type PlaylistDetailResponse,
+} from "@/components/playlists/playlist-list-row-model";
+
+export function usePlaylistListRowPlayback({
+  detailEndpoint,
+  name,
+  playlistId,
+}: {
+  detailEndpoint: string;
+  name: string;
+  playlistId?: number;
+}) {
+  const { t } = useTranslation();
+  const { playAll } = usePlayerActions();
+  const [playingMode, setPlayingMode] = useState<"play" | "shuffle" | null>(
+    null,
+  );
+
+  const loadAndPlay = useCallback(
+    async (mode: "play" | "shuffle") => {
+      setPlayingMode(mode);
+      try {
+        const response = await api<PlaylistDetailResponse>(detailEndpoint);
+        const tracks = toPlayerTracks(response.tracks || []);
+        if (tracks.length === 0) {
+          notify.info(t("playlist.toasts.noPlayableTracks"));
+          return;
+        }
+        const queue = mode === "shuffle" ? shuffleArray(tracks) : tracks;
+        playAll(queue, 0, {
+          type: "playlist",
+          name,
+          id: playlistId,
+          radio:
+            playlistId != null
+              ? { seedType: "playlist", seedId: playlistId }
+              : undefined,
+        });
+      } catch {
+        notify.error(t("home.playlists.loadFailed"));
+      } finally {
+        setPlayingMode(null);
+      }
+    },
+    [detailEndpoint, name, playAll, playlistId, t],
+  );
+
+  return { loadAndPlay, playingMode };
+}

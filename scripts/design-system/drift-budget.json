@@ -1,0 +1,21 @@
+{
+  "totals": {
+    "actionableRawColors": 0,
+    "legacySemanticUtilities": 0,
+    "arbitraryUtilities": 66,
+    "hardcodedColorUtilities": 0,
+    "inlineStyles": 87,
+    "directShadcnImports": 93
+  },
+  "semanticTokens": {
+    "definitions": 134,
+    "foundationDefinitions": 91,
+    "domainDefinitions": 32,
+    "duplicateDefinitions": 3,
+    "actionableDuplicateDefinitions": 0,
+    "oneShotTokens": 22,
+    "unreferencedTokens": 0,
+    "roleViolations": 0,
+    "nonFoundationAliases": 0
+  }
+}

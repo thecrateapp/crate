@@ -991,10 +991,10 @@ class TestFavorites:
         from crate.db.queries.browse_media_favorites import list_favorites
         from crate.db.repositories.browse_media_favorites import add_favorite
 
-        add_favorite("track", "42", "2025-01-01T00:00:00Z")
-        add_favorite("album", "7", "2025-01-02T00:00:00Z")
+        add_favorite(1, "track", "42", "2025-01-01T00:00:00Z")
+        add_favorite(1, "album", "7", "2025-01-02T00:00:00Z")
 
-        favs = list_favorites()
+        favs = list_favorites(1)
         assert len(favs) == 2
         assert favs[0]["item_type"] == "album"
         assert favs[0]["item_id"] == "7"
@@ -1003,16 +1003,16 @@ class TestFavorites:
         from crate.db.queries.browse_media_favorites import list_favorites
         from crate.db.repositories.browse_media_favorites import add_favorite
 
-        add_favorite("artist", "99", "2025-01-01T00:00:00Z")
-        add_favorite("artist", "99", "2025-01-01T00:00:00Z")
+        add_favorite(1, "artist", "99", "2025-01-01T00:00:00Z")
+        add_favorite(1, "artist", "99", "2025-01-01T00:00:00Z")
 
-        favs = list_favorites()
+        favs = list_favorites(1)
         assert len(favs) == 1
 
     def test_list_favorites_empty_when_none_added(self, pg_db):
         from crate.db.queries.browse_media_favorites import list_favorites
 
-        assert list_favorites() == []
+        assert list_favorites(1) == []
 
     def test_remove_favorite_deletes_by_type_and_id(self, pg_db):
         from crate.db.queries.browse_media_favorites import list_favorites
@@ -1021,11 +1021,11 @@ class TestFavorites:
             remove_favorite,
         )
 
-        add_favorite("track", "1", "2025-01-01T00:00:00Z")
-        add_favorite("track", "2", "2025-01-02T00:00:00Z")
+        add_favorite(1, "track", "1", "2025-01-01T00:00:00Z")
+        add_favorite(1, "track", "2", "2025-01-02T00:00:00Z")
 
-        remove_favorite("track", "1")
-        favs = list_favorites()
+        remove_favorite(1, "track", "1")
+        favs = list_favorites(1)
         assert len(favs) == 1
         assert favs[0]["item_id"] == "2"
 
@@ -1033,8 +1033,8 @@ class TestFavorites:
         from crate.db.queries.browse_media_favorites import list_favorites
         from crate.db.repositories.browse_media_favorites import remove_favorite
 
-        remove_favorite("track", "nonexistent")
-        assert list_favorites() == []
+        remove_favorite(1, "track", "nonexistent")
+        assert list_favorites(1) == []
 
 
 # ══════════════════════════════════════════════════════════════════════

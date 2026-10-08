@@ -3,8 +3,8 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 
 const toastErrorMock = vi.hoisted(() => vi.fn());
 
-vi.mock("sonner", () => ({
-  toast: {
+vi.mock("@crate/ui/lib/notify", () => ({
+  notify: {
     error: toastErrorMock,
     success: vi.fn(),
   },
@@ -147,5 +147,25 @@ describe("Upload", () => {
         "La subida es demasiado grande para una sola petición. Inténtalo de nuevo para que Crate pueda dividirla en fragmentos.",
       );
     });
+  });
+
+  it("uses the semantic canvas token for the pending upload queue", () => {
+    const { container } = renderWithListenProviders(<Upload />, {
+      locale: "es",
+    });
+
+    const input = container.querySelector('input[type="file"]');
+    if (!(input instanceof HTMLInputElement)) {
+      throw new Error("Upload input missing");
+    }
+
+    fireEvent.change(input, {
+      target: {
+        files: [new File(["abc"], "album.zip", { type: "application/zip" })],
+      },
+    });
+
+    expect(container.innerHTML).toContain("bg-surface-canvas/50");
+    expect(container.innerHTML).not.toContain("gradient-bg-50");
   });
 });

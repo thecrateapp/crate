@@ -21,6 +21,7 @@ ArtworkKind = Literal[
     "external-artist",
     "genre-cover",
     "release-cover",
+    "playlist-cover",
 ]
 
 ARTWORK_KINDS: frozenset[str] = frozenset(
@@ -32,6 +33,7 @@ ARTWORK_KINDS: frozenset[str] = frozenset(
         "external-artist",
         "genre-cover",
         "release-cover",
+        "playlist-cover",
     }
 )
 VARIANT_SIZE_BUCKETS = (128, 256, 384, 512, 768, 1024, 1280, 2048)
@@ -43,6 +45,7 @@ _MAX_SIZE_BY_KIND: dict[str, int] = {
     "external-artist": 768,
     "genre-cover": 2048,
     "release-cover": 1024,
+    "playlist-cover": 1024,
 }
 _SAFE_ENTITY_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
 

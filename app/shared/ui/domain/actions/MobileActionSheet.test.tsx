@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { createRef } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -100,6 +101,34 @@ describe("MobileActionSheet", () => {
     );
 
     fireEvent.click(screen.getByTestId("inside"));
+
+    act(() => {
+      vi.advanceTimersByTime(140);
+    });
+
+    expect(onClose).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("does not close for a portal submenu boundary", () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    render(
+      <MobileActionSheet open onClose={onClose}>
+        {createPortal(
+          <button
+            data-dismissible-layer-boundary="true"
+            data-testid="portal-submenu"
+            type="button"
+          >
+            Portal submenu
+          </button>,
+          document.body,
+        )}
+      </MobileActionSheet>,
+    );
+
+    fireEvent.click(screen.getByTestId("portal-submenu"));
 
     act(() => {
       vi.advanceTimersByTime(140);
@@ -246,5 +275,78 @@ describe("MobileActionSheet", () => {
 
     expect(panel).toHaveStyle({ transform: "translateY(40px)" });
     expect(panel).not.toHaveClass("animate-sheet-up");
+  });
+
+  it("accepts a translated accessible label", () => {
+    render(
+      <MobileActionSheet open onClose={vi.fn()} ariaLabel="Hoja de acciones">
+        <div>Content</div>
+      </MobileActionSheet>,
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "Hoja de acciones" }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the listen glass surface and adds consumer surface classes", () => {
+    const panelRef = createRef<HTMLDivElement>();
+    const { rerender } = render(
+      <MobileActionSheet open onClose={vi.fn()} panelRef={panelRef}>
+        <div>Content</div>
+      </MobileActionSheet>,
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "Action sheet" }),
+    ).toBeInTheDocument();
+    expect(panelRef.current).toHaveClass("listen-glass-panel");
+
+    rerender(
+      <MobileActionSheet
+        open
+        onClose={vi.fn()}
+        panelRef={panelRef}
+        surfaceClassName="bg-surface-popover"
+      >
+        <div>Content</div>
+      </MobileActionSheet>,
+    );
+
+    expect(panelRef.current).toHaveClass("bg-surface-popover");
+    expect(panelRef.current).toHaveClass("listen-glass-panel");
+  });
+
+  it("snaps back when dragged less than half the sheet height", () => {
+    const onClose = vi.fn();
+    const panelRef = createRef<HTMLDivElement>();
+    render(
+      <MobileActionSheet open onClose={onClose} panelRef={panelRef}>
+        <div>Content</div>
+      </MobileActionSheet>,
+    );
+    const panel = panelRef.current!;
+    vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
+      bottom: 240,
+      height: 200,
+      left: 0,
+      right: 320,
+      top: 40,
+      width: 320,
+      x: 0,
+      y: 40,
+      toJSON: () => {},
+    });
+    const handle = panel.querySelector(
+      "[data-mobile-sheet-drag-handle='true']",
+    ) as HTMLElement;
+
+    fireEvent.touchStart(handle, { touches: [{ clientY: 0 }] });
+    fireEvent.touchMove(panel, { touches: [{ clientY: 60 }] });
+    expect(panel.style.transform).toBe("translateY(60px)");
+    fireEvent.touchEnd(panel);
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(panel.style.transform).toBe("");
   });
 });

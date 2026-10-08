@@ -3,6 +3,9 @@
 interface ImportMetaEnv {
   readonly VITE_API_URL?: string;
   readonly VITE_CRATE_CONNECT_FEATURE_ENABLED?: string;
+  readonly VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED?: string;
+  readonly VITE_CAST_CUSTOM_RECEIVER_ENABLED?: string;
+  readonly VITE_CAST_RECEIVER_APP_ID?: string;
   readonly VITE_EXPLORE_HOME_DISCOVERY_ENABLED?: string;
   readonly VITE_TAURI_OAUTH_WEB_BRIDGE?: string;
   readonly VITE_ALLOW_INSECURE_LOOPBACK?: string;
@@ -10,6 +13,10 @@ interface ImportMetaEnv {
   readonly VITE_CRATE_SMART_MIX_LOCAL_CROSSFADE_MS?: string;
   readonly VITE_CRATE_FIXED_SERVER_URL?: string;
   readonly VITE_CRATE_OAUTH_SCHEME?: string;
+  readonly VITE_SENTRY_DSN?: string;
+  readonly VITE_SENTRY_ENVIRONMENT?: string;
+  readonly VITE_SENTRY_RELEASE?: string;
+  readonly VITE_SENTRY_TRACES_SAMPLE_RATE?: string;
 }
 
 interface ImportMeta {

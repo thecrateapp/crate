@@ -1,18 +1,24 @@
 use std::{
+    fs::OpenOptions,
+    io::Read,
+    os::unix::fs::OpenOptionsExt,
     ptr,
-    sync::{Mutex, OnceLock},
+    sync::{Arc, Condvar, Mutex, OnceLock},
+    thread,
+    time::Duration,
 };
 
 use objc2::{
     class,
     encode::{Encode, Encoding},
-    ffi, msg_send,
+    msg_send,
+    rc::Retained,
     runtime::{AnyClass, AnyObject, Imp, Sel},
     sel,
 };
-use objc2_app_kit::NSApplication;
-use objc2_foundation::{MainThreadMarker, NSString};
+use objc2_foundation::{NSData, NSString};
 
+use crate::macos_delegate::{app_delegate, replace_method};
 use crate::DesktopMediaSessionPayload;
 
 #[link(name = "MediaPlayer", kind = "framework")]
@@ -28,17 +34,117 @@ unsafe extern "C" {
 
 static MEDIA_APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 static ARTWORK_CACHE: OnceLock<Mutex<ArtworkCache>> = OnceLock::new();
+static ARTWORK_REQUEST_STATE: OnceLock<Mutex<ArtworkRequestState>> = OnceLock::new();
+static ARTWORK_FETCH_QUEUE: OnceLock<Arc<ArtworkFetchQueue>> = OnceLock::new();
+
+const ARTWORK_FETCH_TIMEOUT: Duration = Duration::from_secs(8);
+const MAX_ARTWORK_BYTES: u64 = 20 * 1024 * 1024;
 
 #[derive(Default)]
 struct ArtworkCache {
     url: Option<String>,
     artwork: usize,
-    retained_image: usize,
 }
 
 struct LoadedArtwork {
     artwork: *mut AnyObject,
-    retained_image: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ArtworkRequest {
+    generation: u64,
+    url: String,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum ArtworkFetchResult {
+    Loaded(Vec<u8>),
+    RetryableFailure,
+    PermanentFailure,
+}
+
+#[derive(Default)]
+struct ArtworkRequestState {
+    generation: u64,
+    url: Option<String>,
+    loading: bool,
+    settled: bool,
+}
+
+impl ArtworkRequestState {
+    fn begin(&mut self, url: Option<&str>) -> Option<ArtworkRequest> {
+        let url = url.map(str::trim).filter(|value| !value.is_empty());
+        if self.url.as_deref() != url {
+            self.generation = self.generation.wrapping_add(1);
+            self.url = url.map(str::to_owned);
+            self.loading = false;
+            self.settled = false;
+        }
+        let url = self.url.clone()?;
+        if self.loading || self.settled {
+            return None;
+        }
+        self.loading = true;
+        Some(ArtworkRequest {
+            generation: self.generation,
+            url,
+        })
+    }
+
+    fn is_current(&self, request: &ArtworkRequest) -> bool {
+        self.loading
+            && self.generation == request.generation
+            && self.url.as_deref() == Some(request.url.as_str())
+    }
+
+    fn finish(&mut self, request: &ArtworkRequest, settled: bool) -> bool {
+        if !self.is_current(request) {
+            return false;
+        }
+        self.loading = false;
+        self.settled = settled;
+        true
+    }
+}
+
+#[derive(Default)]
+struct ArtworkFetchQueue {
+    pending: Mutex<Option<ArtworkRequest>>,
+    wake: Condvar,
+}
+
+impl ArtworkFetchQueue {
+    fn enqueue(&self, request: ArtworkRequest) {
+        *self
+            .pending
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(request);
+        self.wake.notify_one();
+    }
+
+    #[cfg(test)]
+    fn take_pending(&self) -> Option<ArtworkRequest> {
+        self.pending
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()
+    }
+
+    fn wait_for_pending(&self) -> ArtworkRequest {
+        let mut pending = self
+            .pending
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        loop {
+            if let Some(request) = pending.take() {
+                return request;
+            }
+            pending = self
+                .wake
+                .wait(pending)
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+        }
+    }
 }
 
 type MediaActionImp = unsafe extern "C-unwind" fn(&AnyObject, Sel, &AnyObject) -> isize;
@@ -71,23 +177,205 @@ pub fn install(app: &tauri::App) {
 pub fn update_now_playing(payload: &DesktopMediaSessionPayload) {
     let payload = payload.clone();
     if let Some(app) = MEDIA_APP_HANDLE.get() {
+        let app = app.clone();
         let _ = app.run_on_main_thread(move || unsafe {
+            let artwork_url = non_empty(payload.title.as_deref())
+                .and_then(|_| non_empty(payload.artwork.as_deref()));
+            let request = lock_artwork_request_state().begin(artwork_url);
+            clear_cached_artwork_unless(artwork_url);
             set_now_playing_info(&payload);
+            if let Some(request) = request {
+                fetch_artwork_async(request);
+            }
         });
     }
 }
 
+pub fn update_playback_state(is_playing: bool) {
+    if let Some(app) = MEDIA_APP_HANDLE.get() {
+        let app = app.clone();
+        let _ = app.run_on_main_thread(move || unsafe {
+            set_now_playing_playback_state(playback_state_value(is_playing));
+            update_now_playing_numbers(|info| {
+                set_number(
+                    info,
+                    MPNowPlayingInfoPropertyPlaybackRate,
+                    if is_playing { 1.0 } else { 0.0 },
+                );
+            });
+        });
+    }
+}
+
+pub fn update_position(payload: &crate::DesktopMediaPosition) {
+    let payload = payload.clone();
+    if let Some(app) = MEDIA_APP_HANDLE.get() {
+        let app = app.clone();
+        let _ = app.run_on_main_thread(move || unsafe {
+            update_now_playing_numbers(|info| {
+                if payload.duration.is_finite() && payload.duration > 0.0 {
+                    set_number(info, MPMediaItemPropertyPlaybackDuration, payload.duration);
+                }
+                if payload.position.is_finite() && payload.position >= 0.0 {
+                    set_number(
+                        info,
+                        MPNowPlayingInfoPropertyElapsedPlaybackTime,
+                        payload.position,
+                    );
+                }
+                if payload.playback_rate.is_finite() && payload.playback_rate >= 0.0 {
+                    set_number(
+                        info,
+                        MPNowPlayingInfoPropertyPlaybackRate,
+                        payload.playback_rate,
+                    );
+                }
+            });
+        });
+    }
+}
+
+fn artwork_fetch_queue() -> &'static Arc<ArtworkFetchQueue> {
+    ARTWORK_FETCH_QUEUE.get_or_init(|| {
+        let queue = Arc::new(ArtworkFetchQueue::default());
+        let worker_queue = Arc::clone(&queue);
+        thread::Builder::new()
+            .name("crate-artwork-fetch".to_string())
+            .spawn(move || artwork_fetch_worker(worker_queue))
+            .expect("failed to start artwork fetch worker");
+        queue
+    })
+}
+
+fn fetch_artwork_async(request: ArtworkRequest) {
+    artwork_fetch_queue().enqueue(request);
+}
+
+fn artwork_fetch_worker(queue: Arc<ArtworkFetchQueue>) {
+    loop {
+        let request = queue.wait_for_pending();
+        let result = fetch_artwork(&request.url);
+        let completion_request = request.clone();
+        let Some(app) = MEDIA_APP_HANDLE.get() else {
+            lock_artwork_request_state().finish(&request, false);
+            continue;
+        };
+        if app
+            .run_on_main_thread(move || unsafe {
+                finish_artwork_fetch(completion_request, result);
+            })
+            .is_err()
+        {
+            lock_artwork_request_state().finish(&request, false);
+        }
+    }
+}
+
+#[cfg(test)]
+fn fetch_artwork_bytes_with_timeout(url: &str, timeout: Duration) -> Option<Vec<u8>> {
+    fetch_artwork_with_timeout(url, timeout).into_bytes()
+}
+
+impl ArtworkFetchResult {
+    fn into_bytes(self) -> Option<Vec<u8>> {
+        match self {
+            Self::Loaded(bytes) => Some(bytes),
+            Self::RetryableFailure | Self::PermanentFailure => None,
+        }
+    }
+}
+
+fn fetch_artwork(url: &str) -> ArtworkFetchResult {
+    fetch_artwork_with_timeout(url, ARTWORK_FETCH_TIMEOUT)
+}
+
+fn fetch_artwork_with_timeout(url: &str, timeout: Duration) -> ArtworkFetchResult {
+    let Some(parsed) = reqwest::Url::parse(url).ok() else {
+        return ArtworkFetchResult::PermanentFailure;
+    };
+    if parsed.scheme() == "file" {
+        let Ok(path) = parsed.to_file_path() else {
+            return ArtworkFetchResult::PermanentFailure;
+        };
+        if !crate::is_native_desktop_artwork_path(&path) {
+            return ArtworkFetchResult::PermanentFailure;
+        }
+        let Some(file) = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NONBLOCK | libc::O_CLOEXEC)
+            .open(path)
+            .ok()
+        else {
+            return ArtworkFetchResult::RetryableFailure;
+        };
+        if !file.metadata().is_ok_and(|metadata| metadata.is_file()) {
+            return ArtworkFetchResult::PermanentFailure;
+        }
+        return read_bounded(file, MAX_ARTWORK_BYTES)
+            .map(ArtworkFetchResult::Loaded)
+            .unwrap_or(ArtworkFetchResult::RetryableFailure);
+    }
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return ArtworkFetchResult::PermanentFailure;
+    }
+    let Some(client) = reqwest::blocking::Client::builder()
+        .connect_timeout(timeout)
+        .timeout(timeout)
+        .build()
+        .ok()
+    else {
+        return ArtworkFetchResult::RetryableFailure;
+    };
+    let Some(response) = client
+        .get(url)
+        .send()
+        .ok()
+        .and_then(|response| response.error_for_status().ok())
+    else {
+        return ArtworkFetchResult::RetryableFailure;
+    };
+    if response
+        .content_length()
+        .is_some_and(|length| length > MAX_ARTWORK_BYTES)
+    {
+        return ArtworkFetchResult::RetryableFailure;
+    }
+    read_bounded(response, MAX_ARTWORK_BYTES)
+        .map(ArtworkFetchResult::Loaded)
+        .unwrap_or(ArtworkFetchResult::RetryableFailure)
+}
+
+fn read_bounded(reader: impl Read, max_bytes: u64) -> Option<Vec<u8>> {
+    let mut bytes = Vec::new();
+    reader
+        .take(max_bytes.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .ok()?;
+    (bytes.len() <= max_bytes as usize).then_some(bytes)
+}
+
+unsafe fn finish_artwork_fetch(request: ArtworkRequest, result: ArtworkFetchResult) {
+    if !lock_artwork_request_state().is_current(&request) {
+        return;
+    }
+    let permanent_failure = result == ArtworkFetchResult::PermanentFailure;
+    let artwork = result
+        .into_bytes()
+        .as_deref()
+        .and_then(|bytes| cache_artwork_bytes(&request.url, bytes));
+    if !lock_artwork_request_state().finish(&request, artwork.is_some() || permanent_failure) {
+        return;
+    }
+    if let Some(artwork) = artwork {
+        set_current_now_playing_artwork(artwork);
+    }
+}
+
 unsafe fn patch_application_delegate() {
-    let Some(mtm) = MainThreadMarker::new() else {
+    let Some(delegate) = app_delegate() else {
         return;
     };
-    let app = NSApplication::sharedApplication(mtm);
-    let Some(delegate) = app.delegate() else {
-        return;
-    };
-    let delegate_ref = &*delegate;
-    let delegate_object: &AnyObject = delegate_ref.as_ref();
-    let class = delegate_object.class() as *const AnyClass as *mut AnyClass;
+    let class = (*delegate).class() as *const AnyClass as *mut AnyClass;
 
     replace_method(
         class,
@@ -122,15 +410,10 @@ unsafe fn patch_application_delegate() {
 }
 
 unsafe fn register_remote_commands() {
-    let Some(mtm) = MainThreadMarker::new() else {
+    let Some(delegate) = app_delegate() else {
         return;
     };
-    let app = NSApplication::sharedApplication(mtm);
-    let Some(delegate) = app.delegate() else {
-        return;
-    };
-    let delegate_ref = &*delegate;
-    let delegate_object: &AnyObject = delegate_ref.as_ref();
+    let delegate_object: &AnyObject = &*delegate;
     let center: *mut AnyObject = msg_send![class!(MPRemoteCommandCenter), sharedCommandCenter];
     if center.is_null() {
         return;
@@ -168,6 +451,7 @@ unsafe fn set_now_playing_info(payload: &DesktopMediaSessionPayload) {
 
     let Some(title) = non_empty(payload.title.as_deref()) else {
         let _: () = msg_send![center, setNowPlayingInfo: ptr::null_mut::<AnyObject>()];
+        set_now_playing_playback_state(3);
         clear_artwork_cache();
         return;
     };
@@ -207,54 +491,99 @@ unsafe fn set_now_playing_info(payload: &DesktopMediaSessionPayload) {
     }
 
     let _: () = msg_send![center, setNowPlayingInfo: info];
+    set_now_playing_playback_state(playback_state_value(payload.is_playing));
+}
+
+unsafe fn set_now_playing_playback_state(state: isize) {
+    let center: *mut AnyObject = msg_send![class!(MPNowPlayingInfoCenter), defaultCenter];
+    if center.is_null() {
+        return;
+    }
+    let responds: bool = msg_send![center, respondsToSelector: sel!(setPlaybackState:)];
+    if responds {
+        let _: () = msg_send![center, setPlaybackState: state];
+    }
+}
+
+unsafe fn update_now_playing_numbers(update: impl FnOnce(*mut AnyObject)) {
+    let center: *mut AnyObject = msg_send![class!(MPNowPlayingInfoCenter), defaultCenter];
+    if center.is_null() {
+        return;
+    }
+    let current: *mut AnyObject = msg_send![center, nowPlayingInfo];
+    if current.is_null() {
+        return;
+    }
+    let info: *mut AnyObject = msg_send![current, mutableCopy];
+    if info.is_null() {
+        return;
+    }
+    update(info);
+    let _: () = msg_send![center, setNowPlayingInfo: info];
+    let _: () = msg_send![info, release];
+}
+
+fn playback_state_value(is_playing: bool) -> isize {
+    if is_playing {
+        1
+    } else {
+        2
+    }
 }
 
 unsafe fn cached_artwork_for_url(url: &str) -> Option<*mut AnyObject> {
-    if let Ok(cache) = artwork_cache().lock() {
-        if cache.url.as_deref() == Some(url) && cache.artwork != 0 {
-            return Some(cache.artwork as *mut AnyObject);
-        }
+    let cache = lock_artwork_cache();
+    if cache.url.as_deref() == Some(url) && cache.artwork != 0 {
+        Some(cache.artwork as *mut AnyObject)
+    } else {
+        None
     }
+}
 
-    let loaded = load_artwork(url)?;
-    if let Ok(mut cache) = artwork_cache().lock() {
-        release_cached_artwork(&mut cache);
-        cache.url = Some(url.to_string());
-        cache.artwork = loaded.artwork as usize;
-        cache.retained_image = loaded.retained_image;
-    }
+unsafe fn cache_artwork_bytes(url: &str, bytes: &[u8]) -> Option<*mut AnyObject> {
+    let loaded = load_artwork(bytes)?;
+    let mut cache = lock_artwork_cache();
+    release_cached_artwork(&mut cache);
+    cache.url = Some(url.to_string());
+    cache.artwork = loaded.artwork as usize;
     Some(loaded.artwork)
 }
 
-unsafe fn load_artwork(url: &str) -> Option<LoadedArtwork> {
-    let url_string = NSString::from_str(url);
-    let ns_url: *mut AnyObject = msg_send![class!(NSURL), URLWithString: &*url_string];
-    if ns_url.is_null() {
-        return None;
-    }
-
-    let data: *mut AnyObject = msg_send![class!(NSData), dataWithContentsOfURL: ns_url];
-    if data.is_null() {
-        return None;
-    }
-
+unsafe fn load_artwork(bytes: &[u8]) -> Option<LoadedArtwork> {
+    let data = NSData::with_bytes(bytes);
     let image_alloc: *mut AnyObject = msg_send![class!(NSImage), alloc];
     if image_alloc.is_null() {
         return None;
     }
-    let image: *mut AnyObject = msg_send![image_alloc, initWithData: data];
-    if image.is_null() {
-        return None;
-    }
+    let image: *mut AnyObject = msg_send![image_alloc, initWithData: &*data];
+    let image = Retained::from_raw(image)?;
 
-    if let Some(artwork) = load_modern_artwork(image) {
+    if let Some(artwork) = load_modern_artwork(image.clone()) {
         return Some(artwork);
     }
 
     load_legacy_artwork(image)
 }
 
-unsafe fn load_modern_artwork(image: *mut AnyObject) -> Option<LoadedArtwork> {
+unsafe fn set_current_now_playing_artwork(artwork: *mut AnyObject) {
+    let center: *mut AnyObject = msg_send![class!(MPNowPlayingInfoCenter), defaultCenter];
+    if center.is_null() {
+        return;
+    }
+    let current: *mut AnyObject = msg_send![center, nowPlayingInfo];
+    if current.is_null() {
+        return;
+    }
+    let info: *mut AnyObject = msg_send![current, mutableCopy];
+    if info.is_null() {
+        return;
+    }
+    set_object(info, MPMediaItemPropertyArtwork, artwork);
+    let _: () = msg_send![center, setNowPlayingInfo: info];
+    let _: () = msg_send![info, release];
+}
+
+unsafe fn load_modern_artwork(image: Retained<AnyObject>) -> Option<LoadedArtwork> {
     let supports_modern_init: bool = msg_send![
         class!(MPMediaItemArtwork),
         instancesRespondToSelector: sel!(initWithBoundsSize:requestHandler:)
@@ -263,52 +592,53 @@ unsafe fn load_modern_artwork(image: *mut AnyObject) -> Option<LoadedArtwork> {
         return None;
     }
 
-    let size: CGSize = msg_send![image, size];
-    let image_for_block = image;
-    let request_handler =
-        block2::RcBlock::new(move |_size: CGSize| -> *mut AnyObject { image_for_block });
+    let size: CGSize = msg_send![Retained::as_ptr(&image), size];
+    // The system may retain this block after the current artwork cache moves
+    // to another track. Capture an owned image so late requests cannot use a
+    // pointer released with the previous cache entry.
+    let request_handler = artwork_request_handler(image.clone());
     let artwork_alloc: *mut AnyObject = msg_send![class!(MPMediaItemArtwork), alloc];
     if artwork_alloc.is_null() {
-        let _: () = msg_send![image, release];
         return None;
     }
     let artwork: *mut AnyObject =
         msg_send![artwork_alloc, initWithBoundsSize: size, requestHandler: &*request_handler];
 
     if artwork.is_null() {
-        let _: () = msg_send![image, release];
         None
     } else {
-        Some(LoadedArtwork {
-            artwork,
-            retained_image: image as usize,
-        })
+        Some(LoadedArtwork { artwork })
     }
 }
 
-unsafe fn load_legacy_artwork(image: *mut AnyObject) -> Option<LoadedArtwork> {
+fn artwork_request_handler(
+    image: Retained<AnyObject>,
+) -> block2::RcBlock<dyn Fn(CGSize) -> *mut AnyObject> {
+    block2::RcBlock::new(move |_size: CGSize| -> *mut AnyObject {
+        Retained::as_ptr(&image) as *mut AnyObject
+    })
+}
+
+unsafe fn load_legacy_artwork(image: Retained<AnyObject>) -> Option<LoadedArtwork> {
     let supports_legacy_image_init: bool =
         msg_send![class!(MPMediaItemArtwork), instancesRespondToSelector: sel!(initWithImage:)];
     if !supports_legacy_image_init {
-        let _: () = msg_send![image, release];
         return None;
     }
 
     let artwork_alloc: *mut AnyObject = msg_send![class!(MPMediaItemArtwork), alloc];
     if artwork_alloc.is_null() {
-        let _: () = msg_send![image, release];
         return None;
     }
-    let artwork: *mut AnyObject = msg_send![artwork_alloc, initWithImage: image];
-    let _: () = msg_send![image, release];
+    let artwork: *mut AnyObject = msg_send![
+        artwork_alloc,
+        initWithImage: Retained::as_ptr(&image) as *mut AnyObject
+    ];
 
     if artwork.is_null() {
         None
     } else {
-        Some(LoadedArtwork {
-            artwork,
-            retained_image: 0,
-        })
+        Some(LoadedArtwork { artwork })
     }
 }
 
@@ -346,11 +676,39 @@ fn artwork_cache() -> &'static Mutex<ArtworkCache> {
     ARTWORK_CACHE.get_or_init(|| Mutex::new(ArtworkCache::default()))
 }
 
-unsafe fn clear_artwork_cache() {
-    if let Ok(mut cache) = artwork_cache().lock() {
-        release_cached_artwork(&mut cache);
-        cache.url = None;
+fn artwork_request_state() -> &'static Mutex<ArtworkRequestState> {
+    ARTWORK_REQUEST_STATE.get_or_init(|| Mutex::new(ArtworkRequestState::default()))
+}
+
+// A panic elsewhere while this lock was held would poison it forever under
+// a plain `.lock()?` — recovering keeps the artwork cache (and the native
+// object releases it is responsible for) working instead of silently and
+// permanently going inert.
+fn lock_artwork_cache() -> std::sync::MutexGuard<'static, ArtworkCache> {
+    artwork_cache()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn lock_artwork_request_state() -> std::sync::MutexGuard<'static, ArtworkRequestState> {
+    artwork_request_state()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+unsafe fn clear_cached_artwork_unless(url: Option<&str>) {
+    let mut cache = lock_artwork_cache();
+    if cache.url.as_deref() == url {
+        return;
     }
+    release_cached_artwork(&mut cache);
+    cache.url = None;
+}
+
+unsafe fn clear_artwork_cache() {
+    let mut cache = lock_artwork_cache();
+    release_cached_artwork(&mut cache);
+    cache.url = None;
 }
 
 unsafe fn release_cached_artwork(cache: &mut ArtworkCache) {
@@ -359,19 +717,10 @@ unsafe fn release_cached_artwork(cache: &mut ArtworkCache) {
         let _: () = msg_send![artwork, release];
         cache.artwork = 0;
     }
-    if cache.retained_image != 0 {
-        let image = cache.retained_image as *mut AnyObject;
-        let _: () = msg_send![image, release];
-        cache.retained_image = 0;
-    }
 }
 
 unsafe fn media_action_imp(function: MediaActionImp) -> Imp {
     std::mem::transmute(function)
-}
-
-unsafe fn replace_method(class: *mut AnyClass, selector: Sel, imp: Imp, types: &'static [u8]) {
-    let _ = ffi::class_replaceMethod(class, selector, imp, types.as_ptr().cast());
 }
 
 unsafe extern "C-unwind" fn media_play(
@@ -379,7 +728,7 @@ unsafe extern "C-unwind" fn media_play(
     _cmd: Sel,
     _sender: &AnyObject,
 ) -> isize {
-    emit_media_command("play")
+    emit_media_command(crate::PlaybackCommand::Play)
 }
 
 unsafe extern "C-unwind" fn media_pause(
@@ -387,7 +736,7 @@ unsafe extern "C-unwind" fn media_pause(
     _cmd: Sel,
     _sender: &AnyObject,
 ) -> isize {
-    emit_media_command("pause")
+    emit_media_command(crate::PlaybackCommand::Pause)
 }
 
 unsafe extern "C-unwind" fn media_toggle_play_pause(
@@ -395,7 +744,7 @@ unsafe extern "C-unwind" fn media_toggle_play_pause(
     _cmd: Sel,
     _sender: &AnyObject,
 ) -> isize {
-    emit_media_command("play_pause")
+    emit_media_command(crate::PlaybackCommand::PlayPause)
 }
 
 unsafe extern "C-unwind" fn media_previous(
@@ -403,7 +752,7 @@ unsafe extern "C-unwind" fn media_previous(
     _cmd: Sel,
     _sender: &AnyObject,
 ) -> isize {
-    emit_media_command("previous")
+    emit_media_command(crate::PlaybackCommand::Previous)
 }
 
 unsafe extern "C-unwind" fn media_next(
@@ -411,12 +760,247 @@ unsafe extern "C-unwind" fn media_next(
     _cmd: Sel,
     _sender: &AnyObject,
 ) -> isize {
-    emit_media_command("next")
+    emit_media_command(crate::PlaybackCommand::Next)
 }
 
-fn emit_media_command(command: &str) -> isize {
+fn emit_media_command(command: crate::PlaybackCommand) -> isize {
     if let Some(app) = MEDIA_APP_HANDLE.get() {
         crate::emit_system_media_command(app, command);
     }
     0
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        fs,
+        io::Cursor,
+        net::TcpListener,
+        process,
+        sync::mpsc,
+        thread,
+        time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    };
+
+    use super::{
+        artwork_request_handler, fetch_artwork_bytes_with_timeout, playback_state_value,
+        read_bounded, set_now_playing_playback_state, ArtworkFetchQueue, ArtworkRequest,
+        ArtworkRequestState, CGSize,
+    };
+    use objc2::{
+        class, msg_send,
+        rc::{Retained, Weak},
+        runtime::AnyObject,
+        sel,
+    };
+
+    #[test]
+    fn retained_artwork_request_block_survives_artwork_replacement() {
+        let (previous_artwork, previous_image_weak) = new_test_media_artwork();
+        let (_current_artwork, current_image_weak) = new_test_media_artwork();
+        let previous_image = previous_image_weak.load().unwrap();
+        let current_image = current_image_weak.load().unwrap();
+        assert_ne!(
+            Retained::as_ptr(&previous_image),
+            Retained::as_ptr(&current_image)
+        );
+        let previous_artwork_ptr = Retained::as_ptr(&previous_artwork);
+        let requested_image: *mut AnyObject = unsafe {
+            msg_send![previous_artwork_ptr, imageWithSize: CGSize {
+                width: 32.0,
+                height: 32.0,
+            }]
+        };
+
+        assert_eq!(
+            requested_image as *const AnyObject,
+            Retained::as_ptr(&previous_image)
+        );
+    }
+
+    fn new_test_media_artwork() -> (Retained<AnyObject>, Weak<AnyObject>) {
+        unsafe {
+            let size = CGSize {
+                width: 64.0,
+                height: 64.0,
+            };
+            let image_alloc: *mut AnyObject = msg_send![class!(NSImage), alloc];
+            let image: *mut AnyObject = msg_send![image_alloc, initWithSize: size];
+            let image = Retained::from_raw(image).unwrap();
+            let image_weak = Weak::from_retained(&image);
+            let request_handler = artwork_request_handler(image.clone());
+            let artwork_alloc: *mut AnyObject = msg_send![class!(MPMediaItemArtwork), alloc];
+            let artwork: *mut AnyObject = msg_send![
+                artwork_alloc,
+                initWithBoundsSize: size,
+                requestHandler: &*request_handler
+            ];
+            let artwork = Retained::from_raw(artwork).unwrap();
+            drop(request_handler);
+            drop(image);
+
+            (artwork, image_weak)
+        }
+    }
+
+    #[test]
+    fn now_playing_playback_state_maps_to_macos_values() {
+        assert_eq!(playback_state_value(true), 1);
+        assert_eq!(playback_state_value(false), 2);
+    }
+
+    #[test]
+    fn now_playing_playback_state_updates_native_center() {
+        let center: *mut AnyObject =
+            unsafe { msg_send![class!(MPNowPlayingInfoCenter), defaultCenter] };
+        assert!(!center.is_null());
+
+        let supports_playback_state: bool =
+            unsafe { msg_send![center, respondsToSelector: sel!(setPlaybackState:)] };
+        assert!(supports_playback_state);
+
+        let initial_state: isize = unsafe { msg_send![center, playbackState] };
+        let _restore = PlaybackStateRestore {
+            center,
+            state: initial_state,
+        };
+
+        for (state, expected) in [(1, 1), (2, 2), (3, 3)] {
+            unsafe { set_now_playing_playback_state(state) };
+            let actual: isize = unsafe { msg_send![center, playbackState] };
+            assert_eq!(actual, expected);
+        }
+    }
+
+    struct PlaybackStateRestore {
+        center: *mut AnyObject,
+        state: isize,
+    }
+
+    impl Drop for PlaybackStateRestore {
+        fn drop(&mut self) {
+            unsafe {
+                let _: () = msg_send![self.center, setPlaybackState: self.state];
+            }
+        }
+    }
+
+    #[test]
+    fn artwork_body_reader_rejects_bytes_beyond_the_limit() {
+        assert_eq!(read_bounded(Cursor::new(vec![1_u8; 5]), 4), None);
+        assert_eq!(
+            read_bounded(Cursor::new(vec![1_u8, 2, 3, 4]), 4),
+            Some(vec![1_u8, 2, 3, 4])
+        );
+    }
+
+    #[test]
+    fn artwork_fetch_supports_local_file_urls() {
+        let url = crate::cache_native_desktop_artwork(
+            "local-artwork",
+            b"local-artwork",
+            Some("image/jpeg"),
+            None,
+        )
+        .unwrap()
+        .unwrap();
+
+        let result = fetch_artwork_bytes_with_timeout(&url.url, Duration::from_millis(50));
+
+        assert_eq!(result, Some(b"local-artwork".to_vec()));
+    }
+
+    #[test]
+    fn artwork_fetch_rejects_files_outside_the_managed_cache() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "crate-unmanaged-artwork-{}-{nonce}.jpg",
+            process::id()
+        ));
+        fs::write(&path, b"unmanaged-artwork").unwrap();
+        let url = reqwest::Url::from_file_path(&path).unwrap().to_string();
+
+        let result = fetch_artwork_bytes_with_timeout(&url, Duration::from_millis(50));
+
+        fs::remove_file(path).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn artwork_fetch_timeout_bounds_a_stalled_request() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let (release, released) = mpsc::channel::<()>();
+        let server = thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while Instant::now() < deadline {
+                if let Ok((stream, _)) = listener.accept() {
+                    let _ = released.recv_timeout(deadline - Instant::now());
+                    drop(stream);
+                    return;
+                }
+                thread::sleep(Duration::from_millis(10));
+            }
+        });
+        let started = Instant::now();
+
+        let result = fetch_artwork_bytes_with_timeout(
+            &format!("http://{address}/artwork.jpg"),
+            Duration::from_millis(50),
+        );
+        let elapsed = started.elapsed();
+        let _ = release.send(());
+
+        assert_eq!(result, None);
+        assert!(elapsed < Duration::from_secs(2));
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn artwork_fetch_queue_keeps_only_the_latest_pending_request() {
+        let queue = ArtworkFetchQueue::default();
+        let first = ArtworkRequest {
+            generation: 1,
+            url: "https://example.test/a.jpg".to_string(),
+        };
+        let second = ArtworkRequest {
+            generation: 2,
+            url: "https://example.test/b.jpg".to_string(),
+        };
+
+        queue.enqueue(first);
+        queue.enqueue(second.clone());
+
+        assert_eq!(queue.take_pending(), Some(second));
+        assert_eq!(queue.take_pending(), None);
+    }
+
+    #[test]
+    fn artwork_requests_coalesce_and_reject_stale_completions() {
+        let mut state = ArtworkRequestState::default();
+        let first = state.begin(Some("https://example.test/a.jpg")).unwrap();
+
+        assert!(state.begin(Some("https://example.test/a.jpg")).is_none());
+        let second = state.begin(Some("https://example.test/b.jpg")).unwrap();
+        assert!(!state.finish(&first, true));
+        assert!(state.finish(&second, true));
+        assert!(state.begin(Some("https://example.test/b.jpg")).is_none());
+    }
+
+    #[test]
+    fn failed_artwork_requests_can_retry_without_reloading_successes() {
+        let mut state = ArtworkRequestState::default();
+        let failed = state.begin(Some("file:///tmp/cover.jpg")).unwrap();
+
+        assert!(state.finish(&failed, false));
+        let retry = state.begin(Some("file:///tmp/cover.jpg")).unwrap();
+        assert!(state.finish(&retry, true));
+        assert!(state.begin(Some("file:///tmp/cover.jpg")).is_none());
+        assert!(state.begin(None).is_none());
+        assert_eq!(state.url, None);
+    }
 }

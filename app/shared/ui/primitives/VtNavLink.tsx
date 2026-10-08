@@ -17,7 +17,10 @@ export function VtNavLink({ onClick, to, ...props }: NavLinkProps) {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
       e.preventDefault();
 
-      if (!document.startViewTransition) {
+      const hasTransparentLinuxWindowChrome =
+        document.documentElement.dataset.crateLinuxWindowChrome === "true";
+
+      if (!document.startViewTransition || hasTransparentLinuxWindowChrome) {
         navigate(to);
         return;
       }

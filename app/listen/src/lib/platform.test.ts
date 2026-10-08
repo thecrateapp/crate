@@ -37,7 +37,9 @@ describe("listen platform flags", () => {
 
     expect(platform.listenRuntime).toBe("web");
     expect(platform.usesConfigurableServer).toBe(false);
+    expect(platform.usesNativeFilesystem).toBe(false);
     expect(platform.shouldRegisterServiceWorker).toBe(true);
+    expect(platform.supportsHaptics).toBe(false);
     expect(platform.getListenAppId()).toBe("listen-web");
   });
 
@@ -46,7 +48,9 @@ describe("listen platform flags", () => {
 
     expect(platform.listenRuntime).toBe("capacitor");
     expect(platform.usesConfigurableServer).toBe(true);
+    expect(platform.usesNativeFilesystem).toBe(true);
     expect(platform.usesMobileShell).toBe(true);
+    expect(platform.supportsHaptics).toBe(true);
     expect(platform.getListenAppId()).toBe("listen-android");
   });
 
@@ -59,7 +63,9 @@ describe("listen platform flags", () => {
 
     expect(platform.listenRuntime).toBe("tauri");
     expect(platform.usesConfigurableServer).toBe(true);
+    expect(platform.usesNativeFilesystem).toBe(true);
     expect(platform.usesMobileShell).toBe(false);
+    expect(platform.supportsHaptics).toBe(false);
     expect(platform.shouldRegisterServiceWorker).toBe(false);
     expect(platform.getListenAppId()).toBe("listen-tauri");
   });

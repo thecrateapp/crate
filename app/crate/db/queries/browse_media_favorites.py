@@ -5,13 +5,15 @@ from sqlalchemy import text
 from crate.db.tx import read_scope
 
 
-def list_favorites() -> list[dict]:
+def list_favorites(user_id: int) -> list[dict]:
     with read_scope() as session:
         rows = (
             session.execute(
                 text(
-                    "SELECT item_type, item_id, created_at FROM favorites ORDER BY created_at DESC"
-                )
+                    "SELECT item_type, item_id, created_at FROM favorites "
+                    "WHERE user_id = :user_id ORDER BY created_at DESC"
+                ),
+                {"user_id": user_id},
             )
             .mappings()
             .all()

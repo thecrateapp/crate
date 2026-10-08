@@ -1,0 +1,489 @@
+{
+  "application_revision": "a672a99e368655d1f0833f3d2e560e2a688898c7",
+  "run_count": 3,
+  "fixture_format": {
+    "container": "WAVE PCM",
+    "sample_rate_hz": 44100,
+    "channels": 2,
+    "sample_width_bits": 16,
+    "decoded_track_seconds": {
+      "track20": 1220.4,
+      "track16": 991.8
+    }
+  },
+  "hold_seconds": 90,
+  "after_release_seconds": 60,
+  "runs": [
+    {
+      "run": 1,
+      "host": {
+        "platform": "Windows-2025Server-10.0.26100-SP0",
+        "architecture": "AMD64",
+        "physical_memory_bytes": 17174360064,
+        "cpu_count": 4
+      },
+      "sample_interval_seconds": 0.25,
+      "webview2_shared_pages_may_be_counted_in_process_group_rss": true,
+      "events": [
+        {
+          "time": "2026-10-02T03:02:45.084Z",
+          "event": "audio-context",
+          "sampleRate": 44100
+        },
+        {
+          "time": "2026-10-02T03:02:45.118Z",
+          "event": "fetch-start",
+          "name": "track20"
+        },
+        {
+          "time": "2026-10-02T03:02:45.388Z",
+          "event": "fetch-done",
+          "name": "track20",
+          "encodedBytes": 215278604
+        },
+        {
+          "time": "2026-10-02T03:02:46.349Z",
+          "event": "decode-done",
+          "name": "track20",
+          "durationSeconds": 1220.4,
+          "sampleRate": 44100,
+          "channels": 2,
+          "pcmBytes": 430557120,
+          "retainedPcmBytes": 430557120
+        },
+        {
+          "time": "2026-10-02T03:02:46.355Z",
+          "event": "fetch-start",
+          "name": "track16"
+        },
+        {
+          "time": "2026-10-02T03:02:46.583Z",
+          "event": "fetch-done",
+          "name": "track16",
+          "encodedBytes": 174953564
+        },
+        {
+          "time": "2026-10-02T03:02:47.300Z",
+          "event": "decode-done",
+          "name": "track16",
+          "durationSeconds": 991.8,
+          "sampleRate": 44100,
+          "channels": 2,
+          "pcmBytes": 349907040,
+          "retainedPcmBytes": 780464160
+        },
+        {
+          "time": "2026-10-02T03:02:47.306Z",
+          "event": "ready",
+          "buffers": 2
+        },
+        {
+          "time": "2026-10-02T03:04:17.312Z",
+          "event": "released",
+          "reason": "timer",
+          "releasedCount": 2
+        }
+      ],
+      "phases": {
+        "decode": {
+          "root_rss_mib": {
+            "min": 9.7,
+            "median": 35.2,
+            "max": 43.8
+          },
+          "process_group_rss_mib": {
+            "min": 9.7,
+            "median": 258.6,
+            "max": 1773.1
+          },
+          "webview2_rss_mib": {
+            "min": 0.0,
+            "median": 223.4,
+            "max": 1729.3
+          },
+          "process_group_private_commit_mib": {
+            "min": 1.7,
+            "median": 90.9,
+            "max": 1755.1
+          },
+          "webview2_private_commit_mib": {
+            "min": 0.0,
+            "median": 86.2,
+            "max": 1749.6
+          },
+          "sample_count": 24
+        },
+        "hold": {
+          "root_rss_mib": {
+            "min": 43.6,
+            "median": 43.8,
+            "max": 43.8
+          },
+          "process_group_rss_mib": {
+            "min": 1099.6,
+            "median": 1105.5,
+            "max": 1477.0
+          },
+          "webview2_rss_mib": {
+            "min": 1055.9,
+            "median": 1061.8,
+            "max": 1433.2
+          },
+          "process_group_private_commit_mib": {
+            "min": 867.6,
+            "median": 870.9,
+            "max": 1244.7
+          },
+          "webview2_private_commit_mib": {
+            "min": 862.2,
+            "median": 865.5,
+            "max": 1239.3
+          },
+          "sample_count": 354
+        },
+        "post_release": {
+          "root_rss_mib": {
+            "min": 29.9,
+            "median": 40.1,
+            "max": 43.6
+          },
+          "process_group_rss_mib": {
+            "min": 839.3,
+            "median": 1085.1,
+            "max": 1123.6
+          },
+          "webview2_rss_mib": {
+            "min": 809.4,
+            "median": 1045.0,
+            "max": 1081.9
+          },
+          "process_group_private_commit_mib": {
+            "min": 865.6,
+            "median": 865.8,
+            "max": 878.2
+          },
+          "webview2_private_commit_mib": {
+            "min": 860.5,
+            "median": 860.7,
+            "max": 873.1
+          },
+          "sample_count": 237
+        }
+      }
+    },
+    {
+      "run": 2,
+      "host": {
+        "platform": "Windows-2025Server-10.0.26100-SP0",
+        "architecture": "AMD64",
+        "physical_memory_bytes": 17174360064,
+        "cpu_count": 4
+      },
+      "sample_interval_seconds": 0.25,
+      "webview2_shared_pages_may_be_counted_in_process_group_rss": true,
+      "events": [
+        {
+          "time": "2026-10-02T03:05:25.866Z",
+          "event": "audio-context",
+          "sampleRate": 44100
+        },
+        {
+          "time": "2026-10-02T03:05:25.881Z",
+          "event": "fetch-start",
+          "name": "track20"
+        },
+        {
+          "time": "2026-10-02T03:05:26.158Z",
+          "event": "fetch-done",
+          "name": "track20",
+          "encodedBytes": 215278604
+        },
+        {
+          "time": "2026-10-02T03:05:27.206Z",
+          "event": "decode-done",
+          "name": "track20",
+          "durationSeconds": 1220.4,
+          "sampleRate": 44100,
+          "channels": 2,
+          "pcmBytes": 430557120,
+          "retainedPcmBytes": 430557120
+        },
+        {
+          "time": "2026-10-02T03:05:27.212Z",
+          "event": "fetch-start",
+          "name": "track16"
+        },
+        {
+          "time": "2026-10-02T03:05:27.480Z",
+          "event": "fetch-done",
+          "name": "track16",
+          "encodedBytes": 174953564
+        },
+        {
+          "time": "2026-10-02T03:05:28.230Z",
+          "event": "decode-done",
+          "name": "track16",
+          "durationSeconds": 991.8,
+          "sampleRate": 44100,
+          "channels": 2,
+          "pcmBytes": 349907040,
+          "retainedPcmBytes": 780464160
+        },
+        {
+          "time": "2026-10-02T03:05:28.237Z",
+          "event": "ready",
+          "buffers": 2
+        },
+        {
+          "time": "2026-10-02T03:06:58.242Z",
+          "event": "released",
+          "reason": "timer",
+          "releasedCount": 2
+        }
+      ],
+      "phases": {
+        "decode": {
+          "root_rss_mib": {
+            "min": 33.5,
+            "median": 40.0,
+            "max": 41.8
+          },
+          "process_group_rss_mib": {
+            "min": 39.6,
+            "median": 307.9,
+            "max": 1644.3
+          },
+          "webview2_rss_mib": {
+            "min": 6.1,
+            "median": 267.9,
+            "max": 1604.3
+          },
+          "process_group_private_commit_mib": {
+            "min": 6.3,
+            "median": 104.9,
+            "max": 1844.3
+          },
+          "webview2_private_commit_mib": {
+            "min": 1.7,
+            "median": 98.5,
+            "max": 1838.8
+          },
+          "sample_count": 21
+        },
+        "hold": {
+          "root_rss_mib": {
+            "min": 39.9,
+            "median": 40.0,
+            "max": 40.0
+          },
+          "process_group_rss_mib": {
+            "min": 1095.5,
+            "median": 1103.3,
+            "max": 1475.0
+          },
+          "webview2_rss_mib": {
+            "min": 1055.6,
+            "median": 1063.3,
+            "max": 1435.0
+          },
+          "process_group_private_commit_mib": {
+            "min": 867.1,
+            "median": 870.3,
+            "max": 1244.1
+          },
+          "webview2_private_commit_mib": {
+            "min": 861.5,
+            "median": 864.9,
+            "max": 1238.6
+          },
+          "sample_count": 354
+        },
+        "post_release": {
+          "root_rss_mib": {
+            "min": 33.1,
+            "median": 39.9,
+            "max": 39.9
+          },
+          "process_group_rss_mib": {
+            "min": 1053.0,
+            "median": 1096.0,
+            "max": 1098.8
+          },
+          "webview2_rss_mib": {
+            "min": 1019.8,
+            "median": 1056.1,
+            "max": 1058.9
+          },
+          "process_group_private_commit_mib": {
+            "min": 865.1,
+            "median": 865.9,
+            "max": 866.3
+          },
+          "webview2_private_commit_mib": {
+            "min": 860.1,
+            "median": 860.4,
+            "max": 860.8
+          },
+          "sample_count": 237
+        }
+      }
+    },
+    {
+      "run": 3,
+      "host": {
+        "platform": "Windows-2025Server-10.0.26100-SP0",
+        "architecture": "AMD64",
+        "physical_memory_bytes": 17174360064,
+        "cpu_count": 4
+      },
+      "sample_interval_seconds": 0.25,
+      "webview2_shared_pages_may_be_counted_in_process_group_rss": true,
+      "events": [
+        {
+          "time": "2026-10-02T03:08:06.755Z",
+          "event": "audio-context",
+          "sampleRate": 44100
+        },
+        {
+          "time": "2026-10-02T03:08:06.772Z",
+          "event": "fetch-start",
+          "name": "track20"
+        },
+        {
+          "time": "2026-10-02T03:08:07.060Z",
+          "event": "fetch-done",
+          "name": "track20",
+          "encodedBytes": 215278604
+        },
+        {
+          "time": "2026-10-02T03:08:08.016Z",
+          "event": "decode-done",
+          "name": "track20",
+          "durationSeconds": 1220.4,
+          "sampleRate": 44100,
+          "channels": 2,
+          "pcmBytes": 430557120,
+          "retainedPcmBytes": 430557120
+        },
+        {
+          "time": "2026-10-02T03:08:08.022Z",
+          "event": "fetch-start",
+          "name": "track16"
+        },
+        {
+          "time": "2026-10-02T03:08:08.239Z",
+          "event": "fetch-done",
+          "name": "track16",
+          "encodedBytes": 174953564
+        },
+        {
+          "time": "2026-10-02T03:08:09.031Z",
+          "event": "decode-done",
+          "name": "track16",
+          "durationSeconds": 991.8,
+          "sampleRate": 44100,
+          "channels": 2,
+          "pcmBytes": 349907040,
+          "retainedPcmBytes": 780464160
+        },
+        {
+          "time": "2026-10-02T03:08:09.037Z",
+          "event": "ready",
+          "buffers": 2
+        },
+        {
+          "time": "2026-10-02T03:09:39.043Z",
+          "event": "released",
+          "reason": "timer",
+          "releasedCount": 2
+        }
+      ],
+      "phases": {
+        "decode": {
+          "root_rss_mib": {
+            "min": 21.7,
+            "median": 39.9,
+            "max": 39.9
+          },
+          "process_group_rss_mib": {
+            "min": 21.7,
+            "median": 300.6,
+            "max": 1842.9
+          },
+          "webview2_rss_mib": {
+            "min": 0.0,
+            "median": 261.8,
+            "max": 1803.0
+          },
+          "process_group_private_commit_mib": {
+            "min": 3.2,
+            "median": 103.9,
+            "max": 1849.6
+          },
+          "webview2_private_commit_mib": {
+            "min": 0.0,
+            "median": 98.5,
+            "max": 1844.2
+          },
+          "sample_count": 20
+        },
+        "hold": {
+          "root_rss_mib": {
+            "min": 39.8,
+            "median": 39.9,
+            "max": 39.9
+          },
+          "process_group_rss_mib": {
+            "min": 1098.8,
+            "median": 1103.9,
+            "max": 1475.9
+          },
+          "webview2_rss_mib": {
+            "min": 1059.0,
+            "median": 1064.0,
+            "max": 1436.0
+          },
+          "process_group_private_commit_mib": {
+            "min": 868.9,
+            "median": 872.7,
+            "max": 1246.5
+          },
+          "webview2_private_commit_mib": {
+            "min": 863.6,
+            "median": 867.4,
+            "max": 1241.1
+          },
+          "sample_count": 355
+        },
+        "post_release": {
+          "root_rss_mib": {
+            "min": 26.3,
+            "median": 33.8,
+            "max": 39.8
+          },
+          "process_group_rss_mib": {
+            "min": 779.2,
+            "median": 1009.8,
+            "max": 1102.3
+          },
+          "webview2_rss_mib": {
+            "min": 752.9,
+            "median": 976.0,
+            "max": 1062.4
+          },
+          "process_group_private_commit_mib": {
+            "min": 868.6,
+            "median": 869.0,
+            "max": 870.9
+          },
+          "webview2_private_commit_mib": {
+            "min": 863.4,
+            "median": 863.8,
+            "max": 865.6
+          },
+          "sample_count": 237
+        }
+      }
+    }
+  ]
+}

@@ -986,3 +986,39 @@ def test_global_radio_track_payload_preserves_genres():
     )
 
     assert payload["genres"] == ["screamo", "post-hardcore"]
+
+
+def test_home_recently_played_orders_playlists_by_when_they_were_played(
+    monkeypatch,
+):
+    from datetime import datetime, timezone
+
+    monkeypatch.setattr(
+        home_builder_recent_activity,
+        "get_play_history",
+        lambda user_id, limit: [
+            {
+                "artist": "KNEECAP",
+                "album": "FENIAN",
+                "artist_id": 3,
+                "album_id": 9,
+                "played_at": datetime(2026, 10, 6, 21, 15, tzinfo=timezone.utc),
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        home_builder_recent_activity,
+        "get_recent_playlist_rows_with_artwork",
+        lambda user_id, limit: [
+            {
+                "type": "playlist",
+                "playlist_id": 15,
+                "name": "Deftones",
+                "played_at": datetime(2026, 6, 24, 7, 27, tzinfo=timezone.utc),
+            }
+        ],
+    )
+
+    items = home_builder_recent_activity.build_recently_played(1, limit=3)
+
+    assert [item["type"] for item in items] == ["artist", "album", "playlist"]

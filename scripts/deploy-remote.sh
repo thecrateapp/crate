@@ -24,9 +24,9 @@ IMAGE_PREFIX="${DEPLOY_IMAGE_REGISTRY}/${DEPLOY_IMAGE_OWNER}"
 cd "$SERVER_PATH"
 
 COMPOSE=(docker compose -f docker-compose.yaml -f docker-compose.project.yaml)
-PROJECT_SERVICES=(crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-site crate-docs)
-HEALTHY_SERVICES=(crate-redis crate-postgres crate-api)
-RUNNING_SERVICES=(crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-site crate-docs)
+PROJECT_SERVICES=(crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-cast-receiver crate-site crate-docs)
+HEALTHY_SERVICES=(crate-redis crate-postgres crate-api crate-cast-receiver)
+RUNNING_SERVICES=(crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-cast-receiver crate-site crate-docs)
 QUIESCE_SERVICES=(crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker)
 RELEASE_ENV_KEYS=(
   CRATE_RELEASE_SHA
@@ -38,6 +38,7 @@ RELEASE_ENV_KEYS=(
   CRATE_MEDIA_WORKER_IMAGE
   CRATE_UI_IMAGE
   CRATE_LISTEN_IMAGE
+  CRATE_CAST_RECEIVER_IMAGE
   CRATE_SITE_IMAGE
   CRATE_DOCS_IMAGE
 )
@@ -54,6 +55,7 @@ declare -A SERVICE_IMAGE_REPOS=(
   [crate-media-worker]="${IMAGE_PREFIX}/crate-media-worker"
   [crate-ui]="${IMAGE_PREFIX}/crate-ui"
   [crate-listen]="${IMAGE_PREFIX}/crate-listen"
+  [crate-cast-receiver]="${IMAGE_PREFIX}/crate-cast-receiver"
   [crate-site]="${IMAGE_PREFIX}/crate-site"
   [crate-docs]="${IMAGE_PREFIX}/crate-docs"
 )
@@ -66,6 +68,7 @@ declare -A RELEASE_ENV_REPOS=(
   [CRATE_MEDIA_WORKER_IMAGE]="${IMAGE_PREFIX}/crate-media-worker"
   [CRATE_UI_IMAGE]="${IMAGE_PREFIX}/crate-ui"
   [CRATE_LISTEN_IMAGE]="${IMAGE_PREFIX}/crate-listen"
+  [CRATE_CAST_RECEIVER_IMAGE]="${IMAGE_PREFIX}/crate-cast-receiver"
   [CRATE_SITE_IMAGE]="${IMAGE_PREFIX}/crate-site"
   [CRATE_DOCS_IMAGE]="${IMAGE_PREFIX}/crate-docs"
 )
@@ -78,6 +81,7 @@ declare -A RELEASE_ENV_SERVICES=(
   [CRATE_MEDIA_WORKER_IMAGE]="crate-media-worker"
   [CRATE_UI_IMAGE]="crate-ui"
   [CRATE_LISTEN_IMAGE]="crate-listen"
+  [CRATE_CAST_RECEIVER_IMAGE]="crate-cast-receiver"
   [CRATE_SITE_IMAGE]="crate-site"
   [CRATE_DOCS_IMAGE]="crate-docs"
 )
@@ -256,6 +260,33 @@ assert_required_env() {
   fi
 }
 
+assert_cast_receiver_config() {
+  local app_id
+  local enabled
+  local host
+
+  enabled="$(env_value CRATE_CAST_CUSTOM_RECEIVER_ENABLED)"
+  enabled="${enabled,,}"
+  if [[ -z "$enabled" || "$enabled" == "false" || "$enabled" == "0" ]]; then
+    return 0
+  fi
+  if [[ "$enabled" != "true" && "$enabled" != "1" ]]; then
+    log "CRATE_CAST_CUSTOM_RECEIVER_ENABLED must be true or false"
+    return 1
+  fi
+
+  app_id="$(env_value CRATE_CAST_RECEIVER_APP_ID)"
+  host="$(env_value CRATE_CAST_RECEIVER_HOST)"
+  if [[ "$app_id" == "CC1AD845" || ! "$app_id" =~ ^[A-Za-z0-9]{8}$ ]]; then
+    log "Enabled custom Cast requires a registered 8-character CRATE_CAST_RECEIVER_APP_ID"
+    return 1
+  fi
+  if [[ ! "$host" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]]; then
+    log "CRATE_CAST_RECEIVER_HOST must be a hostname without scheme or path"
+    return 1
+  fi
+}
+
 current_schema_revision() {
   local pg_db
   local pg_password
@@ -309,6 +340,7 @@ cmd_release_preflight() {
   assert_required_env CRATE_FEDERATION_CURSOR_SECRET 32
   assert_required_env CRATE_PUBLIC_API_BASE_URL
   assert_required_env CRATE_INSTANCE_NAME
+  assert_cast_receiver_config
 
   public_api_url="$(env_value CRATE_PUBLIC_API_BASE_URL)"
   if [[ ! "$public_api_url" =~ ^https://[^/]+/?$ ]]; then

@@ -29,6 +29,11 @@ def trace_app():
         response.headers["X-Trace-ID"] = "downstream"
         return response
 
+    @app.get("/api/cast/sessions/{lease}")
+    def cast_session_route(lease: str):
+        del lease
+        return PlainTextResponse("ok")
+
     return TestClient(app)
 
 
@@ -61,6 +66,19 @@ def test_trace_id_replaces_downstream_header(trace_app):
 
     assert response.status_code == 200
     assert response.headers.get_list("X-Trace-ID") == ["upstream"]
+
+
+def test_trace_logs_redact_cast_session_lease(trace_app, caplog):
+    with caplog.at_level(logging.INFO, logger="crate.api.trace_middleware"):
+        response = trace_app.get("/api/cast/sessions/opaque-lease")
+
+    assert response.status_code == 200
+    assert "opaque-lease" not in caplog.text
+    assert any(
+        record.path == "/api/cast/sessions/[Filtered]"
+        for record in caplog.records
+        if hasattr(record, "path")
+    )
 
 
 def test_generate_trace_id_format():
@@ -103,3 +121,25 @@ def test_production_app_registers_trace_middleware_outermost():
     middleware = [entry.cls for entry in app.user_middleware]
 
     assert middleware[0] is TraceMiddleware
+
+
+def test_trace_middleware_reports_returned_5xx_responses(monkeypatch):
+    captured: list[dict] = []
+    monkeypatch.setattr(
+        "crate.observability.sentry.capture_handled_http_error",
+        lambda **kwargs: captured.append(kwargs),
+        raising=False,
+    )
+
+    app = FastAPI()
+    app.add_middleware(TraceMiddleware)
+
+    @app.get("/handled")
+    def handled_error():
+        return PlainTextResponse("failed", status_code=500)
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get("/handled?secret=ignored")
+
+    assert response.status_code == 500
+    assert captured == [{"method": "GET", "route": "/handled", "status_code": 500}]

@@ -1,0 +1,13 @@
+{
+  "subsonic-response": {
+    "status": "failed",
+    "version": "1.16.1",
+    "type": "Crate",
+    "serverVersion": "0.1.0",
+    "openSubsonic": true,
+    "error": {
+      "code": 40,
+      "message": "Wrong username or password"
+    }
+  }
+}

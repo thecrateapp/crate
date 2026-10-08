@@ -88,6 +88,8 @@ class TestStatsApiContracts:
             "window": "30d",
             "title": "Replay this month",
             "subtitle": "The tracks that defined your last 30 days.",
+            "title_key": "stats.replay.thisMonth.title",
+            "subtitle_key": "stats.replay.thisMonth.subtitle",
             "track_count": 2,
             "minutes_listened": 42.5,
             "items": [
@@ -111,6 +113,8 @@ class TestStatsApiContracts:
         data = resp.json()
         assert data["window"] == "30d"
         assert data["title"] == "Replay this month"
+        assert data["title_key"] == "stats.replay.thisMonth.title"
+        assert data["subtitle_key"] == "stats.replay.thisMonth.subtitle"
         assert data["track_count"] == 2
         assert len(data["items"]) == 1
         item = data["items"][0]
@@ -187,9 +191,12 @@ class TestStatsApiContracts:
         top_genres = [
             {
                 "genre_name": "metalcore",
+                "slug": "metalcore",
                 "play_count": 7,
                 "complete_play_count": 3,
                 "minutes_listened": 8.2,
+                "weight": 6.5,
+                "share": 0.42,
             }
         ]
         replay = {
@@ -314,6 +321,9 @@ class TestStatsApiContracts:
             == "22222222-2222-4222-8222-222222222222"
         )
         assert data["top_genres"]["items"][0]["genre_name"] == "metalcore"
+        assert data["top_genres"]["items"][0]["slug"] == "metalcore"
+        assert data["top_genres"]["items"][0]["share"] == 0.42
+        assert data["top_genres"]["items"][0]["weight"] == 6.5
         assert data["replay"]["title"] == "Replay this quarter"
         assert (
             data["replay"]["items"][0]["global_album_uid"]

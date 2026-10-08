@@ -7,21 +7,28 @@
     "dev": "vite --host 127.0.0.1 --port 5178 --strictPort",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4178",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build:app": "tauri build --bundles app",
-    "tauri:build": "tauri build --bundles app",
-    "tauri:build:macos": "tauri build --bundles app",
-    "tauri:build:linux": "tauri build --bundles appimage,deb,rpm",
-    "tauri:build:windows": "tauri build --bundles nsis,msi",
-    "tauri:build:all": "tauri build",
+    "tauri": "node scripts/tauri-cli.mjs",
+    "tauri:dev": "node scripts/tauri-cli.mjs dev",
+    "tauri:build:app": "node scripts/tauri-cli.mjs build --bundles app",
+    "tauri:build": "node scripts/tauri-cli.mjs build --bundles app",
+    "tauri:build:macos": "node scripts/tauri-cli.mjs build --bundles app",
+    "tauri:build:linux": "node scripts/tauri-cli.mjs build --bundles appimage,deb,rpm",
+    "tauri:build:windows": "node scripts/tauri-cli.mjs build --bundles nsis,msi",
+    "tauri:build:windows:nsis": "node scripts/tauri-cli.mjs build --bundles nsis",
+    "tauri:build:all": "node scripts/tauri-cli.mjs build",
+    "build:http-resource-probe": "vite build --config scripts/http-resource-probe/vite.config.ts",
+    "test:glibc": "node --test scripts/verify-linux-glibc.node-test.mjs",
+    "test:version": "node --test scripts/desktop-version.node-test.mjs",
+    "test": "vitest run --config vite.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@crate/ui": "*",
+    "@sentry/react": "^10.69.0",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-deep-link": "^2.4.9",
-    "@tauri-apps/plugin-http": "^2.5.9",
+    "@tauri-apps/plugin-fs": "^2.6.0",
+    "@tauri-apps/plugin-http": "file:vendor/plugin-http-js",
     "@tauri-apps/plugin-opener": "^2.0.0",
     "@vitejs/plugin-react": "^6.0.1",
     "i18next": "^26.3.4",
@@ -35,9 +42,11 @@
     "vite": "^8.0.3"
   },
   "devDependencies": {
+    "@sentry/vite-plugin": "^5.4.0",
     "@tailwindcss/vite": "^4.2.2",
-    "@tauri-apps/cli": "^2.0.0",
+    "@tauri-apps/cli": "^2.12.0",
     "tailwindcss": "^4.2.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.4"
   }
 }

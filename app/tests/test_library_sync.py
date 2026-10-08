@@ -1149,6 +1149,68 @@ class TestRemoveStale:
                 mock_delete.assert_called_once_with("Gone Artist")
 
 
+class TestDuplicateArtistMerge:
+    def test_stale_artist_identity_is_not_counted_as_merged(self):
+        from crate.artist_lifecycle import ArtistIdentityChangedError
+        from crate.library_sync import LibrarySync
+
+        sync = LibrarySync({"library_path": "/tmp/fake", "audio_extensions": [".flac"]})
+        artists = [
+            {"name": "Artist", "album_count": 2, "track_count": 20},
+            {"name": "artist", "album_count": 1, "track_count": 10},
+        ]
+
+        with (
+            patch(
+                "crate.library_sync.get_all_artist_names_and_counts",
+                return_value=artists,
+            ),
+            patch(
+                "crate.library_sync.run_artist_deletion",
+                side_effect=ArtistIdentityChangedError("stale artist"),
+            ),
+            patch("crate.library_sync.merge_artist_into") as mock_merge,
+        ):
+            merged = sync._merge_duplicate_artists()
+
+        assert merged == 0
+        mock_merge.assert_not_called()
+
+
+class TestStaleArtistRemoval:
+    def test_stale_identity_does_not_abort_the_remaining_cleanup(self):
+        from crate.artist_lifecycle import ArtistIdentityChangedError
+        from crate.library_sync import LibrarySync
+
+        sync = LibrarySync({"library_path": "/tmp/fake", "audio_extensions": [".flac"]})
+        artists = [
+            {
+                "name": ".internal",
+                "folder_name": ".internal",
+                "album_count": 0,
+                "track_count": 0,
+            }
+        ]
+
+        with (
+            patch(
+                "crate.library_sync.get_library_artists",
+                return_value=(artists, 1),
+            ),
+            patch(
+                "crate.library_sync.delete_artist",
+                side_effect=ArtistIdentityChangedError("stale artist"),
+            ),
+            patch(
+                "crate.library_sync.get_all_album_paths", return_value=[]
+            ) as mock_album_scan,
+        ):
+            removed = sync.remove_stale()
+
+        assert removed == 0
+        mock_album_scan.assert_called_once()
+
+
 class TestParseInt:
     def test_normal_int(self):
         from crate.library_sync import _parse_int

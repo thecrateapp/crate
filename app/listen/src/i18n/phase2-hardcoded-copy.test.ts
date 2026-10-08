@@ -70,7 +70,7 @@ const filesToForbiddenCopy: Record<string, string[]> = {
     "Failed to update follow status",
     "Play top tracks",
   ],
-  "components/playlists/PlaylistListRow.tsx": [
+  "components/playlists/PlaylistCard.tsx": [
     "This playlist has no playable tracks yet",
     "Failed to load playlist",
   ],

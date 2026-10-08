@@ -17,6 +17,7 @@ _QUEUE_ITEM_KEYS = {
     "track_id",
     "track_entity_uid",
     "entity_uid",
+    "subsonic_id",
     "path",
     "title",
     "artist",
@@ -518,6 +519,34 @@ def get_resume_candidate(
     if not state:
         return None
     return project_live_position(state)
+
+
+def get_device_playback_state(user_id: int, *, device_id: str) -> dict | None:
+    """Load one authorized device snapshot without considering other devices."""
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    """
+                    SELECT s.*, d.device_label
+                    FROM user_playback_device_states s
+                    JOIN user_devices d
+                      ON d.user_id = s.user_id
+                     AND d.device_id = s.device_id
+                    WHERE s.user_id = :user_id
+                      AND s.device_id = :device_id
+                      AND d.revoked_at IS NULL
+                      AND (s.expires_at IS NULL OR s.expires_at > NOW())
+                      AND s.status != 'stopped'
+                    LIMIT 1
+                    """
+                ),
+                {"user_id": user_id, "device_id": device_id},
+            )
+            .mappings()
+            .first()
+        )
+    return _state_from_row(dict(row) if row else None)
 
 
 def project_live_position(state: dict) -> dict:

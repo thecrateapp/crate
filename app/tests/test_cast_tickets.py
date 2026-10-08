@@ -117,6 +117,10 @@ def test_cast_ticket_api_creates_auto_receiver_safe_urls(test_app, monkeypatch):
 
     response = test_app.post(
         "/api/me/cast/tickets",
+        headers={
+            "x-forwarded-host": "listen.example.test",
+            "x-forwarded-proto": "https",
+        },
         json={
             "track_entity_uid": track_entity_uid,
             "purpose": "google_cast",
@@ -126,11 +130,99 @@ def test_cast_ticket_api_creates_auto_receiver_safe_urls(test_app, monkeypatch):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["stream_url"] == ("http://testserver/api/cast/stream/signed-ticket")
-    assert data["metadata_url"] == ("http://testserver/api/cast/media/signed-ticket")
+    assert data["stream_url"] == (
+        "https://listen.example.test/api/cast/stream/signed-ticket"
+    )
+    assert data["metadata_url"] == (
+        "https://listen.example.test/api/cast/media/signed-ticket"
+    )
     assert data["delivery_policy"] == "auto"
     assert calls["user_id"] == 1
     assert calls["target_device_id"] == "kitchen-chromecast"
+
+
+def test_cast_ticket_urls_prefer_configured_public_api_base(test_app, monkeypatch):
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+    monkeypatch.setenv("CRATE_PUBLIC_API_BASE_URL", "https://api.example.test/")
+    monkeypatch.setattr(
+        "crate.api.cast.get_track_delivery_row_by_id",
+        lambda _track_id: {"id": 7, "path": "Artist/Album/track.mp3"},
+    )
+    monkeypatch.setattr(
+        "crate.api.cast.create_cast_ticket",
+        lambda _user_id, **_kwargs: {
+            "ticket": "signed-ticket",
+            "expires_at": expires_at,
+            "delivery_policy": "auto",
+        },
+    )
+
+    response = test_app.post(
+        "/api/me/cast/tickets",
+        headers={
+            "host": "internal-api:8585",
+            "x-forwarded-host": "untrusted.example.test",
+            "x-forwarded-proto": "http",
+        },
+        json={"track_id": 7, "purpose": "google_cast"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["stream_url"] == (
+        "https://api.example.test/api/cast/stream/signed-ticket"
+    )
+    assert response.json()["metadata_url"] == (
+        "https://api.example.test/api/cast/media/signed-ticket"
+    )
+
+
+def test_cast_ticket_separates_sender_metadata_from_receiver_stream_origin(
+    test_app, monkeypatch
+):
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+    monkeypatch.setenv("CRATE_PUBLIC_API_BASE_URL", "https://api.example.test")
+    monkeypatch.setenv("CRATE_CAST_PUBLIC_BASE_URL", "http://192.168.1.20:8585")
+    monkeypatch.setattr(
+        "crate.api.cast.get_track_delivery_row_by_id",
+        lambda _track_id: {"id": 7, "path": "Artist/Album/track.mp3"},
+    )
+    monkeypatch.setattr(
+        "crate.api.cast.create_cast_ticket",
+        lambda _user_id, **_kwargs: {
+            "ticket": "signed-ticket",
+            "expires_at": expires_at,
+            "delivery_policy": "auto",
+        },
+    )
+
+    response = test_app.post(
+        "/api/me/cast/tickets",
+        json={"track_id": 7, "purpose": "google_cast"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["stream_url"] == (
+        "http://192.168.1.20:8585/api/cast/stream/signed-ticket"
+    )
+    assert response.json()["metadata_url"] == (
+        "https://api.example.test/api/cast/media/signed-ticket"
+    )
+
+
+def test_cast_public_routes_allow_receiver_cors_preflight():
+    with _unauthenticated_client() as client:
+        response = client.options(
+            "/api/cast/stream/signed-ticket",
+            headers={
+                "Origin": "https://receiver.example.test",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "Range",
+            },
+        )
+
+    assert response.status_code in {200, 204}
+    assert response.headers["access-control-allow-origin"] == "*"
+    assert "range" in response.headers["access-control-allow-headers"].lower()
 
 
 def test_cast_ticket_api_accepts_track_path(test_app, monkeypatch):
@@ -223,11 +315,20 @@ def test_cast_media_and_stream_use_original_for_cast_safe_source(tmp_path, monke
         assert media["requested_policy"] == ORIGINAL_POLICY
 
         stream_response = client.get(
-            "/api/cast/stream/signed-ticket", headers={"Range": "bytes=0-3"}
+            "/api/cast/stream/signed-ticket",
+            headers={
+                "Origin": "https://receiver.example.test",
+                "Range": "bytes=0-3",
+            },
         )
         assert stream_response.status_code == 206
         assert stream_response.content == b"0123"
         assert stream_response.headers["accept-ranges"] == "bytes"
+        assert stream_response.headers["access-control-allow-origin"] == "*"
+        assert (
+            "content-range"
+            in stream_response.headers["access-control-expose-headers"].lower()
+        )
         assert stream_response.headers["x-crate-delivery-policy"] == ORIGINAL_POLICY
     assert policies == [ORIGINAL_POLICY, ORIGINAL_POLICY]
     assert used == ["signed-ticket", "signed-ticket"]

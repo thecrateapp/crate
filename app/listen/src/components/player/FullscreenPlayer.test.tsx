@@ -15,8 +15,8 @@ vi.mock("@/lib/haptics", () => ({
   triggerHaptic: vi.fn(),
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
+vi.mock("@crate/ui/lib/notify", () => ({
+  notify: {
     success: vi.fn(),
     error: vi.fn(),
     info: vi.fn(),
@@ -24,6 +24,15 @@ vi.mock("sonner", () => ({
 }));
 
 const apiMock = vi.hoisted(() => vi.fn(() => Promise.resolve({})));
+
+const resolvedArtistMock = vi.hoisted(() => ({
+  value: null as {
+    id?: number;
+    globalArtistUid?: string;
+    name: string;
+    slug?: string;
+  } | null,
+}));
 
 vi.mock("@/lib/api", () => ({
   api: apiMock,
@@ -48,10 +57,13 @@ vi.mock("@/components/player/SpinningDisc", () => ({
 
 vi.mock("@/components/player/PlayerTrackIdentity", () => ({
   PlayerTrackIdentity: (props: Record<string, unknown>) => (
-    <div
-      data-testid="player-track-identity"
-      data-props={JSON.stringify(props)}
-    />
+    <div data-testid="player-track-identity" data-props={JSON.stringify(props)}>
+      <button
+        aria-label="Open artist"
+        disabled={!props.artistClickable}
+        onClick={() => (props.onArtistClick as (() => void) | undefined)?.()}
+      />
+    </div>
   ),
 }));
 
@@ -114,7 +126,7 @@ vi.mock("@/components/player/player-source", () => ({
 
 vi.mock("@/components/player/useResolvedPlayerArtist", () => ({
   useResolvedPlayerArtist: () => ({
-    resolvedArtist: null,
+    resolvedArtist: resolvedArtistMock.value,
     artistAvatarUrl: null,
     markArtistPhotoFailed: vi.fn(),
   }),
@@ -175,6 +187,15 @@ vi.mock("@/components/actions/ItemActionMenu", () => ({
     openFromTrigger: vi.fn(),
     close: vi.fn(),
     handleContextMenu: vi.fn(),
+  }),
+  useItemActionTarget: () => ({
+    onContextMenu: vi.fn(),
+    onKeyDown: vi.fn(),
+    onPointerDown: vi.fn(),
+    onPointerUp: vi.fn(),
+    onPointerCancel: vi.fn(),
+    onPointerLeave: vi.fn(),
+    onClickCapture: vi.fn(),
   }),
 }));
 
@@ -241,6 +262,7 @@ describe("FullscreenPlayer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     navigateMock.mockReset();
+    resolvedArtistMock.value = null;
     localStorage.removeItem("listen-eq-enabled");
     androidNativeEngineMock.shouldUseAndroidNativePlayer.mockReturnValue(false);
   });
@@ -334,6 +356,46 @@ describe("FullscreenPlayer", () => {
         expect(screen.getByLabelText("Play")).toBeInTheDocument();
       });
     });
+
+    it("uses semantic tokens for fullscreen static surfaces", async () => {
+      const track = makeTrack({ albumCover: undefined });
+      const user = userEvent.setup();
+      const { container } = renderWithListenProviders(
+        <FullscreenPlayer open onClose={vi.fn()} />,
+        {
+          playerActions: createMockPlayerActions({
+            currentTrack: track,
+            queue: [track],
+            currentIndex: 0,
+          }),
+        },
+      );
+
+      expect(
+        container.querySelector(".fullscreen-player-surface"),
+      ).toBeInTheDocument();
+      expect(
+        container.querySelector(".fullscreen-player-handle"),
+      ).toBeInTheDocument();
+
+      await user.click(screen.getByLabelText("Show album cover"));
+
+      await waitFor(() => {
+        expect(
+          container.querySelector(".fullscreen-player-artwork-placeholder"),
+        ).toBeInTheDocument();
+        expect(
+          container.querySelector(".fullscreen-player-artwork-icon"),
+        ).toBeInTheDocument();
+      });
+
+      expect(container.innerHTML).not.toContain("bg-white/20");
+      expect(container.innerHTML).not.toContain("bg-white/5");
+      expect(container.innerHTML).not.toContain("text-white");
+      expect(container.innerHTML).not.toContain("shadow-black/60");
+      expect(container.innerHTML).not.toContain("text-muted-foreground");
+      expect(container.innerHTML).not.toContain("#1a2030");
+    });
   });
 
   // ════════════════════════════════════════════════════════════════════
@@ -356,6 +418,51 @@ describe("FullscreenPlayer", () => {
         const props = JSON.parse(identity.dataset.props || "{}");
         expect(props.currentTrack.id).toBe("t1");
       });
+    });
+
+    it("keeps the artist badge clickable when only a global artist identity is available", async () => {
+      resolvedArtistMock.value = {
+        globalArtistUid: "artist-global-1",
+        name: "Test Artist",
+      };
+      const track = makeTrack({ globalArtistUid: "artist-global-1" });
+
+      renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track],
+          currentIndex: 0,
+        }),
+      });
+
+      await waitFor(() => {
+        const identity = screen.getByTestId("player-track-identity");
+        const props = JSON.parse(identity.dataset.props || "{}");
+        expect(props.artistClickable).toBe(true);
+      });
+    });
+
+    it("navigates to the artist when the artist badge is clicked", async () => {
+      resolvedArtistMock.value = {
+        id: 42,
+        name: "Test Artist",
+        slug: "test-artist",
+      };
+      const track = makeTrack({ artist: "Test Artist" });
+
+      renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track],
+          currentIndex: 0,
+        }),
+      });
+
+      await userEvent
+        .setup()
+        .click(screen.getByRole("button", { name: "Open artist" }));
+
+      expect(navigateMock).toHaveBeenCalledWith("/artists/test-artist");
     });
 
     it("displays formatted current time and remaining time", async () => {
@@ -861,6 +968,51 @@ describe("FullscreenPlayer", () => {
       });
       expect(queueSwitch).toHaveAttribute("aria-pressed", "false");
     });
+
+    it("uses semantic tokens for active panel and transport states", async () => {
+      const track = makeTrack();
+      const user = userEvent.setup();
+
+      renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track],
+          currentIndex: 0,
+          shuffle: true,
+          repeat: "one",
+        }),
+      });
+
+      const shuffle = await screen.findByRole("button", {
+        name: "Disable shuffle",
+      });
+      const repeat = screen.getByRole("button", { name: "Repeat: one" });
+      expect(shuffle).toHaveClass(
+        "text-accent-action",
+        "drop-shadow-accent-action",
+      );
+      expect(repeat).toHaveClass(
+        "text-accent-action",
+        "drop-shadow-accent-action",
+      );
+
+      const queueSwitch = screen.getByRole("button", { name: "Queue" });
+      expect(queueSwitch).toHaveClass(
+        "text-text-muted",
+        "active:text-text-secondary",
+      );
+
+      await user.click(queueSwitch);
+
+      expect(queueSwitch).toHaveClass(
+        "text-accent-action",
+        "drop-shadow-accent-action-icon",
+      );
+      expect(queueSwitch.querySelector('[aria-hidden="true"]')).toHaveClass(
+        "bg-accent-action",
+        "shadow-accent-action-indicator-active",
+      );
+    });
   });
 
   // ════════════════════════════════════════════════════════════════════
@@ -1016,7 +1168,7 @@ describe("FullscreenPlayer", () => {
       await user.click(screen.getByText("Queue"));
 
       await waitFor(() => {
-        expect(screen.getByText(/Up Next · 5 tracks/)).toBeInTheDocument();
+        expect(screen.getByText("Next up (5)")).toBeInTheDocument();
       });
     });
 
@@ -1101,6 +1253,34 @@ describe("FullscreenPlayer", () => {
 
       await user.click(screen.getByText("Queue One"));
       expect(actions.jumpTo).toHaveBeenCalledWith(1);
+    });
+
+    it("uses semantic tokens for queue rows", async () => {
+      const track = makeTrack();
+      const qTrack = makeQueueTrack({ title: "Queue One" }, 0);
+      const user = userEvent.setup();
+
+      renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track, qTrack],
+          currentIndex: 0,
+        }),
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Queue")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText("Queue"));
+
+      const queueRow = await screen.findByText("Queue One");
+      const row = queueRow.closest('[role="row"]');
+
+      expect(row).toHaveClass("track-row");
+      expect(row).toHaveAttribute("data-density", "compact");
+      expect(queueRow).toHaveClass("text-text-primary");
+      expect(row?.className).not.toContain("white/");
     });
   });
 
@@ -1204,8 +1384,10 @@ describe("FullscreenPlayer", () => {
       expect(activeLine).toHaveClass(
         "text-[1.9rem]",
         "font-extrabold",
-        "text-white",
+        "text-text-primary",
+        "lyrics-active-line",
       );
+      expect(activeLine.className).not.toContain("rgba(");
       expect(nextLine).toHaveClass("text-[1.55rem]");
       expect(nextLine.className).toContain("blur-[0.35px]");
     });
@@ -1226,10 +1408,9 @@ describe("FullscreenPlayer", () => {
       });
 
       await waitFor(() => {
-        const dragHandle = document.querySelector(".w-10.h-1");
+        const dragHandle = document.querySelector(".fullscreen-player-handle");
         expect(dragHandle).toBeInTheDocument();
         expect(dragHandle?.className).toContain("rounded-full");
-        expect(dragHandle?.className).toContain("bg-white/20");
       });
     });
 
@@ -1275,6 +1456,61 @@ describe("FullscreenPlayer", () => {
       await waitFor(() => {
         expect(screen.getByLabelText("Show album cover")).toBeInTheDocument();
       });
+    });
+
+    it("uses semantic tokens for secondary player actions", async () => {
+      const track = makeTrack();
+      localStorage.setItem("listen-eq-enabled", "true");
+      const user = userEvent.setup();
+      renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track],
+          currentIndex: 0,
+        }),
+      });
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Like track")).toBeInTheDocument();
+      });
+
+      const like = screen.getByLabelText("Like track");
+      expect(like).toHaveClass(
+        "border-border-subtle",
+        "bg-surface-control",
+        "active:bg-surface-control-hover",
+      );
+      expect(like).toHaveAttribute("aria-pressed", "false");
+      expect(screen.getByTestId("fullscreen-like-heart")).toBeInTheDocument();
+
+      for (const button of [
+        screen.getByLabelText("Equalizer"),
+        screen.getByLabelText("Show album cover"),
+      ]) {
+        expect(button).toHaveClass(
+          "border-border-subtle",
+          "bg-surface-control",
+          "text-text-secondary",
+          "active:bg-surface-control-hover",
+          "active:text-text-primary",
+        );
+        expect(button.className).not.toContain("white/");
+      }
+
+      const equalizer = screen.getByLabelText("Equalizer");
+      await user.click(equalizer);
+      expect(equalizer).toHaveClass(
+        "text-accent-action",
+        "drop-shadow-accent-action",
+      );
+
+      expect(screen.getByTestId("player-track-menu")).toHaveClass(
+        "border-border-subtle",
+        "bg-surface-control",
+        "text-text-secondary",
+        "active:bg-surface-control-hover",
+        "active:text-text-primary",
+      );
     });
   });
 

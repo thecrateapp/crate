@@ -136,14 +136,6 @@ describe("Home", () => {
   beforeEach(() => {
     viewportState.isDesktop = false;
     vi.stubGlobal("EventSource", MockEventSource);
-    vi.stubGlobal(
-      "ResizeObserver",
-      class ResizeObserver {
-        observe() {}
-        unobserve() {}
-        disconnect() {}
-      },
-    );
     vi.mocked(useApi).mockReturnValue({
       data: homeDiscoveryPayload(),
       loading: false,
@@ -195,7 +187,7 @@ describe("Home", () => {
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
   });
 
-  it("keeps Custom mixes and the library rail out of the desktop home", () => {
+  it("keeps Custom mixes out of the desktop home but shows Just landed", () => {
     viewportState.isDesktop = true;
     vi.mocked(useApi).mockReturnValue({
       data: homeDiscoveryPayloadWithDiscoveryRails(),
@@ -208,7 +200,7 @@ describe("Home", () => {
 
     expect(screen.queryByText("Custom mixes")).toBeNull();
     expect(screen.getByText("Featured Artist")).toBeInTheDocument();
-    expect(screen.queryByText("Just landed")).toBeNull();
+    expect(screen.getByText("Just landed")).toBeInTheDocument();
   });
 
   it("composes the desktop greeting inside the hero without overlapping the rails", () => {
@@ -222,7 +214,7 @@ describe("Home", () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getByTestId("home-discovery-content")).toHaveClass(
-      "max-w-[1480px]",
+      "max-w-content",
       "relative",
       "z-30",
       "mt-0",

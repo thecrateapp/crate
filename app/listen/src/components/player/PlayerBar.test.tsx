@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -6,8 +6,10 @@ import {
   renderWithListenProviders,
 } from "@/test/render-with-listen-providers";
 import { setEqualizerEnabled } from "@/lib/equalizer-prefs";
+import type { Track } from "@/contexts/player-types";
+import { longPress, pressMenuKey } from "@/test/item-action-gestures";
 
-import { PlayerBar } from "./PlayerBar";
+import { PlayerBar, PlayerSurfaceFallback } from "./PlayerBar";
 
 const useIsDesktopMock = vi.hoisted(() => vi.fn(() => false));
 const isLikedMock = vi.hoisted(() => vi.fn(() => false));
@@ -71,8 +73,8 @@ vi.mock("@/lib/haptics", () => ({
   triggerHaptic: triggerHapticMock,
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
+vi.mock("@crate/ui/lib/notify", () => ({
+  notify: {
     success: toastSuccessMock,
     error: vi.fn(),
   },
@@ -96,8 +98,13 @@ vi.mock("@/components/player/lazy-player-surfaces", () => ({
   preloadQueuePanel: vi.fn(),
 }));
 
-vi.mock("@/components/player/bar/PlayerTrackMenu", () => ({
-  PlayerTrackMenu: () => <div data-testid="player-track-menu" />,
+vi.mock("@/components/player/bar/PlayerTrackMenu", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/components/player/bar/PlayerTrackMenu")
+  >()),
+  PlayerTrackMenuContent: ({ currentTrack }: { currentTrack: Track }) => (
+    <div data-testid="player-track-menu">{currentTrack.title}</div>
+  ),
 }));
 
 vi.mock("@/components/player/bar/PlayerVolumeControl", () => ({
@@ -129,6 +136,7 @@ describe("PlayerBar mobile mini-player", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    localStorage.removeItem("listen-fs-player-open");
   });
 
   it("does not render like or contextual actions in the mobile mini-player", () => {
@@ -143,6 +151,28 @@ describe("PlayerBar mobile mini-player", () => {
 
     expect(screen.queryByLabelText("Like track")).toBeNull();
     expect(screen.queryByTestId("player-track-menu")).toBeNull();
+  });
+
+  it("uses semantic tokens for player surface fallbacks", () => {
+    const mobileFallback = renderWithListenProviders(<PlayerSurfaceFallback />);
+    const fullscreenFallback = renderWithListenProviders(
+      <PlayerSurfaceFallback fullscreen />,
+    );
+
+    expect(
+      mobileFallback.container.querySelector(".listen-player-surface-fallback"),
+    ).toBeInTheDocument();
+    expect(
+      fullscreenFallback.container.querySelector(
+        ".listen-player-fullscreen-scrim",
+      ),
+    ).toBeInTheDocument();
+    expect(mobileFallback.container.innerHTML).not.toMatch(
+      /(?:border|text|bg)-(?:white|black|primary|muted)|rgba\(|shadow-\[/,
+    );
+    expect(fullscreenFallback.container.innerHTML).not.toMatch(
+      /(?:border|text|bg)-(?:white|black|primary|muted)|rgba\(|shadow-\[/,
+    );
   });
 
   it("leaves the mobile dock glass to the shared Shell backdrop", () => {
@@ -172,6 +202,163 @@ describe("PlayerBar mobile mini-player", () => {
     expect(container.querySelector(".listen-mobile-player-glass")).toBeNull();
   });
 
+  it("uses semantic tokens for the desktop progress control", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const track = createMockTrack({
+      title: "Semantic Progress",
+      artist: "Crate",
+    });
+
+    const { container } = renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    const progress = container.querySelector(".listen-player-progress");
+
+    expect(progress).toBeInTheDocument();
+    expect(
+      progress?.querySelector(".listen-player-progress-track"),
+    ).toBeInTheDocument();
+    expect(progress?.innerHTML).not.toContain("rgba(");
+  });
+
+  it("uses semantic tokens for desktop transport controls", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const track = createMockTrack({
+      title: "Semantic Transport",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    for (const label of [
+      "Enable shuffle",
+      "Previous track",
+      "Next track",
+      "Repeat: off",
+    ]) {
+      const buttons = screen.getAllByRole("button", { name: label });
+
+      for (const button of buttons) {
+        expect(button.className).toContain("text-text-");
+        expect(button.className).toContain("hover:text-accent-action");
+        expect(button.className).toContain("hover:drop-shadow-accent-action");
+        expect(button.className).not.toContain("text-white/");
+        expect(button.className).not.toContain("rgba(");
+      }
+    }
+  });
+
+  it("uses semantic tokens for the desktop shell and track identity", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const track = createMockTrack({
+      title: "Semantic Shell Track",
+      artist: "Crate",
+    });
+
+    const { container } = renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    const shell = container.querySelector(".listen-player-shell");
+    const artwork = container.querySelector(".listen-player-artwork");
+
+    expect(shell).toBeInTheDocument();
+    expect(artwork).toBeInTheDocument();
+    expect(screen.getByText("Semantic Shell Track")).toHaveClass(
+      "text-text-primary",
+    );
+    expect(screen.getByText("Crate")).toHaveClass("text-text-muted");
+    expect(shell?.outerHTML).not.toMatch(
+      /(?:border|text|bg)-(?:white|black|primary|muted)|rgba\(|shadow-\[/,
+    );
+  });
+
+  it("uses the accent token for active shuffle and repeat states", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const track = createMockTrack({
+      title: "Active Transport",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: {
+        currentTrack: track,
+        queue: [track],
+        shuffle: true,
+        repeat: "one",
+      },
+    });
+
+    const activeGlow = "drop-shadow-accent-action";
+
+    expect(screen.getByRole("button", { name: "Disable shuffle" })).toHaveClass(
+      "text-accent-action",
+      activeGlow,
+    );
+    expect(screen.getByRole("button", { name: "Repeat: one" })).toHaveClass(
+      "text-accent-action",
+      activeGlow,
+    );
+  });
+
+  it("uses semantic tokens for desktop player actions", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const track = createMockTrack({
+      title: "Semantic Actions",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    for (const label of ["Queue", "Lyrics", "Expand player"]) {
+      const buttons = screen.getAllByRole("button", { name: label });
+
+      for (const button of buttons) {
+        expect(button.className).toContain("text-text-");
+        expect(button.className).toContain("hover:text-accent-action");
+        expect(button.className).toContain("hover:drop-shadow-accent-action");
+        expect(button.className).not.toContain("text-white/");
+        expect(button.className).not.toContain("rgba(");
+      }
+    }
+  });
+
+  it("uses compact counter typography for the desktop queue count", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const currentTrack = createMockTrack({
+      id: "queue-current",
+      title: "Current Track",
+      artist: "Crate",
+    });
+    const nextTrack = createMockTrack({
+      id: "queue-next",
+      title: "Next Track",
+      artist: "Crate",
+    });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: {
+        currentTrack,
+        currentIndex: 0,
+        queue: [currentTrack, nextTrack],
+      },
+    });
+
+    const queueCounter = screen
+      .getAllByRole("button", { name: "Queue" })
+      .map((button) => within(button).queryByText("1"))
+      .find((node): node is HTMLElement => node !== null);
+
+    expect(queueCounter).toHaveTextContent("1");
+    expect(queueCounter).toHaveClass("text-counter");
+    expect(queueCounter).not.toHaveClass("text-xs");
+  });
+
   it("hides the desktop Equalizer access when the global toggle is disabled", async () => {
     useIsDesktopMock.mockReturnValue(true);
     localStorage.setItem("listen-eq-enabled", "true");
@@ -193,13 +380,8 @@ describe("PlayerBar mobile mini-player", () => {
     });
   });
 
-  it("likes the current track with a long press on the cover", async () => {
-    vi.useFakeTimers();
+  it("opens the track menu with a long press without opening fullscreen", async () => {
     const track = createMockTrack({
-      id: "track-long-press",
-      entityUid: "track-uid",
-      libraryTrackId: 42,
-      path: "/music/long-press.flac",
       title: "Long Press Song",
       artist: "Crate",
       albumCover: "https://example.test/cover.jpg",
@@ -209,19 +391,31 @@ describe("PlayerBar mobile mini-player", () => {
       playerActions: { currentTrack: track, queue: [track] },
     });
 
-    fireEvent.touchStart(screen.getByLabelText("Track artwork"), {
-      touches: [{ clientX: 10, clientY: 10 }],
-    });
-    await vi.advanceTimersByTimeAsync(550);
+    const trackArea = screen.getByLabelText("Open fullscreen player");
+    expect(trackArea).toHaveClass("item-action-target");
+    expect(screen.queryByTestId("player-track-menu")).toBeNull();
 
-    expect(likeTrackMock).toHaveBeenCalledWith(
-      42,
-      "track-uid",
-      "/music/long-press.flac",
-      null,
+    await longPress(trackArea);
+    fireEvent.click(trackArea);
+
+    expect(screen.getByTestId("player-track-menu")).toHaveTextContent(
+      "Long Press Song",
     );
-    expect(triggerHapticMock).toHaveBeenCalledWith("selection");
-    expect(toastSuccessMock).toHaveBeenCalledWith("Added to liked tracks");
+    expect(screen.queryByTestId("fullscreen-player")).toBeNull();
+    expect(likeTrackMock).not.toHaveBeenCalled();
+  });
+
+  it("opens fullscreen on a regular tap of the mobile track area", () => {
+    const track = createMockTrack({ title: "Tap Song", artist: "Crate" });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    fireEvent.click(screen.getByLabelText("Open fullscreen player"));
+
+    expect(screen.getByTestId("fullscreen-player")).toBeInTheDocument();
+    expect(screen.queryByTestId("player-track-menu")).toBeNull();
   });
 
   it("shows a liked indicator on the cover when the current track is liked", () => {
@@ -265,7 +459,7 @@ describe("PlayerBar mobile mini-player", () => {
     });
 
     const trackButton = screen.getByLabelText("Open fullscreen player");
-    const mobileRow = trackButton.parentElement;
+    const mobileRow = trackButton.parentElement?.parentElement;
     const mobilePlayButton = screen
       .getAllByRole("button", { name: "Play" })
       .find((button) => button.className.includes("h-12"));
@@ -306,7 +500,7 @@ describe("PlayerBar mobile mini-player", () => {
       .find((button) => button.className.includes("h-12"));
     const nextButton = screen
       .getAllByRole("button", { name: "Next track" })
-      .find((button) => button.className.includes("h-12"));
+      .find((button) => button.className.includes("size-12"));
 
     expect(playButton).toBeDefined();
     expect(nextButton).toBeDefined();
@@ -348,7 +542,7 @@ describe("PlayerBar mobile mini-player", () => {
       .find((button) => button.className.includes("h-12"));
     const nextButton = screen
       .getAllByRole("button", { name: "Next track" })
-      .find((button) => button.className.includes("h-12"));
+      .find((button) => button.className.includes("size-12"));
 
     fireEvent.click(playButton!);
     fireEvent.click(nextButton!);
@@ -357,5 +551,114 @@ describe("PlayerBar mobile mini-player", () => {
     expect(nextButton).toBeDisabled();
     expect(togglePlayPause).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
+  });
+});
+
+describe("PlayerBar desktop track identity", () => {
+  beforeEach(() => {
+    useIsDesktopMock.mockReturnValue(true);
+    isLikedMock.mockReturnValue(false);
+    likeTrackMock.mockClear();
+    unlikeTrackMock.mockClear();
+  });
+
+  function renderDesktopBar(overrides: Partial<Track> = {}) {
+    const track = createMockTrack({
+      id: "desktop-track",
+      entityUid: "desktop-uid",
+      libraryTrackId: 7,
+      path: "/music/desktop.flac",
+      title: "Desktop Song",
+      artist: "Crate",
+      albumId: 3,
+      artistId: 5,
+      ...overrides,
+    });
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+    return track;
+  }
+
+  it("does not render a more actions button in the bar", () => {
+    renderDesktopBar();
+
+    expect(
+      screen.queryByRole("button", { name: "More actions" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("player-track-menu")).toBeNull();
+  });
+
+  it("opens the track menu on right click of the track area", () => {
+    renderDesktopBar();
+
+    fireEvent.contextMenu(screen.getByRole("button", { name: "Desktop Song" }));
+
+    expect(screen.getByTestId("player-track-menu")).toHaveTextContent(
+      "Desktop Song",
+    );
+  });
+
+  it("opens the track menu with the ContextMenu key on the title link", () => {
+    renderDesktopBar();
+
+    pressMenuKey(screen.getByRole("button", { name: "Desktop Song" }));
+
+    expect(screen.getByTestId("player-track-menu")).toBeInTheDocument();
+  });
+
+  it("opens the track menu with Shift+F10 on the artist link", () => {
+    renderDesktopBar();
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "Crate" }), {
+      key: "F10",
+      shiftKey: true,
+    });
+
+    expect(screen.getByTestId("player-track-menu")).toBeInTheDocument();
+  });
+
+  it("does not open the track menu from the heart", () => {
+    renderDesktopBar();
+
+    fireEvent.contextMenu(screen.getByRole("button", { name: "Like track" }));
+
+    expect(screen.queryByTestId("player-track-menu")).toBeNull();
+  });
+
+  it("renders the animated follow heart and likes the track", () => {
+    renderDesktopBar();
+
+    const heart = screen.getByRole("button", { name: "Like track" });
+    expect(heart).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("player-bar-like-heart")).toBeInTheDocument();
+
+    fireEvent.click(heart);
+
+    expect(screen.getByTestId("player-bar-like-particles")).toBeInTheDocument();
+    expect(likeTrackMock).toHaveBeenCalledWith(
+      7,
+      "desktop-uid",
+      "/music/desktop.flac",
+      null,
+    );
+    expect(screen.queryByTestId("player-track-menu")).toBeNull();
+  });
+
+  it("unlikes the track from the active heart", () => {
+    isLikedMock.mockReturnValue(true);
+    renderDesktopBar();
+
+    const heart = screen.getByRole("button", { name: "Unlike track" });
+    expect(heart).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(heart);
+
+    expect(unlikeTrackMock).toHaveBeenCalledWith(
+      7,
+      "desktop-uid",
+      "/music/desktop.flac",
+      null,
+    );
   });
 });

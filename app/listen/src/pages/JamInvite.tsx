@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Loader2 } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { api } from "@/lib/api";
 
@@ -21,31 +21,29 @@ export function JamInvite() {
     )
       .then((response) => {
         if (cancelled) return;
-        toast.success(
+        notify.success(
           t("jamInvite.toasts.joined", { name: response.room.name }),
         );
         navigate(`/jam/rooms/${response.room.id}`, { replace: true });
       })
       .catch(() => {
         if (cancelled) return;
-        toast.error(t("jamInvite.toasts.invalid"));
+        notify.error(t("jamInvite.toasts.invalid"));
         navigate("/jam", { replace: true });
       });
     return () => {
       cancelled = true;
     };
-  }, [navigate, token]);
+  }, [navigate, t, token]);
 
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center">
-      <Loader2 size={22} className="animate-spin text-primary" />
+      <Loader2 size={22} className="animate-spin text-accent-action" />
       <div>
-        <p className="text-lg font-medium text-foreground">
+        <p className="text-lg font-medium text-text-primary">
           {t("jamInvite.title")}
         </p>
-        <p className="text-sm text-muted-foreground">
-          {t("jamInvite.subtitle")}
-        </p>
+        <p className="text-sm text-text-muted">{t("jamInvite.subtitle")}</p>
       </div>
     </div>
   );

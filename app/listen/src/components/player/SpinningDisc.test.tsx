@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/components/artwork/CrateImage", () => ({
@@ -11,6 +11,7 @@ vi.mock("@/components/artwork/CrateImage", () => ({
 }));
 
 import { SpinningDisc } from "@/components/player/SpinningDisc";
+import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 const bounds = {
   bottom: 200,
@@ -29,7 +30,7 @@ function renderDisc(props: Partial<Parameters<typeof SpinningDisc>[0]> = {}) {
   const onTogglePlay = vi.fn();
   const onPlaybackRateChange = vi.fn();
 
-  render(
+  renderWithListenProviders(
     <SpinningDisc
       currentTime={30}
       duration={120}
@@ -72,6 +73,23 @@ describe("SpinningDisc", () => {
       "src",
       "/api/albums/1/cover",
     );
+  });
+
+  it("uses semantic tokens for the disc surfaces and play control", () => {
+    const { surface } = renderDisc();
+    const playButton = screen.getByRole("button", { name: "Play" });
+    const discContainer = surface.parentElement;
+
+    expect(surface).toHaveClass("spinning-disc-surface");
+    expect(discContainer?.querySelector(".spinning-disc-ambient")).toBeTruthy();
+    expect(surface.querySelector(".spinning-disc-rotor")).toBeTruthy();
+    expect(surface.querySelector(".spinning-disc-overlay")).toBeTruthy();
+    expect(playButton).toHaveClass("spinning-disc-control");
+    expect(
+      playButton.querySelector(".spinning-disc-control-ring"),
+    ).toBeTruthy();
+    expect(surface.outerHTML).not.toContain("rgba(");
+    expect(surface.outerHTML).not.toContain("border-white");
   });
 
   it("seeks while dragging in live jog mode", () => {

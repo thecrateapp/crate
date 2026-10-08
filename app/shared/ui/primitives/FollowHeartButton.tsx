@@ -7,7 +7,8 @@ import {
   type ReactNode,
 } from "react";
 
-import { Heart, HeartBold } from "../icons";
+import { Heart, HeartBold } from "../icons/media";
+import { Loader2 } from "../icons/status";
 import { cn } from "../lib/cn";
 
 type FollowAnimation = "follow" | "unfollow" | null;
@@ -166,6 +167,9 @@ interface FollowHeartButtonProps
   children?: ReactNode;
   heartTestId?: string;
   particlesTestId?: string;
+  loading?: boolean;
+  label?: string;
+  labelActive?: string;
 }
 
 export function FollowHeartButton({
@@ -177,6 +181,10 @@ export function FollowHeartButton({
   particlesTestId,
   onClick,
   type = "button",
+  loading = false,
+  label,
+  labelActive,
+  disabled,
   ...props
 }: FollowHeartButtonProps) {
   const [followAnimation, setFollowAnimation] = useState<FollowAnimation>(null);
@@ -211,12 +219,17 @@ export function FollowHeartButton({
       {...props}
       type={type}
       aria-pressed={following}
+      aria-label={
+        props["aria-label"] ?? (following ? labelActive ?? label : label)
+      }
+      aria-busy={loading || undefined}
+      disabled={disabled || loading}
       className={cn(
-        "relative inline-flex items-center justify-center gap-1.5 transition-[color,filter,transform]",
+        "relative inline-flex items-center justify-center gap-1.5 outline-none transition-[color,filter,transform,box-shadow] focus-visible:shadow-focus disabled:opacity-50",
         className,
         isActive
-          ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
-          : "text-white/80",
+          ? "text-accent-action drop-shadow-accent-action"
+          : "text-text-primary/80",
       )}
       onClick={handleClick}
     >
@@ -280,12 +293,19 @@ export function FollowHeartButton({
             })}
           </span>
         ) : null}
-        {isActive ? (
+        {loading ? (
+          <Loader2
+            data-testid={heartTestId}
+            aria-hidden="true"
+            size={iconSize}
+            className="animate-spin"
+          />
+        ) : isActive ? (
           <HeartBold
             data-testid={heartTestId}
             size={iconSize}
             className={cn(
-              "text-primary animate-crate-icon-active-pulse",
+              "text-accent-action animate-crate-icon-active-pulse",
               followAnimation === "follow"
                 ? "crate-follow-heart-in"
                 : followAnimation === "unfollow"

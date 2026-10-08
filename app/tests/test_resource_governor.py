@@ -27,6 +27,58 @@ def test_resource_governor_defers_governed_task_when_load_is_high(monkeypatch):
     assert "load 1.00>0.50" in decision.reason
 
 
+def test_resource_governor_allows_default_listener_budget(monkeypatch):
+    from crate import resource_governor as governor
+
+    monkeypatch.setenv("CRATE_RESOURCE_GOVERNOR_ENABLED", "true")
+    monkeypatch.delenv("CRATE_RESOURCE_MAX_ACTIVE_USERS", raising=False)
+    monkeypatch.delenv("CRATE_RESOURCE_MAX_ACTIVE_STREAMS", raising=False)
+    monkeypatch.setattr(
+        governor,
+        "build_snapshot",
+        lambda include_playback=True: governor.ResourceSnapshot(
+            cpu_count=4,
+            load_1m=0.1,
+            load_ratio=0.025,
+            iowait_percent=0.0,
+            swap_used_percent=0.0,
+            memory_available_percent=80.0,
+            active_users=10,
+            active_streams=10,
+        ),
+    )
+
+    decision = governor.should_defer_task("materialize_artwork_variants")
+
+    assert decision.allowed is True
+
+
+def test_resource_governor_defers_above_default_listener_budget(monkeypatch):
+    from crate import resource_governor as governor
+
+    monkeypatch.setenv("CRATE_RESOURCE_GOVERNOR_ENABLED", "true")
+    monkeypatch.delenv("CRATE_RESOURCE_MAX_ACTIVE_USERS", raising=False)
+    monkeypatch.delenv("CRATE_RESOURCE_MAX_ACTIVE_STREAMS", raising=False)
+    snapshot = governor.ResourceSnapshot(
+        cpu_count=4,
+        load_1m=0.1,
+        load_ratio=0.025,
+        iowait_percent=0.0,
+        swap_used_percent=0.0,
+        memory_available_percent=80.0,
+        active_users=11,
+        active_streams=1,
+    )
+    monkeypatch.setattr(
+        governor, "build_snapshot", lambda include_playback=True: snapshot
+    )
+
+    decision = governor.should_defer_task("materialize_artwork_variants")
+
+    assert decision.allowed is False
+    assert "11 active listener(s)>10" in decision.reason
+
+
 def test_resource_governor_allows_non_governed_tasks_without_sampling(monkeypatch):
     from crate import resource_governor as governor
 
@@ -41,6 +93,30 @@ def test_resource_governor_allows_non_governed_tasks_without_sampling(monkeypatc
     decision = governor.should_defer_task("tidal_download")
 
     assert decision.allowed is True
+
+
+def test_cast_spectrum_is_governed_without_deferring_for_its_active_listener(
+    monkeypatch,
+):
+    from crate import resource_governor as governor
+
+    calls: list[tuple[str, bool]] = []
+    monkeypatch.setattr(
+        governor,
+        "evaluate_resources",
+        lambda *, label, listener_sensitive: (
+            calls.append((label, listener_sensitive))
+            or governor.ResourceDecision(allowed=True)
+        ),
+    )
+
+    decision = governor.should_defer_task("generate_cast_spectrum")
+
+    assert decision.allowed is True
+    assert "generate_cast_spectrum" in governor.RESOURCE_GOVERNED_TASK_TYPES
+    assert "generate_cast_spectrum" in governor.AUDIO_HEAVY_TASK_TYPES
+    assert "generate_cast_spectrum" not in governor.MAINTENANCE_WINDOW_TASK_TYPES
+    assert calls == [("generate_cast_spectrum", False)]
 
 
 def test_resource_governor_can_be_bypassed_per_task(monkeypatch):

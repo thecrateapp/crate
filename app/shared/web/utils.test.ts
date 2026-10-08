@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  clamp,
   encPath,
   formatBadgeClass,
   formatBitrate,
+  formatBytes,
   formatCompact,
   formatDuration,
   formatDurationMs,
   formatNumber,
+  formatRelativeTime,
   formatSize,
   timeAgo,
 } from "./utils";
@@ -144,5 +147,69 @@ describe("timeAgo", () => {
     vi.setSystemTime(now);
     const result = timeAgo(new Date(now - 30 * 86_400_000).toISOString());
     expect(result).toContain("/");
+  });
+});
+
+describe("clamp", () => {
+  it("keeps values inside the range", () => {
+    expect(clamp(-1, 0, 10)).toBe(0);
+    expect(clamp(4, 0, 10)).toBe(4);
+    expect(clamp(11, 0, 10)).toBe(10);
+    expect(clamp(0.5, 0, 1)).toBe(0.5);
+  });
+});
+
+describe("formatBytes", () => {
+  it("returns 0 B for empty, negative or invalid input", () => {
+    expect(formatBytes(0)).toBe("0 B");
+    expect(formatBytes(-5)).toBe("0 B");
+    expect(formatBytes(null)).toBe("0 B");
+    expect(formatBytes(undefined)).toBe("0 B");
+    expect(formatBytes(Number.NaN)).toBe("0 B");
+    expect(formatBytes(Number.POSITIVE_INFINITY)).toBe("0 B");
+  });
+
+  it("uses binary units with one decimal below 10", () => {
+    expect(formatBytes(512)).toBe("512 B");
+    expect(formatBytes(1536)).toBe("1.5 KB");
+    expect(formatBytes(5 * 1024 * 1024)).toBe("5.0 MB");
+    expect(formatBytes(12_500_000)).toBe("12 MB");
+    expect(formatBytes(3.25 * 1024 ** 3)).toBe("3.3 GB");
+    expect(formatBytes(2 * 1024 ** 4)).toBe("2.0 TB");
+  });
+
+  it("caps at terabytes", () => {
+    expect(formatBytes(2048 * 1024 ** 4)).toBe("2048 TB");
+  });
+});
+
+describe("formatRelativeTime", () => {
+  const now = Date.parse("2026-10-01T00:00:00Z");
+
+  it("picks the closest unit", () => {
+    expect(formatRelativeTime("2026-10-02T00:00:00Z", "en", now)).toBe(
+      "tomorrow",
+    );
+    expect(formatRelativeTime("2026-10-01T05:00:00Z", "en", now)).toBe(
+      "in 5 hours",
+    );
+    expect(formatRelativeTime("2026-10-01T00:10:00Z", "en", now)).toBe(
+      "in 10 minutes",
+    );
+    expect(formatRelativeTime(now - 3 * 86_400_000, "en", now)).toBe(
+      "3 days ago",
+    );
+  });
+
+  it("falls back to minutes for sub-minute differences", () => {
+    expect(formatRelativeTime(new Date(now + 20_000), "en", now)).toBe(
+      "this minute",
+    );
+  });
+
+  it("localizes the output", () => {
+    expect(formatRelativeTime("2026-10-01T05:00:00Z", "es", now)).toBe(
+      "dentro de 5 horas",
+    );
   });
 });

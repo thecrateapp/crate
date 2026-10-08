@@ -1,15 +1,25 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   clearOfflineAssetsMock,
+  abortOfflineTransferMock,
   hydrateOfflineProfileStateMock,
   isOfflineSupportedMock,
   saveOfflineSnapshotMock,
   setActiveOfflineProfileKeyMock,
   syncOfflineProfileToServiceWorkerMock,
+  offlineSyncOperationMock,
+  deleteCachedTrackAssetMock,
 } = vi.hoisted(() => ({
   clearOfflineAssetsMock: vi.fn(async () => {}),
+  abortOfflineTransferMock: vi.fn(),
   hydrateOfflineProfileStateMock: vi.fn(async () => ({
     items: {
       "track:storage-1": {
@@ -39,14 +49,18 @@ const {
   saveOfflineSnapshotMock: vi.fn(),
   setActiveOfflineProfileKeyMock: vi.fn(),
   syncOfflineProfileToServiceWorkerMock: vi.fn(),
+  offlineSyncOperationMock: vi.fn(async () => {}),
+  deleteCachedTrackAssetMock: vi.fn(async () => {}),
 }));
 
 vi.mock("@/lib/offline", () => ({
   buildAssetUsage: vi.fn(() => new Map()),
   cacheTrackAsset: vi.fn(async () => {}),
   clearOfflineAssets: clearOfflineAssetsMock,
-  deleteCachedTrackAsset: vi.fn(async () => {}),
-  deriveOfflineProfileKey: vi.fn(() => "profile-1"),
+  deleteCachedTrackAsset: deleteCachedTrackAssetMock,
+  deriveOfflineProfileKey: vi.fn((userId: number) =>
+    userId === 7 ? "profile-1" : `profile-${userId}`,
+  ),
   ensureOfflineStorageBudget: vi.fn(async () => {}),
   getOfflineItemKey: (kind: string, entityId: string | number) =>
     `${kind}:${entityId}`,
@@ -96,6 +110,36 @@ vi.mock("@/lib/offline", () => ({
   syncOfflineProfileToServiceWorker: syncOfflineProfileToServiceWorkerMock,
 }));
 
+vi.mock("@/contexts/use-offline-synchronization", () => ({
+  useOfflineSynchronization: ({
+    enabled,
+    enqueue,
+    transferAbortRef,
+  }: {
+    enabled: boolean;
+    enqueue: <T>(fn: () => Promise<T>) => Promise<T>;
+    transferAbortRef: { current: AbortController | null };
+  }) => ({
+    syncing: false,
+    syncAll: () => {
+      if (!enabled) return Promise.resolve();
+      return enqueue(async () => {
+        const controller = {
+          abort: abortOfflineTransferMock,
+        } as unknown as AbortController;
+        transferAbortRef.current = controller;
+        try {
+          await offlineSyncOperationMock();
+        } finally {
+          if (transferAbortRef.current === controller) {
+            transferAbortRef.current = null;
+          }
+        }
+      });
+    },
+  }),
+}));
+
 import { AuthContext, type AuthContextValue } from "@/contexts/auth-context";
 import { OfflineProvider, useOffline } from "@/contexts/OfflineContext";
 
@@ -110,6 +154,8 @@ function createAuthValue(
       role: "user",
     },
     loading: false,
+    accessMode: "authenticated",
+    offlineIdentity: null,
     refetch: vi.fn(async () => ({
       id: 7,
       email: "listener@example.test",
@@ -126,8 +172,25 @@ function OfflineProbe() {
   return (
     <div>
       <div>{offline.summary.itemCount}</div>
+      <div>{offline.readOnly ? "read-only" : "writable"}</div>
+      <div>records:{offline.items.length}</div>
       <div>{offline.getTrackState("entity-1")}</div>
+      <button onClick={() => void offline.syncAll()}>sync</button>
       <button onClick={() => void offline.clearActiveProfile()}>clear</button>
+      <button
+        onClick={() =>
+          void offline
+            .toggleTrackOffline({
+              entityUid: "entity-1",
+              storageId: "storage-1",
+            })
+            .catch(() =>
+              window.dispatchEvent(new Event("offline-write-rejected")),
+            )
+        }
+      >
+        toggle track
+      </button>
     </div>
   );
 }
@@ -135,11 +198,14 @@ function OfflineProbe() {
 describe("OfflineProvider", () => {
   beforeEach(() => {
     clearOfflineAssetsMock.mockClear();
+    abortOfflineTransferMock.mockClear();
     hydrateOfflineProfileStateMock.mockClear();
     isOfflineSupportedMock.mockClear();
     saveOfflineSnapshotMock.mockClear();
     setActiveOfflineProfileKeyMock.mockClear();
     syncOfflineProfileToServiceWorkerMock.mockClear();
+    offlineSyncOperationMock.mockReset().mockResolvedValue(undefined);
+    deleteCachedTrackAssetMock.mockClear();
   });
 
   afterEach(() => {
@@ -165,6 +231,47 @@ describe("OfflineProvider", () => {
     );
   });
 
+  it("hydrates an offline identity as read-only without starting synchronization", async () => {
+    const offlineIdentity = {
+      schemaVersion: 1 as const,
+      serverId: "server-a",
+      serverUrl: "https://a.example.test",
+      userId: 7,
+      profileKey: "profile-a-7",
+      generation: 4,
+    };
+    render(
+      <AuthContext.Provider
+        value={createAuthValue({
+          user: null,
+          accessMode: "offline",
+          offlineIdentity,
+        })}
+      >
+        <OfflineProvider>
+          <OfflineProbe />
+        </OfflineProvider>
+      </AuthContext.Provider>,
+    );
+
+    expect(await screen.findByText("read-only")).toBeInTheDocument();
+    expect(screen.getByText("records:1")).toBeInTheDocument();
+    expect(setActiveOfflineProfileKeyMock).toHaveBeenCalledWith(
+      offlineIdentity.profileKey,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "sync" }));
+    expect(offlineSyncOperationMock).not.toHaveBeenCalled();
+
+    const writeRejected = vi.fn();
+    window.addEventListener("offline-write-rejected", writeRejected, {
+      once: true,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "toggle track" }));
+    await waitFor(() => expect(writeRejected).toHaveBeenCalledOnce());
+    expect(saveOfflineSnapshotMock).not.toHaveBeenCalled();
+  });
+
   it("clears assets for the active profile when asked", async () => {
     render(
       <AuthContext.Provider value={createAuthValue()}>
@@ -183,5 +290,114 @@ describe("OfflineProvider", () => {
     await waitFor(() => {
       expect(clearOfflineAssetsMock).toHaveBeenCalledWith("profile-1");
     });
+  });
+
+  it("aborts and waits for active offline work before clearing assets", async () => {
+    let finishSync: (() => void) | undefined;
+    offlineSyncOperationMock.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishSync = resolve;
+      }),
+    );
+    render(
+      <AuthContext.Provider value={createAuthValue()}>
+        <OfflineProvider>
+          <OfflineProbe />
+        </OfflineProvider>
+      </AuthContext.Provider>,
+    );
+    await waitFor(() => expect(screen.getByText("ready")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "sync" }));
+    await waitFor(() =>
+      expect(offlineSyncOperationMock).toHaveBeenCalledOnce(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "clear" }));
+
+    await waitFor(() =>
+      expect(abortOfflineTransferMock).toHaveBeenCalledOnce(),
+    );
+    expect(clearOfflineAssetsMock).not.toHaveBeenCalled();
+
+    await act(async () => finishSync!());
+    await waitFor(() =>
+      expect(clearOfflineAssetsMock).toHaveBeenCalledWith("profile-1"),
+    );
+  });
+
+  it("persists removal before deleting the track asset", async () => {
+    let finishPersistence: (() => void) | undefined;
+    saveOfflineSnapshotMock.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishPersistence = resolve;
+      }),
+    );
+    render(
+      <AuthContext.Provider value={createAuthValue()}>
+        <OfflineProvider>
+          <OfflineProbe />
+        </OfflineProvider>
+      </AuthContext.Provider>,
+    );
+    await waitFor(() => expect(screen.getByText("ready")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "toggle track" }));
+
+    await waitFor(() => expect(saveOfflineSnapshotMock).toHaveBeenCalled());
+    expect(deleteCachedTrackAssetMock).not.toHaveBeenCalled();
+
+    await act(async () => finishPersistence!());
+    await waitFor(() =>
+      expect(deleteCachedTrackAssetMock).toHaveBeenCalledWith(
+        "profile-1",
+        expect.objectContaining({ entity_uid: "entity-1" }),
+      ),
+    );
+  });
+
+  it("does not let an abandoned profile queue block the next profile", async () => {
+    let finishOldProfileSync: (() => void) | undefined;
+    offlineSyncOperationMock.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishOldProfileSync = resolve;
+      }),
+    );
+    const view = render(
+      <AuthContext.Provider value={createAuthValue()}>
+        <OfflineProvider>
+          <OfflineProbe />
+        </OfflineProvider>
+      </AuthContext.Provider>,
+    );
+    await waitFor(() => expect(screen.getByText("ready")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "sync" }));
+    await waitFor(() =>
+      expect(offlineSyncOperationMock).toHaveBeenCalledOnce(),
+    );
+
+    view.rerender(
+      <AuthContext.Provider
+        value={createAuthValue({
+          user: {
+            id: 8,
+            email: "second@example.test",
+            name: "Second listener",
+            role: "user",
+          },
+        })}
+      >
+        <OfflineProvider>
+          <OfflineProbe />
+        </OfflineProvider>
+      </AuthContext.Provider>,
+    );
+    await waitFor(() =>
+      expect(setActiveOfflineProfileKeyMock).toHaveBeenCalledWith("profile-8"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "clear" }));
+    await act(async () => {});
+
+    expect(clearOfflineAssetsMock).toHaveBeenCalledWith("profile-8");
+    await act(async () => finishOldProfileSync!());
   });
 });

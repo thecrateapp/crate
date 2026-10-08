@@ -113,16 +113,16 @@ func localMediaDescriptorFromRow(row map[string]any, policy string) (LocalMediaD
 	descriptor.SourceMtimeNS = intValue(row["source_mtime_ns"])
 	return descriptor, nil
 }
-func (s *Store) TrackInfoByID(ctx context.Context, trackID int64) (map[string]any, error) {
-	row, err := s.trackInfoRow(ctx, "id = $1", trackID)
+func (s *Store) TrackInfoByID(ctx context.Context, userID, trackID int64) (map[string]any, error) {
+	row, err := s.trackInfoRow(ctx, userID, "t.id = $2", trackID)
 	if err != nil {
 		return nil, err
 	}
 	return serializeTrackInfo(row), nil
 }
 
-func (s *Store) TrackInfoByEntityUID(ctx context.Context, entityUID string) (map[string]any, error) {
-	row, err := s.trackInfoRow(ctx, "entity_uid = $1::uuid", entityUID)
+func (s *Store) TrackInfoByEntityUID(ctx context.Context, userID int64, entityUID string) (map[string]any, error) {
+	row, err := s.trackInfoRow(ctx, userID, "t.entity_uid = $2::uuid", entityUID)
 	if err != nil {
 		return nil, err
 	}
@@ -168,19 +168,31 @@ func (s *Store) TrackPlaybackByEntityUID(ctx context.Context, entityUID string) 
 	}
 	return playbackPayload(row, "original"), nil
 }
-func (s *Store) trackInfoRow(ctx context.Context, predicate string, args ...any) (map[string]any, error) {
+func (s *Store) trackInfoRow(ctx context.Context, userID int64, predicate string, identity any) (map[string]any, error) {
+	if s.trackInfoFn != nil {
+		return s.trackInfoFn(ctx, userID, predicate, identity)
+	}
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
 	rows, err := rowsToMaps(s.pool.Query(ctx, `
-		SELECT entity_uid::text AS entity_uid, storage_id::text AS storage_id, title, artist, album,
-		       format, bitrate, sample_rate, bit_depth, bpm, audio_key, audio_scale,
-		       energy, danceability, valence, acousticness, instrumentalness, loudness,
-		       dynamic_range, mood_json, lastfm_listeners, lastfm_playcount,
-		       popularity, rating, bliss_vector, path
-		FROM library_tracks
+		SELECT t.id, t.entity_uid::text AS entity_uid,
+		       t.storage_id::text AS storage_id, t.title, t.artist, t.album,
+		       t.format, t.bitrate, t.sample_rate, t.bit_depth, t.bpm,
+		       t.audio_key, t.audio_scale, t.energy, t.danceability, t.valence,
+		       t.acousticness, t.instrumentalness, t.loudness, t.dynamic_range,
+		       t.mood_json, t.lastfm_listeners, t.lastfm_playcount, t.popularity,
+	       COALESCE(user_rating.rating, 0)::INTEGER AS rating,
+	       t.bliss_vector, t.path
+		FROM library_tracks t
+		LEFT JOIN global_catalog_tracks global_track
+		  ON global_track.local_track_id = t.id
+		LEFT JOIN user_track_ratings user_rating
+		  ON user_rating.user_id = $1
+		 AND (user_rating.track_id = t.id
+		      OR user_rating.global_track_uid = global_track.global_track_uid)
 		WHERE `+predicate+`
 		LIMIT 1
-	`, args...))
+	`, userID, identity))
 	if err != nil {
 		return nil, err
 	}

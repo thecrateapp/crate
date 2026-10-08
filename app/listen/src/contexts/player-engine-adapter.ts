@@ -10,7 +10,6 @@ import {
   ensureMediaAccessUrl,
   getApiBase,
   getAuthToken,
-  refreshMediaAccessTickets,
   resolveMaybeApiAssetUrl,
   resolveMaybeApiStreamUrl,
 } from "@/lib/api";
@@ -55,10 +54,22 @@ export function toEngineTrack(
   options: StreamUrlOptions = {},
 ): EngineTrack {
   const artwork = resolveMaybeApiAssetUrl(track.albumCover) || undefined;
-  const resolvedUrl = streamUrl ?? getStreamUrl(track, options);
+  const offlineUrl = track.offlineOnly
+    ? getOfflineStreamUrl(track, options)
+    : null;
+  const resolvedUrl = track.offlineOnly
+    ? offlineUrl
+    : streamUrl ?? getStreamUrl(track, options);
+  if (!resolvedUrl) {
+    throw new Error("Offline track is not available on this device");
+  }
   const androidNativeHttp =
     options.target === "android-native" &&
     isTrustedNativeApiUrl(resolvedUrl, getApiBase());
+  const androidNativeArtwork =
+    options.target === "android-native" &&
+    artwork != null &&
+    isTrustedNativeApiUrl(artwork, getApiBase());
 
   return {
     id: track.id,
@@ -67,7 +78,10 @@ export function toEngineTrack(
     title: track.title || "Unknown",
     artist: track.artist || "",
     album: track.album || undefined,
-    artwork,
+    artwork: androidNativeArtwork ? withoutCredentialQuery(artwork) : artwork,
+    artworkAuthorization: androidNativeArtwork
+      ? bearerAuthorizationHeader()
+      : undefined,
     durationMs:
       track.duration && track.duration > 0
         ? Math.round(track.duration * 1000)
@@ -139,7 +153,7 @@ export async function toFreshEngineTrack(
   eqGains?: number[],
   options: StreamUrlOptions = {},
 ): Promise<EngineTrack> {
-  await ensureFreshAuthToken();
+  if (!track.offlineOnly) await ensureFreshAuthToken();
   return toEngineTrack(
     track,
     eqGains,
@@ -153,7 +167,9 @@ export async function toFreshEngineTracks(
   eqGainsByTrackId?: Map<string, number[]>,
   options: StreamUrlOptions = {},
 ): Promise<EngineTrack[]> {
-  await ensureFreshAuthToken();
+  if (tracks.some((track) => !track.offlineOnly)) {
+    await ensureFreshAuthToken();
+  }
   return Promise.all(
     tracks.map(async (track) =>
       toEngineTrack(
@@ -172,25 +188,6 @@ export async function toStartupEngineTracks(
   eqGainsByTrackId?: Map<string, number[]>,
   options: StreamUrlOptions = {},
 ): Promise<EngineTrack[]> {
-  await ensureFreshAuthToken();
-  return resolveStartupEngineTracks(
-    tracks,
-    activeIndex,
-    eqGainsByTrackId,
-    options,
-  );
-}
-
-async function resolveStartupEngineTracks(
-  tracks: Track[],
-  activeIndex: number,
-  eqGainsByTrackId?: Map<string, number[]>,
-  options: StreamUrlOptions = {},
-): Promise<EngineTrack[]> {
-  if (options.target === "android-native") {
-    await refreshNativeArtworkTickets(tracks);
-  }
-  const engineTracks = toEngineTracks(tracks, eqGainsByTrackId, options);
   const normalizedIndex = Math.max(
     0,
     Math.min(Math.trunc(activeIndex), tracks.length - 1),
@@ -199,6 +196,15 @@ async function resolveStartupEngineTracks(
     normalizedIndex,
     Math.min(normalizedIndex + 1, tracks.length - 1),
   ]);
+  if (
+    Array.from(startupIndices).some((index) => {
+      const track = tracks[index];
+      return track && !track.offlineOnly;
+    })
+  ) {
+    await ensureFreshAuthToken();
+  }
+  const engineTracks = toEngineTracks(tracks, eqGainsByTrackId, options);
   await Promise.all(
     Array.from(startupIndices).map(async (index) => {
       const track = tracks[index];
@@ -218,7 +224,9 @@ export async function toStartupEngineQueueSnapshot(
   options: StartupEngineQueueOptions,
 ): Promise<EngineQueueSnapshot> {
   const streamOptions = { target: options.target };
-  await ensureFreshAuthToken();
+  if (options.tracks.some((track) => !track.offlineOnly)) {
+    await ensureFreshAuthToken();
+  }
   const transitionPlansPromise =
     options.target === "android-native"
       ? smartMixTransitionPlanner.plan({
@@ -239,7 +247,7 @@ export async function toStartupEngineQueueSnapshot(
         })
       : Promise.resolve(undefined);
   const [engineTracks, transitionPlans] = await Promise.all([
-    resolveStartupEngineTracks(
+    toStartupEngineTracks(
       options.tracks,
       options.currentIndex,
       options.eqGainsByTrackId,
@@ -274,43 +282,6 @@ function hasOfflineTransitionWindow(
   );
 }
 
-async function refreshNativeArtworkTickets(tracks: Track[]): Promise<void> {
-  const apiBase = getApiBase();
-  if (!apiBase) return;
-  let apiOrigin: string;
-  try {
-    apiOrigin = new URL(apiBase).origin;
-  } catch {
-    return;
-  }
-
-  const targets = new Map<string, { audience: "artwork"; path: string }>();
-  for (const track of tracks) {
-    if (!track.albumCover) continue;
-    try {
-      const artwork = new URL(track.albumCover, apiBase);
-      if (
-        artwork.origin === apiOrigin &&
-        artwork.pathname.startsWith("/api/")
-      ) {
-        targets.set(artwork.pathname, {
-          audience: "artwork",
-          path: artwork.pathname,
-        });
-      }
-    } catch {
-      // Invalid artwork is left to the visual placeholder.
-    }
-  }
-
-  const pending = Array.from(targets.values());
-  for (let index = 0; index < pending.length; index += 128) {
-    await refreshMediaAccessTickets(pending.slice(index, index + 128)).catch(
-      () => false,
-    );
-  }
-}
-
 function hasFreshRemoteStream(track: Track): boolean {
   if (track.origin !== "remote" || !track.remote?.streamUrl) return false;
   if (!track.remote.streamUrlExpiresAt) return true;
@@ -322,6 +293,12 @@ async function resolveFreshEngineStreamUrl(
   options: StreamUrlOptions,
 ): Promise<string> {
   const offlineUrl = getOfflineStreamUrl(track, options);
+  if (track.offlineOnly) {
+    if (!offlineUrl) {
+      throw new Error("Offline track is not available on this device");
+    }
+    return offlineUrl;
+  }
   if (offlineUrl) return offlineUrl;
   let resolvedUrl: string;
   if (hasFreshRemoteStream(track) || !track.globalTrackUid) {

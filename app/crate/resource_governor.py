@@ -33,6 +33,7 @@ RESOURCE_GOVERNED_TASK_TYPES = frozenset(
         "fetch_artwork_all",
         "fix_artist",
         "fix_issues",
+        "generate_cast_spectrum",
         "health_check",
         "library_pipeline",
         "library_sync",
@@ -58,8 +59,11 @@ AUDIO_HEAVY_TASK_TYPES = frozenset(
         "backfill_track_audio_fingerprints",
         "backfill_smart_mix_profiles",
         "compute_smart_mix_profile",
+        "generate_cast_spectrum",
     }
 )
+
+LISTENER_INSENSITIVE_GOVERNED_TASK_TYPES = frozenset({"generate_cast_spectrum"})
 
 MAINTENANCE_WINDOW_TASK_TYPES = frozenset(
     {
@@ -114,6 +118,8 @@ DEFAULT_IOWAIT_PERCENT = 25.0
 DEFAULT_SWAP_PERCENT = 30.0
 DEFAULT_SWAP_MIN_USED_MB = 512.0
 DEFAULT_MIN_MEMORY_AVAILABLE_PERCENT = 15.0
+DEFAULT_MAX_ACTIVE_USERS = 10
+DEFAULT_MAX_ACTIVE_STREAMS = 10
 DEFAULT_NICE_VALUE = 12
 DEFAULT_MAINTENANCE_WINDOW_START = "02:00"
 DEFAULT_MAINTENANCE_WINDOW_END = "07:00"
@@ -167,7 +173,10 @@ def should_defer_task(task_type: str, params: dict | None = None) -> ResourceDec
             return window_decision
     if _bypasses_resource_pressure(task_type, params):
         return ResourceDecision(allowed=True)
-    return evaluate_resources(label=task_type, listener_sensitive=True)
+    return evaluate_resources(
+        label=task_type,
+        listener_sensitive=task_type not in LISTENER_INSENSITIVE_GOVERNED_TASK_TYPES,
+    )
 
 
 def evaluate_maintenance_window(*, task_type: str = "background") -> ResourceDecision:
@@ -229,9 +238,11 @@ def evaluate_resources(
         "CRATE_RESOURCE_MIN_MEMORY_AVAILABLE_PERCENT",
         DEFAULT_MIN_MEMORY_AVAILABLE_PERCENT,
     )
-    max_active_users = _nonnegative_int_setting("CRATE_RESOURCE_MAX_ACTIVE_USERS", 0)
+    max_active_users = _nonnegative_int_setting(
+        "CRATE_RESOURCE_MAX_ACTIVE_USERS", DEFAULT_MAX_ACTIVE_USERS
+    )
     max_active_streams = _nonnegative_int_setting(
-        "CRATE_RESOURCE_MAX_ACTIVE_STREAMS", 0
+        "CRATE_RESOURCE_MAX_ACTIVE_STREAMS", DEFAULT_MAX_ACTIVE_STREAMS
     )
 
     if listener_sensitive:

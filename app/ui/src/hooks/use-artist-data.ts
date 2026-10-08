@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { artistActionApiPath } from "@/lib/library-routes";
 
@@ -86,12 +86,26 @@ export function useArtistEnrichment(
 ) {
   const [enrichment, setEnrichment] = useState<EnrichmentData | null>(null);
   const [loading, setLoading] = useState(false);
+  const endpoint = artistActionApiPath(
+    { artistId, artistEntityUid },
+    "enrichment",
+  );
+
+  const refetch = useCallback(async (): Promise<EnrichmentData | null> => {
+    if (!endpoint) return null;
+    setLoading(true);
+    try {
+      const data = await api<EnrichmentData>(endpoint);
+      setEnrichment(data);
+      return data;
+    } catch {
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [endpoint]);
 
   useEffect(() => {
-    const endpoint = artistActionApiPath(
-      { artistId, artistEntityUid },
-      "enrichment",
-    );
     if (!endpoint) return;
     let cancelled = false;
     setLoading(true);
@@ -106,9 +120,9 @@ export function useArtistEnrichment(
     return () => {
       cancelled = true;
     };
-  }, [artistEntityUid, artistId]);
+  }, [endpoint]);
 
-  return { enrichment, loading };
+  return { enrichment, loading, refetch };
 }
 
 export function useTopTracks(

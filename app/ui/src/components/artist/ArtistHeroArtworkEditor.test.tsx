@@ -688,6 +688,41 @@ describe("ArtistHeroArtworkEditor", () => {
     ).toBeNull();
   });
 
+  it("previews the active artifact revision instead of the editorial revision", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          ...manualProfile(),
+          revision: "editorial-revision",
+          compositions: {
+            desktop: {
+              schema_version: 1,
+              composition: "desktop",
+              render_revision: "cover-fit-v5-neutral-alpha:artifact-desktop",
+              recipe_hash: "desktop-recipe",
+              width: 1480,
+              height: 600,
+              bounds: { left: 0, top: 0, right: 1, bottom: 1 },
+              asset_path: "/api/artists/7/hero?composition=desktop",
+            },
+          },
+        }),
+      ),
+    );
+
+    render(
+      <ArtistHeroArtworkEditor artistId={7} artistName="Converge" canEdit />,
+    );
+
+    expect(await screen.findByAltText("Converge desktop hero")).toHaveAttribute(
+      "src",
+      expect.stringContaining(
+        "v=cover-fit-v5-neutral-alpha%3Aartifact-desktop",
+      ),
+    );
+  });
+
   it("loads and uploads independent sources for desktop and mobile", async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     vi.stubGlobal(
@@ -955,7 +990,7 @@ describe("ArtistHeroArtworkEditor", () => {
 
     expect(
       within(dialog).getByTestId("mobile-hero-result-preview"),
-    ).toHaveStyle({ maxWidth: "min(440px, 46vh)" });
+    ).toHaveClass("max-w-[440px]");
     expect(within(dialog).getByTestId("mobile-hero-scrim")).toHaveClass(
       "bottom-0",
       "h-[82%]",
@@ -1028,5 +1063,55 @@ describe("ArtistHeroArtworkEditor", () => {
       "src",
       "/api/artwork/artists/7/hero-preview/preview-1",
     );
+  });
+
+  it("does not publish a preview that finishes after its recipe became stale", async () => {
+    let resolvePreview!: (result: {
+      status: "completed";
+      result: { preview_url: string };
+    }) => void;
+    vi.mocked(waitForTask).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolvePreview = resolve;
+        }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          return Response.json({ status: "queued", task_id: "stale-preview" });
+        }
+        return Response.json(manualProfile());
+      }),
+    );
+    const user = userEvent.setup();
+
+    render(
+      <ArtistHeroArtworkEditor artistId={7} artistName="Converge" canEdit />,
+    );
+
+    await user.click(
+      await screen.findByRole("button", { name: "Preview result" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Simulate adjusted framing" }),
+    );
+
+    resolvePreview({
+      status: "completed",
+      result: {
+        preview_url: "/api/artwork/artists/7/hero-preview/stale-preview",
+      },
+    });
+
+    await waitFor(() => {
+      expect(
+        within(screen.getByRole("dialog")).getByRole("img"),
+      ).not.toHaveAttribute(
+        "src",
+        "/api/artwork/artists/7/hero-preview/stale-preview",
+      );
+    });
   });
 });

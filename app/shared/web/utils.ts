@@ -49,3 +49,42 @@ export function timeAgo(iso: string): string {
   if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
   return new Date(iso).toLocaleDateString();
 }
+
+export function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB"] as const;
+
+export function formatBytes(bytes: number | null | undefined): string {
+  if (bytes == null || !Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < BYTE_UNITS.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  const digits = value >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${value.toFixed(digits)} ${BYTE_UNITS[unitIndex]}`;
+}
+
+const RELATIVE_TIME_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ["day", 86400],
+  ["hour", 3600],
+  ["minute", 60],
+];
+
+export function formatRelativeTime(
+  date: string | number | Date,
+  locale: string,
+  now: number = Date.now(),
+): string {
+  const diffSeconds = (new Date(date).getTime() - now) / 1000;
+  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  for (const [unit, seconds] of RELATIVE_TIME_UNITS) {
+    if (Math.abs(diffSeconds) >= seconds) {
+      return formatter.format(Math.round(diffSeconds / seconds), unit);
+    }
+  }
+  return formatter.format(Math.round(diffSeconds / 60), "minute");
+}

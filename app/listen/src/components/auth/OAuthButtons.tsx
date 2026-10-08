@@ -1,10 +1,12 @@
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { api, getApiBase } from "@/lib/api";
 import { beginNativeOAuth, isNative } from "@/lib/capacitor";
+import { openExternalUrl } from "@/lib/external-links";
 import { isTauriRuntime } from "@/lib/platform";
+import { recordTauriAuthDiagnostic } from "@/lib/tauri-auth-diagnostic";
 import { OAuthButtons as OAuthButtonsBase } from "@crate/ui/domain/auth/OAuthButtons";
 
 interface OAuthButtonsProps {
@@ -12,51 +14,41 @@ interface OAuthButtonsProps {
   inviteToken?: string;
 }
 
-type TauriOpenerGlobal = Window &
-  typeof globalThis & {
-    __TAURI__?: {
-      opener?: {
-        openUrl?: (url: string) => Promise<void> | void;
-        open?: (url: string) => Promise<void> | void;
-      };
-      shell?: {
-        open?: (url: string) => Promise<void> | void;
-      };
-    };
-  };
+const fetchProviders = async () => {
+  try {
+    const providers = await api<
+      Record<
+        string,
+        { enabled: boolean; configured: boolean; login_url: string | null }
+      >
+    >("/api/auth/providers");
 
-const fetchProviders = () =>
-  api<
-    Record<
-      string,
-      { enabled: boolean; configured: boolean; login_url: string | null }
-    >
-  >("/api/auth/providers");
+    if (isTauriRuntime) {
+      const google = providers.google;
+      const enabled = google?.enabled ?? "missing";
+      const configured = google?.configured ?? "missing";
+      recordTauriAuthDiagnostic(
+        google?.enabled && google?.configured
+          ? "Google OAuth available"
+          : "Google OAuth unavailable",
+        `enabled=${enabled}, configured=${configured}`,
+      );
+    }
+
+    return providers;
+  } catch (error) {
+    if (isTauriRuntime) {
+      recordTauriAuthDiagnostic(
+        "OAuth providers request failed",
+        error instanceof Error ? error.name : "UnknownError",
+      );
+    }
+    throw error;
+  }
+};
 
 function oauthProvider(loginUrl: string): "google" | "apple" {
   return /(?:^|[/?])apple(?:[/?]|$)/i.test(loginUrl) ? "apple" : "google";
-}
-
-function tauriOAuthCallbackUrl(returnTo: string | null): URL {
-  const callbackUrl = new URL("http://127.0.0.1:17654/oauth/callback");
-  if (returnTo && returnTo !== "/")
-    callbackUrl.searchParams.set("next", returnTo);
-  return callbackUrl;
-}
-
-export async function openExternalOAuthUrl(url: string): Promise<void> {
-  const tauri = (window as TauriOpenerGlobal).__TAURI__;
-  const opener =
-    tauri?.opener?.openUrl ?? tauri?.opener?.open ?? tauri?.shell?.open;
-  if (opener) {
-    await opener(url);
-    return;
-  }
-
-  const opened = window.open(url, "_blank", "noopener,noreferrer");
-  if (!opened) {
-    window.location.href = url;
-  }
 }
 
 export function OAuthButtons({
@@ -69,28 +61,24 @@ export function OAuthButtons({
       const base = getApiBase() || window.location.origin;
       const target = new URL(loginUrl, base);
       if (invite) target.searchParams.set("invite", invite);
-      if (isTauriRuntime) {
-        const callbackUrl = tauriOAuthCallbackUrl(rt);
-        target.searchParams.set("return_to", callbackUrl.toString());
-        target.searchParams.set("app_id", "listen-tauri");
-        void openExternalOAuthUrl(target.toString()).catch(() => {
-          window.location.href = target.toString();
-        });
-        return;
-      }
-      if (isNative) {
+      if (isTauriRuntime || isNative) {
+        // Desktop (Tauri) and mobile (Capacitor) both use the PKCE +
+        // one-time-code exchange through the cratemusic:// deep link.
         void beginNativeOAuth(
           oauthProvider(target.toString()),
           rt || "/",
           invite,
         )
-          .then((nativeLoginUrl) =>
-            import("@capacitor/browser").then(({ Browser }) =>
-              Browser.open({ url: nativeLoginUrl }),
-            ),
-          )
+          .then(async (nativeLoginUrl) => {
+            if (isTauriRuntime) {
+              await openExternalUrl(nativeLoginUrl);
+              return;
+            }
+            const { Browser } = await import("@capacitor/browser");
+            await Browser.open({ url: nativeLoginUrl });
+          })
           .catch((error) => {
-            toast.error(
+            notify.error(
               error instanceof Error && error.message
                 ? error.message
                 : t("auth.login.connectionError"),

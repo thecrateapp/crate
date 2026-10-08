@@ -1,3 +1,7 @@
+import { useTranslation } from "react-i18next";
+
+import { Switch } from "@crate/ui/primitives/Switch";
+
 import type { VisualizerConfigState } from "./useVisualizerConfig";
 
 interface VisualizerSettingsPanelProps {
@@ -8,38 +12,57 @@ interface VisualizerSettingsPanelProps {
 const SLIDERS = [
   {
     key: "separation" as const,
-    label: "Separation",
+    labelKey: "player.visualizer.separation",
     min: 0,
     max: 0.5,
     step: 0.01,
   },
-  { key: "glow" as const, label: "Glow", min: 0, max: 15, step: 0.5 },
-  { key: "scale" as const, label: "Scale", min: 0.2, max: 3, step: 0.1 },
+  {
+    key: "glow" as const,
+    labelKey: "player.visualizer.glow",
+    min: 0,
+    max: 15,
+    step: 0.5,
+  },
+  {
+    key: "scale" as const,
+    labelKey: "player.visualizer.scale",
+    min: 0.2,
+    max: 3,
+    step: 0.1,
+  },
   {
     key: "persistence" as const,
-    label: "Persistence",
+    labelKey: "player.visualizer.persistence",
     min: 0,
     max: 2,
     step: 0.1,
   },
-  { key: "octaves" as const, label: "Octaves", min: 1, max: 5, step: 1 },
+  {
+    key: "octaves" as const,
+    labelKey: "player.visualizer.octaves",
+    min: 1,
+    max: 5,
+    step: 1,
+  },
 ] as const;
 
-function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+function Toggle({
+  label,
+  on,
+  onToggle,
+}: {
+  label: string;
+  on: boolean;
+  onToggle: () => void;
+}) {
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={`h-5 w-9 rounded-full transition-colors ${
-        on ? "bg-primary" : "bg-white/20"
-      }`}
-    >
-      <div
-        className={`h-4 w-4 rounded-full bg-white shadow transition-transform ${
-          on ? "translate-x-4.5" : "translate-x-0.5"
-        }`}
-      />
-    </button>
+    <Switch
+      size="sm"
+      aria-label={label}
+      checked={on}
+      onCheckedChange={onToggle}
+    />
   );
 }
 
@@ -47,6 +70,7 @@ export function VisualizerSettingsPanel({
   config,
   className,
 }: VisualizerSettingsPanelProps) {
+  const { t } = useTranslation();
   const {
     surfaceMode,
     vizEnabled,
@@ -64,14 +88,15 @@ export function VisualizerSettingsPanel({
   return (
     <div className={`space-y-3 ${className ?? ""}`}>
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-          Visualizer settings
+        <span className="text-xs font-bold uppercase tracking-wider text-text-muted">
+          {t("player.visualizerSettings")}
         </span>
         <button
+          type="button"
           onClick={resetConfig}
-          className="text-[10px] text-primary hover:underline"
+          className="text-xs link-accent"
         >
-          Reset
+          {t("player.visualizer.reset")}
         </button>
       </div>
 
@@ -80,8 +105,14 @@ export function VisualizerSettingsPanel({
           vizEnabled ? "" : "opacity-45"
         }`}
       >
-        <span className="text-[11px] text-muted-foreground">Album palette</span>
-        <Toggle on={useAlbumPalette} onToggle={toggleAlbumPalette} />
+        <span className="text-xs text-text-muted">
+          {t("player.visualizer.albumPalette")}
+        </span>
+        <Toggle
+          label={t("player.visualizer.albumPalette")}
+          on={useAlbumPalette}
+          onToggle={toggleAlbumPalette}
+        />
       </div>
 
       <div
@@ -89,46 +120,53 @@ export function VisualizerSettingsPanel({
           vizEnabled ? "" : "opacity-45"
         }`}
       >
-        <span className="text-[11px] text-muted-foreground">
-          Track adaptive
+        <span className="text-xs text-text-muted">
+          {t("player.visualizer.trackAdaptive")}
         </span>
-        <Toggle on={trackAdaptiveViz} onToggle={toggleTrackAdaptive} />
+        <Toggle
+          label={t("player.visualizer.trackAdaptive")}
+          on={trackAdaptiveViz}
+          onToggle={toggleTrackAdaptive}
+        />
       </div>
 
-      <div className="rounded-md border border-white/8 bg-white/[0.03] px-2.5 py-2 text-[10px] text-muted-foreground">
+      <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-2 text-xs text-text-muted">
         {!vizEnabled
           ? surfaceMode === "cd"
-            ? "CD mode active"
-            : "Cover mode active"
+            ? t("player.visualizer.cdModeActive")
+            : t("player.visualizer.coverModeActive")
           : trackAdaptiveViz
             ? trackVizProfile.hasAnalysis
-              ? `Using track analysis${
-                  trackVizProfile.summary ? ` · ${trackVizProfile.summary}` : ""
-                }`
-              : "Adaptive on, waiting for track analysis"
-            : "Adaptive off, using your saved base settings"}
+              ? trackVizProfile.summary
+                ? t("player.visualizer.usingTrackAnalysisWithSummary", {
+                    summary: trackVizProfile.summary,
+                  })
+                : t("player.visualizer.usingTrackAnalysis")
+              : t("player.visualizer.waitingForAnalysis")
+            : t("player.visualizer.adaptiveOff")}
       </div>
 
-      {SLIDERS.map(({ key, label, min, max, step }) => (
+      {SLIDERS.map(({ key, labelKey, min, max, step }) => (
         <div
           key={key}
           className={`transition-opacity ${vizEnabled ? "" : "opacity-45"}`}
         >
-          <div className="mb-1 flex justify-between text-[10px]">
-            <span className="text-white/40">{label}</span>
+          <div className="mb-1 flex justify-between text-xs">
+            <span className="text-text-subtle">{t(labelKey)}</span>
             <div className="flex items-center gap-2 font-mono">
               {trackAdaptiveViz ? (
-                <span className="text-white/40">
+                <span className="text-text-subtle">
                   {vizConfig[key].toFixed(key === "octaves" ? 0 : 1)}
                 </span>
               ) : null}
-              <span className="text-white/60">
+              <span className="text-text-secondary">
                 {effectiveVizConfig[key].toFixed(key === "octaves" ? 0 : 1)}
               </span>
             </div>
           </div>
           <input
             type="range"
+            aria-label={t(labelKey)}
             min={min}
             max={max}
             step={step}
@@ -140,7 +178,7 @@ export function VisualizerSettingsPanel({
                 [key]: parseFloat(event.target.value),
               })
             }
-            className="h-1 w-full accent-primary"
+            className="h-1 w-full accent-accent-action"
           />
         </div>
       ))}

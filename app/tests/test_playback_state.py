@@ -429,3 +429,76 @@ def test_playback_state_api_only_claims_playing_checkpoints_when_explicit(
             "state_revision": "rev-1",
         }
     ]
+
+
+def test_subsonic_queue_persistence_keeps_stable_ids_and_last_write_wins(pg_db):
+    from crate.db.repositories.playback_state import (
+        get_device_playback_state,
+        upsert_device,
+        upsert_playback_state,
+    )
+
+    owner = pg_db.create_user("subsonic-queue-owner@test.com")
+    other = pg_db.create_user("subsonic-queue-other@test.com")
+    device_id = "opensubsonic"
+    upsert_device(owner["id"], device_id=device_id, device_type="subsonic")
+
+    upsert_playback_state(
+        owner["id"],
+        device_id=device_id,
+        snapshot_kind="structural",
+        status="paused",
+        current_index=0,
+        queue=[{"subsonic_id": "1", "title": "Old queue"}],
+    )
+    upsert_playback_state(
+        owner["id"],
+        device_id=device_id,
+        snapshot_kind="structural",
+        status="paused",
+        current_index=1,
+        queue=[
+            {"subsonic_id": "1", "title": "First"},
+            {"subsonic_id": "2", "title": "Last queue"},
+        ],
+    )
+
+    saved = get_device_playback_state(owner["id"], device_id=device_id)
+    assert saved is not None
+    assert saved["queue"] == [
+        {"subsonic_id": "1", "title": "First"},
+        {"subsonic_id": "2", "title": "Last queue"},
+    ]
+    assert saved["current_index"] == 1
+    assert get_device_playback_state(other["id"], device_id=device_id) is None
+
+
+def test_exact_playback_state_does_not_select_another_active_device(pg_db):
+    from crate.db.repositories.playback_state import (
+        get_device_playback_state,
+        upsert_device,
+        upsert_playback_state,
+    )
+
+    user = pg_db.create_user("subsonic-queue-device-scope@test.com")
+    upsert_device(user["id"], device_id="opensubsonic", device_type="subsonic")
+    upsert_playback_state(
+        user["id"],
+        device_id="opensubsonic",
+        snapshot_kind="structural",
+        status="paused",
+        queue=[{"subsonic_id": "1", "title": "Saved queue"}],
+    )
+    upsert_device(user["id"], device_id="listen-phone", device_type="listen")
+    upsert_playback_state(
+        user["id"],
+        device_id="listen-phone",
+        snapshot_kind="structural",
+        status="playing",
+        queue=[{"subsonic_id": "2", "title": "Active device"}],
+    )
+
+    saved = get_device_playback_state(user["id"], device_id="opensubsonic")
+
+    assert saved is not None
+    assert saved["queue"] == [{"subsonic_id": "1", "title": "Saved queue"}]

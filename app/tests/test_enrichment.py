@@ -138,7 +138,8 @@ class TestSetlistfmProbableSetlist:
             assert len(result) > 0
             # "Everything In Its Right Place" appears most frequently
             assert result[0]["title"] == "Everything In Its Right Place"
-            assert result[0]["play_count"] == 3
+            # A song repeated in one show counts once for show frequency.
+            assert result[0]["play_count"] == 2
 
     def test_get_probable_setlist_accepts_setlistfm_object_shapes(self):
         setlist_data = {
@@ -176,6 +177,50 @@ class TestSetlistfmProbableSetlist:
 
             result = get_probable_setlist("Unknown Artist")
             assert result is None
+
+    def test_get_probable_setlist_force_bypasses_cache_and_replaces_it(self):
+        cached = {"songs": [{"title": "Old Song", "frequency": 1.0}]}
+        setlist_data = {
+            "setlist": [
+                {
+                    "eventDate": "2026-09-01",
+                    "sets": {"set": [{"song": [{"name": "New Song"}]}]},
+                }
+            ]
+        }
+        with (
+            patch("crate.setlistfm.get_cache", return_value=cached) as get_cache,
+            patch("crate.setlistfm.search_artist", return_value="mbid-123"),
+            patch("crate.setlistfm.get_setlists", return_value=setlist_data),
+            patch("crate.setlistfm.set_cache") as set_cache,
+        ):
+            from crate.setlistfm import get_probable_setlist
+
+            result = get_probable_setlist("Radiohead", num_setlists=1, force=True)
+
+        assert result is not None
+        assert result[0]["title"] == "New Song"
+        get_cache.assert_not_called()
+        set_cache.assert_called_once()
+        cache_payload = set_cache.call_args.args[1]
+        assert cache_payload["model_version"] == 2
+        assert cache_payload["context"]["source_show_count"] == 1
+
+    def test_get_probable_setlist_force_preserves_cached_value_when_provider_is_empty(
+        self,
+    ):
+        with (
+            patch("crate.setlistfm.get_cache") as get_cache,
+            patch("crate.setlistfm.search_artist", return_value=None),
+            patch("crate.setlistfm.set_cache") as set_cache,
+        ):
+            from crate.setlistfm import get_probable_setlist
+
+            result = get_probable_setlist("Radiohead", force=True)
+
+        assert result is None
+        get_cache.assert_not_called()
+        set_cache.assert_not_called()
 
 
 class TestArtistPageEnrichment:
@@ -368,7 +413,11 @@ class TestLastfmGetArtistInfo:
             "artist": {
                 "name": "Radiohead",
                 "bio": {
-                    "summary": 'English rock band <a href="https://www.last.fm/music/Radiohead">Read more on Last.fm</a>.'
+                    "summary": (
+                        'English rock band <a href="https://www.last.fm/music/Radiohead">'
+                        "Read more on Last.fm</a>. User-contributed text is available "
+                        "under the Creative Commons By-SA License; additional terms may apply."
+                    )
                 },
                 "image": [{"#text": "http://img.com/photo.jpg", "size": "large"}],
                 "tags": {"tag": [{"name": "rock"}, {"name": "alternative"}]},
@@ -391,6 +440,7 @@ class TestLastfmGetArtistInfo:
             assert result is not None
             assert "rock" in result["tags"]
             assert result["listeners"] == 5000000
+            assert result["bio"] == "English rock band"
             mock_set.assert_called_once()
 
     def test_get_artist_info_no_api_key(self):

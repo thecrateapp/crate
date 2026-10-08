@@ -1,0 +1,30 @@
+{
+  "receiverReady": {
+    "version": 1,
+    "messageId": "ready-1",
+    "type": "receiver.ready",
+    "capabilities": ["queue-v1", "spectrum-v1"]
+  },
+  "queueAcknowledgement": {
+    "version": 1,
+    "messageId": "ack-1",
+    "replyTo": "mutation-message-1",
+    "type": "queue.ack",
+    "sessionId": "11111111-1111-1111-1111-111111111111",
+    "mutationId": "mutation-1",
+    "queueRevision": 4,
+    "stateSeq": 12
+  },
+  "receiverStatus": {
+    "version": 1,
+    "messageId": "status-1",
+    "type": "receiver.status",
+    "sessionId": "11111111-1111-1111-1111-111111111111",
+    "queueRevision": 4,
+    "stateSeq": 13,
+    "currentIndex": 1,
+    "currentTime": 42.5,
+    "playerState": "PLAYING",
+    "consecutiveFailures": 0
+  }
+}

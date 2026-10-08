@@ -9,11 +9,15 @@ import mutagen
 
 from crate.artwork_tasks import queue_artwork_materialization
 from crate.artwork_variants import ArtworkAsset
+from crate.artist_lifecycle import (
+    ArtistIdentityChangedError,
+    delete_artist,
+    run_artist_deletion,
+)
 from crate.audio import read_tags
 from crate.db.advisory_locks import artist_sync_lock as _artist_sync_lock
 from crate.db.repositories.library import (
     delete_album,
-    delete_artist,
     get_library_albums,
     get_library_artist,
     get_library_artists,
@@ -932,7 +936,16 @@ class LibrarySync:
             keep = artists[0]["name"]
             for other in artists[1:]:
                 discard = other["name"]
-                merge_artist_into(discard, keep)
+                try:
+                    run_artist_deletion(
+                        discard, lambda: merge_artist_into(discard, keep)
+                    )
+                except ArtistIdentityChangedError:
+                    log.info(
+                        "Skipped duplicate artist merge for stale identity '%s'",
+                        discard,
+                    )
+                    continue
                 merged += 1
                 log.info("Merged duplicate artist '%s' into '%s'", discard, keep)
 
@@ -952,9 +965,9 @@ class LibrarySync:
             if row["name"].startswith(".") or (row.get("folder_name") or "").startswith(
                 "."
             ):
-                delete_artist(row["name"])
-                removed += 1
-                log.info("Removed internal library artist row: %s", row["name"])
+                if self._delete_artist_if_current(row["name"]):
+                    removed += 1
+                    log.info("Removed internal library artist row: %s", row["name"])
                 continue
 
             # Remove empty entries whose name is a folder name already owned by a canonical artist
@@ -962,25 +975,25 @@ class LibrarySync:
             if row["album_count"] == 0 and row["track_count"] == 0:
                 # Check if this artist's name matches a folder that belongs to a canonical artist
                 if row["name"] in canonical_folders:
-                    delete_artist(row["name"])
-                    removed += 1
-                    log.info(
-                        "Removed duplicate artist: %s (folder claimed by canonical entry)",
-                        row["name"],
-                    )
+                    if self._delete_artist_if_current(row["name"]):
+                        removed += 1
+                        log.info(
+                            "Removed duplicate artist: %s (folder claimed by canonical entry)",
+                            row["name"],
+                        )
                     continue
                 # Also check if a folder with this name resolves to a canonical artist via tags
                 folder_dir = self.library_path / row["name"]
                 if folder_dir.is_dir():
                     canonical = self._canonical_artist_name(folder_dir, row["name"])
                     if canonical != row["name"] and get_library_artist(canonical):
-                        delete_artist(row["name"])
-                        removed += 1
-                        log.info(
-                            "Removed duplicate artist: %s (canonical name is %s)",
-                            row["name"],
-                            canonical,
-                        )
+                        if self._delete_artist_if_current(row["name"]):
+                            removed += 1
+                            log.info(
+                                "Removed duplicate artist: %s (canonical name is %s)",
+                                row["name"],
+                                canonical,
+                            )
                         continue
 
             # Use folder_name to locate the directory; fall back to name for legacy rows
@@ -991,9 +1004,9 @@ class LibrarySync:
                 album_paths = get_album_paths_for_artist(row["name"])
                 if any(Path(p).is_dir() for p in album_paths):
                     continue
-                delete_artist(row["name"])
-                removed += 1
-                log.info("Removed stale artist: %s", row["name"])
+                if self._delete_artist_if_current(row["name"]):
+                    removed += 1
+                    log.info("Removed stale artist: %s", row["name"])
 
         albums = get_all_album_paths()
 
@@ -1017,6 +1030,15 @@ class LibrarySync:
                 log.info("Removed stale album: %s", row["path"])
 
         return removed
+
+    @staticmethod
+    def _delete_artist_if_current(name: str) -> bool:
+        try:
+            delete_artist(name)
+        except ArtistIdentityChangedError:
+            log.info("Skipped stale artist removal for changed identity '%s'", name)
+            return False
+        return True
 
 
 def _parse_int(val, default=None):

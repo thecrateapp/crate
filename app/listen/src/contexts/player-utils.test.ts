@@ -9,8 +9,12 @@ import { getOfflineNativePlaybackUrl } from "@/lib/offline";
 import { setPlaybackDeliveryPolicyPreference } from "@/lib/player-playback-prefs";
 import {
   getEffectiveCrossfadeSeconds,
+  getStoredRecentlyPlayed,
   getStoredQueue,
   getStreamUrl,
+  LEGACY_RECENTLY_PLAYED_KEY,
+  LEGACY_STORAGE_KEY,
+  RECENTLY_PLAYED_KEY,
   saveQueue,
   SMART_TRANSITION_BALANCED_SECONDS,
   SMART_TRANSITION_LONG_SECONDS,
@@ -169,6 +173,38 @@ describe("getStoredQueue / saveQueue round-trip", () => {
     expect(stored.shuffle).toBe(false);
     expect(stored.unshuffledQueue).toBeNull();
     expect(stored.savedAt).toBeNull();
+  });
+
+  it("migrates the pre-versioned playback state without losing the queue", () => {
+    localStorage.setItem(
+      LEGACY_STORAGE_KEY,
+      JSON.stringify({
+        queue: [TRACK_A],
+        currentIndex: 0,
+        currentTime: 17,
+        wasPlaying: true,
+      }),
+    );
+
+    expect(getStoredQueue()).toEqual(
+      expect.objectContaining({
+        queue: [TRACK_A],
+        currentTime: 17,
+        wasPlaying: true,
+      }),
+    );
+    expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+    expect(localStorage.getItem(LEGACY_STORAGE_KEY)).toBeNull();
+  });
+
+  it("migrates the pre-versioned recently played history", () => {
+    localStorage.setItem(LEGACY_RECENTLY_PLAYED_KEY, JSON.stringify([TRACK_A]));
+
+    expect(getStoredRecentlyPlayed()).toEqual([TRACK_A]);
+    expect(localStorage.getItem(RECENTLY_PLAYED_KEY)).toBe(
+      JSON.stringify([TRACK_A]),
+    );
+    expect(localStorage.getItem(LEGACY_RECENTLY_PLAYED_KEY)).toBeNull();
   });
 
   it("survives malformed JSON by returning defaults", () => {

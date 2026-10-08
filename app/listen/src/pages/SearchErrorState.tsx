@@ -1,0 +1,43 @@
+import { useTranslation } from "react-i18next";
+import { CRATE_ICON_SIZE, RefreshCw, Search } from "@crate/ui/icons";
+import { Button } from "@crate/ui/shadcn/button";
+
+export function SearchErrorState({
+  query,
+  message,
+  onRetry,
+}: {
+  query: string;
+  message: string;
+  onRetry?: () => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="space-y-8">
+      <h1 className="text-2xl font-bold">
+        {t("search.resultsFor", { query })}
+      </h1>
+      <div className="mx-auto max-w-sm rounded-panel border border-state-warning/12 bg-text-primary/[0.035] px-6 py-10 text-center shadow-card">
+        <div className="mx-auto flex size-12 items-center justify-center rounded-full border border-state-warning/15 bg-state-warning/8 text-state-warning-text">
+          <Search size={CRATE_ICON_SIZE.md} />
+        </div>
+        <p className="mt-4 text-base font-semibold text-text-primary">
+          {t("search.unavailable")}
+        </p>
+        <p className="mt-2 text-sm text-text-muted">{message}</p>
+        {onRetry ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-5"
+            onClick={onRetry}
+          >
+            <RefreshCw size={CRATE_ICON_SIZE.xs} />
+            {t("common.retry")}
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}

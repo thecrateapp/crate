@@ -1,9 +1,10 @@
 """Schema models for authentication and user management endpoints."""
 
+import re
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from crate.api.schemas.common import IdentityFieldsMixin, OkResponse
 
@@ -52,6 +53,17 @@ class NativeOAuthExchangeRequest(BaseModel):
     state: str = Field(min_length=16, max_length=256)
 
 
+class NativeOAuthLinkStartRequest(BaseModel):
+    native_code_challenge: str = Field(min_length=43, max_length=43)
+    native_state: str = Field(min_length=16, max_length=256)
+
+
+class NativeOAuthLinkCompleteRequest(BaseModel):
+    code: str = Field(min_length=16, max_length=256)
+    code_verifier: str = Field(min_length=43, max_length=128)
+    state: str = Field(min_length=16, max_length=256)
+
+
 class ProviderToggleRequest(BaseModel):
     enabled: bool
 
@@ -75,10 +87,38 @@ class AuthInviteRequest(BaseModel):
     max_uses: int | None = 1
 
 
+_INSTAGRAM_HANDLE_RE = re.compile(r"^[A-Za-z0-9._]{1,30}$")
+_INSTAGRAM_URL_PREFIX_RE = re.compile(
+    r"^(?:https?://)?(?:www\.)?instagram\.com(?:/|$)", re.IGNORECASE
+)
+_INSTAGRAM_DOMAIN_RE = re.compile(r"instagram\.com", re.IGNORECASE)
+
+
+def normalize_instagram_handle(value: str) -> str:
+    raw = value.strip()
+    if not raw:
+        return ""
+    handle = _INSTAGRAM_URL_PREFIX_RE.sub("", raw)
+    handle = handle.split("?", 1)[0].strip("/").lstrip("@")
+    if not any(char.isalnum() for char in handle) or _INSTAGRAM_DOMAIN_RE.search(
+        handle
+    ):
+        raise ValueError("Instagram handle must include a username")
+    if not _INSTAGRAM_HANDLE_RE.fullmatch(handle):
+        raise ValueError("Instagram handle can only use letters, numbers, . and _")
+    return handle
+
+
 class UpdateProfileRequest(BaseModel):
     name: str | None = None
     username: str | None = None
     bio: str | None = None
+    instagram_handle: str | None = None
+
+    @field_validator("instagram_handle")
+    @classmethod
+    def _validate_instagram_handle(cls, value: str | None) -> str | None:
+        return None if value is None else normalize_instagram_handle(value)
 
 
 class ChangePasswordRequest(BaseModel):
@@ -178,6 +218,7 @@ class AuthRefreshResponse(BaseModel):
 class AuthMeResponse(AuthUserPublicResponse):
     username: str | None = None
     bio: str | None = None
+    instagram_handle: str | None = None
     session_id: str | None = None
     capabilities: list[str] = Field(default_factory=list)
     connected_accounts: list[AuthExternalIdentityResponse] = Field(default_factory=list)
@@ -207,8 +248,14 @@ class RevokeSessionsResponse(OkResponse):
     revoked: int
 
 
-class SubsonicTokenResponse(BaseModel):
-    subsonic_token: str | None = None
+class SubsonicCredentialCreatedResponse(BaseModel):
+    api_key: str = Field(
+        description="New API key; returned only on creation or rotation"
+    )
+
+
+class SubsonicCredentialStatusResponse(BaseModel):
+    configured: bool
 
 
 class OAuthStartResponse(BaseModel):
@@ -250,6 +297,8 @@ class AdminUserSummaryResponse(AuthUserPublicResponse):
     created_at: datetime | None = None
     last_login: datetime | None = None
     last_seen_at: datetime | None = None
+    last_activity_at: datetime | None = None
+    activity_status: str = "never_active"
     active_devices: int | None = None
     online_now: bool = False
     listening_now: bool = False
@@ -266,6 +315,8 @@ class AdminUserDetailResponse(AuthMeResponse):
     created_at: datetime | None = None
     last_login: datetime | None = None
     last_seen_at: datetime | None = None
+    last_activity_at: datetime | None = None
+    activity_status: str = "never_active"
     active_sessions: int | None = None
     active_devices: int | None = None
     online_now: bool = False

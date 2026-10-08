@@ -1,0 +1,14 @@
+{
+  "ignore": {
+    "files": ["scripts/**", "src-tauri/vendor/**", "vendor/**"],
+    "rules": [
+      "react-doctor/no-high-complexity-react-function",
+      "react-doctor/no-giant-component",
+      "react-doctor/prefer-useReducer",
+      "react-doctor/no-many-boolean-props",
+      "react-doctor/no-multi-component-file",
+      "react-doctor/only-export-components",
+      "react-doctor/duplicate-jsx-subtree"
+    ]
+  }
+}

@@ -138,12 +138,16 @@ export function scopesForUrl(url: string): string[] {
   else if (url.startsWith("/api/me/likes")) scopes.push("likes");
   else if (url.startsWith("/api/me/follows")) scopes.push("follows");
   else if (url.startsWith("/api/me/albums")) scopes.push("saved_albums");
+  else if (url.startsWith("/api/me/crates")) scopes.push("crates");
+  else if (url === "/api/me") scopes.push("library");
   else if (url.startsWith("/api/catalog/me/follows"))
     scopes.push("follows", "library");
   else if (url.startsWith("/api/catalog/me/artists"))
     scopes.push("follows", "library");
   else if (url.startsWith("/api/catalog/me/albums"))
     scopes.push("saved_albums", "library");
+  else if (url.match(/^\/api\/catalog\/artists\/[^/]+\/page(?:\?|$)/))
+    scopes.push("artist_bio", "library");
   else if (url.startsWith("/api/me/history")) scopes.push("history");
   else if (url.startsWith("/api/me/stats")) scopes.push("history");
   else if (url.startsWith("/api/users/") && url.includes("/stats"))
@@ -158,6 +162,8 @@ export function scopesForUrl(url: string): string[] {
     const m = url.match(/^\/api\/playlists\/(\d+)/);
     if (m) scopes.push(`playlist:${m[1]}`);
   }
+  // Crate collection and detail queries share the broad invalidation scope.
+  else if (url.startsWith("/api/crates")) scopes.push("crates");
   // Curation
   else if (url.startsWith("/api/curation")) scopes.push("curation");
   // Artist detail — also invalidates on follows (follow button state)
@@ -165,8 +171,14 @@ export function scopesForUrl(url: string): string[] {
     const m = url.match(/^\/api\/artists\/(\d+)/);
     if (m) scopes.push(`artist:${m[1]}`);
     scopes.push("library", "follows");
-  } else if (url.startsWith("/api/artist-slugs/"))
+    if (url.match(/^\/api\/artists\/\d+(?:\?.*)?$/)) scopes.push("artist_bio");
+  } else if (url.match(/^\/api\/artists\/by-entity\/[^/]+(?:\?|$)/))
+    scopes.push("library", "follows", "artist_bio");
+  else if (url.startsWith("/api/artist-slugs/")) {
     scopes.push("library", "follows");
+    if (url.match(/^\/api\/artist-slugs\/[^/]+(?:\/page)?(?:\?|$)/))
+      scopes.push("artist_bio");
+  }
   // Album detail
   else if (url.match(/^\/api\/albums\/\d+/)) {
     const m = url.match(/^\/api\/albums\/(\d+)/);

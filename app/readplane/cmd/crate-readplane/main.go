@@ -17,6 +17,7 @@ import (
 	"github.com/thecrateapp/crate/app/readplane/internal/config"
 	readplanefederation "github.com/thecrateapp/crate/app/readplane/internal/federation"
 	"github.com/thecrateapp/crate/app/readplane/internal/httpx"
+	"github.com/thecrateapp/crate/app/readplane/internal/observability"
 	"github.com/thecrateapp/crate/app/readplane/internal/postgres"
 	"github.com/thecrateapp/crate/app/readplane/internal/redisx"
 	"github.com/thecrateapp/crate/app/readplane/internal/routes"
@@ -32,6 +33,11 @@ func main() {
 	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	sentryEnabled, sentryShutdown, sentryErr := observability.InitSentry("readplane")
+	defer sentryShutdown()
+	if sentryErr != nil {
+		logger.Warn("failed to initialize Sentry", "error", sentryErr)
+	}
 	cfg := config.Load(version)
 	if !cfg.Enabled {
 		logger.Warn("READPLANE_ENABLED=false; service still starting for health checks")
@@ -43,13 +49,27 @@ func main() {
 	pool, err := postgres.Connect(ctx, cfg)
 	if err != nil {
 		logger.Error("failed to connect postgres", "error", err)
+		observability.CaptureOperationError(err, "startup.postgres", nil)
+		sentryShutdown()
 		os.Exit(1)
 	}
 
-	var redisClient = mustRedis(ctx, cfg, logger)
+	redisClient, err := connectRedis(ctx, cfg, logger)
+	if err != nil {
+		logger.Error("failed to configure redis", "role", "cache", "error", err)
+		observability.CaptureOperationError(err, "startup.redis", map[string]string{"role": "cache"})
+		sentryShutdown()
+		os.Exit(1)
+	}
 	var durableRedisClient *redis.Client
 	if cfg.FederationProxyEnabled {
-		durableRedisClient = mustRedisURL(ctx, cfg.DurableRedisURL, cfg.QueryTimeout, logger, "durable")
+		durableRedisClient, err = connectRedisURL(ctx, cfg.DurableRedisURL, cfg.QueryTimeout, logger, "durable")
+		if err != nil {
+			logger.Error("failed to configure redis", "role", "durable", "error", err)
+			observability.CaptureOperationError(err, "startup.redis", map[string]string{"role": "durable"})
+			sentryShutdown()
+			os.Exit(1)
+		}
 	}
 	fallback, err := httpx.NewFallbackProxyWithConfig(httpx.FallbackConfig{
 		Enabled:          cfg.FallbackEnabled,
@@ -61,6 +81,8 @@ func main() {
 	})
 	if err != nil {
 		logger.Error("failed to configure fallback proxy", "error", err)
+		observability.CaptureOperationError(err, "startup.fallback", nil)
+		sentryShutdown()
 		os.Exit(1)
 	}
 
@@ -72,6 +94,7 @@ func main() {
 	if err := catalog.LoadTaxonomy(taxonomyPath); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			logger.Warn("failed to load taxonomy override; using built-in defaults", "path", taxonomyPath, "error", err)
+			observability.CaptureOperationError(err, "startup.taxonomy", nil)
 		}
 	}
 
@@ -110,6 +133,8 @@ func main() {
 		)
 		if signerErr != nil {
 			logger.Error("failed to configure federation control plane", "error", signerErr)
+			observability.CaptureOperationError(signerErr, "startup.federation_control_plane", nil)
+			sentryShutdown()
 			os.Exit(1)
 		}
 		federationProxy = readplanefederation.NewProxy(
@@ -133,9 +158,14 @@ func main() {
 	server := routes.NewServer(cfg, pool, redisClient, authenticator, catalogStore, snapshotStore, fallback, federationProxy, logger)
 	go server.RunAuthInvalidation(ctx)
 
+	handler := server.Handler()
+	if sentryEnabled {
+		handler = observability.WrapHTTP(handler)
+	}
+
 	httpServer := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           server.Handler(),
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -143,6 +173,7 @@ func main() {
 		logger.Info("crate-readplane listening", "addr", cfg.Addr, "version", cfg.Version)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("http server failed", "error", err)
+			observability.CaptureOperationError(err, "http.server", nil)
 			stop()
 		}
 	}()
@@ -152,9 +183,11 @@ func main() {
 	defer cancel()
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		logger.Warn("http shutdown failed", "error", err)
+		observability.CaptureOperationError(err, "shutdown.http", nil)
 	}
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Warn("readplane shutdown failed", "error", err)
+		observability.CaptureOperationError(err, "shutdown.readplane", nil)
 	}
 	if durableRedisClient != nil {
 		_ = durableRedisClient.Close()
@@ -177,20 +210,20 @@ func runHealthcheck() {
 	}
 }
 
-func mustRedis(ctx context.Context, cfg config.Config, logger *slog.Logger) *redis.Client {
-	return mustRedisURL(ctx, cfg.RedisURL, cfg.QueryTimeout, logger, "cache")
+func connectRedis(ctx context.Context, cfg config.Config, logger *slog.Logger) (*redis.Client, error) {
+	return connectRedisURL(ctx, cfg.RedisURL, cfg.QueryTimeout, logger, "cache")
 }
 
-func mustRedisURL(ctx context.Context, redisURL string, timeout time.Duration, logger *slog.Logger, role string) *redis.Client {
+func connectRedisURL(ctx context.Context, redisURL string, timeout time.Duration, logger *slog.Logger, role string) (*redis.Client, error) {
 	client, err := redisx.Connect(redisURL)
 	if err != nil {
-		logger.Error("failed to configure redis", "role", role, "error", err)
-		os.Exit(1)
+		return nil, err
 	}
 	pingCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	if err := redisx.Ping(pingCtx, client); err != nil {
 		logger.Warn("redis ping failed during startup", "role", role, "error", err)
+		observability.CaptureOperationError(err, "startup.redis_ping", map[string]string{"role": role})
 	}
-	return client
+	return client, nil
 }

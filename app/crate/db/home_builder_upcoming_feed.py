@@ -159,7 +159,7 @@ def _build_home_upcoming(
     release_count = sum(1 for item in items if item.get("type") == "release")
 
     return {
-        "items": items[:item_limit],
+        "items": [item for item in items if item.get("is_upcoming")][:item_limit],
         "insights": insights,
         "summary": {
             "followed_artists": len(followed_names),

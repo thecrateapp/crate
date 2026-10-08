@@ -21,6 +21,7 @@ export const isTauriRuntime = listenRuntime === "tauri";
 
 export const usesConfigurableServer = isCapacitorRuntime || isTauriRuntime;
 export const usesNativeFilesystem = isCapacitorRuntime || isTauriRuntime;
+export const usesSecureSessionStore = isCapacitorRuntime || isTauriRuntime;
 export const usesMobileShell = isCapacitorRuntime;
 export const supportsHaptics = isCapacitorRuntime;
 export const shouldRegisterServiceWorker = isWebRuntime;

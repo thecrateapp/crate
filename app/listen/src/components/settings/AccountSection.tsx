@@ -1,0 +1,297 @@
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { notify } from "@crate/ui/lib/notify";
+
+import { CRATE_ICON_SIZE, Shield } from "@crate/ui/icons";
+
+import { ConnectDevicesSection } from "@/components/settings/ConnectDevicesSection";
+import {
+  AccountProfileForm,
+  ConnectedAccounts,
+  PasswordChangeForm,
+} from "@/components/settings/AccountSectionForms";
+import { Section } from "@/components/settings/SettingsPrimitives";
+import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
+import { beginNativeOAuthLink } from "@/lib/capacitor-oauth";
+import { isTauriRuntime } from "@/lib/platform";
+
+interface AuthProviderState {
+  enabled: boolean;
+  configured: boolean;
+  login_url: string | null;
+}
+
+interface AuthPublicConfig {
+  invite_only?: boolean;
+}
+
+export function AccountSection() {
+  const { t } = useTranslation();
+  const { user, refetch } = useAuth();
+  const [name, setName] = useState(user?.name || "");
+  const [username, setUsername] = useState(user?.username || "");
+  const [bio, setBio] = useState(user?.bio || "");
+  const [instagram, setInstagram] = useState(user?.instagram_handle || "");
+  const [saving, setSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [providers, setProviders] = useState<Record<string, AuthProviderState>>(
+    {},
+  );
+  const [authConfig, setAuthConfig] = useState<AuthPublicConfig>({});
+  const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
+  const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    setName(user?.name || "");
+    setUsername(user?.username || "");
+    setBio(user?.bio || "");
+    setInstagram(user?.instagram_handle || "");
+  }, [user?.bio, user?.instagram_handle, user?.name, user?.username]);
+
+  useEffect(() => {
+    api<Record<string, AuthProviderState>>("/api/auth/providers")
+      .then(setProviders)
+      .catch(() => {});
+    api<AuthPublicConfig>("/api/auth/config")
+      .then(setAuthConfig)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const handleLinkCompleted = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{
+          provider?: string;
+          userId?: number;
+        }>
+      ).detail;
+      if (!detail || detail.userId !== user?.id || !detail.provider) return;
+      const provider =
+        detail.provider === "google"
+          ? "Google"
+          : detail.provider === "apple"
+            ? "Apple"
+            : detail.provider;
+      if (linkingProvider === detail.provider) setLinkingProvider(null);
+      notify.success(
+        t("settings.account.toasts.linkSucceeded", {
+          provider,
+        }),
+      );
+      void refetch().catch(() => {});
+    };
+    const handleLinkFailed = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{
+          provider?: string;
+          userId?: number;
+        }>
+      ).detail;
+      if (!detail || detail.userId !== user?.id || !detail.provider) return;
+      const provider =
+        detail.provider === "google"
+          ? "Google"
+          : detail.provider === "apple"
+            ? "Apple"
+            : detail.provider;
+      if (linkingProvider === detail.provider) setLinkingProvider(null);
+      notify.error(
+        t("settings.account.toasts.linkCompletionFailed", {
+          provider,
+        }),
+      );
+    };
+    window.addEventListener("crate:oauth-link-completed", handleLinkCompleted);
+    window.addEventListener("crate:oauth-link-failed", handleLinkFailed);
+    return () => {
+      window.removeEventListener(
+        "crate:oauth-link-completed",
+        handleLinkCompleted,
+      );
+      window.removeEventListener("crate:oauth-link-failed", handleLinkFailed);
+    };
+  }, [linkingProvider, refetch, t, user?.id]);
+
+  useEffect(() => {
+    if (!isTauriRuntime || !linkingProvider) return;
+    let lostFocus = false;
+    const handleBlur = () => {
+      lostFocus = true;
+    };
+    const handleFocus = () => {
+      if (!lostFocus) return;
+      lostFocus = false;
+      setLinkingProvider((current) =>
+        current === linkingProvider ? null : current,
+      );
+    };
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [linkingProvider]);
+
+  async function handleSaveName() {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      await api("/api/auth/profile", "PUT", {
+        name: name.trim(),
+        username: username.trim() || null,
+        bio: bio.trim() || null,
+        instagram_handle: instagram.trim(),
+      });
+      notify.success(t("settings.account.toasts.profileUpdated"));
+      await refetch();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("Username is already taken")) {
+        notify.error(t("settings.account.toasts.usernameTaken"));
+      } else if (message.includes("Instagram handle")) {
+        notify.error(t("settings.account.toasts.instagramInvalid"));
+      } else {
+        notify.error(t("settings.account.toasts.profileUpdateFailed"));
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleChangePassword() {
+    if (!newPassword || newPassword.length < 6) {
+      notify.error(t("settings.account.toasts.passwordTooShort"));
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      notify.error(t("settings.account.toasts.passwordMismatch"));
+      return;
+    }
+    setSaving(true);
+    try {
+      await api("/api/me/password", "PUT", {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+      notify.success(t("settings.account.toasts.passwordChanged"));
+      setShowPassword(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch {
+      notify.error(t("settings.account.toasts.passwordChangeFailed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleLinkProvider(provider: string) {
+    setLinkingProvider(provider);
+    try {
+      if (isTauriRuntime) {
+        if (!user || (provider !== "google" && provider !== "apple")) {
+          throw new Error("The active account cannot link this provider");
+        }
+        await beginNativeOAuthLink(provider, user.id);
+        return;
+      }
+      const response = await api<{ login_url: string }>(
+        `/api/auth/oauth/${provider}/link`,
+        "POST",
+        {
+          return_to: `${window.location.origin}/settings`,
+        },
+      );
+      window.location.href = response.login_url;
+    } catch {
+      notify.error(t("settings.account.toasts.linkFailed", { provider }));
+      setLinkingProvider((current) => (current === provider ? null : current));
+    }
+  }
+
+  async function handleUnlinkProvider(provider: string) {
+    setUnlinkingProvider(provider);
+    try {
+      await api(`/api/auth/oauth/${provider}/unlink`, "POST");
+      notify.success(t("settings.account.toasts.unlinked", { provider }));
+      await refetch();
+    } catch {
+      notify.error(t("settings.account.toasts.unlinkFailed", { provider }));
+    } finally {
+      setUnlinkingProvider(null);
+    }
+  }
+
+  const connectedAccounts = user?.connected_accounts || [];
+  const linkedProviders = new Set<string>();
+  for (const item of connectedAccounts) {
+    if (item.status !== "unlinked") linkedProviders.add(item.provider);
+  }
+  const socialProviders = Object.entries(providers).filter(
+    ([provider, state]) =>
+      provider !== "password" && state.configured && state.enabled,
+  );
+
+  return (
+    <Section
+      title={t("settings.account.title")}
+      description={t("settings.account.description")}
+    >
+      <div className="space-y-4">
+        <AccountProfileForm
+          name={name}
+          username={username}
+          bio={bio}
+          instagram={instagram}
+          email={user?.email}
+          saving={saving}
+          profileUnchanged={
+            name.trim() === (user?.name || "") &&
+            username.trim() === (user?.username || "") &&
+            bio.trim() === (user?.bio || "") &&
+            instagram.trim() === (user?.instagram_handle || "")
+          }
+          setName={setName}
+          setUsername={setUsername}
+          setBio={setBio}
+          setInstagram={setInstagram}
+          onSave={handleSaveName}
+        />
+        <ConnectedAccounts
+          providers={socialProviders}
+          linkedProviders={linkedProviders}
+          linkingProvider={linkingProvider}
+          unlinkingProvider={unlinkingProvider}
+          onLink={handleLinkProvider}
+          onUnlink={handleUnlinkProvider}
+        />
+        <ConnectDevicesSection />
+        {authConfig.invite_only ? (
+          <div className="flex items-start gap-3 rounded-xl border border-accent-action/20 bg-accent-action/10 px-4 py-3 text-sm text-accent-action">
+            <Shield size={CRATE_ICON_SIZE.sm} className="mt-0.5 shrink-0" />
+            <div>{t("settings.account.inviteOnlyNotice")}</div>
+          </div>
+        ) : null}
+        <PasswordChangeForm
+          showPassword={showPassword}
+          setShowPassword={setShowPassword}
+          currentPassword={currentPassword}
+          newPassword={newPassword}
+          confirmPassword={confirmPassword}
+          setCurrentPassword={setCurrentPassword}
+          setNewPassword={setNewPassword}
+          setConfirmPassword={setConfirmPassword}
+          saving={saving}
+          onChangePassword={handleChangePassword}
+        />
+      </div>
+    </Section>
+  );
+}

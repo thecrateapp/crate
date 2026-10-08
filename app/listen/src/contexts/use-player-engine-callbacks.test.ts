@@ -8,6 +8,10 @@ import type { PlaySource, Track } from "@/contexts/player-types";
 import { PLAYER_TRACK_FINISHED_EVENT } from "@/contexts/player-events";
 import { usePlayerEngineCallbacks } from "@/contexts/use-player-engine-callbacks";
 
+const { isCastSessionActiveMock } = vi.hoisted(() => ({
+  isCastSessionActiveMock: vi.fn(() => false),
+}));
+
 vi.mock("@/contexts/player-utils", () => ({
   getStreamUrl: (track: Track) => `/stream/${track.id}`,
 }));
@@ -21,6 +25,10 @@ vi.mock("@/lib/gapless-player", () => ({
 
 vi.mock("@/lib/capacitor", () => ({
   isOnline: vi.fn(() => Promise.resolve(true)),
+}));
+
+vi.mock("@/lib/cast-sender", () => ({
+  isCastSessionActive: isCastSessionActiveMock,
 }));
 
 const TRACK_A: Track = { id: "a", title: "A", artist: "Artist" };
@@ -77,6 +85,25 @@ function createOptions() {
 describe("usePlayerEngineCallbacks", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    isCastSessionActiveMock.mockReturnValue(false);
+  });
+
+  it("ignores late local engine callbacks while Cast owns playback", () => {
+    isCastSessionActiveMock.mockReturnValue(true);
+    const options = createOptions();
+    const listener = vi.fn();
+    window.addEventListener(PLAYER_TRACK_FINISHED_EVENT, listener);
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onTimeUpdate?.(12_000, 0);
+    options.callbacksRef.current.onPlay?.("/stream/a");
+    options.callbacksRef.current.onTrackFinished?.("/stream/a");
+
+    expect(options.commitCurrentTime).not.toHaveBeenCalled();
+    expect(options.commitIsPlaying).not.toHaveBeenCalled();
+    expect(options.ensureTrackerSession).not.toHaveBeenCalled();
+    expect(listener).not.toHaveBeenCalled();
+    window.removeEventListener(PLAYER_TRACK_FINISHED_EVENT, listener);
   });
 
   it("ignores buffering events from preload tracks", () => {

@@ -2,11 +2,10 @@ import base64
 import hashlib
 import logging
 import os
-import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from threading import RLock
-from typing import Literal, overload
+from typing import Literal, TypedDict, overload
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import jwt
@@ -17,6 +16,51 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import JSONResponse, RedirectResponse, Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from crate.api import native_oauth_auth
+from crate.api.auth_dependencies import require_auth as _require_auth
+from crate.api.native_oauth import (
+    InvalidNativeOAuthHandoff,
+    NativeOAuthCompletionUnknown,
+    NativeOAuthUnavailable,
+)
+from crate.api.native_oauth import (
+    complete_exchange as complete_native_oauth_exchange,
+)
+from crate.api.native_oauth import (
+    consume_handoff as consume_native_oauth_handoff,
+)
+from crate.api.native_oauth import (
+    exchange_session_id as native_oauth_exchange_session_id,
+)
+from crate.api.native_oauth import (
+    get_completed_exchange as get_completed_native_oauth_exchange,
+)
+from crate.api.native_oauth import (
+    issue_handoff as issue_native_oauth_handoff,
+)
+from crate.api.native_oauth import (
+    restore_handoff as restore_native_oauth_handoff,
+)
+from crate.api.native_oauth_link import (
+    InvalidNativeOAuthLink,
+    NativeOAuthLinkHandoff,
+    NativeOAuthLinkUnavailable,
+)
+from crate.api.native_oauth_link import (
+    claim_link_handoff as claim_native_oauth_link_handoff,
+)
+from crate.api.native_oauth_link import (
+    complete_link_handoff as complete_native_oauth_link_handoff,
+)
+from crate.api.native_oauth_link import (
+    discard_link_handoff as discard_native_oauth_link_handoff,
+)
+from crate.api.native_oauth_link import (
+    issue_link_handoff as issue_native_oauth_link_handoff,
+)
+from crate.api.native_oauth_link import (
+    restore_link_handoff as restore_native_oauth_link_handoff,
+)
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
@@ -50,22 +94,19 @@ from crate.api.schemas.auth import (
     HeartbeatRequest,
     LoginRequest,
     NativeOAuthExchangeRequest,
+    NativeOAuthLinkCompleteRequest,
+    NativeOAuthLinkStartRequest,
     OAuthStartRequest,
     OAuthStartResponse,
     ProviderToggleRequest,
     RefreshTokenRequest,
     RegisterRequest,
     RevokeSessionsResponse,
-    SubsonicTokenResponse,
+    SubsonicCredentialCreatedResponse,
+    SubsonicCredentialStatusResponse,
     UpdateProfileRequest,
     UpdateUserRoleRequest,
     UpdateUserStatusRequest,
-)
-from crate.api.native_oauth import (
-    InvalidNativeOAuthHandoff,
-    NativeOAuthUnavailable,
-    consume_handoff as consume_native_oauth_handoff,
-    issue_handoff as issue_native_oauth_handoff,
 )
 from crate.api.schemas.common import OkResponse
 from crate.auth import (
@@ -81,12 +122,14 @@ from crate.auth import (
 )
 from crate.db.audit import log_audit
 from crate.db.cache_settings import get_setting, set_setting
+from crate.db.queries.auth_user_activity import derive_user_activity
 from crate.db.repositories.auth import (
     consume_auth_invite,
     count_users,
     create_auth_invite,
     create_session,
     create_user,
+    delete_session,
     get_session,
     get_user_by_email,
     get_user_by_external_identity,
@@ -108,8 +151,15 @@ from crate.db.repositories.auth import (
     update_user_status,
     upsert_user_external_identity,
 )
+from crate.db.repositories.auth_identities import link_oauth_user_identity
 from crate.db.repositories.library_contributions import list_user_album_contributions
 from crate.db.repositories.tasks import create_task
+from crate.user_avatars import (
+    AvatarProxyError,
+    AvatarUnavailable,
+    fetch_avatar,
+    is_proxyable_avatar_url,
+)
 
 log = logging.getLogger(__name__)
 
@@ -349,14 +399,7 @@ def _is_listen_app_id(app_id: str | None) -> bool:
     return (app_id or "").strip().lower().startswith("listen")
 
 
-def _is_native_listen_app_id(app_id: str | None) -> bool:
-    normalized = (app_id or "").strip().lower()
-    return normalized in {
-        "listen-android",
-        "listen-ios",
-        "listen-native",
-        "listen-tauri",
-    }
+_is_native_listen_app_id = native_oauth_auth.is_native_listen_app_id
 
 
 def _is_mobile_native_listen_app_id(app_id: str | None) -> bool:
@@ -364,72 +407,32 @@ def _is_mobile_native_listen_app_id(app_id: str | None) -> bool:
     return normalized in {"listen-android", "listen-ios", "listen-native"}
 
 
-def _env_enabled(name: str, default: bool = False) -> bool:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
+# Compatibility aliases for existing auth callers. New cross-router code imports
+# the shared helpers from native_oauth_auth directly.
 def _native_oauth_exchange_enabled() -> bool:
-    return _env_enabled("NATIVE_OAUTH_EXCHANGE_ENABLED", False)
+    return native_oauth_auth.native_oauth_exchange_enabled()
 
 
-def _native_oauth_legacy_redirect_enabled() -> bool:
-    return _env_enabled("NATIVE_OAUTH_LEGACY_REDIRECT_ENABLED", True)
+_NATIVE_CALLBACK_URL = native_oauth_auth.NATIVE_OAUTH_CALLBACK_URL
+_NATIVE_LINK_CALLBACK_URL = native_oauth_auth.NATIVE_OAUTH_LINK_CALLBACK_URL
+_NATIVE_CHALLENGE_RE = native_oauth_auth.NATIVE_OAUTH_CHALLENGE_RE
+_NATIVE_STATE_RE = native_oauth_auth.NATIVE_OAUTH_STATE_RE
+_NATIVE_VERIFIER_RE = native_oauth_auth.NATIVE_OAUTH_VERIFIER_RE
+_validate_native_oauth_start = native_oauth_auth.validate_native_oauth_start
+_validate_native_oauth_link_start = native_oauth_auth.validate_native_oauth_link_start
 
 
-_NATIVE_CALLBACK_URL = "cratemusic://oauth/callback"
-_NATIVE_DEBUG_CALLBACK_URL = "cratemusic-dbg://oauth/callback"
-_NATIVE_CALLBACK_URLS = frozenset({_NATIVE_CALLBACK_URL, _NATIVE_DEBUG_CALLBACK_URL})
-_NATIVE_CHALLENGE_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
-_NATIVE_STATE_RE = re.compile(r"^[A-Za-z0-9_-]{16,256}$")
-_NATIVE_VERIFIER_RE = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
+def _native_oauth_link_session_is_valid(user_id: int, session_id: str) -> bool:
+    return native_oauth_auth.native_oauth_link_session_is_valid(user_id, session_id)
 
 
-def _validate_native_oauth_start(
-    *,
-    app_id: str | None,
-    mode: str,
-    return_to: str | None,
-    challenge: str | None,
-    state: str | None,
-) -> bool:
-    requested = challenge is not None or state is not None
-    if not requested:
-        if (
-            _is_mobile_native_listen_app_id(app_id)
-            and not _native_oauth_legacy_redirect_enabled()
-        ):
-            raise HTTPException(
-                status_code=426,
-                detail="Native app upgrade required",
-            )
-        return False
-    if not _native_oauth_exchange_enabled():
-        raise HTTPException(
-            status_code=503,
-            detail="Native OAuth exchange is not enabled",
-        )
-    if mode != "login" or not _is_mobile_native_listen_app_id(app_id):
-        raise HTTPException(status_code=400, detail="Invalid native OAuth client")
-    if return_to not in _NATIVE_CALLBACK_URLS:
-        raise HTTPException(status_code=400, detail="Invalid native OAuth callback")
-    if not challenge or not state:
-        raise HTTPException(status_code=400, detail="Incomplete native OAuth binding")
-    if not _NATIVE_CHALLENGE_RE.fullmatch(challenge):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid native OAuth code challenge",
-        )
-    if not _NATIVE_STATE_RE.fullmatch(state):
-        raise HTTPException(status_code=400, detail="Invalid native OAuth state")
-    return True
+def _require_native_oauth_link_auth(request: Request) -> tuple[dict, str]:
+    return native_oauth_auth.require_native_oauth_link_auth(request)
 
 
 def _is_listen_return_to(return_to: str | None) -> bool:
     value = (return_to or "").strip()
-    if _is_native_mobile_callback_url(value):
+    if native_oauth_auth.is_native_callback_url(value):
         return True
     if not value.startswith(("http://", "https://")):
         return False
@@ -438,32 +441,6 @@ def _is_listen_return_to(return_to: str | None) -> bool:
     except Exception:
         return False
     return host == "listen" or host.startswith("listen.")
-
-
-def _is_native_mobile_callback_url(value: str | None) -> bool:
-    if not value:
-        return False
-    parsed = urlparse(value)
-    return (
-        parsed.scheme in {"cratemusic", "cratemusic-dbg"}
-        and parsed.netloc == "oauth"
-        and parsed.path == "/callback"
-    )
-
-
-def _is_tauri_loopback_return_to(return_to: str | None) -> bool:
-    if not return_to:
-        return False
-    try:
-        parsed = urlparse(return_to)
-    except Exception:
-        return False
-    return (
-        parsed.scheme == "http"
-        and parsed.hostname in {"127.0.0.1", "localhost"}
-        and parsed.port == 17654
-        and parsed.path == "/oauth/callback"
-    )
 
 
 def _request_host(request: Request) -> str:
@@ -530,7 +507,7 @@ def _infer_oauth_app_id(request: Request, return_to: str | None) -> str | None:
     if _is_listen_return_to(return_to):
         return (
             "listen-native"
-            if _is_native_mobile_callback_url(return_to)
+            if native_oauth_auth.is_native_callback_url(return_to)
             else "listen-web"
         )
     return None
@@ -593,7 +570,7 @@ def _is_secure() -> bool:
     return domain != "localhost"
 
 
-def _cookie_samesite() -> Literal["lax", "strict", "none"]:
+def _cookie_samesite(secure: bool | None = None) -> Literal["lax", "strict", "none"]:
     override = os.environ.get("CRATE_AUTH_COOKIE_SAMESITE")
     if override:
         normalized = override.strip().lower()
@@ -603,7 +580,58 @@ def _cookie_samesite() -> Literal["lax", "strict", "none"]:
             return "strict"
         if normalized == "none":
             return "none"
-    return "none" if _is_secure() else "lax"
+    return "none" if (_is_secure() if secure is None else secure) else "lax"
+
+
+_LOCAL_COOKIE_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+class _CookieAttributes(TypedDict):
+    secure: bool
+    samesite: Literal["lax", "strict", "none"]
+    domain: str | None
+
+
+def _request_hostname(request: Request) -> str:
+    forwarded_host = (
+        (request.headers.get("x-forwarded-host") or "").split(",")[0].strip()
+    )
+    host = forwarded_host or request.headers.get("host") or request.url.netloc
+    return (urlparse(f"//{host}").hostname or "").lower()
+
+
+def _request_is_https(request: Request) -> bool:
+    forwarded_proto = (
+        (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
+    )
+    return (forwarded_proto or request.url.scheme) == "https"
+
+
+def _host_matches_cookie_domain(hostname: str, domain: str | None) -> bool:
+    if not hostname or hostname in _LOCAL_COOKIE_HOSTS:
+        return False
+    if domain is None:
+        return True
+    bare_domain = domain.lstrip(".").lower()
+    return hostname == bare_domain or hostname.endswith(f".{bare_domain}")
+
+
+def _cookie_attributes(request: Request | None) -> _CookieAttributes:
+    domain = _cookie_domain()
+    if request is None or _host_matches_cookie_domain(
+        _request_hostname(request), domain
+    ):
+        return {
+            "secure": _is_secure(),
+            "samesite": _cookie_samesite(),
+            "domain": domain,
+        }
+
+    secure = _request_is_https(request)
+    samesite = _cookie_samesite(secure)
+    if samesite == "none" and not secure:
+        samesite = "lax"
+    return {"secure": secure, "samesite": samesite, "domain": None}
 
 
 def _set_auth_cookie(
@@ -612,51 +640,55 @@ def _set_auth_cookie(
     cookie_name: str = COOKIE_NAME,
     *,
     max_age: int | None = None,
+    request: Request | None = None,
 ):
     response.set_cookie(
         key=cookie_name,
         value=token,
         httponly=True,
-        secure=_is_secure(),
-        samesite=_cookie_samesite(),
-        domain=_cookie_domain(),
         max_age=max_age or JWT_EXPIRY_HOURS * 3600,
         path="/",
+        **_cookie_attributes(request),
     )
 
 
-def _set_refresh_cookie(response: Response, refresh_token: str, *, max_age: int):
+def _set_refresh_cookie(
+    response: Response,
+    refresh_token: str,
+    *,
+    max_age: int,
+    request: Request | None = None,
+):
     response.set_cookie(
         key=COOKIE_NAME_LISTEN_REFRESH,
         value=refresh_token,
         httponly=True,
-        secure=_is_secure(),
-        samesite=_cookie_samesite(),
-        domain=_cookie_domain(),
         max_age=max_age,
         path="/api/auth",
+        **_cookie_attributes(request),
     )
 
 
-def _clear_auth_cookie(response: Response, cookie_name: str = COOKIE_NAME):
+def _clear_auth_cookie(
+    response: Response,
+    cookie_name: str = COOKIE_NAME,
+    *,
+    request: Request | None = None,
+):
     response.delete_cookie(
         key=cookie_name,
         httponly=True,
-        secure=_is_secure(),
-        samesite=_cookie_samesite(),
-        domain=_cookie_domain(),
         path="/",
+        **_cookie_attributes(request),
     )
 
 
-def _clear_refresh_cookie(response: Response):
+def _clear_refresh_cookie(response: Response, *, request: Request | None = None):
     response.delete_cookie(
         key=COOKIE_NAME_LISTEN_REFRESH,
         httponly=True,
-        secure=_is_secure(),
-        samesite=_cookie_samesite(),
-        domain=_cookie_domain(),
         path="/api/auth",
+        **_cookie_attributes(request),
     )
 
 
@@ -672,10 +704,10 @@ def _clear_cookies_for_context(
         app_id=app_id,
         return_to=return_to,
     )
-    _clear_auth_cookie(response, cookie_name)
+    _clear_auth_cookie(response, cookie_name, request=request)
     if cookie_name == COOKIE_NAME_LISTEN:
-        _clear_auth_cookie(response, COOKIE_NAME)
-        _clear_refresh_cookie(response)
+        _clear_auth_cookie(response, COOKIE_NAME, request=request)
+        _clear_refresh_cookie(response, request=request)
 
 
 def _clean_header_value(value: str | None, *, max_length: int = 160) -> str | None:
@@ -825,18 +857,7 @@ def _revoke_user_sessions(user_id: int, current_session_id: str | None = None) -
 
 
 def _is_proxyable_avatar_url(value: str) -> bool:
-    try:
-        parsed = urlparse(value)
-    except Exception:
-        return False
-    if parsed.scheme != "https":
-        return False
-    host = (parsed.hostname or "").lower()
-    return (
-        host == "lh3.googleusercontent.com"
-        or host.endswith(".googleusercontent.com")
-        or host in {"www.gravatar.com", "secure.gravatar.com", "gravatar.com"}
-    )
+    return is_proxyable_avatar_url(value)
 
 
 def _google_configured() -> bool:
@@ -951,8 +972,7 @@ def _allowed_redirect_origins() -> set[str]:
 def _callback_origin(return_to: str | None = None, *, app_id: str | None = None) -> str:
     allowed = _allowed_redirect_origins()
     if return_to and (
-        _is_native_mobile_callback_url(return_to)
-        or _is_tauri_loopback_return_to(return_to)
+        native_oauth_auth.is_native_callback_url(return_to)
         or _is_native_listen_app_id(app_id)
     ):
         # Native/Tauri OAuth still needs an HTTPS callback registered with
@@ -979,9 +999,7 @@ def _validate_return_to(return_to: str | None, *, app_id: str | None = None) -> 
     """Validate return_to against allowed origins. Returns safe URL or fallback."""
     if not return_to:
         return "/"
-    if _is_native_mobile_callback_url(return_to):
-        return return_to
-    if app_id == "listen-tauri" and _is_tauri_loopback_return_to(return_to):
+    if native_oauth_auth.is_native_callback_url(return_to):
         return return_to
     if return_to.startswith("/") and not return_to.startswith("//"):
         return return_to
@@ -1006,6 +1024,29 @@ def _append_query_param(url: str, key: str, value: str) -> str:
     ]
     params.append((key, value))
     return urlunparse(parsed._replace(query=urlencode(params)))
+
+
+def _native_oauth_completion_redirect_url(
+    *,
+    app_id: str | None,
+    code: str,
+    state: str,
+    return_to: str | None = None,
+) -> str:
+    if (app_id or "").strip().lower() == "listen-tauri":
+        redirect_url = (
+            f"{_callback_origin(_NATIVE_CALLBACK_URL, app_id=app_id)}/auth/callback"
+        )
+        fragment = urlencode({"desktop": "tauri", "code": code, "state": state})
+        return f"{redirect_url}#{fragment}"
+
+    redirect_url = (
+        return_to
+        if return_to in native_oauth_auth.NATIVE_OAUTH_CALLBACK_URLS
+        else _NATIVE_CALLBACK_URL
+    )
+    redirect_url = _append_query_param(redirect_url, "code", code)
+    return _append_query_param(redirect_url, "state", state)
 
 
 def _post_auth_redirect_url(return_to: str, token: str) -> str:
@@ -1077,6 +1118,7 @@ def _build_oauth_state(
     app_id: str | None = None,
     native_code_challenge: str | None = None,
     native_state: str | None = None,
+    session_id: str | None = None,
 ) -> str:
     verifier = secrets.token_urlsafe(48)
     invite_key = None
@@ -1092,6 +1134,7 @@ def _build_oauth_state(
         "app_id": app_id,
         "native_code_challenge": native_code_challenge,
         "native_state": native_state,
+        "session_id": session_id,
         "verifier": verifier,
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
@@ -1219,7 +1262,11 @@ def _build_apple_client_secret() -> str:
 
 
 def _create_login_session(
-    user: dict, request: Request, *, app_id: str | None = None
+    user: dict,
+    request: Request,
+    *,
+    app_id: str | None = None,
+    session_id: str | None = None,
 ) -> tuple[str, dict, str | None]:
     user = _ensure_user_active(user)
     app = app_id or request.headers.get("x-crate-app")
@@ -1227,7 +1274,7 @@ def _create_login_session(
     access_expiry_hours = _access_expiry_hours(request, app_id=app)
     expires_at_dt = datetime.now(timezone.utc) + timedelta(hours=session_expiry_hours)
     expires_at = expires_at_dt.isoformat()
-    session_id = secrets.token_urlsafe(24)
+    session_id = session_id or secrets.token_urlsafe(24)
     session = create_session(
         session_id,
         user["id"],
@@ -1238,7 +1285,7 @@ def _create_login_session(
         device_label=request.headers.get("x-device-label"),
         device_fingerprint=_request_device_fingerprint(request, app_id=app),
     )
-    session_id = session["id"]
+    session_id = str(session["id"])
     token = create_jwt(
         user["id"],
         user["email"],
@@ -1352,6 +1399,7 @@ def _set_login_cookies(
         token,
         _cookie_name_for_context(request, app_id=app_id, return_to=return_to),
         max_age=_access_max_age_seconds(request, app_id=app_id, return_to=return_to),
+        request=request,
     )
     if refresh_token:
         _set_refresh_cookie(
@@ -1360,6 +1408,7 @@ def _set_login_cookies(
             max_age=_session_max_age_seconds(
                 request, app_id=app_id, return_to=return_to
             ),
+            request=request,
         )
 
 
@@ -1603,25 +1652,6 @@ class AuthMiddleware:
         await self.app(scope, receive, send)
 
 
-def _require_auth(request: Request) -> dict:
-    user = getattr(request.state, "user", None)
-    if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return user
-
-
-def _require_vdj_scope(request: Request, scope: str) -> dict:
-    user = _require_auth(request)
-    if user.get("auth_type") != "access_token":
-        return user
-    if scope not in set(user.get("scopes") or []):
-        raise HTTPException(
-            status_code=403,
-            detail=f"Access token is missing required scope: {scope}",
-        )
-    return user
-
-
 def _require_admin(request: Request) -> dict:
     return require_permission(request, "admin.access")
 
@@ -1668,6 +1698,18 @@ def _require_roles_manage(request: Request) -> dict:
 
 def _require_auth_manage(request: Request) -> dict:
     return require_permission(request, "auth.manage")
+
+
+def _require_vdj_scope(request: Request, scope: str) -> dict:
+    user = _require_auth(request)
+    if user.get("auth_type") != "access_token":
+        return user
+    if scope not in set(user.get("scopes") or []):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access token is missing required scope: {scope}",
+        )
+    return user
 
 
 # ── Routes ───────────────────────────────────────────────────────
@@ -1842,12 +1884,14 @@ def refresh_auth(request: Request, body: RefreshTokenRequest | None = None):
         access_token,
         _cookie_name_for_context(request, app_id=session_app_id),
         max_age=_access_max_age_seconds(request, app_id=session_app_id),
+        request=request,
     )
     if _is_listen_request(request, app_id=session_app_id):
         _set_refresh_cookie(
             response,
             next_refresh_token,
             max_age=max(1, int((expires_at - now).total_seconds())),
+            request=request,
         )
     return response
 
@@ -1885,6 +1929,7 @@ def auth_me(request: Request):
         payload = _user_public(db_user)
         payload["username"] = db_user.get("username")
         payload["bio"] = db_user.get("bio")
+        payload["instagram_handle"] = db_user.get("instagram_handle")
         payload["session_id"] = user.get("session_id")
         payload["capabilities"] = sorted(get_user_capabilities(db_user))
         payload["connected_accounts"] = list_user_external_identities(user["id"])
@@ -1909,36 +1954,17 @@ def auth_user_avatar(request: Request, user_id: int):
     _require_auth(request)
     target = get_user_by_id(user_id)
     avatar = (target or {}).get("avatar")
-    if not avatar or not _is_proxyable_avatar_url(avatar):
-        raise HTTPException(status_code=404, detail="Avatar not available")
-
     try:
-        upstream = requests.get(
-            avatar,
-            headers={"User-Agent": "Crate/1.0 (+https://cratemusic.app)"},
-            timeout=8,
-        )
-    except requests.RequestException as exc:
-        raise HTTPException(status_code=502, detail="Avatar fetch failed") from exc
-
-    if upstream.status_code != 200:
+        content, content_type = fetch_avatar(avatar)
+    except AvatarUnavailable as exc:
+        raise HTTPException(status_code=404, detail="Avatar not available") from exc
+    except AvatarProxyError as exc:
         raise HTTPException(
-            status_code=upstream.status_code if upstream.status_code < 500 else 502,
-            detail="Avatar fetch failed",
-        )
-    content_type = (
-        upstream.headers.get("content-type", "image/jpeg")
-        .split(";", 1)[0]
-        .strip()
-        .lower()
-    )
-    if not content_type.startswith("image/"):
-        raise HTTPException(status_code=502, detail="Avatar response was not an image")
-    if len(upstream.content) > 2_000_000:
-        raise HTTPException(status_code=502, detail="Avatar image is too large")
+            status_code=exc.status_code, detail="Avatar fetch failed"
+        ) from exc
 
     return Response(
-        content=upstream.content,
+        content=content,
         media_type=content_type,
         headers={
             "Cache-Control": "private, max-age=86400",
@@ -2066,8 +2092,8 @@ def auth_revoke_session(request: Request, session_id: str):
     revoke_session(session_id)
     response = JSONResponse({"ok": True})
     if user.get("session_id") == session_id:
-        _clear_auth_cookie(response, _cookie_name_for_request(request))
-        _clear_refresh_cookie(response)
+        _clear_auth_cookie(response, _cookie_name_for_request(request), request=request)
+        _clear_refresh_cookie(response, request=request)
     return response
 
 
@@ -2101,6 +2127,8 @@ def update_profile(request: Request, body: UpdateProfileRequest):
         fields["username"] = body.username
     if body.bio is not None:
         fields["bio"] = body.bio
+    if body.instagram_handle is not None:
+        fields["instagram_handle"] = body.instagram_handle or None
     if not fields:
         raise HTTPException(status_code=400, detail="No fields to update")
     try:
@@ -2126,7 +2154,11 @@ def update_profile(request: Request, body: UpdateProfileRequest):
     )
     response = JSONResponse(content=_user_public(updated))
     _set_auth_cookie(
-        response, token, _cookie_name_for_request(request), max_age=expiry_hours * 3600
+        response,
+        token,
+        _cookie_name_for_request(request),
+        max_age=expiry_hours * 3600,
+        request=request,
     )
     return response
 
@@ -2156,42 +2188,45 @@ def change_password(request: Request, body: ChangePasswordRequest):
 
 @router.post(
     "/subsonic-token",
-    response_model=SubsonicTokenResponse,
+    response_model=SubsonicCredentialCreatedResponse,
     responses=AUTH_ERROR_RESPONSES,
-    summary="Generate or rotate the Subsonic token",
+    summary="Create or rotate an OpenSubsonic API key",
 )
 def generate_subsonic_token(request: Request):
-    """Generate or regenerate a Subsonic API token for the current user."""
+    """Generate or rotate a one-time-display OpenSubsonic API key."""
+    from crate.subsonic.auth import create_user_credential
+
     user = _require_auth(request)
-    token = secrets.token_hex(16)
-    update_user(user["id"], subsonic_token=token)
-    return {"subsonic_token": token}
+    return {"api_key": create_user_credential(user["id"])}
 
 
 @router.delete(
     "/subsonic-token",
     response_model=OkResponse,
     responses=AUTH_ERROR_RESPONSES,
-    summary="Delete the Subsonic token",
+    summary="Revoke the OpenSubsonic API key",
 )
 def delete_subsonic_token(request: Request):
-    """Remove the Subsonic API token for the current user."""
+    """Revoke the current user's OpenSubsonic API key."""
+    from crate.subsonic.auth import revoke_user_credential
+
     user = _require_auth(request)
-    update_user(user["id"], subsonic_token=None)
+    revoke_user_credential(user["id"])
     return {"ok": True}
 
 
 @router.get(
     "/subsonic-token",
-    response_model=SubsonicTokenResponse,
+    response_model=SubsonicCredentialStatusResponse,
     responses=AUTH_ERROR_RESPONSES,
-    summary="Get the current Subsonic token",
+    summary="Read OpenSubsonic API key status",
 )
 def get_subsonic_token(request: Request):
-    """Get the current Subsonic API token (if set)."""
+    """Report whether an OpenSubsonic key exists without revealing it."""
+    from crate.subsonic.auth import has_user_credential
+
     user = _require_auth(request)
-    db_user = get_user_by_id(user["id"])
-    return {"subsonic_token": db_user.get("subsonic_token") if db_user else None}
+    return {"configured": has_user_credential(user["id"])}
 
 
 @router.post(
@@ -2211,6 +2246,7 @@ def _oauth_start_response(
     *,
     mode: str,
     user_id: int | None = None,
+    session_id: str | None = None,
 ):
     provider = provider.lower()
     if provider not in {"google", "apple"}:
@@ -2221,22 +2257,32 @@ def _oauth_start_response(
         )
 
     app_id = _infer_oauth_app_id(request, body.return_to)
-    native_exchange = _validate_native_oauth_start(
-        app_id=app_id,
-        mode=mode,
-        return_to=body.return_to,
-        challenge=body.native_code_challenge,
-        state=body.native_state,
-    )
+    if mode == "native_link":
+        _validate_native_oauth_link_start(
+            app_id=app_id,
+            return_to=body.return_to,
+            challenge=body.native_code_challenge,
+            state=body.native_state,
+        )
+        native_exchange = True
+    else:
+        native_exchange = _validate_native_oauth_start(
+            app_id=app_id,
+            mode=mode,
+            return_to=body.return_to,
+            challenge=body.native_code_challenge,
+            state=body.native_state,
+        )
     state = _build_oauth_state(
         provider=provider,
         return_to=body.return_to,
         mode=mode,
-        user_id=user_id if mode == "link" else None,
+        user_id=user_id if mode in {"link", "native_link"} else None,
         invite_token=body.invite_token,
         app_id=app_id,
         native_code_challenge=(body.native_code_challenge if native_exchange else None),
         native_state=body.native_state if native_exchange else None,
+        session_id=session_id if mode == "native_link" else None,
     )
     parsed_state = _parse_oauth_state(state)
     verifier = parsed_state["verifier"]
@@ -2252,9 +2298,9 @@ def _oauth_start_response(
             **common_params,
             "client_id": os.environ["GOOGLE_CLIENT_ID"],
             "scope": "openid email profile",
-            "access_type": "offline",
-            "prompt": "consent",
         }
+        if mode in {"link", "native_link"}:
+            params["prompt"] = "select_account"
         login_url = f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
     else:
         params = {
@@ -2337,11 +2383,17 @@ def _apple_userinfo(code: str, redirect_uri: str, verifier: str) -> dict:
 
 
 @router.get("/oauth/{provider}/callback")
-def oauth_callback(request: Request, provider: str, code: str = "", state: str = ""):
+def oauth_callback(
+    request: Request,
+    provider: str,
+    code: str = "",
+    state: str = "",
+    error: str = "",
+):
     provider = provider.lower()
     if provider not in {"google", "apple"}:
         raise HTTPException(status_code=404, detail="Unknown auth provider")
-    if not code or not state:
+    if not state or (not code and not error):
         raise HTTPException(status_code=400, detail="Invalid OAuth callback")
 
     # Key OAuth callback throttling by provider and client IP; using only the
@@ -2357,6 +2409,51 @@ def oauth_callback(request: Request, provider: str, code: str = "", state: str =
     if parsed_state.get("provider") != provider:
         _record_failed_login(rate_key, request)
         raise HTTPException(status_code=400, detail="OAuth provider mismatch")
+    if error:
+        mode = parsed_state.get("mode")
+        if mode == "native_link":
+            _validate_native_oauth_link_start(
+                app_id=parsed_state.get("app_id"),
+                return_to=parsed_state.get("return_to"),
+                challenge=parsed_state.get("native_code_challenge"),
+                state=parsed_state.get("native_state"),
+            )
+            callback_url = _NATIVE_LINK_CALLBACK_URL
+        elif mode == "login":
+            native_exchange = _validate_native_oauth_start(
+                app_id=parsed_state.get("app_id"),
+                mode=str(mode),
+                return_to=parsed_state.get("return_to"),
+                challenge=parsed_state.get("native_code_challenge"),
+                state=parsed_state.get("native_state"),
+            )
+            if not native_exchange:
+                raise HTTPException(
+                    status_code=400, detail="OAuth authorization was denied"
+                )
+            callback_url = parsed_state.get("return_to") or _NATIVE_CALLBACK_URL
+        else:
+            raise HTTPException(
+                status_code=400, detail="OAuth authorization was denied"
+            )
+        # Denied flows have no handoff code, so return directly to the
+        # registered deep link. Successful Tauri logins use the HTTPS
+        # completion page before opening the app.
+        redirect_url = _append_query_param(
+            callback_url,
+            "state",
+            str(parsed_state["native_state"]),
+        )
+        callback_error = (
+            "cancelled"
+            if error in {"access_denied", "user_cancelled_authorize"}
+            else "provider_error"
+        )
+        return RedirectResponse(
+            url=_append_query_param(redirect_url, "error", callback_error)
+        )
+    if not code:
+        raise HTTPException(status_code=400, detail="Invalid OAuth callback")
     app_id = parsed_state.get("app_id")
     redirect_uri = _oauth_callback_url(
         provider, parsed_state.get("return_to"), app_id=app_id
@@ -2374,6 +2471,64 @@ def oauth_callback(request: Request, provider: str, code: str = "", state: str =
     external_user_id, email, name, avatar = _resolve_provider_subject(
         provider, external_payload
     )
+    if parsed_state.get("mode") == "native_link":
+        _validate_native_oauth_link_start(
+            app_id=app_id,
+            return_to=parsed_state.get("return_to"),
+            challenge=parsed_state.get("native_code_challenge"),
+            state=parsed_state.get("native_state"),
+        )
+        raw_target_user_id = parsed_state.get("user_id")
+        if isinstance(raw_target_user_id, bool) or not isinstance(
+            raw_target_user_id, (int, str)
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Missing user for native account linking",
+            )
+        try:
+            target_user_id = int(raw_target_user_id)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail="Missing user for native account linking",
+            ) from exc
+        initiating_session_id = str(parsed_state.get("session_id") or "")
+        _ensure_user_active(get_user_by_id(target_user_id))
+        if not initiating_session_id or not _native_oauth_link_session_is_valid(
+            target_user_id, initiating_session_id
+        ):
+            raise HTTPException(
+                status_code=401,
+                detail="Native OAuth link session expired",
+            )
+        native_state = str(parsed_state["native_state"])
+        try:
+            handoff_code = issue_native_oauth_link_handoff(
+                user_id=target_user_id,
+                session_id=initiating_session_id,
+                provider=provider,
+                external_user_id=external_user_id,
+                external_username=email or None,
+                app_id=str(app_id),
+                state=native_state,
+                challenge=str(parsed_state["native_code_challenge"]),
+            )
+        except NativeOAuthLinkUnavailable as exc:
+            raise HTTPException(
+                status_code=503,
+                detail="Native OAuth link is temporarily unavailable",
+            ) from exc
+        _clear_failed_login(rate_key, request)
+        redirect_url = _append_query_param(
+            _NATIVE_LINK_CALLBACK_URL,
+            "code",
+            handoff_code,
+        )
+        return RedirectResponse(
+            url=_append_query_param(redirect_url, "state", native_state)
+        )
+
     user = get_user_by_external_identity(provider, external_user_id)
     resolved_via_legacy_google_id = False
     if not user and provider == "google":
@@ -2488,14 +2643,14 @@ def oauth_callback(request: Request, provider: str, code: str = "", state: str =
 
     native_challenge = parsed_state.get("native_code_challenge")
     native_state = parsed_state.get("native_state")
-    if native_challenge is not None or native_state is not None:
-        _validate_native_oauth_start(
-            app_id=app_id,
-            mode=str(parsed_state.get("mode") or ""),
-            return_to=parsed_state.get("return_to"),
-            challenge=native_challenge,
-            state=native_state,
-        )
+    native_exchange = _validate_native_oauth_start(
+        app_id=app_id,
+        mode=str(parsed_state.get("mode") or ""),
+        return_to=parsed_state.get("return_to"),
+        challenge=native_challenge,
+        state=native_state,
+    )
+    if native_exchange:
         try:
             handoff_code = issue_native_oauth_handoff(
                 user_id=int(user["id"]),
@@ -2509,15 +2664,11 @@ def oauth_callback(request: Request, provider: str, code: str = "", state: str =
                 detail="Native OAuth exchange is temporarily unavailable",
             ) from exc
         _clear_failed_login(rate_key, request)
-        redirect_url = _append_query_param(
-            _NATIVE_CALLBACK_URL,
-            "code",
-            handoff_code,
-        )
-        redirect_url = _append_query_param(
-            redirect_url,
-            "state",
-            str(native_state),
+        redirect_url = _native_oauth_completion_redirect_url(
+            app_id=str(app_id) if app_id else None,
+            return_to=parsed_state.get("return_to"),
+            code=handoff_code,
+            state=str(native_state),
         )
         return RedirectResponse(url=redirect_url)
 
@@ -2527,19 +2678,6 @@ def oauth_callback(request: Request, provider: str, code: str = "", state: str =
 
     return_to = parsed_state.get("return_to") or "/"
     safe_return = _validate_return_to(return_to, app_id=app_id)
-
-    if _is_native_mobile_callback_url(safe_return):
-        redirect_url = _append_query_param(safe_return, "token", token)
-        access_expires_at = _access_expires_at_from_token(token)
-        if access_expires_at:
-            redirect_url = _append_query_param(
-                redirect_url, "access_expires_at", _iso_datetime(access_expires_at)
-            )
-        if refresh_token:
-            redirect_url = _append_query_param(
-                redirect_url, "refresh_token", refresh_token
-            )
-        return RedirectResponse(url=redirect_url)
 
     if safe_return.startswith("http"):
         redirect_url = _post_auth_redirect_url(safe_return, token)
@@ -2589,7 +2727,7 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
             detail="Native OAuth exchange is not enabled",
         )
     app_id = (request.headers.get("x-crate-app") or "").strip().lower()
-    if not _is_mobile_native_listen_app_id(app_id):
+    if not _is_native_listen_app_id(app_id):
         raise HTTPException(status_code=400, detail="Invalid native OAuth client")
     if not _NATIVE_VERIFIER_RE.fullmatch(body.code_verifier):
         raise HTTPException(
@@ -2599,6 +2737,14 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
     if not _NATIVE_STATE_RE.fullmatch(body.state):
         raise HTTPException(status_code=400, detail="Invalid native OAuth state")
     try:
+        completed = get_completed_native_oauth_exchange(
+            code=body.code,
+            state=body.state,
+            verifier=body.code_verifier,
+            app_id=app_id,
+        )
+        if completed is not None:
+            return completed
         handoff = consume_native_oauth_handoff(
             code=body.code,
             state=body.state,
@@ -2616,15 +2762,55 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
         ) from exc
     if not secrets.compare_digest(handoff.app_id, app_id):
         raise HTTPException(status_code=401, detail="Native OAuth client mismatch")
-    user = get_user_by_id(handoff.user_id)
-    user = _ensure_user_active(user)
-    update_user_last_login(user["id"])
-    token, session, refresh_token = _create_login_session(
-        user,
-        request,
-        app_id=app_id,
-    )
-    return _auth_login_payload(user, token, session, refresh_token)
+    try:
+        user = get_user_by_id(handoff.user_id)
+        user = _ensure_user_active(user)
+        update_user_last_login(user["id"])
+        requested_session_id = native_oauth_exchange_session_id(body.code)
+        session_already_existed = get_session(requested_session_id) is not None
+        token, session, refresh_token = _create_login_session(
+            user,
+            request,
+            app_id=app_id,
+            session_id=requested_session_id,
+        )
+        session_was_created = (
+            not session_already_existed and session["id"] == requested_session_id
+        )
+        payload = _auth_login_payload(user, token, session, refresh_token)
+    except Exception:
+        try:
+            restore_native_oauth_handoff(code=body.code, handoff=handoff)
+        except NativeOAuthUnavailable:
+            log.warning("Failed to restore native OAuth handoff", exc_info=True)
+        raise
+    try:
+        complete_native_oauth_exchange(
+            code=body.code,
+            handoff=handoff,
+            payload=payload,
+        )
+    except NativeOAuthUnavailable as exc:
+        if session_was_created and not isinstance(exc, NativeOAuthCompletionUnknown):
+            try:
+                delete_session(str(session["id"]))
+            except Exception:
+                log.error(
+                    "Failed to delete incomplete native OAuth session",
+                    exc_info=True,
+                )
+        try:
+            restore_native_oauth_handoff(code=body.code, handoff=handoff)
+        except NativeOAuthUnavailable:
+            log.error(
+                "Failed to restore native OAuth handoff after cache failure",
+                exc_info=True,
+            )
+        raise HTTPException(
+            status_code=503,
+            detail="Native OAuth exchange is temporarily unavailable",
+        ) from exc
+    return payload
 
 
 @router.post(
@@ -2668,6 +2854,181 @@ def oauth_link(request: Request, provider: str, body: OAuthStartRequest):
     return _oauth_start_response(
         request, provider, body, mode="link", user_id=user["id"]
     )
+
+
+@router.post(
+    "/oauth/{provider}/native-link/start",
+    response_model=OAuthStartResponse,
+    responses=_AUTH_PRIVATE_RESPONSES,
+    summary="Start a session-bound native OAuth account link",
+)
+def native_oauth_link_start(
+    request: Request, provider: str, body: NativeOAuthLinkStartRequest
+):
+    user, session_id = _require_native_oauth_link_auth(request)
+    return _oauth_start_response(
+        request,
+        provider,
+        OAuthStartRequest(
+            return_to=_NATIVE_LINK_CALLBACK_URL,
+            native_code_challenge=body.native_code_challenge,
+            native_state=body.native_state,
+        ),
+        mode="native_link",
+        user_id=int(user["id"]),
+        session_id=session_id,
+    )
+
+
+def _apply_native_oauth_link(handoff: NativeOAuthLinkHandoff) -> None:
+    user = _ensure_user_active(get_user_by_id(handoff.user_id))
+    if not _native_oauth_link_session_is_valid(handoff.user_id, handoff.session_id):
+        raise HTTPException(status_code=401, detail="Native OAuth link session expired")
+
+    linked_user = get_user_by_external_identity(
+        handoff.provider,
+        handoff.external_user_id,
+    )
+    if linked_user and int(linked_user["id"]) != handoff.user_id:
+        raise HTTPException(
+            status_code=409,
+            detail=f"{handoff.provider.title()} account is already linked to another user",
+        )
+
+    current_identity = get_user_external_identity(
+        handoff.user_id,
+        handoff.provider,
+    )
+    if (
+        current_identity
+        and current_identity.get("status") != "unlinked"
+        and current_identity.get("external_user_id") != handoff.external_user_id
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=f"A different {handoff.provider.title()} account is already linked",
+        )
+
+    if handoff.provider == "google":
+        legacy_user = get_user_by_google_id(handoff.external_user_id)
+        if legacy_user and int(legacy_user["id"]) != handoff.user_id:
+            raise HTTPException(
+                status_code=409,
+                detail="Google account is already linked to another user",
+            )
+        if user.get("google_id") not in (None, handoff.external_user_id):
+            raise HTTPException(
+                status_code=409,
+                detail="A different Google account is already linked",
+            )
+
+    try:
+        link_oauth_user_identity(
+            handoff.user_id,
+            handoff.provider,
+            external_user_id=handoff.external_user_id,
+            external_username=handoff.external_username,
+            status="linked",
+            last_error=None,
+            metadata=(
+                {"email": handoff.external_username}
+                if handoff.external_username
+                else {}
+            ),
+            legacy_google_id=(
+                handoff.external_user_id
+                if handoff.provider == "google" and not user.get("google_id")
+                else None
+            ),
+        )
+    except SAIntegrityError as exc:
+        _raise_oauth_identity_conflict(handoff.provider, exc)
+
+
+def _discard_native_oauth_link_or_503(code: str) -> None:
+    try:
+        discard_native_oauth_link_handoff(code)
+    except NativeOAuthLinkUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Native OAuth link is temporarily unavailable",
+        ) from exc
+
+
+def _restore_native_oauth_link_or_503(
+    code: str, handoff: NativeOAuthLinkHandoff
+) -> None:
+    try:
+        restore_native_oauth_link_handoff(code=code, handoff=handoff)
+    except NativeOAuthLinkUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Native OAuth link is temporarily unavailable",
+        ) from exc
+
+
+@router.post(
+    "/oauth/native-link/complete",
+    response_model=OkResponse,
+    responses=_AUTH_PRIVATE_RESPONSES,
+    summary="Complete a session-bound native OAuth account link",
+)
+def native_oauth_link_complete(request: Request, body: NativeOAuthLinkCompleteRequest):
+    user, session_id = _require_native_oauth_link_auth(request)
+    app_id = (request.headers.get("x-crate-app") or "").strip().lower()
+    if not _NATIVE_VERIFIER_RE.fullmatch(body.code_verifier):
+        raise HTTPException(
+            status_code=400, detail="Invalid native OAuth code verifier"
+        )
+    if not _NATIVE_STATE_RE.fullmatch(body.state):
+        raise HTTPException(status_code=400, detail="Invalid native OAuth link state")
+    try:
+        status, handoff = claim_native_oauth_link_handoff(
+            code=body.code,
+            state=body.state,
+            verifier=body.code_verifier,
+            app_id=app_id,
+            user_id=int(user["id"]),
+            session_id=session_id,
+        )
+    except InvalidNativeOAuthLink as exc:
+        raise HTTPException(
+            status_code=401,
+            detail="Native OAuth link is invalid or expired",
+        ) from exc
+    except NativeOAuthLinkUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Native OAuth link is temporarily unavailable",
+        ) from exc
+
+    if status == "completed":
+        return {"ok": True}
+    if status == "in_progress":
+        raise HTTPException(
+            status_code=503,
+            detail="Native OAuth link is already being completed",
+        )
+
+    try:
+        _apply_native_oauth_link(handoff)
+        complete_native_oauth_link_handoff(code=body.code, handoff=handoff)
+    except HTTPException as exc:
+        if exc.status_code == 409 or exc.status_code in {401, 403, 404}:
+            _discard_native_oauth_link_or_503(body.code)
+        else:
+            _restore_native_oauth_link_or_503(body.code, handoff)
+        raise
+    except NativeOAuthLinkUnavailable as exc:
+        _restore_native_oauth_link_or_503(body.code, handoff)
+        raise HTTPException(
+            status_code=503,
+            detail="Native OAuth link is temporarily unavailable",
+        ) from exc
+    except Exception:
+        _restore_native_oauth_link_or_503(body.code, handoff)
+        raise
+    return {"ok": True}
 
 
 @router.post("/unlink-google")
@@ -2872,7 +3233,15 @@ def admin_get_user_detail(request: Request, user_id: int):
     payload["last_login"] = _iso_datetime(user.get("last_login"))
     payload["connected_accounts"] = list_user_external_identities(user_id)
     payload["sessions"] = list_sessions(user_id, include_revoked=True)
-    payload.update(get_user_presence(user_id))
+    presence = get_user_presence(user_id)
+    payload.update(presence)
+    payload.update(
+        derive_user_activity(
+            last_login=payload.get("last_login"),
+            last_seen_at=presence.get("last_seen_at"),
+            last_played_at=presence.get("last_played_at"),
+        )
+    )
     return payload
 
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import type { PlayerPauseOptions } from "./player-context";
 import type { Track } from "./player-types";
 import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
@@ -6,7 +7,9 @@ import { isNative } from "@/lib/capacitor-runtime";
 import { useMediaAccessVersion } from "@/hooks/use-media-access-version";
 import { syncDesktopMediaSession } from "@/lib/desktop-tray";
 import {
+  markNativeMediaSessionPlayingIntent,
   onNativeMediaControl,
+  shouldResumeAfterNativeInterruption,
   stopNativeMediaSession,
   syncNativeMediaSession,
 } from "@/lib/native-media-session";
@@ -32,7 +35,7 @@ export function useMediaSession({
   isPlaying: boolean;
   currentTime: number;
   duration: number;
-  pause: () => void;
+  pause: (options?: PlayerPauseOptions) => void;
   resume: () => void;
   next: () => void;
   prev: () => void;
@@ -71,10 +74,20 @@ export function useMediaSession({
       const actions = actionsRef.current;
       switch (event.control) {
         case "play":
+          if (
+            event.source === "audio-interruption-resume" &&
+            !shouldResumeAfterNativeInterruption()
+          ) {
+            break;
+          }
           actions.resume();
           break;
         case "pause":
-          actions.pause();
+          actions.pause(
+            event.source === "audio-interruption"
+              ? { preserveNativeResume: true }
+              : undefined,
+          );
           break;
         case "next":
           actions.next();
@@ -105,6 +118,12 @@ export function useMediaSession({
       cleanup?.();
     };
   }, []);
+
+  useEffect(() => {
+    if (isPlaying) {
+      markNativeMediaSessionPlayingIntent();
+    }
+  }, [isPlaying]);
 
   // Update metadata when track changes
   useEffect(() => {
@@ -166,6 +185,7 @@ export function useMediaSession({
         artist: null,
         album: null,
         artwork: null,
+        mediaId: null,
         isPlaying: false,
         position: 0,
         duration: 0,
@@ -179,6 +199,7 @@ export function useMediaSession({
       artist: currentTrack.artist || "",
       album: currentTrack.album || "",
       artwork: coverUrl || null,
+      mediaId: `${mediaAccessVersion}:${currentTrack.id}`,
       isPlaying,
       position: nativePositionSeconds,
       duration: duration || 0,
@@ -231,7 +252,13 @@ export function useMediaSession({
 
     const actions: Array<[MediaSessionAction, MediaSessionActionHandler]> = [
       ["play", () => actionsRef.current.resume()],
-      ["pause", () => actionsRef.current.pause()],
+      [
+        "pause",
+        () => {
+          navigator.mediaSession.playbackState = "paused";
+          actionsRef.current.pause({ immediate: true });
+        },
+      ],
       ["previoustrack", () => actionsRef.current.prev()],
       ["nexttrack", () => actionsRef.current.next()],
       [

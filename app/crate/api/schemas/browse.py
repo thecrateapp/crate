@@ -52,6 +52,7 @@ class BrowseExplorePageResponse(BaseModel):
     filters: BrowseFiltersResponse
     playlists: list[CuratedPlaylistSummaryResponse] = Field(default_factory=list)
     moods: list[MoodPresetResponse] = Field(default_factory=list)
+    recent_global_artists: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class GenreProfileResponse(BaseModel):
@@ -146,6 +147,7 @@ class ArtistDetailResponse(IdentityFieldsMixin):
     primary_format: str | None = None
     genres: list[str] = Field(default_factory=list)
     genre_profile: list[GenreProfileResponse] = Field(default_factory=list)
+    manual_genres: list[str] = Field(default_factory=list)
     issue_count: int
     is_v2: bool
     popularity: int | None = None

@@ -43,6 +43,13 @@ export function resolveTrackInfoUrl(
   return path || null;
 }
 
+const MAX_PLAUSIBLE_KBPS = 10_000;
+
+export function bitrateToKbps(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value) || value <= 0) return null;
+  return value > MAX_PLAUSIBLE_KBPS ? Math.round(value / 1000) : value;
+}
+
 export function getTrackQualityFallback(
   track: Pick<Track, "format" | "bitrate" | "sampleRate" | "bitDepth">,
 ) {
@@ -66,7 +73,7 @@ export function getTrackQualityFromInfo(info: TrackInfo | null) {
 
   return {
     format: info.format || undefined,
-    bitrate: info.bitrate ?? undefined,
+    bitrate: bitrateToKbps(info.bitrate) ?? undefined,
     sampleRate: info.sample_rate ?? undefined,
     bitDepth: info.bit_depth ?? undefined,
   };

@@ -1,8 +1,10 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
+import { useTrackActionEntries } from "@/components/actions/track-actions";
+import { longPress, pressMenuKey } from "@/test/item-action-gestures";
 import { toTrackRowData } from "@/lib/track-row-data";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
@@ -15,6 +17,15 @@ vi.mock("react-router", async () => {
   return {
     ...actual,
     useNavigate: () => navigateMock,
+  };
+});
+
+vi.mock("@/components/actions/track-actions", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/components/actions/track-actions")>();
+  return {
+    ...actual,
+    useTrackActionEntries: vi.fn(actual.useTrackActionEntries),
   };
 });
 
@@ -108,7 +119,7 @@ describe("TrackRow playback behavior", () => {
     renderWithListenProviders(<TrackRow track={track} />);
 
     const user = userEvent.setup();
-    await user.click(screen.getByTitle("Like"));
+    await user.click(screen.getByTitle("Like track"));
 
     expect(screen.getByTestId("track-like-particles")).toBeInTheDocument();
     expect(screen.getByTestId("track-like-heart")).toHaveClass(
@@ -172,6 +183,26 @@ describe("TrackRow playback behavior", () => {
       expect.objectContaining({ title: "Track One" }),
     );
     expect(playAll).not.toHaveBeenCalled();
+  });
+
+  it("includes playlist actions when the row does not provide playlist callbacks", async () => {
+    const track: TrackRowData = {
+      id: 1,
+      entity_uid: "entity-1",
+      title: "Track One",
+      artist: "Artist",
+      album: "Album",
+    };
+
+    renderWithListenProviders(<TrackRow track={track} />);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    await user.click(screen.getByRole("menuitem", { name: "Add to playlist" }));
+
+    expect(
+      screen.getByRole("menuitem", { name: "Add to new playlist" }),
+    ).toBeVisible();
   });
 
   it("opens the normal track menu on right click without selecting the row", () => {
@@ -409,6 +440,106 @@ describe("TrackRow playback behavior", () => {
     expect(container.innerHTML).toContain("stroke-dashoffset");
   });
 
+  it("hides the track number on the active row and keeps it on the others", () => {
+    const playerActions = {
+      currentTrack: {
+        id: "entity-1",
+        entityUid: "entity-1",
+        title: "Track One",
+        artist: "Artist",
+      },
+    };
+
+    renderWithListenProviders(
+      <>
+        <TrackRow
+          track={{
+            id: 1,
+            entity_uid: "entity-1",
+            title: "Track One",
+            artist: "Artist",
+          }}
+          index={1}
+        />
+        <TrackRow
+          track={{
+            id: 2,
+            entity_uid: "entity-2",
+            title: "Track Two",
+            artist: "Artist",
+          }}
+          index={2}
+        />
+      </>,
+      { playerActions, playerState: { isPlaying: true } },
+    );
+
+    expect(
+      screen.getByTestId("track-row-playback-progress"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("1")).not.toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+  });
+
+  it("consumes semantic classes for row states and playback progress", () => {
+    const track: TrackRowData = {
+      id: 1,
+      entity_uid: "entity-1",
+      title: "Track One",
+      artist: "Artist",
+      album: "Album",
+    };
+
+    const { container } = renderWithListenProviders(
+      <TrackRow track={track} showCoverThumb />,
+      {
+        playerActions: {
+          currentTrack: {
+            id: "entity-1",
+            entityUid: "entity-1",
+            title: "Track One",
+            artist: "Artist",
+          },
+        },
+        playerState: {
+          isPlaying: true,
+        },
+      },
+    );
+
+    expect(container.firstElementChild).toHaveClass("track-row");
+    expect(container.firstElementChild).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("track-row-playback-progress")).toHaveClass(
+      "track-row-playback-progress",
+    );
+    expect(
+      screen.getByTestId("track-row-playback-progress").firstElementChild,
+    ).toHaveClass("track-row-playback-aura");
+  });
+
+  it("uses the inset link focus recipe for artist and album links inside the truncated meta line", () => {
+    renderWithListenProviders(
+      <TrackRow
+        track={{
+          id: 1,
+          title: "Track One",
+          artist: "Artist",
+          artist_id: 3,
+          album: "Album",
+          album_id: 12,
+        }}
+        showArtist
+        showAlbum
+      />,
+    );
+
+    for (const name of ["Artist", "Album"]) {
+      const link = screen.getByRole("button", { name });
+      expect(link).toHaveClass("link-meta", "link-inset", "truncate");
+      expect(link.parentElement).toHaveClass("truncate");
+    }
+  });
+
   it("uses normalized global album artwork for catalog-only rows", () => {
     const track = toTrackRowData({
       id: "track-global-1",
@@ -432,5 +563,124 @@ describe("TrackRow playback behavior", () => {
     expect(container.innerHTML).toContain(
       "/api/catalog/albums/album-global-1/cover",
     );
+  });
+
+  describe("action menu gestures", () => {
+    const track: TrackRowData = {
+      id: 1,
+      entity_uid: "entity-1",
+      title: "Track One",
+      artist: "Artist",
+      album: "Album",
+      album_id: 12,
+    };
+
+    it("computes menu entries only when the menu opens", async () => {
+      vi.mocked(useTrackActionEntries).mockClear();
+      renderWithListenProviders(<TrackRow track={track} />);
+
+      expect(useTrackActionEntries).not.toHaveBeenCalled();
+
+      fireEvent.contextMenu(screen.getByRole("row", { name: "Track One" }));
+
+      expect(await screen.findByText("Play now")).toBeInTheDocument();
+      expect(useTrackActionEntries).toHaveBeenCalled();
+    });
+
+    it("opens the menu with a touch long-press without playing", async () => {
+      const play = vi.fn();
+      renderWithListenProviders(<TrackRow track={track} />, {
+        playerActions: { play },
+      });
+      const row = screen.getByRole("row", { name: "Track One" });
+
+      await longPress(row);
+      fireEvent.click(row);
+
+      expect(
+        await screen.findByRole("dialog", { name: "Actions menu" }),
+      ).toBeInTheDocument();
+      expect(play).not.toHaveBeenCalled();
+    });
+
+    it("opens the menu with the ContextMenu key and Shift+F10", async () => {
+      const { unmount } = renderWithListenProviders(<TrackRow track={track} />);
+      pressMenuKey(screen.getByRole("row", { name: "Track One" }));
+      expect(await screen.findByText("Play now")).toBeInTheDocument();
+      unmount();
+
+      renderWithListenProviders(<TrackRow track={track} />);
+      fireEvent.keyDown(screen.getByRole("row", { name: "Track One" }), {
+        key: "F10",
+        shiftKey: true,
+      });
+      expect(await screen.findByText("Play now")).toBeInTheDocument();
+    });
+
+    it("does not open the menu on disabled rows", () => {
+      renderWithListenProviders(
+        <TrackRow track={{ ...track, disabled: true }} />,
+      );
+
+      fireEvent.contextMenu(screen.getByRole("row", { name: "Track One" }));
+
+      expect(screen.queryByText("Play now")).not.toBeInTheDocument();
+    });
+
+    it("renders rank, meta and extra actions", async () => {
+      const onRemove = vi.fn();
+      renderWithListenProviders(
+        <TrackRow
+          track={track}
+          rank={3}
+          meta="12 plays"
+          density="compact"
+          showLike={false}
+          extraActions={[
+            { key: "remove", label: "Remove", onSelect: onRemove },
+          ]}
+        />,
+      );
+      const row = screen.getByRole("row", { name: "Track One" });
+
+      expect(row).toHaveAttribute("data-density", "compact");
+      expect(within(row).getByText("3")).toBeInTheDocument();
+      expect(within(row).getByText("12 plays")).toBeInTheDocument();
+      expect(screen.queryByTitle("Like track")).not.toBeInTheDocument();
+
+      fireEvent.contextMenu(row);
+      fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }));
+      expect(onRemove).toHaveBeenCalled();
+    });
+
+    it("offers link actions on catalog-only rows", async () => {
+      renderWithListenProviders(
+        <TrackRow
+          track={{
+            title: "Remote Track",
+            artist: "Artist",
+            album: "Album",
+            global_track_uid: "global-track-1",
+            global_artist_uid: "global-artist-1",
+            global_album_uid: "global-album-1",
+            availability: {
+              catalog: true,
+              stream: true,
+              import: false,
+              local: false,
+            },
+          }}
+        />,
+      );
+
+      fireEvent.contextMenu(screen.getByRole("row", { name: "Remote Track" }));
+
+      expect(
+        await screen.findByRole("menuitem", { name: "Go to artist" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("menuitem", { name: "Play now" }),
+      ).not.toBeInTheDocument();
+    });
   });
 });

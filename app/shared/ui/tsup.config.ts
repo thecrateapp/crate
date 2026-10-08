@@ -34,7 +34,7 @@ function walk(dir: string, extensions: string[], out: Record<string, string>) {
 
 export default defineConfig({
   entry: collectEntries(
-    ["lib", "icons", "primitives", "shadcn", "composites", "domain", "charts"],
+    ["lib", "icons", "primitives", "shadcn", "composites", "domain"],
     [".ts", ".tsx"],
   ),
   format: ["esm"],
@@ -53,6 +53,7 @@ export default defineConfig({
     "class-variance-authority",
     "clsx",
     "tailwind-merge",
+    "sonner",
     "qrcode",
   ],
   esbuildOptions(options) {

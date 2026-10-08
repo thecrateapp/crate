@@ -1142,7 +1142,7 @@ class TestRepairJobs:
                 {"artist_name": "Birds in Row", "genre_id": genre_id},
             )
 
-        rename_artist("Birds in Row", "Birds In Row", "birds-in-row")
+        merged = rename_artist("Birds in Row", "Birds In Row", "birds-in-row")
 
         with transaction_scope() as session:
             artists = (
@@ -1173,6 +1173,17 @@ class TestRepairJobs:
         assert {row["artist"] for row in albums} == {"Birds In Row"}
         assert {row["artist"] for row in tracks} == {"Birds In Row"}
         assert {row["artist_name"] for row in artist_genres} == {"Birds In Row"}
+        assert merged is False
+
+    def test_rename_artist_reports_merge_into_existing_artist(self, pg_db):
+        from crate.db.jobs.repair import rename_artist
+
+        pg_db.upsert_artist({"name": "Source Artist"})
+        pg_db.upsert_artist({"name": "Canonical Artist"})
+
+        merged = rename_artist("Source Artist", "Canonical Artist", "canonical-artist")
+
+        assert merged is True
 
 
 class TestGenreTaxonomyCleanup:
@@ -2580,6 +2591,26 @@ class TestLibraryCRUD:
         assert artist["album_count"] == 2
         assert artist["track_count"] == 15
 
+    def test_upsert_artist_with_missing_numeric_id_updates_only_matching_name(
+        self, pg_db
+    ):
+        from crate.db.tx import transaction_scope
+
+        pg_db.upsert_artist({"name": "Artist Without ID"})
+        pg_db.upsert_artist({"name": "Other Artist Without ID", "album_count": 55})
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    "UPDATE library_artists SET id = NULL WHERE name IN (:first, :second)"
+                ),
+                {"first": "Artist Without ID", "second": "Other Artist Without ID"},
+            )
+
+        pg_db.upsert_artist({"name": "Artist Without ID", "album_count": 7})
+
+        assert pg_db.get_library_artist("Artist Without ID")["album_count"] == 7
+        assert pg_db.get_library_artist("Other Artist Without ID")["album_count"] == 55
+
     def test_manual_artist_metadata_locks_enrichment_fields(self, pg_db):
         from crate.db.repositories.field_locks import list_locked_fields
         from crate.db.repositories.library_enrichment_writes import (
@@ -2827,6 +2858,42 @@ class TestLibraryCRUD:
         assert raw_artist is not None
         assert raw_artist["storage_id"] == storage_id
         assert {row["key_type"] for row in keys} >= {"name", "slug"}
+
+    def test_upsert_artist_updates_selected_row_by_id_after_concurrent_rename(
+        self, pg_db, monkeypatch
+    ):
+        from crate.db.repositories import library_artist_upserts
+        from crate.db.tx import transaction_scope
+
+        storage_id = str(uuid4())
+        pg_db.upsert_artist({"name": "Before Rename", "storage_id": storage_id})
+        update_existing = library_artist_upserts._update_existing_artist
+
+        def rename_before_update(session, **kwargs):
+            existing_id = kwargs["existing_id"]
+            with transaction_scope() as concurrent_session:
+                concurrent_session.execute(
+                    text("UPDATE library_artists SET name = :name WHERE id = :id"),
+                    {"name": "After Rename", "id": existing_id},
+                )
+            return update_existing(session, **kwargs)
+
+        monkeypatch.setattr(
+            library_artist_upserts, "_update_existing_artist", rename_before_update
+        )
+        with transaction_scope() as session:
+            library_artist_upserts.upsert_artist(
+                {
+                    "name": "New Scan Name",
+                    "storage_id": storage_id,
+                    "track_count": 17,
+                },
+                session=session,
+            )
+
+        artist = pg_db.get_library_artist("After Rename")
+        assert artist is not None
+        assert artist["track_count"] == 17
 
     def test_upsert_album(self, pg_db):
         pg_db.upsert_artist({"name": "Artist B"})

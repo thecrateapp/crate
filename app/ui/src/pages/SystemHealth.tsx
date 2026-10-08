@@ -196,6 +196,9 @@ interface PlaybackDeliveryStats {
   variant_tracks: number;
   ready: number;
   pending: number;
+  pending_active?: number;
+  pending_unassigned?: number;
+  pending_stale?: number;
   running: number;
   failed: number;
   missing: number;
@@ -392,7 +395,7 @@ function ProgressBar({
       ) : null}
       <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
         <div
-          className={`h-full rounded-full transition-all ${color}`}
+          className={`h-full rounded-full transition-[width,background-color] ${color}`}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -693,7 +696,21 @@ function PlaybackTranscodingOverview({
   const statuses = [
     { label: "Ready", value: stats?.ready ?? 0, color: "bg-emerald-400" },
     { label: "Running", value: stats?.running ?? 0, color: "bg-cyan-400" },
-    { label: "Pending", value: stats?.pending ?? 0, color: "bg-amber-400" },
+    {
+      label: "Active pending",
+      value: stats?.pending_active ?? stats?.pending ?? 0,
+      color: "bg-amber-400",
+    },
+    {
+      label: "Unassigned",
+      value: stats?.pending_unassigned ?? 0,
+      color: "bg-yellow-300",
+    },
+    {
+      label: "Stale pending",
+      value: stats?.pending_stale ?? 0,
+      color: "bg-orange-500",
+    },
     { label: "Failed", value: stats?.failed ?? 0, color: "bg-red-400" },
     { label: "Missing", value: stats?.missing ?? 0, color: "bg-white/35" },
   ];
@@ -1463,7 +1480,7 @@ export function SystemHealth() {
                     <div className="flex w-32 items-center gap-2">
                       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
                         <div
-                          className="h-full rounded-full bg-primary transition-all"
+                          className="h-full rounded-full bg-primary transition-[width,background-color]"
                           style={{ width: `${pct}%` }}
                         />
                       </div>

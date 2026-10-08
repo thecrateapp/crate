@@ -28,9 +28,11 @@ def update_artist_has_photo(artist_name: str, has_photo: int) -> None:
         )
 
 
-def rename_artist(old_name: str, new_name: str, folder_name: str) -> None:
+def rename_artist(old_name: str, new_name: str, folder_name: str) -> bool:
+    """Rename an artist, returning whether the source merged into another row."""
+
     if not old_name:
-        return
+        return False
     with transaction_scope() as session:
         existing = (
             session.execute(
@@ -41,7 +43,7 @@ def rename_artist(old_name: str, new_name: str, folder_name: str) -> None:
             .first()
         )
         if not existing:
-            return
+            return False
 
         if old_name == new_name:
             session.execute(
@@ -54,7 +56,7 @@ def rename_artist(old_name: str, new_name: str, folder_name: str) -> None:
                 ),
                 {"folder": folder_name, "name": old_name},
             )
-            return
+            return False
 
         target = (
             session.execute(
@@ -64,6 +66,7 @@ def rename_artist(old_name: str, new_name: str, folder_name: str) -> None:
             .mappings()
             .first()
         )
+        merged = target is not None
         temp_name = f"__crate_tmp__{uuid4().hex}"
 
         session.execute(
@@ -161,6 +164,7 @@ def rename_artist(old_name: str, new_name: str, folder_name: str) -> None:
             ),
             {"new_name": new_name, "old_name": old_name},
         )
+        return merged
 
 
 def merge_artist_into_artist(

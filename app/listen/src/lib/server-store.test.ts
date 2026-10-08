@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 
 vi.mock("@/lib/platform", () => ({
   usesConfigurableServer: true,
+  usesSecureSessionStore: false,
   isCapacitorRuntime: false,
 }));
 
@@ -16,8 +17,13 @@ import {
   removeServer,
   setCurrentServerToken,
   setCurrentServerRefreshToken,
+  setServerAuthTokens,
   updateServerLabel,
 } from "./server-store";
+import {
+  getOfflineIdentityForServer,
+  persistVerifiedOfflineIdentity,
+} from "./offline-identity";
 
 beforeEach(() => {
   localStorage.clear();
@@ -106,9 +112,16 @@ describe("removeServer", () => {
   it("removes a server and clears current if it was active", () => {
     const s = addServer("https://crate.local");
     setCurrentServerId(s.id);
+    persistVerifiedOfflineIdentity({
+      serverId: s.id,
+      serverUrl: s.url,
+      userId: 42,
+      profileKey: "profile-42",
+    });
     removeServer(s.id);
     expect(getServers()).toHaveLength(0);
     expect(getCurrentServer()).toBeNull();
+    expect(getOfflineIdentityForServer(s.id, s.url)).toBeNull();
   });
 });
 
@@ -131,6 +144,31 @@ describe("setCurrentServerRefreshToken", () => {
     setCurrentServerId(s.id);
     setCurrentServerRefreshToken("ref123");
     expect(getCurrentServer()?.refreshToken).toBe("ref123");
+  });
+});
+
+describe("setServerAuthTokens", () => {
+  it("updates only the explicitly addressed server", () => {
+    const serverA = addServer("https://a.example.com");
+    const serverB = addServer("https://b.example.com");
+    setCurrentServerId(serverB.id);
+
+    expect(
+      setServerAuthTokens(serverA.id, "access-a", "refresh-a", "2030-01-01"),
+    ).toBe(true);
+
+    expect(
+      getServers().find((server) => server.id === serverA.id),
+    ).toMatchObject({
+      token: "access-a",
+      refreshToken: "refresh-a",
+      tokenExpiresAt: "2030-01-01",
+    });
+    expect(getCurrentServer()?.id).toBe(serverB.id);
+  });
+
+  it("rejects credentials for a removed server", () => {
+    expect(setServerAuthTokens("missing", "access", "refresh")).toBe(false);
   });
 });
 

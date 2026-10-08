@@ -1,0 +1,1190 @@
+# Tauri hardening validation — 2026-09-30
+
+## Scope and revision
+
+- Branch: `feat/tauri-desktop-app`
+- Baseline source revision for the original launch, R01–R05, and R08 captures: `df72643d229ad7b47908f183690f5a35294a8ddf`
+- Follow-up source revision for automated gates and the initial R07 capture: `5d6ca6e2cd462cc469a9b81d95fbe2ec5f52687e` (R07 renderer code is from parent `00c988e9`); the live macOS HTTP resource-table soak below used `3a851e3bca9634660ee6441a39c60b19f62a8943`.
+- Host: Mac17,2; macOS 27.0.1 (build 26A434), arm64, 16 GiB RAM; on AC power when checked after the run
+- Approved support floors: macOS 11+, Windows 10 version 1803+, and Linux with WebKitGTK 2.40+
+- Cross-platform R01 HTTPS sample: source revision `56d10e05`, [Build Desktop Apps run 36887209288](https://github.com/thecrateapp/crate/actions/runs/36887209288)
+- Decision recorded: retain current audio behavior until native memory measurements exist for each OS; defer any long-track fallback decision.
+
+This is an interim validation record. Its capture groups use the revisions listed above; they do not close the native acceptance matrix or R08.
+
+## macOS launch and window smoke
+
+A fresh release `.app` was built from this revision using `CRATE_DESKTOP_VERSION=2.7.4 npm run --workspace=app/listen-desktop tauri:build:app -- --config /tmp/tauri-current-isolated.json`. The isolated bundle identifier was `app.cratemusic.crate.desktop.hardening-smoke20260930`; its product name was `Crate Hardening Smoke`. The package reports version `2.7.4`, minimum macOS `11.0`, and arm64; `otool` confirms binary `minos 11.0`. The artifact verifier accepted both `.app` bundles in the macOS output directory as version `2.7.4`.
+
+The smoke ran on macOS 27.0.1, not on the declared minimum. The app opened at `#/server-setup`. `Cmd+W` removed its window while its process remained alive; activating the isolated app restored the same setup screen. `Cmd+Q` ended the test process. The separate `/Applications/Crate.app` process was left untouched.
+
+The `Crate Hardening Smoke` bundle above was not used for memory measurement. Separate release bundles with the probe page were built for macOS and Linux below. Those bundles exercise release-mode Tauri/WebKit without login, API traffic, saved profile state, or the real player; they do not close the installed-player acceptance gates.
+
+## Same-revision automated gates
+
+### Latest desktop matrix — `d3856a95cf7c33d6b84332890730f85a3d7b7615`
+
+The manual [Build Desktop Apps run](https://github.com/thecrateapp/crate/actions/runs/36840953428) passed macOS and Linux. Windows bundle creation, version checks, and the NSIS install/open/uninstall smoke also passed, as did the new unit tests that sanitize the probe's child-process environment. The R02 probe still exited before its first loopback request with `0xC0000139 (STATUS_ENTRYPOINT_NOT_FOUND)`, so the overall workflow failed at that measurement. The report confirms the child PATH omitted both Python 3.13 installation directories (`Scripts` and the interpreter directory); removing those paths and Python-specific variables did not change the failure. The root cause remains unknown and Windows R02 cleanup remains unverified.
+
+Two targeted launch changes have now failed to explain the Windows probe exit: running the executable beside the installed app, and removing Python's environment from the probe child. Reviewing the latest artifact exposed a gap in the diagnostics: the PE import step searched for the probe under `target/release/`, but Cargo writes this example to `target/release/examples/`, so that artifact captured only the product executable. The workflow now captures the actual probe imports and fails the diagnostic step if the file is missing. Use that comparison to narrow the missing entry point before adding loader tracing or changing the probe build.
+
+At branch head `98a436fc`, [Backend Tests](https://github.com/thecrateapp/crate/actions/runs/36836760168), [Frontend Tests](https://github.com/thecrateapp/crate/actions/runs/36836760389), [React Doctor](https://github.com/thecrateapp/crate/actions/runs/36836760127), and [PR Agent Review](https://github.com/thecrateapp/crate/actions/runs/36836752248) passed. Manually dispatched [Build Android](https://github.com/thecrateapp/crate/actions/runs/36836977593) and [Build iOS](https://github.com/thecrateapp/crate/actions/runs/36836977889) also passed. The `d70099cc` change affects the measurement harness and documentation, not application code. PR-triggered desktop jobs remain skipped while PR #259 is a draft.
+
+### CI confirmation on latest source revision — `0e921f66586a149b05b97d47605706fc76a0cd6a`
+
+The exact-head [Build Desktop Apps workflow](https://github.com/thecrateapp/crate/actions/runs/36786733551) completed successfully on macOS, Windows, and Linux. The macOS job built and version-checked both ARM64 and Intel tester app bundles; Windows and Linux built their desktop bundles, and Linux passed the GLIBC 2.36 compatibility and artifact-version checks. The [Backend Tests](https://github.com/thecrateapp/crate/actions/runs/36786607204), [Frontend Tests](https://github.com/thecrateapp/crate/actions/runs/36786606943), [React Doctor](https://github.com/thecrateapp/crate/actions/runs/36786607134), and [PR Agent Review](https://github.com/thecrateapp/crate/actions/runs/36786603833) workflows also passed on this exact SHA. Build Android and Build iOS were skipped because PR #259 remains a draft. Focused local validation for the latest OAuth changes is recorded in the persistent-review follow-up below. This confirms C06 for `0e921f66`; it does not close installed OS/WebView, real-player, signing/notarization, minimum-version, or upgrade gates.
+
+I downloaded and inspected both macOS ZIPs from that run. The ARM64 bundle SHA-256 is `3d4eab6573b6a9debcabbe730e31dae94584ddf9174cbc0201218b89c53c5dce`; the Intel bundle SHA-256 is `308282328ce8a6bd66183c8fc0a351720facf7639cfa02714ec2f80600558215`. Both `Info.plist` and Mach-O load commands declare macOS 11.0; the binaries are arm64 and x86_64 respectively, version `0.1.0`. Both have ad-hoc signatures with no Team ID, so this confirms support-floor metadata and architecture, not distribution signing or notarization.
+
+On `df72643d229ad7b47908f183690f5a35294a8ddf`, Desktop Vitest passed 43/43; Listen passed 2,416 tests across 323 files with 4 existing skips; Rust macOS passed 48/48 and Clippy completed with `-D warnings`. Desktop and Listen typechecks, Listen ESLint, and both Vite production builds passed. The builds retain the existing 564.65 kB chunk warning; Node also prints its `module.register()` deprecation warning.
+
+Follow-up validation on branch revision `5d6ca6e2cd462cc469a9b81d95fbe2ec5f52687e` passed Desktop Vitest 43/43, Listen 2,416 passed with 4 existing skips, Rust 48/48, Clippy `-D warnings`, and Listen/Desktop typechecks. GitHub `Build Desktop Apps` passed all three jobs: Linux and Windows bundle/version checks, plus the macOS tester-bundle build. `Build Android` passed its typecheck, lint, contract tests, and Android tests. The signed APK/AAB steps were skipped because this was a manual non-release run. `PR Agent Review` completed successfully. These workflows are linked to the exact revision above; the PR remains draft.
+
+### CI confirmation on source revision — `575f4b4341f18eb80118b897eb6a5964452aeab2`
+
+All six GitHub workflows passed against this exact head: [Build Desktop Apps](https://github.com/thecrateapp/crate/actions/runs/36742978292), [Build Android](https://github.com/thecrateapp/crate/actions/runs/36742977995), [Backend Tests](https://github.com/thecrateapp/crate/actions/runs/36742977975), [Frontend Tests](https://github.com/thecrateapp/crate/actions/runs/36742979128), [React Doctor](https://github.com/thecrateapp/crate/actions/runs/36742978304), and [PR Agent Review](https://github.com/thecrateapp/crate/actions/runs/36742956223). Desktop builds passed on Linux, macOS, and Windows. Linux produced AppImage, DEB, and RPM artifacts; the binary verifier accepted GLIBC 2.34 under the 2.36 ceiling, and the artifact verifier accepted DEB/RPM metadata plus the AppImage filename for version `0.1.0`. Android's `build-apk` job passed. Backend security scan, quality checks, all eight test shards, and coverage passed; frontend appearance and test jobs passed. PR #259 remains open as a draft. This closes C06 for this SHA; it does not close installed runtime, minimum-OS, signing, or release-upgrade acceptance.
+
+### CI confirmation on current source revision — `c0cc0d44538aebeebe977396234000417480cef2`
+
+The manually dispatched [Build Desktop Apps workflow](https://github.com/thecrateapp/crate/actions/runs/36776469753) completed successfully on macOS, Windows, and Linux. The pull-request frontend tests, appearance check, React Doctor, security scan, and PR Agent Review are green on this head. Backend quality, test shards, coverage, and Android build remain skipped by CI because PR #259 is still a draft; OAuth-focused backend tests were run locally as recorded below. A green bundle build does not replace installed-app or minimum-OS acceptance.
+
+The Linux artifacts were downloaded from that run and inspected in a Debian 12 container. `dpkg-deb -f` reported `Package: crate`, `Version: 0.1.0`, and `libwebkit2gtk-4.1-0 (>= 2.40.0)`. The AppImage extracted successfully; its `.desktop` file contains no version field. The branch now extracts AppImages during Linux artifact verification and checks for the executable `usr/bin/crate-desktop` plus a launchable desktop entry. The payload check passed all 13 version-script tests and against the downloaded AppImage in a Debian 12 container. The AppImage's internal runtime version and installed launch remain open. SHA-256: AppImage `423f63f0f61a98b96978cc3ba6337e5f081fdafd154188969dc52b8076524385`; DEB `8dcc2144be78b4a5cd1603fadd3b270284b21e362ba05949d9f58d4027b75b65`; RPM `c8cd9aa962b568b76e7dd2f1a65c7eecbd1afaf4e1d88a5bc99a7082ce329575`.
+
+### CI confirmation on current source revision — `8baf8c5cc28276356950e6be2427be25d2366324`
+
+The manually dispatched [Build Desktop Apps workflow](https://github.com/thecrateapp/crate/actions/runs/36779952133) passed Linux, Windows, and macOS bundle jobs on this exact head. [Build Android](https://github.com/thecrateapp/crate/actions/runs/36779029181) and [Backend Tests](https://github.com/thecrateapp/crate/actions/runs/36779029012) also passed on this SHA, including Android tests plus backend quality, all eight test shards, and coverage. Frontend tests, appearance, React Doctor, security scan, and PR Agent Review passed as well. PR #259 remains a draft. This confirms C06 for this SHA; installed runtime, minimum-OS, signing, and upgrade checks remain separate.
+
+### CI confirmation and cross-platform HTTP diagnostic — `a098d86690eefff146323caae8dd77b5083d94a0`
+
+The manually dispatched [Build Desktop Apps workflow](https://github.com/thecrateapp/crate/actions/runs/36781473125) completed successfully on Linux, Windows, and macOS. Backend Tests, Frontend Tests, React Doctor, and PR Agent Review also passed on this exact SHA. Android and iOS PR build jobs were skipped because PR #259 remains a draft; Android passed on the previous code-equivalent source SHA `8baf8c5c`. The only changes after that source SHA were the diagnostic CI step and validation documentation. This confirms C06 for `a098d866`; installed runtime, minimum-OS, signing, and upgrade checks remain separate.
+
+## macOS native performance measurements — R01, R03–R05
+
+The offline probes used the recorded source revision on the Mac17,2 ARM64 host above. The corrected release HTTP microbenchmark first ran against a loopback HTTP/1.1 server on a checkout based on `2903365a`, then was repeated on source HEAD `8baf8c5c`. The offline probes ran in an isolated Tauri development window with synthetic metadata and 1-byte files under a dedicated app identifier. Timings are not production API or installed-player acceptance results.
+
+### R01 — HTTP client reuse
+
+`cargo run --locked --release --manifest-path app/listen-desktop/src-tauri/Cargo.toml --example http_pool_bench` compared a fresh reqwest client per request with one shared client. Each response contained 16 KiB. The fixture sets `TCP_NODELAY` and writes headers plus body together; the earlier Linux run's roughly 41 ms delay came from the fixture's delayed-ACK behavior, not production HTTP latency. These measurements repeat the corrected fixture on the Mac17,2 ARM64 host at source HEAD `8baf8c5c`. The shared client's accepted-connection count excludes the warmup request because the benchmark resets that counter after warmup.
+
+| Concurrency | Requests | Fresh client: total / p50 / p95 | Shared client: total / p50 / p95 | Accepted connections: fresh / shared |
+| ----------- | -------: | ------------------------------: | -------------------------------: | -----------------------------------: |
+| 1           |      100 |            20 ms / 124 / 148 µs |                6 ms / 50 / 62 µs |                              100 / 0 |
+| 1           |    1,000 |            162 ms / 77 / 122 µs |               34 ms / 28 / 34 µs |                            1,000 / 0 |
+| 1           |    5,000 |            841 ms / 78 / 119 µs |              170 ms / 26 / 43 µs |                            5,000 / 0 |
+| 8           |      100 |            19 ms / 219 / 365 µs |               1 ms / 85 / 175 µs |                              100 / 7 |
+| 8           |    1,000 |           138 ms / 227 / 614 µs |              16 ms / 91 / 253 µs |                            1,000 / 7 |
+| 8           |    5,000 |           744 ms / 299 / 527 µs |              90 ms / 96 / 224 µs |                            5,000 / 7 |
+
+The corrected local fixture shows that pooling reuses keep-alive connections and lowers loopback latency in this run. The exact-head desktop CI workflow then ran the same probe on hosted Linux, Windows, and macOS runners. All results below are synthetic HTTP loopback measurements, not API or installed-app measurements. The shared-client connection count excludes its warmup request.
+
+| OS (hosted runner) | Concurrency | Requests |     Fresh total / p50 / p95 | Shared total / p50 / p95 | Connections fresh / shared |
+| ------------------ | ----------: | -------: | --------------------------: | -----------------------: | -------------------------: |
+| Linux              |           1 |      100 |           4 ms / 30 / 38 µs |        1 ms / 11 / 12 µs |                    100 / 0 |
+| Linux              |           1 |    1,000 |          42 ms / 29 / 33 µs |       13 ms / 11 / 11 µs |                  1,000 / 0 |
+| Linux              |           1 |    5,000 |         209 ms / 29 / 33 µs |       62 ms / 11 / 11 µs |                  5,000 / 0 |
+| Linux              |           8 |      100 |         5 ms / 249 / 355 µs |       1 ms / 87 / 185 µs |                    100 / 7 |
+| Linux              |           8 |    1,000 |        48 ms / 234 / 281 µs |       14 ms / 79 / 97 µs |                  1,000 / 7 |
+| Linux              |           8 |    5,000 |       244 ms / 237 / 287 µs |      74 ms / 78 / 206 µs |                  5,000 / 7 |
+| Windows            |           1 |      100 |        34 ms / 235 / 271 µs |        5 ms / 40 / 50 µs |                    100 / 0 |
+| Windows            |           1 |    1,000 |       331 ms / 236 / 286 µs |       33 ms / 28 / 33 µs |                  1,000 / 0 |
+| Windows            |           1 |    5,000 |     1,690 ms / 248 / 294 µs |      168 ms / 27 / 36 µs |                  5,000 / 0 |
+| Windows            |           8 |      100 |    24 ms / 1,051 / 1,583 µs |      4 ms / 179 / 880 µs |                    100 / 7 |
+| Windows            |           8 |    1,000 |   242 ms / 1,025 / 1,506 µs |     29 ms / 172 / 211 µs |                  1,000 / 7 |
+| Windows            |           8 |    5,000 | 1,468 ms / 1,209 / 1,955 µs |    144 ms / 173 / 211 µs |                  5,000 / 7 |
+| macOS              |           1 |      100 |        51 ms / 165 / 501 µs |        7 ms / 60 / 80 µs |                    100 / 0 |
+| macOS              |           1 |    1,000 |       468 ms / 152 / 408 µs |      82 ms / 57 / 144 µs |                  1,000 / 0 |
+| macOS              |           1 |    5,000 |     2,099 ms / 150 / 329 µs |      327 ms / 55 / 76 µs |                  5,000 / 0 |
+| macOS              |           8 |      100 |        21 ms / 337 / 491 µs |      2 ms / 124 / 279 µs |                    100 / 7 |
+| macOS              |           8 |    1,000 |       254 ms / 400 / 700 µs |     23 ms / 143 / 172 µs |                  1,000 / 7 |
+| macOS              |           8 |    5,000 |   1,442 ms / 447 / 1,002 µs |    217 ms / 173 / 706 µs |                  5,000 / 7 |
+
+On each runner and request size, the shared client accepted zero new connections after warmup at concurrency one and seven at concurrency eight, while a fresh client opened one connection per request. Shared-client totals were lower in all six cases on each OS. This confirms keep-alive reuse in the fixture and supports keeping the shared client. See the exact [workflow run](https://github.com/thecrateapp/crate/actions/runs/36781473125) for the raw runner output.
+
+#### macOS HTTPS API sample — 2026-10-01
+
+The same Tauri reqwest client was then measured against the production read-only
+`GET /api/setup/status` route on `api.lespedants.org`. The route returns HTTP
+200 and counts users; it does not mutate state. The Mac17,2 host ran a release
+build of the example at source revision `3570c6c4`. Each mode ran 25 measured
+requests at concurrency 1 and 8, plus one warmup per mode/concurrency. Including
+one preflight request, the run sent 105 GETs. The remote server does not expose
+per-client accepted-connection counts, so this comparison records timings only.
+
+| Concurrency | Client | Cold request | Total for 25 |      p50 |      p95 |
+| ----------: | ------ | -----------: | -----------: | -------: | -------: |
+|           1 | Fresh  |      95.4 ms |      2.287 s |  88.7 ms | 108.1 ms |
+|           1 | Shared |      94.9 ms |      1.719 s |  68.8 ms |  72.8 ms |
+|           8 | Fresh  |      84.6 ms |       470 ms | 114.7 ms | 132.3 ms |
+|           8 | Shared |      93.9 ms |       360 ms |  83.8 ms | 104.4 ms |
+
+The shared client was faster in this single sample at both concurrency levels,
+including lower p50/p95. The loopback fixture separately confirms actual
+keep-alive reuse. Treat the remote result as directional: it is one short run
+through the production proxy and an unauthenticated status route, not an SLA or
+a representative authenticated player request. Raw measurements are in
+[`tauri-r01-api-macos-2026-10-01.json`](measurements/tauri-r01-api-macos-2026-10-01.json).
+
+#### GitHub-hosted HTTPS sample — 2026-10-01
+
+The opt-in [Build Desktop Apps run 36887209288](https://github.com/thecrateapp/crate/actions/runs/36887209288)
+repeated the same read-only API sample on `ubuntu-22.04`, `windows-latest`, and
+`macos-latest`, at source revision `56d10e05`. Each runner sent 104 GETs: 25
+measured requests plus one warmup for each mode at concurrency 1 and 8. All
+responses passed `error_for_status`. Values below are milliseconds; `cold` is
+the first warmup request, `total` covers the 25 measured requests, and p50/p95
+are per-request latency.
+
+| Runner  | Concurrency |   Fresh cold / total / p50 / p95 |  Shared cold / total / p50 / p95 |
+| ------- | ----------: | -------------------------------: | -------------------------------: |
+| Linux   |           1 |   867.7 / 10,687 / 239.6 / 851.3 |    238.6 / 5,511 / 217.3 / 230.0 |
+| Linux   |           8 |  212.1 / 2,519 / 254.9 / 1,738.5 |    236.0 / 1,554 / 217.3 / 410.7 |
+| Windows |           1 | 948.3 / 12,236 / 252.2 / 1,474.5 |    784.9 / 6,069 / 207.9 / 301.8 |
+| Windows |           8 |    239.9 / 2,635 / 269.1 / 798.8 |    248.1 / 1,559 / 246.5 / 395.4 |
+| macOS   |           1 | 766.7 / 15,227 / 657.0 / 1,710.1 | 230.2 / 11,216 / 202.3 / 1,345.6 |
+| macOS   |           8 |      718.0 / 962 / 219.6 / 248.9 |    627.4 / 7,688 / 361.5 / 793.8 |
+
+Linux and Windows favored the shared client in total, p50, and p95 at both
+concurrency levels. Hosted macOS favored it at concurrency 1, while its one
+concurrency-8 sample had substantially higher shared-client total and tails;
+the total is dominated by an outlier despite a p95 below 0.8 seconds. This
+disagrees with the earlier physical-Mac sample, so the hosted result is noisy
+and directional rather than a stable latency claim. The loopback measurements
+remain the evidence for actual keep-alive reuse. Raw values are in
+[`tauri-r01-api-hosted-2026-10-01.json`](measurements/tauri-r01-api-hosted-2026-10-01.json).
+
+#### GitHub-hosted HTTPS repeat — 2026-10-02
+
+The manually dispatched [Build Desktop Apps run 36954986569](https://github.com/thecrateapp/crate/actions/runs/36954986569)
+repeated the same probe on all three hosted OS runners at source revision
+`eb3e4781`. Each runner again sent 104 read-only GETs, and every response passed
+`error_for_status`. Values below use milliseconds in the order cold request /
+total for 25 / p50 / p95.
+
+| Runner  | Concurrency |                  Fresh client |                 Shared client |
+| ------- | ----------: | ----------------------------: | ----------------------------: |
+| Linux   |           1 | 406.7 / 6,454 / 238.3 / 329.2 | 231.3 / 4,642 / 186.4 / 189.9 |
+| Linux   |           8 | 235.6 / 1,062 / 246.4 / 297.6 | 235.0 / 1,219 / 196.2 / 339.0 |
+| Windows |           1 | 552.9 / 8,328 / 189.9 / 553.8 | 531.1 / 3,417 / 137.5 / 140.8 |
+| Windows |           8 | 166.7 / 1,420 / 165.5 / 565.9 | 152.3 / 1,211 / 167.2 / 278.9 |
+| macOS   |           1 | 779.8 / 9,666 / 220.2 / 715.7 | 232.4 / 4,375 / 174.8 / 182.2 |
+| macOS   |           8 | 251.9 / 1,547 / 244.8 / 326.1 | 219.4 / 1,277 / 200.8 / 322.0 |
+
+The shared client improved total elapsed time and p50 on five of six
+OS/concurrency combinations. Linux at concurrency 8 was mixed: shared p50 was
+lower, while its total and p95 were higher; Windows p50 at concurrency 8 was
+1.6 ms higher for the shared client. This repeat removes the earlier
+hosted macOS concurrency-8 regression, but the Linux concurrency-8 sample and
+the spread across cold requests still show substantial remote-run noise. Keep
+the shared client based on confirmed loopback connection reuse; treat hosted
+HTTPS latency as directional. Raw values are in
+[`tauri-r01-api-hosted-2026-10-02-run-36954986569.json`](measurements/tauri-r01-api-hosted-2026-10-02-run-36954986569.json).
+
+#### macOS local loopback revalidation — 2026-10-01
+
+Repeated the corrected release microbenchmark at branch revision `b1accd90` on
+macOS 27.0.1 ARM64. The local fixture sets `TCP_NODELAY`, writes response
+headers and body together, and returns 16 KiB. Values are total / p50 / p95;
+connection counts exclude the shared client's warmup connection.
+
+| Concurrency | Requests | Fresh total / p50 / p95 | Shared total / p50 / p95 | Connections fresh / shared |
+| ----------: | -------: | ----------------------: | -----------------------: | -------------------------: |
+|           1 |      100 |    50 ms / 207 / 327 µs |        4 ms / 37 / 47 µs |                    100 / 0 |
+|           1 |     1000 |     133 ms / 69 / 93 µs |       35 ms / 29 / 35 µs |                  1,000 / 0 |
+|           1 |     5000 |     625 ms / 69 / 83 µs |      174 ms / 28 / 34 µs |                  5,000 / 0 |
+|           8 |      100 |    11 ms / 199 / 245 µs |       1 ms / 78 / 154 µs |                    100 / 7 |
+|           8 |     1000 |   107 ms / 189 / 222 µs |      13 ms / 82 / 102 µs |                  1,000 / 7 |
+|           8 |     5000 |   579 ms / 221 / 356 µs |      78 ms / 84 / 148 µs |                  5,000 / 7 |
+
+The shared client finished sooner in all six local cases and reused the
+keep-alive connections. This reinforces the decision to retain the shared
+client; it is still a synthetic loopback result, not a production API latency
+or installed-player RSS claim. Raw output is in
+[`tauri-r01-loopback-macos-2026-10-01.txt`](measurements/tauri-r01-loopback-macos-2026-10-01.txt).
+
+#### Local macOS HTTPS revalidation — 2026-10-02
+
+Repeated the production read-only `GET /api/setup/status` probe on Mac17,2
+(macOS 27.0.1, ARM64), at branch revision `e8c8530d`. The Rust source is
+unchanged from `489a6909`. The release example sent 104 GETs: 25 measured
+requests plus one warmup per client mode and concurrency (1 and 8). All
+responses passed `error_for_status`; no preflight request was made. The endpoint
+does not expose connection counts, so this records timings only.
+
+| Concurrency | Client | Cold request | Total for 25 |        p50 |        p95 |
+| ----------: | ------ | -----------: | -----------: | ---------: | ---------: |
+|           1 | Fresh  |   113.000 ms |      2.345 s |  88.740 ms | 103.932 ms |
+|           1 | Shared |    83.049 ms |      1.565 s |  63.610 ms |  66.243 ms |
+|           8 | Fresh  |    85.245 ms |       581 ms | 115.072 ms | 129.606 ms |
+|           8 | Shared |    92.481 ms |       395 ms |  95.549 ms | 106.776 ms |
+
+The shared client had lower total, p50, and p95 at both concurrency levels,
+although its first concurrency-8 request was 7.2 ms slower. This second local
+Mac sample agrees directionally with the 2026-10-01 sample, but remains a short
+unauthenticated endpoint probe rather than representative playback traffic,
+CPU/RSS profiling, or an SLA. Raw output is in
+[`tauri-r01-api-macos-2026-10-02.txt`](measurements/tauri-r01-api-macos-2026-10-02.txt).
+
+### R03 — Offline index hydration and file verification
+
+Three repetitions per size loaded profile indexes containing 100, 1,000, and 5,000 entries. The first pass used a new profile cache but the OS file cache was not cold; the immediately repeated same-process pass was below 1 ms at every size. Median first-pass hydration was 11 ms, 94 ms, and 456 ms. Each first profile load invoked `reconcile_offline_media` once; the warm cache pass invoked no Rust command. The timing includes metadata parsing and locator hydration, but the instrumentation did not count every `plugin-fs` read IPC.
+
+The probe also verified 1-byte local files through the production `verifyNativeOfflineAssets` adapter. All files passed size/existence checks in all three runs. At the 500-asset batch size, the adapter made 1, 2, and 10 native IPC calls for 100, 1,000, and 5,000 assets; median elapsed times were 5 ms, 43 ms, and 220 ms. Ten batch commands overlapped in the 5,000-file case. The Rust semaphore still bounds file inspections to eight; its per-file in-flight count was not instrumented here, and the Rust unit tests cover that bound.
+
+### R04 — Concurrent verification callers
+
+Two callers each verified 1,000 files, three repetitions. Sequential execution took a median 93 ms; concurrent callers took 84 ms and overlapped at most four verification IPC commands. This small difference does not justify changing the global limit of eight. The benchmark checks throughput and results, while the Rust tests remain the evidence for the inner file-task cap.
+
+### R05 — Durable index writes
+
+A temporary observer in the Tauri filesystem adapter counted the UTF-8 payload written for the index `.next` file and timed each `writeTextFile`; the adapter was restored after measurement. These byte counts exclude JSON reads, metadata operations, and rename traffic.
+
+Three repetitions of 100 sequential full-snapshot saves produced 100 durable writes, 623,435 payload bytes in total, and a median elapsed time of 544 ms. Coalescing 100 same-turn mutations into one flush produced one 12,671-byte index write in 6 ms median. Same-turn bursts of 1,000 and 5,000 mutations also produced one durable write each: 130,671 bytes in 16 ms and 666,671 bytes in 211 ms median. The burst case is a stress ceiling because real download completions do not all arrive in one JavaScript turn.
+
+The more representative two-at-a-time run applied 1,000 mutations in 500 durable commits, three repetitions. It took 2,360 ms median, wrote 32,157,410 index-payload bytes total (30.7 MiB), and ended with a 128,671-byte index. Per-commit latency was 5 ms p50 and 6 ms p95; the underlying `writeTextFile` p95 was 1 ms. This confirms that batching halves the number of full-index commits at download concurrency two, while the full JSON snapshot still creates cumulative write amplification. Keep the current durable JSON writer for now; deciding on a journal needs Linux and Windows measurements plus real download completion cadence and an agreed latency/write budget.
+
+The reproducible probes and exact commands are in [`app/listen-desktop/scripts/native-perf/`](../../app/listen-desktop/scripts/native-perf/README.md). R01 and R03–R05 remain open for Linux/Windows and real API/download workloads.
+
+### R02 — HTTP plugin resource cleanup revalidation — `5d6ca6e2`
+
+The vendored `tauri-plugin-http` resource tests passed 2/2: the cleanup helper returns all three request resources to baseline, and cancellation signals the pending request while releasing those resources (including repeated cancellation). The frontend plugin wrapper tests passed 3/3 for bodyless `204` cleanup, cancellation of a partially consumed body, and abort-listener removal when response headers fail.
+
+An isolated macOS Tauri development WebView on branch revision `3a851e3b` then exercised the plugin against a loopback fixture with a temporary command that read the live `ResourceTable` count. Twenty-five cycles each covered a consumed 200 response, consumed HTTP 500 response, connection-refused request, bodyless 204, abort during a delayed request, and cancellation after the first chunk of a stream: 150 requests total. The baseline was zero resources; the count returned to zero after every request, with no failed checks. The raw JSON result is `/tmp/tauri-http-resource-macos-20260930.json`. The probe page and counter were removed after the run.
+
+This closes the live development-WebView soak on macOS. A follow-up release-mode packaged-app soak used a dedicated probe bundle built from branch source revision `856de16c` with a temporary probe page and resource-count commands; the production Tauri/plugin code was unchanged. The bundle was arm64, version `2.7.4`, minimum macOS `11.0`, and intentionally unsigned/notarized. Across 25 cycles of the same six scenarios (150 requests), the live resource count returned to zero after every settled request: baseline/minimum/maximum/final were all zero, with no failed checks. The binary SHA-256 was `adc11bcdeec9801f8b604d038ec560721682a432e184e3c29a29cbf03758969b`.
+
+During the 14.37-second packaged soak, 83 RSS samples of the main Tauri process ranged from 15.4 MiB to 105.9 MiB (median 63.0 MiB, p95 101.4 MiB); the last sample was 47.7 MiB. This sample covers only the main process, not WebKit subprocesses, and the short isolated loopback soak is not real playback or API traffic. Structured host, bundle, request, and RSS evidence is in [`tauri-r02-macos-release-2026-09-30.json`](measurements/tauri-r02-macos-release-2026-09-30.json). The temporary page and commands were removed after the run.
+
+R02's macOS live development and packaged WebView soaks are now recorded. Packaged runtime checks on Windows and Linux remain open.
+
+### R06 — Media session por diferencias
+
+`useMediaSession` still submits a full snapshot each second, but `syncDesktopMediaSession` compares a key containing track identity, title, artist, album, and artwork. It calls `update_desktop_media_session` only when that key changes; playback state and timeline use `update_desktop_media_playback_state` and `update_desktop_media_position` separately. That prevents Windows from repeating `ClearAll`/thumbnail loading/`Update` on position ticks and prevents those ticks from publishing Linux metadata. The focused `desktop-tray` and tray-command suites passed 21/21 tests on `c0cc0d44`. R06 is resolved in code; actual OS media-center behavior remains part of the installed-player gates below.
+
+## macOS visualizer measurement — R07
+
+Three visible 30-second Tauri development WebView runs used the production `MusicVisualizer`, a deterministic synthetic analyser, and the Apple GPU (`WebGL 2.0`, `Apple Inc.`). With the initial wide probe canvas at 1,231 × 720 CSS pixels and DPR 1, the buffer was capped independently at 1,024 × 720. Each run reported frame-interval p50 17 ms and p95 18 ms; max intervals were 203, 31, and 25 ms. The first run included a brief hidden/visible transition; the two later runs stayed near 60 Hz. Synchronous renderer tick p95 was at or below the WebView's roughly 1 ms timer resolution. This records scheduling and CPU-side GL submission, not GPU completion time.
+
+During the first 30 seconds of a repeat, sampled `ps %cpu` across the Tauri, WebKit GPU, WebContent, and Networking processes averaged 13.3% as a group (sample p95 18.5%; max 31.5%). Summed RSS had median 75.8 MiB, sample p95 94.8 MiB, and max 114.5 MiB. Per-process RSS medians/maxima were: Tauri 36.0/38.2 MiB; WebKit GPU 13.6/17.7 MiB; WebContent 21.4/47.5 MiB; Networking 6.1/11.1 MiB. RSS sums can double-count shared pages, and `ps %cpu` is only a sampled proxy; neither is an energy measurement. An explicit stop check observed no additional renderer ticks for two seconds.
+
+The capped-size measurement exposed an aspect-ratio defect: clamping width and height independently stretched non-square canvases. `getVisualizerRenderSize` now applies one scale factor to both dimensions. The regression changed the DPR-2 resize expectation from 1,024 × 1,024 to 1,024 × 768; it failed before the fix. The renderer and hook suites pass 59/59, with Listen typecheck and focused ESLint green.
+
+After that fix, three visible runs at the final 720 × 720 CSS size and DPR 1 recorded frame-interval p50/p95/max of 17/17–18/18–26 ms, 17/17/18 ms, and 17/17/24 ms. Synchronous tick p95 was 1 ms or less. A separate native window cycle stayed minimized for 8.59 seconds; the WebView reported hidden then visible, the interval maximum captured the 8.59-second pause, and the following two runs returned to p50/p95 17/17 ms. The stop check passed with an unchanged tick count over two seconds.
+
+A 100-sample `top` delta capture at one-second intervals covered all three visible runs. Per-process CPU p50/p95/max was Tauri 4.5/5.5/6.7%, WebKit GPU 5.4/8.0/8.9%, WebContent 5.7/7.2/8.1%, and Networking 0/0.1/2.2%. A separate 0.5-second RSS capture across the same runs recorded median/p95/max MiB of Tauri 34.9/44.3/45.8, GPU 12.4/14.6/15.2, WebContent 17.5/21.5/24.4, and Networking 6.8/9.6/10.5. Keep process values separate; RSS can double-count shared pages, and these dev-WebView numbers do not measure energy or GPU completion.
+
+This harness instantiates the production `MusicVisualizer` directly with a synthetic analyser; it does not mount `useMusicVisualizer` or run real audio. The hook's visibility behavior has automated coverage, while native minimize/restore here verifies WebView visibility and RAF suspension/resumption. R07 remains open for repeatable HiDPI runs, an installed-player smoke, and comparable release runs on macOS Intel, Windows, and a regular Linux desktop. Linux steps are in the [Linux measurement handover](tauri-linux-measurement-handover-2026-09-30.md).
+
+### macOS HiDPI follow-up — 2026-09-30, branch revision `5d6ca6e2`
+
+The probe window was placed on the external 5K display (5,120 × 2,880 pixels, 2,560 × 1,440 logical points). The native WebView reported DPR 2. At 720 × 720 CSS pixels, the production renderer allocated a 1,024 × 1,024 canvas, confirming the configured buffer cap on a Retina display. WebGL reported `Apple GPU`.
+
+One uninterrupted visible 30-second run reported frame-interval p50/p95/max of 17/18/45 ms and synchronous tick p50/p95/max of 0/1/1 ms. The renderer stop check passed with an unchanged tick count over two seconds. Two later cycles recorded hidden/visible transitions and are not counted as clean visible runs; their frame maxima are not included here. The corresponding JSONL file is `/tmp/tauri-visualizer-macos-hidpi-20260930-r2.jsonl`.
+
+The process CPU/RSS samplers started after the clean cycle and overlapped those interrupted cycles, so this capture does not provide valid per-process CPU/RSS for the DPR-2 run. The earlier DPR-1 three-run capture remains the CPU/RSS evidence. An installed-player integration check and clean repeated HiDPI runs remain open.
+
+### Bloom sampling optimization candidate — R07
+
+The bloom shader now groups adjacent symmetric Gaussian taps into fractional
+samples with linear texture filtering. Each paired sample exactly reconstructs
+the two original weights; the blur therefore keeps the same kernel while
+reducing texture reads from 9 to 5 per pass, or 90 to 50 across the existing
+10 passes. The kernel equivalence, texture filters, and shader sample count are
+covered by focused Listen tests. A production Listen build also passes.
+
+This code-level reduction is not evidence that Linux frame pacing is smooth.
+The first isolated local attempt could not produce a valid visible Mac
+measurement because macOS was locked and the WebView reported
+`visibilityState=hidden`; a visible follow-up is recorded below. R07 remains
+open until the same probe records visible runs on the i9 Wayland host and the
+installed Linux player; keep the Linux visualizer hidden until those
+measurements meet the frame-pacing gate.
+
+#### macOS visible follow-up — 2026-10-02, renderer source `489a6909`
+
+After the session was unlocked, the isolated Tauri development WebView ran
+three visible 30-second cycles against the optimized production
+`MusicVisualizer`. WebGL 2 reported Apple GPU; the 688 × 688 CSS canvas rendered
+at 688 × 688 with DPR 1. Frame-interval p50 / p95 / max was 17 / 19 / 191 ms,
+17 / 19 / 21 ms, and 17 / 19 / 22 ms. The first cycle had one 191 ms maximum;
+the later two stayed within 21–22 ms. The first-cycle outlier's cause is
+unknown and is kept in the result rather than excluded. The explicit renderer
+stop check passed: tick count stayed at 5,755 over its two-second observation.
+
+This confirms visible DPR-1 frame pacing and RAF cancellation on this Apple
+GPU with the current renderer. The probe uses a synthetic analyser in a dev
+WebView and does not measure real audio, CPU/RSS, GPU completion, energy, a
+release build, HiDPI, Intel, Windows, or Wayland; it is not a comparison proving
+the bloom optimization's effect. Raw events are in
+[`tauri-r07-macos-visualizer-2026-10-02.jsonl`](measurements/tauri-r07-macos-visualizer-2026-10-02.jsonl).
+
+### CI status on source revision — `026c3198025e5a3130d90abb16b21d26bec5f8ed`
+
+The current PR checks showed Android, Desktop Apps, and iOS as `skipped` because
+PR #259 remains a draft; these were not failed jobs. Manual dispatches against
+this exact source revision completed successfully: [Build Android](https://github.com/thecrateapp/crate/actions/runs/36942333262), [Build Desktop Apps](https://github.com/thecrateapp/crate/actions/runs/36942333335), and [Build iOS](https://github.com/thecrateapp/crate/actions/runs/36942333179). Desktop passed on Linux, Windows, and macOS. These runs predate the bloom shader change; the exact updated source was validated separately below.
+
+### CI confirmation on source revision — `489a69097e17b32a38ab47e0b47d941fba4962bb`
+
+The pull-request event again showed Build Android, Build Desktop Apps, and
+Build iOS as `skipped` because PR #259 is still a draft. Manual dispatches
+against this exact SHA passed: [Build Android](https://github.com/thecrateapp/crate/actions/runs/36944893264), [Build Desktop Apps](https://github.com/thecrateapp/crate/actions/runs/36944893226), [Build iOS](https://github.com/thecrateapp/crate/actions/runs/36944893145), and [Backend Tests](https://github.com/thecrateapp/crate/actions/runs/36945858611). The backend run passed quality, security, all eight test shards, and coverage. Frontend Tests, React Doctor, and PR Agent Review also passed on the same SHA: [Frontend Tests](https://github.com/thecrateapp/crate/actions/runs/36944876922), [React Doctor](https://github.com/thecrateapp/crate/actions/runs/36944876872), and [PR Agent Review](https://github.com/thecrateapp/crate/actions/runs/36944875333). Desktop passed on Linux, macOS, and Windows. The CI `skipped` results are draft gating, not failed jobs.
+
+## Production player path relevant to R08
+
+Tauri desktop runs the production `Gapless5` engine with both HTML5 audio and WebAudio enabled. It begins the HTML5 stream while fetching the same track into an `ArrayBuffer`, decodes the full track with `AudioContext.decodeAudioData`, then promotes playback to an `AudioBufferSourceNode` and pauses the HTML5 element. Desktop sets `loadLimit` to two tracks so the adjacent track can be ready for gapless playback; when crossfade is enabled, track transitions can overlap. The setup and limit are in [`gapless-player.ts`](../../app/listen/src/lib/gapless-player.ts), and the fetch/decode/promotion path is in [`gapless5.js`](../../app/listen/src/lib/gapless5/gapless5.js).
+
+The synthetic probes use the same browser decode API and retain two full-length buffers, so they provide evidence about the PCM cost and WebView retention at that buffer count. They bypass the production queue scheduler, simultaneous HTML5 stream, natural track transition, and crossfade. Their RSS peaks therefore do not establish the real player's peak or release behavior; R08 still needs an installed-player run that captures active playback, adjacent preload, transition, and post-transition release.
+
+## macOS development WebView memory measurement
+
+The probe was run in a fresh `crate-desktop` process on the host above. It fetched two local FLAC fixtures over loopback, decoded them sequentially with `AudioContext.decodeAudioData`, kept both `AudioBuffer`s for 90 seconds, then cleared the references and closed the context. The fixture page made no Crate API requests.
+
+The WebKit `AudioContext` selected 44,100 Hz. The 20.34-minute stereo buffer contained 430,594,752 bytes of Float32 PCM (410.6 MiB); the 16.53-minute buffer contained 349,839,512 bytes (333.6 MiB). Together they retained 780,434,264 bytes (744.3 MiB). The sampler recorded process RSS every 250 ms from before app startup through 15 seconds after release. Its startup interval began before Tauri existed, so only the peak is useful for that phase. Apple `footprint` sampled the Tauri and WebKit process IDs every 500 ms for 125 seconds; its first sample began about 14 seconds after the two buffers were ready, while its per-process peak field covered the process lifetime.
+
+| Phase                    | Process-group RSS summary                     | WebContent RSS summary         | Additional observation                                                                                                                   |
+| ------------------------ | --------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Decode and startup       | Peak 1,132.2 MiB                              | Peak 961.7 MiB                 | Group peak sample: WebContent 939.1 MiB, Tauri 117.6 MiB, GPU 26.2 MiB, Networking 45.5 MiB, plus a 3.8 MiB pre-existing WebKit service. |
+| 90-second buffer hold    | Min / median / max: 79.0 / 91.4 / 1,085.1 MiB | Median / max: 11.0 / 928.3 MiB | RSS drops sharply after the early decode samples although the page still retains both buffers.                                           |
+| 15 seconds after release | Min / median / max: 94.6 / 102.3 / 104.7 MiB  | Median / max: 13.7 / 16.7 MiB  | The browser-visible buffer references were cleared and the context closed.                                                               |
+
+RSS is only the resident portion. `footprint` reported a WebContent `phys_footprint_peak` of 1,096.9 MiB and about 971 MiB at its first post-decode sample. It remained about 971 MiB 48 seconds after release; at that point the sampled process group was 1,032.2 MiB total footprint, including 1,023.1 MiB reported as swapped. This explains why RSS alone fell to tens of MiB. It is an observed high-water/retention result, not proof of a leak: the probe leaves a closed `AudioContext` in the page and does not test reuse by the real player.
+
+A separate earlier 48,000 Hz pass measured about 810.1 MiB of decoded PCM for the same two durations and approximately 828 MiB RSS in WebContent just after both decodes. That pass did not include the same complete sampler, so treat it as a comparison point rather than a directly comparable repeat. The output rate materially changes the decoded byte count; use the actual `AudioBuffer.sampleRate`, not only the source file rate.
+
+The repeatable probe and local fixture server are in [`app/listen-desktop/scripts/audio-rss/`](../../app/listen-desktop/scripts/audio-rss/README.md). The saved harness was smoke-tested in Tauri with one 16.53-minute fixture: WebKit reported 44,100 Hz, 349,839,512 decoded bytes, and released the buffer after the configured one-second timer. These results came from a Tauri development WebView on macOS 27.0.1. They do not cover the real player, the macOS 11 floor, Intel macOS, 60–120-minute tracks, crossfade/three-buffer overlap, active playback, visualizer/EQ, or a 60-minute soak. Release-mode macOS and Linux measurements are recorded below. Windows development WebView2 results are recorded further down; R08 remains open and no fallback or byte budget is approved.
+
+## macOS packaged release RSS measurement
+
+A separate `.app` release bundle was built from the same revision with version `2.7.4`, product name `Crate Audio RSS macOS`, and isolated identifier `app.cratemusic.crate.desktop.audio.rss.macos20260930`. The bundle is arm64, declares `LSMinimumSystemVersion=11.0`, and `otool` confirms binary `minos 11.0`. It was launched from `target/release/bundle/macos` with `open -n`; it was not copied into `/Applications` or signed/notarized as a release. The test app used a measurement-only window and a loopback fixture server. The user's separate `/Applications/Crate.app` remained running and untouched.
+
+The same 20.34- and 16.53-minute synthetic FLAC fixtures were decoded. This release WebView selected 48,000 Hz, so the buffers contained 468,633,600 bytes (446.9 MiB) and 380,851,200 bytes (363.1 MiB), 849,484,800 bytes total (810.1 MiB). A sampler started before launch and captured the Tauri process plus the newly started WebKit XPC processes every 250 ms for 210 seconds (707 samples), ending 110.3 seconds after release. RSS values below are MiB; process-group sums can count shared pages more than once.
+
+| Phase                                               | Process-group RSS min / median / max | WebContent RSS min / median / max |
+| --------------------------------------------------- | ------------------------------------ | --------------------------------- |
+| Decode, from AudioContext creation to ready (2.2 s) | 177.4 / 755.2 / 1,333.0              | 29.1 / 617.7 / 1,125.7            |
+| 90-second hold                                      | 86.3 / 89.9 / 1,130.0                | 17.2 / 19.1 / 1,002.5             |
+| 0–15 seconds after release                          | 95.9 / 98.4 / 116.9                  | 15.9 / 18.4 / 24.8                |
+| 15–30 seconds after release                         | 76.6 / 95.0 / 95.9                   | 8.2 / 15.6 / 15.9                 |
+| 30–60 seconds after release                         | 73.7 / 75.7 / 77.3                   | 7.6 / 8.0 / 8.4                   |
+| 60–110 seconds after release                        | 70.5 / 72.5 / 74.9                   | 5.1 / 6.4 / 7.1                   |
+
+Low RSS during the hold and after release did not mean the decoded memory had disappeared. Around 84 seconds after release, a 10-second Apple `footprint` sample measured WebContent at 889.9 MiB with a lifetime peak of 1,341.5 MiB; total sampled process-group footprint was 943.7 MiB, including 938.6 MiB swapped. The OS had compressed/swapped most of the resident pages. This is a high-water/retention observation, not proof of a leak.
+
+## Linux debug WebView RSS measurement (container)
+
+A separate run used the same revision (`df72643d229ad7b47908f183690f5a35294a8ddf`) inside Debian 12 ARM64 on the local OrbStack Linux VM, with WebKitGTK 2.50.6. The VM reports 7.8 GiB RAM and no cgroup memory cap. Tauri ran as a debug build under Xvfb with software rendering and a private D-Bus session; no installed desktop shell, compositor, GPU acceleration, account, or Crate API was involved. This is a Linux/WebKitGTK runtime datapoint, not installed desktop acceptance, and it does not validate the declared WebKitGTK 2.40 minimum.
+
+Two synthetic pink-noise FLAC fixtures were decoded at 44,100 Hz: 20.34 minutes (430,557,120 PCM bytes / 410.6 MiB) and 16.53 minutes (349,907,040 bytes / 333.7 MiB), 780,464,160 bytes total (744.3 MiB). The probe retained both buffers for 90 seconds and then cleared them and closed the AudioContext. A sampler started before Tauri launch and sampled the Tauri process plus its WebKit children every 250 ms for 210 seconds (823 samples). RSS values below are MiB; process-group sums can count shared pages more than once.
+
+| Phase                                               | Process-group RSS min / median / max | WebContent RSS min / median / max |
+| --------------------------------------------------- | ------------------------------------ | --------------------------------- |
+| Decode, from AudioContext creation to ready (4.9 s) | 456.1 / 1,163.3 / 1,803.2            | 188.5 / 866.2 / 1,560.8           |
+| 90-second hold                                      | 1,034.2 / 1,228.4 / 1,625.4          | 929.1 / 1,013.0 / 1,383.2         |
+| 0–15 seconds after release                          | 1,049.4 / 1,052.4 / 1,052.5          | 943.6 / 945.3 / 945.4             |
+| 15–30 seconds after release                         | 1,052.3 / 1,052.3 / 1,052.4          | 945.2 / 945.3 / 945.3             |
+| 30–60 seconds after release                         | 1,013.9 / 1,014.2 / 1,052.3          | 931.0 / 931.2 / 945.2             |
+
+The process group settled below 166.1 MiB (WebContent below 83.1 MiB) about 60.5 seconds after release; the final sample at 74.1 seconds was 165.6 MiB group RSS and 82.6 MiB WebContent RSS. The retained high RSS during the first minute is an allocator/WebKit retention observation, not proof of a leak. Unlike the macOS probe, this container run has no `phys_footprint` measure.
+
+The macOS release WebView selected 48 kHz while both Linux runs selected 44.1 kHz, changing the PCM size for the same source durations. macOS RSS fell as the OS swapped/compressed pages while `phys_footprint` stayed high; Linux release RSS stayed near 899 MiB after release. These are captures on different WebKit engines/hosts, and the Linux runtime is a container under Xvfb. Windows development WebView2 is now measured below, but packaged builds, supported-floor hosts, and measurements with the real player remain required before deciding whether long tracks need a fallback.
+
+## Linux packaged release RSS measurement
+
+A measurement-specific Linux release `.deb` was built from the same revision as `crate-rss-linux` version `2.7.4`, architecture `arm64`, then installed with `dpkg -i` in the Debian 12 ARM64 container. Its package metadata declares `libwebkit2gtk-4.1-0 (>= 2.40.0)`; the runtime used WebKitGTK 2.50.6. The package opened successfully under Xvfb with software rendering and a private D-Bus session. This exercises the bundled release binary and WebKitGTK, but not a normal desktop shell/compositor or the declared 2.40 floor.
+
+It decoded the same fixtures at 44,100 Hz and retained 744.3 MiB PCM for 90 seconds. The sampler started before launch and captured the app and its WebKit children every 250 ms for 210 seconds (824 samples), including 106.0 seconds after release. RSS values are MiB; process-group sums can count shared pages more than once.
+
+| Phase                                               | Process-group RSS min / median / max | WebContent RSS min / median / max |
+| --------------------------------------------------- | ------------------------------------ | --------------------------------- |
+| Decode, from AudioContext creation to ready (4.9 s) | 413.0 / 984.5 / 1,717.6              | 169.5 / 692.4 / 1,486.3           |
+| 90-second hold                                      | 1,242.5 / 1,270.3 / 1,982.3          | 1,020.3 / 1,041.1 / 1,751.1       |
+| 0–15 seconds after release                          | 1,055.0 / 1,055.0 / 1,254.4          | 939.4 / 939.4 / 1,030.9           |
+| 15–30 seconds after release                         | 1,055.0 / 1,055.0 / 1,055.1          | 939.4 / 939.4 / 939.5             |
+| 30–60 seconds after release                         | 973.8 / 1,055.1 / 1,055.1            | 899.1 / 939.5 / 939.5             |
+| 60–106 seconds after release                        | 961.5 / 973.8 / 973.8                | 894.2 / 899.1 / 899.1             |
+
+Unlike macOS, the Linux WebContent RSS remained near 899 MiB more than 100 seconds after release. It is an observed high-water/retention result, not proof of a leak. This package used a measurement-only window and synthetic audio, so it does not establish memory use in the real player or normal desktop environment.
+
+## Windows development WebView2 RSS measurement — 2026-10-01
+
+The opt-in Windows RSS probe ran in [Build Desktop Apps workflow 36807020863](https://github.com/thecrateapp/crate/actions/runs/36807020863), using probe source revision `ac4a8c97b85c124d7ac1ccfb89fe0123ed3a187e`. The hosted machine was `Windows-2025Server-10.0.26100-SP0` (AMD64, 4 vCPU, 16 GiB RAM). This is a Tauri development WebView2 run, not an installed release or the supported Windows 10 version 1803 floor.
+
+Each of three runs decoded two synthetic stereo WAV fixtures at 44,100 Hz: 20.34 minutes (430,557,120 PCM bytes / 410.6 MiB) and 16.53 minutes (349,907,040 bytes / 333.7 MiB), 780,464,160 bytes total (744.3 MiB). The page held both buffers for 90 seconds, cleared references, closed the AudioContext, and sampled the Tauri process group and WebView2 processes every 250 ms for 60 seconds after release. Table entries are the median of the three run medians / the largest of the three run maxima, in MiB. The process-group RSS may count shared pages more than once; private commit is reported separately.
+
+| Phase                       | Process-group RSS median / max | WebView2 RSS median / max | Process-group private commit median / max | WebView2 private commit median / max |
+| --------------------------- | -----------------------------: | ------------------------: | ----------------------------------------: | -----------------------------------: |
+| 90-second buffer hold       |              1,103.5 / 1,481.7 |         1,060.4 / 1,441.2 |                           872.0 / 1,248.5 |                      866.6 / 1,243.1 |
+| 0–15 seconds after release  |              1,096.7 / 1,105.8 |         1,053.7 / 1,065.4 |                             867.4 / 869.0 |                        862.1 / 863.8 |
+| 15–30 seconds after release |              1,091.8 / 1,132.3 |         1,050.4 / 1,094.4 |                             867.2 / 880.9 |                        861.9 / 875.7 |
+| 30–60 seconds after release |              1,071.5 / 1,099.5 |         1,039.5 / 1,062.3 |                             866.6 / 869.3 |                        861.5 / 864.1 |
+
+The decode/startup sampling window varied substantially across repetitions, so its medians are not comparable. The observed startup peaks were 1,690.4 MiB process-group RSS, 1,649.9 MiB WebView2 RSS, and 1,850.6 MiB process-group private commit (1,845.2 MiB for WebView2). After release, RSS remained around 1.0–1.1 GiB through the measured minute and private commit around 860–881 MiB. This is high retention in a synthetic development probe, not proof of a leak. The capture does not exercise the real player, an installed package, Windows 10 1803, long-track overlap/gapless playback, or a longer soak; it cannot establish a fallback threshold.
+
+## Windows WebView2 RSS repeat — 2026-10-02
+
+The current-head [Build Desktop Apps run 36957591905](https://github.com/thecrateapp/crate/actions/runs/36957591905)
+repeated the Windows probe at application source revision `a672a99e` on a
+`Windows-2025Server-10.0.26100-SP0` AMD64 runner with 4 vCPUs and 16 GiB RAM.
+Three fresh Tauri development processes each decoded the same two synthetic
+stereo WAV fixtures at 44,100 Hz (430,557,120 and 349,907,040 PCM bytes,
+780,464,160 bytes / 744.3 MiB total), held them for 90 seconds, then sampled
+for 60 seconds after release. At each phase, the table gives the median of the
+three run medians / largest of the three run maxima, in MiB.
+
+| Phase                      | Process-group RSS |      WebView2 RSS | Process-group private commit | WebView2 private commit |
+| -------------------------- | ----------------: | ----------------: | ---------------------------: | ----------------------: |
+| 90-second buffer hold      | 1,103.9 / 1,477.0 | 1,063.3 / 1,436.0 |              870.9 / 1,246.5 |         865.5 / 1,241.1 |
+| 0–60 seconds after release | 1,085.1 / 1,123.6 | 1,045.0 / 1,081.9 |                865.9 / 878.2 |           860.7 / 873.1 |
+
+The decode/startup samples reached 1,842.9 MiB process-group RSS and 1,803.0
+MiB WebView2 RSS; process-group and WebView2 private-commit maxima were 1,849.6
+and 1,844.2 MiB. The phase's median depends on when the first sample lands, so
+use the maximum only as an observed peak. At the end of the one-minute
+post-release window, private commit remained around 861–869 MiB across runs,
+and RSS remained high. This is a repeatable synthetic WebView2 retention
+observation, not proof of a leak or the real player's peak. The probe still
+does not cover the Windows 10 1803 floor, an installed release, actual player
+transitions, overlap, or a longer soak; keep the current behavior and do not
+derive a memory fallback threshold from this capture. The compact per-run
+summary is [`tauri-r08-windows-audio-rss-2026-10-02-run-36957591905.json`](measurements/tauri-r08-windows-audio-rss-2026-10-02-run-36957591905.json);
+the [workflow run](https://github.com/thecrateapp/crate/actions/runs/36957591905)
+retains raw 250 ms process samples and event logs in its
+`desktop-audio-rss-windows-36957591905` artifact.
+
+## Linux release artifact compatibility regression — 2026-09-30
+
+The GitHub Linux artifacts from run `36720616713` at `95c9f5395927fcce27c7846204bdc64d86a65c23` were built on `ubuntu-24.04`. I downloaded its `crate-linux-0.1.0.deb` and installed it in an isolated Debian 12 amd64 container with WebKitGTK 2.50.6. Launch failed before a window appeared: `/lib/x86_64-linux-gnu/libc.so.6` did not provide `GLIBC_2.39`, which the packaged binary requires. The package metadata did not declare a matching libc minimum, so installation succeeded despite the incompatible binary.
+
+The new `verify-linux-glibc.mjs` gate rejects the old artifact against the supported GLIBC 2.36 ceiling with `Binary requires GLIBC_2.39; maximum supported is GLIBC_2.36`. On revision `59ddb5d5c6b927dfb8ba440ea6feeafe20b669bb`, [Build Desktop Apps run 36728542909](https://github.com/thecrateapp/crate/actions/runs/36728542909) completed all three Linux, Windows, and macOS jobs successfully, including the Linux GLIBC verifier, artifact-version checks, and uploads. The Linux artifact was built on Ubuntu 22.04 amd64; its `.deb` declares `libwebkit2gtk-4.1-0 (>= 2.40.0)`.
+
+I downloaded `crate-linux-0.1.0.deb` from that run and installed it in an isolated Debian 12 amd64 container. With GLIBC 2.36, the packaged app opened a visible `Crate` window under Xvfb within 12 seconds and remained alive until the smoke ended. The SHA-256 of the tested `.deb` is `ed30a8bc15aca33283bb7a4a78f9bca9ae909a510b66146c0b40be528e3df9af`. This verifies the launch ABI and the package's declared WebKitGTK floor in a container; it does not cover a normal desktop session, accelerated GPU, the exact WebKitGTK 2.40 floor, or installed-player behavior. Ubuntu 22.04 runner use is transitional; move Linux builds into a Debian 12 based environment before those hosted runners retire.
+
+## macOS artwork callback ownership — C07
+
+On macOS 27.0.1 arm64, the artwork ownership path was audited and tested against the native `MPMediaItemArtwork` API. `load_artwork` wraps the `NSImage` returned by `initWithData:` in `Retained`; `load_modern_artwork` captures an owned clone in the request-handler block. The artwork cache owns the initialized artwork object until replacement or clearing, while `setObject:forKey:` lets the Now Playing dictionary retain the artwork it displays. The ownership chain is artwork → request-handler block → image, with no reverse reference or retain cycle.
+
+`retained_artwork_request_block_survives_artwork_replacement` creates two native artwork objects, drops the Rust image and block owners, then asks the previous artwork for an image after the newer artwork exists. Objective-C weak references confirm both source images remain alive, and the delayed request returns the original image. This directly exercises block lifetime through `MPMediaItemArtwork`; it does not exercise the installed app's `MPNowPlayingInfoCenter`, OS media controls, or rapid real-track playback. No use-after-free was reproduced.
+
+On source commit `5c0072ee32140f262c2fb6d2cbf0a49d3a8bfbe1`, `cargo test --manifest-path app/listen-desktop/src-tauri/Cargo.toml --lib` passed 48/48 and `cargo clippy --manifest-path app/listen-desktop/src-tauri/Cargo.toml --all-targets -- -D warnings` passed. Apple documents the request-handler initializer and callback size contract in [`MPMediaItemArtwork.initWithBoundsSize:requestHandler:`](https://developer.apple.com/documentation/mediaplayer/mpmediaitemartwork/init%28boundssize%3Arequesthandler%3A%29?language=objc). C07's object-lifetime regression is covered; the installed Now Playing smoke remains open with C03.
+
+## macOS Now Playing playback state — C03
+
+On the same macOS 27.0.1 arm64 host, a native MediaPlayer probe set `MPNowPlayingInfoCenter.playbackState` to playing, paused, and stopped and read back raw values 1, 2, and 3. A Rust regression test now calls `set_now_playing_playback_state` for those three states and reads the value back from the native center; it restores the test process's initial state on exit. Apple documents that macOS apps must update this property whenever playback begins or halts in [`MPNowPlayingInfoCenter.playbackState`](https://developer.apple.com/documentation/mediaplayer/mpnowplayinginfocenter/playbackstate?language=objc).
+
+On source commit `7bae0cbc05c91f2a744c32bd89da15e702acf414`, Rust tests passed 49/49, Clippy passed with `-D warnings`, and rustfmt check passed. This validates the app's native state setter and mapping. It does not validate remote-command delivery, competing media apps, or controls during real playback, backgrounding, headset changes, and sleep/wake; the installed-app C03 smoke remains pending.
+
+## Google native OAuth return — F10
+
+On the temporary macOS test bundle built from source commit `013a2c63ce1b269fd9d1ea3f6914de342a892c34` on macOS 27.0.1 arm64, Diego completed Google login and Crate reached its authenticated state. Chrome remained open on Google's “Vas a volver a iniciar sesión en lespedants.org” confirmation/return screen. The app login succeeded; the browser window is separate and is not dismissed by the Tauri deep-link handler. The screenshot's “Continuar” control is Google's own confirmation. This is a manual smoke of Google login on this macOS host only; it does not cover Apple, Windows/Linux, account linking, cancellation, or callback replay. The temporary test bundle uses identifier `app.cratemusic.crate.desktop.manual20260930` and is not a release artifact.
+
+After that smoke, the Tauri callback was changed to pass through Listen's `/auth/callback?desktop=tauri` completion page before opening the `cratemusic://` link. That route already displays the “Volver a Crate” confirmation and a fallback button, so Chrome should show that the handoff completed instead of retaining Google's confirmation screen. Backend tests verify the HTTPS redirect and one-time code; the updated browser handoff still needs a manual run against the changed API.
+
+Diego retested the temporary desktop app after this change: Crate authenticated, but Chrome still displayed Google's confirmation page. The app defaults to `https://api.lespedants.org`, while PR #259 is still open, so that API is not yet running the updated callback. The retest therefore confirms the existing deep-link login works but does not exercise the HTTPS completion redirect. Google authorization also set `prompt=consent` on every attempt. Crate only uses Google's user-info response and does not store a Google refresh token, so login no longer requests offline access or forces consent. Account-linking flows use `prompt=select_account` so the user can choose a different Google identity; first-time consent can still appear for that identity. Tauri cannot close a tab opened in the external browser, but after the API update the tab should leave Google's page and show Crate's completion page.
+
+Persistent review of commit `f194f674` then found that a failed handoff restore could leave OAuth account linking in progress until its 15-minute expiry. Claims now hold a 90-second lease while the canonical handoff remains available; another request can safely reclaim it after the lease expires. Redis can also migrate legacy pending entries after the same grace period. Unit and API tests cover lease expiry, an active concurrent claim, and recovery when both completion and restoration fail. A disposable Redis 7 container also passed claim, concurrent-claim, lease-expiry recovery, restoration, completion, and migration of a legacy pending entry. Backend Tests and PR Agent Review for `acfe4baa31b3d1580723e68914a751a0b3e9a362` both passed. The desktop matrix, Android build, backend, frontend, and React Doctor workflows for `f194f674` also passed on their respective jobs.
+
+The next persistent review reported that native OAuth, OAuth account-linking, and Last.fm handoffs allowed in-memory fallback whenever `DOMAIN` defaulted to localhost, even with no explicit environment. They now share a helper that permits this fallback only when `CRATE_ENV` is explicitly `dev`, `development`, or `test`, and removes expired/corrupt in-memory records during operations. Tests also exercise the fallback policy and expired claim leases. The review's `get_home_playlist` signature concern is a false positive: the callee accepts `session=`; the callback-test concern is also covered by `TestOAuthCallback.test_native_callback_redirects_with_code_only` and the Listen callback component tests. The reported `session_id` disclosure was checked: the value is a random internal session identifier, not an access or refresh credential, and native link start/completion still require a verified bearer token. It does not by itself authorize a session. The reported `app_id` mismatch is also ruled out: both native link startup and completion require the Tauri app id, completion passes that validated request id to the handoff claim, and tests reject other native app ids at both endpoints.
+
+The review also flagged the one-time handoff code in the Tauri HTTPS callback query string. Tauri now receives `desktop`, `code`, and `state` in the URL fragment instead, then removes them from the address bar before opening the app. The browser does not send a fragment in the HTTP request, so it stays out of proxy query logs and referrer headers; the opaque code remains short-lived, one-time, and PKCE-bound.
+
+The OAuth-focused backend tests (`141 passed, 12 skipped`), Listen `AuthCallback` tests (`7 passed`), and changed-file pre-commit hooks passed on the earlier working tree. The merged branch revision and its current CI results are recorded below.
+
+### Persistent review — Google offline access
+
+The review of `2903365a` says removing `access_type=offline` can silently stop the application receiving a Google refresh token. In the current product flow this is not a required credential: Google is used only for identity (`openid email profile`); [`_google_userinfo`](../../app/crate/api/auth.py) exchanges the code, uses the access token for Google's user-info endpoint, and returns only that profile. The callback persists the provider subject and email metadata, not provider tokens. The app's refresh token is a separate Crate session JWT. Google unlink removes the local external identity and does not call Google's token-revocation endpoint; there is no existing server-side Google grant to revoke or Google API sync that depends on a refresh token.
+
+The regression tests cover both sides of this contract: `test_google_userinfo_does_not_expose_provider_refresh_token` supplies a token response containing a refresh token and verifies only user info is returned, while `test_public_google_login_uses_identity_scopes_without_offline_access` and `test_google_oauth_start_does_not_force_consent_for_existing_grants` assert the identity request does not ask for offline access or forced consent. `test_google_link_callback_does_not_store_provider_refresh_token` also injects a profile containing a refresh token into the account-link callback and verifies persistence receives only the provider identity and email metadata. The finding is therefore not a regression in current behavior. If a future feature calls Google APIs after login, it must add explicit scopes, secure refresh-token storage/rotation, and unlink-time revocation together; requesting offline access during identity login alone would create an unused long-lived credential.
+
+On current application source at `eb3e4781`, a focused rerun of the two Google
+authorization-start tests, token-exchange filtering, account-link persistence,
+and Tauri success handoff passed 5/5 in an isolated Python 3.13 container.
+
+### Persistent review — native Last.fm retryability
+
+The review found that transient HTTP 408/429 responses and malformed or unclassified successful responses from Last.fm were marked non-retryable. In the native linking flow that could discard the browser handoff even when the provider failure was temporary. These responses now remain retryable; Last.fm error code 8 (temporary operation failure) joins the existing transient provider errors, while definitive code 15 remains non-retryable. Regression tests cover 408, 429, missing/unknown error details, and the provider classifications. `test_native_lastfm_link_api.py` also verifies a failed completion keeps the pending token available for retry. The review's test-mock concern is a false positive: the endpoint imports `lastfm_get_session_strict` inside the handler, so patching `crate.scrobble.lastfm_get_session_strict` before the request is handled patches the reference that the handler resolves.
+
+The next review found that provider denial returned an HTTP 400 for native login instead of returning to the app. Native login denials now redirect through the validated `cratemusic://oauth/callback` with the native state and `error=cancelled`; native callback consumers clear the matching secure PKCE record and do not emit a successful-auth event. Tests cover server denial redirects and client cleanup. The review also requested a contract test for Tauri's HTTPS callback fragment: `AuthCallback.test.tsx` already verifies fragment parsing and the deep-link handoff, and new backend tests now assert the generated Tauri fragment and preserve the Android/iOS query-string contract.
+
+The review then described the success and cancellation redirect paths as inconsistent. They take different initial routes by design: successful Tauri OAuth returns to the HTTPS `/auth/callback` fragment page so the one-time code is not sent in an HTTP query; that page strips the fragment and opens `cratemusic://oauth/callback?code=...&state=...`. A denial contains no code and goes straight to `cratemusic://oauth/callback?state=...&error=cancelled`. Tauri consumes both deep links with `consumeOAuthCallbackUrl`; tests now cover the backend success URL, the browser fragment-to-deep-link bridge, successful exchange, and cancellation cleanup. The inconsistency finding is therefore a false positive.
+
+On source revision `0e921f66`, the final OAuth regression suite passed: backend `test_auth.py` and `test_native_oauth_link_api.py` (10 tests for the added exact Tauri fragment contract), Listen AuthCallback/native OAuth suites (37 tests), and Tauri init tests (18 tests). The Last.fm retryability suites passed 29 tests. The complete exact-head Backend Tests and Frontend Tests workflows also passed above; the branch is clean and pushed at this revision.
+
+## Linux desktop handover and merged branch validation — 2026-09-30
+
+The Linux agent's [desktop validation report](tauri-linux-desktop-results-2026-09-30.md) records a real GNOME Wayland run on CachyOS. R03–R05 pass for the synthetic offline workload after removing per-file path IPC. The previous R01 Linux measurement is invalidated by delayed-ACK behavior in its local HTTP fixture; rerun it with the corrected fixture above. R07 and R08 are partial; AppImage launch and MPRIS are partial; native UI automation and real-player/offline flows remain open.
+
+The report measured visualizer RAF intervals around 23–24 ms. Diego also confirmed that it feels too slow on an i9 Wayland machine, so Tauri Linux now hides the visualizer until rendering can meet the required frame rate. The change is covered by `ExtendedPlayer.test.tsx`; web and Capacitor keep the existing visualizer.
+
+Revision `31ecac20900a712e95e21965d3d82c5834f6c7a5` merges current `main` and includes the Linux agent's `7f79f2ed` commit. Local checks passed: Rust 50/50, Clippy with `-D warnings`, Desktop Vitest 45/45, desktop-version tests 15/15, Listen/Desktop typechecks and production builds, Listen lint, the Linux visualizer test 7/7, palette ticket-fetch test 1/1, and `docker compose config --quiet`. The merge commit hooks passed Ruff, Ruff format, Prettier, and Listen ESLint. Pytest was unavailable in the local Python installation, so backend validation ran in CI.
+
+All manually dispatched workflows passed on that exact revision: [Build Desktop Apps](https://github.com/thecrateapp/crate/actions/runs/36769695744) (Linux, macOS, Windows), [Build Android](https://github.com/thecrateapp/crate/actions/runs/36769696429), and [Backend Tests](https://github.com/thecrateapp/crate/actions/runs/36770071955), including all eight shards and coverage. The pull-request [Frontend Tests](https://github.com/thecrateapp/crate/actions/runs/36769600208), [React Doctor](https://github.com/thecrateapp/crate/actions/runs/36769600187), and [PR Agent Review](https://github.com/thecrateapp/crate/actions/runs/36769595295) also passed. Some PR jobs were skipped because the PR remains draft; the manual runs above cover those build and backend-test gates. This closes C06 for the revision, not the installed OS/WebView, real-player, signing, or upgrade gates.
+
+## Recommendation decisions — R01–R13
+
+The original review numbers nine recommendations. R01–R08 follow the measurement work above; R09–R13 below are an explicit tracking extension over recommendations 6–9 and the compatibility/release section. This mapping is inferred because the source review did not assign R09–R13 IDs.
+
+### R11 — macOS Keychain prompt investigation — 2026-10-01
+
+The credential path in `secure_session.rs` uses the OS keyring under the stable Tauri bundle identifier and is exposed only through the three allowlisted Rust commands. Read-only inspection of `/Applications/Crate.app` found an ad-hoc signature, no Team ID, and a designated requirement tied to that binary's CDHash. The local keychain contains an Apple Development identity, but no Developer ID Application identity. Before the current change, the desktop workflow also did not import a signing certificate or configure notarization; ad-hoc tester bundles therefore could not validate Keychain trust across rebuilt or updated app binaries.
+
+The running manual-test bundle is a separate ad-hoc build with identifier `app.cratemusic.crate.desktop.manual20260930`; its designated requirement is also tied to its own CDHash. This makes ad-hoc identity a strong explanation for renewed Keychain authorization after rebuilding or switching between the installed and manual bundles. It does not prove a prompt on every launch of an unchanged binary. macOS Keychain ACLs trust code requirements, and Apple's signing guidance describes designated requirements as the identity used to recognize code across versions. The inspection also cannot distinguish an app-authorization prompt from a request to unlock the `login` keychain. See Apple's [Keychain access-control documentation](https://developer.apple.com/documentation/security/access-control-lists) and [code-requirement guidance](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
+
+Crate desktop is not distributed as a signed or notarized app, so every macOS build, including tag releases, keeps an ad-hoc signature and no Apple credentials are required. R11 stays open as an accepted risk: after an update the Keychain may ask again for the stored session, or the listener may need to sign in again. Do not weaken the Keychain ACL or replace the OS keyring to suppress a prompt.
+
+The first manual desktop run after wiring signing, `36790028684` on `7dedd484`, failed on macOS because empty `APPLE_ID`, `APPLE_PASSWORD`, and `APPLE_TEAM_ID` variables still made Tauri attempt to notarize an ad-hoc tester build (`Team ID must be at least 3 characters`). Non-tag macOS builds now unset those variables before invoking Tauri. The corrected exact-head run `36791161770` on `a587a15b` passed macOS, Linux, and Windows; both macOS architectures produced valid ad-hoc signed tester ZIPs and Tauri skipped notarization as expected. This validates the tester path, not the tag-only signing path. No Developer ID certificate or notarization credentials are available for an actual release run. Installing that signed release over the existing app and checking repeated launches and an upgrade remain open. Do not weaken the Keychain ACL or replace the OS keyring to suppress a prompt.
+
+| ID                                       | Decision                                                                                                                                                                                                                                                                                                                                                                                                             | Remaining evidence or work                                                                                                                                                                                    |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R01 — shared HTTP transport              | Keep the shared reqwest client; loopback confirms reuse on the three hosted OSes and local Mac. Hosted HTTPS repeats improved shared total and p50 in five of six cases; concurrency-8 samples were mixed for Linux and Windows. Remote latency remains directional.                                                                                                                                                 | Repeat noisy remote samples before making latency claims; measure cancellation, CPU/RSS, and installed-app traffic before claiming full production impact.                                                    |
+| R02 — HTTP resource lifetime             | Keep the cleanup changes. Mac development and packaged soaks, the Linux release-mode probe on WebKitGTK 2.40.3, and the Windows release-mode probe returned the resource table to baseline for all 150 requests per run. The 20-second Linux sample peaked at 197 MiB for Crate, 299 MiB for WebKitWebProcess, and 57 MiB for WebKitNetworkProcess.                                                                  | Windows evidence is from a Windows Server 2025 hosted runner, not the Windows 10 1803 floor. Linux used Debian 12 under Xvfb, not a normal desktop session or a package-manager-installed app.                |
+| R03 — offline hydration and verification | Keep cached hydration and batched verification. Linux 5,000-entry hydration took 71–95 ms and verification took a 161 ms median; Windows hydration took 80.3 ms and 5,000-file verification 1.53 s. Warm hydration was below 1 ms in the Mac and Windows probes. These are synthetic filesystem workloads.                                                                                                           | Measure against real libraries, installed builds, and download/cancellation flows before setting performance thresholds.                                                                                      |
+| R04 — verification concurrency           | Keep the global limit of eight. Two synthetic 1,000-file callers completed in 68 ms concurrent vs. 78 ms sequential on Linux, and 573.3 ms vs. 592.9 ms on Windows. The small gains do not justify raising the limit; Mac measurements also showed no material reason to change it.                                                                                                                                  | Measure contention during real concurrent downloads and file reads on installed Windows/Linux builds; revisit only if the workload shows meaningful queueing.                                                 |
+| R05 — offline index writes               | Keep the atomic JSON snapshot and same-turn batching; do not add a journal from synthetic data alone. Linux paired 1,000-mutation writes had 10 ms p95 commit latency; Windows paired writes had 38.7 ms p95 (104.4 ms max), while a 5,000-mutation burst took 2.97 s.                                                                                                                                               | Measure actual completion cadence and write latency during real downloads/cancellations before changing storage format or durability policy.                                                                  |
+| R06 — media session diffs                | Resolved in the frontend/native command bridge; metadata/artwork are separated from playback state and position, with 21 focused tests passing.                                                                                                                                                                                                                                                                      | Test OS media controls during real playback and remote commands.                                                                                                                                              |
+| R07 — visualizer and power               | Keep the visualizer hidden in Tauri Linux until it meets the user's smoothness requirement; web and Capacitor retain it. Mac synthetic runs are near 60 Hz.                                                                                                                                                                                                                                                          | Release/HiDPI measurements on Windows and ordinary Linux desktops; do not infer energy use from RAF alone.                                                                                                    |
+| R08 — decoded-audio memory               | Keep current behavior. Synthetic probes on macOS, Linux, and Windows show high WebView memory retention after releasing 744–810 MiB PCM. The partial macOS real-player run had only 93 MiB median summed RSS but 1.50 GiB median WebContent `phys_footprint` and substantial swap; it mixed playback and pause and is not a controlled soak. This is a pressure signal, not proof of a leak or a fallback threshold. | Repeat fresh-process real-player captures with active playback, preload, transition, and release phases on all OS; include overlap/gapless behavior and supported floors before setting a budget or fallback. |
+| R09 — runtime capability boundaries      | Keep explicit `isTauriRuntime`/`isCapacitorRuntime` checks; do not broaden global `isNative`, which selects Capacitor plugins. Defer a capability-facade refactor until it removes demonstrated duplication.                                                                                                                                                                                                         | Revisit when a concrete cross-runtime defect or measurable maintenance cost appears.                                                                                                                          |
+| R10 — server/session transitions         | Keep the F05/F06 transition fixes and their regression coverage. Defer a broad transition orchestrator extraction; current evidence does not establish one safe shared ordering for every auth/offline flow.                                                                                                                                                                                                         | Add a focused design only if new transition bugs or duplicated behavior recur.                                                                                                                                |
+| R11 — permissions and secrets            | Keep Tauri sessions in the OS credential vault and keep key access behind allowlisted Rust commands. Do not add a wider upload scope; no upload-plugin permission appears in the current Tauri capability list.                                                                                                                                                                                                      | Verify macOS keychain prompting on the signed release identity and exercise Windows/Linux vault behavior on installed builds.                                                                                 |
+| R12 — observable errors                  | Keep runtime error reporting and typed secure-storage failures; optional artwork failures stay non-blocking. The 2026-10-01 audit on `d482a739` confirms the inspected Tauri auth/native error reporters scrub payloads before telemetry.                                                                                                                                                                            | Re-audit when adding reporters; local OS-registration `stderr` may include filesystem paths, so do not forward it verbatim to telemetry.                                                                      |
+| R13 — compatibility and release          | Keep the published support floors and artifact verifiers. CI now passes the current three-OS desktop build; a Debian 12 launch verified GLIBC 2.36 compatibility on an earlier artifact.                                                                                                                                                                                                                             | Install on the exact minimum OS/WebView versions; validate signed/notarized release upgrades and supported Linux desktops/codecs.                                                                             |
+
+The current desktop production build emits a dynamically imported Sentry chunk
+of 564.7 kB minified / 184.2 kB gzip. Its source map lists modules from replay,
+feedback, and multiple core packages, while `app/listen/src/lib/sentry.ts`
+uses initialization, tracing, scope, error-capture, and user-identification
+APIs. The entrypoint calls `initSentry()` before desktop bootstrap without
+awaiting it, so its cold-start cost has not been measured. Keep telemetry as
+is and profile time to first render before changing imports; verify any
+tree-shaking change across web, Tauri, and Capacitor.
+
+## Acceptance tracking — C01–C07
+
+The review documents identify C03, C06, and C07, but do not define C01, C02, C04, or C05. The following mapping is inferred for bookkeeping; it must not be read as an original acceptance checklist.
+
+The agreed macOS 11 Big Sur floor is compatible with the frontend's declared
+browser floor when the OS has Safari 16.4: Tailwind CSS 4 requires Safari 16.4
+for core functionality, and Apple's Safari 16.4 release notes list Big Sur as
+a supported OS. This establishes that the floor is feasible, not that Crate's
+WKWebView has been exercised on a minimum-version host. See the official
+[Tailwind compatibility requirements](https://tailwindcss.com/docs/compatibility)
+and [Safari 16.4 release notes](https://developer.apple.com/documentation/safari-release-notes/safari-16_4-release-notes).
+
+| ID  | Inferred gate                             | Current status                                                                                                                                                                                                                                                                                                                                                                                                  |
+| --- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C01 | Support-floor metadata and declarations   | Partial: exact-head macOS ARM64 and Intel artifacts declare macOS 11.0; Windows 10 1803 is paired with minimum WebView2 111.0.1661.34 and a silent download bootstrapper; exact-head DEB/RPM packages require WebKitGTK 2.40+ and the AppImage bundles WebKitGTK. Exact minimum hosts remain untested.                                                                                                          |
+| C02 | Launch/window lifecycle and package smoke | Partial: macOS 27 release bundle opened, hid, and reopened; the exact-head Linux `.deb` rendered its setup screen under Xvfb with system WebKitGTK/JSC 2.40.3 and the exact-head AppImage rendered with bundled WebKitGTK 2.50.4. Exact-head workflow 36947461225 installed the Windows NSIS bundle, observed its main window, and ran the silent uninstaller. Minimum-host and upgrade acceptance remain open. |
+| C03 | macOS Now Playing state                   | Native mapping tests pass. A live macOS debug-app smoke played and paused a track; Control Center delivery, external remote commands, and release-player behavior remain open.                                                                                                                                                                                                                                  |
+| C04 | Native OAuth handoff                      | Backend callback tests pass, and the user confirmed Google login succeeds in the macOS app; the browser remains on Google's page after handoff. The updated deployed callback and Apple/Windows/Linux account flows remain unverified.                                                                                                                                                                          |
+| C05 | Linux package ABI/WebKit compatibility    | Pass for tested artifacts: the `.deb` and RPM from `44e69227` rendered with system WebKitGTK/JavaScriptCoreGTK 2.40.3; the exact-head `.deb` from `e8c8530d` rendered with that same runtime, and its AppImage rendered with bundled WebKitGTK 2.50.4. The current Linux CI symbol gate passed. These are x86_64 Debian 12 Xvfb/X11 checks, not a physical Wayland or minimum-distribution installation test.   |
+| C06 | Desktop CI builds and artifact checks     | Pass: exact-head [manual matrix 36957591905](https://github.com/thecrateapp/crate/actions/runs/36957591905) passed macOS, Linux, and Windows at `a672a99e`, including artifact checks, macOS ARM64/Intel bundles, Windows install/launch/uninstall and 150 HTTP-probe requests, plus Linux ABI/WebKitGTK gates. Minimum-host acceptance remains open.                                                           |
+| C07 | macOS artwork callback ownership          | Native lifetime regression test passes, and the in-app artwork rendered during the live smoke; delivery through the installed system Now Playing surface remains open.                                                                                                                                                                                                                                          |
+
+## Other native gates still pending
+
+The installed release matrix remains open for macOS 11 and Intel, Windows 10 1803/WebView2, and a native Linux distribution at its published support floor. Windows CI now installs the NSIS bundle, creates its main window, and verifies uninstaller cleanup on `windows-latest`; the supported-floor install/upgrade, real-player RSS, and media-control checks remain open. Linux has a Debian 12 GNOME Wayland launch and MPRIS smoke, plus `.deb`/RPM payload launches on WebKitGTK 2.40.3 and an AppImage launch on its bundled WebKitGTK 2.50.4 under Xvfb/X11, as recorded below; route and installed-player inspection, offline flows, and upgrade from the previous package remain open. Provider credentials, media-system behavior, signed artifacts, and the remaining native acceptance scenarios are not covered by this report. A green CI build does not substitute for those runs.
+
+## Finding implementation crosswalk — F01–F20
+
+The fixes below are present in the current branch and their regression suites are part of the green Listen frontend, Rust, backend, or desktop-version checks recorded above. This closes the code findings; it does not turn the separately listed installed-platform acceptance checks into passes.
+
+| Finding | Current fix and regression evidence                                                                                                                                                                                                                 |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F01     | Offline cold-start identity is restricted to a previously verified user with cached media; `AuthContext.test.tsx` covers that mode and logout/anonymous boundaries.                                                                                 |
+| F02     | Tauri `connect-src` admits both offline asset URL forms used by WebAudio; the exact policy was exercised in the recorded Chromium CSP probe.                                                                                                        |
+| F03     | `tauri-filesystem.ts` normalizes Windows file/path-not-found errors to a stable code; `tauri-filesystem.test.ts` covers Win32 error 2 and 3.                                                                                                        |
+| F04     | The vendored HTTP plugin is built without cookie-store support, and startup removes legacy `.cookies`; a Rust test covers idempotent cleanup.                                                                                                       |
+| F05     | Removing an active server revokes its captured session before changing selection; `ServersSection.test.tsx` covers removal and fallback behavior.                                                                                                   |
+| F06     | Auth/runtime identity resets before switching to a tokenless server; `AuthContext.test.tsx` covers stale responses and tokenless switching.                                                                                                         |
+| F07     | Playback-recovery intent is invalidated by later pause/stop actions; gapless recovery and player-control tests cover the races.                                                                                                                     |
+| F08     | The visualizer owner destroys its renderer on unmount; `useMusicVisualizer.test.ts` covers lifecycle cleanup. Tauri Linux remains hidden under the user's frame-rate requirement.                                                                   |
+| F09     | Tauri external links go through the explicit opener bridge; `external-links.test.ts` ensures opener failures never navigate the app window.                                                                                                         |
+| F10     | Native OAuth linking is bound to the initiating user, server, and app; backend native-link API tests and Listen OAuth tests cover the handoff.                                                                                                      |
+| F11     | Last.fm uses an external browser and a session-bound native callback; `native-lastfm-oauth.test.ts` covers success, retry, cancellation, and stale-flow rejection.                                                                                  |
+| F12     | Playlist and Jam invitations use public share URLs; `share-url.test.ts`, playlist tests, and `JamSession.test.tsx` cover native/public origins.                                                                                                     |
+| F13     | Tauri downloads use temporary files, atomic promotion, failure cleanup, and orphan reconciliation; offline transfer and Rust storage tests cover partial files and interrupted promotion.                                                           |
+| F14     | Tauri transfer cancellation closes stalled requests and has idle/total deadlines; frontend transfer tests and Rust stalled-response tests cover cancellation and cleanup.                                                                           |
+| F15     | Offline validity includes delivered size and source fingerprint/version; `offline-native-assets.test.ts` covers changed-source replacement and preserving the old copy on failed promotion.                                                         |
+| F16     | Normal/single-instance activation restores and focuses the main window; Rust activation tests distinguish normal launch, deep links, and background media commands.                                                                                 |
+| F17     | Linux theme reads are asynchronous, cached, coalesced, and time-bounded; `linux_desktop_theme.rs` covers deadlines and stalled portal futures.                                                                                                      |
+| F18     | Windows SMTC resolves validated cached artwork with `StorageFile`/`CreateFromFile`; Windows media-control tests cover managed paths and stale thumbnail requests.                                                                                   |
+| F19     | Linux MPRIS artwork now uses the bounded native cache; Rust cache tests cover byte/entry limits, active-item protection, and evictions.                                                                                                             |
+| F20     | Release versions are resolved before packaging and inspected in platform artifact metadata; `desktop-version.node-test.mjs` covers version propagation and artifact verification, and the three-OS workflow passed on the code-equivalent revision. |
+
+## Follow-up validation — 2026-10-01
+
+### Linux WebKitGTK minimum runtime check
+
+The Linux `.deb` from [Build Desktop Apps workflow `36807020863`](https://github.com/thecrateapp/crate/actions/runs/36807020863), built from source revision `ac4a8c97b85c124d7ac1ccfb89fe0123ed3a187e`, was installed in an ephemeral Debian 12 amd64 container under OrbStack's x86_64 emulation. JavaScriptCoreGTK and WebKitGTK were both pinned to `2.40.3-2~deb12u2`; the app was started under a private D-Bus session and Xvfb with software rendering. The process exited before opening a window:
+
+```text
+crate-desktop: symbol lookup error: crate-desktop: undefined symbol: webkit_cookie_manager_get_all_cookies_finish
+```
+
+The API is available since WebKitGTK 2.42 according to the [WebKitGTK API reference](https://webkitgtk.org/reference/webkit2gtk/2.42.2/method.CookieManager.get_all_cookies_finish.html). Source inspection locates this import in Wry 0.57's WebKitGTK cookie enumeration implementation, which is wired into Tauri's runtime cookie getter. The app's direct `webkit2gtk` dependency enables `v2_40`, but that feature does not remove Wry's unconditional import. The `.deb` SHA-256 was `46e8edc536009c7795cbd9e0a2d3b0f656492f642b8f3ed38d6fc2850a7c178a`.
+
+This showed that the artifact built at that revision did not meet its published 2.40 minimum. C05 was failed for that artifact. Commit `44e69227` later vendored Wry and changed the cookie getter to resolve the 2.42 symbols dynamically; on older WebKitGTK, cookie enumeration now returns `NotSupported` instead of preventing the process from loading. The later artifact and 2.40.3 launch evidence are recorded below. This Xvfb run does not validate a normal Wayland or X11 desktop session.
+
+The performance and OAuth validation snapshot was updated against branch revision `cf8dcb271ed0dc465304107ebdd1f6a6ded9f711`. Application code remains at source revision `a587a15b`; commits `5db156a9`, `f8a32779`, and `cf8dcb27` add and harden the Windows install, launch, and uninstall smoke in the desktop CI workflow.
+
+- OAuth review follow-up: ran from the repository root in the prebuilt `musicdock-worker-test:local` image:
+
+  ```sh
+  docker run --rm --entrypoint python \
+    -v "$PWD":/workspace -w /workspace \
+    -e PYTHONPATH=/workspace/app musicdock-worker-test:local \
+    -m pytest app/tests/test_auth.py -k 'oauth or google' \
+    app/tests/test_native_oauth_exchange.py \
+    app/tests/test_native_oauth_link.py \
+    app/tests/test_native_oauth_link_api.py -q
+  ```
+
+  It passed **87 tests**, with 49 deselected. Google OAuth exchanges use Google's access token only for `userinfo`; provider refresh tokens are discarded, no provider token is persisted, and unlink does not call Google's revocation API. Crate session refresh JWTs are independent. The finding about loss of a Google refresh token does not describe a current app dependency; do not request offline access until a Google API/revocation use case exists.
+
+- Current PR checks on `cf8dcb27`: Listen frontend tests/build and desktop typecheck/tests, appearance, React Doctor, changed-Python security scan, and Review pull request passed. PR #259 remains a draft, so APK, backend quality/test shards/coverage, simulator builds, and the desktop pull-request build were skipped. Commits after application source revision `a587a15b` change only the desktop workflow and validation documentation; the broader OAuth subset was rerun against the unchanged application source.
+- Targeted OAuth review regressions were rerun against the unchanged application source at `700803d7`: three Google backend contract tests passed, `AuthCallback.test.tsx` passed 7/7, and `tauri-init.test.ts` passed 18/18. Together these cover Google identity scopes/provider-token handling, the Tauri HTTPS-fragment success handoff, callback conversion to the app deep link, and Tauri deep-link consumption. The persistent review still displays its two earlier OAuth observations; no new code review comments were added for this revision.
+- The manually dispatched [Build Desktop Apps workflow `36803358214`](https://github.com/thecrateapp/crate/actions/runs/36803358214) passed macOS, Linux, and Windows on branch revision `cf8dcb27`, whose application source is code-equivalent to `a587a15b`. Both macOS tester architectures and the Windows NSIS install/main-window/uninstall cleanup smoke passed. This does not test the Windows support floor, Developer ID notarization, real-player RSS, or installed upgrades. The desktop, Android, and simulator PR jobs were skipped because the PR remains a draft.
+- C04 remains partial: automated OAuth callback/exchange/link coverage and the earlier macOS login are verified; the updated deployed callback and installed OAuth flows on all three desktop operating systems are still open.
+- The macOS host is macOS 27.0.1 on Apple M5, not a support-floor or Intel host. A manual test app is currently running and was left untouched. Minimum-version acceptance, Windows supported-floor/upgrade checks, real-player RSS, signed release installation, Linux Wayland/player-route/offline checks, and upgrade from the previous Linux package remain open as described above.
+
+### Linux WebKitGTK 2.40.3 package and AppImage launches
+
+The manually dispatched [Build Desktop Apps workflow `36815596145`](https://github.com/thecrateapp/crate/actions/runs/36815596145) built the Linux bundle from `44e6922761f412798f6b3a337a167376ba30f503`; its Linux job and the WebKitGTK 2.40 symbol check passed. The downloaded `crate-linux-0.1.0.deb` has SHA-256 `d8ea548f3cbf1bf9dda78faca9caee3494f75d51fffe5a3c40f0e1bb059d0719` and declares `libwebkit2gtk-4.1-0 (>= 2.40.0)`.
+
+The `.deb` executable was extracted into the Debian 12 x86_64 test container. My first attempt loaded 2.40.3 libraries through `LD_LIBRARY_PATH` while WebKit launched the container's 2.50 helper executable from its compiled-in `/usr/lib` path; its WebProcess crashed, so that black-window capture was invalid and is not evidence against the package. I then installed the exact Debian 12 WebKitGTK and JavaScriptCoreGTK `2.40.3-2~deb12u2` packages into the isolated container and reran the executable under a private D-Bus session and Xvfb/X11 with software rendering. `dpkg-query` confirmed both versions; `/proc/<pid>/maps` confirmed `crate-desktop`, `WebKitWebProcess`, and `WebKitNetworkProcess` loaded `libwebkit2gtk-4.1.so.0.8.4` and `libjavascriptcoregtk-4.1.so.0.3.12` from `/usr/lib`. The 1280x820 Crate window rendered its server-setup screen and stayed alive through the 5-second smoke. This validates first-page rendering against the declared WebKitGTK 2.40 floor in Debian 12. It does not cover a physical Wayland/X11 desktop, installation on a minimum-distribution host, or installed-player behavior.
+
+The RPM payload was extracted with `rpm2cpio` and launched against the same installed 2.40.3 system runtime. Its 1280x820 Crate window rendered the server-setup screen; `/proc/<pid>/maps` confirmed both the app and `WebKitWebProcess` loaded `libwebkit2gtk-4.1.so.0.8.4` and `libjavascriptcoregtk-4.1.so.0.3.12` from `/usr/lib`. RPM SHA-256: `7349541a37e899a60bd268c22bdb173a57df93ba21a9e192fef9a0f17d1c4715`.
+
+The AppImage from the same workflow was extracted with its own runtime and launched under Xvfb. The server-setup screen rendered; `crate-desktop`, `WebKitWebProcess`, and `WebKitNetworkProcess` all mapped WebKitGTK/JavaScriptCoreGTK from the AppImage tree. Calling the bundled library's version function reported WebKitGTK `2.50.4`, so the 2.40 host-runtime floor applies to the `.deb` and RPM, while this AppImage smoke exercised its bundled WebKit stack. AppImage SHA-256: `51ca260721f7651710fdf061cfc4c256a278ad0b12a40895715d758cb891560b`.
+
+These later launches supersede the earlier 2.40.3 startup failure for the release artifact built before `44e69227`; the `.deb` and RPM from `44e69227` loaded and rendered with 2.40.3. C05 passes for those tested Linux artifacts and this Debian 12 x86_64 runtime. The result does not establish a physical Wayland/X11 desktop, another minimum distribution, or installed-player compatibility.
+
+### Exact-head Linux WebKitGTK 2.40.3 launch — `e8c8530d`, 2026-10-02
+
+The Linux `.deb` from exact-head [Build Desktop Apps run
+`36947461225`](https://github.com/thecrateapp/crate/actions/runs/36947461225)
+has SHA-256
+`325cf5da8af3a38c210754ceb9a8cdbb6cbd3b68f4fc1fea5d520e42eab80b08`. Its
+metadata requires `libwebkit2gtk-4.1-0 (>= 2.40.0)`. I installed it in the
+Debian 12 x86_64 WebKitGTK 2.40.3 test container and launched the packaged
+`/usr/bin/crate-desktop` for an eight-second smoke under Xvfb/X11, software
+rendering, and a private D-Bus session with isolated XDG directories. The
+container used `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1`; this is a library
+compatibility smoke, not a sandbox or physical desktop test.
+
+The app stayed alive, created a visible Crate window, and rendered the server
+setup screen. `dpkg-query` reported WebKitGTK and JavaScriptCoreGTK
+`2.40.3-2~deb12u2`; `/proc` mappings confirmed the app, WebKit web process, and
+WebKit network process loaded system WebKitGTK, while the web process loaded
+system JavaScriptCoreGTK. The app executable SHA-256 was
+`817b57a0c210fe9ac07b353061bef4579a61e544a4289f770d502c341feb16d3`. The
+captured [startup screenshot](measurements/tauri-c05-linux-deb-webkitgtk2403-2026-10-02.png)
+and [`deb` smoke record](measurements/tauri-c05-linux-deb-webkitgtk2403-2026-10-02.txt)
+preserve the visual and package evidence.
+
+This extends C05 to the exact-head Linux `.deb`. It still does not establish
+launch on a physical Wayland/X11 desktop, on a separate minimum-distribution
+host, or the installed player's offline, audio, or media-control behavior.
+
+The exact-head [AppImage from the same run](https://github.com/thecrateapp/crate/actions/runs/36947461225)
+was also extracted and launched in the Debian 12 container. Its visible Crate
+window stayed alive for eight seconds; the app and WebKit helpers mapped their
+libraries from the extracted AppImage tree, and the bundled version API
+reported WebKitGTK 2.50.4. Its SHA-256 is
+`4141f066b1a4e285f031ce01a28289a74014bfe04478dbddbf718d9dbdc21ebd`; raw
+details and the [startup screenshot](measurements/tauri-c05-linux-appimage-2026-10-02.png)
+are in
+[`tauri-c05-linux-appimage-2026-10-02.txt`](measurements/tauri-c05-linux-appimage-2026-10-02.txt).
+
+### R02 — Linux release-mode HTTP resource check — 2026-10-01
+
+A temporary measurement build was compiled from branch revision `a91cdfd5` with `cargo build --release --features tauri/custom-protocol --offline`. The temporary command and probe page were removed after the run. The executable had SHA-256 `fee07f94af0907aca6a18ccc47a2c66122fbc07c88ad710c49d7b57fb9bdcea3` and used isolated bundle identifier `app.cratemusic.crate.desktop.httpmeasurement20261001`; it was not installed from a `.deb` or RPM. It ran in the Debian 12 x86_64 container under Xvfb/X11 with software rendering. `dpkg-query` reported WebKitGTK and JavaScriptCoreGTK `2.40.3-2~deb12u2`, and `/proc` mappings showed the app and both WebKit helper processes loaded the system libraries.
+
+The Tauri `ResourceTable` baseline was zero. The same frontend HTTP plugin exercised 25 requests each for consumed 200, consumed 500, connection refused, bodyless 204, abort before response headers, and cancellation after the first streamed chunk. All 150 requests returned to zero resources, with no rejected scenario or test timeout. The per-request counts are preserved in [`tauri-r02-linux-resource-2026-10-01.json`](measurements/tauri-r02-linux-resource-2026-10-01.json).
+
+A 20-second sampler at 100 ms intervals recorded RSS separately for the app and WebKit helpers. After excluding zero-RSS zombie rows, median/p95/maximum RSS was 196.1/197.1/197.1 MiB for `crate-desktop`, 286.4/297.9/298.5 MiB for `WebKitWebProcess`, and 56.4/56.5/56.5 MiB for `WebKitNetworkProcess`. The raw sample is [`tauri-r02-linux-rss-2026-10-01.csv`](measurements/tauri-r02-linux-rss-2026-10-01.csv); its columns are Unix epoch nanoseconds, PID, parent PID, RSS KiB, and process name. This short synthetic run measures the isolated probe page, not real playback or API traffic. It does not close the Windows package check or validate a physical Linux desktop session.
+
+### R02 — Windows packaged probe initialization — 2026-10-01
+
+The exact-head [Build Desktop Apps run](https://github.com/thecrateapp/crate/actions/runs/36866367072) built all three desktop targets. Linux and macOS passed; Windows built the probe, installed and launched the app smoke bundle, and uninstalled it. Its separate release-mode HTTP probe started WebView2 and reached `PageLoadEvent::Finished`, but timed out after 90 seconds with no fixture requests (`requestHits: {}`). A Rust-injected call to `record_probe_diagnostic` succeeded (`native-eval-bridge-available`), so the WebView and Tauri invoke bridge are available even though the frontend probe does not start. The full failure record is [`tauri-r02-windows-resource-2026-10-01.json`](measurements/tauri-r02-windows-resource-2026-10-01.json).
+
+The follow-up exact-head [Build Desktop Apps run](https://github.com/thecrateapp/crate/actions/runs/36869660492) identified the cause: `document.title` was `Crate`, `#status` was absent, and the loaded resource list contained the production Listen bundles. The source passed a custom-named file to `generate_context!`, but Tauri reads `tauri.conf.json` from that file's directory, so it silently selected the product config and bundled app frontend. The probe config now lives at `http-resource-probe/tauri.conf.json`, with the probe frontend path relative to that directory and the Tauri IPC origin allowed in its CSP. The Windows runner also fails fast if diagnostics show the wrong document. The CI failure record is [`tauri-r02-windows-resource-2026-10-01-run-36869660492.json`](measurements/tauri-r02-windows-resource-2026-10-01-run-36869660492.json).
+
+The next [Build Desktop Apps run](https://github.com/thecrateapp/crate/actions/runs/36874549657) exposed a build-order dependency: Cargo tests compile the example, so the probe frontend must exist before `cargo test`. The workflow now builds that frontend before native tests on all three runners. At source SHA `bbc6a6b6`, run [36875635665](https://github.com/thecrateapp/crate/actions/runs/36875635665) loaded the expected isolated page (`title=Crate HTTP resource probe`, `#status` present) and completed all 25 iterations of all six scenarios, but reported a false failure for every `connection-refused` request. The sender correctly rejected each request; the probe incorrectly treated that expected rejection as a scenario error. The failure artifact is [`tauri-r02-windows-resource-2026-10-01-run-36875635665.json`](measurements/tauri-r02-windows-resource-2026-10-01-run-36875635665.json). Added an explicit rejection assertion and a two-case regression test.
+
+The exact-head [Build Desktop Apps run](https://github.com/thecrateapp/crate/actions/runs/36878973875) passed on SHA `2014dec4` for macOS, Windows, and Linux. Windows ran the probe beside the installed bundle: its report has `status=passed`, a zero `ResourceTable` baseline, no failures, and 25/25 completions for each scenario. Fixture hit counts match all expected requests, the document diagnostics identify the probe page, and no unexpected Windows application events or loader import failures were recorded. The successful measurement is [`tauri-r02-windows-resource-2026-10-01-run-36878973875.json`](measurements/tauri-r02-windows-resource-2026-10-01-run-36878973875.json). This closes the Windows CI probe and C06 on this SHA; it does not validate Windows 10 1803 or a user's installed hardware/runtime.
+
+### Exact-head CI revalidation — 2026-10-01
+
+The application source revision validated here is `d482a7392c5eb42f820535e77197aa2a4217aedc`. Its manually dispatched [Build Desktop Apps run 36894639856](https://github.com/thecrateapp/crate/actions/runs/36894639856) passed on macOS, Windows, and Linux. This run used the default workflow inputs; it did not repeat the opt-in production API sample. The Windows HTTP resource probe completed successfully alongside the bundle and artifact checks.
+
+On the same SHA, [Frontend Tests run 36893043933](https://github.com/thecrateapp/crate/actions/runs/36893043933) passed both `test` and `appearance-chromium`; [React Doctor run 36893044043](https://github.com/thecrateapp/crate/actions/runs/36893044043), [Backend Tests security scan 36893044065](https://github.com/thecrateapp/crate/actions/runs/36893044065), and [PR Agent Review run 36893039873](https://github.com/thecrateapp/crate/actions/runs/36893039873) also passed. PR #259 remains a draft, so its desktop, Android, backend quality, test-shard, and coverage jobs are skipped rather than failed. The manual matrix supplies the current three-OS desktop build evidence; minimum-host, real-player, signed-release, and upgrade gates remain open.
+
+To validate the draft-skipped jobs without changing PR state, manually dispatched [Backend Tests run 36897854291](https://github.com/thecrateapp/crate/actions/runs/36897854291) and [Build Android run 36897854429](https://github.com/thecrateapp/crate/actions/runs/36897854429) on the same SHA. Backend security, quality, all eight test shards, and coverage passed. Android typecheck, lint, mobile contract/build-script tests, bundle budget, and Android lint/unit tests passed. The branch run did not assemble an APK: signed release packaging and GitHub Release attachment are tag-gated, and no release was published.
+
+The earlier three-OS failure in [Build Desktop Apps run 36874549657](https://github.com/thecrateapp/crate/actions/runs/36874549657) was a shared build-order defect: `cargo test` compiled `http_resource_probe` before its `frontendDist` had been generated. Commit `bbc6a6b6` added the frontend build before Rust tests. A later Windows-only failure in [run 36875635665](https://github.com/thecrateapp/crate/actions/runs/36875635665) came from the probe treating expected connection-refused responses as failures; commit `2014dec4` corrected that assertion, and exact-head desktop matrices have since passed. These historical failures are resolved on the current branch.
+
+### R12 telemetry review — 2026-10-01
+
+The native Sentry client disables default PII and applies `scrub_native_event`: it removes user, request, server, message, stack, breadcrumb, context, and extra data; keeps only allowlisted `service`/`operation` tags; and replaces exception details with a generic value. `safe_operation` rejects labels containing arbitrary payloads. The unit tests in `observability.rs` verify URL, path, secret, and error-payload removal.
+
+The Tauri auth diagnostic accepts bounded status/detail labels and rejects URLs, deep links, OAuth codes/state/verifiers, credentials, and user paths; the corresponding tests cover both newly recorded and persisted records. `tauri-init.ts` logs fixed OAuth status labels and URL counts and uses a generic catch message. The inspected auth and secure-storage error paths do not attach raw errors, deep-link URLs, or tokens to telemetry. Existing frontend and desktop CI runs on `d482a739` passed these suites.
+
+There are still local `eprintln!` calls for Linux deep-link and desktop-file registration that format the OS error. Those messages are not sent through Sentry; a filesystem error can include the user's local path. Keep that distinction explicit if local logs are ever collected centrally, and scrub paths before forwarding them.
+
+### OAuth review and current CI status — 2026-10-01
+
+The current application source revision is `a230ad67e619c0438813cb22861be6e3f6a637f5`. The latest persistent review questioned whether native OAuth denial callbacks use a different redirect contract from successful Tauri callbacks. The difference is intentional: denial has no handoff code and returns to the registered `cratemusic://oauth/callback` or `cratemusic://oauth/link-callback` deep link with `error=cancelled`; the app consumes that query, clears the pending state, and records cancellation. Successful Tauri login uses the HTTPS completion page because it carries the short-lived handoff code. Backend denial tests and `capacitor-oauth.test.ts` cover the emitted and consumed cancellation callbacks; `tauri-init.test.ts` verifies cancellation is not treated as login success. The change in `app/crate/api/auth.py` documents this distinction.
+
+The same review noted import ordering in `app/crate/api/playlists.py`. The import block is now Ruff-isort sorted. Ruff `check`, `check --select I`, and `format --check` passed locally; the commit hooks also passed.
+
+The review also questioned whether clients prepend their origin to the now-absolute invitation URLs. Inspection of every consumer found no double-origin path: the Crate editor resolves `join_url` with the standard `URL(input, base)` constructor, which preserves an absolute input; Playlist and Jam consumers use `publicShareUrl`, which returns absolute HTTP(S) inputs unchanged. Backend tests assert `join_url` and `qr_value` match the configured public URL for Playlist and Jam. Added a component regression for the Crate editor's absolute invitation URL; `CrateEditor.test.tsx` and `share-url.test.ts` pass 10/10 together, and Listen typecheck passes.
+
+On this exact source revision, [Backend Tests run 36901635103](https://github.com/thecrateapp/crate/actions/runs/36901635103) passed security, quality/typecheck, all eight test shards, and coverage. [Frontend Tests run 36901628805](https://github.com/thecrateapp/crate/actions/runs/36901628805) passed `test` and `appearance-chromium`; [React Doctor run 36901629158](https://github.com/thecrateapp/crate/actions/runs/36901629158) and [PR Agent Review run 36901625727](https://github.com/thecrateapp/crate/actions/runs/36901625727) also passed. The PR-triggered backend quality, shards, and coverage, plus Android, iOS, and desktop jobs, are skipped because PR #259 remains a draft. They are skipped, not failed; the manual backend run above exercised the backend gates on this exact SHA.
+
+### AppImage WebKit payload guard and exact-head CI — 2026-10-01
+
+The support reference now distinguishes host WebKitGTK for DEB/RPM from the bundled runtime in AppImage. The AppImage from Build Desktop Apps run `36815596145` has SHA-256 `51ca260721f7651710fdf061cfc4c256a278ad0b12a40895715d758cb891560b`; extracting that exact artifact confirmed `libwebkit2gtk-4.1.so.0`, `libjavascriptcoregtk-4.1.so.0`, `WebKitWebProcess`, and `WebKitNetworkProcess` are present in its payload. The earlier Xvfb launch recorded above confirmed that artifact loaded WebKitGTK 2.50.4 from its bundle.
+
+Commit `d8c224aa7f8de6229f41ede51dc40b60e621eed7` makes the artifact verifier reject an AppImage missing those runtime libraries or helper processes. The focused desktop version suite passed 15/15; the docs site build and integrity check passed (41 canonical documents); Prettier and `git diff --check` passed.
+
+The exact-head [manual Build Desktop Apps run `36905646310`](https://github.com/thecrateapp/crate/actions/runs/36905646310) passed on macOS, Windows, and Linux. The Linux job exercised the new AppImage payload assertion; the Windows HTTP resource probe, installer launch, and cleanup also passed. PR-triggered [Frontend Tests `36905582313`](https://github.com/thecrateapp/crate/actions/runs/36905582313), [React Doctor `36905582514`](https://github.com/thecrateapp/crate/actions/runs/36905582514), [Backend Tests security scan `36905582507`](https://github.com/thecrateapp/crate/actions/runs/36905582507), and [PR Agent Review `36905577526`](https://github.com/thecrateapp/crate/actions/runs/36905577526) passed. Backend quality, test shards, and coverage, plus Android, iOS, and the PR-triggered desktop matrix, remain skipped while PR #259 is a draft; none of these checks failed.
+
+### Exact-head pull-request checks — 2026-10-01
+
+At branch head `b08739fbce44465ec7f325a5b0607c38d7994b26`, [Frontend Tests run `36907870707`](https://github.com/thecrateapp/crate/actions/runs/36907870707) passed both the full `test` job (9m14s) and `appearance-chromium`. [React Doctor run `36907870748`](https://github.com/thecrateapp/crate/actions/runs/36907870748), [Backend Tests security scan run `36907870834`](https://github.com/thecrateapp/crate/actions/runs/36907870834), and [PR Agent Review run `36907864561`](https://github.com/thecrateapp/crate/actions/runs/36907864561) also passed. Backend quality, test shards, coverage, Android, iOS, and the PR-triggered desktop matrix were skipped because PR #259 remains a draft; none of the checks on this head failed. This head differs from `d8c224aa` only in validation documentation, so the manual three-OS desktop build and artifact checks remain code-equivalent evidence, not a fresh build of this documentation-only revision.
+
+### Capacitor mobile revalidation — 2026-10-01
+
+Manual [Build Android run `36911039525`](https://github.com/thecrateapp/crate/actions/runs/36911039525) and [Build iOS run `36911039628`](https://github.com/thecrateapp/crate/actions/runs/36911039628) both passed on branch SHA `0c9f28f111c681cd24548a5e677c505f18787027`. Android passed Listen typecheck and lint, mobile bridge/offline/session contracts, mobile build-script tests, secure release configuration, the Capacitor web bundle and budget, Android lint, and Android unit tests. iOS passed bridge contracts, secure release configuration, bounded artwork decoding, secure-session Keychain round trip, offline integrity, media-session interruption and artwork tests, Capacitor bundle sync, locked CocoaPods install, and the iOS simulator build. These exact-head workflow-dispatch runs validate web/Capacitor preservation and native build contracts; they do not replace physical-device acceptance or the installed Tauri player checks. Signed Android release and store publication steps did not run on this branch dispatch.
+
+### Focused local regression revalidation — `ea1268db`
+
+On the current macOS 27.0.1 ARM64 host, focused Listen regressions passed: 6 files / 33 tests covering runtime separation, the Linux-Tauri-only visualizer gate, visualizer cleanup, offline asset lifecycle, and playback platform integrations. Listen and desktop TypeScript checks passed; Desktop Vitest passed 8 files / 48 tests; the desktop version/artifact verifier passed 15/15; the Linux GLIBC verifier passed 4/4; `cargo test --locked --manifest-path app/listen-desktop/src-tauri/Cargo.toml` passed 50/50, and `cargo clippy --locked --all-targets --manifest-path app/listen-desktop/src-tauri/Cargo.toml -- -D warnings` passed. The Rust tests include macOS Now Playing state and artwork callback lifetime coverage. Clippy reports existing warnings in vendored Wry, while the application crate passes with warnings denied. These checks ran against the current branch head, whose application source matches the three-OS build at `d8c224aa`; later commits only update validation documentation.
+
+An interactive manual-test bundle was already running, so this pass did not launch another Tauri window or send playback/media commands. C03 and C07 remain partial: their native unit coverage passes, but installed Now Playing controls, real playback, and artwork delivery were not re-tested in the running app. This host is not the macOS 11 or Intel acceptance target. The checks establish that shared web/Capacitor runtime behavior was not changed by the Tauri/Linux visualizer gate; they do not replace the installed Capacitor device checks recorded above.
+
+### Current-HEAD workflow-dispatch revalidation — `79258d93`
+
+The commit is documentation-only; the Tauri application source is unchanged from `d8c224aa`. I manually dispatched the desktop, backend, and Android workflows because PR #259 is a draft and its PR-triggered equivalents skip those jobs.
+
+- [Build Desktop Apps run `36918291667`](https://github.com/thecrateapp/crate/actions/runs/36918291667) passed Linux, Windows, and macOS. The Linux job passed GLIBC/WebKitGTK symbol and artifact-version checks; macOS passed ARM64 and Intel tester-bundle checks; Windows passed bundle-version checks plus NSIS install, launch, and uninstall smoke.
+- The Windows packaged HTTP resource probe passed on Windows Server 2025. Its report records 25 repetitions for each of six scenarios, zero baseline resources, no failures, and exit code 0. The raw report is [`tauri-r02-windows-resource-2026-10-01-run-36918291667.json`](measurements/tauri-r02-windows-resource-2026-10-01-run-36918291667.json). This is packaged CI evidence, not a Windows 10 1803 host run.
+- [Backend Tests run `36918621570`](https://github.com/thecrateapp/crate/actions/runs/36918621570) passed the security scan, quality checks, all eight test shards, and coverage.
+- [Build Android run `36918621533`](https://github.com/thecrateapp/crate/actions/runs/36918621533) passed `build-apk` on this branch. The [Frontend Tests run `36917279966`](https://github.com/thecrateapp/crate/actions/runs/36917279966), [React Doctor run `36917280056`](https://github.com/thecrateapp/crate/actions/runs/36917280056), and PR-triggered backend security scan also passed.
+- PR-triggered desktop, Android, backend quality, test shards, and coverage were skipped because the PR is a draft; they were not failures. PR Agent Review run `36917274621` was cancelled at its configured 15-minute limit and produced no new review comments.
+
+These runs close current-HEAD automated build/test evidence for C06 and revalidate web/Capacitor build contracts. They do not close exact-minimum-host, signed/notarized release, upgrade, deployed OAuth, installed Now Playing/artwork, or real-player RSS gates.
+
+### Exact-head Windows offline measurement and desktop matrix — `fdff630d`
+
+The PR review initially showed skipped Android/backend/desktop jobs because PR #259 is still a draft; these were not failed jobs. The manually dispatched [Build Desktop Apps run `36930987123`](https://github.com/thecrateapp/crate/actions/runs/36930987123) completed successfully on macOS, Linux, and Windows at source SHA `fdff630d393f566df7c28b6eb68ec07d84116fba`. On Windows, the offline measurement probe completed, uploaded its report, and the bundle/build diagnostics passed. The raw Windows R03–R05 capture is [`tauri-r03-r05-offline-windows-2026-10-01-run-36930987123.json`](measurements/tauri-r03-r05-offline-windows-2026-10-01-run-36930987123.json); see the [desktop results](tauri-linux-desktop-results-2026-09-30.md#windows-server-2025-synthetic-revalidation--2026-10-01) for recalculated timing summaries.
+
+The same revision's active PR checks passed: frontend tests and Chromium appearance, React Doctor, the Python security scan, and PR Agent Review. PR-triggered backend quality, test shards, coverage, Android, iOS, and desktop matrix were skipped because the PR is a draft. These are pending PR activation, not failures.
+
+The captured raw samples validate against the capture schema and match the successful run. Its aggregate `minMs` summary fields have a known q=0 bug from that source revision; this validation record derives minima directly from the raw samples. The percentile helper was corrected afterward and has a regression test. This hosted synthetic probe does not replace real download cadence, installed-player, minimum-Windows-version, or user-library acceptance.
+
+### Exact-head CI and corrected Windows measurement — `995eb81d`
+
+The percentile fix, its regression test, and the validation updates are committed as `995eb81d5704afbda90f5036e1eb506085b4c3cb` on `feat/tauri-desktop-app`.
+
+- The exact-head [Build Desktop Apps run `36935505561`](https://github.com/thecrateapp/crate/actions/runs/36935505561) passed on macOS, Linux, and Windows. Windows also completed the offline probe with all summaries matching their raw samples, passed the NSIS install/launch smoke, and passed the HTTP resource probe.
+- The exact-head [Build Android run `36934939763`](https://github.com/thecrateapp/crate/actions/runs/36934939763) passed `build-apk`, including Listen typecheck/lint, mobile contracts, secure configuration, Capacitor bundle/budget, and Android lint/tests. Signed release APK/AAB creation remains tag-only and was skipped on this branch dispatch.
+- PR-triggered [Frontend Tests run `36933934877`](https://github.com/thecrateapp/crate/actions/runs/36933934877), [React Doctor run `36933934692`](https://github.com/thecrateapp/crate/actions/runs/36933934692), [Backend Tests security scan run `36933934790`](https://github.com/thecrateapp/crate/actions/runs/36933934790), and [PR Agent Review run `36933932400`](https://github.com/thecrateapp/crate/actions/runs/36933932400) passed.
+- The PR-triggered desktop matrix, Android job, iOS simulator, backend quality, test shards, and coverage show **skipped** because PR #259 is still a draft; none of them are failed. The manual desktop and Android runs above exercised those platform build paths on this exact SHA. Backend quality and test shards did not run on this SHA, and no backend code changed in this follow-up.
+
+This closes the current desktop matrix and Windows synthetic R03–R05 workflow failures. It does not close real download cadence, installed-player acceptance, signed/notarized release, minimum-OS hosts, or the other release gates listed above.
+
+### Exact-head draft workflow revalidation — `7a42e029`
+
+PR #259 remains a draft. Its latest pull-request checks show Frontend Tests,
+React Doctor, changed-Python security, and PR Agent Review as passed. The
+Backend Tests quality/shards/coverage jobs, Android `build-apk`, iOS simulator,
+and desktop matrix are skipped by their explicit draft guards; they are not
+failed checks. To validate those paths without changing the PR state, the
+following workflows were manually dispatched on exact head
+`7a42e029cab81bb115df07c7cd55df0d730e7b03`:
+
+- [Backend Tests run `36939011439`](https://github.com/thecrateapp/crate/actions/runs/36939011439): quality, security scan, all eight test shards, and coverage passed.
+- [Build Android run `36939011453`](https://github.com/thecrateapp/crate/actions/runs/36939011453): `build-apk` passed.
+- [Build Desktop Apps run `36939011731`](https://github.com/thecrateapp/crate/actions/runs/36939011731): Linux, macOS, and Windows passed, including their configured artifact and native probe checks.
+
+This closes the exact-head automated workflow evidence for C06 and the backend,
+Android, and desktop CI paths. Manual dispatch does not change the skipped
+pull-request check conclusions. Exact minimum-OS installations, signed release
+upgrades, OAuth on the deployed callback and all three desktop OSes, installed
+Now Playing/artwork behavior, and real-player RSS/offline acceptance remain
+open.
+
+### Focused offline-transfer audit — macOS 27.0.1 arm64, `2c06f777`
+
+The F13/F14 transfer and cleanup suites passed on the current source: Rust
+`cargo test --lib offline_storage::tests` passed 13/13, and the Listen Vitest
+files `offline-native-assets.test.ts` plus `offline-tauri-transfer.test.ts`
+passed 14/14. This covers interrupted promotion recovery, orphan cleanup,
+stalled-response cancellation, idle/total deadlines, and frontend cleanup when
+a profile is cancelled.
+
+R08 remains partial on this host. The expected `test-music` directory is absent
+from the checkout and `rg --files` found no local audio fixtures, so no real
+track RSS run was attempted. Synthetic WAV measurements do not close the
+real-player acceptance gate; it still needs a nominated local long-track
+fixture and playback/race measurements.
+
+### Exact-head cross-platform CI — `e8c8530d`, 2026-10-02
+
+The branch was still a draft, so pull-request-triggered platform jobs were
+skipped. Manual runs on exact head `e8c8530d08862f992ead217eab21b9e3e3c650fb`
+completed successfully:
+
+- [Build Desktop Apps run `36947461225`](https://github.com/thecrateapp/crate/actions/runs/36947461225): Linux, Windows, and macOS passed, including Linux ABI/artifact checks, macOS ARM64 and Intel tester bundles, Windows install/launch/uninstall smoke, and the Windows HTTP resource probe.
+- [Build Android run `36947461063`](https://github.com/thecrateapp/crate/actions/runs/36947461063): Listen typecheck/lint, mobile contracts, Capacitor bundle and budget, Android lint, and Android tests passed. Tag-only signed release outputs were skipped as expected.
+- [Build iOS run `36947460876`](https://github.com/thecrateapp/crate/actions/runs/36947460876): iOS bridge/offline/media-session contracts, Capacitor bundle sync, CocoaPods dependency installation, and simulator build passed.
+
+Metadata inspected in these exact-head artifacts declares `LSMinimumSystemVersion=11.0` in both macOS tester bundles, `libwebkit2gtk-4.1-0 (>= 2.40.0)` in the Debian package, and `webkit2gtk4.1 >= 2.40.0` in the RPM. This validates the published declarations, not runtime behavior on those minimum hosts.
+
+This confirms exact-head automated build coverage for C06 and revalidates the
+web/Capacitor build paths. It does not replace real Windows 10 1803 or macOS 11
+hosts, normal Linux desktop sessions, signed/notarized release installation,
+upgrades, or installed-player acceptance.
+
+### Exact-head CI revalidation — `c4e3b5d1`, 2026-10-02
+
+PR #259 remains a draft, so its Android `build-apk`, iOS `simulator`, desktop
+matrix, and backend `quality`, test shards, and coverage checks are skipped on
+the pull-request event. They were manually validated on exact HEAD
+`c4e3b5d125900f11389785d236241f2aaa2d1e31`:
+
+- [Build Desktop Apps run `36951961797`](https://github.com/thecrateapp/crate/actions/runs/36951961797) passed macOS, Linux, and Windows. It built both macOS tester bundles, passed Linux ABI/artifact checks, and on Windows passed NSIS install/window/uninstall plus the packaged HTTP resource probe.
+- [Backend Tests run `36953300234`](https://github.com/thecrateapp/crate/actions/runs/36953300234) passed security, quality/typecheck/Ruff, all eight test shards, and coverage.
+- [Build Android run `36953300457`](https://github.com/thecrateapp/crate/actions/runs/36953300457) passed Listen typecheck/lint, mobile contracts, Capacitor bundle and budget, Android lint, and Android tests. Tag-only signed release outputs were skipped as expected.
+- [Build iOS run `36953300123`](https://github.com/thecrateapp/crate/actions/runs/36953300123) passed bridge contracts, secure configuration, native iOS tests, and simulator build.
+- Current-head PR checks passed: [Frontend Tests `36951781891`](https://github.com/thecrateapp/crate/actions/runs/36951781891) including `test` and `appearance-chromium`, [React Doctor `36951781896`](https://github.com/thecrateapp/crate/actions/runs/36951781896), changed-Python security scan `36951781904`, and [PR Agent Review `36951779630`](https://github.com/thecrateapp/crate/actions/runs/36951779630).
+
+This closes current-head automated build/test evidence for C06 and revalidates
+the web/Capacitor paths without changing the PR's draft state. It does not close
+minimum-OS, installed-player, signed-release, or upgrade acceptance.
+
+### Current exact-head matrix and Windows RSS repeat — `a672a99e`, 2026-10-02
+
+The [Build Desktop Apps run `36957591905`](https://github.com/thecrateapp/crate/actions/runs/36957591905)
+passed on exact HEAD `a672a99e368655d1f0833f3d2e560e2a688898c7` for macOS,
+Linux, and Windows. It passed macOS ARM64/Intel tester builds, Linux
+GLIBC/WebKitGTK/artifact checks, and Windows artifact verification,
+installation, launch, uninstallation, and the packaged HTTP resource probe
+(25 iterations each across six scenarios; zero resource baseline and no
+failures). The same Windows runner completed the new three-run WebView2 audio
+RSS capture recorded above.
+
+At that head, pull-request Frontend Tests (`36956826872`), appearance
+(`36956826872`), React Doctor (`36956826845`), changed-Python security scan
+(`36956826830`), and PR Agent Review (`36956824205`) passed. Android, iOS, and
+backend quality/test-shard/coverage checks were skipped because this commit
+only changed documentation and the PR remains a draft; they were not failed.
+The code source is unchanged from the full platform/backend/Android/iOS
+validation at `c4e3b5d1` above. This closes exact-head C06 automated evidence,
+not installed support-floor hosts, signed upgrades, real-player behavior, or
+the Mac interactive gates.
+
+### Current pull-request checks — `a61b48a5`, 2026-10-02
+
+The current PR head `a61b48a5119a63f0696acbdbb0219fca036acd9c` passed
+[Frontend Tests](https://github.com/thecrateapp/crate/actions/runs/36959792379)
+(both `test` and `appearance-chromium`), [React Doctor](https://github.com/thecrateapp/crate/actions/runs/36959792420),
+the changed-Python security scan in [Backend Tests](https://github.com/thecrateapp/crate/actions/runs/36959792431),
+and [PR Agent Review](https://github.com/thecrateapp/crate/actions/runs/36959790296).
+The backend quality/test/coverage jobs, Android `build-apk`, iOS simulator,
+and PR desktop matrix were skipped by the draft guards; they were not failures.
+This commit changed validation documents and the Windows RSS record only, so
+the code-equivalent desktop matrix at `a672a99e` remains the latest platform
+build evidence. It does not close installed acceptance gates.
+
+### Current exact-head CI — `94198f48`, 2026-10-02
+
+PR #259 head `94198f48c302bf67895fbc9721563b0c1b805bcf` passed [Frontend
+Tests](https://github.com/thecrateapp/crate/actions/runs/36961211602): the full
+`test` job completed in 9m38 and `appearance-chromium` passed. [React
+Doctor](https://github.com/thecrateapp/crate/actions/runs/36961211550), the
+changed-Python security scan in [Backend
+Tests](https://github.com/thecrateapp/crate/actions/runs/36961211496), and
+[PR Agent Review](https://github.com/thecrateapp/crate/actions/runs/36961209185)
+also passed. The PR-triggered desktop matrix, Android `build-apk`, iOS
+simulator, and backend quality/test-shard/coverage jobs were skipped under the
+draft/path guards; none were red. The diff from `c4e3b5d1` to this head contains
+no application or workflow changes, so the exact-head desktop, Android, iOS,
+and full backend evidence at `c4e3b5d1` remains code-equivalent. Minimum-host,
+installed-player, signed-release, and upgrade acceptance remains open.
+
+### Current-head pull-request checks — `fdff74f2`, 2026-10-02
+
+At PR head `fdff74f21947b39cdfeb40395445e6d4695b7020`, Frontend Tests passed
+the full test job and `appearance-chromium` ([run `36962124284`](https://github.com/thecrateapp/crate/actions/runs/36962124284));
+React Doctor ([`36962124302`](https://github.com/thecrateapp/crate/actions/runs/36962124302)),
+the changed-Python security scan ([`36962124268`](https://github.com/thecrateapp/crate/actions/runs/36962124268)),
+and PR Agent Review ([`36962122257`](https://github.com/thecrateapp/crate/actions/runs/36962122257))
+also passed. Android `build-apk`, iOS simulator, the PR desktop matrix, backend
+quality, test shards, and coverage were skipped by the draft/path guards; none
+were failures. From `c4e3b5d1` to this head, the diff contains only validation
+documents and measurement data, so the exact-head full desktop/backend/mobile
+workflow results recorded above remain code-equivalent.
+
+### macOS live playback smoke — 2026-10-02
+
+On the macOS 27.0.1 Apple M5 host, the running `Crate Manual Test` debug bundle
+had the Placebo track “Bionic” loaded with its artwork, FLAC 16/44.1 metadata,
+and a five-minute duration. The Play control changed the accessible state from
+paused to “Now playing” with a Pause control; toggling it again returned the
+app to paused. The app volume was restored to its initial value of 80 after the
+brief smoke. The media-state and artwork callback runtime code in this bundle
+matches the current source; the later macOS-only source difference was a
+timeout adjustment in a Rust test.
+
+This confirms basic playback and in-app artwork rendering for C03/C07. It does
+not verify the macOS Control Center/Now Playing surface, external remote-command
+delivery, or artwork delivery to that surface, so both gates remain partial.
+
+### R08 — macOS real-player long-track capture (partial) — 2026-10-02
+
+On the same Mac17,2 / macOS 27.0.1 host, the already-running `Crate Manual
+Test` debug bundle played a real library track reported as 17:23, FLAC
+24-bit/88.2 kHz, with another 17:45 track next in its queue. The bundle's
+exact source revision was not independently established, and this was not a
+fresh launch or installed release. The app was paused by the end of capture;
+the exact active-versus-paused boundary is unknown, so these are partial
+real-player observations rather than a continuous active-playback soak.
+
+The 120-second `ps` capture sampled four processes at nominal 250 ms intervals
+(390 samples per process). RSS min / median / max was 24.0 / 32.9 / 56.2 MiB
+for `crate-desktop`, 20.0 / 28.5 / 149.9 MiB for WebKit WebContent, 18.7 /
+21.1 / 44.3 MiB for WebKit GPU, and 5.6 / 7.6 / 9.8 MiB for WebKit Networking.
+The sum of these process RSS values was 69.8 / 93.0 / 230.5 MiB; this sum may
+count shared pages more than once.
+
+An overlapping 90-second Apple `footprint` capture produced 181 samples. Its
+WebContent `phys_footprint` was 1,498.8 / 1,500.9 / 1,588.6 MiB (min / median
+/ max), while the process-group reported total footprint was 1,764.1 / 1,766.1
+/ 1,862.7 MiB and swapped pages were 1,455.3 / 1,547.1 / 1,575.7 MiB. The
+WebContent lifetime `phys_footprint_peak` was 2,856 MiB; this peak predates
+the capture and cannot be attributed to this playback. The host had 16 GiB
+RAM and system-wide swap was already heavily used when checked after capture;
+there is no before-test system baseline to attribute that pressure to Crate.
+
+The contrast between low `ps` RSS and high native footprint / swapped pages is
+a serious memory-pressure signal, but it does not prove a leak or establish a
+fallback threshold. Keep current audio behavior while collecting clean,
+fresh-process repetitions with phase boundaries for active playback, preload,
+track transition, and buffer release on macOS, Windows, and Linux. The raw
+captures are [`tauri-r08-macos-real-player-rss-2026-10-02.csv`](measurements/tauri-r08-macos-real-player-rss-2026-10-02.csv)
+and [`tauri-r08-macos-real-player-footprint-2026-10-02.json`](measurements/tauri-r08-macos-real-player-footprint-2026-10-02.json).
+
+### Persistent-review recheck — `41b80711`, 2026-10-02
+
+The PR Agent Review workflow completed successfully on this head. Its
+persistent summary repeated the Google refresh-token concern and a possible
+`AttributeError` in `get_followed_artist_genre_names`:
+
+- The Google concern is not a current dependency. The provider request asks
+  only for `openid email profile`; `_google_userinfo` uses the access token for
+  Google's user-info endpoint and returns that profile. The callback persists
+  identity metadata, not provider tokens. The existing tests listed in
+  “Persistent review — Google offline access” verify the request parameters
+  and that provider refresh tokens are not exposed or stored.
+- The `AttributeError` concern is contradicted by the current implementation
+  in [`home_catalog.py`](../../app/crate/db/queries/home_catalog.py): the
+  function enters `optional_scope(session) as s` and uses `s.execute()` for its
+  query. Its caller in [`home_context.py`](../../app/crate/db/home_context.py)
+  passes the current session explicitly. There is no `session.execute()` after
+  the scope variable was renamed, so the reported `None.execute()` path is not
+  present.
+
+The current PR run's frontend test and Chromium appearance jobs were still in
+progress at this audit; the security scan, React Doctor, and PR Agent Review
+had passed. Desktop, Android, iOS, and the full backend test jobs were skipped
+by the PR draft guards, not reported as failures.
+
+### Persistent-review follow-up — `7469bf71`, 2026-10-02
+
+The next persistent PR review, updated through `0cdddca0`, correctly identified
+that `auth.getSession` failures had lost the HTTP status and Last.fm error
+details after the strict native path was introduced. Commit `7469bf71` restores
+those diagnostics in `lastfm_get_session_strict`, so both native and legacy
+callers log them once. Provider messages are whitespace-normalized, capped at
+160 characters, and redact the API key, API secret, and auth token; request
+exception text and URLs are not logged.
+
+Regression tests first failed against the old logging and now verify status,
+provider code/message, credential redaction, and the single log record through
+the legacy wrapper. `test_scrobble_lastfm.py` passes 17/17, and the repository
+pre-commit Ruff and formatting hooks pass. The separate Google refresh-token
+finding remains non-applicable: the Google flow requests identity scopes and
+does not persist provider tokens.
+
+### Persistent-review follow-up — `5c3e4ca3`, 2026-10-02
+
+The review found a real compatibility risk in changing invite `join_url` and
+`qr_value` from relative to absolute URLs: older clients may already prepend
+the configured public origin. The API now preserves both legacy fields as
+relative values and adds optional `public_url` for clients that need a fully
+qualified link. The Listen app's `inviteShareUrl` prefers `public_url` and
+falls back to deriving the public URL from the relative `join_url`, preserving
+support for older API responses and custom public path prefixes.
+
+Regression coverage passes for the API and schema contract (4 Python tests),
+and the affected Listen share, jam-session, playlist, and crate tests pass
+(132 Vitest tests). Listen typecheck, ESLint, and production build pass; the
+build retains its existing large-chunk advisory. Ruff, Prettier, and ESLint
+pre-commit hooks pass.
+
+The same review repeated two OAuth concerns that do not match the implementation:
+Google requests identity scopes and does not persist provider refresh tokens;
+the Tauri HTTPS callback handoff is covered by native OAuth tests asserting the
+`https://listen.lespedants.org/auth/callback#desktop=tauri&code=...&state=...`
+completion fragment. These findings do not require code changes.
+
+After pushing `5c54089f`, PR run [`37054557995`](https://github.com/thecrateapp/crate/actions/runs/37054557995)
+passed the full frontend test job in 6m54s, including Listen tests/build and
+desktop typecheck/tests; Chromium appearance also passed. React Doctor,
+changed-Python security scan, and PR Agent Review passed in runs
+[`37054557936`](https://github.com/thecrateapp/crate/actions/runs/37054557936),
+[`37054558161`](https://github.com/thecrateapp/crate/actions/runs/37054558161),
+and [`37054553772`](https://github.com/thecrateapp/crate/actions/runs/37054553772).
+The native desktop build matrix, Android APK, iOS simulator, backend quality,
+test shards, and coverage were skipped because the PR remained draft. The
+PR-Agent log also says it pruned the very large PR diff, so its passing result
+does not represent a full review of every changed file.
+
+### Current desktop matrix and persistent-review follow-up — 2026-10-02
+
+The manually dispatched [Build Desktop Apps run `37059089945`](https://github.com/thecrateapp/crate/actions/runs/37059089945)
+passed all three OS jobs at source `731cc8c2`, including the Windows packaged
+install/launch/uninstall smoke and HTTP resource probe. The app source is
+unchanged between that revision and `0c7c0bc1`; the intervening commit only
+updated a test mock. [Build Android run `37059090184`](https://github.com/thecrateapp/crate/actions/runs/37059090184)
+also passed on `731cc8c2`.
+
+At `0c7c0bc1`, the PR Frontend Tests run `37060210259` passed its full test
+and Chromium appearance jobs. React Doctor (`37060210230`), changed-Python
+security scan (`37060210373`), and PR Agent Review (`37060206355`) passed. The
+PR remains draft, so backend quality/test shards/coverage, Android APK, iOS
+simulator, and PR-triggered desktop jobs were skipped. The PR-Agent log again
+pruned the large diff; its green result is not a complete line-by-line review.
+
+That review repeated two observations. The claimed missing successful Tauri
+OAuth redirect test is a false positive: `test_native_oauth_completion_redirect_uses_tauri_fragment`
+asserts the exact HTTPS origin, path, and fragment; `AuthCallback.test.tsx`
+asserts the fragment is removed from browser history and is converted to the
+app deep link. The callback code does not log the URL or handoff values.
+
+The query-scope observation was valid. `get_followed_artist_genre_names()` is
+read-only, but `optional_scope(None)` opened and committed a write transaction.
+It now uses `read_scope()` when no caller session is supplied and a
+`nullcontext()` to reuse a provided session. Its regression test first failed
+against the old implementation; after the change, the two scope-contract tests
+and the three existing PostgreSQL integration cases passed (5 total), and Ruff
+check/format passed. These tests ran against the isolated `crate_test` database
+on the local test PostgreSQL service. The exact-head [Backend Tests run
+`37061770694`](https://github.com/thecrateapp/crate/actions/runs/37061770694)
+then passed security, quality, all eight test shards, and coverage on
+`c59f4f1c`.
+
+The exact-head [Frontend Tests run
+`37061759521`](https://github.com/thecrateapp/crate/actions/runs/37061759521)
+passed the full test/build job and Chromium appearance. React Doctor
+(`37061759516`), changed-Python security scan (`37061759274`), and PR Agent
+Review (`37061756680`) also passed. The latest review again raised the Google
+offline-refresh-token concern. It is a false positive:
+`test_public_google_login_uses_identity_scopes_without_offline_access` asserts
+the normal login mode requests only identity scopes, while
+`test_google_userinfo_does_not_expose_provider_refresh_token` and
+`test_google_link_callback_does_not_store_provider_refresh_token` verify that
+provider refresh tokens are not returned or persisted. The callback stores
+Google identity metadata; Crate's own session refresh JWT is independent.
+
+The PR remains draft, so PR-triggered Android APK, iOS simulator, backend
+quality/test shards/coverage, and desktop bundle jobs were skipped. The
+code-equivalent manual desktop matrix and Android build are recorded above.
+
+### Persistent-review follow-up — OAuth transaction and artist fallback — 2026-10-02
+
+The review correctly identified that native OAuth linking could commit the
+external identity before a later `users.google_id` uniqueness error. A
+PostgreSQL regression test failed against that implementation and observed the
+orphaned identity row. The operation now lives in
+`db.repositories.auth_identities.link_oauth_user_identity()`, where both writes
+share one transaction; the API maps an integrity conflict only after rollback.
+The database transport-boundary test also caught the initial attempt to open
+that transaction from the API router, so the transaction was moved into the
+repository.
+
+The review's artist-upsert concern is a false positive for the current schema.
+`library_artists.name` is the primary key, while the `id` column is nullable.
+When an existing row has no `id`, the fallback predicate uses the exact
+persisted name selected from that row. A PostgreSQL regression test seeds two
+case-variant names with null IDs, selects one through its `storage_id`, and
+verifies that only that row changes. Sixty focused backend tests, including
+this case, the native OAuth rollback case, and the database-boundary tests,
+passed locally.
+
+The repeated Google refresh-token finding remains a false positive:
+Google login requests identity scopes only, and Crate neither exposes nor
+persists Google's provider refresh token. This is covered by the OAuth tests
+noted above.
+
+On `890e3a95`, the manually dispatched [Backend Tests run
+`37065530450`](https://github.com/thecrateapp/crate/actions/runs/37065530450)
+passed security, quality/type checking, all eight test shards, and coverage.
+The exact-head [Frontend Tests run
+`37065521773`](https://github.com/thecrateapp/crate/actions/runs/37065521773)
+passed tests/build and Chromium appearance. React Doctor and PR Agent Review
+also passed. The exact-head [Build Desktop Apps run
+`37064363758`](https://github.com/thecrateapp/crate/actions/runs/37064363758)
+passed macOS, Linux, and Windows; [Build Android run
+`37064363725`](https://github.com/thecrateapp/crate/actions/runs/37064363725)
+passed. Those two artifact runs used `6589283b`; the intervening `890e3a95`
+changes are backend-only and do not alter desktop or mobile app sources. The
+PR remains a draft, so its PR-triggered desktop, Android, and full backend jobs
+remain skipped.
+
+### Exact-head review follow-up and CI — `a76780be`, 2026-10-02
+
+The artist upsert now checks that its guarded `UPDATE` affects exactly one row,
+so a selected artist that disappears before the update fails explicitly. The
+first type-check run on `49dec4da` found that SQLAlchemy exposes the result as a
+generic `Result` to Pyright; the row-count read now uses the same explicit
+`CursorResult` cast used by other repositories. This changes only static
+typing; the row-count guard is unchanged. Local validation passed Pyright on
+the repository module with zero errors, Ruff check/format, and both PostgreSQL
+cases in `test_library_artist_upserts.py`.
+
+The manually dispatched [Backend Tests run
+`37068097621`](https://github.com/thecrateapp/crate/actions/runs/37068097621)
+passed on `a76780be`: quality/type check, changed-Python security scan, all
+eight test shards, and coverage. The exact-head [Frontend Tests run
+`37068094675`](https://github.com/thecrateapp/crate/actions/runs/37068094675)
+passed test/build and Chromium appearance. [React Doctor
+`37068094787`](https://github.com/thecrateapp/crate/actions/runs/37068094787),
+[security scan](https://github.com/thecrateapp/crate/actions/runs/37068094686),
+and [PR Agent Review](https://github.com/thecrateapp/crate/actions/runs/37068093232)
+also passed. PR #259 remains a draft, so its PR-triggered desktop, Android,
+iOS, and full backend checks are skipped. The application sources are
+unchanged from the three-OS [Build Desktop Apps run
+`37064363758`](https://github.com/thecrateapp/crate/actions/runs/37064363758)
+and [Build Android run
+`37064363725`](https://github.com/thecrateapp/crate/actions/runs/37064363725);
+the changes since that build are backend code, tests, and this report.
+
+These CI results do not close the minimum-OS upgrade matrix, Developer ID
+signing/notarization, installed OAuth completion on all operating systems,
+physical Linux Wayland playback/offline checks, native Now Playing delivery,
+or clean real-player memory captures across all three desktop systems.
+
+### macOS C07 artwork ownership revalidation — 2026-10-03
+
+On the current branch checkout, the isolated macOS regression
+`cargo test --locked --manifest-path app/listen-desktop/src-tauri/Cargo.toml --lib macos_media_controls::tests::retained_artwork_request_block_survives_artwork_replacement -- --exact`
+passed 1/1. The test constructs two native `MPMediaItemArtwork` objects and
+verifies that the earlier request handler still returns its owned image after
+the current artwork changes. It does not publish metadata to
+`MPNowPlayingInfoCenter` or verify delivery in Control Center. This revalidates
+the callback-lifetime contract without interacting with the already-running
+manual app; C07's system-surface delivery remains open.

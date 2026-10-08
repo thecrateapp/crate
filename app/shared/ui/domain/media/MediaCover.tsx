@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { CrateIcon } from "@crate/ui/icons";
 import { Music } from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
@@ -9,6 +9,7 @@ export interface MediaCoverProps {
   fallbackUrl?: string | null;
   alt?: string;
   fallbackIcon?: CrateIcon;
+  fallback?: ReactNode;
   iconSize?: number;
   shape?: MediaImageShape;
   className?: string;
@@ -19,6 +20,7 @@ export function MediaCover({
   fallbackUrl,
   alt = "",
   fallbackIcon,
+  fallback,
   iconSize = 18,
   shape = "square",
   className,
@@ -39,20 +41,37 @@ export function MediaCover({
       : null;
 
   const baseClasses = cn(
-    "overflow-hidden bg-white/5",
+    "overflow-hidden bg-text-primary/5",
     shapeClass(shape),
     className,
   );
 
   if (!imageSrc) {
     const Icon = fallbackIcon ?? Music;
+    const hasCustomFallback =
+      fallback !== undefined && fallback !== null && fallback !== false;
 
     return (
       <div
         className={cn(baseClasses, "flex items-center justify-center")}
         data-testid="media-cover-fallback"
+        role={alt ? "img" : undefined}
+        aria-label={alt || undefined}
       >
-        <Icon size={iconSize} className="text-white/25" />
+        {hasCustomFallback ? (
+          typeof fallback === "string" || typeof fallback === "number" ? (
+            <span
+              aria-hidden="true"
+              className="text-sm font-semibold uppercase text-text-muted"
+            >
+              {fallback}
+            </span>
+          ) : (
+            fallback
+          )
+        ) : (
+          <Icon size={iconSize} className="text-text-primary/25" />
+        )}
       </div>
     );
   }
@@ -63,7 +82,7 @@ export function MediaCover({
         src={imageSrc}
         alt={alt}
         loading="lazy"
-        className="h-full w-full object-cover"
+        className=" size-full object-cover"
         onError={() => {
           if (showingPrimary) {
             setPrimaryErrored(true);

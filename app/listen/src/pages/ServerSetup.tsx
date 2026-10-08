@@ -7,7 +7,12 @@ import {
   Server,
   AlertCircle,
   CheckCircle2,
+  CRATE_ICON_SIZE,
 } from "@crate/ui/icons";
+import { CrateLogo } from "@crate/ui/domain/brand/CrateLogo";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { Button } from "@crate/ui/shadcn/button";
+import { Input } from "@crate/ui/shadcn/input";
 
 import {
   addServer,
@@ -125,86 +130,93 @@ export function ServerSetup() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#08090d] px-6 py-10 text-white">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(6,182,212,0.18),transparent_34%),radial-gradient(circle_at_12%_70%,rgba(20,184,166,0.08),transparent_28%)]" />
+    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-surface-canvas px-6 py-10 text-text-primary">
+      <div className="server-setup-atmosphere pointer-events-none absolute inset-0" />
       <form
         onSubmit={handleSubmit}
-        className="relative w-full max-w-[560px] rounded-[12px] border border-white/10 bg-[#101118]/90 p-8 shadow-[0_28px_90px_-45px_rgba(0,0,0,0.9)] backdrop-blur-xl sm:p-10"
+        className="relative w-full max-w-[560px] rounded-panel border border-border-quiet bg-surface-elevated/90 p-8 shadow-card backdrop-blur-xl sm:p-10"
       >
         <div className="flex flex-col items-center text-center">
-          <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 shadow-[0_0_50px_-24px_rgba(34,211,238,0.9)]">
-            <img src="/icons/logo.svg" alt="Crate" className="h-14 w-14" />
+          <div className="mb-5 flex size-20 items-center justify-center rounded-xl border border-accent-action/20 bg-accent-action/10 shadow-accent-action-strong">
+            <CrateLogo title="Crate" className="size-14" />
           </div>
-          <h1 className="text-balance text-3xl font-bold tracking-[-0.04em] text-white sm:text-4xl">
+          <h1 className="text-balance text-3xl font-bold tracking-display text-text-primary sm:text-4xl">
             {t("serverSetup.title")}
           </h1>
-          <p className="mt-3 max-w-md text-sm leading-6 text-slate-400">
+          <p className="mt-3 max-w-md text-sm leading-6 text-text-secondary">
             {t("serverSetup.description")}
           </p>
         </div>
 
-        <label className="mt-8 flex flex-col gap-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-            {t("serverSetup.urlLabel")}
-          </span>
-          <div className="relative">
-            <Server
-              size={18}
-              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-cyan-200/50"
-            />
-            <input
-              type="url"
-              inputMode="url"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://api.your-crate.com"
-              className="h-14 w-full rounded-lg border border-white/10 bg-white/[0.04] pl-12 pr-4 text-base text-white outline-none transition placeholder:text-slate-600 hover:border-white/20 focus:border-cyan-300/70 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(34,211,238,0.08)]"
-              required
-            />
-          </div>
-        </label>
+        <FormField
+          label={t("serverSetup.urlLabel")}
+          className="mt-8 gap-2"
+          labelClassName="text-xs font-semibold uppercase tracking-overline text-text-muted"
+        >
+          {(control) => (
+            <div className="relative">
+              <Server
+                size={CRATE_ICON_SIZE.md}
+                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-text-accent/50"
+              />
+              <Input
+                {...control}
+                type="url"
+                inputMode="url"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://api.your-crate.com"
+                className="h-14 rounded-lg bg-text-primary/[0.04] pl-12 pr-4 shadow-none backdrop-blur-none placeholder:text-text-muted/70 hover:border-text-primary/20 focus-visible:border-accent-action/70 focus-visible:bg-text-primary/[0.06] md:text-base"
+                required
+              />
+            </div>
+          )}
+        </FormField>
 
         {/* Status strip. One line, changes tone based on probeState. */}
         <StatusLine state={probeState} />
 
         <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-          <button
+          <Button
             type="submit"
             disabled={probeState.status === "probing"}
-            className="group flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-cyan-300 px-5 text-sm font-semibold text-[#041217] shadow-[0_0_34px_-12px_rgba(34,211,238,0.75)] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+            className="group h-auto min-h-12 flex-1 rounded-lg px-5 font-semibold shadow-action-solid has-[>svg]:px-5"
           >
             {probeState.status === "probing" ? (
               <>
-                <Loader2 size={16} className="animate-spin" />
+                <Loader2
+                  size={CRATE_ICON_SIZE.sm}
+                  className="size-4 animate-spin"
+                />
                 {t("serverSetup.checking")}
               </>
             ) : (
               <>
                 {t("serverSetup.continue")}
                 <ArrowRight
-                  size={16}
-                  className="transition group-hover:translate-x-0.5"
+                  size={CRATE_ICON_SIZE.sm}
+                  className="size-4 transition group-hover:translate-x-0.5"
                 />
               </>
             )}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
             onClick={() => setUrl("http://localhost:8585")}
-            className="min-h-12 rounded-lg border border-white/10 px-5 text-sm font-semibold text-slate-300 transition hover:border-white/20 hover:bg-white/[0.05] hover:text-white"
+            className="h-auto min-h-12 rounded-lg border border-border-quiet px-5 font-semibold text-text-secondary-strong hover:border-text-primary/20 hover:bg-text-primary/[0.05] hover:text-text-primary has-[>svg]:px-5"
           >
             {t("serverSetup.localDev")}
-          </button>
+          </Button>
         </div>
 
-        <p className="pt-5 text-center text-[12px] leading-5 text-slate-500">
+        <p className="pt-5 text-center text-[0.75rem] leading-5 text-text-muted">
           {t("serverSetup.docsPrefix")}{" "}
           <a
             href="https://docs.cratemusic.app/technical/development-deployment-and-operations"
-            className="text-cyan-300 underline-offset-2 hover:underline"
+            className="link-accent"
             target="_blank"
             rel="noreferrer"
           >
@@ -224,8 +236,8 @@ function StatusLine({ state }: { state: ProbeState }) {
   }
   if (state.status === "ok") {
     return (
-      <div className="flex items-center gap-2 text-[13px] text-emerald-300">
-        <CheckCircle2 size={14} />
+      <div className="flex items-center gap-2 text-caption text-state-success-text">
+        <CheckCircle2 size={CRATE_ICON_SIZE.xs} />
         {t("serverSetup.status.detected")}
         {state.inviteOnly ? ` ${t("serverSetup.status.inviteOnly")}` : ""}
       </div>
@@ -233,15 +245,15 @@ function StatusLine({ state }: { state: ProbeState }) {
   }
   if (state.status === "not-crate") {
     return (
-      <div className="flex items-center gap-2 text-[13px] text-amber-300">
-        <AlertCircle size={14} />
+      <div className="flex items-center gap-2 text-caption text-state-warning-text">
+        <AlertCircle size={CRATE_ICON_SIZE.xs} />
         {t("serverSetup.status.notCrate")}
       </div>
     );
   }
   return (
-    <div className="flex items-center gap-2 text-[13px] text-rose-300">
-      <AlertCircle size={14} />
+    <div className="flex items-center gap-2 text-caption text-state-danger-text">
+      <AlertCircle size={CRATE_ICON_SIZE.xs} />
       {state.messageKey ? t(state.messageKey) : state.message}
     </div>
   );

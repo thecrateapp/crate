@@ -13,6 +13,22 @@ export const DEV_LOG_EVENT = "crate:dev-log";
 const DEV_LOG_STORAGE_KEY = "crate-dev-logs";
 const DEV_LOG_FORCE_KEY = "crate-dev-logs-enabled";
 const MAX_LOGS = 200;
+const SENSITIVE_ASSIGNMENT =
+  /\b(authorization|set-cookie|cookie|password|passwd|secret|access[_ -]?token|refresh[_ -]?token|id[_ -]?token|token|media_ticket|session[_ -]?key|verifier|oauth[_ -]?code|code|state)(\s*[:=]\s*)(["']?)[^\s,;&"'<>]+/gi;
+const QUERY_STRING = /\?(?!\[Filtered query\])[^#\s"'<>]+/g;
+const BEARER_CREDENTIAL = /\b(?:Bearer|Basic)\s+[^\s,;]+/gi;
+const DEEP_LINK = /\b(?:tauri|cratemusic):\/\/[^\s"'<>]*/gi;
+const PERSONAL_PATH = /(?:\/Users\/|\/home\/)[^\s"'<>]*/g;
+
+function redactSensitiveQueryParams(value: string): string {
+  return value
+    .replace(BEARER_CREDENTIAL, "[Filtered credential]")
+    .replace(SENSITIVE_ASSIGNMENT, "$1$2[Filtered]")
+    .replace(QUERY_STRING, "?[Filtered query]")
+    .replace(DEEP_LINK, "[Filtered deep link]")
+    .replace(PERSONAL_PATH, "[Filtered path]")
+    .replace(/\b[A-Z]:\\Users\\[^\s"'<>]*/gi, "[Filtered path]");
+}
 
 function devLogsEnabled(): boolean {
   if (import.meta.env.DEV) return true;
@@ -25,11 +41,30 @@ function devLogsEnabled(): boolean {
 
 function readLogs(): DevLogEntry[] {
   if (typeof window === "undefined") return [];
-  if (window.__crateDevLogs) return window.__crateDevLogs;
+  const sanitize = (logs: DevLogEntry[]): boolean => {
+    let changed = false;
+    logs.forEach((entry, index) => {
+      const message = redactSensitiveQueryParams(entry.message);
+      const detail = entry.detail
+        ? redactSensitiveQueryParams(entry.detail)
+        : undefined;
+      if (message !== entry.message || detail !== entry.detail) {
+        logs[index] = { ...entry, message, detail };
+        changed = true;
+      }
+    });
+    return changed;
+  };
+
+  if (window.__crateDevLogs) {
+    if (sanitize(window.__crateDevLogs)) persistLogs(window.__crateDevLogs);
+    return window.__crateDevLogs;
+  }
   try {
     const raw = window.localStorage.getItem(DEV_LOG_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
     window.__crateDevLogs = Array.isArray(parsed) ? parsed : [];
+    if (sanitize(window.__crateDevLogs)) persistLogs(window.__crateDevLogs);
     return window.__crateDevLogs;
   } catch {
     window.__crateDevLogs = [];
@@ -63,12 +98,17 @@ function dispatchRecordedLogEvent(entry: DevLogEntry): void {
 export function redactUrl(value: string): string {
   try {
     const url = new URL(value);
-    if (url.searchParams.has("token")) {
-      url.searchParams.set("token", "redacted");
+    for (const key of url.searchParams.keys()) {
+      if (
+        key.toLowerCase() === "token" ||
+        key.toLowerCase() === "media_ticket"
+      ) {
+        url.searchParams.set(key, "redacted");
+      }
     }
-    return url.toString();
+    return redactSensitiveQueryParams(url.toString());
   } catch {
-    return value.replace(/([?&]token=)[^&]+/g, "$1redacted");
+    return redactSensitiveQueryParams(value);
   }
 }
 
@@ -86,13 +126,15 @@ export function recordDevLog(
     timestamp: Date.now(),
     level,
     scope,
-    message,
+    message: redactSensitiveQueryParams(message),
     detail:
-      typeof detail === "string"
-        ? detail
-        : detail == null
-          ? undefined
-          : JSON.stringify(detail),
+      redactSensitiveQueryParams(
+        typeof detail === "string"
+          ? detail
+          : detail == null
+            ? ""
+            : JSON.stringify(detail),
+      ) || undefined,
   };
   const next = [...logs, entry].slice(-MAX_LOGS);
   window.__crateDevLogs = next;
@@ -107,11 +149,15 @@ export function recordDevLog(
         : level === "error"
           ? "error"
           : "info";
-  console[consoleMethod](`[${scope}] ${message}`, entry.detail ?? "");
+  console[consoleMethod](`[${scope}] ${entry.message}`, entry.detail ?? "");
 }
 
 export function getDevLogs(): DevLogEntry[] {
   return [...readLogs()];
+}
+
+export function getDevLogsSnapshot(): DevLogEntry[] {
+  return readLogs();
 }
 
 export function clearDevLogs(): void {

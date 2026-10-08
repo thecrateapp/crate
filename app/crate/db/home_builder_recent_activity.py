@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from crate.db.home_builder_shared import (
     _album_identity,
     _artist_identity,
@@ -29,6 +31,20 @@ def _has_album_route(row: dict) -> bool:
         or row.get("album_slug")
         or row.get("album_id") is not None
     )
+
+
+def _played_at_sort_key(item: dict) -> float:
+    played_at = item.get("played_at")
+    if isinstance(played_at, str):
+        try:
+            played_at = datetime.fromisoformat(played_at)
+        except ValueError:
+            return float("-inf")
+    if isinstance(played_at, datetime):
+        if played_at.tzinfo is None:
+            played_at = played_at.replace(tzinfo=timezone.utc)
+        return played_at.timestamp()
+    return float("-inf")
 
 
 def build_recently_played(user_id: int, limit: int = 9) -> list[dict]:
@@ -84,14 +100,12 @@ def build_recently_played(user_id: int, limit: int = 9) -> list[dict]:
 
     recent_playlists = get_recent_playlist_rows_with_artwork(user_id, target_per_bucket)
 
-    items: list[dict] = []
-    for index in range(target_per_bucket):
-        if index < len(recent_playlists):
-            items.append(recent_playlists[index])
-        if index < len(recent_artists):
-            items.append(recent_artists[index])
-        if index < len(recent_albums):
-            items.append(recent_albums[index])
+    items = [
+        *recent_playlists[:target_per_bucket],
+        *recent_artists[:target_per_bucket],
+        *recent_albums[:target_per_bucket],
+    ]
+    items.sort(key=_played_at_sort_key, reverse=True)
     return items[:limit]
 
 

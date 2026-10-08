@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { pluginMock, registerPluginMock } = vi.hoisted(() => {
   const plugin = {
+    cancelPendingResume: vi.fn(async () => {}),
     update: vi.fn(async () => {}),
     stop: vi.fn(async () => {}),
     addListener: vi.fn(),
@@ -54,5 +55,39 @@ describe("native media session bridge", () => {
     expect(registerPluginMock).toHaveBeenCalledWith("CrateMediaSession");
     expect(pluginMock.update).toHaveBeenCalledTimes(1);
     expect(pluginMock.getOutputCapabilities).toHaveBeenCalledTimes(1);
+  });
+
+  it("forwards explicit pause intent to the native media session", async () => {
+    const mediaSession = await import("@/lib/native-media-session");
+
+    await mediaSession.cancelNativeMediaSessionResume();
+
+    expect(pluginMock.cancelPendingResume).toHaveBeenCalledTimes(1);
+  });
+
+  it("blocks an interruption resume synchronously before native acknowledges pause", async () => {
+    let acknowledgePause: (() => void) | undefined;
+    pluginMock.cancelPendingResume.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          acknowledgePause = resolve;
+        }),
+    );
+    const mediaSession = await import("@/lib/native-media-session");
+
+    const pendingPause = mediaSession.cancelNativeMediaSessionResume();
+
+    expect(mediaSession.shouldResumeAfterNativeInterruption()).toBe(false);
+    acknowledgePause?.();
+    await pendingPause;
+  });
+
+  it("allows interruption resume again after an explicit play intent", async () => {
+    const mediaSession = await import("@/lib/native-media-session");
+    await mediaSession.cancelNativeMediaSessionResume();
+
+    mediaSession.markNativeMediaSessionPlayingIntent();
+
+    expect(mediaSession.shouldResumeAfterNativeInterruption()).toBe(true);
   });
 });

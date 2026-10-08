@@ -29,7 +29,11 @@ import androidx.media3.common.audio.AudioProcessor;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.datasource.DataSource;
+import androidx.media3.datasource.DataSourceBitmapLoader;
+import androidx.media3.datasource.DataSpec;
 import androidx.media3.datasource.HttpDataSource;
+import androidx.media3.datasource.ResolvingDataSource;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.analytics.AnalyticsListener;
@@ -37,6 +41,7 @@ import androidx.media3.exoplayer.audio.AudioSink;
 import androidx.media3.exoplayer.audio.DefaultAudioSink;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.session.CommandButton;
+import androidx.media3.session.CacheBitmapLoader;
 import androidx.media3.session.DefaultMediaNotificationProvider;
 import androidx.media3.session.MediaSession;
 import androidx.media3.session.MediaSessionService;
@@ -49,12 +54,14 @@ import com.getcapacitor.JSObject;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 @UnstableApi
 public class CrateNativePlaybackService extends MediaSessionService {
@@ -90,6 +97,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private final NativePlaybackTelemetry telemetry =
         new NativePlaybackTelemetry(MAX_BUFFERED_EVENTS);
 
+    private final NativeEventSequence nativeEventSequence = new NativeEventSequence();
+
     private ExoPlayer deckAPlayer;
     private ExoPlayer deckBPlayer;
     private CrateMixPlayer player;
@@ -100,7 +109,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private NativeMixAudioProcessor deckBAudioProcessor;
     private NativeInterruptionCoordinator interruptionCoordinator;
     private NativeEqController eqController;
-    private DefaultHttpDataSource.Factory httpDataSourceFactory;
+    private volatile Map<String, String> streamAuthorizationByOrigin =
+        Collections.emptyMap();
+    private volatile Map<String, String> artworkAuthorizationByOrigin =
+        Collections.emptyMap();
+    private DataSource.Factory artworkDataSourceFactory;
     private AudioManager audioManager;
     private AudioFocusRequest audioFocusRequest;
     private MediaSession mediaSession;
@@ -114,6 +127,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private boolean eqEnabled = false;
     private boolean sessionRegistered = false;
     private boolean resumeAuthorizationPending = false;
+    private boolean restoredPlayWhenReady = false;
+    private ResumeAuthorizationIntent resumeAuthorizationIntent;
     private boolean audioFocusHeld = false;
     private boolean handlingInterruption = false;
     private boolean noisyReceiverRegistered = false;
@@ -164,10 +179,6 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 .build();
         notificationProvider.setSmallIcon(R.drawable.ic_stat_crate);
         setMediaNotificationProvider(notificationProvider);
-        httpDataSourceFactory = new DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(false)
-            .setConnectTimeoutMs(10_000)
-            .setReadTimeoutMs(30_000);
         deckAAudioProcessor = new NativeMixAudioProcessor();
         deckBAudioProcessor = new NativeMixAudioProcessor();
         eqController = new NativeEqController();
@@ -388,6 +399,17 @@ public class CrateNativePlaybackService extends MediaSessionService {
                     );
                 }
                 resetPlayEventCheckpoint();
+                if (resumeAuthorizationPending) {
+                    ResumeAuthorizationIntent current = currentResumeAuthorizationIntent();
+                    resumeAuthorizationIntent = new ResumeAuthorizationIntent(
+                        newPosition.mediaItemIndex,
+                        newPosition.positionMs,
+                        current.playWhenReady,
+                        queueState.size()
+                    );
+                    emitResumeAuthorizationRequired(resumeAuthorizationIntent);
+                    openAppForAuthorization();
+                }
                 emitPosition();
                 persistCheckpoint();
                 emitState("stateChanged");
@@ -426,6 +448,14 @@ public class CrateNativePlaybackService extends MediaSessionService {
         restoreCheckpoint();
         MediaSession.Builder sessionBuilder = new MediaSession.Builder(this, player)
             .setId("crate-native-playback")
+            .setBitmapLoader(
+                new CacheBitmapLoader(
+                    new DataSourceBitmapLoader(
+                        DataSourceBitmapLoader.DEFAULT_EXECUTOR_SERVICE.get(),
+                        artworkDataSourceFactory
+                    )
+                )
+            )
             .setMediaButtonPreferences(mediaButtonPreferences())
             .setShowPlayButtonIfPlaybackIsSuppressed(true)
             .setCallback(new MediaSession.Callback() {
@@ -460,14 +490,37 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 ) {
                     if (
                         resumeAuthorizationPending &&
-                        (
-                            playerCommand == Player.COMMAND_PLAY_PAUSE ||
-                            playerCommand == Player.COMMAND_PREPARE
-                        )
+                        isCommandBlockedDuringResumeAuthorization(playerCommand)
                     ) {
-                        emitResumeAuthorizationRequired();
+                        // Only an explicit play/pause press means the user
+                        // is asking for playback to start — a bare seek or
+                        // an OS-triggered prepare shouldn't override the
+                        // paused/playing state the checkpoint was actually
+                        // saved with.
+                        ResumeAuthorizationIntent intent = currentResumeAuthorizationIntent();
+                        if (playerCommand == Player.COMMAND_PLAY_PAUSE) {
+                            intent = intent.withPlayWhenReady(true);
+                        } else if (
+                            playerCommand == Player.COMMAND_SEEK_TO_NEXT ||
+                            playerCommand == Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM
+                        ) {
+                            intent = intent.next();
+                        } else if (
+                            playerCommand == Player.COMMAND_SEEK_TO_PREVIOUS ||
+                            playerCommand == Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM
+                        ) {
+                            intent = intent.previous();
+                        }
+                        emitResumeAuthorizationRequired(intent);
                         openAppForAuthorization();
                         return SessionError.ERROR_SESSION_AUTHENTICATION_EXPIRED;
+                    }
+                    if (
+                        resumeAuthorizationPending &&
+                        isResumeAuthorizationCursorCommand(playerCommand)
+                    ) {
+                        emitResumeAuthorizationRequired(currentResumeAuthorizationIntent());
+                        openAppForAuthorization();
                     }
                     return SessionResult.RESULT_SUCCESS;
                 }
@@ -484,6 +537,21 @@ public class CrateNativePlaybackService extends MediaSessionService {
         }
         syncPositionTicker();
         syncNativeMixTicker();
+    }
+
+    static boolean isCommandBlockedDuringResumeAuthorization(int playerCommand) {
+        return playerCommand == Player.COMMAND_PLAY_PAUSE ||
+            playerCommand == Player.COMMAND_PREPARE;
+    }
+
+    static boolean isResumeAuthorizationCursorCommand(int playerCommand) {
+        return playerCommand == Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM ||
+            playerCommand == Player.COMMAND_SEEK_TO_DEFAULT_POSITION ||
+            playerCommand == Player.COMMAND_SEEK_TO_MEDIA_ITEM ||
+            playerCommand == Player.COMMAND_SEEK_TO_NEXT ||
+            playerCommand == Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM ||
+            playerCommand == Player.COMMAND_SEEK_TO_PREVIOUS ||
+            playerCommand == Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM;
     }
 
     private void createNotificationChannel() {
@@ -541,10 +609,28 @@ public class CrateNativePlaybackService extends MediaSessionService {
             }
                 .setEnableDecoderFallback(true)
                 .setEnableAudioTrackPlaybackParams(true);
+        DefaultHttpDataSource.Factory httpDataSourceFactory = new DefaultHttpDataSource.Factory()
+            .setAllowCrossProtocolRedirects(false)
+            .setConnectTimeoutMs(10_000)
+            .setReadTimeoutMs(30_000);
         DefaultDataSource.Factory dataSourceFactory =
             new DefaultDataSource.Factory(this, httpDataSourceFactory);
+        ResolvingDataSource.Factory authorizedDataSourceFactory =
+            new ResolvingDataSource.Factory(
+                dataSourceFactory,
+                dataSpec -> withAuthorization(dataSpec, streamAuthorizationByOrigin)
+            );
+        DefaultHttpDataSource.Factory artworkHttpDataSourceFactory =
+            new DefaultHttpDataSource.Factory()
+                .setAllowCrossProtocolRedirects(false)
+                .setConnectTimeoutMs(10_000)
+                .setReadTimeoutMs(30_000);
+        artworkDataSourceFactory = new ResolvingDataSource.Factory(
+            new DefaultDataSource.Factory(this, artworkHttpDataSourceFactory),
+            dataSpec -> withAuthorization(dataSpec, artworkAuthorizationByOrigin)
+        );
         DefaultMediaSourceFactory mediaSourceFactory =
-            new DefaultMediaSourceFactory(dataSourceFactory);
+            new DefaultMediaSourceFactory(authorizedDataSourceFactory);
         return new ExoPlayer.Builder(
             this,
             renderersFactory,
@@ -795,6 +881,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 track.artist,
                 track.album,
                 track.artwork,
+                "",
                 track.durationMs,
                 null
             );
@@ -805,7 +892,14 @@ public class CrateNativePlaybackService extends MediaSessionService {
         int index = queueState.clampPlaybackIndex(checkpoint.index);
         player.setMediaItems(mediaItems, index, checkpoint.positionMs);
         player.setRepeatMode(toRepeatMode(checkpoint.repeat));
+        restoredPlayWhenReady = checkpoint.playWhenReady;
         resumeAuthorizationPending = true;
+        resumeAuthorizationIntent = new ResumeAuthorizationIntent(
+            index,
+            checkpoint.positionMs,
+            checkpoint.playWhenReady,
+            mediaItems.size()
+        );
     }
 
     private void persistCheckpoint() {
@@ -818,23 +912,44 @@ public class CrateNativePlaybackService extends MediaSessionService {
         for (NativeTrack track : queueState.snapshot()) {
             safeTracks.add(track.toSafeCheckpointTrack());
         }
+        ResumeAuthorizationIntent pendingIntent = resumeAuthorizationPending
+            ? currentResumeAuthorizationIntent()
+            : null;
         checkpointStore.save(
             new PlaybackCheckpointStore.Checkpoint(
                 queueState.revision(),
                 safeTracks,
-                Math.max(0, player.getCurrentMediaItemIndex()),
-                Math.max(0L, player.getCurrentPosition()),
+                pendingIntent == null
+                    ? Math.max(0, player.getCurrentMediaItemIndex())
+                    : pendingIntent.index,
+                pendingIntent == null
+                    ? Math.max(0L, player.getCurrentPosition())
+                    : pendingIntent.positionMs,
                 repeatModeName(player.getRepeatMode()),
-                player.getPlayWhenReady()
+                pendingIntent == null
+                    ? player.getPlayWhenReady()
+                    : pendingIntent.playWhenReady
             )
         );
     }
 
-    private void emitResumeAuthorizationRequired() {
+    private ResumeAuthorizationIntent currentResumeAuthorizationIntent() {
+        if (resumeAuthorizationIntent != null) return resumeAuthorizationIntent;
+        return new ResumeAuthorizationIntent(
+            player == null ? 0 : player.getCurrentMediaItemIndex(),
+            player == null ? 0L : player.getCurrentPosition(),
+            restoredPlayWhenReady,
+            queueState.size()
+        );
+    }
+
+    private void emitResumeAuthorizationRequired(ResumeAuthorizationIntent intent) {
+        resumeAuthorizationIntent = intent;
+        restoredPlayWhenReady = intent.playWhenReady;
         JSObject payload = basePayload();
-        payload.put("index", player == null ? 0 : Math.max(0, player.getCurrentMediaItemIndex()));
-        payload.put("positionMs", player == null ? 0L : Math.max(0L, player.getCurrentPosition()));
-        payload.put("playWhenReady", true);
+        payload.put("index", intent.index);
+        payload.put("positionMs", intent.positionMs);
+        payload.put("playWhenReady", intent.playWhenReady);
         emit("resumeAuthorizationRequired", payload);
     }
 
@@ -923,7 +1038,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     public void setEventSink(@Nullable NativePlaybackTelemetry.EventSink sink) {
         telemetry.setEventSink(sink);
         if (sink != null && resumeAuthorizationPending) {
-            emitResumeAuthorizationRequired();
+            emitResumeAuthorizationRequired(currentResumeAuthorizationIntent());
         }
         syncPositionTicker();
         syncNativeMixTicker();
@@ -965,6 +1080,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     ) {
         if (player == null) return;
         resumeAuthorizationPending = false;
+        resumeAuthorizationIntent = null;
         this.crossfadeMs = Math.max(0, crossfadeMs);
         resetPlayEventCheckpoint();
 
@@ -1042,23 +1158,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     private void applyQueueAuthorization(List<NativeTrack> tracks) {
-        if (httpDataSourceFactory == null) return;
-        String authorization = "";
-        for (NativeTrack track : tracks) {
-            if (
-                track != null &&
-                !track.authorization.isEmpty() &&
-                isHttpsUrl(track.url)
-            ) {
-                authorization = track.authorization;
-                break;
-            }
-        }
-        Map<String, String> headers = new HashMap<>();
-        if (!authorization.isEmpty()) {
-            headers.put("Authorization", authorization);
-        }
-        httpDataSourceFactory.setDefaultRequestProperties(headers);
+        streamAuthorizationByOrigin = streamAuthorizationByOrigin(tracks);
+        artworkAuthorizationByOrigin = artworkAuthorizationByOrigin(tracks);
     }
 
     private List<NativeTransitionPlan> resolveTransitionPlans(
@@ -1120,12 +1221,61 @@ public class CrateNativePlaybackService extends MediaSessionService {
         return -1;
     }
 
-    private boolean isHttpsUrl(String url) {
-        try {
-            return "https".equalsIgnoreCase(Uri.parse(url).getScheme());
-        } catch (RuntimeException error) {
-            return false;
+    static Map<String, String> streamAuthorizationByOrigin(List<NativeTrack> tracks) {
+        return authorizationByOrigin(tracks, false);
+    }
+
+    static Map<String, String> artworkAuthorizationByOrigin(List<NativeTrack> tracks) {
+        return authorizationByOrigin(tracks, true);
+    }
+
+    private static Map<String, String> authorizationByOrigin(
+        List<NativeTrack> tracks,
+        boolean artwork
+    ) {
+        Map<String, String> authorizationByOrigin = new HashMap<>();
+        if (tracks == null) return Collections.emptyMap();
+        for (NativeTrack track : tracks) {
+            if (track == null) continue;
+            String url = artwork ? track.artwork : track.url;
+            String authorization = artwork
+                ? track.artworkAuthorization
+                : track.authorization;
+            String origin = httpsOrigin(url);
+            if (!authorization.isEmpty() && !origin.isEmpty()) {
+                authorizationByOrigin.put(origin, authorization);
+            }
         }
+        return Collections.unmodifiableMap(authorizationByOrigin);
+    }
+
+    private static String httpsOrigin(String url) {
+        try {
+            URI uri = URI.create(valueOrDefault(url, ""));
+            if (
+                !"https".equalsIgnoreCase(uri.getScheme()) ||
+                uri.getHost() == null ||
+                uri.getRawUserInfo() != null
+            ) {
+                return "";
+            }
+            return "https://" + uri.getRawAuthority();
+        } catch (RuntimeException error) {
+            return "";
+        }
+    }
+
+    private static DataSpec withAuthorization(
+        DataSpec dataSpec,
+        Map<String, String> authorizationByOrigin
+    ) {
+        String authorization = authorizationByOrigin.get(
+            httpsOrigin(dataSpec.uri.toString())
+        );
+        if (authorization == null || authorization.isEmpty()) return dataSpec;
+        return dataSpec.withAdditionalHeaders(
+            Collections.singletonMap("Authorization", authorization)
+        );
     }
 
     public void appendTracks(String revision, List<NativeTrack> tracks) {
@@ -1136,7 +1286,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
             playableTracks.add(track);
         }
         if (!queueState.append(revision, playableTracks)) return;
-        applyQueueAuthorization(playableTracks);
+        applyQueueAuthorization(queueState.snapshot());
         List<MediaItem> mediaItems = new ArrayList<>();
         for (NativeTrack track : playableTracks) {
             mediaItems.add(toMediaItem(track));
@@ -1156,7 +1306,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         if (player == null || track == null || track.url.isEmpty()) return;
         int safeIndex = queueState.insert(revision, index, track);
         if (safeIndex < 0) return;
-        applyQueueAuthorization(Collections.singletonList(track));
+        applyQueueAuthorization(queueState.snapshot());
         MediaItem mediaItem = toMediaItem(track);
         deckA.insert(safeIndex, track, mediaItem);
         deckB.insert(safeIndex, track, mediaItem);
@@ -1171,6 +1321,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
     public void removeTrack(String revision, int index) {
         if (player == null || !queueState.remove(revision, index)) return;
+        applyQueueAuthorization(queueState.snapshot());
         deckA.remove(index);
         deckB.remove(index);
         mixController.updateQueue(
@@ -1198,6 +1349,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     public void play() {
+        if (
+            blockIfResumeAuthorizationPending(
+                currentResumeAuthorizationIntent().withPlayWhenReady(true)
+            )
+        ) return;
         if (player != null) {
             player.play();
             syncPositionTicker();
@@ -1206,6 +1362,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     public void pause() {
+        restoredPlayWhenReady = false;
+        if (resumeAuthorizationPending) {
+            resumeAuthorizationIntent = currentResumeAuthorizationIntent()
+                .withPlayWhenReady(false);
+        }
         if (player != null) {
             cancelNativeTransition("pause");
             player.pause();
@@ -1216,6 +1377,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     public void stopPlayback() {
+        restoredPlayWhenReady = false;
+        if (resumeAuthorizationPending) {
+            resumeAuthorizationIntent = currentResumeAuthorizationIntent()
+                .withPlayWhenReady(false);
+        }
         if (player != null) {
             cancelNativeTransition("stop");
             player.stop();
@@ -1226,6 +1392,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     public void seekTo(long positionMs) {
+        if (
+            blockIfResumeAuthorizationPending(
+                currentResumeAuthorizationIntent().seekTo(positionMs)
+            )
+        ) return;
         if (player != null) {
             cancelNativeTransition("seek");
             player.seekTo(Math.max(0L, positionMs));
@@ -1234,7 +1405,24 @@ public class CrateNativePlaybackService extends MediaSessionService {
         }
     }
 
+    // jumpTo/next/previous are called directly by the JS-facing plugin,
+    // bypassing the MediaSession onPlayerCommandRequest gate above (that
+    // one only covers lock-screen/hardware-button controllers) — without
+    // this, JS could still skip across a restored queue of fake
+    // placeholder URIs before re-supplying the real ones.
+    private boolean blockIfResumeAuthorizationPending(ResumeAuthorizationIntent intent) {
+        if (!resumeAuthorizationPending) return false;
+        emitResumeAuthorizationRequired(intent);
+        openAppForAuthorization();
+        return true;
+    }
+
     public void jumpTo(int index, boolean autoplay) {
+        if (
+            blockIfResumeAuthorizationPending(
+                currentResumeAuthorizationIntent().jumpTo(index, autoplay)
+            )
+        ) return;
         if (player == null || index < 0 || index >= player.getMediaItemCount()) return;
         cancelNativeTransition("jump");
         player.seekToDefaultPosition(index);
@@ -1244,6 +1432,9 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     public void next() {
+        if (
+            blockIfResumeAuthorizationPending(currentResumeAuthorizationIntent().next())
+        ) return;
         if (player != null && player.hasNextMediaItem()) {
             cancelNativeTransition("next");
             player.seekToNextMediaItem();
@@ -1253,6 +1444,9 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     public void previous() {
+        if (
+            blockIfResumeAuthorizationPending(currentResumeAuthorizationIntent().previous())
+        ) return;
         if (player != null && player.hasPreviousMediaItem()) {
             cancelNativeTransition("previous");
             player.seekToPreviousMediaItem();
@@ -1604,9 +1798,23 @@ public class CrateNativePlaybackService extends MediaSessionService {
         telemetry.emit(eventName, payload);
     }
 
+    static <T> void coalesceLatestPositionEvent(
+        List<T> events,
+        T latestPosition,
+        Predicate<T> isPositionEvent
+    ) {
+        for (int index = events.size() - 1; index >= 0; index--) {
+            if (isPositionEvent.test(events.get(index))) {
+                events.remove(index);
+            }
+        }
+        events.add(latestPosition);
+    }
+
     private JSObject basePayload() {
         JSObject payload = new JSObject();
         payload.put("revision", queueState.revision());
+        payload.put("nativeSequence", nativeEventSequence.next());
         payload.put("nativeTimeMs", System.currentTimeMillis());
         return payload;
     }

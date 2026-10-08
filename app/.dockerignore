@@ -20,6 +20,15 @@ reference/
 docs/
 shared/
 
+# The Cast receiver image consumes only the shared Cast protocol from the
+# otherwise excluded shared frontend tree.
+!shared/
+shared/*
+!shared/cast/
+!shared/cast/**
+!shared/fonts/
+!shared/fonts/**
+
 # Backend image does not need tests or local/mobile build artifacts.
 tests/
 **/node_modules/

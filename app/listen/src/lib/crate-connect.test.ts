@@ -24,9 +24,9 @@ import {
 } from "@/lib/crate-connect";
 
 describe("Crate Connect v2 client primitives", () => {
-  it("keeps the feature compiled in unless explicitly disabled", () => {
-    expect(isCrateConnectFeatureFlagEnabled(undefined)).toBe(true);
-    expect(isCrateConnectFeatureFlagEnabled("")).toBe(true);
+  it("keeps the feature disabled unless explicitly enabled", () => {
+    expect(isCrateConnectFeatureFlagEnabled(undefined)).toBe(false);
+    expect(isCrateConnectFeatureFlagEnabled("")).toBe(false);
     expect(isCrateConnectFeatureFlagEnabled("true")).toBe(true);
     expect(isCrateConnectFeatureFlagEnabled("false")).toBe(false);
   });

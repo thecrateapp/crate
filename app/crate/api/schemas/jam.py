@@ -137,6 +137,7 @@ class JamInviteResponse(_JamModel):
     created_at: str | datetime | None = None
     join_url: str | None = None
     qr_value: str | None = None
+    public_url: str | None = None
 
 
 class JamJoinResponse(_JamModel):

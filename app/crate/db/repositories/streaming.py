@@ -229,7 +229,8 @@ def ensure_variant_record(payload: dict) -> dict:
                         ELSE stream_variants.error
                     END,
                     task_id = CASE
-                        WHEN stream_variants.source_path IS DISTINCT FROM EXCLUDED.source_path
+                        WHEN stream_variants.status = 'failed'
+                          OR stream_variants.source_path IS DISTINCT FROM EXCLUDED.source_path
                           OR stream_variants.source_mtime_ns IS DISTINCT FROM EXCLUDED.source_mtime_ns
                           OR stream_variants.source_size IS DISTINCT FROM EXCLUDED.source_size
                         THEN NULL
@@ -338,6 +339,7 @@ def mark_variant_missing(cache_key: str) -> None:
                 """
                 UPDATE stream_variants
                 SET status = 'pending',
+                    task_id = NULL,
                     error = NULL,
                     relative_path = NULL,
                     bytes = NULL,
@@ -383,6 +385,7 @@ def mark_stream_variants_missing(cache_keys: list[str]) -> int:
                 """
                 UPDATE stream_variants
                 SET status = 'pending',
+                    task_id = NULL,
                     error = NULL,
                     relative_path = NULL,
                     bytes = NULL,

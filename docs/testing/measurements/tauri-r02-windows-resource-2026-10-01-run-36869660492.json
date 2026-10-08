@@ -1,0 +1,28 @@
+{
+  "status": "failed",
+  "headSha": "74be827d596ab170207b41415aa37cb87621fd7c",
+  "platform": "Windows-2025Server-10.0.26100-SP0",
+  "python": "3.13.15 (tags/v3.13.15:4061bc4, Aug  5 2026, 13:05:39) [MSC v.1944 64 bit (AMD64)]",
+  "executable": "C:\\Users\\runneradmin\\AppData\\Local\\Crate\\http_resource_probe.exe",
+  "executableSha256": "9a44d6a9ea7acf4b5990f2deef9315dd5d29e20d7b6bf85a10b8fe3c014d3842",
+  "workingDirectory": "D:\\a\\crate\\crate",
+  "fixtureOrigin": "http://127.0.0.1:53054",
+  "refusedOrigin": "http://127.0.0.1:53055",
+  "iterationsPerScenario": 25,
+  "scenarios": [
+    "consumed-200",
+    "consumed-500",
+    "connection-refused",
+    "bodyless-204",
+    "abort-before-headers",
+    "cancel-after-first-chunk"
+  ],
+  "pythonPathEntriesRemoved": [
+    "C:\\hostedtoolcache\\windows\\Python\\3.13.15\\x64\\Scripts",
+    "C:\\hostedtoolcache\\windows\\Python\\3.13.15\\x64"
+  ],
+  "error": "probe did not report within 90s",
+  "returnCode": 1,
+  "requestHits": {},
+  "frontendDiagnostics": "page-load:Started:http://tauri.localhost/\nnative-early-diagnostics-installed\ncsp-violation:connect-src:http://ipc.localhost/record_probe_diagnostic\ncsp-violation:style-src-elem:inline\npage-load:Finished:http://tauri.localhost/\nnative-eval-submitted\nearly-window-error:undefined\ncsp-violation:style-src-elem:inline\nearly-window-error:undefined\ndocument-state:{\"href\":\"http://tauri.localhost/\",\"readyState\":\"complete\",\"title\":\"Crate\",\"status\":null,\"scripts\":[{\"src\":\"http://tauri.localhost/assets/index-DT_ECO3w.js\",\"type\":\"module\",\"readyState\":null}],\"resources\":[\"http://tauri.localhost/assets/index-DT_ECO3w.js\",\"http://tauri.localhost/assets/rolldown-runtime-QTnfLwEv.js\",\"http://tauri.localhost/assets/react-vendor-DNFwJVnV.js\",\"http://tauri.localhost/assets/core-D2pSb06P.js\",\"http://tauri.localhost/assets/dist-dc70ybFR.js\",\"http://tauri.localhost/assets/capacitor-core-BZtq2xqQ.js\",\"http://tauri.localhost/assets/useTranslation-jQPFymvd.js\",\"http://tauri.localhost/assets/cache-DwCUQqCY.js\",\"http://tauri.localhost/assets/api-BDJ_EZMa.js\",\"http://tauri.localhost/assets/external-links-BnnhiYUu.js\",\"http://tauri.localhost/assets/theme-skin-hfM2CwET.js\",\"http://tauri.localhost/assets/AuthContext-BzRt2j-G.js\",\"http://tauri.localhost/assets/cn-DCk78r2F.js\",\"http://tauri.localhost/assets/CrateLogo-C_l9bzuo.js\",\"http://tauri.localhost/assets/CrateLoader-CDj3vObx.js\",\"http://tauri.localhost/assets/AppFallbacks-BGl5UI2i.js\",\"http://tauri.localhost/assets/native-lastfm-oauth-fGb5Y7s_.js\",\"http://tauri.localhost/assets/create-preloadable-lazy-B72jGBxV.js\",\"http://tauri.localhost/assets/base-CBPwa-rJ.js\",\"http://tauri.localhost/assets/CloseSquare-C16oKenp.js\",\"http://tauri.localhost/assets/button-BkrHqqHR.js\",\"http://tauri.localhost/assets/desktop-tray-_csdmGPh.js\",\"http://tauri.localhost/assets/tauri-auth-diagnostic-CTF1waR-.js\",\"http://tauri.localhost/assets/event-Uhn-XHMD.js\",\"http://tauri.localhost/assets/index-DGAwdm9X.css\",\"http://tauri.localhost/assets/dist-js-DY7nWSJk.js\"]}\nnative-eval-bridge-available\nscript-fetch:{\"src\":\"http://tauri.localhost/assets/index-DT_ECO3w.js\",\"status\":200,\"contentType\":\"text/javascript\",\"bytes\":136123,\"preview\":\"const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=[\\\"assets/Album-BFnJZRbZ.js\\\",\\\"assets/rolldown-runtime-QTnfLwEv.js\"}\n"
+}

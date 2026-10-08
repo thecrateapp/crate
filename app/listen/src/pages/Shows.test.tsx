@@ -131,9 +131,9 @@ describe("Shows page", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Artistas seguidos")).toBeInTheDocument();
     expect(screen.getByText("Próximo concierto")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Todo" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Todo" })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Conciertos" }),
+      screen.getByRole("radio", { name: "Conciertos" }),
     ).toBeInTheDocument();
     expect(
       screen.getByPlaceholderText("Filtra por artista, sala o ciudad..."),
@@ -148,6 +148,29 @@ describe("Shows page", () => {
     expect(screen.getByText("Followed artists")).toBeInTheDocument();
     expect(screen.getByText("Attending")).toBeInTheDocument();
     expect(screen.queryByText("Insights")).not.toBeInTheDocument();
+  });
+
+  it("explains when followed artists have no current Radar signals", () => {
+    mockUseApi.mockReturnValue({
+      data: {
+        items: [],
+        insights: [],
+        summary: {
+          followed_artists: 1,
+          show_count: 0,
+          release_count: 0,
+          attending_count: 0,
+          insight_count: 0,
+        },
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithListenProviders(<Shows />);
+
+    expect(screen.getByText("No new Radar signals yet")).toBeInTheDocument();
   });
 
   it("uses one expanded show card as the next show source of truth", () => {
@@ -165,10 +188,9 @@ describe("Shows page", () => {
     renderWithListenProviders(<Shows />);
 
     expect(screen.queryByText("announced")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open" })).toHaveAttribute(
-      "href",
-      expect.stringContaining("future-lp"),
-    );
+    expect(
+      screen.getByRole("link", { name: "Open Future LP" }),
+    ).toHaveAttribute("href", expect.stringContaining("future-lp"));
     expect(
       screen.queryByRole("link", { name: "Source" }),
     ).not.toBeInTheDocument();

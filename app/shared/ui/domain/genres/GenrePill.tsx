@@ -1,5 +1,5 @@
 import { cn } from "@crate/ui/lib/cn";
-import { X } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, X } from "@crate/ui/icons";
 
 export interface GenreProfileItem {
   name: string;
@@ -38,7 +38,7 @@ export function GenrePill({
     <>
       <span className="min-w-0 truncate">{item.name.toLowerCase()}</span>
       {percent != null ? (
-        <span className="shrink-0 rounded-sm border border-[var(--active-border)] bg-[var(--active-bg-strong)] px-1 py-0.5 text-[10px] font-semibold text-[var(--active-text)]">
+        <span className="shrink-0 rounded-sm border border-[var(--active-border)] bg-[var(--active-bg-strong)] px-1 py-0.5 text-badge font-semibold text-[var(--active-text)]">
           {percent}%
         </span>
       ) : null}
@@ -50,7 +50,7 @@ export function GenrePill({
   if (item.source) titleParts.push(item.source);
   const title = titleParts.join(" · ");
   const pillClassName =
-    "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-[var(--chip-active-border)] bg-[var(--chip-active-bg)] px-2 py-1 text-[11px] text-[var(--active-text)]";
+    "genre-pill inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-badge";
 
   if (onRemove) {
     return (
@@ -59,7 +59,7 @@ export function GenrePill({
           <button
             type="button"
             onClick={onClick}
-            className="inline-flex min-w-0 items-center gap-1.5 transition-colors hover:text-[var(--active-text)]"
+            className="inline-flex min-w-0 items-center gap-1.5 transition-colors hover:text-accent-action"
           >
             {content}
           </button>
@@ -70,9 +70,9 @@ export function GenrePill({
           type="button"
           aria-label={removeLabel ?? `Remove ${item.name}`}
           onClick={onRemove}
-          className="shrink-0 rounded-full p-0.5 text-[var(--active-text)]/70 transition-colors hover:bg-[var(--pill-active-bg)] hover:text-[var(--active-text)]"
+          className="shrink-0 rounded-full p-0.5 text-text-muted transition-colors hover:bg-text-primary/10 hover:text-text-primary"
         >
-          <X size={12} />
+          <X size={CRATE_ICON_SIZE.micro} />
         </button>
       </span>
     );
@@ -84,11 +84,7 @@ export function GenrePill({
         type="button"
         onClick={onClick}
         title={title}
-        className={cn(
-          pillClassName,
-          "transition-colors hover:border-[var(--pill-active-border)] hover:bg-[var(--pill-active-bg)]",
-          className,
-        )}
+        className={cn(pillClassName, "transition-colors", className)}
       >
         {content}
       </button>

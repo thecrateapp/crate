@@ -1,10 +1,13 @@
-import { App } from "@capacitor/app";
-import { Keyboard, KeyboardResize, KeyboardStyle } from "@capacitor/keyboard";
-import { Network } from "@capacitor/network";
-import { StatusBar, Style } from "@capacitor/status-bar";
-
-import { consumeOAuthCallbackUrl } from "@/lib/capacitor-oauth";
+import {
+  consumeOAuthCallbackUrl,
+  retryPendingNativeOAuthCallback,
+  storePendingOAuthProviderError,
+} from "@/lib/capacitor-oauth";
 import { isIosRuntime, isNative, platform } from "@/lib/capacitor-runtime";
+import {
+  getAppliedThemeSkin,
+  type ResolvedColorMode,
+} from "@crate/ui/lib/theme-skin";
 
 let viewportFallbackInitialized = false;
 let keyboardInitialized = false;
@@ -65,6 +68,9 @@ function scrollFocusedInputIntoView() {
 async function initKeyboardHandling() {
   if (keyboardInitialized || platform !== "ios") return;
   keyboardInitialized = true;
+  const { Keyboard, KeyboardResize, KeyboardStyle } = await import(
+    "@capacitor/keyboard"
+  );
 
   try {
     await Keyboard.setStyle({ style: KeyboardStyle.Dark });
@@ -88,10 +94,15 @@ async function initKeyboardHandling() {
 async function initializeCapacitor(): Promise<string | null> {
   initViewportHeightFallback();
   if (!isNative) return null;
+  const [{ App }, { Network }, { StatusBar }] = await Promise.all([
+    import("@capacitor/app"),
+    import("@capacitor/network"),
+    import("@capacitor/status-bar"),
+  ]);
   await initKeyboardHandling();
 
   try {
-    await StatusBar.setStyle({ style: Style.Dark });
+    await applyNativeColorMode(getAppliedThemeSkin().resolvedMode);
     await StatusBar.setOverlaysWebView({ overlay: true });
     if (platform === "android") {
       await StatusBar.setBackgroundColor({ color: "#00000000" });
@@ -115,10 +126,7 @@ async function initializeCapacitor(): Promise<string | null> {
   });
 
   App.addListener("appUrlOpen", ({ url }) => {
-    void consumeOAuthCallbackUrl(url).then((result) => {
-      if (!result.handled) return;
-      window.dispatchEvent(new CustomEvent("crate:auth-token-received"));
-    });
+    void consumeOAuthCallbackAndNotify(url);
   });
 
   App.addListener("pause", () => {
@@ -127,15 +135,20 @@ async function initializeCapacitor(): Promise<string | null> {
 
   App.addListener("resume", () => {
     window.dispatchEvent(new CustomEvent("crate:app-resumed"));
+    void retryPendingOAuthExchange();
   });
 
+  let launchUrl: string | null = null;
   try {
-    const launch = await App.getLaunchUrl();
-    if (launch?.url) {
-      await consumeOAuthCallbackUrl(launch.url);
-    }
+    launchUrl = (await App.getLaunchUrl())?.url ?? null;
   } catch {
     // Ignore launch URL failures
+  }
+
+  if (launchUrl) {
+    void consumeLaunchOAuthAndRetry(launchUrl);
+  } else {
+    void retryPendingOAuthExchange();
   }
 
   Network.addListener("networkStatusChange", (status) => {
@@ -145,10 +158,50 @@ async function initializeCapacitor(): Promise<string | null> {
     );
     if (status.connected) {
       window.dispatchEvent(new CustomEvent("crate:network-restored"));
+      void retryPendingOAuthExchange();
     }
   });
 
   return null;
+}
+
+async function consumeOAuthCallbackAndNotify(url: string): Promise<void> {
+  const result = await consumeOAuthCallbackUrl(url);
+  if (result.handled && result.providerError) {
+    storePendingOAuthProviderError();
+    window.dispatchEvent(new CustomEvent("crate:oauth-provider-error"));
+    return;
+  }
+  if (result.handled && !result.cancelled) {
+    window.dispatchEvent(new CustomEvent("crate:auth-token-received"));
+  }
+}
+
+async function consumeLaunchOAuthAndRetry(url: string): Promise<void> {
+  await consumeOAuthCallbackAndNotify(url);
+  await retryPendingOAuthExchange();
+}
+
+async function retryPendingOAuthExchange(): Promise<void> {
+  const result = await retryPendingNativeOAuthCallback();
+  if (result.handled) {
+    window.dispatchEvent(new CustomEvent("crate:auth-token-received"));
+  }
+}
+
+export async function applyNativeColorMode(
+  mode: ResolvedColorMode,
+): Promise<void> {
+  if (!isNative) return;
+
+  try {
+    const { StatusBar, Style } = await import("@capacitor/status-bar");
+    await StatusBar.setStyle({
+      style: mode === "dark" ? Style.Dark : Style.Light,
+    });
+  } catch {
+    // Native status-bar support is best-effort across Capacitor shells.
+  }
 }
 
 export function initCapacitor(): Promise<string | null> {

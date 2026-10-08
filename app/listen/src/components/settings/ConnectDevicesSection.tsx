@@ -1,7 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, LogOut, MonitorSpeaker } from "@crate/ui/icons";
-import { toast } from "sonner";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
+import {
+  CRATE_ICON_SIZE,
+  Loader2,
+  LogOut,
+  MonitorSpeaker,
+  Check,
+  Activity,
+  Clock,
+} from "@crate/ui/icons";
+import { notify } from "@crate/ui/lib/notify";
+import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
+import { Switch } from "@crate/ui/primitives/Switch";
+import { Button } from "@crate/ui/shadcn/button";
 
 import { api } from "@/lib/api";
 import {
@@ -91,7 +103,13 @@ function ConnectDevicesSectionContent() {
     null,
   );
   const [updatingPreference, setUpdatingPreference] = useState(false);
+  const [pendingRevoke, setPendingRevoke] = useState<ConnectDevice | null>(
+    null,
+  );
   const devicesRequestIdRef = useRef(0);
+  const showLoadError = useEffectEvent(() => {
+    notify.error(t("settings.connectDevices.toasts.loadFailed"));
+  });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -113,7 +131,7 @@ function ConnectDevicesSectionContent() {
         if (requestId !== devicesRequestIdRef.current) return;
         if (error instanceof DOMException && error.name === "AbortError")
           return;
-        toast.error(t("settings.connectDevices.toasts.loadFailed"));
+        showLoadError();
       })
       .finally(() => {
         if (
@@ -138,9 +156,9 @@ function ConnectDevicesSectionContent() {
       setDevices((current) =>
         current.filter((item) => item.device_id !== device.device_id),
       );
-      toast.success(t("settings.connectDevices.toasts.revoked"));
+      notify.success(t("settings.connectDevices.toasts.revoked"));
     } catch {
-      toast.error(t("settings.connectDevices.toasts.revokeFailed"));
+      notify.error(t("settings.connectDevices.toasts.revokeFailed"));
     } finally {
       setForgettingDeviceId(null);
     }
@@ -154,57 +172,41 @@ function ConnectDevicesSectionContent() {
       if (nextEnabled && !CRATE_CONNECT_V2_TRANSPORT_ENABLED) {
         void registerCurrentConnectDevice().catch(() => {});
       }
-      toast.success(
+      notify.success(
         nextEnabled
           ? t("settings.connectDevices.toasts.enabled")
           : t("settings.connectDevices.toasts.disabled"),
       );
     } catch {
-      toast.error(t("settings.connectDevices.toasts.updateFailed"));
+      notify.error(t("settings.connectDevices.toasts.updateFailed"));
     } finally {
       setUpdatingPreference(false);
     }
   }
 
   return (
-    <div className="space-y-3 rounded-xl bg-white/5 p-4">
+    <div className="space-y-3 rounded-xl bg-text-primary/5 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="text-sm font-medium text-foreground">
+          <div className="text-sm font-medium text-text-primary">
             {t("settings.connectDevices.title")}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-text-muted">
             {t("settings.connectDevices.description")}
           </p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={connectEnabled}
+        <Switch
+          aria-label={t("settings.connectDevices.title")}
+          checked={connectEnabled}
           disabled={updatingPreference}
-          onClick={() => void handleToggleConnect()}
-          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-            connectEnabled
-              ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-200"
-              : "border-white/10 bg-white/5 text-white/55"
-          } disabled:cursor-wait disabled:opacity-70`}
-        >
-          {updatingPreference ? (
-            <Loader2 size={12} className="animate-spin" />
-          ) : (
-            <span
-              className={`h-2 w-2 rounded-full ${
-                connectEnabled ? "bg-cyan-300" : "bg-white/35"
-              }`}
-            />
-          )}
-          {connectEnabled ? t("common.enabled") : t("common.disabled")}
-        </button>
+          onCheckedChange={() => void handleToggleConnect()}
+          className="disabled:cursor-wait disabled:opacity-70"
+        />
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 size={14} className="animate-spin" />
+        <div className="flex items-center gap-2 text-sm text-text-muted">
+          <Loader2 size={CRATE_ICON_SIZE.xs} className="animate-spin" />
           {t("settings.connectDevices.loading")}
         </div>
       ) : (
@@ -219,67 +221,86 @@ function ConnectDevicesSectionContent() {
             return (
               <div
                 key={device.device_id}
-                className="flex items-start justify-between gap-4 rounded-lg border border-white/10 px-3 py-3"
+                className="flex items-start justify-between gap-4 rounded-lg border border-border-quiet p-3 "
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                    <div className="inline-flex items-center gap-2 text-sm font-medium text-text-primary">
                       <MonitorSpeaker
-                        size={14}
-                        className="text-muted-foreground"
+                        size={CRATE_ICON_SIZE.xs}
+                        className="text-text-muted"
                       />
                       <span className="truncate">{label}</span>
                     </div>
                     {isCurrent ? (
-                      <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-0.5 text-[11px] font-medium text-cyan-300">
+                      <CrateBadge icon={Check}>
                         {t("common.current")}
-                      </span>
+                      </CrateBadge>
                     ) : null}
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                        device.active
-                          ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
-                          : "border-white/10 bg-white/5 text-white/50"
-                      }`}
+                    <CrateBadge
+                      icon={device.active ? Activity : Clock}
+                      tone={device.active ? "success" : "neutral"}
                     >
                       {device.active ? t("common.active") : t("common.recent")}
-                    </span>
+                    </CrateBadge>
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
+                  <div className="mt-1 text-xs text-text-muted">
                     {t("settings.connectDevices.lastSeen", {
                       value: formatSeenAt(lastSeen, t("common.recently")),
                     })}
                   </div>
                   {meta ? (
-                    <div className="mt-1 text-[11px] text-white/40">{meta}</div>
+                    <div className="mt-1 text-xs text-text-primary/40">
+                      {meta}
+                    </div>
                   ) : null}
                 </div>
-                <button
-                  type="button"
+                <Button
+                  variant="danger-soft"
                   aria-label={t("settings.connectDevices.revokeNamed", {
                     name: label,
                   })}
-                  disabled={busy || isCurrent}
-                  onClick={() => void revokeDevice(device)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={isCurrent}
+                  loading={busy}
+                  onClick={() => setPendingRevoke(device)}
+                  className="h-auto gap-2 rounded-lg border-state-danger/20 px-3 py-2 text-xs [&_svg:not([class*='size-'])]:size-3.5 has-[>svg]:px-3"
                 >
-                  {busy ? (
-                    <Loader2 size={13} className="animate-spin" />
-                  ) : (
-                    <LogOut size={13} />
-                  )}
+                  {busy ? null : <LogOut size={CRATE_ICON_SIZE.xs} />}
                   {t("settings.connectDevices.revoke")}
-                </button>
+                </Button>
               </div>
             );
           })}
           {devices.length === 0 ? (
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-text-muted">
               {t("settings.connectDevices.empty")}
             </div>
           ) : null}
         </div>
       )}
+      <ConfirmDialog
+        open={pendingRevoke !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingRevoke(null);
+        }}
+        onConfirm={async () => {
+          if (pendingRevoke) await revokeDevice(pendingRevoke);
+        }}
+        tone="danger"
+        title={t("settings.connectDevices.revokeConfirmTitle")}
+        description={
+          pendingRevoke
+            ? t("settings.connectDevices.revokeConfirmDescription", {
+                name: deviceLabel(pendingRevoke),
+              })
+            : undefined
+        }
+        confirmLabel={t("settings.connectDevices.revoke")}
+        cancelLabel={t("common.cancel")}
+        closeLabel={t("common.close")}
+        ariaLabel={t("settings.connectDevices.revokeConfirmTitle")}
+        backdropLabel={t("common.close")}
+      />
     </div>
   );
 }

@@ -10,6 +10,7 @@ from crate.api.curation import curated_playlists
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES
 from crate.api.schemas import BrowseExplorePageResponse
 from crate.db.cache_store import get_cache, set_cache
+from crate.db.home_builder_upcoming_artists import _build_recent_global_artists
 from crate.db.queries.global_catalog import list_global_catalog_genres
 from crate.db.repositories.global_catalog_state import (
     catalog_serves_global,
@@ -82,17 +83,23 @@ def _explore_genres(local_genres: list[dict]) -> list[dict]:
 )
 def api_browse_explore_page(request: Request):
     user = _require_auth(request)
-    cache_key = f"listen:explore_page:v1:{user['id']}"
+    cache_key = f"listen:explore_page:v2:{user['id']}"
     cached = get_cache(cache_key, max_age_seconds=_EXPLORE_PAGE_CACHE_TTL_SECONDS)
     if cached is not None:
         return cached
 
     filters = dict(api_browse_filters(request))
     filters["genres"] = _explore_genres(list(filters.get("genres") or []))
+    try:
+        recent_global_artists = _build_recent_global_artists(7)
+    except Exception:
+        log.warning("Recent global artists unavailable for Explore", exc_info=True)
+        recent_global_artists = []
     payload = {
         "filters": filters,
         "playlists": curated_playlists(request)[:8],
         "moods": api_browse_moods(request),
+        "recent_global_artists": recent_global_artists,
     }
     set_cache(cache_key, payload, ttl=_EXPLORE_PAGE_CACHE_TTL_SECONDS)
     return payload

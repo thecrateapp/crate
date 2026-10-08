@@ -7,6 +7,7 @@ Each service requires user-level credentials stored in user_external_identities.
 import hashlib
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass
 
@@ -31,6 +32,64 @@ class LastfmSession:
     key: str
     username: str | None = None
     subscriber: bool | None = None
+
+
+class LastfmAuthenticationError(RuntimeError):
+    def __init__(self, *, retryable: bool) -> None:
+        super().__init__("Last.fm authentication could not be completed")
+        self.retryable = retryable
+
+
+def _lastfm_message_for_log(message: object, secrets: tuple[str, ...]) -> str:
+    if not isinstance(message, str) or not message.strip():
+        return "unavailable"
+
+    sanitized = re.sub(r"\s+", " ", message[:512]).strip()
+    for secret in secrets:
+        if secret:
+            sanitized = sanitized.replace(secret, "[redacted]")
+    return sanitized[:160] or "unavailable"
+
+
+def lastfm_get_auth_token(api_key: str, api_secret: str) -> str | None:
+    """Create a short-lived Last.fm desktop authorization token."""
+    if not api_key or not api_secret:
+        return None
+
+    params = {"method": "auth.getToken", "api_key": api_key}
+    sig_str = "".join(f"{key}{value}" for key, value in sorted(params.items()))
+    params["api_sig"] = hashlib.md5(
+        f"{sig_str}{api_secret}".encode(), usedforsecurity=False
+    ).hexdigest()
+    params["format"] = "json"
+
+    try:
+        response = requests.get(LASTFM_API_URL, params=params, timeout=10)
+        data = response.json() if response.content else {}
+        raw_error = data.get("error")
+        safe_error = _lastfm_message_for_log(
+            str(raw_error)
+            if isinstance(raw_error, (int, str)) and not isinstance(raw_error, bool)
+            else None,
+            (api_key, api_secret),
+        )
+        response_token = data.get("token")
+        secrets = (api_key, api_secret) + (
+            (response_token,) if isinstance(response_token, str) else ()
+        )
+        safe_message = _lastfm_message_for_log(data.get("message"), secrets)
+        token = data.get("token") if response.status_code == 200 else None
+        if isinstance(token, str) and re.fullmatch(r"[a-fA-F0-9]{32}", token):
+            return token
+        log.warning(
+            "Last.fm auth.getToken failed: status=%s error=%s message=%s",
+            response.status_code,
+            safe_error,
+            safe_message,
+        )
+    except Exception as exc:
+        log.warning("Last.fm auth.getToken failed: failure_type=%s", type(exc).__name__)
+    return None
 
 
 def lastfm_scrobble(
@@ -61,7 +120,9 @@ def lastfm_scrobble(
 
     # Generate API signature: md5 of sorted params + secret
     sig_str = "".join(f"{k}{v}" for k, v in sorted(params.items())) + api_secret
-    params["api_sig"] = hashlib.md5(sig_str.encode("utf-8")).hexdigest()
+    params["api_sig"] = hashlib.md5(
+        sig_str.encode("utf-8"), usedforsecurity=False
+    ).hexdigest()
     params["format"] = "json"
 
     try:
@@ -105,7 +166,9 @@ def lastfm_now_playing(
         params["album"] = album
 
     sig_str = "".join(f"{k}{v}" for k, v in sorted(params.items())) + api_secret
-    params["api_sig"] = hashlib.md5(sig_str.encode("utf-8")).hexdigest()
+    params["api_sig"] = hashlib.md5(
+        sig_str.encode("utf-8"), usedforsecurity=False
+    ).hexdigest()
     params["format"] = "json"
 
     try:
@@ -119,15 +182,35 @@ def lastfm_get_session(
     api_key: str, api_secret: str, auth_token: str
 ) -> LastfmSession | None:
     """Exchange a Last.fm auth token for a session key."""
+    try:
+        return lastfm_get_session_strict(api_key, api_secret, auth_token)
+    except LastfmAuthenticationError:
+        return None
+
+
+def lastfm_get_session_strict(
+    api_key: str, api_secret: str, auth_token: str
+) -> LastfmSession:
+    """Exchange a Last.fm auth token and preserve retryable failure details."""
+    if not api_key or not api_secret or not auth_token:
+        log.warning(
+            "Last.fm auth.getSession failed: status=not-requested "
+            "error=not-requested message=missing credentials retryable=false"
+        )
+        raise LastfmAuthenticationError(retryable=False)
+
     params = {
         "method": "auth.getSession",
         "api_key": api_key,
         "token": auth_token,
     }
     sig_str = "".join(f"{k}{v}" for k, v in sorted(params.items())) + api_secret
-    params["api_sig"] = hashlib.md5(sig_str.encode("utf-8")).hexdigest()
+    params["api_sig"] = hashlib.md5(
+        sig_str.encode("utf-8"), usedforsecurity=False
+    ).hexdigest()
     params["format"] = "json"
 
+    resp = None
     try:
         resp = requests.get(LASTFM_API_URL, params=params, timeout=10)
         data = resp.json() if resp.content else {}
@@ -140,15 +223,54 @@ def lastfm_get_session(
                 if str(session.get("subscriber", "")).isdigit()
                 else None,
             )
-        log.warning(
-            "Last.fm auth.getSession failed: status=%s error=%s message=%s",
-            resp.status_code,
-            data.get("error"),
-            data.get("message"),
+        raw_error_code = data.get("error")
+        if isinstance(raw_error_code, bool) or not isinstance(
+            raw_error_code, (int, str)
+        ):
+            error_code = None
+        else:
+            try:
+                error_code = int(raw_error_code)
+            except ValueError:
+                error_code = None
+        retryable_http_status = (
+            resp.status_code in {408, 429} or resp.status_code >= 500
         )
-    except Exception:
-        log.warning("Last.fm auth.getSession failed", exc_info=True)
-    return None
+        unclassified_success = 200 <= resp.status_code < 300 and error_code is None
+        retryable = (
+            retryable_http_status
+            or unclassified_success
+            or error_code
+            in {
+                8,
+                11,
+                14,
+                16,
+                29,
+            }
+        )
+        safe_message = _lastfm_message_for_log(
+            data.get("message"), (api_key, api_secret, auth_token)
+        )
+        log.warning(
+            "Last.fm auth.getSession failed: status=%s error=%s "
+            "message=%s retryable=%s",
+            resp.status_code,
+            error_code,
+            safe_message,
+            retryable,
+        )
+        raise LastfmAuthenticationError(retryable=retryable)
+    except LastfmAuthenticationError:
+        raise
+    except Exception as exc:
+        log.warning(
+            "Last.fm auth.getSession failed: status=%s error=unknown "
+            "message=unavailable failure_type=%s retryable=true",
+            getattr(resp, "status_code", "unknown"),
+            type(exc).__name__,
+        )
+        raise LastfmAuthenticationError(retryable=True) from exc
 
 
 # ── ListenBrainz ────────────────────────────────────────────────

@@ -20,8 +20,11 @@ final class OfflineAssetVerifier {
                 return new Result(relativePath, false, 0, false);
             }
             long size = Math.max(0, asset.length());
-            boolean valid =
-                expectedBytes <= 0 || size == 0 || size == expectedBytes;
+            // A 0-byte file is never a valid asset, even when we have no
+            // expected size to compare against — it means a download that
+            // started and produced an empty file, not one that legitimately
+            // has no content.
+            boolean valid = size > 0 && (expectedBytes <= 0 || size == expectedBytes);
             if (!valid) {
                 asset.delete();
             }

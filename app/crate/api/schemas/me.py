@@ -188,6 +188,7 @@ class UserLibraryCountsResponse(BaseModel):
     saved_albums: int
     liked_tracks: int
     playlists: int
+    crates: int
 
 
 class ShowAttendanceAddResponse(OkResponse):
@@ -230,6 +231,26 @@ class ListenBrainzConnectResponse(OkResponse):
 
 class LastfmAuthUrlResponse(BaseModel):
     api_key: str
+
+
+class NativeLastfmLinkStartRequest(BaseModel):
+    code_challenge: str = Field(min_length=43, max_length=43)
+    state: str = Field(min_length=16, max_length=256)
+
+
+class NativeLastfmLinkStartResponse(BaseModel):
+    flow_id: str
+    authorization_url: str
+
+
+class NativeLastfmLinkCompleteRequest(BaseModel):
+    flow_id: str = Field(min_length=43, max_length=43)
+    state: str = Field(min_length=16, max_length=256)
+    code_verifier: str = Field(min_length=43, max_length=128)
+
+
+class NativeLastfmLinkCompleteResponse(OkResponse):
+    username: str
 
 
 class GeolocationResponse(BaseModel):
@@ -478,9 +499,12 @@ class StatsAlbumResponse(BaseModel):
 
 class StatsGenreResponse(BaseModel):
     genre_name: str
+    slug: str | None = None
     play_count: int
     complete_play_count: int
     minutes_listened: float | int
+    weight: float | None = None
+    share: float | None = None
     first_played_at: datetime | str | None = None
     last_played_at: datetime | str | None = None
 
@@ -509,6 +533,8 @@ class ReplayMixResponse(BaseModel):
     window: str
     title: str
     subtitle: str
+    title_key: str | None = None
+    subtitle_key: str | None = None
     track_count: int
     minutes_listened: float | int
     items: list[StatsTrackResponse] = Field(default_factory=list)

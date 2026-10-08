@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { action, type MenuActionConfig } from "@crate/ui/domain/actions";
 
@@ -65,6 +65,7 @@ export interface AlbumMenuData {
   globalAlbumUid?: string;
   albumSlug?: string;
   cover?: string;
+  isPreRelease?: boolean;
 }
 
 export interface ArtistMenuData {
@@ -161,8 +162,8 @@ export function sharePath(
   path: string,
   label: string,
   options: Partial<Omit<SharePayload, "title" | "url">> & {
-    copiedToast?: string;
-  } = {},
+    copiedToast: string;
+  },
 ) {
   return async () => {
     const url = publicShareUrl(path);
@@ -175,7 +176,7 @@ export function sharePath(
     });
     if (!opened) {
       await navigator.clipboard.writeText(url);
-      toast.success(options.copiedToast ?? "Link copied");
+      notify.success(options.copiedToast);
     }
   };
 }

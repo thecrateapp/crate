@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { notify } from "@crate/ui/lib/notify";
 
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { api } from "@/lib/api";
@@ -30,15 +30,15 @@ export function useUpcomingShowActions(
         await api(`/api/me/shows/${item.id}/attendance`, "DELETE");
         setAttending(false);
         onAttendanceChange?.(false);
-        toast.success(t("radar.show.toasts.removedAttendance"));
+        notify.success(t("radar.show.toasts.removedAttendance"));
       } else {
         await api(`/api/me/shows/${item.id}/attendance`, "POST");
         setAttending(true);
         onAttendanceChange?.(true);
-        toast.success(t("radar.show.toasts.markedAttending"));
+        notify.success(t("radar.show.toasts.markedAttending"));
       }
     } catch {
-      toast.error(t("radar.show.toasts.attendanceFailed"));
+      notify.error(t("radar.show.toasts.attendanceFailed"));
     } finally {
       setSavingAttendance(false);
     }
@@ -46,11 +46,11 @@ export function useUpcomingShowActions(
 
   async function playProbableSetlist() {
     if (!item.probable_setlist?.length) {
-      toast.info(t("radar.show.toasts.noSetlist"));
+      notify.info(t("radar.show.toasts.noSetlist"));
       return;
     }
     if (!item.artist_id) {
-      toast.info(t("radar.show.toasts.artistNotLinked"));
+      notify.info(t("radar.show.toasts.artistNotLinked"));
       return;
     }
     try {
@@ -60,7 +60,7 @@ export function useUpcomingShowActions(
         artistName: item.artist,
       });
       if (!queue.length) {
-        toast.info(
+        notify.info(
           t("radar.show.toasts.setlistTracksMissing", {
             count: item.probable_setlist.length,
           }),
@@ -71,11 +71,11 @@ export function useUpcomingShowActions(
         type: "playlist",
         name: t("radar.show.probableSetlistSource", { name: item.artist }),
       });
-      toast.success(
+      notify.success(
         t("radar.show.toasts.playingSetlist", { count: queue.length }),
       );
     } catch {
-      toast.error(t("radar.show.toasts.loadSetlistFailed"));
+      notify.error(t("radar.show.toasts.loadSetlistFailed"));
     } finally {
       setPlayingSetlist(false);
     }

@@ -3,6 +3,7 @@ import type { MutableRefObject } from "react";
 
 import type { AuthUser } from "@/contexts/auth-context";
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
+import { isCastSessionActive } from "@/lib/cast-sender";
 import {
   buildPlaybackStatePayload,
   markCurrentConnectDevicePresent,
@@ -102,7 +103,7 @@ export function useRemotePlaybackState({
       snapshotKind: "light" | "structural",
       options?: { keepalive?: boolean; claimActive?: boolean },
     ) => {
-      if (!authUser || !enabled) return;
+      if (!authUser || !enabled || isCastSessionActive()) return;
       const payload = buildPayload(snapshotKind, {
         claimActive: options?.claimActive,
       });
@@ -121,7 +122,7 @@ export function useRemotePlaybackState({
 
   const publishStructuralNow = useCallback(
     async (options?: { claimActive?: boolean }) => {
-      if (!authUser || !enabled) return;
+      if (!authUser || !enabled || isCastSessionActive()) return;
       const payload = buildPayload("structural", {
         claimActive: options?.claimActive,
       });
@@ -182,6 +183,7 @@ export function useRemotePlaybackState({
     void registerCurrentConnectDevice()
       .then(() => markCurrentConnectDevicePresent())
       .then(() => {
+        if (isCastSessionActive()) return;
         if (!isPlayingRef.current || !queueRef.current.length) {
           return;
         }

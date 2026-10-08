@@ -1,6 +1,6 @@
 import logging
 import json
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 from fastapi import APIRouter, Query, Request
@@ -8,11 +8,21 @@ from fastapi.responses import JSONResponse, Response
 
 from crate.api.artwork_delivery import deliver_artwork, deliver_original_artwork
 from crate.artist_hero_artwork import (
-    ARTIST_HERO_RENDER_VERSION,
     DESKTOP_HERO_SIZE,
     MOBILE_HERO_SIZE,
 )
-from crate.artist_hero_contract import artist_hero_profile_ready_compositions
+from crate.artist_hero_publication import (
+    ArtistHeroArtifactIdentity,
+    ArtistHeroComposition,
+    artist_hero_artifact_asset,
+    resolve_artist_hero_artifact_source_path,
+    artist_hero_publication_lock,
+    resolve_artist_hero_publication_path,
+)
+from crate.artist_hero_contract import (
+    artist_hero_profile_composition_is_supported,
+    artist_hero_profile_ready_compositions,
+)
 from crate.api._deps import (
     artist_name_from_id,
     artist_name_from_ref,
@@ -55,6 +65,7 @@ from crate.api.schemas.browse import (
     ArtistTrackTitleResponse,
     BrowseFiltersResponse,
 )
+from crate.artist_bio import normalize_artist_bio
 from crate.db.cache_store import get_cache, set_cache
 from crate.db.health import get_all_artist_issue_counts, get_artist_issue_count
 from crate.external_artist_artwork import (
@@ -70,7 +81,10 @@ from crate.db.repositories.library import (
     get_library_artist_by_entity_uid,
     get_library_artist_by_slug,
 )
-from crate.db.repositories.artist_hero_artwork import get_artist_hero_artwork
+from crate.db.repositories.artist_hero_artwork import (
+    get_artist_hero_artwork,
+    get_artist_hero_render_revision,
+)
 from crate.db.repositories.featured_artists import set_artist_featured
 from crate.db.repositories.playlists import get_public_system_playlists_for_artist
 from crate.db.repositories.tasks import create_task_dedup
@@ -394,7 +408,7 @@ def _artist_library_info_payload(name: str) -> dict:
         return {"similar": []}
 
     return {
-        "bio": artist.get("bio") or "",
+        "bio": normalize_artist_bio(artist.get("bio")),
         "tags": tags,
         "similar": _enrich_similar_artists(similar),
         "listeners": int(artist.get("listeners") or 0),
@@ -784,7 +798,8 @@ def api_artists(
         hero.mobile_recipe AS _hero_mobile_recipe,
         hero.desktop_enabled AS _hero_desktop_enabled,
         hero.mobile_enabled AS _hero_mobile_enabled,
-        hero.revision AS _hero_revision
+        hero.revision AS _hero_revision,
+        hero.render_manifest AS _hero_render_manifest
     """
     joins = """
         LEFT JOIN artist_hero_artwork hero ON hero.artist_id = la.id
@@ -870,6 +885,7 @@ def api_artists(
             "desktop_enabled": row.get("_hero_desktop_enabled"),
             "mobile_enabled": row.get("_hero_mobile_enabled"),
             "revision": row.get("_hero_revision"),
+            "render_manifest": row.get("_hero_render_manifest"),
         }
         item = {
             "id": row.get("id"),
@@ -1077,6 +1093,7 @@ def api_artist_hero_by_id(
     composition: str = Query("desktop", pattern="^(desktop|mobile)$"),
     size: int | None = Query(None, ge=32, le=2048),
     image_format: str | None = Query(None, alias="format", pattern="^webp$"),
+    version: str | None = Query(None, alias="v"),
 ):
     artist_name = artist_name_from_id(artist_id)
     if not artist_name:
@@ -1087,6 +1104,7 @@ def api_artist_hero_by_id(
         composition=composition,
         size=size,
         image_format=image_format,
+        render_revision=version if isinstance(version, str) else None,
     )
 
 
@@ -1101,6 +1119,7 @@ def api_artist_hero_by_entity_uid(
     composition: str = Query("desktop", pattern="^(desktop|mobile)$"),
     size: int | None = Query(None, ge=32, le=2048),
     image_format: str | None = Query(None, alias="format", pattern="^webp$"),
+    version: str | None = Query(None, alias="v"),
 ):
     artist = get_library_artist_by_entity_uid(artist_entity_uid)
     if not artist:
@@ -1111,6 +1130,7 @@ def api_artist_hero_by_entity_uid(
         composition=composition,
         size=size,
         image_format=image_format,
+        render_revision=version if isinstance(version, str) else None,
     )
 
 
@@ -1405,6 +1425,7 @@ def api_artist_hero(
     composition: str,
     size: int | None = None,
     image_format: str | None = None,
+    render_revision: str | None = None,
 ):
     """Deliver the canonical composed hero for Home and artist pages."""
     _require_auth(request)
@@ -1415,9 +1436,65 @@ def api_artist_hero(
     entity_uid = str((artist_row or {}).get("entity_uid") or "")
     artist_id = int((artist_row or {}).get("id") or 0)
     profile = get_artist_hero_artwork(artist_id) if artist_id else None
-    local_original = (
+    legacy_original = (
         artist_dir / f"artist-hero-{composition}.webp" if artist_dir else None
     )
+    artifact_identity = _artist_hero_artifact_identity(
+        profile, entity_uid=entity_uid, composition=composition
+    )
+    retained_revision = False
+    versioned_original = None
+    legacy_current_revision = bool(
+        render_revision is not None
+        and artifact_identity is None
+        and profile
+        and render_revision == str(profile.get("revision") or "")
+        and legacy_original is not None
+        and legacy_original.is_file()
+    )
+    if (
+        not legacy_current_revision
+        and render_revision is not None
+        and (
+            artifact_identity is None
+            or artifact_identity.render_revision != render_revision
+        )
+    ):
+        retained = get_artist_hero_render_revision(
+            artist_id=artist_id,
+            composition=composition,
+            render_revision=render_revision,
+        )
+        retained_path = (
+            resolve_artist_hero_publication_path(retained.get("relative_path"))
+            if retained
+            else None
+        )
+        if retained_path is None or not entity_uid:
+            return _artist_hero_revision_unavailable_response(composition)
+        artifact_identity = ArtistHeroArtifactIdentity(
+            artist_entity_uid=entity_uid,
+            composition=cast(ArtistHeroComposition, composition),
+            render_revision=render_revision,
+        )
+        versioned_original = retained_path
+        retained_revision = True
+    elif artifact_identity is not None:
+        versioned_original = resolve_artist_hero_artifact_source_path(artifact_identity)
+    local_original = (
+        versioned_original if artifact_identity is not None else legacy_original
+    )
+    legacy_fallback = bool(
+        artifact_identity is not None
+        and not retained_revision
+        and versioned_original is not None
+        and not versioned_original.is_file()
+        and legacy_original is not None
+        and legacy_original.is_file()
+        and not legacy_original.is_symlink()
+    )
+    if legacy_fallback:
+        local_original = legacy_original
     has_eligible_profile = bool(
         entity_uid
         and profile
@@ -1426,32 +1503,64 @@ def api_artist_hero(
     )
     if has_eligible_profile and profile is not None:
         revision = str(profile.get("revision") or "")
-        renderer_is_current = revision.startswith(f"{ARTIST_HERO_RENDER_VERSION}:")
-        if (
-            local_original is None
-            or not local_original.is_file()
-            or not renderer_is_current
-        ):
+        renderer_is_current = retained_revision or (
+            artist_hero_profile_composition_is_supported(profile, composition)
+        )
+        if not renderer_is_current:
             _queue_artist_hero_recompose(name, artist_id)
             return _artist_hero_pending_response(composition, revision)
+        if legacy_fallback:
+            _queue_artist_hero_recompose(name, artist_id)
         canonical_width = (
             DESKTOP_HERO_SIZE[0] if composition == "desktop" else MOBILE_HERO_SIZE[0]
         )
-        if size is None or size == canonical_width:
-            response = deliver_original_artwork(
-                local_original,
-                cache_control="private, no-cache, must-revalidate",
-            )
-        else:
-            response = deliver_artwork(
-                ArtworkAsset("artist-hero", f"{entity_uid}:{composition}"),
+
+        def deliver_hero(*, buffer_file: bool = False) -> Response:
+            if size is None or size == canonical_width:
+                if local_original is None or not local_original.is_file():
+                    return Response(status_code=404)
+                response = deliver_original_artwork(
+                    local_original,
+                    cache_control="private, no-cache, must-revalidate",
+                    buffer_file=buffer_file,
+                )
+                if legacy_fallback:
+                    response.headers["X-Crate-Artwork"] = "hero-fallback"
+                return response
+            return deliver_artwork(
+                (
+                    artist_hero_artifact_asset(artifact_identity)
+                    if artifact_identity is not None
+                    else ArtworkAsset("artist-hero", f"{entity_uid}:{composition}")
+                ),
                 requested_size=size,
                 local_original=local_original,
                 missing_response=Response(status_code=404),
+                queue_on_miss=not legacy_fallback,
                 cache_visibility="private",
-                validate_source_revision=True,
+                validate_source_revision=not legacy_fallback,
+                buffer_file=buffer_file,
             )
-        return _decorate_artist_hero_response(response, composition, revision)
+
+        with artist_hero_publication_lock(entity_uid):
+            if local_original is None or not local_original.is_file():
+                if retained_revision:
+                    return _artist_hero_revision_unavailable_response(composition)
+                if artifact_identity is not None:
+                    _queue_artist_hero_recompose(name, artist_id)
+                    return _artist_hero_artifact_unavailable_response(composition)
+                _queue_artist_hero_recompose(name, artist_id)
+                return _artist_hero_pending_response(composition, revision)
+            response = deliver_hero(buffer_file=True)
+        response = _decorate_artist_hero_response(
+            response,
+            composition,
+            artifact_identity.render_revision if artifact_identity else revision,
+        )
+        if legacy_fallback:
+            response.headers["Cache-Control"] = "private, no-cache, must-revalidate"
+            response.headers["X-Crate-Artwork"] = "hero-fallback"
+        return response
     return api_artist_background(
         request,
         name,
@@ -1459,6 +1568,28 @@ def api_artist_hero(
         size=size,
         image_format=image_format,
     )
+
+
+def _artist_hero_artifact_identity(
+    profile: dict | None, *, entity_uid: str, composition: str
+) -> ArtistHeroArtifactIdentity | None:
+    if not profile or not entity_uid:
+        return None
+    manifest = profile.get("render_manifest")
+    if not isinstance(manifest, dict):
+        return None
+    artifacts = manifest.get("artifacts")
+    artifact = artifacts.get(composition) if isinstance(artifacts, dict) else None
+    if not isinstance(artifact, dict):
+        return None
+    try:
+        return ArtistHeroArtifactIdentity(
+            artist_entity_uid=entity_uid,
+            composition=cast(ArtistHeroComposition, composition),
+            render_revision=str(artifact.get("render_revision") or ""),
+        )
+    except ValueError:
+        return None
 
 
 def _queue_artist_hero_recompose(name: str, artist_id: int) -> None:
@@ -1483,6 +1614,28 @@ def _artist_hero_pending_response(composition: str, revision: str) -> Response:
             "Retry-After": "1",
             "X-Crate-Artwork": "hero-pending",
             "X-Crate-Artwork-Revision": revision,
+            "X-Crate-Hero-Composition": composition,
+        },
+    )
+
+
+def _artist_hero_revision_unavailable_response(composition: str) -> Response:
+    return Response(
+        status_code=404,
+        headers={
+            "Cache-Control": "no-store",
+            "X-Crate-Artwork": "hero-revision-unavailable",
+            "X-Crate-Hero-Composition": composition,
+        },
+    )
+
+
+def _artist_hero_artifact_unavailable_response(composition: str) -> Response:
+    return Response(
+        status_code=404,
+        headers={
+            "Cache-Control": "no-store",
+            "X-Crate-Artwork": "hero-unavailable",
             "X-Crate-Hero-Composition": composition,
         },
     )
@@ -1955,7 +2108,13 @@ def api_external_artist_photo(
         return response
 
     if is_external_artist_artwork_missing(artist_name):
-        return Response(status_code=404, headers={"Cache-Control": "no-store"})
+        return Response(
+            status_code=404,
+            headers={
+                "Cache-Control": "public, max-age=86400",
+                "X-Crate-External-Artwork": "missing",
+            },
+        )
 
     return Response(
         status_code=404,
@@ -2004,7 +2163,13 @@ def api_artist(request: Request, name: str):
         album_quality = get_album_quality_map(album_ids)
 
     top_genres = get_artist_top_genres(canonical)
-    genre_profile = build_genre_profile(get_artist_genre_profile(canonical), limit=8)
+    genre_rows = get_artist_genre_profile(canonical)
+    genre_profile = build_genre_profile(genre_rows, limit=8)
+    manual_genres = [
+        str(item["slug"])
+        for item in genre_rows
+        if item.get("source") == "manual" and item.get("slug")
+    ]
 
     upcoming_releases = get_upcoming_releases_for_artist(canonical)
     upcoming_releases_by_slug = {
@@ -2146,12 +2311,13 @@ def api_artist(request: Request, name: str):
         "primary_format": artist.get("primary_format"),
         "genres": top_genres,
         "genre_profile": genre_profile,
+        "manual_genres": manual_genres,
         "issue_count": get_artist_issue_count(canonical),
         "is_v2": is_v2,
         "popularity": artist.get("popularity"),
         "popularity_score": artist.get("popularity_score"),
         "popularity_confidence": artist.get("popularity_confidence"),
-        "bio": artist.get("bio"),
+        "bio": normalize_artist_bio(artist.get("bio")),
         "tags_json": _coerce_json_list(artist.get("tags_json")),
         "urls_json": artist.get("urls_json")
         if isinstance(artist.get("urls_json"), dict)

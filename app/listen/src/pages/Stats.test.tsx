@@ -1,5 +1,5 @@
-import { screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useApi } from "@/hooks/use-api";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -9,6 +9,34 @@ import { Stats } from "./Stats";
 
 vi.mock("@/hooks/use-api", () => ({
   useApi: vi.fn(),
+}));
+
+vi.mock("@/hooks/use-lazy-crate-options", () => ({
+  useLazyCrateOptions: () => ({
+    crateOptions: [],
+    ensureCrateOptionsLoaded: vi.fn(),
+  }),
+}));
+
+vi.mock("@/contexts/LikedTracksContext", () => ({
+  useLikedTracks: () => ({
+    isLiked: () => false,
+    toggleTrackLike: vi.fn(),
+  }),
+}));
+
+vi.mock("@/contexts/SavedAlbumsContext", () => ({
+  useSavedAlbums: () => ({
+    isSaved: () => false,
+    toggleAlbumSaved: vi.fn(),
+  }),
+}));
+
+vi.mock("@/contexts/ArtistFollowsContext", () => ({
+  useArtistFollows: () => ({
+    isFollowing: () => false,
+    toggleArtistFollow: vi.fn(),
+  }),
 }));
 
 const mockUseApi = vi.mocked(useApi);
@@ -21,6 +49,59 @@ describe("Stats page", () => {
       error: null,
       refetch: vi.fn(),
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("refreshes the extracted stats controller while a snapshot is pending", () => {
+    vi.useFakeTimers();
+    const refetch = vi.fn();
+    mockUseApi.mockReturnValue({
+      data: {
+        window: "30d",
+        overview: {
+          window: "30d",
+          play_count: 0,
+          complete_play_count: 0,
+          skip_count: 0,
+          minutes_listened: 0,
+          active_days: 0,
+          skip_rate: 0,
+          top_artist: null,
+        },
+        trends: { window: "30d", points: [] },
+        top_tracks: { window: "30d", items: [] },
+        top_artists: { window: "30d", items: [] },
+        top_albums: { window: "30d", items: [] },
+        top_genres: { window: "30d", items: [] },
+        replay: {
+          window: "30d",
+          title: "Replay",
+          subtitle: "Pending",
+          track_count: 0,
+          minutes_listened: 0,
+          items: [],
+        },
+        snapshot: { pending: true },
+      },
+      loading: false,
+      error: null,
+      refetch,
+    });
+
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "es",
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(1_500);
+    });
+
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 
   it("localizes the main stats chrome", () => {
@@ -38,6 +119,79 @@ describe("Stats page", () => {
     expect(
       screen.getByText("Tus estadísticas esperan una señal"),
     ).toBeInTheDocument();
+  });
+
+  it("shows a single global empty state without per-section empties", () => {
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "es",
+    });
+
+    expect(screen.getAllByTestId("empty-state")).toHaveLength(1);
+    expect(
+      screen.queryByText(
+        "Sigue escuchando y esta página empezará a escribir tu recap.",
+      ),
+    ).not.toBeInTheDocument();
+  });
+
+  it("uses semantic tokens for the stats shell and hero", () => {
+    const period = "30d";
+    const dashboard: StatsDashboard = {
+      window: period,
+      overview: {
+        window: period,
+        play_count: 1,
+        complete_play_count: 1,
+        skip_count: 0,
+        minutes_listened: 3,
+        active_days: 1,
+        skip_rate: 0,
+        top_artist: null,
+      },
+      trends: { window: period, points: [] },
+      top_tracks: { window: period, items: [] },
+      top_artists: { window: period, items: [] },
+      top_albums: { window: period, items: [] },
+      top_genres: { window: period, items: [] },
+      replay: {
+        window: period,
+        title: "Replay",
+        subtitle: "Snapshot",
+        track_count: 0,
+        minutes_listened: 0,
+        items: [],
+      },
+    };
+    mockUseApi.mockReturnValue({
+      data: dashboard,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const { container } = renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "es",
+    });
+
+    expect(
+      container.querySelector(".stats-page-atmosphere"),
+    ).toBeInTheDocument();
+    expect(container.querySelector(".stats-page-grid")).toBeInTheDocument();
+
+    const hero = container.querySelector(".stats-hero-surface");
+    expect(hero).toBeInTheDocument();
+    expect(hero).not.toHaveClass("bg-[#101116]");
+    expect(hero).not.toHaveClass("shadow-black/35");
+    expect(hero?.querySelector(".stats-hero-overlay")).toBeInTheDocument();
+
+    const heroTitle = container.querySelector(".stats-hero-title");
+    expect(heroTitle).toBeInTheDocument();
+    expect(heroTitle).not.toHaveClass("text-white");
+    expect(container.querySelectorAll(".stats-hero-metric")).toHaveLength(3);
   });
 
   it("localizes data-backed stats panels", () => {
@@ -121,8 +275,10 @@ describe("Stats page", () => {
       },
       replay: {
         window: "30d",
-        title: "Replay",
-        subtitle: "Snapshot",
+        title: "Replay this month",
+        subtitle: "The tracks that defined your last 30 days.",
+        title_key: "stats.replay.thisMonth.title",
+        subtitle_key: "stats.replay.thisMonth.subtitle",
         track_count: 0,
         minutes_listened: 0,
         items: [],
@@ -164,6 +320,11 @@ describe("Stats page", () => {
     expect(
       screen.getByText("Tu replay aparecerá cuando escuches un poco más."),
     ).toBeInTheDocument();
+    expect(screen.getByText("Replay de este mes")).toBeInTheDocument();
+    expect(
+      screen.getByText("Las canciones que definieron tus últimos 30 días."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Replay this month")).not.toBeInTheDocument();
   });
 
   it("uses global album artwork for remote replay tracks", () => {

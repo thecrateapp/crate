@@ -105,4 +105,18 @@ describe("SearchBar", () => {
     expect(buttons.length).toBe(0);
     expect(queryByLabelText("Clear search")).not.toBeInTheDocument();
   });
+
+  it("accepts translated labels for the input and clear button", () => {
+    const { getByLabelText } = render(
+      <SearchBar
+        value="dredg"
+        onChange={vi.fn()}
+        label="Buscar"
+        clearLabel="Borrar búsqueda"
+      />,
+    );
+
+    expect(getByLabelText("Buscar")).toBeInTheDocument();
+    expect(getByLabelText("Borrar búsqueda")).toBeInTheDocument();
+  });
 });

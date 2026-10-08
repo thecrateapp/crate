@@ -19,6 +19,7 @@ from dramatiq.middleware import (
 )
 
 from crate.config import get_durable_redis_url
+from crate.observability import init_sentry, resolve_service_name
 
 log = logging.getLogger(__name__)
 
@@ -41,5 +42,6 @@ def get_broker() -> RedisBroker:
 
 
 # Module-level broker — set on import so actors can register
+init_sentry(resolve_service_name("workers"))
 broker = get_broker()
 dramatiq.set_broker(broker)

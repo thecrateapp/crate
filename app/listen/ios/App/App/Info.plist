@@ -22,6 +22,8 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>CrateCastReceiverApplicationID</key>
+	<string>$(CRATE_CAST_RECEIVER_APP_ID)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

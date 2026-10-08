@@ -60,6 +60,7 @@ public class ExoPlayerNativePlaybackDeckTest {
             "Artist",
             "Album",
             "",
+            "",
             180_000L,
             null
         );

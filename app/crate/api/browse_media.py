@@ -54,8 +54,6 @@ from crate.equalizer import (
     save_user_track_eq_preset,
 )
 from crate.db.cache_store import get_cache, set_cache
-from crate.db.repositories.library import set_track_rating
-from crate.db.repositories.browse_media_favorites import add_favorite, remove_favorite
 from crate.db.queries.browse_media import (
     count_mood_presets,
     find_track_id_by_path,
@@ -69,12 +67,16 @@ from crate.db.queries.browse_media import (
     get_track_info_cols_by_path,
     get_track_path,
     get_track_path_by_entity_uid,
-    list_favorites,
 )
+from crate.db.queries.browse_media_favorites import list_favorites
+from crate.subsonic.services import preferences
 from crate.local_search import search_local_library
 from crate.metrics import record_later
 from crate.db.queries.browse_media_track_lookup import get_track_info_cols_by_storage_id
-from crate.db.repositories.tasks import create_task_dedup
+from crate.db.repositories.tasks import (
+    create_task_dedup,
+    find_active_task_by_type_params,
+)
 from crate.federation.global_playback import (
     GlobalTrackNotFound,
     NoPlayableGlobalTrack,
@@ -143,6 +145,20 @@ _DOWNLOAD_RESPONSES = merge_responses(
         404: error_response("The requested download could not be found."),
     },
 )
+
+
+def _queue_completeness_refresh() -> str:
+    """Queue or recover the active completeness task after deduplication."""
+    params: dict = {}
+    task_id = create_task_dedup("compute_completeness", params)
+    if task_id is None:
+        task_id = find_active_task_by_type_params("compute_completeness", params)
+    if task_id is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Could not queue completeness refresh",
+        )
+    return task_id
 
 
 @router.get(
@@ -225,8 +241,8 @@ def api_search(
     summary="List favorite artists, albums, and tracks",
 )
 def api_favorites_list(request: Request):
-    _require_auth(request)
-    return {"items": list_favorites()}
+    user = _require_auth(request)
+    return {"items": list_favorites(int(user["id"]))}
 
 
 @router.post(
@@ -236,8 +252,7 @@ def api_favorites_list(request: Request):
     summary="Add an item to favorites",
 )
 def api_favorites_add(request: Request, body: FavoriteMutationRequest):
-    _require_auth(request)
-    from datetime import datetime, timezone
+    user = _require_auth(request)
 
     item_id = body.item_id
     item_type = body.type
@@ -248,8 +263,10 @@ def api_favorites_add(request: Request, body: FavoriteMutationRequest):
             status_code=400, detail="type must be song, album, or artist"
         )
 
-    now = datetime.now(timezone.utc).isoformat()
-    add_favorite(item_type, item_id, now)
+    try:
+        preferences.star(int(user["id"]), item_type, item_id)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
     return {"ok": True}
 
@@ -261,7 +278,7 @@ def api_favorites_add(request: Request, body: FavoriteMutationRequest):
     summary="Remove an item from favorites",
 )
 def api_favorites_remove(request: Request, body: FavoriteMutationRequest):
-    _require_auth(request)
+    user = _require_auth(request)
     item_id = body.item_id
     item_type = body.type
     if not item_id:
@@ -271,7 +288,10 @@ def api_favorites_remove(request: Request, body: FavoriteMutationRequest):
             status_code=400, detail="type must be song, album, or artist"
         )
 
-    remove_favorite(item_type, item_id)
+    try:
+        preferences.unstar(int(user["id"]), item_type, item_id)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
     return {"ok": True}
 
@@ -283,7 +303,7 @@ def api_favorites_remove(request: Request, body: FavoriteMutationRequest):
     summary="Set a rating for a track",
 )
 def api_rate_track(request: Request, body: TrackRatingRequest):
-    _require_auth(request)
+    user = _require_auth(request)
 
     rating = body.rating
     track_id = body.track_id
@@ -298,12 +318,13 @@ def api_rate_track(request: Request, body: TrackRatingRequest):
     if not track_id:
         raise HTTPException(status_code=404, detail="Track not found")
 
-    set_track_rating(track_id, rating)
+    if not preferences.set_native_track_rating(int(user["id"]), track_id, rating):
+        raise HTTPException(status_code=404, detail="Track not found")
     return {"ok": True, "rating": rating}
 
 
 _TRACK_INFO_QUERY_COLS = (
-    "entity_uid, title, artist, album, format, bitrate, sample_rate, bit_depth, "
+    "id, entity_uid, path, title, artist, album, format, bitrate, sample_rate, bit_depth, "
     "bpm, audio_key, audio_scale, energy, "
     "danceability, valence, acousticness, instrumentalness, loudness, "
     "dynamic_range, mood_json, bliss_vector, lastfm_listeners, lastfm_playcount, popularity, rating"
@@ -340,7 +361,7 @@ def _derive_bliss_signature(bliss_vector) -> dict[str, float] | None:
     }
 
 
-def _serialize_track_info_row(row) -> dict:
+def _serialize_track_info_row(row, *, user_id: int | None = None) -> dict:
     payload = dict(row)
     raw_path = str(payload.get("path") or "")
     if raw_path and (
@@ -376,6 +397,8 @@ def _serialize_track_info_row(row) -> dict:
     if payload.get("entity_uid") is not None:
         payload["entity_uid"] = str(payload["entity_uid"])
         payload.pop("storage_id", None)
+    if user_id is not None and payload.get("id") is not None:
+        payload["rating"] = preferences.get_rating(user_id, int(payload["id"]))
     bliss_vector = payload.pop("bliss_vector", None)
     payload["bliss_signature"] = _derive_bliss_signature(bliss_vector)
     return payload
@@ -431,11 +454,11 @@ def _get_track_path_via_storage_alias(storage_id: str) -> str | None:
     summary="Get detailed track metadata by track ID",
 )
 def api_track_info_by_id(request: Request, track_id: int):
-    _require_auth(request)
+    user = _require_auth(request)
     row = get_track_info_cols(track_id, _TRACK_INFO_QUERY_COLS)
     if not row:
         raise HTTPException(status_code=404, detail="Track not found")
-    return _serialize_track_info_row(row)
+    return _serialize_track_info_row(row, user_id=int(user["id"]))
 
 
 @router.get(
@@ -445,11 +468,11 @@ def api_track_info_by_id(request: Request, track_id: int):
     summary="Get detailed track metadata by entity UID",
 )
 def api_track_info_by_entity_uid(request: Request, entity_uid: str):
-    _require_auth(request)
+    user = _require_auth(request)
     row = get_track_info_cols_by_entity_uid(entity_uid, _TRACK_INFO_QUERY_COLS)
     if not row:
         raise HTTPException(status_code=404, detail="Track not found")
-    return _serialize_track_info_row(row)
+    return _serialize_track_info_row(row, user_id=int(user["id"]))
 
 
 @router.get(
@@ -461,7 +484,7 @@ def api_track_info_by_entity_uid(request: Request, entity_uid: str):
     include_in_schema=False,
 )
 def api_track_info_by_storage_id(request: Request, storage_id: str):
-    _require_auth(request)
+    user = _require_auth(request)
     entity_uid = _get_entity_uid_from_storage_alias(storage_id)
     if entity_uid:
         return RedirectResponse(
@@ -470,7 +493,7 @@ def api_track_info_by_storage_id(request: Request, storage_id: str):
     row = _get_track_info_cols_via_storage_alias(storage_id, _TRACK_INFO_QUERY_COLS)
     if not row:
         raise HTTPException(status_code=404, detail="Track not found")
-    return _serialize_track_info_row(row)
+    return _serialize_track_info_row(row, user_id=int(user["id"]))
 
 
 @router.get(
@@ -480,7 +503,7 @@ def api_track_info_by_storage_id(request: Request, storage_id: str):
     summary="Get detailed track metadata by file path",
 )
 def api_track_info(request: Request, filepath: str):
-    _require_auth(request)
+    user = _require_auth(request)
     if filepath.startswith("/music/"):
         filepath = filepath[len("/music/") :]
 
@@ -488,7 +511,7 @@ def api_track_info(request: Request, filepath: str):
 
     if not row:
         raise HTTPException(status_code=404, detail="Track not found")
-    return _serialize_track_info_row(row)
+    return _serialize_track_info_row(row, user_id=int(user["id"]))
 
 
 # ── EQ adaptive features ────────────────────────────────────────────
@@ -928,7 +951,7 @@ def api_discover_completeness(request: Request):
     cached = get_cache("discover:completeness", max_age_seconds=86400)
     if cached is not None:
         return cached
-    create_task_dedup("compute_completeness", {})
+    _queue_completeness_refresh()
     return []
 
 
@@ -941,7 +964,7 @@ def api_discover_completeness(request: Request):
 def api_discover_completeness_refresh(request: Request):
     """Force recompute of completeness data."""
     _require_auth(request)
-    task_id = create_task_dedup("compute_completeness", {})
+    task_id = _queue_completeness_refresh()
     return {"task_id": task_id}
 
 

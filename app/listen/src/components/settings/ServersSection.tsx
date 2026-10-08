@@ -1,9 +1,19 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { Plus, Trash2, Server, CheckCircle2 } from "@crate/ui/icons";
-import { toast } from "sonner";
+import {
+  CheckCircle2,
+  CRATE_ICON_SIZE,
+  Plus,
+  Server,
+  Trash2,
+} from "@crate/ui/icons";
+import { notify } from "@crate/ui/lib/notify";
+import { IconButton } from "@crate/ui/primitives/IconButton";
+import { Button } from "@crate/ui/shadcn/button";
 
 import { usesConfigurableServer } from "@/lib/platform";
+import { revokeServerSession } from "@/lib/api";
 import {
   getCurrentServerId,
   getServers,
@@ -12,7 +22,6 @@ import {
   setCurrentServerId,
   type ServerConfig,
 } from "@/lib/server-store";
-import { useAuth } from "@/contexts/AuthContext";
 import { FIXED_SERVER_URL } from "@/lib/mobile-build-config";
 
 /**
@@ -20,13 +29,12 @@ import { FIXED_SERVER_URL } from "@/lib/mobile-build-config";
  * configurable shells — on web, there's always a single implicit server
  * (the one that served the app) so this UI would be confusing.
  *
- * Switching server drops the app back to the login screen for that
- * instance. Removing the active server clears its token and bounces
- * back to the setup screen if it was the only one.
+ * Switching server resets the session and authenticates against the
+ * selected instance. Removing a server revokes its session best-effort.
  */
 export function ServersSection() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
   const [servers, setServers] = useState<ServerConfig[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
 
@@ -42,41 +50,36 @@ export function ServersSection() {
 
   if (!usesConfigurableServer || FIXED_SERVER_URL) return null;
 
-  const handleSwitch = async (server: ServerConfig) => {
+  const handleSwitch = (server: ServerConfig) => {
     if (server.id === currentId) return;
     setCurrentServerId(server.id);
-    // Force a full re-auth against the new server. If the stored token
-    // is still valid we land back in the app; if not, login screen.
-    toast.success(`Switched to ${server.label}`);
-    if (server.token) {
-      // Reload so all in-flight queries drop and re-hit the new host.
-      window.location.href = "/";
-    } else {
-      navigate("/login", { replace: true });
-    }
+    notify.success(
+      t("settings.servers.toasts.switched", { name: server.label }),
+    );
   };
 
-  const handleRemove = async (server: ServerConfig) => {
-    const wasCurrent = server.id === currentId;
-    removeServer(server.id);
-    toast.success(`Removed ${server.label}`);
-    if (wasCurrent) {
-      // Currently-logged-in server was removed. Logout flushes local
-      // state and navigates to /login; ServerGate then bounces to
-      // /server-setup if there are no remaining servers.
-      await logout().catch(() => {});
+  const handleRemove = (server: ServerConfig) => {
+    if (server.token) {
+      void revokeServerSession(server).catch(() => {
+        // Local removal must work when this server is offline.
+      });
     }
+    removeServer(server.id);
+    notify.success(
+      t("settings.servers.toasts.removed", { name: server.label }),
+    );
   };
 
   return (
-    <section className="rounded-[12px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+    <section className="rounded-panel border border-border-quiet bg-text-primary/[0.03] p-5 sm:p-6">
       <div className="mb-1 flex items-center gap-2">
-        <Server size={16} className="text-cyan-400" />
-        <h2 className="text-sm font-semibold text-foreground">Servers</h2>
+        <Server size={CRATE_ICON_SIZE.sm} className="text-accent-action" />
+        <h2 className="text-sm font-semibold text-text-primary">
+          {t("settings.servers.title")}
+        </h2>
       </div>
-      <p className="mb-4 text-[12px] text-muted-foreground">
-        Crate servers this app can talk to. Switching drops you back to the
-        login screen for the new host.
+      <p className="mb-4 text-[0.75rem] text-text-muted">
+        {t("settings.servers.description")}
       </p>
 
       <div className="space-y-2">
@@ -87,8 +90,8 @@ export function ServersSection() {
               key={server.id}
               className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition ${
                 isCurrent
-                  ? "border-cyan-400/40 bg-cyan-400/10"
-                  : "border-white/10 bg-white/[0.03]"
+                  ? "border-accent-action/40 bg-accent-action/10"
+                  : "border-border-quiet bg-text-primary/[0.03]"
               }`}
             >
               <button
@@ -100,43 +103,44 @@ export function ServersSection() {
                 <div className="flex items-center gap-2">
                   <span
                     className={`text-sm font-medium ${
-                      isCurrent ? "text-cyan-100" : "text-white"
+                      isCurrent ? "text-text-accent" : "text-text-primary"
                     }`}
                   >
                     {server.label}
                   </span>
                   {isCurrent ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-300">
-                      <CheckCircle2 size={10} />
-                      Current
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-caps text-text-accent">
+                      <CheckCircle2 size={CRATE_ICON_SIZE.micro} />
+                      {t("settings.servers.current")}
                     </span>
                   ) : null}
                 </div>
-                <div className="text-[11px] text-muted-foreground">
-                  {server.url}
-                </div>
+                <div className="text-xs text-text-muted">{server.url}</div>
               </button>
-              <button
-                type="button"
+              <IconButton
+                tone="danger"
                 onClick={() => handleRemove(server)}
-                aria-label={`Remove ${server.label}`}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 text-muted-foreground transition hover:border-rose-400/40 hover:bg-rose-400/10 hover:text-rose-200"
+                label={t("settings.servers.remove", {
+                  name: server.label,
+                })}
+                className="size-9 rounded-lg border border-border-quiet text-text-muted hover:border-state-danger/40 hover:bg-state-danger/10 hover:text-state-danger-text"
               >
-                <Trash2 size={14} />
-              </button>
+                <Trash2 size={CRATE_ICON_SIZE.xs} className="size-3.5" />
+              </IconButton>
             </div>
           );
         })}
       </div>
 
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        shape="pill"
         onClick={() => navigate("/server-setup")}
-        className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 transition hover:border-cyan-400/30 hover:bg-cyan-400/10 hover:text-cyan-200"
+        className="mt-4 h-auto border border-text-primary/15 bg-text-primary/5 px-4 py-2 text-text-primary/80 hover:border-accent-action/30 hover:bg-accent-action/10 hover:text-text-accent has-[>svg]:px-4"
       >
-        <Plus size={14} />
-        Add another server
-      </button>
+        <Plus size={CRATE_ICON_SIZE.xs} className="size-3.5" />
+        {t("settings.servers.add")}
+      </Button>
     </section>
   );
 }

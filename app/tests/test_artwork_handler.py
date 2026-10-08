@@ -1,5 +1,6 @@
 import base64
 import io
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -52,6 +53,9 @@ class TestHandlerRegistration:
     def test_artwork_task_handlers_registers_all_handlers(self):
         expected = {
             "backfill_artist_heroes",
+            "migrate_artist_heroes",
+            "migrate_artist_hero",
+            "rollback_artist_hero",
             "backfill_artwork_variants",
             "cleanup_artwork_variants",
             "compose_artist_hero",
@@ -98,6 +102,231 @@ class TestHandlerRegistration:
 
 
 class TestHandleMaterializeArtworkVariants:
+    def test_artist_hero_materialization_rechecks_artist_inside_lock(self, monkeypatch):
+        lookups = iter(
+            [
+                {"id": 42, "entity_uid": "artist-entity"},
+                None,
+            ]
+        )
+        events: list[str] = []
+
+        @contextmanager
+        def publication_lock(artist_entity_uid):
+            assert artist_entity_uid == "artist-entity"
+            events.append("lock-enter")
+            yield
+            events.append("lock-exit")
+
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_library_artist_by_entity_uid",
+            lambda _entity_uid: next(lookups),
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.artist_hero_publication_lock",
+            publication_lock,
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.resolve_artwork_source",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                AssertionError("deleted artists must not resolve hero sources")
+            ),
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.emit_progress",
+            lambda *_args, **_kwargs: None,
+        )
+
+        result = _handle_materialize_artwork_variants(
+            "task-1",
+            {
+                "kind": "artist-hero",
+                "entity_key": "artist-entity:desktop:renderer:revision-a",
+            },
+            {},
+        )
+
+        assert result == {
+            "status": "missing",
+            "kind": "artist-hero",
+            "entity_key": "artist-entity:desktop:renderer:revision-a",
+        }
+        assert events == ["lock-enter", "lock-exit"]
+
+    def test_artist_hero_materialization_rejects_a_deleted_composition(
+        self, monkeypatch
+    ):
+        artist = {"id": 42, "entity_uid": "artist-entity"}
+        _mock_emit_silence(monkeypatch)
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_library_artist_by_entity_uid",
+            lambda _entity_uid: artist,
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_artist_hero_artwork",
+            lambda _artist_id: {"desktop_enabled": False},
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.resolve_artwork_source",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                AssertionError("deleted compositions must not be rematerialized")
+            ),
+        )
+
+        result = _handle_materialize_artwork_variants(
+            "task-deleted",
+            {
+                "kind": "artist-hero",
+                "entity_key": "artist-entity:desktop:renderer:revision-a",
+            },
+            {},
+        )
+
+        assert result == {
+            "status": "missing",
+            "kind": "artist-hero",
+            "entity_key": "artist-entity:desktop:renderer:revision-a",
+        }
+
+    def test_artist_hero_materialization_allows_a_retained_enabled_revision(
+        self, monkeypatch
+    ):
+        from crate.artwork_sources import ArtworkSource
+
+        artist = {"id": 42, "entity_uid": "artist-entity"}
+        _mock_emit_silence(monkeypatch)
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_library_artist_by_entity_uid",
+            lambda _entity_uid: artist,
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_artist_hero_artwork",
+            lambda _artist_id: {
+                "desktop_enabled": True,
+                "review_status": "approved",
+                "render_manifest": {
+                    "artifacts": {
+                        "desktop": {"render_revision": "renderer:revision-new"}
+                    }
+                },
+            },
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_artist_hero_render_revision",
+            lambda **_kwargs: {"render_revision": "renderer:revision-old"},
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.resolve_artwork_source",
+            lambda *_args, **_kwargs: ArtworkSource(
+                b"image", "image/jpeg", "publication"
+            ),
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.materialize_artwork",
+            lambda *_args, **_kwargs: {
+                "source_revision": "source-a",
+                "variant_count": 1,
+            },
+        )
+
+        result = _handle_materialize_artwork_variants(
+            "task-retained",
+            {
+                "kind": "artist-hero",
+                "entity_key": "artist-entity:desktop:renderer:revision-old",
+            },
+            {},
+        )
+
+        assert result["status"] == "materialized"
+        assert result["revision"] == "source-a"
+
+    def test_artist_hero_materialization_rejects_a_stale_legacy_asset(
+        self, monkeypatch
+    ):
+        artist = {"id": 42, "entity_uid": "artist-entity"}
+        _mock_emit_silence(monkeypatch)
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_library_artist_by_entity_uid",
+            lambda _entity_uid: artist,
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_artist_hero_artwork",
+            lambda _artist_id: {
+                "desktop_enabled": True,
+                "review_status": "approved",
+                "render_manifest": {
+                    "artifacts": {
+                        "desktop": {"render_revision": "renderer:revision-new"}
+                    }
+                },
+            },
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.resolve_artwork_source",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                AssertionError("stale legacy assets must not be rematerialized")
+            ),
+        )
+
+        result = _handle_materialize_artwork_variants(
+            "task-stale-legacy",
+            {
+                "kind": "artist-hero",
+                "entity_key": "artist-entity:desktop",
+            },
+            {},
+        )
+
+        assert result == {
+            "status": "missing",
+            "kind": "artist-hero",
+            "entity_key": "artist-entity:desktop",
+        }
+
+    def test_artist_hero_materialization_rejects_legacy_asset_for_v2_manifest(
+        self, monkeypatch
+    ):
+        artist = {"id": 42, "entity_uid": "artist-entity"}
+        _mock_emit_silence(monkeypatch)
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_library_artist_by_entity_uid",
+            lambda _entity_uid: artist,
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_artist_hero_artwork",
+            lambda _artist_id: {
+                "desktop_enabled": True,
+                "review_status": "approved",
+                "render_manifest": {
+                    "manifest_version": 2,
+                    "artifacts": {"desktop": {"relative_path": "artifact.webp"}},
+                },
+            },
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.resolve_artwork_source",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                AssertionError("V2 manifests must not recreate legacy hero assets")
+            ),
+        )
+
+        result = _handle_materialize_artwork_variants(
+            "task-stale-v2-legacy",
+            {
+                "kind": "artist-hero",
+                "entity_key": "artist-entity:desktop",
+            },
+            {},
+        )
+
+        assert result == {
+            "status": "missing",
+            "kind": "artist-hero",
+            "entity_key": "artist-entity:desktop",
+        }
+
     def test_materializes_resolved_source(self, monkeypatch):
         from crate.artwork_sources import ArtworkSource
 
@@ -203,16 +432,18 @@ class TestHandleMaterializeArtworkVariants:
 
 class TestHandleArtworkVariantMaintenance:
     def test_cleanup_defaults_to_a_bounded_full_library_pass(self, monkeypatch):
-        seen: list[int] = []
+        seen: list[dict] = []
         monkeypatch.setattr(
             "crate.worker_handlers.artwork.cleanup_artwork_variants",
-            lambda *, max_assets: seen.append(max_assets) or {"assets_checked": 0},
+            lambda **kwargs: seen.append(kwargs) or {"assets_checked": 0},
         )
 
-        result = _handle_cleanup_artwork_variants("task-1", {}, {})
+        result = _handle_cleanup_artwork_variants(
+            "task-1", {}, {"library_path": "/music"}
+        )
 
         assert result == {"assets_checked": 0}
-        assert seen == [10_000]
+        assert seen == [{"max_assets": 10_000, "library_root": Path("/music")}]
 
 
 # ── _handle_fetch_cover ──────────────────────────────────────────
@@ -830,6 +1061,39 @@ class TestHandleFetchAlbumCover:
             {},
         )
         assert result == {"status": "already_has_cover"}
+
+    def test_existing_cover_repairs_catalog_availability(self, monkeypatch, tmp_path):
+        album_dir = tmp_path / "Band" / "Album"
+        album_dir.mkdir(parents=True)
+        (album_dir / "cover.jpg").write_bytes(b"existing")
+        marked_albums = []
+        materialized_assets = []
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.set_album_has_cover",
+            marked_albums.append,
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.get_library_album_by_id",
+            lambda _album_id: {"entity_uid": "album-entity"},
+        )
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.queue_artwork_materialization",
+            lambda asset, *, reason: materialized_assets.append(
+                (asset.kind, asset.entity_key, reason)
+            ),
+        )
+
+        result = _handle_fetch_album_cover(
+            "task-1",
+            {"path": str(album_dir), "album_id": 132},
+            {},
+        )
+
+        assert result == {"status": "already_has_cover"}
+        assert marked_albums == [132]
+        assert materialized_assets == [
+            ("album-cover", "album-entity", "existing-cover")
+        ]
 
     def test_already_has_folder_jpg(self, tmp_path):
         album_dir = tmp_path / "Band" / "Album2"

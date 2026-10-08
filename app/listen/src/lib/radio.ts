@@ -1,36 +1,14 @@
 import type { PlaySource, Track } from "@/contexts/PlayerContext";
+import {
+  toRadioTrack,
+  toShapedRadioTrack,
+  type RadioTrackPayload,
+  type ShapedRadioTrack,
+} from "./radio-model";
 import { ApiError, api } from "@/lib/api";
-import { albumCoverApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
-import { toPlayableTrack } from "@/lib/playable-track";
 import { getPlaySourceLabel } from "@/components/player/player-source";
 
-export interface RadioTrackPayload {
-  track_id?: number | null;
-  global_track_uid?: string | null;
-  global_artist_uid?: string | null;
-  global_album_uid?: string | null;
-  track_entity_uid?: string | null;
-  track_slug?: string | null;
-  track_path?: string | null;
-  title: string;
-  artist: string;
-  artist_id?: number | null;
-  artist_entity_uid?: string | null;
-  artist_slug?: string | null;
-  album?: string | null;
-  album_id?: number | null;
-  album_entity_uid?: string | null;
-  album_slug?: string | null;
-  duration?: number | null;
-  score?: number | null;
-  bpm?: number | null;
-  audio_key?: string | null;
-  audio_scale?: string | null;
-  energy?: number | null;
-  danceability?: number | null;
-  valence?: number | null;
-  bliss_vector?: number[] | null;
-}
+export type { RadioTrackPayload, ShapedRadioTrack } from "./radio-model";
 
 interface RadioResponse {
   session?: {
@@ -59,54 +37,6 @@ function looksLikeUuid(value: string): boolean {
   );
 }
 
-function toTrack(payload: RadioTrackPayload): Track {
-  const cover = payload.album
-    ? albumCoverApiUrl(
-        {
-          albumId: payload.album_id,
-          albumEntityUid: payload.album_entity_uid,
-          artistEntityUid: payload.artist_entity_uid,
-          albumSlug: payload.album_slug,
-          artistName: payload.artist,
-          albumName: payload.album,
-        },
-        { size: 512 },
-      ) ||
-      artistPhotoApiUrl(
-        {
-          artistId: payload.artist_id,
-          artistEntityUid: payload.artist_entity_uid,
-          artistSlug: payload.artist_slug,
-          artistName: payload.artist,
-        },
-        { size: 512 },
-      ) ||
-      undefined
-    : artistPhotoApiUrl(
-        {
-          artistId: payload.artist_id,
-          artistEntityUid: payload.artist_entity_uid,
-          artistSlug: payload.artist_slug,
-          artistName: payload.artist,
-        },
-        { size: 512 },
-      ) || undefined;
-
-  return toPlayableTrack(
-    {
-      ...payload,
-      id:
-        payload.track_id ??
-        `radio:${payload.artist || "unknown"}:${payload.album || "unknown"}:${
-          payload.title || "unknown"
-        }`,
-      path: payload.track_path,
-      library_track_id: payload.track_id,
-    },
-    { cover },
-  );
-}
-
 async function requestRadio(
   url: string,
   options: RadioRequestOptions = {},
@@ -129,6 +59,7 @@ async function startSeededRadioSession(
     | "album"
     | "track"
     | "playlist"
+    | "crate"
     | "home-playlist"
     | "genre",
   seedValue: string,
@@ -149,7 +80,7 @@ async function startSeededRadioSession(
     { signal: options.signal },
   );
   return {
-    tracks: data.tracks.map(shapedToTrack),
+    tracks: data.tracks.map(toShapedRadioTrack),
     source: {
       type: "radio",
       name:
@@ -289,7 +220,7 @@ export async function fetchRadioContinuation(
       `/api/artists/${radio.seedId}/radio?limit=${limit}`,
       options,
     );
-    return (data.tracks || []).map(toTrack);
+    return (data.tracks || []).map(toRadioTrack);
   }
 
   if (radio.seedType === "track") {
@@ -322,7 +253,7 @@ export async function fetchRadioContinuation(
       `/api/radio/track?${params.toString()}`,
       options,
     );
-    return (data.tracks || []).map(toTrack);
+    return (data.tracks || []).map(toRadioTrack);
   }
 
   if (radio.seedType === "album" && radio.seedId != null) {
@@ -330,7 +261,7 @@ export async function fetchRadioContinuation(
       `/api/radio/album/${radio.seedId}?limit=${limit}`,
       options,
     );
-    return (data.tracks || []).map(toTrack);
+    return (data.tracks || []).map(toRadioTrack);
   }
 
   if (radio.seedType === "playlist" && radio.seedId != null) {
@@ -341,7 +272,7 @@ export async function fetchRadioContinuation(
             String(radio.seedId),
           )}?limit=${limit}`;
     const data = await requestRadio(path, options);
-    return (data.tracks || []).map(toTrack);
+    return (data.tracks || []).map(toRadioTrack);
   }
 
   return [];
@@ -364,7 +295,7 @@ export async function fetchInfiniteContinuation(
       `/api/radio/album/${seed.seedId}?limit=${limit}`,
       options,
     );
-    return (data.tracks || []).map(toTrack);
+    return (data.tracks || []).map(toRadioTrack);
   }
 
   if (
@@ -379,33 +310,13 @@ export async function fetchInfiniteContinuation(
             String(seed.seedId),
           )}?limit=${limit}`;
     const data = await requestRadio(path, options);
-    return (data.tracks || []).map(toTrack);
+    return (data.tracks || []).map(toRadioTrack);
   }
 
   return [];
 }
 
 // ── Shaped Radio (v2) — sessions with like/dislike feedback ────────
-
-export interface ShapedRadioTrack {
-  track_id?: number | null;
-  global_track_uid?: string | null;
-  global_artist_uid?: string | null;
-  global_album_uid?: string | null;
-  entity_uid?: string | null;
-  title: string;
-  artist: string;
-  album?: string | null;
-  album_id?: number | null;
-  bpm?: number | null;
-  audio_key?: string | null;
-  audio_scale?: string | null;
-  energy?: number | null;
-  danceability?: number | null;
-  valence?: number | null;
-  bliss_vector?: number[] | null;
-  distance: number;
-}
 
 interface ShapedRadioStartResponse {
   session_id: string;
@@ -417,40 +328,6 @@ interface ShapedRadioStartResponse {
 interface ShapedRadioNextResponse {
   session_id: string;
   tracks: ShapedRadioTrack[];
-}
-
-function shapedToTrack(t: ShapedRadioTrack): Track {
-  return toPlayableTrack(
-    {
-      id: t.global_track_uid ?? t.track_id,
-      global_track_uid: t.global_track_uid,
-      global_artist_uid: t.global_artist_uid,
-      global_album_uid: t.global_album_uid,
-      entity_uid: t.entity_uid,
-      title: t.title,
-      artist: t.artist,
-      album: t.album,
-      album_id: t.album_id,
-      library_track_id: t.track_id,
-      bpm: t.bpm,
-      audio_key: t.audio_key,
-      audio_scale: t.audio_scale,
-      energy: t.energy,
-      danceability: t.danceability,
-      valence: t.valence,
-      bliss_vector: t.bliss_vector,
-    },
-    {
-      cover: t.album_id
-        ? albumCoverApiUrl({ albumId: t.album_id }, { size: 512 }) || undefined
-        : t.global_album_uid
-          ? albumCoverApiUrl(
-              { globalAlbumUid: t.global_album_uid },
-              { size: 512 },
-            ) || undefined
-          : undefined,
-    },
-  );
 }
 
 export async function startShapedRadio(
@@ -476,7 +353,7 @@ export async function startShapedRadio(
     return {
       sessionId: data.session_id,
       seedLabel: data.seed_label,
-      tracks: data.tracks.map(shapedToTrack),
+      tracks: data.tracks.map(toShapedRadioTrack),
       source: {
         type: "radio",
         name:
@@ -487,6 +364,7 @@ export async function startShapedRadio(
             | "album"
             | "artist"
             | "playlist"
+            | "crate"
             | "home-playlist"
             | "genre"
             | "discovery",
@@ -525,7 +403,7 @@ export async function fetchShapedRadioNext(
       },
       { signal: options.signal },
     );
-    return data.tracks.map(shapedToTrack);
+    return data.tracks.map(toShapedRadioTrack);
   } catch {
     return [];
   }

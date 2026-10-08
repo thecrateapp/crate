@@ -154,7 +154,12 @@ public class CrateSecureSessionPlugin extends Plugin {
         }
     }
 
-    private SecretKey secretKey() throws Exception {
+    // Capacitor plugin calls can arrive concurrently (e.g. a session write
+    // and an OAuth record write racing on app launch). Without this, two
+    // callers could both miss the "already exists" check and each
+    // generate a fresh key, silently making ciphertext written under the
+    // key that got overwritten permanently undecryptable.
+    private synchronized SecretKey secretKey() throws Exception {
         KeyStore keyStore = KeyStore.getInstance(KEYSTORE);
         keyStore.load(null);
         KeyStore.Entry existing = keyStore.getEntry(KEY_ALIAS, null);

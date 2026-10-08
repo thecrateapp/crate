@@ -14,6 +14,7 @@ DB_HEAVY_TASKS = {
     "wipe_library",
     "rebuild_library",
     "repair",
+    "repair_duplicate_tracks",
     "migrate_storage_v2",
     "fix_artist",
 }

@@ -21,6 +21,7 @@ import java.io.InputStream;
 import java.io.ByteArrayOutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -76,6 +77,11 @@ public class CrateSocialSharePlugin extends Plugin {
             call.reject("Missing image URL");
             return;
         }
+        // Self-hosted artwork can require auth (bearer token, not cookies,
+        // for the native multi-server flow) — the caller only passes these
+        // for same-origin API URLs, never third-party CDNs, so we don't
+        // need to re-derive or restrict that here.
+        JSObject headers = call.getObject("headers");
 
         imageExecutor.execute(() -> {
             HttpURLConnection connection = null;
@@ -87,6 +93,16 @@ public class CrateSocialSharePlugin extends Plugin {
                 connection.setReadTimeout(10_000);
                 connection.setRequestProperty("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");
                 connection.setRequestProperty("User-Agent", "Crate Android");
+                if (headers != null) {
+                    Iterator<String> keys = headers.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        String value = headers.getString(key, "");
+                        if (!value.isEmpty()) {
+                            connection.setRequestProperty(key, value);
+                        }
+                    }
+                }
 
                 int status = connection.getResponseCode();
                 if (status < 200 || status >= 300) {

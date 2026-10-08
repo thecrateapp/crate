@@ -3,6 +3,10 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const navigateMock = vi.hoisted(() => vi.fn());
+const toast = vi.hoisted(() => ({
+  error: vi.fn(),
+  success: vi.fn(),
+}));
 
 vi.mock("react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router")>();
@@ -40,6 +44,8 @@ vi.mock("@/lib/radio", () => ({
   fetchTrackRadio: vi.fn(),
 }));
 
+vi.mock("@crate/ui/lib/notify", () => ({ notify: toast }));
+
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { I18nProvider, type ListenLocale } from "@/i18n";
 import { fetchTrackRadio } from "@/lib/radio";
@@ -55,6 +61,8 @@ describe("useTrackActionEntries", () => {
   beforeEach(() => {
     navigateMock.mockReset();
     vi.mocked(fetchTrackRadio).mockReset();
+    toast.error.mockReset();
+    toast.success.mockReset();
   });
 
   it("shares tracks through Crate's share sheet with the public preview URL", async () => {
@@ -218,10 +226,97 @@ describe("useTrackActionEntries", () => {
         "Iniciar radio de canción",
         "Compartir canción",
         "Descargar canción",
-        "Playlists",
-        "Añadir a una playlist nueva",
-        "Añadir a Favorites",
       ]),
     );
+
+    const playlistMenu = result.current.find(
+      (entry) => entry.key === "playlist",
+    );
+    expect(playlistMenu?.type).toBe("disclosure");
+    if (playlistMenu?.type !== "disclosure") {
+      throw new Error("Playlist submenu missing");
+    }
+    expect(playlistMenu.label).toBe("Añadir a playlist");
+    expect(playlistMenu.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "Añadir a una playlist nueva" }),
+        expect.objectContaining({ label: "Añadir a Favorites" }),
+      ]),
+    );
+  });
+
+  it("groups playlist actions under a disclosure submenu", () => {
+    const { result } = renderHook(
+      () =>
+        useTrackActionEntries({
+          track: {
+            id: 12,
+            entity_uid: "track-entity-12",
+            title: "Talk for Hours",
+            artist: "High Vis",
+          },
+          playlistOptions: [{ id: 1, name: "Favorites" }],
+          onCreatePlaylist: vi.fn(),
+          onAddToPlaylist: vi.fn(),
+        }),
+      { wrapper: i18nWrapper("es") },
+    );
+
+    const playlistMenu = result.current.find(
+      (entry) => entry.key === "playlist",
+    );
+    expect(playlistMenu?.type).toBe("disclosure");
+    if (playlistMenu?.type !== "disclosure") {
+      throw new Error("Playlist submenu missing");
+    }
+    expect(playlistMenu.items.map((item) => item.key)).toEqual([
+      "playlist-create",
+      "playlist-1",
+    ]);
+  });
+
+  it("shows an error when adding a track to a playlist fails", async () => {
+    const onAddToPlaylist = vi
+      .fn()
+      .mockRejectedValue(new Error("playlist unavailable"));
+    const { result } = renderHook(
+      () =>
+        useTrackActionEntries({
+          track: {
+            id: 12,
+            entity_uid: "track-entity-12",
+            title: "Talk for Hours",
+            artist: "High Vis",
+          },
+          playlistOptions: [{ id: 1, name: "Favorites" }],
+          onAddToPlaylist,
+        }),
+      { wrapper: i18nWrapper("es") },
+    );
+
+    const playlistMenu = result.current.find(
+      (entry) => entry.key === "playlist",
+    );
+    const addAction =
+      playlistMenu?.type === "disclosure"
+        ? playlistMenu.items.find((entry) => entry.key === "playlist-1")
+        : undefined;
+    if (
+      !addAction ||
+      addAction.type === "divider" ||
+      addAction.type === "label" ||
+      addAction.type === "disclosure"
+    ) {
+      throw new Error("Playlist action missing");
+    }
+
+    await act(async () => {
+      await addAction.onSelect();
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      "No se pudo añadir la canción a la playlist",
+    );
+    expect(toast.success).not.toHaveBeenCalled();
   });
 });

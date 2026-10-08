@@ -37,6 +37,9 @@ vi.mock("@/lib/api", async (importOriginal) => {
         if (method === "PUT") return body;
         return { remote_scrobbling_enabled: false };
       }
+      if (url === "/api/auth/subsonic-token") {
+        return { configured: false };
+      }
       return {};
     }),
   };
@@ -53,7 +56,9 @@ describe("Settings", () => {
   });
 
   it("localizes the settings page chrome", () => {
-    renderWithListenProviders(<Settings />, { locale: "es" });
+    const { container } = renderWithListenProviders(<Settings />, {
+      locale: "es",
+    });
 
     expect(
       screen.getByRole("heading", { name: "Ajustes" }),
@@ -66,6 +71,17 @@ describe("Settings", () => {
     expect(screen.getByText("Al terminar la pista")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("tu-handle")).toBeInTheDocument();
     expect(screen.getByText("Enlaces rápidos")).toBeInTheDocument();
+    expect(screen.getByText("OpenSubsonic")).toBeInTheDocument();
+    expect(container.querySelector(".settings-header")).toBeInTheDocument();
+    expect(container.querySelector(".settings-section")).toBeInTheDocument();
+  });
+
+  it("does not show the appearance settings while the feature is disabled", () => {
+    renderWithListenProviders(<Settings />, { locale: "en" });
+
+    expect(
+      screen.queryByRole("heading", { name: "Appearance" }),
+    ).not.toBeInTheDocument();
   });
 
   it("changes and stores the selected Listen language", async () => {
@@ -124,12 +140,12 @@ describe("Settings", () => {
 
     renderWithListenProviders(<Settings />, { locale: "en" });
 
-    const toggle = screen.getByRole("button", { name: "Equalizer" });
-    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const toggle = screen.getByRole("switch", { name: "Equalizer" });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
 
     await user.click(toggle);
     expect(localStorage.getItem("listen-eq-enabled")).toBe("false");
-    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(toggle).toHaveAttribute("aria-checked", "false");
   });
 
   it("keeps crossfade controls on desktop", () => {
@@ -145,16 +161,16 @@ describe("Settings", () => {
 
     renderWithListenProviders(<Settings />, { locale: "en" });
 
-    const toggle = await screen.findByRole("button", {
+    const toggle = await screen.findByRole("switch", {
       name: "Scrobble remote plays",
     });
-    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(toggle).toHaveAttribute("aria-checked", "false");
 
     await user.click(toggle);
 
     expect(api).toHaveBeenCalledWith("/api/me/scrobble/preferences", "PUT", {
       remote_scrobbling_enabled: true,
     });
-    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(toggle).toHaveAttribute("aria-checked", "true");
   });
 });

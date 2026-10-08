@@ -52,6 +52,7 @@ vi.mock("@/lib/cache", () => ({
 vi.mock("@/lib/platform", () => ({
   getListenAppId: () => "listen-web",
   isTauriRuntime: false,
+  usesNativeFilesystem: false,
   get usesConfigurableServer() {
     return runtimeState.usesConfigurableServer;
   },
@@ -60,6 +61,8 @@ vi.mock("@/lib/platform", () => ({
 vi.mock("@/lib/server-store", () => ({
   SERVER_STORE_EVENT: "crate-server-store-change",
   getCurrentServer: () => runtimeState.currentServer,
+  getCurrentServerId: () => runtimeState.currentServer?.id ?? null,
+  getServers: () => [runtimeState.currentServer].filter(Boolean),
   migrateLegacyToken: vi.fn(),
   seedDefaultServer: vi.fn(),
 }));

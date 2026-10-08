@@ -1,0 +1,16 @@
+branch_revision=e8c8530d08862f992ead217eab21b9e3e3c650fb
+workflow=https://github.com/thecrateapp/crate/actions/runs/36947461225
+artifact=crate-linux-0.1.0.AppImage
+artifact_sha256=4141f066b1a4e285f031ce01a28289a74014bfe04478dbddbf718d9dbdc21ebd
+container=Debian 12 x86_64, OrbStack
+system_runtime_webkitgtk=2.40.3-2~deb12u2
+appimage_runtime_webkitgtk=2.50.4
+launch=extracted AppRun under xvfb-run and a private D-Bus session
+rendering=software, X11/Xvfb
+profile=isolated XDG_CONFIG_HOME, XDG_DATA_HOME, XDG_CACHE_HOME, XDG_RUNTIME_DIR
+sandbox=WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 (container smoke only)
+duration=8 seconds
+visible_window=true
+rendered=Crate server setup page
+library_maps=app, WebKitWebProcess, and WebKitNetworkProcess used libraries from the extracted AppImage tree
+screenshot=tauri-c05-linux-appimage-2026-10-02.png

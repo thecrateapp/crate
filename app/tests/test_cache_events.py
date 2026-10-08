@@ -321,6 +321,53 @@ def test_jam_mutations_invalidate_jam_scope():
     assert cache_events._match_invalidation_scopes("/api/jam/rooms/abc/end") == ["jam"]
 
 
+def test_crate_mutations_invalidate_collection_and_crate_detail():
+    from crate.api import cache_events
+    from crate.db.cache_invalidation import cache_prefixes_for_scopes
+
+    crate_id = "7ee76303-7aa6-4317-a5d3-18c2e1360b1c"
+    assert cache_events._match_invalidation_scopes("/api/crates") == [
+        "crates",
+        "library",
+    ]
+    assert cache_events._match_invalidation_scopes(
+        f"/api/crates/{crate_id}/albums"
+    ) == [
+        "crates",
+        f"crate:{crate_id}",
+        "library",
+    ]
+    assert cache_events._match_invalidation_scopes(
+        "/api/crates/invites/example-token/accept"
+    ) == ["crates", "library"]
+    assert cache_events._should_append_invalidation_domain_event("crates") is True
+    assert cache_prefixes_for_scopes(["crates"]) == {"crate:"}
+    assert f"crate:{crate_id}" in cache_prefixes_for_scopes([f"crate:{crate_id}"])
+
+
+def test_crate_invalidation_does_not_mark_global_ui_snapshots_stale(monkeypatch):
+    from crate.api import cache_events
+
+    marked: list[tuple[str | None, str | None]] = []
+    monkeypatch.setattr(
+        "crate.db.cache_store.delete_cache_prefix",
+        lambda _prefix: None,
+    )
+    monkeypatch.setattr(
+        "crate.db.ui_snapshot_store.mark_ui_snapshots_stale",
+        lambda scope=None, subject_key=None, scope_prefix=None: marked.append(
+            (scope or scope_prefix, subject_key)
+        ),
+    )
+
+    cache_events._clear_backend_cache_for_scopes(
+        ["crates", "crate:7ee76303-7aa6-4317-a5d3-18c2e1360b1c"]
+    )
+
+    assert ("home:", None) not in marked
+    assert ("ops", "dashboard") not in marked
+
+
 def test_admin_auth_mutations_invalidate_readplane_identity_cache():
     from crate.api import cache_events
 
@@ -329,4 +376,55 @@ def test_admin_auth_mutations_invalidate_readplane_identity_cache():
     ) == ["auth"]
     assert cache_events._match_invalidation_scopes("/api/admin/auth/users/7/role") == [
         "auth"
+    ]
+
+
+def test_open_subsonic_star_get_mutations_invalidate_likes(monkeypatch):
+    from crate.api import cache_events
+
+    invalidations: list[tuple[str, ...]] = []
+    monkeypatch.setattr(
+        cache_events,
+        "broadcast_invalidation",
+        lambda *scopes: invalidations.append(scopes),
+    )
+
+    async def app(_scope, _receive, send):
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
+
+    async def receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(_message):
+        return None
+
+    async def run_request(path: str, query_string: str = ""):
+        await cache_events.CacheInvalidationMiddleware(app)(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": path,
+                "query_string": query_string.encode(),
+            },
+            receive,
+            send,
+        )
+
+    async def run_requests():
+        await run_request("/rest/star.view", "id=gt-111")
+        await run_request("/rest/unstar.view", "id=gt-111")
+        await run_request("/rest/star", "id=gt-112")
+        await run_request("/rest/star.view", "artistId=ga-222")
+        await run_request("/rest/unstar.view", "albumId=gal-333")
+        await run_request("/rest/getStarred.view")
+
+    asyncio.run(run_requests())
+
+    assert invalidations == [
+        ("likes",),
+        ("likes",),
+        ("likes",),
+        ("follows", "home", "upcoming"),
+        ("saved_albums", "home"),
     ]

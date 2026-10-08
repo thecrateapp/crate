@@ -44,6 +44,7 @@ const gaplessMock = vi.hoisted(() => {
     loop = false;
     masterOut: ReturnType<ReturnType<typeof createContext>["createGain"]>;
     playbackRate = 1;
+    onplay?: (path: string, analyser: AnalyserNode | null) => void;
     pauseCalls = 0;
     playlist = { shuffledIndices: [] as number[], sources: [] as string[] };
     position = 0;
@@ -107,6 +108,7 @@ const gaplessMock = vi.hoisted(() => {
 
     play(): void {
       this.playCalls += 1;
+      this.onplay?.(this.getTrack(), {} as AnalyserNode);
     }
 
     pause(): void {
@@ -294,6 +296,44 @@ describe("gapless player audio recovery", () => {
     expect(recovered.playCalls).toBe(1);
   });
 
+  it("restores the paused position if WebKitGTK reports zero after minimizing", async () => {
+    const staleContext = gaplessMock.createContext("running");
+    gaplessMock.contextQueue.push(staleContext);
+
+    initPlayer();
+    loadQueue(["/tracks/a.flac", "/tracks/b.flac"], 0);
+    seekTo(42_000);
+    await play();
+    pause();
+
+    const pausedPlayer = gaplessMock.instances[0]!;
+    expect(pausedPlayer.position).toBe(42_000);
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "hidden",
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    // Reproduce the failure: after minimizing, the WebKit player reports 0
+    // even though the last confirmed paused position was 42 seconds.
+    pausedPlayer.position = 0;
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    await play();
+    await flushMicrotasks();
+
+    expect(gaplessMock.instances).toHaveLength(1);
+    expect(gaplessMock.instances[0]!.context).toBe(staleContext);
+    expect(gaplessMock.instances[0]!.getTrack()).toBe("/tracks/a.flac");
+    expect(gaplessMock.instances[0]!.position).toBe(42_000);
+    expect(gaplessMock.instances[0]!.playCalls).toBe(2);
+  });
+
   it("does not rebuild or restart active Tauri playback when foregrounded", async () => {
     const staleContext = gaplessMock.createContext("running");
     const freshContext = gaplessMock.createContext("running");
@@ -326,10 +366,50 @@ describe("gapless player audio recovery", () => {
     expect(gaplessMock.instances[0]!.playCalls).toBe(1);
   });
 
+  it("marks Tauri output stale after a long hidden gap even if playback was active", async () => {
+    vi.useFakeTimers();
+    const staleContext = gaplessMock.createContext("running");
+    gaplessMock.contextQueue.push(staleContext);
+
+    initPlayer();
+    loadQueue(["/tracks/a.flac", "/tracks/b.flac"], 1);
+    seekTo(32_000);
+    await play();
+    expect(gaplessMock.instances[0]!.playCalls).toBe(1);
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "hidden",
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    // Simulate the machine sleeping for well over the long-absence
+    // threshold — timers (and the app) are effectively frozen for this
+    // stretch, same as a real system sleep.
+    await vi.advanceTimersByTimeAsync(11_000);
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+    await flushMicrotasks();
+
+    await play();
+    await flushMicrotasks();
+
+    expect(gaplessMock.instances).toHaveLength(1);
+    expect(gaplessMock.instances[0]!.context).toBe(staleContext);
+    expect(gaplessMock.instances[0]!.index).toBe(1);
+    expect(gaplessMock.instances[0]!.position).toBe(32_000);
+    expect(gaplessMock.instances[0]!.playCalls).toBe(2);
+
+    vi.useRealTimers();
+  });
+
   it("upgrades an in-flight Tauri foreground wake before play after pause", async () => {
     const staleContext = gaplessMock.createContext("running");
-    const freshContext = gaplessMock.createContext("running");
-    gaplessMock.contextQueue.push(staleContext, freshContext);
+    gaplessMock.contextQueue.push(staleContext);
 
     initPlayer();
     loadQueue(["/tracks/a.flac", "/tracks/b.flac"], 0);
@@ -346,14 +426,47 @@ describe("gapless player audio recovery", () => {
     await play();
     await flushMicrotasks();
 
-    expect(gaplessMock.instances).toHaveLength(2);
-    expect(gaplessMock.instances[0]!.stopCalls).toBe(1);
+    expect(gaplessMock.instances).toHaveLength(1);
+    expect(gaplessMock.instances[0]!.context).toBe(staleContext);
+    expect(gaplessMock.instances[0]!.tracks).toEqual([
+      "/tracks/a.flac",
+      "/tracks/b.flac",
+    ]);
+    expect(gaplessMock.instances[0]!.index).toBe(0);
+    expect(gaplessMock.instances[0]!.position).toBe(18_000);
+    expect(gaplessMock.instances[0]!.playCalls).toBe(2);
+  });
 
-    const recovered = gaplessMock.instances[1]!;
-    expect(recovered.context).toBe(freshContext);
-    expect(recovered.tracks).toEqual(["/tracks/a.flac", "/tracks/b.flac"]);
-    expect(recovered.index).toBe(0);
-    expect(recovered.position).toBe(18_000);
-    expect(recovered.playCalls).toBe(1);
+  it("does not carry stale-output state across a destroy/init cycle", async () => {
+    const firstContext = gaplessMock.createContext("running");
+    gaplessMock.contextQueue.push(firstContext);
+
+    initPlayer();
+    loadQueue(["/tracks/a.flac"], 0);
+
+    // Never played, so this wake always marks the output stale — the same
+    // path a real background/sleep cycle would take.
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+    await flushMicrotasks();
+
+    destroyPlayer();
+
+    const freshContext = gaplessMock.createContext("running");
+    gaplessMock.contextQueue.push(freshContext);
+    initPlayer();
+    loadQueue(["/tracks/b.flac"], 0);
+    await play();
+
+    // Exactly the pre-destroy instance plus the fresh one from this
+    // session. A 3rd instance would mean the stale-output flag leaked
+    // across destroyPlayer() and forced an unnecessary rebuild on the
+    // very first play of the new session.
+    expect(gaplessMock.instances).toHaveLength(2);
+    expect(gaplessMock.instances[1]!.context).toBe(freshContext);
+    expect(gaplessMock.instances[1]!.playCalls).toBe(1);
   });
 });

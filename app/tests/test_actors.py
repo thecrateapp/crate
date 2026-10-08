@@ -19,6 +19,19 @@ def test_enrich_mbids_is_resource_governed_but_not_db_heavy():
     assert "enrich_mbids" not in tasks_shared.DB_HEAVY_TASKS
 
 
+def test_cast_spectrum_runs_on_governed_heavy_pool():
+    from crate import actors
+    from crate.worker import TASK_HANDLERS
+
+    config = actors.TASK_POOL_CONFIG["generate_cast_spectrum"]
+
+    assert config.queue == "heavy"
+    assert config.priority == 1
+    assert config.time_limit_seconds == 1200
+    assert config.max_retries == 2
+    assert TASK_HANDLERS["generate_cast_spectrum"] is not None
+
+
 def test_download_slot_acquire_is_atomic_and_capacity_bound(monkeypatch):
     from crate import actors
 

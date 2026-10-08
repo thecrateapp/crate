@@ -45,7 +45,15 @@ describe("SearchResults", () => {
     const input = screen.getByPlaceholderText(
       "Search artists, albums, tracks...",
     );
+    const surface = screen
+      .getByRole("heading", { name: "Search" })
+      .closest(".shadow-card");
+    expect(surface).not.toBeNull();
+    expect(surface).toHaveClass("shadow-card");
     await user.type(input, "Converge");
+    expect(screen.getByRole("button", { name: "Search" })).toHaveClass(
+      "shadow-action",
+    );
     await user.click(screen.getByRole("button", { name: "Search" }));
 
     await waitFor(() => {
@@ -112,6 +120,25 @@ describe("SearchResults", () => {
       expect(screen.getByText("Search unavailable")).toBeInTheDocument();
     });
     expect(screen.queryByText("No music found")).not.toBeInTheDocument();
+  });
+
+  it("retries a failed search from the error state", async () => {
+    vi.mocked(api).mockRejectedValue(new ApiError(500, "Server error"));
+
+    renderWithListenProviders(<SearchResults />, {
+      path: "/search",
+      route: "/search?q=high-vis",
+    });
+
+    const retry = await screen.findByRole("button", { name: "Retry" });
+    vi.mocked(api).mockClear();
+    vi.mocked(api).mockResolvedValue({ artists: [], albums: [], tracks: [] });
+    await userEvent.click(retry);
+
+    await waitFor(() => {
+      expect(screen.getByText("No music found")).toBeInTheDocument();
+    });
+    expect(api).toHaveBeenCalled();
   });
 
   it("renders global catalog tracks as playable rows", async () => {
@@ -257,7 +284,10 @@ describe("SearchResults", () => {
       expect(screen.getAllByText("Blending").length).toBeGreaterThan(0);
       expect(screen.getByText("Talk For Hours")).toBeInTheDocument();
     });
-    expect(screen.getByRole("button", { name: /High Vis/i })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open High Vis" })).toHaveAttribute(
+      "href",
+      "/artists/high-vis",
+    );
     const links = screen.getAllByRole("link");
     expect(
       links.find(

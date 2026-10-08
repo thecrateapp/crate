@@ -29,7 +29,7 @@ NC     := \033[0m
 # ===========================================================================
 
 DC_DEV := $(DC) -f docker-compose.dev.yaml -f docker-compose.readplane.dev.yaml
-DEV_CONTAINERS := crate-dev-api crate-dev-readplane crate-dev-worker crate-dev-maintenance-worker crate-dev-analysis-worker crate-dev-playback-worker crate-dev-postgres crate-dev-redis crate-dev-slskd crate-dev-caddy crate-dev-readplane-proxy
+DEV_CONTAINERS := crate-dev-api crate-dev-readplane crate-dev-worker crate-dev-fast-worker crate-dev-projector crate-dev-maintenance-worker crate-dev-analysis-worker crate-dev-playback-worker crate-dev-media-worker crate-dev-cast-receiver crate-dev-postgres crate-dev-redis crate-dev-redis-durable crate-dev-slskd crate-dev-caddy crate-dev-readplane-proxy
 
 .PHONY: dev
 dev: ## Start backend (Postgres + Redis + API + Worker + Readplane + Caddy) and frontend dev servers
@@ -53,9 +53,9 @@ dev: ## Start backend (Postgres + Redis + API + Worker + Readplane + Caddy) and 
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
 	@-pkill -f "vite.*app/site" 2>/dev/null || true
-	@-pkill -f "vite.*app/reference" 2>/dev/null || true
 	@docker rm -f $(DEV_CONTAINERS) >/dev/null 2>&1 || true
 	@sleep 0.5
+	@$(MAKE) --no-print-directory _ensure-dev-certs
 	@$(DC_DEV) up -d --build
 	@echo "$(GREEN)Backend is up (Postgres, Redis, API, Worker, Readplane, Caddy)$(NC)"
 	@echo ""
@@ -73,6 +73,7 @@ dev: ## Start backend (Postgres + Redis + API + Worker + Readplane + Caddy) and 
 	@echo ""
 	@echo "  $(GREEN)Admin:$(NC)  https://admin.dev.lespedants.org"
 	@echo "  $(GREEN)Listen:$(NC) https://listen.dev.lespedants.org"
+	@echo "  $(GREEN)Cast:$(NC)   https://cast.dev.lespedants.org"
 	@echo "  $(GREEN)Docs:$(NC)   https://docs.dev.cratemusic.app"
 	@echo "  $(GREEN)Site:$(NC)   https://www.dev.cratemusic.app"
 	@echo "  $(GREEN)API:$(NC)    https://api.dev.lespedants.org"
@@ -147,7 +148,6 @@ dev-down: ## Stop everything (backend + frontends)
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
 	@-pkill -f "vite.*app/site" 2>/dev/null || true
-	@-pkill -f "vite.*app/reference" 2>/dev/null || true
 	@echo "$(GREEN)Everything stopped$(NC)"
 
 .PHONY: dev-logs
@@ -179,7 +179,6 @@ dev-rebuild: ## Rebuild and restart everything
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
 	@-pkill -f "vite.*app/site" 2>/dev/null || true
-	@-pkill -f "vite.*app/reference" 2>/dev/null || true
 	@docker rm -f $(DEV_CONTAINERS) >/dev/null 2>&1 || true
 	@sleep 0.5
 	@$(DC_DEV) up -d --build --force-recreate
@@ -215,7 +214,6 @@ dev-reset: ## Reset the dev environment (wipe data and stop everything)
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
 	@-pkill -f "vite.*app/site" 2>/dev/null || true
-	@-pkill -f "vite.*app/reference" 2>/dev/null || true
 	@echo "$(GREEN)Dev environment reset (data removed)$(NC)"
 
 # ===========================================================================
@@ -679,6 +677,7 @@ ps: ## Show dev service status
 	@-curl -fsS -I http://localhost:5174 >/dev/null 2>&1 && echo "  Listen: http://localhost:5174 (running)" || echo "  Listen: not running"
 	@-curl -fsS -I http://localhost:5175 >/dev/null 2>&1 && echo "  Docs:   http://localhost:5175 (running)" || echo "  Docs:   not running"
 	@-curl -fsS -I http://localhost:5176 >/dev/null 2>&1 && echo "  Site:   http://localhost:5176 (running)" || echo "  Site:   not running"
+	@-curl -fsS http://localhost:8591/healthz >/dev/null 2>&1 && echo "  Cast:   http://localhost:8591 (running)" || echo "  Cast:   not running"
 
 .PHONY: pull
 pull: ## Pull images for the local stack
@@ -695,7 +694,7 @@ shell: ## Open a shell in a service (usage: make shell s=crate-api)
 # ===========================================================================
 
 .PHONY: setup
-setup: _check-deps _create-network _generate-certs _setup-hosts _create-dirs ## Initial local environment setup
+setup: _check-deps _create-network _generate-certs _generate-dev-certs _setup-hosts _create-dirs ## Initial local environment setup
 	@echo "$(GREEN)Setup complete. Run 'make up' to start the stack$(NC)"
 
 .PHONY: _check-deps
@@ -722,6 +721,31 @@ _generate-certs:
 		&& mv $(LOCAL_DOMAIN)+1.pem $(LOCAL_DOMAIN).pem \
 		&& mv $(LOCAL_DOMAIN)+1-key.pem $(LOCAL_DOMAIN)-key.pem
 	@echo "$(GREEN)Certificates generated$(NC)"
+
+.PHONY: _generate-dev-certs _ensure-dev-certs
+_generate-dev-certs:
+	@echo "$(YELLOW)Generating mkcert certificate for development domains...$(NC)"
+	@mkdir -p data/caddy/certs
+	@mkcert \
+		-cert-file data/caddy/certs/dev-stack.pem \
+		-key-file data/caddy/certs/dev-stack-key.pem \
+		admin.dev.lespedants.org \
+		listen.dev.lespedants.org \
+		api.dev.lespedants.org \
+		cast.dev.lespedants.org \
+		docs.dev.cratemusic.app \
+		reference.dev.cratemusic.app \
+		www.dev.cratemusic.app \
+		admin-dev.lespedants.org \
+		listen-dev.lespedants.org \
+		api-dev.lespedants.org
+	@echo "$(GREEN)Development certificate generated$(NC)"
+
+_ensure-dev-certs:
+	@command -v mkcert >/dev/null 2>&1 || { echo "$(RED)mkcert is required. Run 'make setup' first$(NC)"; exit 1; }
+	@if [ ! -s data/caddy/certs/dev-stack.pem ] || [ ! -s data/caddy/certs/dev-stack-key.pem ]; then \
+		$(MAKE) --no-print-directory _generate-dev-certs; \
+	fi
 
 .PHONY: _setup-hosts
 _setup-hosts:
@@ -896,10 +920,10 @@ dns-setup: ## Setup local DNS wildcard for *.crate.local → 127.0.0.1 (requires
 	@./scripts/setup-local-dns.sh
 
 .PHONY: trust-local-ca
-trust-local-ca: ## Trust Caddy's local CA for HTTPS (run after first 'make dev', requires sudo)
-	@docker cp crate-dev-caddy:/data/caddy/pki/authorities/local/root.crt /tmp/caddy-root.crt
-	@sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/caddy-root.crt
-	@echo "$(GREEN)Caddy local CA trusted. Restart your browser.$(NC)"
+trust-local-ca: ## Trust the mkcert CA for local HTTPS
+	@command -v mkcert >/dev/null 2>&1 || { echo "$(RED)mkcert is required. Run 'make setup' first$(NC)"; exit 1; }
+	@mkcert -install
+	@echo "$(GREEN)mkcert CA trusted. Restart your browser if needed.$(NC)"
 
 # ===========================================================================
 # CAPACITOR (mobile native builds)
@@ -1040,8 +1064,9 @@ cap-android-release: ## Build signed/shrunk Android APK+AAB for the exact releas
 # ===========================================================================
 
 TAURI_DIR := app/listen-desktop
-TAURI_RELEASE_VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || git describe --tags --abbrev=0 2>/dev/null || gh release view --json tagName --jq .tagName 2>/dev/null || node -p "require('./$(TAURI_DIR)/src-tauri/tauri.conf.json').version")
+TAURI_RELEASE_VERSION ?= $(shell env -u GITHUB_ENV node $(TAURI_DIR)/scripts/desktop-version.mjs 2>/dev/null || node -p "require('./$(TAURI_DIR)/src-tauri/tauri.conf.json').version")
 TAURI_MACOS_OUTPUT_DIR ?= desktop-artifacts/$(TAURI_RELEASE_VERSION)-macos-testers
+TAURI_MACOS_SIGNING_IDENTITY ?= $(if $(APPLE_SIGNING_IDENTITY),$(APPLE_SIGNING_IDENTITY),-)
 TAURI_MACOS_ARM_APP := $(TAURI_DIR)/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Crate.app
 TAURI_MACOS_INTEL_APP := $(TAURI_DIR)/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Crate.app
 
@@ -1067,19 +1092,27 @@ tauri-build-macos-testers: ## Build ARM + Intel macOS .app ZIPs for manual teste
 		echo "$(RED)macOS tester builds must run on macOS.$(NC)"; \
 		exit 1; \
 	fi
+	@rm -rf "$(TAURI_DIR)/src-tauri/target/aarch64-apple-darwin/release/bundle" "$(TAURI_DIR)/src-tauri/target/x86_64-apple-darwin/release/bundle"
 	@echo "$(YELLOW)Building Crate macOS ARM bundle ($(TAURI_RELEASE_VERSION))$(NC)"
-	@npm run --workspace=$(TAURI_DIR) tauri -- build --target aarch64-apple-darwin --bundles app
+	@APPLE_SIGNING_IDENTITY="$(TAURI_MACOS_SIGNING_IDENTITY)" CRATE_DESKTOP_VERSION="$(TAURI_RELEASE_VERSION)" npm run --workspace=$(TAURI_DIR) tauri -- build --target aarch64-apple-darwin --bundles app
+	@node $(TAURI_DIR)/scripts/verify-desktop-artifact-version.mjs "$(TAURI_DIR)/src-tauri/target/aarch64-apple-darwin/release/bundle/macos" "$(TAURI_RELEASE_VERSION)"
 	@echo "$(YELLOW)Building Crate macOS Intel bundle ($(TAURI_RELEASE_VERSION))$(NC)"
-	@npm run --workspace=$(TAURI_DIR) tauri -- build --target x86_64-apple-darwin --bundles app
+	@APPLE_SIGNING_IDENTITY="$(TAURI_MACOS_SIGNING_IDENTITY)" CRATE_DESKTOP_VERSION="$(TAURI_RELEASE_VERSION)" npm run --workspace=$(TAURI_DIR) tauri -- build --target x86_64-apple-darwin --bundles app
+	@node $(TAURI_DIR)/scripts/verify-desktop-artifact-version.mjs "$(TAURI_DIR)/src-tauri/target/x86_64-apple-darwin/release/bundle/macos" "$(TAURI_RELEASE_VERSION)"
 	@mkdir -p "$(TAURI_MACOS_OUTPUT_DIR)"
 	@arm_binary="$(TAURI_MACOS_ARM_APP)/Contents/MacOS/crate-desktop"; \
 	intel_binary="$(TAURI_MACOS_INTEL_APP)/Contents/MacOS/crate-desktop"; \
 	file "$$arm_binary" | grep -q "arm64" || { echo "$(RED)ARM bundle is not arm64$(NC)"; exit 1; }; \
 	file "$$intel_binary" | grep -q "x86_64" || { echo "$(RED)Intel bundle is not x86_64$(NC)"; exit 1; }
-	@echo "$(YELLOW)Applying minimal ad-hoc macOS signatures$(NC)"
-	@xattr -cr "$(TAURI_MACOS_ARM_APP)" "$(TAURI_MACOS_INTEL_APP)" 2>/dev/null || true
-	@codesign --force --deep --sign - "$(TAURI_MACOS_ARM_APP)"
-	@codesign --force --deep --sign - "$(TAURI_MACOS_INTEL_APP)"
+	@for app in "$(TAURI_MACOS_ARM_APP)" "$(TAURI_MACOS_INTEL_APP)"; do \
+		if [ "$(TAURI_MACOS_SIGNING_IDENTITY)" = "-" ]; then \
+			signature="$$(codesign -dv --verbose=2 "$$app" 2>&1)"; \
+			printf '%s\n' "$$signature" | grep -q '^Signature=adhoc$$' || { echo "$(RED)Expected an ad-hoc signature for $$app$(NC)"; exit 1; }; \
+		else \
+			signature="$$(codesign -dv --verbose=2 "$$app" 2>&1)"; \
+			printf '%s\n' "$$signature" | grep -F "Authority=$(TAURI_MACOS_SIGNING_IDENTITY)" >/dev/null || { echo "$(RED)Unexpected signing identity for $$app$(NC)"; exit 1; }; \
+		fi; \
+	done
 	@codesign --verify --deep --strict --verbose=2 "$(TAURI_MACOS_ARM_APP)"
 	@codesign --verify --deep --strict --verbose=2 "$(TAURI_MACOS_INTEL_APP)"
 	@ditto -c -k --keepParent "$(TAURI_MACOS_ARM_APP)" "$(TAURI_MACOS_OUTPUT_DIR)/Crate-macos-arm64-$(TAURI_RELEASE_VERSION).app.zip"

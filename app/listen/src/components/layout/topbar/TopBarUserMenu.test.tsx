@@ -18,10 +18,6 @@ vi.mock("@crate/ui/lib/use-hover-capability", () => ({
   useHoverCapability: () => canHover,
 }));
 
-vi.mock("@/lib/input-capabilities", () => ({
-  isTouchDominantPointer: () => false,
-}));
-
 vi.mock("@/lib/platform", () => ({
   capacitorPlatform: "web",
   getListenAppId: () => "listen-web",
@@ -101,12 +97,15 @@ describe("TopBarUserMenu", () => {
   it("uses the canonical glass context menu on desktop", async () => {
     renderMenu();
 
+    expect(screen.getByRole("button", { name: "User menu" })).toHaveClass(
+      "shadow-icon-control",
+    );
     fireEvent.click(screen.getByRole("button", { name: "User menu" }));
 
     const menu = screen.getByRole("menu");
     expect(menu).toHaveClass(
       "listen-glass-panel",
-      "rounded-[12px]",
+      "rounded-panel",
       "z-app-context-menu",
     );
     expect(screen.getByText("Diego")).toBeInTheDocument();
@@ -171,7 +170,7 @@ describe("TopBarUserMenu", () => {
       screen.getByPlaceholderText("High Vis, Denzel Curry, ..."),
     ).toBeInTheDocument();
     expect(
-      screen.getByPlaceholderText("Bandcamp, Tidal, Spotify, YouTube..."),
+      screen.getByPlaceholderText("Bandcamp, Tidal, Spotify, YouTube…"),
     ).toBeInTheDocument();
     expect(
       screen.getByPlaceholderText("¿Por qué debería estar en Crate?"),

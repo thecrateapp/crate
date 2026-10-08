@@ -176,6 +176,8 @@ def _cold_dashboard(window: str, month: str | None, subject_key: str) -> dict:
             "window": period,
             "title": "Replay",
             "subtitle": "Listening projection pending",
+            "title_key": "stats.replay.title",
+            "subtitle_key": "stats.replay.pending.subtitle",
             "track_count": 0,
             "minutes_listened": 0,
             "items": [],
