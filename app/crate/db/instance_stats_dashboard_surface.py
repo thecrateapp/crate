@@ -20,6 +20,7 @@ from crate.db.queries.user_library_stats_signal import (
     METRICS_VERSION,
     get_stats_signal,
 )
+from crate.db.queries.instance_stats_listeners import get_top_listeners
 from crate.db.queries.user_stats_periods import resolve_stats_period
 from crate.db.repositories.tasks import create_task_dedup
 from crate.db.tx import read_scope
@@ -105,6 +106,7 @@ def build_instance_stats_dashboard(
     with read_scope() as session:
         period = resolve_stats_period("UTC", window=window, month=month)
         payload.update(get_stats_signal(session, None, period))
+        payload["top_listeners"] = get_top_listeners(session, period)
     return payload
 
 

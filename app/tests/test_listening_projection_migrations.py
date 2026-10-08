@@ -51,3 +51,16 @@ def test_listening_projection_migration_creates_every_projection(monkeypatch):
         "user_listening_sessions",
     ):
         assert f"CREATE TABLE IF NOT EXISTS {table}" in statements
+
+
+def test_pulse_listed_migration_defaults_users_into_the_ranking(monkeypatch):
+    migration, section = _replay(
+        "106_user_pulse_listed",
+        "auth_v106",
+        "create_users_pulse_listed_v106_schema",
+        monkeypatch,
+    )
+    assert migration == section
+    assert migration == [
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS pulse_listed BOOLEAN NOT NULL DEFAULT TRUE"
+    ]

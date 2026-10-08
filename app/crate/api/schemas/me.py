@@ -777,6 +777,16 @@ class StatsGenreTrendResponse(BaseModel):
     delta_vs_previous: float | None = None
 
 
+class StatsTopListenerResponse(BaseModel):
+    user_id: int
+    username: str | None = None
+    display_name: str | None = None
+    avatar: str | None = None
+    minutes: float
+    plays: int
+    active_days: int
+
+
 class StatsDashboardResponse(BaseModel):
     window: str
     subject: StatsSubjectResponse | None = None
@@ -799,6 +809,7 @@ class StatsDashboardResponse(BaseModel):
     heatmap: StatsHeatmapResponse | None = None
     music_age: StatsMusicAgeResponse | None = None
     genre_trend: list[StatsGenreTrendResponse] = Field(default_factory=list)
+    top_listeners: list[StatsTopListenerResponse] = Field(default_factory=list)
 
 
 class HomeArtworkRefResponse(IdentityFieldsMixin):

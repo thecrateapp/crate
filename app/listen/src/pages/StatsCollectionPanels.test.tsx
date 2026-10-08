@@ -14,6 +14,7 @@ import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 import {
   TopAlbumsPanel,
   TopArtistsPanel,
+  TopListenersPanel,
   TopTracksPanel,
 } from "./StatsCollectionPanels";
 
@@ -134,6 +135,41 @@ describe("Stats collection panels", () => {
       "data-density",
       "default",
     );
+  });
+
+  it("ranks top listeners with a profile link and their listening time", () => {
+    renderWithListenProviders(
+      <TopListenersPanel
+        listeners={[
+          {
+            user_id: 3,
+            username: "jane",
+            display_name: "Jane Doe",
+            avatar: null,
+            minutes: 125,
+            plays: 30,
+            active_days: 9,
+          },
+          {
+            user_id: 4,
+            username: null,
+            display_name: "No Profile",
+            avatar: null,
+            minutes: 60,
+            plays: 1,
+            active_days: 1,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: /Jane Doe/ })).toHaveAttribute(
+      "href",
+      "/users/jane",
+    );
+    expect(screen.getByText("2h 5m · 30 plays")).toBeInTheDocument();
+    expect(screen.getByText("1h · 1 play")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /No Profile/ })).toBeNull();
   });
 
   it("uses the singular play label for a single play", () => {

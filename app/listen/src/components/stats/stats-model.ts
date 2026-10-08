@@ -373,6 +373,16 @@ export interface StatsDecadeAlbum {
   year: number;
 }
 
+export interface StatsTopListener {
+  user_id: number;
+  username?: string | null;
+  display_name?: string | null;
+  avatar?: string | null;
+  minutes: number;
+  plays: number;
+  active_days: number;
+}
+
 export interface StatsMusicAge {
   median_year: number;
   decades: {
@@ -425,6 +435,7 @@ export interface StatsDashboard {
   artist_of_period?: StatsArtistOfPeriod | null;
   heatmap?: StatsHeatmap | null;
   music_age?: StatsMusicAge | null;
+  top_listeners?: StatsTopListener[];
   genre_trend?: StatsGenreTrend[];
 }
 
