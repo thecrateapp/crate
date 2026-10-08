@@ -133,8 +133,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private boolean handlingInterruption = false;
     private boolean noisyReceiverRegistered = false;
     private NativeTransitionPlan activeTransitionPlan;
-    private Player transitionOutgoingPlayer;
-    private int transitionOutgoingRepeatMode = Player.REPEAT_MODE_OFF;
+    private ExoPlayerNativePlaybackDeck transitionOutgoingDeck;
+    private String fallenBackEdge = "";
     private int transitionOutgoingIndex = -1;
     private long transitionStartedElapsedMs;
     private long transitionStartedWallMs;
@@ -1546,11 +1546,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         }
 
         long delayMs = activeTransitionPlan == null
-            ? NativeMixTiming.nextCheckDelayMs(
-                Math.max(0L, player.getCurrentPosition()),
-                currentTrackDurationMs(),
-                crossfadeMs
-            )
+            ? evaluatePendingMix().nextCheckDelayMs
             : 20L;
         nativeMixTickerStarted = true;
         mainHandler.postDelayed(nativeMixTicker, delayMs);
@@ -1594,35 +1590,65 @@ public class CrateNativePlaybackService extends MediaSessionService {
         }
 
         int outgoingIndex = player.getCurrentMediaItemIndex();
-        if (
-            outgoingIndex < 0 ||
-            outgoingIndex + 1 >= queueState.size() ||
-            !mixController.hasPreparedStandby()
-        ) {
+        NativeTransitionPlan plan = pendingTransitionPlan();
+        if (plan == null) return;
+        NativeMixTrigger.Decision decision = evaluatePendingMix(plan);
+        if (decision.action == NativeMixTrigger.Action.FALL_BACK) {
+            fallenBackEdge = edgeKey(plan);
             return;
         }
-        long durationMs = currentTrackDurationMs();
-        long positionMs = Math.max(0L, player.getCurrentPosition());
-        if (
-            !NativeMixTiming.shouldStart(
-                player.isPlaying(),
-                positionMs,
-                durationMs,
-                crossfadeMs
-            )
-        ) {
-            return;
-        }
+        if (decision.action != NativeMixTrigger.Action.START) return;
+        ExoPlayer outgoingPlayer = activePhysicalPlayer();
+        if (outgoingPlayer == null) return;
+        NativeTransitionPlan boundedPlan = plan.withTiming(
+            Math.max(0L, player.getCurrentPosition()),
+            plan.incomingCueMs,
+            decision.durationMs
+        );
 
+        transitionOutgoingDeck = outgoingPlayer == deckA.player() ? deckA : deckB;
+        transitionOutgoingIndex = outgoingIndex;
+        transitionStartedElapsedMs = nowElapsedMs;
+        transitionStartedWallMs = System.currentTimeMillis();
+        lastTransitionProgressEventElapsedMs = nowElapsedMs;
+        activeTransitionPlan = boundedPlan;
+        transitionOutgoingDeck.setPauseAtEndOfTrack(true);
+        if (!mixController.beginTransition(boundedPlan)) {
+            clearNativeTransitionState();
+            return;
+        }
+        emit("transitionStarted", transitionPayload(boundedPlan, 0.0f));
+    }
+
+    private NativeMixTrigger.Decision evaluatePendingMix() {
+        return evaluatePendingMix(pendingTransitionPlan());
+    }
+
+    private NativeMixTrigger.Decision evaluatePendingMix(
+        @Nullable NativeTransitionPlan plan
+    ) {
+        if (plan != null) {
+            mixController.prepareStandbyAt(plan.incomingCueMs);
+        }
+        return NativeMixTrigger.evaluate(
+            player.isPlaying(),
+            Math.max(0L, player.getCurrentPosition()),
+            currentTrackDurationMs(),
+            plan,
+            plan != null &&
+                mixController.isStandbyReadyAt(
+                    plan.incomingCueMs,
+                    NativeMixTrigger.STANDBY_BUFFER_MARGIN_MS
+                )
+        );
+    }
+
+    @Nullable
+    private NativeTransitionPlan pendingTransitionPlan() {
+        int outgoingIndex = player.getCurrentMediaItemIndex();
         NativeTrack outgoing = queueState.get(outgoingIndex);
         NativeTrack incoming = queueState.get(outgoingIndex + 1);
-        if (outgoing == null || incoming == null) return;
-        long fadeDurationMs = NativeMixTiming.transitionDurationMs(
-            positionMs,
-            durationMs,
-            crossfadeMs
-        );
-        if (fadeDurationMs <= 0L) return;
+        if (outgoing == null || incoming == null) return null;
         NativeTransitionPlan plan = queueState.transitionPlanFor(
             outgoing.id,
             incoming.id
@@ -1631,26 +1657,15 @@ public class CrateNativePlaybackService extends MediaSessionService {
             plan = NativeTransitionPlan.safeFallback(
                 outgoing.id,
                 incoming.id,
-                fadeDurationMs,
+                crossfadeMs,
                 "missing_plan"
             );
         }
-        ExoPlayer outgoingPlayer = activePhysicalPlayer();
-        if (outgoingPlayer == null) return;
+        return fallenBackEdge.equals(edgeKey(plan)) ? null : plan;
+    }
 
-        transitionOutgoingPlayer = outgoingPlayer;
-        transitionOutgoingRepeatMode = outgoingPlayer.getRepeatMode();
-        transitionOutgoingIndex = outgoingIndex;
-        transitionStartedElapsedMs = nowElapsedMs;
-        transitionStartedWallMs = System.currentTimeMillis();
-        lastTransitionProgressEventElapsedMs = nowElapsedMs;
-        activeTransitionPlan = plan;
-        outgoingPlayer.setRepeatMode(Player.REPEAT_MODE_ONE);
-        if (!mixController.beginTransition(plan)) {
-            clearNativeTransitionState();
-            return;
-        }
-        emit("transitionStarted", transitionPayload(plan, 0.0f));
+    private String edgeKey(NativeTransitionPlan plan) {
+        return queueState.revision() + ":" + plan.outgoingTrackId + ">" + plan.incomingTrackId;
     }
 
     private boolean hasMixableAdjacentTrack() {
@@ -1681,14 +1696,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     private void clearNativeTransitionState() {
-        if (transitionOutgoingPlayer != null) {
-            transitionOutgoingPlayer.setRepeatMode(
-                transitionOutgoingRepeatMode
-            );
+        if (transitionOutgoingDeck != null) {
+            transitionOutgoingDeck.setPauseAtEndOfTrack(false);
         }
         activeTransitionPlan = null;
-        transitionOutgoingPlayer = null;
-        transitionOutgoingRepeatMode = Player.REPEAT_MODE_OFF;
+        transitionOutgoingDeck = null;
         transitionOutgoingIndex = -1;
         transitionStartedElapsedMs = 0L;
         transitionStartedWallMs = 0L;

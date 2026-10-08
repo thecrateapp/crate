@@ -83,6 +83,57 @@ public class NativeMixControllerTest {
     }
 
     @Test
+    public void preparesTheStandbyAtThePlannedIncomingCue() {
+        controller.setQueue(queue, 0, true);
+        controller.setEnabled(true);
+
+        controller.prepareStandbyAt(8_000L);
+        controller.prepareStandbyAt(8_000L);
+
+        assertEquals("two", deckB.preparedTrack.id);
+        assertEquals(8_000L, deckB.positionMs);
+        assertEquals(2, countCalls(deckB, "prepare:two"));
+    }
+
+    @Test
+    public void neverStartsIncomingBeforeTheStandbyIsReadyAtItsCue() {
+        deckB.autoReady = false;
+        controller.setQueue(queue, 0, true);
+        controller.setEnabled(true);
+        controller.prepareStandbyAt(8_000L);
+        NativeTransitionPlan plan = NativeTransitionPlan.safeFallback(
+            "one",
+            "two",
+            4_000L,
+            "test"
+        ).withTiming(165_000L, 8_000L, 4_000L);
+
+        assertFalse(controller.isStandbyReadyAt(8_000L, 1_000L));
+        assertFalse(controller.beginTransition(plan));
+        assertFalse(deckB.playing);
+        assertFalse(controller.isTransitionActive());
+        assertEquals(0, listener.failures);
+
+        deckB.completePreparation();
+
+        assertTrue(controller.isStandbyReadyAt(8_000L, 1_000L));
+        assertTrue(controller.beginTransition(plan));
+        assertTrue(deckB.playing);
+        assertEquals(8_000L, deckB.positionMs);
+        assertFalse(deckB.calls.contains("seek:8000"));
+    }
+
+    @Test
+    public void standbyWithTooLittleBufferIsNotReady() {
+        controller.setQueue(queue, 0, true);
+        controller.setEnabled(true);
+        controller.prepareStandbyAt(8_000L);
+        deckB.bufferedAheadMs = 300L;
+
+        assertFalse(controller.isStandbyReadyAt(8_000L, 1_000L));
+    }
+
+    @Test
     public void mixEnvelopePreservesTheUserVolume() {
         controller.setQueue(queue, 0, true);
         controller.setEnabled(true);

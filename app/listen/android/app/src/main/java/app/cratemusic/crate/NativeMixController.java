@@ -28,6 +28,7 @@ final class NativeMixController {
     private boolean repeatOne;
     private boolean handoffComplete;
     private boolean standbyPreparationFailed;
+    private long standbyPreparedCueMs;
     private float outputVolume = 1.0f;
     private float duckMultiplier = 1.0f;
     private float mixProgress;
@@ -175,11 +176,16 @@ final class NativeMixController {
             return false;
         }
 
-        stateMachine.transitionTo(NativeTransitionState.PREPARING);
-        if (!standbyDeck.isReadyFor(incoming) && !prepareStandby()) {
-            failTransition("standby_prepare_failed");
+        if (
+            !standbyDeck.isReadyAt(
+                incoming,
+                plan.incomingCueMs,
+                NativeMixTrigger.STANDBY_BUFFER_MARGIN_MS
+            )
+        ) {
             return false;
         }
+        stateMachine.transitionTo(NativeTransitionState.PREPARING);
         stateMachine.transitionTo(NativeTransitionState.ARMED);
 
         activePlan = plan;
@@ -188,7 +194,6 @@ final class NativeMixController {
         handoffComplete = false;
         mixProgress = 0.0f;
         applyMixVolumes(mixProgress);
-        mixIncomingDeck.seekTo(plan.incomingCueMs);
         mixIncomingDeck.play();
         stateMachine.transitionTo(NativeTransitionState.MIXING);
         return true;
@@ -247,6 +252,30 @@ final class NativeMixController {
         return logicalIndex;
     }
 
+    void prepareStandbyAt(long incomingCueMs) {
+        if (activePlan != null || !canMixNext()) {
+            return;
+        }
+        NativeTrack incoming = queue.get(logicalIndex + 1);
+        long cueMs = Math.max(0L, incomingCueMs);
+        if (standbyDeck.isReadyFor(incoming) && standbyPreparedCueMs == cueMs) {
+            return;
+        }
+        prepareStandby(cueMs);
+    }
+
+    boolean isStandbyReadyAt(long incomingCueMs, long minimumBufferedMs) {
+        return (
+            activePlan == null &&
+            canMixNext() &&
+            standbyDeck.isReadyAt(
+                queue.get(logicalIndex + 1),
+                incomingCueMs,
+                minimumBufferedMs
+            )
+        );
+    }
+
     boolean hasPreparedStandby() {
         return (
             canMixNext() &&
@@ -291,12 +320,17 @@ final class NativeMixController {
             standbyDeck.releasePreparedSource();
             return false;
         }
-        NativeTrack incoming = queue.get(logicalIndex + 1);
-        if (standbyDeck.isReadyFor(incoming)) {
+        if (standbyDeck.isReadyFor(queue.get(logicalIndex + 1))) {
             return true;
         }
+        return prepareStandby(0L);
+    }
+
+    private boolean prepareStandby(long cueMs) {
+        NativeTrack incoming = queue.get(logicalIndex + 1);
         try {
-            standbyDeck.prepare(incoming, 0L);
+            standbyDeck.prepare(incoming, cueMs);
+            standbyPreparedCueMs = cueMs;
             standbyDeck.setVolume(0.0f);
             standbyPreparationFailed = false;
             return true;
@@ -349,17 +383,6 @@ final class NativeMixController {
         resetTransition();
         stateMachine.transitionTo(NativeTransitionState.IDLE);
         prepareStandby();
-    }
-
-    private void failTransition(String reason) {
-        stateMachine.transitionTo(NativeTransitionState.FAILED);
-        activeDeck.setVolume(effectiveOutputVolume());
-        activeDeck.play();
-        standbyDeck.stop();
-        standbyDeck.releasePreparedSource();
-        resetTransition();
-        stateMachine.transitionTo(NativeTransitionState.IDLE);
-        listener.onFailed(reason);
     }
 
     private void resetTransition() {

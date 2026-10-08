@@ -12,6 +12,9 @@ final class FakeNativePlaybackDeck implements NativePlaybackDeck {
     boolean playing;
     boolean released;
     boolean failPreparation;
+    boolean autoReady = true;
+    boolean ready;
+    long bufferedAheadMs = 30_000L;
 
     FakeNativePlaybackDeck(String name) {
         this.name = name;
@@ -26,11 +29,30 @@ final class FakeNativePlaybackDeck implements NativePlaybackDeck {
         preparedTrack = track;
         positionMs = startPositionMs;
         released = false;
+        ready = autoReady;
+    }
+
+    void completePreparation() {
+        ready = preparedTrack != null;
     }
 
     @Override
     public boolean isReadyFor(NativeTrack track) {
         return preparedTrack != null && preparedTrack.id.equals(track.id);
+    }
+
+    @Override
+    public boolean isReadyAt(
+        NativeTrack track,
+        long requestedPositionMs,
+        long minimumBufferedMs
+    ) {
+        return (
+            ready &&
+            isReadyFor(track) &&
+            positionMs == requestedPositionMs &&
+            bufferedAheadMs >= minimumBufferedMs
+        );
     }
 
     @Override
@@ -55,6 +77,7 @@ final class FakeNativePlaybackDeck implements NativePlaybackDeck {
     public void seekTo(long requestedPositionMs) {
         calls.add("seek:" + requestedPositionMs);
         positionMs = requestedPositionMs;
+        ready = false;
     }
 
     @Override
@@ -69,5 +92,6 @@ final class FakeNativePlaybackDeck implements NativePlaybackDeck {
         preparedTrack = null;
         released = true;
         playing = false;
+        ready = false;
     }
 }

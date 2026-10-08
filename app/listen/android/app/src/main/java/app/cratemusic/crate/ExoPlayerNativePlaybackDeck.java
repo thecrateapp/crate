@@ -1,5 +1,6 @@
 package app.cratemusic.crate;
 
+import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
@@ -9,6 +10,8 @@ import java.util.Collections;
 import java.util.List;
 
 final class ExoPlayerNativePlaybackDeck implements NativePlaybackDeck {
+    private static final long READY_POSITION_TOLERANCE_MS = 250L;
+
     private final ExoPlayer player;
     private final NativeMixAudioProcessor audioProcessor;
     private final List<NativeTrack> queue = new ArrayList<>();
@@ -117,6 +120,30 @@ final class ExoPlayerNativePlaybackDeck implements NativePlaybackDeck {
     }
 
     @Override
+    public boolean isReadyAt(
+        NativeTrack track,
+        long positionMs,
+        long minimumBufferedMs
+    ) {
+        if (!isReadyFor(track)) {
+            return false;
+        }
+        long currentPositionMs = Math.max(0L, player.getCurrentPosition());
+        if (Math.abs(currentPositionMs - positionMs) > READY_POSITION_TOLERANCE_MS) {
+            return false;
+        }
+        long durationMs = player.getDuration();
+        long remainingMs = durationMs == C.TIME_UNSET
+            ? minimumBufferedMs
+            : Math.max(0L, durationMs - currentPositionMs);
+        long bufferedAheadMs = Math.max(
+            0L,
+            player.getBufferedPosition() - currentPositionMs
+        );
+        return bufferedAheadMs >= Math.min(minimumBufferedMs, remainingMs);
+    }
+
+    @Override
     public void play() {
         player.play();
     }
@@ -146,6 +173,10 @@ final class ExoPlayerNativePlaybackDeck implements NativePlaybackDeck {
         player.pause();
         player.stop();
         audioProcessor.setGainImmediately(0.0f);
+    }
+
+    void setPauseAtEndOfTrack(boolean pauseAtEnd) {
+        player.setPauseAtEndOfMediaItems(pauseAtEnd);
     }
 
     ExoPlayer player() {

@@ -183,6 +183,31 @@ final class NativeTransitionPlan {
         );
     }
 
+    NativeTransitionPlan withTiming(
+        long requestedOutgoingCueMs,
+        long requestedIncomingCueMs,
+        long requestedDurationMs
+    ) {
+        return new NativeTransitionPlan(
+            plannerVersion,
+            outgoingTrackId,
+            incomingTrackId,
+            mode,
+            Math.max(0L, requestedDurationMs),
+            Math.max(0L, requestedOutgoingCueMs),
+            Math.max(0L, requestedIncomingCueMs),
+            incomingTempoRatio,
+            beatPhaseOffsetMs,
+            handoffProgress,
+            outgoingGainDb,
+            incomingGainDb,
+            curve,
+            bassHandoff,
+            confidence,
+            fallbackReason
+        );
+    }
+
     static NativeTransitionPlan safeFallback(
         String outgoingTrackId,
         String incomingTrackId,

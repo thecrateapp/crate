@@ -5,6 +5,8 @@ interface NativePlaybackDeck {
 
     boolean isReadyFor(NativeTrack track);
 
+    boolean isReadyAt(NativeTrack track, long positionMs, long minimumBufferedMs);
+
     void play();
 
     void pause();
