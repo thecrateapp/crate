@@ -279,3 +279,203 @@ def test_planner_is_deterministic_for_identical_inputs() -> None:
         incoming,
         context,
     )
+
+
+def _assert_plan_fits(plan, outgoing: TrackMixProfile, incoming: TrackMixProfile):
+    assert plan.duration_ms >= 0
+    assert plan.outgoing_cue_ms >= 0
+    assert plan.incoming_cue_ms >= 0
+    assert plan.outgoing_cue_ms + plan.duration_ms <= outgoing.duration_ms
+    assert (
+        plan.incoming_cue_ms + plan.duration_ms * plan.incoming_tempo_ratio
+        <= incoming.duration_ms
+    )
+
+
+def test_late_outro_cue_moves_earlier_instead_of_running_past_the_track() -> None:
+    outgoing = _profile("outgoing", outro_cue_ms=176_000)
+    incoming = _profile("incoming")
+
+    plan = plan_transition(
+        outgoing,
+        incoming,
+        _context(source="radio", preferred_duration_ms=12_000),
+    )
+
+    _assert_plan_fits(plan, outgoing, incoming)
+    assert plan.duration_ms == 12_000
+    assert plan.outgoing_cue_ms <= 168_000
+    assert plan.fallback_reason is None
+
+
+def test_outro_cue_never_moves_into_the_protected_outgoing_body() -> None:
+    outgoing = _profile(
+        "outgoing",
+        duration_ms=40_000,
+        outro_cue_ms=39_000,
+        bpm=None,
+        bpm_confidence=None,
+    )
+    incoming = _profile("incoming")
+
+    plan = plan_transition(
+        outgoing,
+        incoming,
+        _context(source="radio", preferred_duration_ms=12_000),
+    )
+
+    _assert_plan_fits(plan, outgoing, incoming)
+    assert plan.outgoing_cue_ms >= 20_000
+
+
+def test_short_incoming_shortens_the_transition() -> None:
+    outgoing = _profile("outgoing")
+    incoming = _profile("incoming", duration_ms=25_000, intro_cue_ms=0)
+
+    plan = plan_transition(
+        outgoing,
+        incoming,
+        _context(source="radio", preferred_duration_ms=12_000),
+    )
+
+    _assert_plan_fits(plan, outgoing, incoming)
+    assert plan.duration_ms <= 15_000
+
+
+def test_intro_cue_near_the_end_restarts_incoming_from_zero() -> None:
+    outgoing = _profile("outgoing")
+    incoming = _profile("incoming", intro_cue_ms=175_000)
+
+    plan = plan_transition(
+        outgoing,
+        incoming,
+        _context(source="radio", preferred_duration_ms=12_000),
+    )
+
+    _assert_plan_fits(plan, outgoing, incoming)
+    assert plan.incoming_cue_ms == 0
+
+
+def test_impossible_window_degrades_to_a_short_cut() -> None:
+    outgoing = _profile("outgoing", duration_ms=2_000, outro_cue_ms=1_900)
+    incoming = _profile("incoming", duration_ms=1_500, intro_cue_ms=0)
+
+    plan = plan_transition(
+        outgoing,
+        incoming,
+        _context(source="radio", preferred_duration_ms=12_000),
+    )
+
+    _assert_plan_fits(plan, outgoing, incoming)
+    assert plan.mode is TransitionMode.ADAPTIVE
+    assert plan.duration_ms <= PLANNER_POLICY_V1.manual_ramp_ms
+    assert plan.fallback_reason is TransitionFallbackReason.INSUFFICIENT_WINDOW
+
+
+@pytest.mark.parametrize("incoming_bpm", [113.2, 120.0, 127.0])
+def test_tempo_adjusted_incoming_consumption_stays_inside_the_track(
+    incoming_bpm: float,
+) -> None:
+    outgoing = _profile("outgoing")
+    incoming = _profile(
+        "incoming",
+        bpm=incoming_bpm,
+        duration_ms=30_000,
+        intro_cue_ms=8_000,
+    )
+
+    plan = plan_transition(
+        outgoing,
+        incoming,
+        _context(source="radio", preferred_duration_ms=12_000),
+    )
+
+    _assert_plan_fits(plan, outgoing, incoming)
+
+
+def test_phase_offset_uses_both_beat_grids() -> None:
+    outgoing = _profile("outgoing", downbeat_anchor_ms=500, outro_cue_ms=165_100)
+    incoming = _profile("incoming", downbeat_anchor_ms=0, intro_cue_ms=8_000)
+
+    plan = plan_transition(outgoing, incoming, _context(source="radio"))
+
+    assert plan.mode is TransitionMode.BEATMATCH
+    beat_ms = 60_000 / 120.0
+    outgoing_phase = (plan.outgoing_cue_ms - 500) % beat_ms
+    incoming_phase = (plan.incoming_cue_ms - 0) % beat_ms
+    assert plan.beat_phase_offset_ms == round(
+        (outgoing_phase - incoming_phase) % beat_ms
+    )
+
+
+def test_half_time_incoming_grid_is_normalized_before_phase() -> None:
+    outgoing = _profile("outgoing", downbeat_anchor_ms=500)
+    incoming = _profile("incoming", bpm=60.0, downbeat_anchor_ms=0)
+
+    plan = plan_transition(outgoing, incoming, _context(source="radio"))
+
+    assert plan.mode is TransitionMode.BEATMATCH
+    assert 0 <= plan.beat_phase_offset_ms < 500
+
+
+def test_unaccredited_loudness_never_boosts_the_incoming_deck() -> None:
+    plan = plan_transition(
+        _profile("outgoing", outro_lufs=-6.0, true_peak_dbfs=-12.0),
+        _profile("incoming", intro_lufs=-20.0, true_peak_dbfs=-12.0),
+        _context(source="radio"),
+    )
+
+    assert plan.incoming_gain_db <= 0.0
+
+
+def test_unknown_true_peak_reserves_full_scale_headroom() -> None:
+    plan = plan_transition(
+        _profile("outgoing", true_peak_dbfs=None),
+        _profile("incoming", true_peak_dbfs=None),
+        _context(source="radio"),
+    )
+
+    ceiling = PLANNER_POLICY_V1.combined_true_peak_ceiling_dbfs
+    headroom = PLANNER_POLICY_V1.equal_power_midpoint_headroom_db
+    assert ceiling == -1.0
+    assert plan.outgoing_gain_db <= ceiling - headroom
+    assert plan.incoming_gain_db <= ceiling - headroom
+
+
+@pytest.mark.parametrize("source", ["radio", "playlist", "shuffle"])
+@pytest.mark.parametrize("track_ms", [1_000, 20_000, 45_000, 180_000, 600_000])
+@pytest.mark.parametrize("outro_offset_ms", [None, 0, 1_000, 30_000])
+@pytest.mark.parametrize("intro_cue_ms", [None, 0, 8_000, 590_000])
+@pytest.mark.parametrize("incoming_bpm", [113.2, 120.0, 127.0, 60.0])
+@pytest.mark.parametrize("preferred_ms", [0, 1_000, 6_000, 12_000])
+def test_every_plan_stays_inside_both_tracks(
+    source: str,
+    track_ms: int,
+    outro_offset_ms: int | None,
+    intro_cue_ms: int | None,
+    incoming_bpm: float,
+    preferred_ms: int,
+) -> None:
+    outro_cue_ms = (
+        None if outro_offset_ms is None else max(0, track_ms - outro_offset_ms)
+    )
+    outgoing = _profile("outgoing", duration_ms=track_ms, outro_cue_ms=outro_cue_ms)
+    incoming = _profile(
+        "incoming",
+        duration_ms=track_ms,
+        intro_cue_ms=intro_cue_ms,
+        bpm=incoming_bpm,
+    )
+
+    plan = plan_transition(
+        outgoing,
+        incoming,
+        _context(source=source, preferred_duration_ms=preferred_ms),
+    )
+
+    _assert_plan_fits(plan, outgoing, incoming)
+    assert plan == plan_transition(
+        outgoing,
+        incoming,
+        _context(source=source, preferred_duration_ms=preferred_ms),
+    )

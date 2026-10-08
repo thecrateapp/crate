@@ -28,6 +28,7 @@ class TransitionFallbackReason(StrEnum):
     INCOMPATIBLE_METER = "incompatible_meter"
     PRELOAD_DEADLINE = "preload_deadline"
     OFFLINE_UNAVAILABLE = "offline_unavailable"
+    INSUFFICIENT_WINDOW = "insufficient_window"
 
 
 @dataclass(frozen=True, slots=True)

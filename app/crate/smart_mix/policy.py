@@ -15,8 +15,12 @@ class PlannerPolicyV1:
     manual_ramp_ms: int = 350
     minimum_transition_ms: int = 1_000
     maximum_transition_ms: int = 12_000
+    minimum_outgoing_body_ratio: float = 0.5
+    minimum_outgoing_body_ms: int = 30_000
+    minimum_incoming_body_ms: int = 10_000
     max_loudness_adjustment_db: float = 6.0
-    combined_true_peak_ceiling_dbfs: float = -0.1
+    maximum_unaccredited_gain_db: float = 0.0
+    combined_true_peak_ceiling_dbfs: float = -1.0
     equal_power_midpoint_headroom_db: float = 3.0103
     tempo_weight: float = 0.28
     harmonic_weight: float = 0.22

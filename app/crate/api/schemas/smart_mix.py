@@ -172,6 +172,7 @@ class TransitionPlanResponse(SmartMixApiModel):
             "incompatible_meter",
             "preload_deadline",
             "offline_unavailable",
+            "insufficient_window",
         ]
         | None
     ) = Field(default=None, alias="fallbackReason")

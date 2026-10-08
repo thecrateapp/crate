@@ -124,13 +124,14 @@ def plan_transition(
         )
 
     if context.source == "manual" or not context.automatic:
+        window = _fit_window(outgoing, incoming, policy.manual_ramp_ms, 1.0, policy)
         return _base_plan(
             outgoing_uid,
             incoming_uid,
             mode=TransitionMode.ADAPTIVE,
-            duration_ms=policy.manual_ramp_ms,
-            outgoing_cue_ms=_outgoing_cue(outgoing, policy.manual_ramp_ms),
-            incoming_cue_ms=_incoming_cue(incoming),
+            duration_ms=window.duration_ms,
+            outgoing_cue_ms=window.outgoing_cue_ms,
+            incoming_cue_ms=window.incoming_cue_ms,
             confidence=0.5,
             policy=policy,
         )
@@ -147,46 +148,61 @@ def plan_transition(
 
     fallback_reason = _beatmatch_fallback_reason(outgoing, incoming, context, policy)
     compatibility = score_compatibility(outgoing, incoming, policy=policy)
-    duration_ms = _transition_duration(context.preferred_duration_ms, policy)
-    if fallback_reason is not None:
-        return _base_plan(
-            outgoing_uid,
-            incoming_uid,
-            mode=TransitionMode.ADAPTIVE,
-            duration_ms=duration_ms,
-            outgoing_cue_ms=_outgoing_cue(outgoing, duration_ms),
-            incoming_cue_ms=_incoming_cue(incoming),
-            confidence=compatibility.signal_confidence,
-            fallback_reason=fallback_reason,
-            outgoing_gain_db=_safe_deck_gain(outgoing.true_peak_dbfs, 0.0, policy),
-            incoming_gain_db=_safe_deck_gain(
-                incoming.true_peak_dbfs,
-                _loudness_delta(outgoing, incoming, policy),
-                policy,
-            ),
-            policy=policy,
-        )
+    requested_ms = _transition_duration(context.preferred_duration_ms, policy)
+    outgoing_gain_db = _safe_deck_gain(outgoing.true_peak_dbfs, 0.0, policy)
+    incoming_gain_db = _safe_deck_gain(
+        incoming.true_peak_dbfs,
+        _loudness_delta(outgoing, incoming, policy),
+        policy,
+    )
 
-    tempo_ratio = _tempo_ratio(outgoing.bpm, incoming.bpm)
-    outgoing_cue_ms = _outgoing_cue(outgoing, duration_ms)
-    incoming_cue_ms = _incoming_cue(incoming)
+    if fallback_reason is None:
+        tempo_ratio = round(_tempo_ratio(outgoing.bpm, incoming.bpm), 6)
+        window = _fit_window(
+            outgoing,
+            incoming,
+            requested_ms,
+            tempo_ratio,
+            policy,
+            snap_to_beats=True,
+        )
+        if window.fits:
+            return _base_plan(
+                outgoing_uid,
+                incoming_uid,
+                mode=TransitionMode.BEATMATCH,
+                duration_ms=window.duration_ms,
+                outgoing_cue_ms=window.outgoing_cue_ms,
+                incoming_cue_ms=window.incoming_cue_ms,
+                incoming_tempo_ratio=tempo_ratio,
+                beat_phase_offset_ms=_beat_phase_offset(
+                    outgoing,
+                    incoming,
+                    window.outgoing_cue_ms,
+                    window.incoming_cue_ms,
+                    tempo_ratio,
+                ),
+                confidence=min(compatibility.overall, compatibility.signal_confidence),
+                outgoing_gain_db=outgoing_gain_db,
+                incoming_gain_db=incoming_gain_db,
+                bass_handoff="balanced",
+                policy=policy,
+            )
+
+    window = _fit_window(outgoing, incoming, requested_ms, 1.0, policy)
+    if not window.fits:
+        return _short_cut_plan(outgoing_uid, incoming_uid, outgoing, incoming, policy)
     return _base_plan(
         outgoing_uid,
         incoming_uid,
-        mode=TransitionMode.BEATMATCH,
-        duration_ms=duration_ms,
-        outgoing_cue_ms=outgoing_cue_ms,
-        incoming_cue_ms=incoming_cue_ms,
-        incoming_tempo_ratio=tempo_ratio,
-        beat_phase_offset_ms=_beat_phase_offset(incoming, incoming_cue_ms),
-        confidence=min(compatibility.overall, compatibility.signal_confidence),
-        outgoing_gain_db=_safe_deck_gain(outgoing.true_peak_dbfs, 0.0, policy),
-        incoming_gain_db=_safe_deck_gain(
-            incoming.true_peak_dbfs,
-            _loudness_delta(outgoing, incoming, policy),
-            policy,
-        ),
-        bass_handoff="balanced",
+        mode=TransitionMode.ADAPTIVE,
+        duration_ms=window.duration_ms,
+        outgoing_cue_ms=window.outgoing_cue_ms,
+        incoming_cue_ms=window.incoming_cue_ms,
+        confidence=compatibility.signal_confidence,
+        fallback_reason=fallback_reason,
+        outgoing_gain_db=outgoing_gain_db,
+        incoming_gain_db=incoming_gain_db,
         policy=policy,
     )
 
@@ -285,15 +301,43 @@ def _fallback_plan(
     reason: TransitionFallbackReason,
     policy: PlannerPolicyV1,
 ) -> TransitionPlan:
+    window = _fit_window(outgoing, incoming, policy.fallback_duration_ms, 1.0, policy)
+    if not window.fits:
+        return _short_cut_plan(outgoing_uid, incoming_uid, outgoing, incoming, policy)
     return _base_plan(
         outgoing_uid,
         incoming_uid,
         mode=TransitionMode.ADAPTIVE,
-        duration_ms=policy.fallback_duration_ms,
-        outgoing_cue_ms=_outgoing_cue(outgoing, policy.fallback_duration_ms),
-        incoming_cue_ms=_incoming_cue(incoming),
+        duration_ms=window.duration_ms,
+        outgoing_cue_ms=window.outgoing_cue_ms,
+        incoming_cue_ms=window.incoming_cue_ms,
         confidence=0.0,
         fallback_reason=reason,
+        policy=policy,
+    )
+
+
+def _short_cut_plan(
+    outgoing_uid: str,
+    incoming_uid: str,
+    outgoing: TrackMixProfile | None,
+    incoming: TrackMixProfile | None,
+    policy: PlannerPolicyV1,
+) -> TransitionPlan:
+    duration_ms = policy.manual_ramp_ms
+    if outgoing is not None:
+        duration_ms = min(duration_ms, outgoing.duration_ms)
+    if incoming is not None:
+        duration_ms = min(duration_ms, incoming.duration_ms)
+    return _base_plan(
+        outgoing_uid,
+        incoming_uid,
+        mode=TransitionMode.ADAPTIVE,
+        duration_ms=duration_ms,
+        outgoing_cue_ms=outgoing.duration_ms - duration_ms if outgoing else 0,
+        incoming_cue_ms=0,
+        confidence=0.0,
+        fallback_reason=TransitionFallbackReason.INSUFFICIENT_WINDOW,
         policy=policy,
     )
 
@@ -318,18 +362,100 @@ def _transition_duration(preferred_ms: int, policy: PlannerPolicyV1) -> int:
     )
 
 
-def _outgoing_cue(profile: TrackMixProfile | None, duration_ms: int) -> int:
-    if profile is None:
-        return 0
-    if profile.outro_cue_ms is not None:
-        return profile.outro_cue_ms
-    return max(0, profile.duration_ms - duration_ms)
+@dataclass(frozen=True, slots=True)
+class _TransitionWindow:
+    outgoing_cue_ms: int
+    incoming_cue_ms: int
+    duration_ms: int
+    fits: bool
 
 
-def _incoming_cue(profile: TrackMixProfile | None) -> int:
-    if profile is None:
+def _fit_window(
+    outgoing: TrackMixProfile | None,
+    incoming: TrackMixProfile | None,
+    requested_ms: int,
+    tempo_ratio: float,
+    policy: PlannerPolicyV1,
+    *,
+    snap_to_beats: bool = False,
+) -> _TransitionWindow:
+    duration_ms = requested_ms
+    incoming_cue_ms = 0
+    if incoming is not None:
+        incoming_cue_ms = _incoming_cue(incoming)
+        if snap_to_beats:
+            incoming_cue_ms = _previous_beat(incoming, incoming_cue_ms)
+        available_ms = _incoming_window(incoming, incoming_cue_ms, tempo_ratio, policy)
+        if available_ms < duration_ms and incoming_cue_ms > 0:
+            incoming_cue_ms = 0
+            available_ms = _incoming_window(incoming, 0, tempo_ratio, policy)
+        duration_ms = min(duration_ms, available_ms)
+
+    if outgoing is None:
+        return _TransitionWindow(
+            outgoing_cue_ms=0,
+            incoming_cue_ms=incoming_cue_ms,
+            duration_ms=max(0, duration_ms),
+            fits=duration_ms >= policy.minimum_transition_ms,
+        )
+
+    track_ms = outgoing.duration_ms
+    earliest_cue_ms = min(
+        int(track_ms * policy.minimum_outgoing_body_ratio),
+        policy.minimum_outgoing_body_ms,
+    )
+    cue_ms = (
+        outgoing.outro_cue_ms
+        if outgoing.outro_cue_ms is not None
+        else track_ms - max(0, duration_ms)
+    )
+    cue_ms = max(cue_ms, earliest_cue_ms)
+    latest_cue_ms = track_ms - max(0, duration_ms)
+    if cue_ms > latest_cue_ms:
+        cue_ms = latest_cue_ms
+        if snap_to_beats:
+            cue_ms = _previous_beat(outgoing, cue_ms)
+        cue_ms = max(cue_ms, earliest_cue_ms)
+    cue_ms = max(0, min(cue_ms, track_ms))
+    duration_ms = max(0, min(duration_ms, track_ms - cue_ms))
+    return _TransitionWindow(
+        outgoing_cue_ms=cue_ms,
+        incoming_cue_ms=incoming_cue_ms,
+        duration_ms=duration_ms,
+        fits=duration_ms >= policy.minimum_transition_ms,
+    )
+
+
+def _incoming_cue(profile: TrackMixProfile) -> int:
+    cue_ms = profile.intro_cue_ms or 0
+    if cue_ms >= profile.duration_ms:
         return 0
-    return profile.intro_cue_ms or 0
+    return cue_ms
+
+
+def _incoming_window(
+    profile: TrackMixProfile,
+    cue_ms: int,
+    tempo_ratio: float,
+    policy: PlannerPolicyV1,
+) -> int:
+    playable_ms = profile.duration_ms - cue_ms - policy.minimum_incoming_body_ms
+    if playable_ms <= 0:
+        return 0
+    return math.floor(playable_ms / tempo_ratio)
+
+
+def _previous_beat(profile: TrackMixProfile, position_ms: int) -> int:
+    anchor_ms = (
+        profile.downbeat_anchor_ms
+        if profile.downbeat_anchor_ms is not None
+        else profile.beat_anchor_ms
+    )
+    if not profile.bpm or anchor_ms is None or position_ms < anchor_ms:
+        return position_ms
+    beat_ms = 60_000.0 / profile.bpm
+    beats = math.floor((position_ms - anchor_ms) / beat_ms)
+    return int(anchor_ms + beats * beat_ms)
 
 
 def _tempo_ratio(outgoing_bpm: float | None, incoming_bpm: float | None) -> float:
@@ -411,7 +537,7 @@ def _loudness_delta(
     desired = float(outgoing.outro_lufs) - float(incoming.intro_lufs)
     return max(
         -policy.max_loudness_adjustment_db,
-        min(policy.max_loudness_adjustment_db, desired),
+        min(policy.maximum_unaccredited_gain_db, desired),
     )
 
 
@@ -429,11 +555,30 @@ def _safe_deck_gain(
     return min(desired_gain_db, safe_gain)
 
 
-def _beat_phase_offset(profile: TrackMixProfile, cue_ms: int) -> int:
-    if not profile.bpm or profile.downbeat_anchor_ms is None:
+def _beat_phase_offset(
+    outgoing: TrackMixProfile,
+    incoming: TrackMixProfile,
+    outgoing_cue_ms: int,
+    incoming_cue_ms: int,
+    tempo_ratio: float,
+) -> int:
+    if (
+        not outgoing.bpm
+        or not incoming.bpm
+        or outgoing.downbeat_anchor_ms is None
+        or incoming.downbeat_anchor_ms is None
+    ):
         return 0
-    beat_period_ms = max(1, round(60_000.0 / profile.bpm))
-    return int((profile.downbeat_anchor_ms - cue_ms) % beat_period_ms)
+    outgoing_beat_ms = 60_000.0 / outgoing.bpm
+    incoming_beat_ms = 60_000.0 / _normalized_tempo(outgoing.bpm, incoming.bpm)
+    outgoing_phase_ms = (
+        outgoing_cue_ms - outgoing.downbeat_anchor_ms
+    ) % outgoing_beat_ms
+    incoming_phase_ms = (
+        (incoming_cue_ms - incoming.downbeat_anchor_ms) % incoming_beat_ms
+    ) / tempo_ratio
+    offset_ms = round((outgoing_phase_ms - incoming_phase_ms) % outgoing_beat_ms)
+    return int(offset_ms) % max(1, round(outgoing_beat_ms))
 
 
 def _round_score(value: float) -> float:
