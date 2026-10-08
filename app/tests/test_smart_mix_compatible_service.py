@@ -8,7 +8,7 @@ from crate.smart_mix.compatible import (
     rank_compatible_tracks,
 )
 from crate.smart_mix.models import MixProfileQuality, TrackMixProfile
-from crate.smart_mix.policy import PLANNER_POLICY_V1
+from crate.smart_mix.policy import PLANNER_POLICY
 
 
 def test_ranking_is_deterministic_and_uses_shared_policy() -> None:
@@ -28,7 +28,7 @@ def test_ranking_is_deterministic_and_uses_shared_policy() -> None:
         "incompatible",
     ]
     assert first == second
-    assert first[0].score_breakdown.planner_version == PLANNER_POLICY_V1.version
+    assert first[0].score_breakdown.planner_version == PLANNER_POLICY.version
 
 
 def test_half_and_double_bpm_candidates_remain_compatible() -> None:

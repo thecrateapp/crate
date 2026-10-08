@@ -7,7 +7,7 @@ import org.json.JSONObject;
 import java.util.Locale;
 
 final class NativeTransitionPlan {
-    static final int SUPPORTED_PLANNER_VERSION = 1;
+    static final int SUPPORTED_PLANNER_VERSION = 2;
     static final float MIN_TEMPO_RATIO = 0.94f;
     static final float MAX_TEMPO_RATIO = 1.06f;
 

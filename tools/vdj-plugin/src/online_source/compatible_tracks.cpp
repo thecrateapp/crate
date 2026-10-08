@@ -93,7 +93,7 @@ ParseResult<CompatibleTracks> CompatibleTracksClient::fetch(
         .url = allowed_origin_ + "/api/tracks/by-entity/" +
             encode_path_segment(seed_entity_uid) +
             "/compatible?scope=local&limit=20&planner_version=" +
-            std::string(kSmartMixAnalyzerVersion),
+            std::string(kSmartMixPlannerVersion),
         .allowed_origin = allowed_origin_,
         .headers = {
             {"Accept", "application/json"},

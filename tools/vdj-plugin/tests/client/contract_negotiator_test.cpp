@@ -14,7 +14,7 @@ Capabilities supported_capabilities()
         .max_plugin_version = "1.x",
         .contract_version = "2026-08",
         .profile_schema_version = 1,
-        .planner_version = "smart-mix-v1",
+        .planner_version = "smart-mix-v2",
         .online_source = true,
         .smart_mix_assistant = true,
         .automation = false,
@@ -33,7 +33,7 @@ int main()
             .require_smart_mix_assistant = true,
             .require_automation = false,
             .profile_schema_version = 1,
-            .planner_version = "smart-mix-v1",
+            .planner_version = "smart-mix-v2",
         }
     );
     assert(accepted.ok());

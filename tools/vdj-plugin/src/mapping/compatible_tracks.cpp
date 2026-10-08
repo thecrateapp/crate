@@ -321,7 +321,7 @@ bool parse_breakdown(
             "plannerVersion",
             breakdown.planner_version
         ) &&
-        breakdown.planner_version == kSmartMixProfileVersion &&
+        breakdown.planner_version == kSmartMixPlannerPolicyVersion &&
         unit_number(value, "overall", breakdown.overall) &&
         unit_number(value, "signalConfidence", breakdown.signal_confidence) &&
         unit_number(value, "tempo", breakdown.tempo) &&
@@ -394,7 +394,7 @@ ParseResult<CompatibleTracks> parse_compatible_tracks_json(std::string_view json
             root,
             "plannerVersion",
             results.planner_version
-        ) || results.planner_version != kSmartMixAnalyzerVersion) {
+        ) || results.planner_version != kSmartMixPlannerVersion) {
         return invalid<CompatibleTracks>(
             "invalid compatible tracks contract metadata"
         );

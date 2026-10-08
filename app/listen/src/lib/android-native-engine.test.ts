@@ -161,7 +161,7 @@ describe("android native engine flags", () => {
     const { AndroidNativeEngine } = await import("@/lib/android-native-engine");
     const engine = new AndroidNativeEngine();
     const plan = {
-      plannerVersion: 1,
+      plannerVersion: 2,
       outgoingTrackId: "track-1",
       incomingTrackId: "track-2",
     } as unknown as EngineTransitionPlan;

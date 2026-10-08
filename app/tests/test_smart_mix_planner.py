@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import UTC, datetime
+import json
 import math
+from pathlib import Path
 
 import pytest
 
@@ -14,7 +16,7 @@ from crate.smart_mix.models import (
     TransitionMode,
 )
 from crate.smart_mix.planner import plan_transition, score_compatibility
-from crate.smart_mix.policy import PLANNER_POLICY_V1
+from crate.smart_mix.policy import PLANNER_POLICY
 
 
 def _context(
@@ -98,7 +100,7 @@ def test_selects_transition_mode(
     if expected_mode is TransitionMode.GAPLESS:
         assert plan.duration_ms == 0
     elif context.source == "manual":
-        assert plan.duration_ms == PLANNER_POLICY_V1.manual_ramp_ms
+        assert plan.duration_ms == PLANNER_POLICY.manual_ramp_ms
 
 
 @pytest.mark.parametrize(
@@ -153,7 +155,7 @@ def test_missing_profile_uses_fixed_safe_fallback() -> None:
     )
 
     assert plan.mode is TransitionMode.ADAPTIVE
-    assert plan.duration_ms == PLANNER_POLICY_V1.fallback_duration_ms
+    assert plan.duration_ms == PLANNER_POLICY.fallback_duration_ms
     assert plan.outgoing_track_entity_uid == "missing-outgoing"
     assert plan.fallback_reason is TransitionFallbackReason.MISSING_PROFILE
     assert plan.confidence == 0.0
@@ -225,7 +227,7 @@ def test_compatibility_score_uses_versioned_dimensions() -> None:
         genre_similarity=0.8,
     )
 
-    assert score.planner_version == PLANNER_POLICY_V1.version
+    assert score.planner_version == PLANNER_POLICY.version
     assert score.overall > 0.8
     assert score.signal_confidence > 0.8
     assert set(score.to_dict()) == {
@@ -258,14 +260,14 @@ def test_gain_matching_is_capped_and_combined_true_peak_is_protected() -> None:
         _context(source="radio"),
     )
 
-    assert plan.incoming_gain_db <= PLANNER_POLICY_V1.max_loudness_adjustment_db
+    assert plan.incoming_gain_db <= PLANNER_POLICY.max_loudness_adjustment_db
     midpoint_envelope = math.sqrt(0.5)
     combined_peak = (
         _amplitude(-0.1 + plan.outgoing_gain_db) * midpoint_envelope
         + _amplitude(-0.2 + plan.incoming_gain_db) * midpoint_envelope
     )
     assert 20.0 * math.log10(combined_peak) <= (
-        PLANNER_POLICY_V1.combined_true_peak_ceiling_dbfs + 1e-6
+        PLANNER_POLICY.combined_true_peak_ceiling_dbfs + 1e-6
     )
 
 
@@ -368,7 +370,7 @@ def test_impossible_window_degrades_to_a_short_cut() -> None:
 
     _assert_plan_fits(plan, outgoing, incoming)
     assert plan.mode is TransitionMode.ADAPTIVE
-    assert plan.duration_ms <= PLANNER_POLICY_V1.manual_ramp_ms
+    assert plan.duration_ms <= PLANNER_POLICY.manual_ramp_ms
     assert plan.fallback_reason is TransitionFallbackReason.INSUFFICIENT_WINDOW
 
 
@@ -435,8 +437,8 @@ def test_unknown_true_peak_reserves_full_scale_headroom() -> None:
         _context(source="radio"),
     )
 
-    ceiling = PLANNER_POLICY_V1.combined_true_peak_ceiling_dbfs
-    headroom = PLANNER_POLICY_V1.equal_power_midpoint_headroom_db
+    ceiling = PLANNER_POLICY.combined_true_peak_ceiling_dbfs
+    headroom = PLANNER_POLICY.equal_power_midpoint_headroom_db
     assert ceiling == -1.0
     assert plan.outgoing_gain_db <= ceiling - headroom
     assert plan.incoming_gain_db <= ceiling - headroom
@@ -479,3 +481,24 @@ def test_every_plan_stays_inside_both_tracks(
         incoming,
         _context(source=source, preferred_duration_ms=preferred_ms),
     )
+
+
+FIXTURE_PATH = (
+    Path(__file__).resolve().parent / "fixtures/smart_mix/transition_plans_v2.json"
+)
+FIXTURE = json.loads(FIXTURE_PATH.read_text())
+
+
+def test_shared_plan_fixture_matches_the_current_planner_version() -> None:
+    assert FIXTURE["plannerVersion"] == PLANNER_POLICY.version
+
+
+@pytest.mark.parametrize("case", FIXTURE["cases"], ids=lambda case: case["name"])
+def test_planner_reproduces_the_shared_plan_fixture(case: dict) -> None:
+    plan = plan_transition(
+        _profile("11111111-1111-4111-8111-111111111111", **case["outgoing"]),
+        _profile("22222222-2222-4222-8222-222222222222", **case["incoming"]),
+        _context(**case["context"]),
+    )
+
+    assert plan.to_dict() == case["expected"]

@@ -135,12 +135,12 @@ class TransitionEdgeRequest(SmartMixRequestModel):
 
 
 class TransitionPlanBatchRequest(SmartMixRequestModel):
-    planner_version: Literal["smart-mix-v1"] = Field(alias="plannerVersion")
+    planner_version: Literal["smart-mix-v2"] = Field(alias="plannerVersion")
     edges: list[TransitionEdgeRequest] = Field(min_length=1, max_length=32)
 
 
 class TransitionPlanResponse(SmartMixApiModel):
-    planner_version: Literal[1] = Field(alias="plannerVersion")
+    planner_version: Literal[2] = Field(alias="plannerVersion")
     outgoing_track_entity_uid: UUID = Field(alias="outgoingTrackEntityUid")
     incoming_track_entity_uid: UUID = Field(alias="incomingTrackEntityUid")
     mode: Literal["gapless", "adaptive", "beatmatch"]
@@ -179,7 +179,7 @@ class TransitionPlanResponse(SmartMixApiModel):
 
 
 class TransitionPlanBatchResponse(SmartMixApiModel):
-    planner_version: Literal["smart-mix-v1"] = Field(alias="plannerVersion")
+    planner_version: Literal["smart-mix-v2"] = Field(alias="plannerVersion")
     plans: list[TransitionPlanResponse]
 
 
@@ -227,7 +227,7 @@ class CompatibleTrackResponse(SmartMixApiModel):
 class CompatibleTracksResponse(SmartMixApiModel):
     seed_track_entity_uid: str = Field(serialization_alias="seedTrackEntityUid")
     scope: Literal["local"]
-    planner_version: Literal["smart-mix-v1"] = Field(
+    planner_version: Literal["smart-mix-v2"] = Field(
         serialization_alias="plannerVersion"
     )
     items: list[CompatibleTrackResponse]

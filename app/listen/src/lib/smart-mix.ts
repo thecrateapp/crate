@@ -7,7 +7,8 @@ export const SMART_TRANSITION_LONG_SECONDS = 6;
 export const SMART_TRANSITION_MIXED_QUEUE_SECONDS = 3;
 
 const SMART_TRANSITION_MIN_SIGNAL_WEIGHT = 0.35;
-const SMART_MIX_PLANNER_VERSION = "smart-mix-v1";
+const SMART_MIX_PLANNER_VERSION = "smart-mix-v2";
+const SMART_MIX_PLANNER_POLICY_VERSION = 2;
 const MAX_TRANSITION_DURATION_MS = 12_000;
 const KEY_TO_PITCH_CLASS: Record<string, number> = {
   c: 0,
@@ -117,7 +118,7 @@ interface TransitionPlanResponse {
 }
 
 interface TransitionPlanBatchResponse {
-  plannerVersion: "smart-mix-v1";
+  plannerVersion: typeof SMART_MIX_PLANNER_VERSION;
   plans: TransitionPlanResponse[];
 }
 
@@ -306,7 +307,9 @@ export class SmartMixTransitionPlanner {
             plan.incomingTrackEntityUid === edge.incoming.entityUid,
         );
         const compatibleServerPlan =
-          serverPlan?.plannerVersion === 1 ? serverPlan : undefined;
+          serverPlan?.plannerVersion === SMART_MIX_PLANNER_POLICY_VERSION
+            ? serverPlan
+            : undefined;
         localPlans.set(
           edgeKey(edge),
           compatibleServerPlan
@@ -450,7 +453,7 @@ function safeTransitionPlan(
 ): EngineTransitionPlan {
   const durationMs = clampDuration(preferredDurationMs);
   return {
-    plannerVersion: 1,
+    plannerVersion: SMART_MIX_PLANNER_POLICY_VERSION,
     outgoingTrackId: edge.outgoing.id,
     incomingTrackId: edge.incoming.id,
     mode: durationMs > 0 ? "adaptive" : "gapless",

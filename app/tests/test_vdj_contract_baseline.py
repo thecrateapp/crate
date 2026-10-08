@@ -10,7 +10,7 @@ def test_capabilities_keep_smart_mix_contract_stable(test_app, monkeypatch):
     assert response.status_code == 200
     assert response.json()["smart_mix"] == {
         "available": True,
-        "planner_version": "smart-mix-v1",
+        "planner_version": "smart-mix-v2",
         "android_native_crossfade": False,
         "android_beatmatch": False,
     }

@@ -7,7 +7,7 @@ from typing import Iterable, Sequence
 
 from crate.smart_mix.models import MixProfileQuality, TrackMixProfile
 from crate.smart_mix.planner import CompatibilityScore, score_compatibility
-from crate.smart_mix.policy import PLANNER_POLICY_V1, PlannerPolicyV1
+from crate.smart_mix.policy import PLANNER_POLICY, PlannerPolicy
 
 
 _VARIANT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
@@ -72,7 +72,7 @@ def rank_compatible_tracks(
     candidates: Iterable[CompatibleTrackCandidate],
     *,
     limit: int,
-    policy: PlannerPolicyV1 = PLANNER_POLICY_V1,
+    policy: PlannerPolicy = PLANNER_POLICY,
 ) -> list[CompatibleTrackResult]:
     capped_limit = max(1, min(int(limit), 100))
     seed_variant = _variant(seed.title)
@@ -138,7 +138,7 @@ def rank_compatible_tracks(
 def _fallback_reasons(
     candidate: CompatibleTrackCandidate,
     breakdown: CompatibilityScore,
-    policy: PlannerPolicyV1,
+    policy: PlannerPolicy,
 ) -> tuple[str, ...]:
     reasons: list[str] = []
     if (

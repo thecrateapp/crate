@@ -79,7 +79,7 @@ def compatible_tracks(
     entity_uid: UUID,
     scope: Literal["local"] = Query(default="local"),
     limit: int = Query(default=20, ge=1, le=100),
-    planner_version: Literal["smart-mix-v1"] = Query(default="smart-mix-v1"),
+    planner_version: Literal["smart-mix-v2"] = Query(default="smart-mix-v2"),
 ) -> CompatibleTracksResponse:
     _require_vdj_scope(request, "vdj.smart_mix.read")
     seed, candidates = get_compatible_track_inputs(

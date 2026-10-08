@@ -1,5 +1,6 @@
 #pragma once
 
+#include "crate_vdj/mix_profile.hpp"
 #include "crate_vdj/models.hpp"
 
 #include <optional>
@@ -22,7 +23,7 @@ struct NegotiationRequirements {
     bool require_smart_mix_assistant = false;
     bool require_automation = false;
     int profile_schema_version = 1;
-    std::string planner_version = "smart-mix-v1";
+    std::string planner_version = std::string(kSmartMixPlannerVersion);
 };
 
 struct NegotiationResult {

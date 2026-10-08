@@ -57,7 +57,7 @@ def test_compatible_tracks_returns_one_bounded_ranked_response(
         params={
             "scope": "local",
             "limit": 20,
-            "planner_version": "smart-mix-v1",
+            "planner_version": "smart-mix-v2",
         },
     )
 
@@ -66,7 +66,7 @@ def test_compatible_tracks_returns_one_bounded_ranked_response(
     assert response.json() == {
         "seedTrackEntityUid": "seed",
         "scope": "local",
-        "plannerVersion": "smart-mix-v1",
+        "plannerVersion": "smart-mix-v2",
         "items": [
             {
                 "trackId": candidate.track_id,
@@ -77,7 +77,7 @@ def test_compatible_tracks_returns_one_bounded_ranked_response(
                 "score": 0.91,
                 "confidence": 0.9,
                 "scoreBreakdown": {
-                    "plannerVersion": 1,
+                    "plannerVersion": 2,
                     "overall": 0.91,
                     "signalConfidence": 0.9,
                     "tempo": 1.0,
@@ -121,7 +121,7 @@ def test_compatible_tracks_validates_scope_limit_and_planner_version(test_app) -
     assert test_app.get(path, params={"limit": 0}).status_code == 422
     assert test_app.get(path, params={"limit": 101}).status_code == 422
     assert (
-        test_app.get(path, params={"planner_version": "future-v2"}).status_code == 422
+        test_app.get(path, params={"planner_version": "future-v3"}).status_code == 422
     )
 
 
@@ -137,7 +137,7 @@ def _candidate(track_uid: str) -> CompatibleTrackCandidate:
             profile_version=1,
             profile_revision=f"profile-{track_uid}",
             analyzer="crate-rust",
-            analyzer_version="smart-mix-v1",
+            analyzer_version="smart-mix-v2",
             source_revision=f"source-{track_uid}",
             duration_ms=180_000,
             quality=MixProfileQuality.FULL,
@@ -155,7 +155,7 @@ def _candidate(track_uid: str) -> CompatibleTrackCandidate:
 
 def _result(candidate: CompatibleTrackCandidate) -> CompatibleTrackResult:
     breakdown = CompatibilityScore(
-        planner_version=1,
+        planner_version=2,
         overall=0.91,
         signal_confidence=0.9,
         tempo=1.0,

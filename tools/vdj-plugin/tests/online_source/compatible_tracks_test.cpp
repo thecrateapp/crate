@@ -12,7 +12,7 @@ namespace {
 constexpr std::string_view kCompatibleTracksJson = R"json({
     "seedTrackEntityUid": "seed-track",
     "scope": "local",
-    "plannerVersion": "smart-mix-v1",
+    "plannerVersion": "smart-mix-v2",
     "items": [
         {
             "trackId": 42,
@@ -23,7 +23,7 @@ constexpr std::string_view kCompatibleTracksJson = R"json({
             "score": 0.91,
             "confidence": 0.88,
             "scoreBreakdown": {
-                "plannerVersion": 1,
+                "plannerVersion": 2,
                 "overall": 0.91,
                 "signalConfidence": 0.88,
                 "tempo": 1.0,
@@ -46,7 +46,7 @@ constexpr std::string_view kCompatibleTracksJson = R"json({
             "score": 0.42,
             "confidence": 0.31,
             "scoreBreakdown": {
-                "plannerVersion": 1,
+                "plannerVersion": 2,
                 "overall": 0.42,
                 "signalConfidence": 0.31,
                 "tempo": 0.5,
@@ -106,10 +106,10 @@ int main()
     assert(parsed.ok());
     assert(parsed.value->seed_track_entity_uid == "seed-track");
     assert(parsed.value->scope == "local");
-    assert(parsed.value->planner_version == "smart-mix-v1");
+    assert(parsed.value->planner_version == "smart-mix-v2");
     assert(parsed.value->items.size() == 2);
     assert(parsed.value->items[0].track_entity_uid == "compatible-first");
-    assert(parsed.value->items[0].score_breakdown.planner_version == 1);
+    assert(parsed.value->items[0].score_breakdown.planner_version == 2);
     assert(parsed.value->items[0].score_breakdown.harmonic_relationship ==
            "adjacent");
     assert(parsed.value->items[1].fallback_reasons[0] == "low_confidence");
@@ -137,7 +137,7 @@ int main()
     assert(fetched.ok());
     assert(http.request_seen.url ==
            "https://api.dev.lespedants.org/api/tracks/by-entity/seed-track/"
-           "compatible?scope=local&limit=20&planner_version=smart-mix-v1");
+           "compatible?scope=local&limit=20&planner_version=smart-mix-v2");
     assert(http.request_seen.headers.size() == 2);
     assert(http.request_seen.headers[1].second ==
            "Bearer crv_compatible-token");

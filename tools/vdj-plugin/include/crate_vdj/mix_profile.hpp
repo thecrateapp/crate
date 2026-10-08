@@ -60,6 +60,8 @@ struct MixProfile {
 
 inline constexpr std::string_view kSmartMixAnalyzerVersion = "smart-mix-v1";
 inline constexpr int kSmartMixProfileVersion = 1;
+inline constexpr std::string_view kSmartMixPlannerVersion = "smart-mix-v2";
+inline constexpr int kSmartMixPlannerPolicyVersion = 2;
 
 ParseResult<MixProfile> parse_mix_profile_json(std::string_view json);
 

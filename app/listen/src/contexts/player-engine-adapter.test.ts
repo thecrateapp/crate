@@ -487,7 +487,7 @@ describe("player engine adapter", () => {
         available: true,
         androidNativeCrossfade: true,
         androidBeatmatch: false,
-        plannerVersion: "smart-mix-v1",
+        plannerVersion: "smart-mix-v2",
       });
     });
 

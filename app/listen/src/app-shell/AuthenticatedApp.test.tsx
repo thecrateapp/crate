@@ -70,7 +70,7 @@ describe("AuthenticatedApp", () => {
     apiMock.mockResolvedValue({
       smart_mix: {
         available: true,
-        planner_version: "smart-mix-v1",
+        planner_version: "smart-mix-v2",
         android_native_crossfade: true,
         android_beatmatch: false,
       },
@@ -86,7 +86,7 @@ describe("AuthenticatedApp", () => {
       available: true,
       androidNativeCrossfade: true,
       androidBeatmatch: false,
-      plannerVersion: "smart-mix-v1",
+      plannerVersion: "smart-mix-v2",
     });
   });
 });

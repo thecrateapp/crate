@@ -13,7 +13,7 @@ from crate.smart_mix.models import (
     TransitionMode,
     TransitionPlan,
 )
-from crate.smart_mix.policy import PLANNER_POLICY_V1, PlannerPolicyV1
+from crate.smart_mix.policy import PLANNER_POLICY, PlannerPolicy
 
 
 HarmonicRelationshipValue = Literal[
@@ -61,7 +61,7 @@ def score_compatibility(
     *,
     bliss_similarity: float | None = None,
     genre_similarity: float | None = None,
-    policy: PlannerPolicyV1 = PLANNER_POLICY_V1,
+    policy: PlannerPolicy = PLANNER_POLICY,
 ) -> CompatibilityScore:
     tempo = _tempo_score(outgoing.bpm, incoming.bpm)
     relationship = camelot_relationship(outgoing.camelot, incoming.camelot)
@@ -106,7 +106,7 @@ def plan_transition(
     *,
     outgoing_track_entity_uid: str | None = None,
     incoming_track_entity_uid: str | None = None,
-    policy: PlannerPolicyV1 = PLANNER_POLICY_V1,
+    policy: PlannerPolicy = PLANNER_POLICY,
 ) -> TransitionPlan:
     outgoing_uid = _track_uid(outgoing, outgoing_track_entity_uid, "outgoing")
     incoming_uid = _track_uid(incoming, incoming_track_entity_uid, "incoming")
@@ -211,7 +211,7 @@ def _beatmatch_fallback_reason(
     outgoing: TrackMixProfile,
     incoming: TrackMixProfile,
     context: TransitionContext,
-    policy: PlannerPolicyV1,
+    policy: PlannerPolicy,
 ) -> TransitionFallbackReason | None:
     if not context.allow_beatmatch:
         return TransitionFallbackReason.LOW_CONFIDENCE
@@ -265,7 +265,7 @@ def _base_plan(
     outgoing_cue_ms: int,
     incoming_cue_ms: int,
     confidence: float,
-    policy: PlannerPolicyV1,
+    policy: PlannerPolicy,
     incoming_tempo_ratio: float = 1.0,
     beat_phase_offset_ms: int = 0,
     outgoing_gain_db: float = 0.0,
@@ -299,7 +299,7 @@ def _fallback_plan(
     outgoing: TrackMixProfile | None,
     incoming: TrackMixProfile | None,
     reason: TransitionFallbackReason,
-    policy: PlannerPolicyV1,
+    policy: PlannerPolicy,
 ) -> TransitionPlan:
     window = _fit_window(outgoing, incoming, policy.fallback_duration_ms, 1.0, policy)
     if not window.fits:
@@ -322,7 +322,7 @@ def _short_cut_plan(
     incoming_uid: str,
     outgoing: TrackMixProfile | None,
     incoming: TrackMixProfile | None,
-    policy: PlannerPolicyV1,
+    policy: PlannerPolicy,
 ) -> TransitionPlan:
     duration_ms = policy.manual_ramp_ms
     if outgoing is not None:
@@ -353,7 +353,7 @@ def _track_uid(
     return str(value)
 
 
-def _transition_duration(preferred_ms: int, policy: PlannerPolicyV1) -> int:
+def _transition_duration(preferred_ms: int, policy: PlannerPolicy) -> int:
     if preferred_ms <= 0:
         return policy.fallback_duration_ms
     return min(
@@ -375,7 +375,7 @@ def _fit_window(
     incoming: TrackMixProfile | None,
     requested_ms: int,
     tempo_ratio: float,
-    policy: PlannerPolicyV1,
+    policy: PlannerPolicy,
     *,
     snap_to_beats: bool = False,
 ) -> _TransitionWindow:
@@ -437,7 +437,7 @@ def _incoming_window(
     profile: TrackMixProfile,
     cue_ms: int,
     tempo_ratio: float,
-    policy: PlannerPolicyV1,
+    policy: PlannerPolicy,
 ) -> int:
     playable_ms = profile.duration_ms - cue_ms - policy.minimum_incoming_body_ms
     if playable_ms <= 0:
@@ -479,7 +479,7 @@ def _tempo_score(outgoing_bpm: float | None, incoming_bpm: float | None) -> floa
 
 def _harmonic_score(
     relationship: CamelotRelationship,
-    policy: PlannerPolicyV1,
+    policy: PlannerPolicy,
 ) -> float:
     return {
         CamelotRelationship.SAME: policy.harmonic_same_score,
@@ -493,7 +493,7 @@ def _harmonic_score(
 def _continuity_score(
     outgoing: float | None,
     incoming: float | None,
-    policy: PlannerPolicyV1,
+    policy: PlannerPolicy,
 ) -> float:
     if outgoing is None or incoming is None:
         return policy.neutral_dimension_score
@@ -502,7 +502,7 @@ def _continuity_score(
 
 def _optional_score(
     value: float | None,
-    policy: PlannerPolicyV1,
+    policy: PlannerPolicy,
 ) -> float:
     if value is None:
         return policy.neutral_dimension_score
@@ -530,7 +530,7 @@ def _signal_confidence(
 def _loudness_delta(
     outgoing: TrackMixProfile,
     incoming: TrackMixProfile,
-    policy: PlannerPolicyV1,
+    policy: PlannerPolicy,
 ) -> float:
     if outgoing.outro_lufs is None or incoming.intro_lufs is None:
         return 0.0
@@ -544,7 +544,7 @@ def _loudness_delta(
 def _safe_deck_gain(
     true_peak_dbfs: float | None,
     desired_gain_db: float,
-    policy: PlannerPolicyV1,
+    policy: PlannerPolicy,
 ) -> float:
     peak = float(true_peak_dbfs) if true_peak_dbfs is not None else 0.0
     safe_gain = (

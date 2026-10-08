@@ -15,7 +15,7 @@ const ENABLED_CAPABILITIES: SmartMixCapabilities = {
   available: true,
   androidNativeCrossfade: true,
   androidBeatmatch: true,
-  plannerVersion: "smart-mix-v1",
+  plannerVersion: "smart-mix-v2",
 };
 
 const PLAYLIST_SOURCE: PlaySource = {
@@ -53,7 +53,7 @@ const TRACKS: Track[] = [
 
 function serverPlan(outgoing: Track, incoming: Track) {
   return {
-    plannerVersion: 1 as const,
+    plannerVersion: 2 as const,
     outgoingTrackEntityUid: outgoing.entityUid!,
     incomingTrackEntityUid: incoming.entityUid!,
     mode: "adaptive" as const,
@@ -75,7 +75,7 @@ function serverPlan(outgoing: Track, incoming: Track) {
 describe("SmartMixTransitionPlanner", () => {
   it("requests only current→N+1 and N+1→N+2", async () => {
     const request = vi.fn().mockResolvedValue({
-      plannerVersion: "smart-mix-v1",
+      plannerVersion: "smart-mix-v2",
       plans: [
         serverPlan(TRACKS[1]!, TRACKS[2]!),
         serverPlan(TRACKS[2]!, TRACKS[3]!),
@@ -99,7 +99,7 @@ describe("SmartMixTransitionPlanner", () => {
       "/api/playback/transition-plans",
       "POST",
       {
-        plannerVersion: "smart-mix-v1",
+        plannerVersion: "smart-mix-v2",
         edges: [
           expect.objectContaining({
             outgoingTrackEntityUid: TRACKS[1]!.entityUid,
@@ -151,7 +151,7 @@ describe("SmartMixTransitionPlanner", () => {
     const signals: AbortSignal[] = [];
     const pending: Array<{
       resolve: (value: {
-        plannerVersion: "smart-mix-v1";
+        plannerVersion: "smart-mix-v2";
         plans: ReturnType<typeof serverPlan>[];
       }) => void;
       reject: (reason?: unknown) => void;
@@ -165,7 +165,7 @@ describe("SmartMixTransitionPlanner", () => {
       ) => {
         signals.push(options.signal);
         return new Promise<{
-          plannerVersion: "smart-mix-v1";
+          plannerVersion: "smart-mix-v2";
           plans: ReturnType<typeof serverPlan>[];
         }>((resolve, reject) => {
           pending.push({ resolve, reject });
@@ -202,7 +202,7 @@ describe("SmartMixTransitionPlanner", () => {
 
     expect(signals[0]?.aborted).toBe(true);
     pending[1]!.resolve({
-      plannerVersion: "smart-mix-v1",
+      plannerVersion: "smart-mix-v2",
       plans: [
         serverPlan(TRACKS[1]!, TRACKS[2]!),
         serverPlan(TRACKS[2]!, TRACKS[3]!),
@@ -258,7 +258,7 @@ describe("SmartMixTransitionPlanner", () => {
 
   it("copies only the transition contract and never server credentials", async () => {
     const request = vi.fn().mockResolvedValue({
-      plannerVersion: "smart-mix-v1",
+      plannerVersion: "smart-mix-v2",
       plans: [
         {
           ...serverPlan(TRACKS[0]!, TRACKS[1]!),
@@ -383,7 +383,7 @@ describe("SmartMixTransitionPlanner startup and offline contract", () => {
       },
     ];
     const request = vi.fn().mockResolvedValue({
-      plannerVersion: "smart-mix-v1",
+      plannerVersion: "smart-mix-v2",
       plans: [],
     });
     const planner = new SmartMixTransitionPlanner(request);
@@ -441,7 +441,7 @@ describe("SmartMixTransitionPlanner startup and offline contract", () => {
     const first = planner.plan(planInput());
     const second = planner.plan(planInput());
     resolvers[0]!({
-      plannerVersion: "smart-mix-v1",
+      plannerVersion: "smart-mix-v2",
       plans: [serverPlan(TRACKS[0]!, TRACKS[1]!)],
     });
 
@@ -489,7 +489,7 @@ describe("SmartMixTransitionPlanner startup and offline contract", () => {
 
   it("caches plans without stream URLs or credentials", async () => {
     const request = vi.fn().mockResolvedValue({
-      plannerVersion: "smart-mix-v1",
+      plannerVersion: "smart-mix-v2",
       plans: [serverPlan(TRACKS[0]!, TRACKS[1]!)],
     });
     const planner = new SmartMixTransitionPlanner(request);

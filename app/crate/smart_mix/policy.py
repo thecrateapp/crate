@@ -4,9 +4,9 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)
-class PlannerPolicyV1:
-    version: int = 1
-    identifier: str = "smart-mix-v1"
+class PlannerPolicy:
+    version: int = 2
+    identifier: str = "smart-mix-v2"
     minimum_bpm_confidence: float = 0.75
     minimum_tempo_stability: float = 0.80
     maximum_tempo_adjustment: float = 0.04
@@ -37,7 +37,7 @@ class PlannerPolicyV1:
     neutral_dimension_score: float = 0.5
 
 
-PLANNER_POLICY_V1 = PlannerPolicyV1()
+PLANNER_POLICY = PlannerPolicy()
 
 
-__all__ = ["PLANNER_POLICY_V1", "PlannerPolicyV1"]
+__all__ = ["PLANNER_POLICY", "PlannerPolicy"]

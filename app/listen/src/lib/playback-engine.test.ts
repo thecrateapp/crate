@@ -113,7 +113,7 @@ describe("EngineQueueSnapshot", () => {
       volume: 1,
       transitionPlans: [
         {
-          plannerVersion: 1,
+          plannerVersion: 2,
           outgoingTrackId: "track-1",
           incomingTrackId: "track-2",
           mode: "adaptive",

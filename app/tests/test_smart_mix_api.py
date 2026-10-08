@@ -19,7 +19,7 @@ def test_profile_and_plan_routes_require_authentication(test_app) -> None:
         plans = test_app.post(
             "/api/playback/transition-plans",
             json={
-                "plannerVersion": "smart-mix-v1",
+                "plannerVersion": "smart-mix-v2",
                 "edges": [_edge(uid, str(uuid.uuid4()))],
             },
         )
@@ -144,7 +144,7 @@ def test_batch_plans_deduplicate_edges_and_load_profiles_once(
     response = test_app.post(
         "/api/playback/transition-plans",
         json={
-            "plannerVersion": "smart-mix-v1",
+            "plannerVersion": "smart-mix-v2",
             "edges": [edge, edge],
         },
     )
@@ -157,7 +157,7 @@ def test_batch_plans_deduplicate_edges_and_load_profiles_once(
 
     cached_response = test_app.post(
         "/api/playback/transition-plans",
-        json={"plannerVersion": "smart-mix-v1", "edges": [edge]},
+        json={"plannerVersion": "smart-mix-v2", "edges": [edge]},
     )
     assert cached_response.status_code == 200
     assert len(planned) == 1
@@ -185,7 +185,7 @@ def test_missing_profile_returns_per_edge_fallback(test_app, monkeypatch) -> Non
     response = test_app.post(
         "/api/playback/transition-plans",
         json={
-            "plannerVersion": "smart-mix-v1",
+            "plannerVersion": "smart-mix-v2",
             "edges": [_edge(outgoing_uid, incoming_uid)],
         },
     )
@@ -204,7 +204,7 @@ def test_batch_rejects_empty_oversized_or_unknown_plan_requests(test_app) -> Non
     assert (
         test_app.post(
             path,
-            json={"plannerVersion": "smart-mix-v1", "edges": []},
+            json={"plannerVersion": "smart-mix-v2", "edges": []},
         ).status_code
         == 422
     )
@@ -212,7 +212,7 @@ def test_batch_rejects_empty_oversized_or_unknown_plan_requests(test_app) -> Non
         test_app.post(
             path,
             json={
-                "plannerVersion": "smart-mix-v1",
+                "plannerVersion": "smart-mix-v2",
                 "edges": [_edge(uid, str(uuid.uuid4())) for _ in range(33)],
             },
         ).status_code
@@ -222,7 +222,7 @@ def test_batch_rejects_empty_oversized_or_unknown_plan_requests(test_app) -> Non
         test_app.post(
             path,
             json={
-                "plannerVersion": "future-v2",
+                "plannerVersion": "future-v3",
                 "edges": [_edge(uid, str(uuid.uuid4()))],
             },
         ).status_code
@@ -235,7 +235,7 @@ def test_batch_rejects_empty_oversized_or_unknown_plan_requests(test_app) -> Non
     assert (
         test_app.post(
             path,
-            json={"plannerVersion": "smart-mix-v1", "edges": [edge_with_path]},
+            json={"plannerVersion": "smart-mix-v2", "edges": [edge_with_path]},
         ).status_code
         == 422
     )
@@ -267,7 +267,7 @@ def _profile(
         profile_version=1,
         profile_revision=f"profile-{track_uid}",
         analyzer="crate-rust",
-        analyzer_version="smart-mix-v1",
+        analyzer_version="smart-mix-v2",
         source_revision=f"source-{track_uid}",
         duration_ms=180_000,
         quality=MixProfileQuality.FULL,

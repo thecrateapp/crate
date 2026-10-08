@@ -62,7 +62,7 @@ int main()
         {
           "contract_version": "2026-08",
           "profile_schema_version": 1,
-          "planner_version": "smart-mix-v1",
+          "planner_version": "smart-mix-v2",
           "online_source": true,
           "smart_mix_assistant": true,
           "automation": false,
@@ -70,7 +70,7 @@ int main()
         }
     )json");
     assert(parsed.ok());
-    assert(parsed.value->planner_version == "smart-mix-v1");
+    assert(parsed.value->planner_version == "smart-mix-v2");
     assert(parsed.value->online_source);
     assert(!parsed.value->automation);
 
@@ -78,7 +78,7 @@ int main()
         {
           "contract_version": "2026-08",
           "profile_schema_version": 2,
-          "planner_version": "smart-mix-v1",
+          "planner_version": "smart-mix-v2",
           "online_source": false,
           "smart_mix_assistant": false,
           "automation": false
@@ -91,7 +91,7 @@ int main()
         {
           "contract_version": "2026-08",
           "profile_schema_version": 1,
-          "planner_version": "smart-mix-v1",
+          "planner_version": "smart-mix-v2",
           "online_source": false,
           "smart_mix_assistant": false
         }
@@ -108,7 +108,7 @@ int main()
             "max_plugin_version": "1.x",
             "contract_version": "2026-08",
             "profile_schema_version": 1,
-            "planner_version": "smart-mix-v1",
+            "planner_version": "smart-mix-v2",
             "online_source": true,
             "smart_mix_assistant": true,
             "automation": false
