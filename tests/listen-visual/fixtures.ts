@@ -353,6 +353,199 @@ const genreDetail = {
   shows: [],
 };
 
+function statsDay(offset: number): string {
+  const day = new Date(Date.UTC(2026, 8, 12) - offset * 86_400_000);
+  return day.toISOString().slice(0, 10);
+}
+
+const statsTapePoints = Array.from({ length: 30 }, (_, index) => {
+  const offset = 29 - index;
+  const minutes = 40 + ((index * 37) % 90) + (index % 7 === 6 ? 70 : 0);
+  return { bucket: statsDay(offset), minutes, plays: Math.round(minutes / 4) };
+});
+
+const statsDashboard = {
+  window: "30d",
+  overview: {
+    window: "30d",
+    play_count: 812,
+    complete_play_count: 700,
+    skip_count: 40,
+    minutes_listened: 3420,
+    active_days: 27,
+    skip_rate: 0.05,
+    top_artist: null,
+  },
+  trends: { window: "30d", points: [] },
+  top_tracks: {
+    window: "30d",
+    items: ["Mob DLA", "Trauma Bonds", "Fever Dream"].map((title, index) => ({
+      track_id: index + 1,
+      track_path: `High Vis/Guided Tour/0${index + 1} ${title}.flac`,
+      title,
+      artist: "High Vis",
+      artist_id: 7,
+      artist_slug: "high-vis",
+      album: "Guided Tour",
+      album_id: 71,
+      album_slug: "guided-tour",
+      play_count: 40 - index * 7,
+      complete_play_count: 30,
+      minutes_listened: 120 - index * 20,
+    })),
+  },
+  top_artists: {
+    window: "30d",
+    items: [
+      {
+        artist_name: "High Vis",
+        artist_id: 7,
+        artist_slug: "high-vis",
+        play_count: 204,
+        complete_play_count: 180,
+        minutes_listened: 720,
+      },
+    ],
+  },
+  top_albums: {
+    window: "30d",
+    items: ["Guided Tour", "Blending", "No Sense No Feeling"].map(
+      (album, index) => ({
+        artist: "High Vis",
+        artist_id: 7,
+        album,
+        album_id: 71 + index,
+        play_count: 90 - index * 20,
+        complete_play_count: 60,
+        minutes_listened: 300,
+      }),
+    ),
+  },
+  top_genres: { window: "30d", items: [] },
+  replay: {
+    window: "30d",
+    title: "Replay this month",
+    subtitle: "The tracks that defined your last 30 days.",
+    title_key: "stats.replay.thisMonth.title",
+    subtitle_key: "stats.replay.thisMonth.subtitle",
+    track_count: 0,
+    minutes_listened: 0,
+    items: [],
+  },
+  story: {
+    window: "30d",
+    movers: [],
+    discoveries: [
+      {
+        artist_name: "High Vis",
+        artist_id: 7,
+        artist_slug: "high-vis",
+        play_count: 42,
+        minutes_listened: 120,
+        first_played_at: "2026-08-20T21:00:00Z",
+      },
+    ],
+    comebacks: [],
+    rhythm: { peak_hour_play_count: 0, peak_weekday_play_count: 0 },
+    audio_profile: { energy: 0.79, danceability: 0.32, valence: 0.5, bpm: 137 },
+    monthly_snapshots: [],
+  },
+  timezone: "UTC",
+  provisional: true,
+  metrics_version: "listening-v1",
+  tape: {
+    granularity: "day",
+    start: statsDay(29),
+    end: statsDay(-1),
+    points: statsTapePoints,
+    mood: statsTapePoints.map((point, index) => ({
+      bucket: point.bucket,
+      energy: 0.55 + ((index * 13) % 30) / 100,
+      valence: 0.4,
+    })),
+    peaks: [
+      {
+        kind: "obsession",
+        bucket: statsDay(9),
+        day: statsDay(9),
+        value: 31,
+        track: { title: "Mob DLA", artist: "High Vis", album: "Guided Tour" },
+      },
+    ],
+    months: [
+      { month: "2026-09", minutes: 2100, plays: 500, top_artist: "High Vis" },
+    ],
+  },
+  highlights: {
+    artist_count: 64,
+    longest_streak: { days: 21, start: "2026-08-20", end: "2026-09-09" },
+    current_streak: { days: 3 },
+    new_artists: { count: 9, share: 0.21 },
+    longest_session: {
+      minutes: 260,
+      started_at: "2026-09-05T18:00:00Z",
+      track_count: 61,
+    },
+    obsession: {
+      day: statsDay(9),
+      plays: 31,
+      minutes: 120,
+      track: {
+        title: "Mob DLA",
+        artist: "High Vis",
+        album: "Guided Tour",
+        album_id: 71,
+      },
+    },
+  },
+  artist_of_period: {
+    artist_name: "High Vis",
+    artist_id: 7,
+    artist_slug: "high-vis",
+    plays: 204,
+    minutes: 720,
+    active_days: 18,
+    first_day_in_period: "2026-08-14",
+    top_album: { album: "Guided Tour", plays: 80, album_id: 71 },
+  },
+  heatmap: {
+    cells: Array.from({ length: 7 }, (_, weekday) =>
+      Array.from({ length: 24 }, (_, hour) =>
+        hour >= 20 || hour < 2
+          ? 40 + weekday * 5
+          : hour >= 8 && hour <= 10
+            ? 20
+            : 3,
+      ),
+    ),
+    peak: { weekday: 6, hour: 22 },
+    night_share: 0.38,
+  },
+  music_age: {
+    median_year: 2019,
+    decades: [
+      { decade: 2000, share: 0.1 },
+      { decade: 2010, share: 0.6 },
+      { decade: 2020, share: 0.3 },
+    ],
+    oldest_album: { album: "Guided Tour", year: 2008 },
+  },
+  genre_trend: [
+    {
+      genre_name: "Hardcore",
+      slug: "hardcore",
+      share: 0.44,
+      delta_vs_previous: 0.06,
+    },
+    {
+      genre_name: "Post-Punk",
+      slug: "post-punk",
+      share: 0.2,
+      delta_vs_previous: -0.02,
+    },
+  ],
+};
+
 function responseFor(pathname: string): unknown {
   if (pathname === "/api/auth/me" || pathname === "/api/me") {
     return {
@@ -374,6 +567,10 @@ function responseFor(pathname: string): unknown {
     };
   }
   if (pathname === "/api/me/home/discovery") return homeDiscovery;
+  if (pathname === "/api/me/stats/dashboard") return statsDashboard;
+  if (pathname === "/api/me/stats/today") {
+    return { day: "2026-09-12", timezone: "UTC", minutes: 38, plays: 9 };
+  }
   if (pathname === "/api/me/playlists-page") {
     return { playlists: [], followed_curated_playlists: [] };
   }
