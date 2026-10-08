@@ -566,6 +566,10 @@ html[data-keyboard-open] select {
   border-radius: var(--radius-lg);
 }
 
+[data-slot="segmented-control"] {
+  border-radius: calc(var(--radius-lg) + 0.25rem);
+}
+
 /* ── Listen-only vendor overrides ── */
 
 /* Keep shared modal primitives within Listen's 12px large-surface contract. */

@@ -3,7 +3,7 @@ import type { PlayerPauseOptions } from "./player-context";
 import type { Track } from "./player-types";
 import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
-import { isNative } from "@/lib/capacitor-runtime";
+import { isIosBrowser, isNative } from "@/lib/capacitor-runtime";
 import { useMediaAccessVersion } from "@/hooks/use-media-access-version";
 import { syncDesktopMediaSession } from "@/lib/desktop-tray";
 import {
@@ -268,21 +268,25 @@ export function useMediaSession({
             actionsRef.current.seek(details.seekTime);
         },
       ],
-      [
-        "seekbackward",
-        (details) => {
-          const { currentTime, seek } = actionsRef.current;
-          seek(Math.max(0, currentTime - (details.seekOffset || 10)));
-        },
-      ],
-      [
-        "seekforward",
-        (details) => {
-          const { currentTime, duration, seek } = actionsRef.current;
-          seek(Math.min(duration, currentTime + (details.seekOffset || 10)));
-        },
-      ],
     ];
+    if (!isIosBrowser) {
+      actions.push(
+        [
+          "seekbackward",
+          (details) => {
+            const { currentTime, seek } = actionsRef.current;
+            seek(Math.max(0, currentTime - (details.seekOffset || 10)));
+          },
+        ],
+        [
+          "seekforward",
+          (details) => {
+            const { currentTime, duration, seek } = actionsRef.current;
+            seek(Math.min(duration, currentTime + (details.seekOffset || 10)));
+          },
+        ],
+      );
+    }
 
     for (const [action, handler] of actions) {
       try {

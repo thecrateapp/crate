@@ -21,6 +21,7 @@ import {
   drawStoryArtworkBackground,
   drawStoryBackground,
   drawStoryBrand,
+  drawDiggingStoryCard,
   type CrateStoryArtwork,
   SQUARE_POST_SIZE,
   STORY_HEIGHT,
@@ -104,19 +105,33 @@ async function renderShareCard(
       )
     : [];
 
+  const digging = payload.kind === "digging" ? payload.digging : undefined;
+  const gridUrls = digging
+    ? digging.coverUrls.slice(0, 5)
+    : crateAlbums.map((album) => album.imageUrl ?? null);
+
   const [artwork, logo, ...crateArtworks] = await Promise.all([
-    payload.imageUrl && (!isCrate || crateAlbums.length === 0)
+    payload.imageUrl && !digging && (!isCrate || crateAlbums.length === 0)
       ? loadOptionalCanvasImage(payload.imageUrl, "artwork")
       : Promise.resolve(null),
     loadOptionalCanvasImage(CRATE_LOGO_URL, "logo"),
-    ...crateAlbums.map((album, index) =>
-      album.imageUrl
-        ? loadOptionalCanvasImage(album.imageUrl, `crate album ${index + 1}`)
+    ...gridUrls.map((url, index) =>
+      url
+        ? loadOptionalCanvasImage(url, `grid artwork ${index + 1}`)
         : Promise.resolve(null),
     ),
   ]);
   try {
-    if (isCrate) {
+    if (digging) {
+      drawStoryBackground(ctx, canvas.width, canvas.height, colors);
+      drawDiggingStoryCard(
+        ctx,
+        digging,
+        crateArtworks.map((value) => value?.image ?? null),
+        logo?.image ?? null,
+        colors,
+      );
+    } else if (isCrate) {
       const albums = crateAlbums.map(
         (album, index): CrateStoryArtwork => ({
           image: crateArtworks[index]?.image ?? null,

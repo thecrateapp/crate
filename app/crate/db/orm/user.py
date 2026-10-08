@@ -24,6 +24,7 @@ class User(Base):
     name: Mapped[str | None] = mapped_column(Text)
     bio: Mapped[str | None] = mapped_column(Text)
     instagram_handle: Mapped[str | None] = mapped_column(Text)
+    timezone: Mapped[str | None] = mapped_column(Text)
     password_hash: Mapped[str | None] = mapped_column(Text)
     avatar: Mapped[str | None] = mapped_column(Text)
     role: Mapped[str] = mapped_column(Text, nullable=False, server_default="user")

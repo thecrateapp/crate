@@ -57,7 +57,8 @@ test/             renderWithListenProviders, gesture helpers
 - Icons: `@crate/ui/icons`, sized with `CRATE_ICON_SIZE`. `lucide-react` is not a Listen dependency (bundle test enforces it).
 - Prefer `@crate/ui` primitives over raw `<button>`/`<input>` (budgeted in `component-policy.test.ts`; raw buttons need an explicit `type`). Do not redefine a `@crate/ui` component name locally.
 - No arbitrary radius/z-index/shadow/text-size values beyond the budget (`design-token-policy.test.ts`, `radius-policy.test.ts`). Genre chips go through `GenrePill`; every other badge goes through `CrateBadge` (`@crate/ui/primitives/CrateBadge`): rectangular, white text, sentence case, the tone colors only the icon (`badge-policy.test.ts`).
-- Charts: Nivo only.
+- Charts: Nivo only. Exception: the Stats signal tape, heatmap and decade bars (`components/stats/`) are hand-built SVG/CSS because they animate per bar and must match the Crate Digging canvas card; do not add new custom charts elsewhere.
+- Stats (`pages/Stats.tsx`, `pages/StatsDigging.tsx`, `components/stats/`) read one `/api/me/stats/dashboard` payload per period plus `/api/me/stats/today`. Motion is CSS-only (`stats-reveal`, keyframes in `recipes.css`) with reduced-motion fallbacks.
 
 ## i18n (hard rule)
 

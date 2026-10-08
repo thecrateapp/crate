@@ -70,12 +70,10 @@ const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
   "pages/PathDetail.tsx": { "text-[0.75rem]": 1 },
   "pages/Paths.tsx": { "text-[0.75rem]": 1 },
   "pages/ServerSetup.tsx": { "text-[0.75rem]": 1 },
-  "pages/Stats.tsx": { "tracking-[-0.085em]": 1 },
   "pages/StatsCollectionPanels.tsx": {
     "text-[8.5rem]": 1,
     "tracking-[-0.12em]": 1,
   },
-  "pages/StatsStorySections.tsx": { "tracking-[-0.07em]": 1 },
 };
 
 const ICON_SIZE_BUDGET: Record<string, Record<string, number>> = {
@@ -92,9 +90,7 @@ const ICON_SIZE_BUDGET: Record<string, Record<string, number>> = {
   "pages/Paths.tsx": { "22": 1 },
   "pages/PlaylistInvite.tsx": { "22": 1 },
   "pages/SearchAlbumResults.tsx": { "32": 1 },
-  "pages/StatsAnalyticsSections.tsx": { "22": 1 },
   "pages/StatsCollectionPanels.tsx": { "22": 1 },
-  "pages/StatsListeningPulse.tsx": { "22": 1 },
 };
 
 function productionSourceFiles(directory: string): string[] {

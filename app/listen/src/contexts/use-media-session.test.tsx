@@ -6,7 +6,7 @@ import type { NativeMediaControlEvent } from "@/lib/native-media-session-bridge"
 import type { Track } from "./player-types";
 import { useMediaSession } from "./use-media-session";
 
-const runtime = vi.hoisted(() => ({ isNative: false }));
+const runtime = vi.hoisted(() => ({ isNative: false, isIosBrowser: false }));
 const nativeMediaSession = vi.hoisted(() => ({
   cancelPendingResume: vi.fn(async () => {}),
   controlListener: null as ((event: NativeMediaControlEvent) => void) | null,
@@ -16,6 +16,9 @@ const nativeMediaSession = vi.hoisted(() => ({
 vi.mock("@/lib/capacitor-runtime", () => ({
   get isNative() {
     return runtime.isNative;
+  },
+  get isIosBrowser() {
+    return runtime.isIosBrowser;
   },
 }));
 
@@ -127,6 +130,7 @@ function getMediaSessionActionHandler(
 
 beforeEach(() => {
   runtime.isNative = false;
+  runtime.isIosBrowser = false;
   nativeMediaSession.controlListener = null;
   nativeMediaSession.resumeAllowed = true;
   vi.clearAllMocks();
@@ -170,6 +174,36 @@ afterEach(() => {
 });
 
 describe("useMediaSession", () => {
+  it("offers seek and track skipping on non-iOS browsers", () => {
+    renderSession();
+
+    const actions = mediaSession.setActionHandler.mock.calls.map(
+      ([action]) => action,
+    );
+    expect(actions).toEqual(
+      expect.arrayContaining([
+        "previoustrack",
+        "nexttrack",
+        "seekbackward",
+        "seekforward",
+      ]),
+    );
+  });
+
+  it("leaves seek actions unset on iOS so the lock screen shows track skipping", () => {
+    runtime.isIosBrowser = true;
+    renderSession();
+
+    const actions = mediaSession.setActionHandler.mock.calls.map(
+      ([action]) => action,
+    );
+    expect(actions).toEqual(
+      expect.arrayContaining(["previoustrack", "nexttrack"]),
+    );
+    expect(actions).not.toContain("seekbackward");
+    expect(actions).not.toContain("seekforward");
+  });
+
   it("requests an immediate pause from the Web MediaSession handler", () => {
     renderSession();
 

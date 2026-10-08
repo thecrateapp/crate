@@ -277,6 +277,50 @@ describe("ShareSheetHost", () => {
     expect(screen.queryByText("Story style")).not.toBeInTheDocument();
   });
 
+  it("offers only the story image for a private Crate Digging story", async () => {
+    const user = userEvent.setup();
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: vi.fn(async () => undefined),
+    });
+    Object.defineProperty(navigator, "canShare", {
+      configurable: true,
+      value: vi.fn(() => true),
+    });
+    const diggingPayload: SharePayload = {
+      kind: "digging",
+      title: "2026 on Crate",
+      subtitle: "Converge, no doubt about it.",
+      url: "https://listen.example/stats/digging?window=year%3A2026",
+      digging: {
+        kicker: "2026 on Crate",
+        headline: "Converge, no doubt about it.",
+        coverUrls: [],
+        topArtistsLabel: "Top artists",
+        topArtists: ["Converge"],
+        topTracksLabel: "Top tracks",
+        topTracks: ["Concubine"],
+        stats: [{ value: "41,382", label: "minutes" }],
+        credit: "A selected year by diego",
+      },
+    };
+    renderWithListenProviders(<ShareSheetHost />);
+
+    openPayload(diggingPayload);
+    const story = await screen.findByText("Instagram Story");
+    expect(screen.queryByText("WhatsApp")).not.toBeInTheDocument();
+    expect(screen.queryByText("Copy link")).not.toBeInTheDocument();
+    expect(screen.queryByText("Square post")).not.toBeInTheDocument();
+    await user.click(story);
+
+    await waitFor(() =>
+      expect(mocks.buildInstagramStoryBlob).toHaveBeenCalledWith(
+        diggingPayload,
+        expect.anything(),
+      ),
+    );
+  });
+
   it("downloads the square post when file sharing is unavailable", async () => {
     const user = userEvent.setup();
     Object.defineProperty(navigator, "share", {

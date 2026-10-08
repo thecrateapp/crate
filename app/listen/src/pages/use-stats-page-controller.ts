@@ -4,28 +4,30 @@ import { useLocation, useParams, useSearchParams } from "react-router";
 import type { TFunction } from "i18next";
 
 import {
-  buildRecapHighlights,
   localizedReplayTitle,
   statsTrackRowData,
   toPlayerTrack,
   type ReplayMix,
   type StatsDashboard,
+  type StatsSelection,
   type StatsStory,
-  type StatsWindow,
+  type StatsToday,
 } from "@/components/stats/stats-model";
 import type { TrackRowData } from "@/components/cards/TrackRowModel";
 import { usePlayerActions, type PlaySource } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
 import { usePendingStatsSnapshotRefresh } from "@/hooks/use-pending-stats-snapshot-refresh";
 import {
+  STATS_DASHBOARD_LIMITS,
   buildSoundProfile,
   formatMonthTitle,
   normalizeMonthParam,
-  normalizeWindowParam,
-  STATS_WINDOWS,
-  WINDOW_COPY_KEYS,
+  normalizeSelectionParam,
+  selectionDays,
+  selectionYear,
+  statsSelectionOptions,
   type SoundProfile,
-  type StatsPeriod,
+  type StatsSelectionOption,
 } from "@/pages/stats-page-model";
 
 const EMPTY_TOP_TRACKS: StatsDashboard["top_tracks"]["items"] = [];
@@ -33,59 +35,35 @@ const EMPTY_TOP_ARTISTS: StatsDashboard["top_artists"]["items"] = [];
 const EMPTY_TOP_ALBUMS: StatsDashboard["top_albums"]["items"] = [];
 const EMPTY_TOP_GENRES: StatsDashboard["top_genres"]["items"] = [];
 const EMPTY_REPLAY_ITEMS: ReplayMix["items"] = [];
+const EMPTY_DISCOVERIES: StatsStory["discoveries"] = [];
 
 export interface StatsPageController {
-  changeWindow: (window: StatsWindow) => void;
-  coverTracks: StatsDashboard["top_tracks"]["items"];
+  changeSelection: (selection: StatsSelection) => void;
   dashboard: StatsDashboard | null | undefined;
   dashboardLoading: boolean;
+  discoveries: StatsStory["discoveries"];
   hasStats: boolean;
-  heroBody: string;
-  heroTitle: string;
   isGlobalStats: boolean;
   isUserStats: boolean;
-  leadArtist: StatsDashboard["top_artists"]["items"][number] | undefined;
-  leadGenre: StatsDashboard["top_genres"]["items"][number] | undefined;
-  leadTrack: StatsDashboard["top_tracks"]["items"][number] | undefined;
+  kicker: string;
   overview: StatsDashboard["overview"] | undefined;
-  period: StatsPeriod;
   playReplay: () => void;
-  recapHighlights: ReturnType<typeof buildRecapHighlights>;
-  replay: ReplayMix | undefined;
   replayItems: ReplayMix["items"];
-  replayRows: TrackRowData[];
-  replaySource: PlaySource;
   selectedMonth: string | null;
-  selectedWindow: StatsWindow;
+  selection: StatsSelection;
+  selectionOptions: StatsSelectionOption[];
+  signalTitle: { lead: string; accent: string };
   soundProfile: SoundProfile;
-  story: StatsStory | undefined;
   subjectName: string | null;
   t: ReturnType<typeof useTranslation>["t"];
+  today: StatsToday | null;
   topAlbumItems: StatsDashboard["top_albums"]["items"];
   topArtistItems: StatsDashboard["top_artists"]["items"];
   topGenreItems: StatsDashboard["top_genres"]["items"];
   topTrackItems: StatsDashboard["top_tracks"]["items"];
   topTrackRows: TrackRowData[];
   topTrackSource: PlaySource;
-  topComeback: StatsStory["comebacks"][number] | undefined;
-  topDiscovery: StatsStory["discoveries"][number] | undefined;
-  topMover: StatsStory["movers"][number] | undefined;
-  trends: StatsDashboard["trends"] | undefined;
   username: string | undefined;
-}
-
-function resolveSelectedWindow(
-  selectedMonth: string | null,
-  searchWindow: string | null,
-): StatsWindow {
-  return selectedMonth ? "30d" : normalizeWindowParam(searchWindow);
-}
-
-function buildStatsPeriodQuery(
-  selectedMonth: string | null,
-  selectedWindow: StatsWindow,
-): string {
-  return selectedMonth ? `month=${selectedMonth}` : `window=${selectedWindow}`;
 }
 
 function buildStatsEndpoint(
@@ -99,39 +77,42 @@ function buildStatsEndpoint(
   return "/api/me/stats/dashboard";
 }
 
-function buildStatsPeriod(
-  selectedMonth: string | null,
-  selectedWindow: StatsWindow,
-  locale: string,
-  t: TFunction,
-  windowCopy: Record<StatsWindow, StatsPeriod>,
-): StatsPeriod {
-  if (selectedMonth) {
-    return {
-      title: formatMonthTitle(selectedMonth, locale),
-      label: t("stats.window.month"),
-    };
-  }
-  return windowCopy[selectedWindow];
-}
-
-function buildStatsHeroCopy(
+function buildKicker(
   isGlobalStats: boolean,
   isUserStats: boolean,
   subjectName: string | null,
   t: TFunction,
-): Pick<StatsPageController, "heroBody" | "heroTitle"> {
-  const heroTitle = isGlobalStats
-    ? t("stats.hero.globalTitle")
-    : isUserStats && subjectName
-      ? t("stats.hero.userTitle", { name: subjectName })
-      : t("stats.hero.yourTitle");
-  const heroBody = isGlobalStats
-    ? t("stats.hero.globalBody")
-    : isUserStats
-      ? t("stats.hero.userBody")
-      : t("stats.hero.yourBody");
-  return { heroBody, heroTitle };
+): string {
+  if (isGlobalStats) return t("stats.hero.globalTitle");
+  if (isUserStats && subjectName) {
+    return t("stats.hero.userTitle", { name: subjectName });
+  }
+  return t("stats.hero.yourTitle");
+}
+
+function buildSignalTitle(
+  selectedMonth: string | null,
+  selection: StatsSelection,
+  locale: string,
+  t: TFunction,
+): { lead: string; accent: string } {
+  const accent = t("stats.signal.title.accent");
+  if (selectedMonth) {
+    return {
+      lead: t("stats.signal.title.month", {
+        month: formatMonthTitle(selectedMonth, locale),
+      }),
+      accent,
+    };
+  }
+  const year = selectionYear(selection);
+  if (year !== null)
+    return { lead: t("stats.signal.title.year", { year }), accent };
+  const days = selectionDays(selection);
+  if (days !== null) {
+    return { lead: t("stats.signal.title.days", { count: days }), accent };
+  }
+  return { lead: t("stats.signal.title.allTime"), accent };
 }
 
 export function useStatsPageController(): StatsPageController {
@@ -141,29 +122,21 @@ export function useStatsPageController(): StatsPageController {
   const [searchParams, setSearchParams] = useSearchParams();
   const isGlobalStats = location.pathname === "/stats/global";
   const isUserStats = Boolean(username);
+  const currentYear = new Date().getFullYear();
   const selectedMonth = normalizeMonthParam(searchParams.get("month"));
-  const selectedWindow = resolveSelectedWindow(
-    selectedMonth,
+  const requested = normalizeSelectionParam(
     searchParams.get("window"),
+    currentYear,
   );
-  const statsPeriodQuery = buildStatsPeriodQuery(selectedMonth, selectedWindow);
-  const windowCopy = useMemo(
-    () =>
-      Object.fromEntries(
-        STATS_WINDOWS.map((window) => {
-          const copy = WINDOW_COPY_KEYS[window];
-          return [window, { title: t(copy.title), label: t(copy.label) }];
-        }),
-      ) as Record<StatsWindow, StatsPeriod>,
-    [t],
+  const selection: StatsSelection =
+    isGlobalStats && selectionYear(requested) !== null ? "365d" : requested;
+  const selectionOptions = useMemo(
+    () => statsSelectionOptions(currentYear, { calendarYear: !isGlobalStats }),
+    [currentYear, isGlobalStats],
   );
-  const period = buildStatsPeriod(
-    selectedMonth,
-    selectedWindow,
-    i18n.language,
-    t,
-    windowCopy,
-  );
+  const periodQuery = selectedMonth
+    ? `month=${selectedMonth}`
+    : `window=${encodeURIComponent(selection)}`;
   const { playAll } = usePlayerActions();
   const statsEndpoint = buildStatsEndpoint(isGlobalStats, username);
   const {
@@ -171,30 +144,20 @@ export function useStatsPageController(): StatsPageController {
     loading: dashboardLoading,
     refetch: refetchDashboard,
   } = useApi<StatsDashboard>(
-    `${statsEndpoint}?${statsPeriodQuery}&tracks_limit=12&artists_limit=10&albums_limit=12&genres_limit=10&replay_limit=36`,
+    `${statsEndpoint}?${periodQuery}&${STATS_DASHBOARD_LIMITS}`,
+  );
+  const { data: today } = useApi<StatsToday>(
+    !isGlobalStats && !isUserStats ? "/api/me/stats/today" : null,
   );
   usePendingStatsSnapshotRefresh(
     dashboard?.snapshot?.pending === true,
     refetchDashboard,
   );
   const overview = dashboard?.overview;
-  const trends = dashboard?.trends;
-  const topTrackItems = useMemo(
-    () => dashboard?.top_tracks.items ?? EMPTY_TOP_TRACKS,
-    [dashboard?.top_tracks.items],
-  );
-  const topArtistItems = useMemo(
-    () => dashboard?.top_artists.items ?? EMPTY_TOP_ARTISTS,
-    [dashboard?.top_artists.items],
-  );
-  const topAlbumItems = useMemo(
-    () => dashboard?.top_albums.items ?? EMPTY_TOP_ALBUMS,
-    [dashboard?.top_albums.items],
-  );
-  const topGenreItems = useMemo(
-    () => dashboard?.top_genres.items ?? EMPTY_TOP_GENRES,
-    [dashboard?.top_genres.items],
-  );
+  const topTrackItems = dashboard?.top_tracks.items ?? EMPTY_TOP_TRACKS;
+  const topArtistItems = dashboard?.top_artists.items ?? EMPTY_TOP_ARTISTS;
+  const topAlbumItems = dashboard?.top_albums.items ?? EMPTY_TOP_ALBUMS;
+  const topGenreItems = dashboard?.top_genres.items ?? EMPTY_TOP_GENRES;
   const replay = dashboard?.replay as ReplayMix | undefined;
   const story = dashboard?.story;
   const replayItems = replay?.items ?? EMPTY_REPLAY_ITEMS;
@@ -204,89 +167,50 @@ export function useStatsPageController(): StatsPageController {
     () => topTrackItems.map(statsTrackRowData),
     [topTrackItems],
   );
-  const replayRows = useMemo(
-    () => replayItems.map(statsTrackRowData),
-    [replayItems],
-  );
   const topTrackSource = useMemo<PlaySource>(
     () => ({ type: "playlist", name: t("stats.topTracks.title") }),
     [t],
   );
-  const replaySource = useMemo<PlaySource>(
-    () => ({ type: "playlist", name: replayTitle }),
-    [replayTitle],
-  );
-  const recapHighlights = useMemo(
-    () =>
-      buildRecapHighlights(
-        overview ?? undefined,
-        replay ?? undefined,
-        topArtistItems,
-        topTrackItems,
-        t,
-      ),
-    [overview, replay, topArtistItems, topTrackItems, t],
-  );
-  const soundProfile = buildStatsSoundProfile(story, topTrackItems);
   const subjectName = resolveSubjectName(dashboard, username);
-  const heroCopy = buildStatsHeroCopy(
-    isGlobalStats,
-    isUserStats,
-    subjectName,
-    t,
-  );
-  const leadTrack = topTrackItems[0];
-  const leadArtist = topArtistItems[0];
-  const leadGenre = topGenreItems[0];
-  const topMover = story?.movers[0];
-  const topDiscovery = story?.discoveries[0];
-  const topComeback = story?.comebacks[0];
 
-  function changeWindow(window: StatsWindow) {
-    setSearchParams({ window });
+  function changeSelection(next: StatsSelection) {
+    setSearchParams({ window: next });
   }
 
   function playReplay() {
     if (!replayItems.length) return;
-    playAll(replayItems.map(toPlayerTrack), 0, replaySource);
+    playAll(replayItems.map(toPlayerTrack), 0, {
+      type: "playlist",
+      name: replayTitle,
+    });
   }
 
   return {
-    changeWindow,
-    coverTracks: replayItems.length ? replayItems : topTrackItems,
+    changeSelection,
     dashboard,
     dashboardLoading,
+    discoveries: story?.discoveries ?? EMPTY_DISCOVERIES,
     hasStats: Boolean(overview?.play_count),
-    ...heroCopy,
     isGlobalStats,
     isUserStats,
-    leadArtist,
-    leadGenre,
-    leadTrack,
+    kicker: buildKicker(isGlobalStats, isUserStats, subjectName, t),
     overview,
-    period,
     playReplay,
-    recapHighlights,
-    replay,
     replayItems,
-    replayRows,
-    replaySource,
     selectedMonth,
-    selectedWindow,
-    soundProfile,
-    story,
+    selection,
+    selectionOptions,
+    signalTitle: buildSignalTitle(selectedMonth, selection, i18n.language, t),
+    soundProfile: buildStatsSoundProfile(story, topTrackItems),
     subjectName,
     t,
+    today: today ?? null,
     topAlbumItems,
     topArtistItems,
-    topComeback,
-    topDiscovery,
     topGenreItems,
-    topMover,
     topTrackItems,
     topTrackRows,
     topTrackSource,
-    trends,
     username,
   };
 }

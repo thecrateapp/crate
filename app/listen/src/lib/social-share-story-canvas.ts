@@ -1,4 +1,8 @@
-import type { ShareCardLabels, SharePayload } from "@/lib/social-share";
+import type {
+  ShareCardLabels,
+  SharePayload,
+  DiggingShareData,
+} from "@/lib/social-share";
 
 import type { SocialShareColors } from "./social-share-colors";
 
@@ -1679,4 +1683,145 @@ function roundedRect(
   ctx.lineTo(x, y + radius);
   ctx.quadraticCurveTo(x, y, x + radius, y);
   ctx.closePath();
+}
+
+const DIGGING_COVER_GAP = 14;
+
+export function drawDiggingStoryCard(
+  ctx: CanvasRenderingContext2D,
+  data: DiggingShareData,
+  covers: (HTMLImageElement | null)[],
+  logo: HTMLImageElement | null,
+  colors: SocialShareColors,
+) {
+  const left = CARD_MARGIN + 24;
+  const width = STORY_WIDTH - left * 2;
+  const limit = STORY_HEIGHT - STORY_SAFE_BOTTOM;
+  drawStoryBrand(ctx, logo, colors);
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = colors.accent;
+  ctx.font = `700 40px ${FONT_STACK}`;
+  ctx.fillText(
+    truncateToWidth(ctx, data.kicker, width),
+    left,
+    STORY_SAFE_TOP + 270,
+  );
+
+  ctx.fillStyle = colors.cardSurface;
+  const headlineSize = fitWrappedFont(ctx, data.headline, width, 100, 60, 2);
+  ctx.font = `800 ${headlineSize}px ${FONT_STACK}`;
+  ctx.letterSpacing = `${Math.round(headlineSize * -0.045)}px`;
+  const headlineEnd = drawWrappedText(
+    ctx,
+    data.headline,
+    left,
+    STORY_SAFE_TOP + 270 + headlineSize + 24,
+    width,
+    headlineSize * 0.95,
+    2,
+  );
+  ctx.letterSpacing = "0px";
+
+  const statsLabelY = limit - 8;
+  const statsValueY = statsLabelY - 44;
+  const listsLabelY = statsValueY - 64 - 56 - (64 + 2 * 52);
+  const coversTop = headlineEnd + 56;
+  const coversBottom = listsLabelY - 70;
+  const cell = Math.min(
+    (width - DIGGING_COVER_GAP * 3) / 4,
+    (coversBottom - coversTop - DIGGING_COVER_GAP) / 2,
+  );
+  const gridWidth = cell * 4 + DIGGING_COVER_GAP * 3;
+  const gridLeft = left + (width - gridWidth) / 2;
+  const slots: [number, number, number][] = [
+    [0, 0, 2],
+    [2, 0, 1],
+    [3, 0, 1],
+    [2, 1, 1],
+    [3, 1, 1],
+  ];
+  slots.forEach(([column, row, span], index) => {
+    const size = cell * span + DIGGING_COVER_GAP * (span - 1);
+    const x = gridLeft + column * (cell + DIGGING_COVER_GAP);
+    const top = coversTop + row * (cell + DIGGING_COVER_GAP);
+    ctx.save();
+    roundedRect(ctx, x, top, size, size, 14);
+    ctx.clip();
+    const image = covers[index];
+    if (image) {
+      drawCoverImage(ctx, image, x, top, size, size);
+    } else {
+      ctx.fillStyle = colors.generatedMiddle;
+      ctx.fillRect(x, top, size, size);
+    }
+    ctx.restore();
+  });
+
+  const columnWidth = (width - 48) / 2;
+  drawDiggingList(
+    ctx,
+    data.topArtistsLabel,
+    data.topArtists,
+    left,
+    listsLabelY,
+    columnWidth,
+    colors,
+  );
+  drawDiggingList(
+    ctx,
+    data.topTracksLabel,
+    data.topTracks,
+    left + columnWidth + 48,
+    listsLabelY,
+    columnWidth,
+    colors,
+  );
+
+  const statWidth = width / 3;
+  data.stats.slice(0, 3).forEach((stat, index) => {
+    const x = left + index * statWidth;
+    ctx.fillStyle = colors.cardSurface;
+    const size = fitFont(ctx, stat.value, statWidth - 24, 64, 36, "800");
+    ctx.font = `800 ${size}px ${FONT_STACK}`;
+    ctx.letterSpacing = `${Math.round(size * -0.04)}px`;
+    ctx.fillText(stat.value, x, statsValueY);
+    ctx.letterSpacing = "0px";
+    ctx.fillStyle = colors.accent;
+    ctx.font = `600 28px ${FONT_STACK}`;
+    ctx.fillText(
+      truncateToWidth(ctx, stat.label, statWidth - 24),
+      x,
+      statsLabelY,
+    );
+  });
+
+  ctx.fillStyle = colors.cardMutedInk;
+  ctx.font = `500 30px ${FONT_STACK}`;
+  ctx.fillText(truncateToWidth(ctx, data.credit, width), left, limit + 72);
+}
+
+function drawDiggingList(
+  ctx: CanvasRenderingContext2D,
+  label: string,
+  items: string[],
+  x: number,
+  y: number,
+  width: number,
+  colors: SocialShareColors,
+) {
+  ctx.textAlign = "left";
+  ctx.fillStyle = colors.accent;
+  ctx.font = `600 30px ${FONT_STACK}`;
+  ctx.fillText(truncateToWidth(ctx, label, width), x, y);
+  items.slice(0, 3).forEach((item, index) => {
+    const top = y + 64 + index * 52;
+    ctx.fillStyle = colors.cardMutedInk;
+    ctx.font = `700 34px ${FONT_STACK}`;
+    ctx.fillText(String(index + 1), x, top);
+    ctx.fillStyle = colors.cardSurface;
+    ctx.font = `600 34px ${FONT_STACK}`;
+    ctx.fillText(truncateToWidth(ctx, item, width - 44), x + 44, top);
+  });
 }

@@ -153,7 +153,7 @@ from crate.db.repositories.auth import (
 )
 from crate.db.repositories.auth_identities import link_oauth_user_identity
 from crate.db.repositories.library_contributions import list_user_album_contributions
-from crate.db.repositories.tasks import create_task
+from crate.db.repositories.tasks import create_task, create_task_dedup
 from crate.user_avatars import (
     AvatarProxyError,
     AvatarUnavailable,
@@ -1828,6 +1828,7 @@ def auth_me(request: Request):
         payload["username"] = db_user.get("username")
         payload["bio"] = db_user.get("bio")
         payload["instagram_handle"] = db_user.get("instagram_handle")
+        payload["timezone"] = db_user.get("timezone")
         payload["session_id"] = user.get("session_id")
         payload["capabilities"] = sorted(get_user_capabilities(db_user))
         payload["connected_accounts"] = list_user_external_identities(user["id"])
@@ -2027,6 +2028,8 @@ def update_profile(request: Request, body: UpdateProfileRequest):
         fields["bio"] = body.bio
     if body.instagram_handle is not None:
         fields["instagram_handle"] = body.instagram_handle or None
+    if body.timezone is not None:
+        fields["timezone"] = body.timezone or None
     if not fields:
         raise HTTPException(status_code=400, detail="No fields to update")
     try:
@@ -2039,6 +2042,8 @@ def update_profile(request: Request, body: UpdateProfileRequest):
         raise
     if not updated:
         raise HTTPException(status_code=404, detail="User not found")
+    if "timezone" in fields:
+        create_task_dedup("refresh_user_listening_stats", {"user_id": user["id"]})
     # Re-issue the short-lived access token with updated display fields.
     expiry_hours = _access_expiry_hours(request)
     token = create_jwt(

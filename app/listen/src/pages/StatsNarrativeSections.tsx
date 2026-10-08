@@ -9,34 +9,6 @@ import type { StatsAffinity } from "@/components/stats/stats-model";
 import { cn } from "@/lib/utils";
 import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
-const NARRATIVE_TONES = [
-  "stats-narrative-tone-cool",
-  "stats-narrative-tone-warm",
-  "stats-narrative-tone-alert",
-];
-
-export function StatsRecapSection({
-  highlights,
-  t,
-}: {
-  highlights: StatsPageController["recapHighlights"];
-  t: StatsPageController["t"];
-}) {
-  return (
-    <section className="mt-5 grid gap-4 lg:grid-cols-3">
-      {highlights.length > 0 ? (
-        highlights.map((item, index) => (
-          <NarrativeTile key={item.title} index={index} {...item} />
-        ))
-      ) : (
-        <div className="stats-card-empty rounded-panel border border-dashed p-6 text-sm lg:col-span-3">
-          {t("stats.empty.recap")}
-        </div>
-      )}
-    </section>
-  );
-}
-
 export function StatsEmptyState({ t }: { t: StatsPageController["t"] }) {
   return (
     <EmptyState
@@ -61,12 +33,8 @@ export function ScopeLink({
   return (
     <Link
       to={to}
-      className={cn(
-        "rounded-full border px-3 py-1.5 text-xs font-black uppercase tracking-kicker transition-colors",
-        active
-          ? "border-accent-action/30 bg-accent-action/15 text-accent-action"
-          : "stats-scope-link-inactive",
-      )}
+      aria-current={active ? "page" : undefined}
+      className={cn("pb-0.5", active ? "link-accent" : "link-meta")}
     >
       {children}
     </Link>
@@ -123,36 +91,5 @@ export function AffinityCard({
         </div>
       ) : null}
     </section>
-  );
-}
-
-function NarrativeTile({
-  title,
-  body,
-  index,
-}: {
-  title: string;
-  body: string;
-  index: number;
-}) {
-  const { t } = useTranslation();
-
-  return (
-    <div
-      className={cn(
-        "stats-narrative-tile rounded-panel p-5",
-        NARRATIVE_TONES[index % NARRATIVE_TONES.length],
-      )}
-    >
-      <div className="stats-muted-label text-xs font-black uppercase tracking-overline">
-        {t("stats.narrative.signal", {
-          number: String(index + 1).padStart(2, "0"),
-        })}
-      </div>
-      <div className="mt-3 text-xl font-black tracking-tighter text-text-primary">
-        {title}
-      </div>
-      <p className="mt-2 text-sm leading-6 text-text-muted">{body}</p>
-    </div>
   );
 }

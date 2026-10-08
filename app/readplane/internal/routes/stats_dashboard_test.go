@@ -42,6 +42,24 @@ func TestStatsDashboardSubjectKey(t *testing.T) {
 			want:   "user:9:month:2026-04:2026-04:12:10:12:10:36",
 		},
 		{
+			name:   "calendar year window",
+			userID: 4,
+			query:  url.Values{"window": {"YEAR:2026"}},
+			want:   "user:4:year:2026:default:12:10:12:10:36",
+		},
+		{
+			name:    "year before the history",
+			userID:  4,
+			query:   url.Values{"window": {"year:1900"}},
+			wantErr: true,
+		},
+		{
+			name:    "malformed year window",
+			userID:  4,
+			query:   url.Values{"window": {"year:26"}},
+			wantErr: true,
+		},
+		{
 			name:    "invalid month",
 			userID:  9,
 			query:   url.Values{"month": {"April"}},

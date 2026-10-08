@@ -23,13 +23,31 @@ export type ShareSubjectKind =
   | "artist"
   | "playlist"
   | "crate"
-  | "genre";
+  | "genre"
+  | "digging";
 
 export interface CrateShareAlbum {
   imageUrl?: string | null;
   name: string;
   artistName: string;
   position: number;
+}
+
+export interface DiggingShareStat {
+  value: string;
+  label: string;
+}
+
+export interface DiggingShareData {
+  kicker: string;
+  headline: string;
+  coverUrls: string[];
+  topArtistsLabel: string;
+  topArtists: string[];
+  topTracksLabel: string;
+  topTracks: string[];
+  stats: DiggingShareStat[];
+  credit: string;
 }
 
 export interface SharePayload {
@@ -46,6 +64,7 @@ export interface SharePayload {
   crateOwnerName?: string | null;
   crateSortDirection?: "asc" | "desc";
   crateTrackCount?: number;
+  digging?: DiggingShareData;
 }
 
 export interface ShareCardLabels {

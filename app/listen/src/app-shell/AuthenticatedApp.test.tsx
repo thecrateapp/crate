@@ -24,6 +24,10 @@ vi.mock("@/components/share/ShareSheet", () => ({
   ShareSheetHost: () => null,
 }));
 
+vi.mock("@/app-shell/TimezoneAutodetect", () => ({
+  TimezoneAutodetect: () => null,
+}));
+
 vi.mock("@/components/dev/TauriDevLogPanel", () => ({
   TauriDevLogPanel: () => null,
 }));

@@ -45,6 +45,7 @@ from crate.api.schemas.acquisition import (
 )
 from crate.api.schemas.common import OkResponse, TaskEnqueueResponse
 from crate.api.schemas.me import (
+    StatsTodayResponse,
     ChangePasswordRequest,
     CitySearchResultResponse,
     FeedItemResponse,
@@ -158,6 +159,7 @@ from crate.db.repositories.library_contributions import (
     list_user_album_contributions,
 )
 from crate.db.repositories.global_user_library import get_user_global_library_counts
+from crate.db.repositories.user_listening_today import get_listening_today
 from crate.db.repositories.playlists import get_followed_system_playlists, get_playlists
 from crate.db.repositories.recommendations import (
     record_recommendation_exposure,
@@ -949,6 +951,17 @@ def update_now_playing(request: Request, body: NowPlayingRequest):
 def stats(request: Request):
     user = _require_auth(request)
     return get_play_stats(user["id"])
+
+
+@router.get(
+    "/stats/today",
+    response_model=StatsTodayResponse,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Get minutes and plays listened today, updated on every play",
+)
+def stats_today(request: Request):
+    user = _require_auth(request)
+    return get_listening_today(user["id"])
 
 
 @router.get(

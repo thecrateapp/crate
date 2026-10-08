@@ -2,7 +2,9 @@
 
 import re
 from datetime import datetime
+from functools import lru_cache
 from typing import Any
+from zoneinfo import available_timezones
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -109,16 +111,36 @@ def normalize_instagram_handle(value: str) -> str:
     return handle
 
 
+def normalize_timezone(value: str) -> str:
+    candidate = value.strip()
+    if not candidate:
+        return ""
+    if candidate not in _available_timezones():
+        raise ValueError("Timezone must be an IANA name such as Europe/Madrid")
+    return candidate
+
+
+@lru_cache(maxsize=1)
+def _available_timezones() -> frozenset[str]:
+    return frozenset(available_timezones())
+
+
 class UpdateProfileRequest(BaseModel):
     name: str | None = None
     username: str | None = None
     bio: str | None = None
     instagram_handle: str | None = None
+    timezone: str | None = None
 
     @field_validator("instagram_handle")
     @classmethod
     def _validate_instagram_handle(cls, value: str | None) -> str | None:
         return None if value is None else normalize_instagram_handle(value)
+
+    @field_validator("timezone")
+    @classmethod
+    def _validate_timezone(cls, value: str | None) -> str | None:
+        return None if value is None else normalize_timezone(value)
 
 
 class ChangePasswordRequest(BaseModel):
@@ -219,6 +241,7 @@ class AuthMeResponse(AuthUserPublicResponse):
     username: str | None = None
     bio: str | None = None
     instagram_handle: str | None = None
+    timezone: str | None = None
     session_id: str | None = None
     capabilities: list[str] = Field(default_factory=list)
     connected_accounts: list[AuthExternalIdentityResponse] = Field(default_factory=list)

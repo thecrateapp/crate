@@ -9,7 +9,12 @@ import {
   UpcomingAlbumsSection,
 } from "@/components/home/HomeDiscoverySections";
 import { JustLandedSection } from "@/components/home/HomeLibrarySections";
-import { HomeReplaySection } from "@/components/home/HomePlaybackSections";
+import {
+  HomeReplaySection,
+  type HomeListeningSignal,
+} from "@/components/home/HomePlaybackSections";
+import type { StatsDashboard } from "@/components/stats/stats-model";
+import { useApi } from "@/hooks/use-api";
 import {
   getHomeDateString,
   getHomeGreeting,
@@ -23,6 +28,7 @@ import { PullIndicator } from "@crate/ui/primitives/PullIndicator";
 import type { HomePageController } from "@/pages/use-home-page-controller";
 import type { HomePageViewModel } from "@/pages/home-page-model";
 import { homePlaylistPath } from "@/pages/home-page-model";
+import { STATS_DASHBOARD_LIMITS } from "@/pages/stats-page-model";
 
 type LoadedHomePageController = Omit<HomePageController, "view"> & {
   view: HomePageViewModel;
@@ -103,9 +109,27 @@ function HomeMobileRails({ page }: HomeSectionProps) {
   return <HomeCommonRails page={page} />;
 }
 
+const HOME_SIGNAL_DAYS = 30;
+
+function homeListeningSignal(
+  dashboard: StatsDashboard | null,
+): HomeListeningSignal | null {
+  if (!dashboard?.overview || dashboard.snapshot?.pending) return null;
+  return {
+    days: HOME_SIGNAL_DAYS,
+    minutes: dashboard.overview.minutes_listened,
+    plays: dashboard.overview.play_count,
+    artists: dashboard.highlights?.artist_count ?? null,
+    tape: dashboard.tape ?? null,
+  };
+}
+
 function HomeDesktopRails({ page }: HomeSectionProps) {
   const { currentDiscovery, replay, replayPreview, recommendedTracks } =
     page.view;
+  const { data: dashboard } = useApi<StatsDashboard>(
+    `/api/me/stats/dashboard?window=${HOME_SIGNAL_DAYS}d&${STATS_DASHBOARD_LIMITS}`,
+  );
 
   return (
     <>
@@ -129,6 +153,7 @@ function HomeDesktopRails({ page }: HomeSectionProps) {
       <HomeReplaySection
         replay={replay || undefined}
         replayPreview={replayPreview}
+        signal={homeListeningSignal(dashboard)}
         onOpenStats={page.openReplayStats}
         onPlayReplay={page.playReplayMix}
         onPlayTrack={page.playReplayTrack}

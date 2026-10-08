@@ -1,23 +1,36 @@
-import { BarChart3 } from "@crate/ui/icons";
+import { Link } from "react-router";
 
+import { CRATE_ICON_SIZE, Play, Sparkles } from "@crate/ui/icons";
+import { Button } from "@crate/ui/shadcn/button";
+
+import { StatsArtistOfPeriod } from "@/components/stats/StatsArtistOfPeriod";
+import {
+  StatsDiscoveriesCard,
+  StatsMusicAgeCard,
+} from "@/components/stats/StatsClosingCards";
+import { StatsGenreTrendCard } from "@/components/stats/StatsGenreTrendCard";
+import { StatsHeadlineNumbers } from "@/components/stats/StatsHeadlineNumbers";
+import { StatsHeatmapCard } from "@/components/stats/StatsHeatmapCard";
+import { StatsHighlights } from "@/components/stats/StatsHighlights";
+import { StatsPeriodPicker } from "@/components/stats/StatsPeriodPicker";
+import { StatsReveal } from "@/components/stats/StatsReveal";
+import { StatsSignalTape } from "@/components/stats/StatsSignalTape";
 import {
   useStatsPageController,
   type StatsPageController,
 } from "@/pages/use-stats-page-controller";
+
+import { SoundProfileCard } from "./StatsAnalyticsSections";
+import {
+  TopAlbumsPanel,
+  TopArtistsPanel,
+  TopTracksPanel,
+} from "./StatsCollectionPanels";
 import {
   AffinityCard,
   ScopeLink,
   StatsEmptyState,
-  StatsRecapSection,
 } from "./StatsNarrativeSections";
-import {
-  StatsAnalyticsSection,
-  StatsCollectionsSection,
-} from "./StatsSections";
-import { StatsStorySection } from "./StatsStorySections";
-import { StatsHeroSection } from "./StatsHeroSections";
-import { WindowPicker } from "@/components/stats/StatsPanels";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export function Stats() {
   const page = useStatsPageController();
@@ -25,87 +38,182 @@ export function Stats() {
 }
 
 function StatsPageContent({ page }: { page: StatsPageController }) {
-  const {
-    dashboard,
-    dashboardLoading,
-    hasStats,
-    recapHighlights,
-    story,
-    subjectName,
-    topComeback,
-    topDiscovery,
-    topMover,
-  } = page;
+  const { dashboard, dashboardLoading, hasStats, t } = page;
+  const tape = dashboard?.tape;
+  const highlights = dashboard?.highlights;
   return (
-    <div className="relative -mx-4 -mt-2 overflow-hidden px-4 pb-12 pt-3 sm:-mx-6 sm:px-6">
-      <div className="stats-page-atmosphere pointer-events-none absolute inset-0 -z-10" />
-      <div className="stats-page-grid pointer-events-none absolute inset-x-0 top-0 -z-10 h-hero-2xl opacity-30" />
+    <div className="pb-12">
       <StatsHeader page={page} />
       {!dashboardLoading && !hasStats ? (
-        <StatsEmptyState t={page.t} />
+        <StatsEmptyState t={t} />
       ) : (
         <>
-          <StatsHeroSection page={page} />
-          <StatsRecapSection highlights={recapHighlights} t={page.t} />
-          <StatsStorySection
-            story={story}
-            fallbackMover={topMover}
-            fallbackDiscovery={topDiscovery}
-            fallbackComeback={topComeback}
+          <StatsHeadlineNumbers
+            minutes={page.overview?.minutes_listened ?? 0}
+            plays={page.overview?.play_count ?? 0}
+            activeDays={page.overview?.active_days ?? 0}
+            artists={highlights?.artist_count ?? null}
+            today={page.today}
           />
+          {tape?.points.length ? (
+            <StatsSignalTape tape={tape} />
+          ) : dashboardLoading ? (
+            <div className="stats-signal-skeleton" aria-hidden="true" />
+          ) : null}
+          <StatsActionBand page={page} />
+          {dashboard?.artist_of_period ? (
+            <StatsReveal className="mt-12">
+              <StatsArtistOfPeriod artist={dashboard.artist_of_period} />
+            </StatsReveal>
+          ) : null}
+          {highlights ? (
+            <StatsReveal className="mt-4">
+              <StatsHighlights highlights={highlights} />
+            </StatsReveal>
+          ) : null}
+          <StatsReveal className="mt-10 grid gap-5 xl:grid-cols-2">
+            <TopTracksPanel
+              items={page.topTrackItems}
+              rows={page.topTrackRows}
+              loading={dashboardLoading}
+              playSource={page.topTrackSource}
+            />
+            <TopArtistsPanel
+              items={page.topArtistItems}
+              loading={dashboardLoading}
+            />
+          </StatsReveal>
+          <StatsReveal>
+            <TopAlbumsPanel
+              items={page.topAlbumItems}
+              loading={dashboardLoading}
+            />
+          </StatsReveal>
+          <StatsListeningSection page={page} />
+          <StatsReveal className="mt-5 grid gap-5 lg:grid-cols-2">
+            {dashboard?.music_age ? (
+              <StatsMusicAgeCard musicAge={dashboard.music_age} />
+            ) : null}
+            <StatsDiscoveriesCard discoveries={page.discoveries} />
+          </StatsReveal>
           <AffinityCard
             affinity={dashboard?.viewer_affinity}
-            subject={subjectName}
+            subject={page.subjectName}
           />
-          <StatsAnalyticsSection page={page} />
-          <StatsCollectionsSection page={page} />
         </>
       )}
     </div>
   );
 }
 
-function StatsHeader({ page }: { page: StatsPageController }) {
-  const { t, heroBody, heroTitle, isGlobalStats, isUserStats, username } = page;
-
+function StatsListeningSection({ page }: { page: StatsPageController }) {
+  const { dashboard, t } = page;
   return (
-    <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-      <div>
-        <CrateBadge size="md" icon={BarChart3}>
-          {t("stats.hero.badge")}
-        </CrateBadge>
-        <h1 className="stats-hero-title mt-4 max-w-4xl text-[clamp(2.65rem,8vw,7.5rem)] font-black uppercase leading-[0.82] tracking-[-0.085em]">
-          {heroTitle}
-          <span className="stats-hero-title-accent block">
-            {t("stats.hero.decoded")}
-          </span>
-        </h1>
-        <p className="stats-hero-body mt-4 max-w-2xl text-sm leading-6 sm:text-base">
-          {heroBody}
-        </p>
+    <StatsReveal className="mt-10">
+      <h2 className="mb-4 text-2xl font-extrabold tracking-tight text-text-primary">
+        {t("stats.listening.title")}
+      </h2>
+      <div className="grid gap-5 lg:grid-cols-3">
+        {dashboard?.heatmap ? (
+          <StatsHeatmapCard heatmap={dashboard.heatmap} />
+        ) : null}
+        <SoundProfileCard
+          profile={page.soundProfile}
+          genres={[]}
+          skipRate={page.overview?.skip_rate ?? 0}
+          hideGenres
+        />
+        {dashboard?.genre_trend?.length ? (
+          <StatsGenreTrendCard genres={dashboard.genre_trend} />
+        ) : null}
       </div>
-      <div className="flex flex-col items-start gap-3 lg:items-end">
-        <div className="flex flex-wrap gap-2">
-          {!isUserStats ? (
+    </StatsReveal>
+  );
+}
+
+function StatsHeader({ page }: { page: StatsPageController }) {
+  const { t, isGlobalStats, isUserStats, username } = page;
+  return (
+    <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <div className="flex flex-wrap items-center gap-x-3 text-base font-bold">
+          {isUserStats ? (
+            <>
+              <span className="text-accent-action">{page.kicker}</span>
+              {username ? (
+                <>
+                  <span aria-hidden="true" className="text-text-muted">
+                    ·
+                  </span>
+                  <ScopeLink active={false} to={"/users/" + username}>
+                    {t("stats.scope.backToProfile")}
+                  </ScopeLink>
+                </>
+              ) : null}
+            </>
+          ) : (
             <>
               <ScopeLink active={!isGlobalStats} to="/stats">
                 {t("stats.scope.yourDna")}
               </ScopeLink>
+              <span aria-hidden="true" className="text-text-muted">
+                ·
+              </span>
               <ScopeLink active={isGlobalStats} to="/stats/global">
                 {t("stats.scope.cratePulse")}
               </ScopeLink>
             </>
-          ) : username ? (
-            <ScopeLink active={false} to={"/users/" + username}>
-              {t("stats.scope.backToProfile")}
-            </ScopeLink>
-          ) : null}
+          )}
         </div>
-        <WindowPicker
-          value={page.selectedMonth ? null : page.selectedWindow}
-          onChange={page.changeWindow}
-        />
+        <h1 className="stats-signal-title mt-1">
+          {page.signalTitle.lead}{" "}
+          <span className="text-accent-action">{page.signalTitle.accent}</span>
+        </h1>
       </div>
-    </div>
+      <StatsPeriodPicker
+        options={page.selectionOptions}
+        value={page.selectedMonth ? null : page.selection}
+        onChange={page.changeSelection}
+      />
+    </header>
+  );
+}
+
+function StatsActionBand({ page }: { page: StatsPageController }) {
+  const { t, isGlobalStats, isUserStats } = page;
+  const showDigging = !isGlobalStats && !isUserStats && page.hasStats;
+  const showReplay = page.replayItems.length > 0;
+  if (!showDigging && !showReplay) return null;
+  return (
+    <section className="mt-10 flex flex-col gap-4 rounded-panel border border-border-quiet bg-surface-card p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+      {showDigging ? (
+        <div>
+          <h2 className="text-lg font-bold text-text-primary">
+            {t("stats.digging.band.title")}
+          </h2>
+          <p className="mt-1 text-sm text-text-secondary">
+            {t("stats.digging.band.body")}
+          </p>
+        </div>
+      ) : null}
+      <div className="flex flex-wrap gap-2 *:grow sm:*:grow-0">
+        {showDigging ? (
+          <Button asChild>
+            <Link
+              to={`/stats/digging?window=${encodeURIComponent(page.selection)}`}
+            >
+              <Sparkles size={CRATE_ICON_SIZE.sm} />
+              {t("stats.digging.open")}
+            </Link>
+          </Button>
+        ) : null}
+        {showReplay ? (
+          <Button type="button" variant="outline" onClick={page.playReplay}>
+            <Play size={CRATE_ICON_SIZE.sm} />
+            {t("stats.signal.playReplay")}
+          </Button>
+        ) : null}
+      </div>
+    </section>
   );
 }

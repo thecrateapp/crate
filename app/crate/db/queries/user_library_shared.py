@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -20,6 +21,23 @@ def normalize_stats_window(window: str) -> str:
     if candidate not in _STATS_WINDOWS:
         raise ValueError(f"Unsupported stats window: {window}")
     return candidate
+
+
+_YEAR_WINDOW_RE = re.compile(r"^year:(\d{4})$")
+
+
+def year_from_window(window: str | None) -> int | None:
+    match = _YEAR_WINDOW_RE.match((window or "").strip().lower())
+    return int(match.group(1)) if match else None
+
+
+def normalize_user_stats_window(window: str) -> str:
+    year = year_from_window(window)
+    if year is None:
+        return normalize_stats_window(window)
+    if year < 1970 or year > datetime.now(timezone.utc).year + 1:
+        raise ValueError(f"Unsupported stats window: {window}")
+    return f"year:{year}"
 
 
 @lru_cache(maxsize=1)
@@ -57,6 +75,8 @@ __all__ = [
     "_STATS_WINDOWS",
     "library_root",
     "normalize_stats_window",
+    "normalize_user_stats_window",
+    "year_from_window",
     "relative_track_path",
     "window_day_cutoff",
 ]
