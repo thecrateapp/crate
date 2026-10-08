@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PlaySource, Track } from "@/contexts/player-types";
 import type { EngineQueueSnapshot } from "@/lib/playback-engine";
@@ -8,6 +8,7 @@ import {
   SMART_TRANSITION_SHORT_SECONDS,
   SmartMixTransitionPlanner,
   type SmartMixCapabilities,
+  type SmartMixRequest,
 } from "@/lib/smart-mix";
 
 const ENABLED_CAPABILITIES: SmartMixCapabilities = {
@@ -231,7 +232,7 @@ describe("SmartMixTransitionPlanner", () => {
     });
 
     expect(request).not.toHaveBeenCalled();
-    expect(plans).toHaveLength(2);
+    expect(plans).toHaveLength(3);
     expect(plans).toEqual([
       expect.objectContaining({
         outgoingTrackId: "runtime-1",
@@ -245,6 +246,11 @@ describe("SmartMixTransitionPlanner", () => {
         incomingTrackId: "runtime-3",
         mode: "gapless",
         durationMs: 0,
+        fallbackReason: "capability_unavailable",
+      }),
+      expect.objectContaining({
+        outgoingTrackId: "runtime-3",
+        incomingTrackId: "runtime-4",
         fallbackReason: "capability_unavailable",
       }),
     ]);
@@ -312,10 +318,196 @@ describe("SmartMixTransitionPlanner", () => {
     const restored = JSON.parse(
       JSON.stringify(snapshot),
     ) as EngineQueueSnapshot;
-    expect(restored.transitionPlans).toHaveLength(2);
+    expect(restored.transitionPlans).toHaveLength(3);
     expect(restored.transitionPlans?.[0]?.fallbackReason).toBe(
       "capability_unavailable",
     );
+  });
+});
+
+function planInput(
+  overrides: Partial<Parameters<SmartMixTransitionPlanner["plan"]>[0]> = {},
+): Parameters<SmartMixTransitionPlanner["plan"]>[0] {
+  return {
+    revision: "queue-revision-1",
+    tracks: TRACKS,
+    currentIndex: 0,
+    playSource: PLAYLIST_SOURCE,
+    shuffle: false,
+    offline: false,
+    preferredDurationMs: 4000,
+    capabilities: ENABLED_CAPABILITIES,
+    ...overrides,
+  };
+}
+
+type PlanBatch = Awaited<ReturnType<SmartMixRequest>>;
+
+function pendingRequest() {
+  const signals: AbortSignal[] = [];
+  const resolvers: Array<(value: PlanBatch) => void> = [];
+  const request = vi.fn(
+    (
+      _path: string,
+      _method: string,
+      _body: unknown,
+      options: { signal: AbortSignal },
+    ) => {
+      signals.push(options.signal);
+      return new Promise<PlanBatch>((resolve, reject) => {
+        resolvers.push(resolve);
+        options.signal.addEventListener(
+          "abort",
+          () => reject(new DOMException("Aborted", "AbortError")),
+          { once: true },
+        );
+      });
+    },
+  );
+  return { request, signals, resolvers };
+}
+
+describe("SmartMixTransitionPlanner startup and offline contract", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("plans at most the next three edges", async () => {
+    const tracks = [
+      ...TRACKS,
+      {
+        id: "runtime-5",
+        entityUid: "55555555-5555-4555-8555-555555555555",
+        title: "Five",
+        artist: "Band E",
+      },
+    ];
+    const request = vi.fn().mockResolvedValue({
+      plannerVersion: "smart-mix-v1",
+      plans: [],
+    });
+    const planner = new SmartMixTransitionPlanner(request);
+
+    const plans = await planner.plan(planInput({ tracks }));
+
+    const body = request.mock.calls[0]![2] as { edges: unknown[] };
+    expect(body.edges).toHaveLength(3);
+    expect(
+      plans.map((plan) => [plan.outgoingTrackId, plan.incomingTrackId]),
+    ).toEqual([
+      ["runtime-1", "runtime-2"],
+      ["runtime-2", "runtime-3"],
+      ["runtime-3", "runtime-4"],
+    ]);
+  });
+
+  it("never requests plans while the network is offline", async () => {
+    const request = vi.fn();
+    const planner = new SmartMixTransitionPlanner(request);
+
+    const plans = await planner.plan(planInput({ networkAvailable: false }));
+
+    expect(request).not.toHaveBeenCalled();
+    expect(plans).toHaveLength(3);
+    expect(plans[0]).toMatchObject({
+      mode: "adaptive",
+      durationMs: 4000,
+      fallbackReason: "offline",
+    });
+  });
+
+  it("aborts the request after the one second deadline and falls back", async () => {
+    vi.useFakeTimers();
+    const { request, signals } = pendingRequest();
+    const planner = new SmartMixTransitionPlanner(request);
+
+    const result = planner.plan(planInput());
+    await vi.advanceTimersByTimeAsync(999);
+    expect(signals[0]?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(signals[0]?.aborted).toBe(true);
+    const plans = await result;
+    expect(plans).toHaveLength(3);
+    expect(
+      plans.every((plan) => plan.fallbackReason === "planner_timeout"),
+    ).toBe(true);
+  });
+
+  it("shares one in-flight request for the same queue generation", async () => {
+    const { request, resolvers } = pendingRequest();
+    const planner = new SmartMixTransitionPlanner(request);
+
+    const first = planner.plan(planInput());
+    const second = planner.plan(planInput());
+    resolvers[0]!({
+      plannerVersion: "smart-mix-v1",
+      plans: [serverPlan(TRACKS[0]!, TRACKS[1]!)],
+    });
+
+    expect(request).toHaveBeenCalledTimes(1);
+    await expect(second).resolves.toEqual(await first);
+  });
+
+  it("aborts the previous request when the server identity changes", async () => {
+    const { request, signals } = pendingRequest();
+    const planner = new SmartMixTransitionPlanner(request);
+
+    const first = planner.plan(planInput({ identity: "server-a" }));
+    void planner.plan(planInput({ identity: "server-b" }));
+
+    expect(signals[0]?.aborted).toBe(true);
+    await expect(first).resolves.toEqual([]);
+  });
+
+  it("does not retry a failed generation until it is invalidated", async () => {
+    const request = vi.fn().mockRejectedValue(new Error("network down"));
+    const planner = new SmartMixTransitionPlanner(request);
+
+    const first = await planner.plan(planInput());
+    const second = await planner.plan(planInput());
+
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(second).toEqual(first);
+    expect(first[0]?.fallbackReason).toBe("planner_unavailable");
+
+    planner.invalidate();
+    await planner.plan(planInput());
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it("cancels in-flight planning and discards the late result", async () => {
+    const { request, signals } = pendingRequest();
+    const planner = new SmartMixTransitionPlanner(request);
+
+    const result = planner.plan(planInput());
+    planner.cancel();
+
+    expect(signals[0]?.aborted).toBe(true);
+    await expect(result).resolves.toEqual([]);
+  });
+
+  it("caches plans without stream URLs or credentials", async () => {
+    const request = vi.fn().mockResolvedValue({
+      plannerVersion: "smart-mix-v1",
+      plans: [serverPlan(TRACKS[0]!, TRACKS[1]!)],
+    });
+    const planner = new SmartMixTransitionPlanner(request);
+    const tracks = TRACKS.map((track) => ({
+      ...track,
+      path: `/music/${track.id}.flac`,
+      remote: {
+        streamUrl: "https://media.example/stream?media_ticket=secret",
+      },
+    })) as Track[];
+
+    const plans = await planner.plan(planInput({ tracks }));
+    const cached = await planner.plan(planInput({ tracks }));
+
+    expect(request).toHaveBeenCalledTimes(1);
+    const serialized = JSON.stringify([plans, cached]);
+    expect(serialized).not.toContain("media_ticket");
+    expect(serialized).not.toContain("/music/");
   });
 });
 

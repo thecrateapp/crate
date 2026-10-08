@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   apiMock,
@@ -447,6 +447,137 @@ describe("player engine adapter", () => {
     expect(JSON.parse(JSON.stringify(snapshot)).transitionPlans).toEqual(
       snapshot.transitionPlans,
     );
+  });
+
+  describe("native Smart Mix startup planning", () => {
+    const NATIVE_QUEUE = [
+      {
+        id: "runtime-1",
+        entityUid: "11111111-1111-4111-8111-111111111111",
+        title: "One",
+        artist: "Band A",
+      },
+      {
+        id: "runtime-2",
+        entityUid: "22222222-2222-4222-8222-222222222222",
+        title: "Two",
+        artist: "Band B",
+      },
+    ];
+
+    function nativeSnapshotOptions(revision: string) {
+      return {
+        revision,
+        tracks: NATIVE_QUEUE,
+        currentIndex: 0,
+        positionMs: 0,
+        autoplay: true,
+        repeat: "off" as const,
+        crossfadeMs: 3000,
+        volume: 1,
+        playSource: { type: "playlist" as const, name: "Mix", id: 1 },
+        shuffle: false,
+        target: "android-native" as const,
+      };
+    }
+
+    beforeEach(() => {
+      setSmartMixCapabilities({
+        available: true,
+        androidNativeCrossfade: true,
+        androidBeatmatch: false,
+        plannerVersion: "smart-mix-v1",
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    });
+
+    it("loads the queue within the planning deadline when the planner hangs", async () => {
+      vi.useFakeTimers();
+      apiMock.mockImplementation(
+        (
+          path: string,
+          _method: string,
+          _body: unknown,
+          options?: { signal?: AbortSignal },
+        ) =>
+          path === "/api/playback/transition-plans"
+            ? new Promise((_resolve, reject) => {
+                options?.signal?.addEventListener("abort", () =>
+                  reject(new DOMException("Aborted", "AbortError")),
+                );
+              })
+            : Promise.resolve(null),
+      );
+
+      const snapshotPromise = toStartupEngineQueueSnapshot(
+        nativeSnapshotOptions("hanging-planner"),
+      );
+      await vi.advanceTimersByTimeAsync(1000);
+      const snapshot = await snapshotPromise;
+
+      expect(snapshot.tracks).toHaveLength(2);
+      expect(snapshot.transitionPlans?.[0]?.fallbackReason).toBe(
+        "planner_timeout",
+      );
+    });
+
+    it("does not call the planner while the device is offline", async () => {
+      vi.stubGlobal("navigator", { ...navigator, onLine: false });
+      apiMock.mockResolvedValue(null);
+
+      const snapshot = await toStartupEngineQueueSnapshot(
+        nativeSnapshotOptions("offline-network"),
+      );
+
+      expect(apiMock).not.toHaveBeenCalledWith(
+        "/api/playback/transition-plans",
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(snapshot.transitionPlans?.[0]?.fallbackReason).toBe("offline");
+    });
+
+    it("cancels in-flight planning when Smart Mix becomes unavailable", async () => {
+      const signals: AbortSignal[] = [];
+      apiMock.mockImplementation(
+        (
+          path: string,
+          _method: string,
+          _body: unknown,
+          options?: { signal?: AbortSignal },
+        ) => {
+          if (path !== "/api/playback/transition-plans") {
+            return Promise.resolve(null);
+          }
+          if (options?.signal) signals.push(options.signal);
+          return new Promise((_resolve, reject) => {
+            options?.signal?.addEventListener("abort", () =>
+              reject(new DOMException("Aborted", "AbortError")),
+            );
+          });
+        },
+      );
+
+      const snapshotPromise = toStartupEngineQueueSnapshot(
+        nativeSnapshotOptions("disabled-mid-flight"),
+      );
+      await vi.waitFor(() => expect(signals).toHaveLength(1));
+      setSmartMixCapabilities({
+        available: false,
+        androidNativeCrossfade: false,
+        androidBeatmatch: false,
+        plannerVersion: null,
+      });
+
+      expect(signals[0]?.aborted).toBe(true);
+      const snapshot = await snapshotPromise;
+      expect(snapshot.tracks).toHaveLength(2);
+    });
   });
 
   it("keeps web and desktop snapshots on the legacy transition path", async () => {

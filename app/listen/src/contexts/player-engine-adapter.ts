@@ -27,9 +27,26 @@ import {
 import {
   getSmartMixCapabilities,
   SmartMixTransitionPlanner,
+  subscribeSmartMixCapabilities,
 } from "@/lib/smart-mix";
 
 const smartMixTransitionPlanner = new SmartMixTransitionPlanner(api);
+
+subscribeSmartMixCapabilities((capabilities) => {
+  if (!capabilities.available || !capabilities.androidNativeCrossfade) {
+    smartMixTransitionPlanner.cancel();
+  }
+});
+
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () =>
+    smartMixTransitionPlanner.invalidate(),
+  );
+}
+
+function isNetworkAvailable(): boolean {
+  return typeof navigator === "undefined" || navigator.onLine !== false;
+}
 
 export interface StartupEngineQueueOptions {
   revision: string;
@@ -244,6 +261,8 @@ export async function toStartupEngineQueueSnapshot(
             ),
           preferredDurationMs: options.crossfadeMs,
           capabilities: getSmartMixCapabilities(),
+          networkAvailable: isNetworkAvailable(),
+          identity: getApiBase(),
         })
       : Promise.resolve(undefined);
   const [engineTracks, transitionPlans] = await Promise.all([

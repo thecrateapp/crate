@@ -48,6 +48,9 @@ const DISABLED_SMART_MIX_CAPABILITIES: SmartMixCapabilities = {
 };
 
 let smartMixCapabilities = DISABLED_SMART_MIX_CAPABILITIES;
+const capabilityListeners = new Set<
+  (capabilities: SmartMixCapabilities) => void
+>();
 
 export function setSmartMixCapabilities(
   capabilities: SmartMixCapabilities,
@@ -57,6 +60,18 @@ export function setSmartMixCapabilities(
     androidNativeCrossfade: capabilities.androidNativeCrossfade === true,
     androidBeatmatch: capabilities.androidBeatmatch === true,
     plannerVersion: capabilities.plannerVersion ?? null,
+  };
+  for (const listener of capabilityListeners) {
+    listener(getSmartMixCapabilities());
+  }
+}
+
+export function subscribeSmartMixCapabilities(
+  listener: (capabilities: SmartMixCapabilities) => void,
+): () => void {
+  capabilityListeners.add(listener);
+  return () => {
+    capabilityListeners.delete(listener);
   };
 }
 
@@ -73,6 +88,8 @@ interface SmartMixPlanInput {
   offline: boolean;
   preferredDurationMs: number;
   capabilities: SmartMixCapabilities;
+  networkAvailable?: boolean;
+  identity?: string;
 }
 
 interface TransitionEdge {
@@ -111,22 +128,74 @@ export type SmartMixRequest = (
   options: { signal: AbortSignal },
 ) => Promise<TransitionPlanBatchResponse>;
 
+export const SMART_MIX_PLANNING_DEADLINE_MS = 1_000;
+const MAX_PLANNED_EDGES = 3;
+
+interface SmartMixPlannerOptions {
+  deadlineMs?: number;
+}
+
 export class SmartMixTransitionPlanner {
   private active:
     | {
-        revision: string;
+        key: string;
         controller: AbortController;
+        promise: Promise<EngineTransitionPlan[]>;
       }
     | undefined;
+  private settled: { key: string; plans: EngineTransitionPlan[] } | undefined;
+  private readonly deadlineMs: number;
 
-  constructor(private readonly request: SmartMixRequest) {}
+  constructor(
+    private readonly request: SmartMixRequest,
+    options: SmartMixPlannerOptions = {},
+  ) {
+    this.deadlineMs = options.deadlineMs ?? SMART_MIX_PLANNING_DEADLINE_MS;
+  }
 
-  async plan(input: SmartMixPlanInput): Promise<EngineTransitionPlan[]> {
-    if (this.active && this.active.revision !== input.revision) {
+  cancel(): void {
+    this.active?.controller.abort();
+    this.active = undefined;
+    this.settled = undefined;
+  }
+
+  invalidate(): void {
+    this.settled = undefined;
+  }
+
+  plan(input: SmartMixPlanInput): Promise<EngineTransitionPlan[]> {
+    const edges = boundedTransitionEdges(input.tracks, input.currentIndex);
+    const key = generationKey(input, edges);
+    if (this.active?.key === key) return this.active.promise;
+    if (this.active) {
       this.active.controller.abort();
+      this.active = undefined;
+    }
+    if (this.settled?.key === key) {
+      return Promise.resolve(this.settled.plans.map((plan) => ({ ...plan })));
     }
 
-    const edges = boundedTransitionEdges(input.tracks, input.currentIndex);
+    const controller = new AbortController();
+    const promise = this.resolvePlans(input, edges, controller).then(
+      (plans) => {
+        if (this.active?.controller === controller) {
+          this.active = undefined;
+          if (!controller.signal.aborted || plans.length > 0) {
+            this.settled = { key, plans };
+          }
+        }
+        return plans;
+      },
+    );
+    this.active = { key, controller, promise };
+    return promise;
+  }
+
+  private async resolvePlans(
+    input: SmartMixPlanInput,
+    edges: TransitionEdge[],
+    controller: AbortController,
+  ): Promise<EngineTransitionPlan[]> {
     if (edges.length === 0) return [];
 
     const localPlans = new Map<string, EngineTransitionPlan>();
@@ -157,6 +226,16 @@ export class SmartMixTransitionPlanner {
       return orderedPlans(edges, localPlans);
     }
 
+    if (input.networkAvailable === false) {
+      for (const edge of unresolved) {
+        localPlans.set(
+          edgeKey(edge),
+          safeTransitionPlan(edge, input.preferredDurationMs, "offline"),
+        );
+      }
+      return orderedPlans(edges, localPlans);
+    }
+
     const requestable = unresolved.filter(
       (edge) => edge.outgoing.entityUid && edge.incoming.entityUid,
     );
@@ -176,8 +255,11 @@ export class SmartMixTransitionPlanner {
       return orderedPlans(edges, localPlans);
     }
 
-    const controller = new AbortController();
-    this.active = { revision: input.revision, controller };
+    let timedOut = false;
+    const deadline = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, this.deadlineMs);
     try {
       const response = await this.request(
         "/api/playback/transition-plans",
@@ -200,11 +282,16 @@ export class SmartMixTransitionPlanner {
         },
         { signal: controller.signal },
       );
-      if (
-        controller.signal.aborted ||
-        this.active?.revision !== input.revision
-      ) {
-        return [];
+      if (controller.signal.aborted) {
+        return timedOut
+          ? fallbackPlans(
+              edges,
+              localPlans,
+              requestable,
+              input,
+              "planner_timeout",
+            )
+          : [];
       }
 
       const responsePlans =
@@ -233,29 +320,70 @@ export class SmartMixTransitionPlanner {
       }
       return orderedPlans(edges, localPlans);
     } catch (error) {
+      if (timedOut) {
+        return fallbackPlans(
+          edges,
+          localPlans,
+          requestable,
+          input,
+          "planner_timeout",
+        );
+      }
       if (
         controller.signal.aborted ||
         (error instanceof DOMException && error.name === "AbortError")
       ) {
         return [];
       }
-      for (const edge of requestable) {
-        localPlans.set(
-          edgeKey(edge),
-          safeTransitionPlan(
-            edge,
-            input.preferredDurationMs,
-            "planner_unavailable",
-          ),
-        );
-      }
-      return orderedPlans(edges, localPlans);
+      return fallbackPlans(
+        edges,
+        localPlans,
+        requestable,
+        input,
+        "planner_unavailable",
+      );
     } finally {
-      if (this.active?.controller === controller) {
-        this.active = undefined;
-      }
+      clearTimeout(deadline);
     }
   }
+}
+
+function fallbackPlans(
+  edges: TransitionEdge[],
+  localPlans: Map<string, EngineTransitionPlan>,
+  requestable: TransitionEdge[],
+  input: SmartMixPlanInput,
+  reason: string,
+): EngineTransitionPlan[] {
+  for (const edge of requestable) {
+    localPlans.set(
+      edgeKey(edge),
+      safeTransitionPlan(edge, input.preferredDurationMs, reason),
+    );
+  }
+  return orderedPlans(edges, localPlans);
+}
+
+function generationKey(
+  input: SmartMixPlanInput,
+  edges: TransitionEdge[],
+): string {
+  return JSON.stringify([
+    input.identity ?? "",
+    input.revision,
+    edges.map((edge) => [
+      edge.outgoing.id,
+      edge.outgoing.entityUid ?? "",
+      edge.incoming.id,
+      edge.incoming.entityUid ?? "",
+    ]),
+    input.playSource?.type ?? "",
+    input.shuffle,
+    input.offline,
+    input.networkAvailable !== false,
+    clampDuration(input.preferredDurationMs),
+    input.capabilities,
+  ]);
 }
 
 function boundedTransitionEdges(
@@ -264,7 +392,11 @@ function boundedTransitionEdges(
 ): TransitionEdge[] {
   const normalizedIndex = Math.max(0, Math.trunc(currentIndex));
   const edges: TransitionEdge[] = [];
-  for (const index of [normalizedIndex, normalizedIndex + 1]) {
+  for (
+    let index = normalizedIndex;
+    index < normalizedIndex + MAX_PLANNED_EDGES;
+    index += 1
+  ) {
     const outgoing = tracks[index];
     const incoming = tracks[index + 1];
     if (outgoing && incoming) {
