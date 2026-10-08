@@ -278,48 +278,61 @@ export function ShareSheetHost() {
           </div>
         ) : (
           <div className="relative space-y-2 p-4 ">
-            <ShareAction
-              icon={MessageCircle}
-              title="WhatsApp"
-              subtitle={t("share.whatsappSubtitle")}
-              onClick={() =>
-                void openTarget(buildWhatsAppShareUrl(payload, shareText))
-              }
-            />
-            <ShareAction
-              icon={Send}
-              title="Telegram"
-              subtitle={t("share.telegramSubtitle")}
-              onClick={() =>
-                void openTarget(buildTelegramShareUrl(payload, shareText))
-              }
-            />
-            <ShareAction
-              icon={busyAction === "story" ? Loader2 : Camera}
-              title={t("share.instagramStory")}
-              subtitle={storySubtitle}
-              disabled={storyDisabled}
-              busy={busyAction === "story"}
-              onClick={() =>
-                payload.kind === "crate"
-                  ? setChoosingStoryStyle(true)
-                  : void shareImage("story")
-              }
-            />
-            <ShareAction
-              icon={busyAction === "square" ? Loader2 : ImagePlus}
-              title={t("share.squarePost")}
-              subtitle={t("share.squarePostSubtitle")}
-              disabled={busyAction !== null}
-              busy={busyAction === "square"}
-              onClick={() => void shareImage("square")}
-            />
-            <ShareAction
-              icon={Copy}
-              title={t("share.copyLink")}
-              subtitle={formatShareDisplayUrl(payload.url)}
-              onClick={() => void copyLink()}
-            />
+            {payload.kind === "wrapped" ? (
+              <ShareAction
+                icon={busyAction === "story" ? Loader2 : Camera}
+                title={t("share.instagramStory")}
+                subtitle={storySubtitle}
+                disabled={storyDisabled}
+                busy={busyAction === "story"}
+                onClick={() => void shareImage("story")}
+              />
+            ) : (
+              <>
+                <ShareAction
+                  icon={MessageCircle}
+                  title="WhatsApp"
+                  subtitle={t("share.whatsappSubtitle")}
+                  onClick={() =>
+                    void openTarget(buildWhatsAppShareUrl(payload, shareText))
+                  }
+                />
+                <ShareAction
+                  icon={Send}
+                  title="Telegram"
+                  subtitle={t("share.telegramSubtitle")}
+                  onClick={() =>
+                    void openTarget(buildTelegramShareUrl(payload, shareText))
+                  }
+                />
+                <ShareAction
+                  icon={busyAction === "story" ? Loader2 : Camera}
+                  title={t("share.instagramStory")}
+                  subtitle={storySubtitle}
+                  disabled={storyDisabled}
+                  busy={busyAction === "story"}
+                  onClick={() =>
+                    payload.kind === "crate"
+                      ? setChoosingStoryStyle(true)
+                      : void shareImage("story")
+                  }
+                />
+                <ShareAction
+                  icon={busyAction === "square" ? Loader2 : ImagePlus}
+                  title={t("share.squarePost")}
+                  subtitle={t("share.squarePostSubtitle")}
+                  disabled={busyAction !== null}
+                  busy={busyAction === "square"}
+                  onClick={() => void shareImage("square")}
+                />
+                <ShareAction
+                  icon={Copy}
+                  title={t("share.copyLink")}
+                  subtitle={formatShareDisplayUrl(payload.url)}
+                  onClick={() => void copyLink()}
+                />
+              </>
+            )}
           </div>
         )}
       </div>

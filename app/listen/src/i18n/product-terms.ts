@@ -4,6 +4,7 @@ export const PRODUCT_TERMS = {
   cratePulse: "Crate Pulse",
   crossfade: "Crossfade",
   discoveryRadio: "Discovery Radio",
+  wrapped: "Wrapped",
 } as const;
 
 export const EXACT_PRODUCT_TERM_KEYS = [
@@ -14,10 +15,12 @@ export const EXACT_PRODUCT_TERM_KEYS = [
   ["stats.scope.cratePulse", PRODUCT_TERMS.cratePulse],
   ["settings.playback.crossfade", PRODUCT_TERMS.crossfade],
   ["radio.discovery", PRODUCT_TERMS.discoveryRadio],
+  ["share.kind.wrapped", PRODUCT_TERMS.wrapped],
 ] as const;
 
 export const CONTAINED_PRODUCT_TERM_KEYS = [
   ["home.sections.listeningDna.action", PRODUCT_TERMS.crateDna],
   ["stats.scope.yourDna", PRODUCT_TERMS.crateDna],
   ["userProfile.actions.viewListeningDna", PRODUCT_TERMS.crateDna],
+  ["stats.wrapped.open", PRODUCT_TERMS.wrapped],
 ] as const;

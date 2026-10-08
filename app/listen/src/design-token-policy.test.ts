@@ -90,7 +90,6 @@ const ICON_SIZE_BUDGET: Record<string, Record<string, number>> = {
   "pages/Paths.tsx": { "22": 1 },
   "pages/PlaylistInvite.tsx": { "22": 1 },
   "pages/SearchAlbumResults.tsx": { "32": 1 },
-  "pages/StatsAnalyticsSections.tsx": { "22": 1 },
   "pages/StatsCollectionPanels.tsx": { "22": 1 },
 };
 

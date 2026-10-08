@@ -6499,6 +6499,10 @@
     "sourceHash": "sha256:818743b0e0b7dd74f851691955ff6bd32aa5d8d54cf9a72f42800d68e845f11e",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "share.kind.wrapped": {
+    "sourceHash": "sha256:335d80264ae0f58d6210cae99e832a1575137507f3a589dcafce35c730e570d8",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
   "share.squarePost": {
     "sourceHash": "sha256:2ca001cbf52ea257dffbbdedfe50308731606e65ff4c05f1dcedf5584f9c1350",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
@@ -7330,6 +7334,94 @@
   "stats.window.year": {
     "sourceHash": "sha256:91e17150f436416e01ca72d8071348c867e0dbc84da2a6c83a9ebfdf5bd41c9c",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "stats.wrapped.age.body": {
+    "sourceHash": "sha256:84953cf0f0ddfa2374776de8730017859740275a3533d1ae87994279db7f2b06",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.artist.body": {
+    "sourceHash": "sha256:7e04a383f24b72f1b5c1dc8e030484054fdf01d876bf86af684c8f697d822c46",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.chapter": {
+    "sourceHash": "sha256:518ba02bd0b7fcbb1a9cf496beb00ab91d1bf5d1209a7dbc14ac17066d9e81e5",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.close": {
+    "sourceHash": "sha256:dcef91680813a3c1a01e611a5f551e570a65076e5e95d3ef5c9f7beee610b1ba",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.credit": {
+    "sourceHash": "sha256:3d041842b466b6a9bf477dee9e2691edba474db11472041450d094bd61b8ab57",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.habits.label": {
+    "sourceHash": "sha256:7b9b58c59e44457e11b62082440774d5def757ce9e44a3b0d05061b1038d8b5a",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.habits.obsession": {
+    "sourceHash": "sha256:e58faad4f4992ae31e270c236b82bea4c1eaae3b801d1f1999c6234f0d0055cb",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.habits.streak": {
+    "sourceHash": "sha256:85b7b7af3aac144b6f0cb4a4b31ffe9a0b3ce77aec49249d33abf0a9fec3cec1",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.kicker": {
+    "sourceHash": "sha256:250a2a0c27ed70643268b729d1532e6a970c286f8eac3e5d127b7363e66cfe00",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.label": {
+    "sourceHash": "sha256:ac2a84d0c03061b2f20df42481ce1cead59fa240ee30b4cd06f9f881cb4f8e28",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.lastDays": {
+    "sourceHash": "sha256:555a8bdbbd7211c2a6e40f7f436e4523b62a728ec2a82b4e711244b2b241c4e1",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.minutes.body": {
+    "sourceHash": "sha256:085a830cbff1dbb4159bb81401985a59f511a54c27236df3acaad75345534229",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.minutes.label": {
+    "sourceHash": "sha256:d4d202587c89b5799f6c2216d44f9b80ab9ef600e602f1f04e4b13d89d42fedc",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.minutes.unit": {
+    "sourceHash": "sha256:ba787aebb7cd3169aef5444d71ea58d2aa68225bcd4a34c61e98d2f8ec59625c",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.open": {
+    "sourceHash": "sha256:6334cc2393d961c0ec0990fdc2ad0356fb929457b88f4359a670a8feace56772",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.progress": {
+    "sourceHash": "sha256:9b67f5f7fb1a986e07f3c05da255170b1e14650ddd6a30564fb7b35a7edcf8d1",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.share": {
+    "sourceHash": "sha256:75b6c4d474f35c09fe726237b47dd818d58c6ce1abc6289e1a9bbc08736ec9f8",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.summary.fallback": {
+    "sourceHash": "sha256:1c7517a9994f040af269cd2ac80dca4617b314579cffe0be191913e2ab1163dc",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.summary.headline": {
+    "sourceHash": "sha256:6b4ab5ae7b2820f2f69c422232693f39d972dfdb6f97d648fe9124540793d76d",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.summary.label": {
+    "sourceHash": "sha256:a75487dc1eb219688d270535ea66c154b30edbbd4c6b20e9adc7e7525a80265b",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.topGenre": {
+    "sourceHash": "sha256:e6eacbe921d9832636c7f3235099c4318d3a1e8e4215f2a7d7bb1d8a4ae7d19f",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
+  },
+  "stats.wrapped.tracks.kicker": {
+    "sourceHash": "sha256:4969d858424266834c517f1f64c3328a41d0ceea59fbb526ef96739599d55e45",
+    "reviewedAt": "2026-10-08T01:38:00.995Z"
   },
   "topbar.back": {
     "sourceHash": "sha256:c445bc7aead602603625aaad094867a86b1a39b66245336d63f79d47fe4c5520",

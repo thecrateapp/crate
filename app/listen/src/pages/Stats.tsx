@@ -1,4 +1,6 @@
-import { CRATE_ICON_SIZE, Play } from "@crate/ui/icons";
+import { Link } from "react-router";
+
+import { CRATE_ICON_SIZE, Play, Sparkles } from "@crate/ui/icons";
 import { Button } from "@crate/ui/shadcn/button";
 
 import { StatsArtistOfPeriod } from "@/components/stats/StatsArtistOfPeriod";
@@ -164,6 +166,18 @@ function StatsHeader({ page }: { page: StatsPageController }) {
             value={page.selectedMonth ? null : page.selection}
             onChange={page.changeSelection}
           />
+          {!isGlobalStats && !isUserStats && page.hasStats ? (
+            <Button asChild size="sm">
+              <Link
+                to={`/stats/wrapped?window=${encodeURIComponent(
+                  page.selection,
+                )}`}
+              >
+                <Sparkles size={CRATE_ICON_SIZE.xs} />
+                {t("stats.wrapped.open")}
+              </Link>
+            </Button>
+          ) : null}
           {page.replayItems.length ? (
             <Button
               type="button"

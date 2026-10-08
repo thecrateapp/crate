@@ -143,6 +143,7 @@ export const COMPLETED_ENGLISH_FALLBACK_ALLOWLIST = new Set<string>([
   "playlistComposer.descriptionLabel",
   "playlistComposer.playlistLabel",
   "share.storyStyle.podium.title",
+  "share.kind.wrapped",
   "settings.account.instagram",
 ]);
 
