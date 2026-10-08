@@ -56,7 +56,7 @@ export function TranslationOverlay() {
         <dialog
           open
           aria-label="Edit translation"
-          className="pointer-events-auto absolute right-4 bottom-20 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-md border border-accent-action/20 bg-surface-canvas/82 text-text-primary shadow-translation-editor backdrop-blur-2xl"
+          className="pointer-events-auto absolute left-auto m-0 right-4 bottom-20 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-md border border-accent-action/20 bg-surface-canvas/82 text-text-primary shadow-translation-editor backdrop-blur-2xl"
         >
           <div className="flex items-start justify-between gap-3 border-b border-border-quiet px-4 py-3">
             <div className="min-w-0">
