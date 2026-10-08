@@ -447,10 +447,10 @@ ParseResult<MixProfile> parse_mix_profile_json(std::string_view json)
             "unsupported Smart Mix profile version"
         );
     }
-    if (profile.analyzer_version != kSmartMixAnalyzerVersion) {
+    if (profile.analyzer_version.empty()) {
         return failure<MixProfile>(
-            ModelErrorCode::UnsupportedSchema,
-            "unsupported Smart Mix analyzer version"
+            ModelErrorCode::InvalidField,
+            "missing Smart Mix analyzer version"
         );
     }
 

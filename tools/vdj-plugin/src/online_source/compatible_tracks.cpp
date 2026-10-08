@@ -42,7 +42,7 @@ ParseResult<CompatibleTracks> missing_profile(std::string_view seed_uid)
     CompatibleTracks results;
     results.seed_track_entity_uid = seed_uid;
     results.scope = "local";
-    results.planner_version = kSmartMixAnalyzerVersion;
+    results.planner_version = kSmartMixPlannerVersion;
     results.fallback_reason = "missing_profile";
     return ParseResult<CompatibleTracks>{
         .value = std::move(results),

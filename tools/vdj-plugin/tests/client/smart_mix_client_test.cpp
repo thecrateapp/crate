@@ -164,13 +164,14 @@ int main()
         .status_code = 200,
         .body = profile_json_with(
             "analyzerVersion",
-            "\"smart-mix-v2\""
+            "\"smart-mix-audio-v2\""
         ),
     };
-    const auto mismatched = client.fetch_summary(
+    const auto newer_analyzer = client.fetch_summary(
         "550e8400-e29b-41d4-a716-446655440000",
         CancellationToken{}
     );
-    assert(!mismatched.ok());
-    assert(mismatched.error_code == ModelErrorCode::UnsupportedSchema);
+    assert(newer_analyzer.ok());
+    assert(newer_analyzer.value->analyzer_version == "smart-mix-audio-v2");
+
 }
