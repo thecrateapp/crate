@@ -15,6 +15,8 @@ final class FakeNativePlaybackDeck implements NativePlaybackDeck {
     boolean autoReady = true;
     boolean ready;
     long bufferedAheadMs = 30_000L;
+    NativeMixAudioProcessor.Role envelopeRole;
+    float envelopeProgress;
 
     FakeNativePlaybackDeck(String name) {
         this.name = name;
@@ -84,6 +86,28 @@ final class FakeNativePlaybackDeck implements NativePlaybackDeck {
     public void setVolume(float requestedVolume) {
         calls.add("volume:" + requestedVolume);
         volume = requestedVolume;
+    }
+
+    @Override
+    public void startEnvelope(
+        NativeMixAudioProcessor.Role role,
+        long durationMs,
+        float stagingGainDb
+    ) {
+        calls.add("envelope:" + role + ":" + durationMs + ":" + stagingGainDb);
+        envelopeRole = role;
+        envelopeProgress = 0.0f;
+    }
+
+    @Override
+    public void clearEnvelope() {
+        calls.add("clear-envelope");
+        envelopeRole = null;
+    }
+
+    @Override
+    public float envelopeProgress() {
+        return envelopeProgress;
     }
 
     @Override

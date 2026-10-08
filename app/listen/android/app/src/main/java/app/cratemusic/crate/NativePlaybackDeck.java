@@ -17,5 +17,15 @@ interface NativePlaybackDeck {
 
     void setVolume(float volume);
 
+    void startEnvelope(
+        NativeMixAudioProcessor.Role role,
+        long durationMs,
+        float stagingGainDb
+    );
+
+    void clearEnvelope();
+
+    float envelopeProgress();
+
     void releasePreparedSource();
 }

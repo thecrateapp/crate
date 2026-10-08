@@ -59,17 +59,11 @@ public class NativeMixControllerTest {
         );
 
         assertTrue(controller.beginTransition(plan));
-        controller.applyProgress(0.5f);
-        assertEquals(
-            (float) Math.sqrt(0.5),
-            deckA.volume,
-            0.0001f
-        );
-        assertEquals(
-            (float) Math.sqrt(0.5),
-            deckB.volume,
-            0.0001f
-        );
+        assertTrue(deckA.calls.contains("envelope:OUTGOING:4000:0.0"));
+        assertTrue(deckB.calls.contains("envelope:INCOMING:4000:0.0"));
+        deckB.envelopeProgress = 0.5f;
+        assertEquals(0.5f, controller.transitionProgress(), 0.0f);
+        controller.applyProgress(controller.transitionProgress());
         assertEquals(1, controller.logicalIndex());
         assertEquals(1, listener.handoffs);
 
@@ -149,12 +143,12 @@ public class NativeMixControllerTest {
         );
         controller.applyProgress(0.5f);
 
-        float expectedMidpoint = (float) Math.sqrt(0.5) * 0.5f;
-        assertEquals(expectedMidpoint, deckA.volume, 0.0001f);
-        assertEquals(expectedMidpoint, deckB.volume, 0.0001f);
+        assertEquals(0.5f, deckA.volume, 0.0001f);
+        assertEquals(0.5f, deckB.volume, 0.0001f);
 
         controller.applyProgress(1.0f);
         assertEquals(0.5f, deckB.volume, 0.0001f);
+        assertEquals("clear-envelope", deckB.calls.get(deckB.calls.size() - 1));
     }
 
     @Test
@@ -174,17 +168,16 @@ public class NativeMixControllerTest {
                 "local_fallback"
             )
         );
-        controller.applyProgress(0.5f);
+        controller.applyProgress(0.25f);
 
-        float duckedMidpoint =
-            (float) Math.sqrt(0.5) * 0.8f * 0.25f;
-        assertEquals(duckedMidpoint, deckA.volume, 0.0001f);
-        assertEquals(duckedMidpoint, deckB.volume, 0.0001f);
+        assertEquals(0.2f, deckA.volume, 0.0001f);
+        assertEquals(0.2f, deckB.volume, 0.0001f);
 
         controller.setDuckMultiplier(1.0f);
-        float restoredMidpoint = (float) Math.sqrt(0.5) * 0.8f;
-        assertEquals(restoredMidpoint, deckA.volume, 0.0001f);
-        assertEquals(restoredMidpoint, deckB.volume, 0.0001f);
+        assertEquals(0.8f, deckA.volume, 0.0001f);
+        assertEquals(0.8f, deckB.volume, 0.0001f);
+        assertTrue(deckA.calls.contains("envelope:OUTGOING:4000:0.0"));
+        assertEquals(1, countCalls(deckA, "envelope:"));
     }
 
     @Test
@@ -227,6 +220,10 @@ public class NativeMixControllerTest {
         assertSame(deckA, controller.activeDeck());
         assertEquals(0, controller.logicalIndex());
         assertEquals(1.0f, deckA.volume, 0.0001f);
+        assertTrue(
+            deckA.calls.indexOf("clear-envelope") <
+                deckA.calls.lastIndexOf("volume:1.0")
+        );
         assertFalse(deckB.playing);
         assertEquals(1, listener.cancellations);
     }

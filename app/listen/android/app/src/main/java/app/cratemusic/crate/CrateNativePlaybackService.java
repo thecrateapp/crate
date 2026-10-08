@@ -136,7 +136,6 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private ExoPlayerNativePlaybackDeck transitionOutgoingDeck;
     private String fallenBackEdge = "";
     private int transitionOutgoingIndex = -1;
-    private long transitionStartedElapsedMs;
     private long transitionStartedWallMs;
     private long lastTransitionProgressEventElapsedMs;
     private final AudioManager.OnAudioFocusChangeListener
@@ -1561,11 +1560,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         if (player == null || mixController == null) return;
         long nowElapsedMs = SystemClock.elapsedRealtime();
         if (activeTransitionPlan != null) {
-            float progress = NativeMixTiming.progress(
-                nowElapsedMs,
-                transitionStartedElapsedMs,
-                activeTransitionPlan.durationMs
-            );
+            float progress = mixController.transitionProgress();
             mixController.applyProgress(progress);
             if (
                 progress >= 1.0f ||
@@ -1608,7 +1603,6 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
         transitionOutgoingDeck = outgoingPlayer == deckA.player() ? deckA : deckB;
         transitionOutgoingIndex = outgoingIndex;
-        transitionStartedElapsedMs = nowElapsedMs;
         transitionStartedWallMs = System.currentTimeMillis();
         lastTransitionProgressEventElapsedMs = nowElapsedMs;
         activeTransitionPlan = boundedPlan;
@@ -1702,7 +1696,6 @@ public class CrateNativePlaybackService extends MediaSessionService {
         activeTransitionPlan = null;
         transitionOutgoingDeck = null;
         transitionOutgoingIndex = -1;
-        transitionStartedElapsedMs = 0L;
         transitionStartedWallMs = 0L;
         lastTransitionProgressEventElapsedMs = 0L;
     }

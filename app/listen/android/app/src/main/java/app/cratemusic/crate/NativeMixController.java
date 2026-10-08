@@ -31,7 +31,6 @@ final class NativeMixController {
     private long standbyPreparedCueMs;
     private float outputVolume = 1.0f;
     private float duckMultiplier = 1.0f;
-    private float mixProgress;
 
     NativeMixController(
         NativePlaybackDeck deckA,
@@ -192,8 +191,17 @@ final class NativeMixController {
         mixOutgoingDeck = activeDeck;
         mixIncomingDeck = standbyDeck;
         handoffComplete = false;
-        mixProgress = 0.0f;
-        applyMixVolumes(mixProgress);
+        mixOutgoingDeck.startEnvelope(
+            NativeMixAudioProcessor.Role.OUTGOING,
+            plan.durationMs,
+            plan.outgoingGainDb
+        );
+        mixIncomingDeck.startEnvelope(
+            NativeMixAudioProcessor.Role.INCOMING,
+            plan.durationMs,
+            plan.incomingGainDb
+        );
+        mixIncomingDeck.setVolume(effectiveOutputVolume());
         mixIncomingDeck.play();
         stateMachine.transitionTo(NativeTransitionState.MIXING);
         return true;
@@ -207,8 +215,6 @@ final class NativeMixController {
             return;
         }
         float progress = Math.max(0.0f, Math.min(1.0f, requestedProgress));
-        mixProgress = progress;
-        applyMixVolumes(progress);
 
         if (!handoffComplete && progress >= activePlan.handoffProgress) {
             handoff();
@@ -216,6 +222,10 @@ final class NativeMixController {
         if (progress >= 1.0f) {
             completeTransition();
         }
+    }
+
+    float transitionProgress() {
+        return mixIncomingDeck == null ? 0.0f : mixIncomingDeck.envelopeProgress();
     }
 
     void cancel(String reason) {
@@ -226,10 +236,12 @@ final class NativeMixController {
         boolean afterHandoff = handoffComplete;
         stateMachine.transitionTo(NativeTransitionState.CANCELLED);
         if (afterHandoff) {
+            mixIncomingDeck.clearEnvelope();
             mixIncomingDeck.setVolume(effectiveOutputVolume());
             mixOutgoingDeck.stop();
             mixOutgoingDeck.releasePreparedSource();
         } else {
+            mixOutgoingDeck.clearEnvelope();
             mixOutgoingDeck.setVolume(effectiveOutputVolume());
             mixIncomingDeck.stop();
             mixIncomingDeck.releasePreparedSource();
@@ -293,7 +305,8 @@ final class NativeMixController {
             activeDeck.setVolume(effectiveOutputVolume());
             return;
         }
-        applyMixVolumes(mixProgress);
+        mixOutgoingDeck.setVolume(effectiveOutputVolume());
+        mixIncomingDeck.setVolume(effectiveOutputVolume());
     }
 
     void setDuckMultiplier(float requestedMultiplier) {
@@ -312,7 +325,8 @@ final class NativeMixController {
             activeDeck.setVolume(effectiveOutputVolume());
             return;
         }
-        applyMixVolumes(mixProgress);
+        mixOutgoingDeck.setVolume(effectiveOutputVolume());
+        mixIncomingDeck.setVolume(effectiveOutputVolume());
     }
 
     private boolean prepareStandby() {
@@ -380,6 +394,7 @@ final class NativeMixController {
         mixOutgoingDeck.stop();
         mixOutgoingDeck.releasePreparedSource();
         mixIncomingDeck.setVolume(effectiveOutputVolume());
+        mixIncomingDeck.clearEnvelope();
         resetTransition();
         stateMachine.transitionTo(NativeTransitionState.IDLE);
         prepareStandby();
@@ -390,28 +405,9 @@ final class NativeMixController {
         mixOutgoingDeck = null;
         mixIncomingDeck = null;
         handoffComplete = false;
-        mixProgress = 0.0f;
-    }
-
-    private void applyMixVolumes(float progress) {
-        double phase = progress * Math.PI * 0.5;
-        mixOutgoingDeck.setVolume(
-            (float) Math.cos(phase) *
-            amplitude(activePlan.outgoingGainDb) *
-            effectiveOutputVolume()
-        );
-        mixIncomingDeck.setVolume(
-            (float) Math.sin(phase) *
-            amplitude(activePlan.incomingGainDb) *
-            effectiveOutputVolume()
-        );
     }
 
     private float effectiveOutputVolume() {
         return outputVolume * duckMultiplier;
-    }
-
-    private static float amplitude(float gainDb) {
-        return (float) Math.pow(10.0, gainDb / 20.0);
     }
 }
