@@ -100,7 +100,6 @@ def get_vdj_folder_page(
             COALESCE(NULLIF(t.title, ''), t.filename) AS title,
             t.artist,
             t.album,
-            t.path,
             t.duration,
             COALESCE(NULLIF(t.year, ''), NULLIF(a.year, '')) AS year,
             COALESCE(

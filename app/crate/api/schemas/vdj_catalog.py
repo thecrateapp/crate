@@ -13,7 +13,6 @@ class VdjCatalogTrackResponse(BaseModel):
     title: str
     artist: str | None = None
     album: str | None = None
-    path: str | None = None
     duration: float | None = None
     year: str | None = None
     genre: str | None = None

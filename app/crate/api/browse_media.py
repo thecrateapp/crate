@@ -181,6 +181,11 @@ def api_search(
         return {"artists": [], "albums": [], "tracks": []}
 
     scope = scope if scope in ("local", "auto", "federated") else "local"
+    if scope != "local" and user.get("auth_type") == "access_token":
+        raise HTTPException(
+            status_code=403,
+            detail="Access tokens can only search the local library",
+        )
     if scope == "local":
         return search_local_library(q_stripped, capped_limit)
 

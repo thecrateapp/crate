@@ -320,8 +320,7 @@ bool parse_track(const JsonValue& item, std::vector<SearchTrack>& tracks)
     if (!string_field(item, "entity_uid", track.entity_uid, true) ||
         !string_field(item, "title", track.title, true) ||
         !string_field(item, "artist", track.artist, false) ||
-        !string_field(item, "album", track.album, false) ||
-        !string_field(item, "path", track.path, false)) {
+        !string_field(item, "album", track.album, false)) {
         return false;
     }
     const auto* duration = field(item, "duration");
