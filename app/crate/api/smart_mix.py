@@ -21,8 +21,8 @@ from crate.api.schemas.smart_mix import (
     TransitionPlanResponse,
 )
 from crate.db.cache_store import (
-    get_smart_mix_plan_cache,
-    set_smart_mix_plan_cache,
+    get_smart_mix_plan_caches,
+    set_smart_mix_plan_caches,
 )
 from crate.db.queries.smart_mix_compatible import get_compatible_track_inputs
 from crate.db.repositories.smart_mix import (
@@ -34,7 +34,6 @@ from crate.smart_mix.models import (
     MixProfileQuality,
     TrackMixProfile,
     TransitionContext,
-    TransitionPlan,
 )
 from crate.smart_mix.planner import plan_transition
 from crate.smart_mix.versions import PLANNER_IDENTIFIER
@@ -139,20 +138,32 @@ def transition_plans(
     _require_vdj_scope(request, "vdj.smart_mix.read")
     unique_edges = _deduplicate_edges(payload.edges)
     entity_uids = _ordered_entity_uids(unique_edges)
-    profiles = get_track_mix_profiles_by_entity_uids(
-        entity_uids,
-        include_beat_grid=True,
-    )
+    profiles = get_track_mix_profiles_by_entity_uids(entity_uids)
     profiles_by_uid = dict(zip(entity_uids, profiles, strict=True))
-
-    plans = [
-        _plan_edge(
+    edge_profiles = [
+        (
             edge,
-            outgoing=profiles_by_uid.get(str(edge.outgoing_track_entity_uid)),
-            incoming=profiles_by_uid.get(str(edge.incoming_track_entity_uid)),
+            profiles_by_uid.get(str(edge.outgoing_track_entity_uid)),
+            profiles_by_uid.get(str(edge.incoming_track_entity_uid)),
         )
         for edge in unique_edges
     ]
+    cache_keys = [
+        _plan_cache_key(edge, outgoing, incoming)
+        for edge, outgoing, incoming in edge_profiles
+    ]
+    cached = get_smart_mix_plan_caches(cache_keys)
+    computed: dict[str, dict] = {}
+    plans = []
+    for cache_key, (edge, outgoing, incoming) in zip(
+        cache_keys, edge_profiles, strict=True
+    ):
+        serialized = cached.get(cache_key)
+        if serialized is None:
+            serialized = _plan_edge(edge, outgoing=outgoing, incoming=incoming)
+            computed[cache_key] = serialized
+        plans.append(TransitionPlanResponse.model_validate(serialized))
+    set_smart_mix_plan_caches(computed)
     return TransitionPlanBatchResponse.model_validate(
         {
             "plannerVersion": payload.planner_version,
@@ -203,23 +214,14 @@ def _plan_edge(
     *,
     outgoing: TrackMixProfile | None,
     incoming: TrackMixProfile | None,
-) -> TransitionPlanResponse:
-    context = _transition_context(edge.context)
-    cache_key = _plan_cache_key(edge, outgoing, incoming)
-    cached = get_smart_mix_plan_cache(cache_key)
-    if cached is not None:
-        return TransitionPlanResponse.model_validate(cached)
-
-    plan = plan_transition(
+) -> dict:
+    return plan_transition(
         outgoing,
         incoming,
-        context,
+        _transition_context(edge.context),
         outgoing_track_entity_uid=str(edge.outgoing_track_entity_uid),
         incoming_track_entity_uid=str(edge.incoming_track_entity_uid),
-    )
-    serialized = plan.to_dict()
-    set_smart_mix_plan_cache(cache_key, serialized)
-    return _plan_response(plan)
+    ).to_dict()
 
 
 def _transition_context(payload: TransitionContextRequest) -> TransitionContext:
@@ -257,10 +259,6 @@ def _plan_cache_key(
         separators=(",", ":"),
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def _plan_response(plan: TransitionPlan) -> TransitionPlanResponse:
-    return TransitionPlanResponse.model_validate(plan.to_dict())
 
 
 __all__ = ["router"]

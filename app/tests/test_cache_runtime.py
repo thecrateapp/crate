@@ -92,86 +92,99 @@ def test_l1_hit_respects_stricter_requested_max_age(monkeypatch):
     assert cache_store.get_cache("key", max_age_seconds=10) is None
 
 
-def test_smart_mix_plan_cache_uses_revision_key_and_bounded_ttl(monkeypatch):
-    from crate.db import cache_store
+class _FakeRedisPipeline:
+    def __init__(self, redis: "_FakeRedis") -> None:
+        self.redis = redis
+        self.commands: list[tuple[str, int, str]] = []
 
-    reads: list[tuple[str, int | None]] = []
-    writes: list[tuple[str, dict, int | None]] = []
-    monkeypatch.setattr(
-        cache_store,
-        "get_cache",
-        lambda key, max_age_seconds=None: (
-            reads.append((key, max_age_seconds)) or {"mode": "adaptive"}
-        ),
-    )
-    monkeypatch.setattr(
-        cache_store,
-        "set_cache",
-        lambda key, value, ttl=None: writes.append((key, value, ttl)),
-    )
-    monkeypatch.setattr(
-        cache_store,
-        "_maybe_prune_smart_mix_plan_cache",
-        lambda: None,
-    )
+    def setex(self, key: str, ttl: int, value: str) -> None:
+        self.commands.append((key, ttl, value))
 
-    assert cache_store.get_smart_mix_plan_cache("revision-key") == {"mode": "adaptive"}
-    cache_store.set_smart_mix_plan_cache("revision-key", {"mode": "beatmatch"})
-
-    expected_key = "smart-mix:transition-plan:v1:revision-key"
-    assert reads == [(expected_key, cache_store.SMART_MIX_PLAN_CACHE_TTL_SECONDS)]
-    assert writes == [
-        (
-            expected_key,
-            {"mode": "beatmatch"},
-            cache_store.SMART_MIX_PLAN_CACHE_TTL_SECONDS,
-        )
-    ]
+    def execute(self) -> None:
+        self.redis.pipeline_executions += 1
+        for key, _ttl, value in self.commands:
+            self.redis.values[key] = value
 
 
-def test_smart_mix_plan_cache_prunes_only_expired_revisioned_entries(
-    pg_db,
-    monkeypatch,
-):
-    del pg_db
-    from sqlalchemy import text
+class _FakeRedis:
+    def __init__(self, values: dict[str, str] | None = None) -> None:
+        self.values = dict(values or {})
+        self.mget_calls: list[list[str]] = []
+        self.pipeline_executions = 0
+
+    def mget(self, keys: list[str]) -> list[str | None]:
+        self.mget_calls.append(list(keys))
+        return [self.values.get(key) for key in keys]
+
+    def pipeline(self, transaction: bool = True) -> _FakeRedisPipeline:
+        return _FakeRedisPipeline(self)
+
+
+def _forbid_postgres(monkeypatch, cache_store) -> None:
+    def fail(*_args, **_kwargs):
+        raise AssertionError("plan cache must not use PostgreSQL")
+
+    monkeypatch.setattr(cache_store, "read_scope", fail)
+    monkeypatch.setattr(cache_store, "transaction_scope", fail)
+
+
+def test_smart_mix_plan_caches_read_a_batch_in_one_redis_round_trip(monkeypatch):
+    import json
+    import uuid
 
     from crate.db import cache_store
-    from crate.db.tx import read_scope, transaction_scope
 
-    prefix = cache_store.SMART_MIX_PLAN_CACHE_PREFIX
-    keys = {
-        "expired": f"{prefix}expired",
-        "fresh": f"{prefix}fresh",
-        "unrelated": "unrelated:expired",
+    first, second, missing = (uuid.uuid4().hex for _ in range(3))
+    prefix = f"cache:{cache_store.SMART_MIX_PLAN_CACHE_PREFIX}"
+    redis = _FakeRedis(
+        {
+            f"{prefix}{first}": json.dumps({"mode": "adaptive"}),
+            f"{prefix}{second}": json.dumps({"mode": "beatmatch"}),
+        }
+    )
+    monkeypatch.setattr(cache_store, "get_redis", lambda: redis)
+    _forbid_postgres(monkeypatch, cache_store)
+
+    found = cache_store.get_smart_mix_plan_caches([first, second, missing])
+
+    assert found == {first: {"mode": "adaptive"}, second: {"mode": "beatmatch"}}
+    assert len(redis.mget_calls) == 1
+    assert cache_store.get_smart_mix_plan_caches([first, second]) == {
+        first: {"mode": "adaptive"},
+        second: {"mode": "beatmatch"},
     }
-    with transaction_scope() as session:
-        session.execute(
-            text("DELETE FROM cache WHERE key = ANY(:keys)"),
-            {"keys": list(keys.values())},
-        )
-        session.execute(
-            text(
-                """
-                INSERT INTO cache (key, value_json, updated_at)
-                VALUES
-                    (:expired, '{}'::jsonb, NOW() - INTERVAL '7 hours'),
-                    (:fresh, '{}'::jsonb, NOW()),
-                    (:unrelated, '{}'::jsonb, NOW() - INTERVAL '7 hours')
-                """
-            ),
-            keys,
-        )
+    assert len(redis.mget_calls) == 1
 
-    monkeypatch.setattr(cache_store, "_smart_mix_plan_last_prune_at", 0.0)
-    monkeypatch.setattr(cache_store.time, "monotonic", lambda: 10_000.0)
-    cache_store._maybe_prune_smart_mix_plan_cache()
 
-    with read_scope() as session:
-        remaining = set(
-            session.execute(
-                text("SELECT key FROM cache WHERE key = ANY(:keys)"),
-                {"keys": list(keys.values())},
-            ).scalars()
-        )
-    assert remaining == {keys["fresh"], keys["unrelated"]}
+def test_smart_mix_plan_caches_write_a_batch_in_one_pipeline(monkeypatch):
+    import json
+    import uuid
+
+    from crate.db import cache_store
+
+    first, second = (uuid.uuid4().hex for _ in range(2))
+    redis = _FakeRedis()
+    monkeypatch.setattr(cache_store, "get_redis", lambda: redis)
+    _forbid_postgres(monkeypatch, cache_store)
+
+    cache_store.set_smart_mix_plan_caches(
+        {first: {"mode": "adaptive"}, second: {"mode": "beatmatch"}}
+    )
+
+    prefix = f"cache:{cache_store.SMART_MIX_PLAN_CACHE_PREFIX}"
+    assert redis.pipeline_executions == 1
+    assert json.loads(redis.values[f"{prefix}{second}"]) == {"mode": "beatmatch"}
+
+
+def test_smart_mix_plan_caches_skip_postgres_when_redis_is_down(monkeypatch):
+    import uuid
+
+    from crate.db import cache_store
+
+    key = uuid.uuid4().hex
+    monkeypatch.setattr(cache_store, "get_redis", lambda: None)
+    _forbid_postgres(monkeypatch, cache_store)
+
+    assert cache_store.get_smart_mix_plan_caches([key]) == {}
+    cache_store.set_smart_mix_plan_caches({key: {"mode": "adaptive"}})
+    assert cache_store.get_smart_mix_plan_caches([key]) == {key: {"mode": "adaptive"}}

@@ -101,10 +101,11 @@ def test_batch_plans_deduplicate_edges_and_load_profiles_once(
     loads: list[list[str]] = []
     planned: list[tuple[str, str]] = []
     cached: dict[str, dict] = {}
+    cache_reads: list[list[str]] = []
 
-    def fake_profiles(entity_uids, *, include_beat_grid):
+    def fake_profiles(entity_uids, **kwargs):
         loads.append(list(entity_uids))
-        assert include_beat_grid is True
+        assert kwargs.get("include_beat_grid", False) is False
         return [
             _profile(uid, include_grid=True)
             if uid in {outgoing_uid, incoming_uid}
@@ -131,13 +132,16 @@ def test_batch_plans_deduplicate_edges_and_load_profiles_once(
     monkeypatch.setattr(smart_mix, "plan_transition", counting_planner)
     monkeypatch.setattr(
         smart_mix,
-        "get_smart_mix_plan_cache",
-        lambda key: cached.get(key),
+        "get_smart_mix_plan_caches",
+        lambda keys: (
+            cache_reads.append(list(keys))
+            or {key: cached[key] for key in keys if key in cached}
+        ),
     )
     monkeypatch.setattr(
         smart_mix,
-        "set_smart_mix_plan_cache",
-        lambda key, value: cached.__setitem__(key, value),
+        "set_smart_mix_plan_caches",
+        lambda plans: cached.update(plans),
     )
     edge = _edge(outgoing_uid, incoming_uid)
 
@@ -154,6 +158,7 @@ def test_batch_plans_deduplicate_edges_and_load_profiles_once(
     assert response.json()["plans"][0]["mode"] == "beatmatch"
     assert loads == [[outgoing_uid, incoming_uid]]
     assert planned == [(outgoing_uid, incoming_uid)]
+    assert len(cache_reads) == 1
 
     cached_response = test_app.post(
         "/api/playback/transition-plans",
@@ -175,12 +180,8 @@ def test_missing_profile_returns_per_edge_fallback(test_app, monkeypatch) -> Non
             None if uid == outgoing_uid else _profile(uid) for uid in entity_uids
         ],
     )
-    monkeypatch.setattr(smart_mix, "get_smart_mix_plan_cache", lambda _key: None)
-    monkeypatch.setattr(
-        smart_mix,
-        "set_smart_mix_plan_cache",
-        lambda _key, _value: None,
-    )
+    monkeypatch.setattr(smart_mix, "get_smart_mix_plan_caches", lambda _keys: {})
+    monkeypatch.setattr(smart_mix, "set_smart_mix_plan_caches", lambda _plans: None)
 
     response = test_app.post(
         "/api/playback/transition-plans",

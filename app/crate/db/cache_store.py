@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import json
-import threading
-import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from sqlalchemy import text
@@ -25,10 +24,7 @@ from crate.db.tx import read_scope, transaction_scope
 
 SMART_MIX_PLAN_CACHE_PREFIX = "smart-mix:transition-plan:v1:"
 SMART_MIX_PLAN_CACHE_TTL_SECONDS = 6 * 60 * 60
-_SMART_MIX_PLAN_PRUNE_INTERVAL_SECONDS = 5 * 60
-_SMART_MIX_PLAN_PRUNE_BATCH_SIZE = 500
-_smart_mix_plan_prune_lock = threading.Lock()
-_smart_mix_plan_last_prune_at = 0.0
+_SMART_MIX_PLAN_L1_TTL_SECONDS = 5 * 60
 
 
 def get_cache(key: str, max_age_seconds: int | None = None) -> Any | None:
@@ -125,57 +121,58 @@ def set_cache(key: str, value: Any, ttl: int | None = None) -> None:
         pass
 
 
-def get_smart_mix_plan_cache(plan_key: str) -> dict[str, Any] | None:
-    value = get_cache(
-        f"{SMART_MIX_PLAN_CACHE_PREFIX}{plan_key}",
-        max_age_seconds=SMART_MIX_PLAN_CACHE_TTL_SECONDS,
-    )
-    return value if isinstance(value, dict) else None
-
-
-def set_smart_mix_plan_cache(plan_key: str, value: dict[str, Any]) -> None:
-    set_cache(
-        f"{SMART_MIX_PLAN_CACHE_PREFIX}{plan_key}",
-        value,
-        ttl=SMART_MIX_PLAN_CACHE_TTL_SECONDS,
-    )
-    _maybe_prune_smart_mix_plan_cache()
-
-
-def _maybe_prune_smart_mix_plan_cache() -> None:
-    global _smart_mix_plan_last_prune_at
-
-    now = time.monotonic()
-    with _smart_mix_plan_prune_lock:
-        if now - _smart_mix_plan_last_prune_at < _SMART_MIX_PLAN_PRUNE_INTERVAL_SECONDS:
-            return
-        _smart_mix_plan_last_prune_at = now
-
-    cutoff = datetime.now(timezone.utc) - timedelta(
-        seconds=SMART_MIX_PLAN_CACHE_TTL_SECONDS
-    )
+def get_smart_mix_plan_caches(plan_keys: Sequence[str]) -> dict[str, dict[str, Any]]:
+    found: dict[str, dict[str, Any]] = {}
+    missing: list[str] = []
+    for plan_key in plan_keys:
+        value = _mem_get(
+            f"{SMART_MIX_PLAN_CACHE_PREFIX}{plan_key}",
+            max_age_seconds=SMART_MIX_PLAN_CACHE_TTL_SECONDS,
+        )
+        if isinstance(value, dict):
+            found[plan_key] = value
+        else:
+            missing.append(plan_key)
+    redis_client = get_redis()
+    if not redis_client or not missing:
+        return found
     try:
-        with transaction_scope() as session:
-            session.execute(
-                text(
-                    """
-                    DELETE FROM cache
-                    WHERE ctid IN (
-                        SELECT ctid
-                        FROM cache
-                        WHERE key LIKE :prefix
-                          AND updated_at < :cutoff
-                        ORDER BY updated_at
-                        LIMIT :batch_size
-                    )
-                    """
-                ),
-                {
-                    "prefix": f"{SMART_MIX_PLAN_CACHE_PREFIX}%",
-                    "cutoff": cutoff,
-                    "batch_size": _SMART_MIX_PLAN_PRUNE_BATCH_SIZE,
-                },
+        raw_values = redis_client.mget(
+            [f"cache:{SMART_MIX_PLAN_CACHE_PREFIX}{plan_key}" for plan_key in missing]
+        )
+        for plan_key, raw in zip(missing, raw_values, strict=True):
+            value = json.loads(raw) if raw is not None else None
+            if isinstance(value, dict):
+                found[plan_key] = value
+                _mem_set(
+                    f"{SMART_MIX_PLAN_CACHE_PREFIX}{plan_key}",
+                    value,
+                    _SMART_MIX_PLAN_L1_TTL_SECONDS,
+                )
+    except Exception:
+        pass
+    return found
+
+
+def set_smart_mix_plan_caches(plans: Mapping[str, dict[str, Any]]) -> None:
+    for plan_key, value in plans.items():
+        _mem_set(
+            f"{SMART_MIX_PLAN_CACHE_PREFIX}{plan_key}",
+            value,
+            _SMART_MIX_PLAN_L1_TTL_SECONDS,
+        )
+    redis_client = get_redis()
+    if not redis_client or not plans:
+        return
+    try:
+        pipeline = redis_client.pipeline(transaction=False)
+        for plan_key, value in plans.items():
+            pipeline.setex(
+                f"cache:{SMART_MIX_PLAN_CACHE_PREFIX}{plan_key}",
+                SMART_MIX_PLAN_CACHE_TTL_SECONDS,
+                json.dumps(value, default=str),
             )
+        pipeline.execute()
     except Exception:
         pass
 
@@ -273,7 +270,7 @@ __all__ = [
     "delete_cache_prefix",
     "get_cache",
     "get_cache_stats",
-    "get_smart_mix_plan_cache",
+    "get_smart_mix_plan_caches",
     "set_cache",
-    "set_smart_mix_plan_cache",
+    "set_smart_mix_plan_caches",
 ]
