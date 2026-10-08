@@ -136,7 +136,7 @@ function StatsHeader({ page }: { page: StatsPageController }) {
   return (
     <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <div className="flex flex-wrap items-center gap-x-2 text-sm font-semibold">
+        <div className="flex flex-wrap items-center gap-x-3 text-base font-bold">
           {isUserStats ? (
             <>
               <span className="text-accent-action">{page.kicker}</span>

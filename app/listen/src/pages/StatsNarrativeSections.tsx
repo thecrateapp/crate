@@ -34,12 +34,7 @@ export function ScopeLink({
     <Link
       to={to}
       aria-current={active ? "page" : undefined}
-      className={cn(
-        "transition-colors",
-        active
-          ? "text-accent-action"
-          : "text-text-muted hover:text-text-primary",
-      )}
+      className={cn("pb-0.5", active ? "link-accent" : "link-meta")}
     >
       {children}
     </Link>
