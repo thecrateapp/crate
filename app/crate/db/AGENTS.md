@@ -16,7 +16,7 @@ deploy, testing policy) live in the root `AGENTS.md`; this file only covers the 
 | `orm/`                                                     | SQLAlchemy 2.0 `Mapped` models. `orm/contract.py:ACTIVE_ORM_MODELS` is checked against the live schema                                                                                                                                             |
 | `models/`                                                  | Pydantic output models for DB results                                                                                                                                                                                                              |
 | `schema_sections/`                                         | Idempotent DDL used by `schema_bootstrap.create_schema()` (called by migration `001`) and, for newer features, by the migration itself (`crates_v099/v100/v102.py`)                                                                                |
-| `migrations/versions/`                                     | Alembic revisions `001`..`102`, linear, 3-digit string ids                                                                                                                                                                                         |
+| `migrations/versions/`                                     | Alembic revisions `001`..`105`, linear, 3-digit string ids                                                                                                                                                                                         |
 | `ui_snapshot_*.py`, `snapshot_events.py`                   | `ui_snapshots` read model: `get_or_build_ui_snapshot()` (read, else build + upsert with `source_seq`), `mark_ui_snapshots_stale()`, Redis pub of snapshot versions                                                                                 |
 | `domain_events.py`, `domain_event_outbox.py`               | Transactional outbox: `append_domain_event(..., session=s)` enqueues in the caller's transaction; relay publishes to Redis Streams; projector consumes                                                                                             |
 | `init_db.py`, `core_migrations.py`, `core_provisioning.py` | Startup: advisory lock, `alembic upgrade head`, seeds                                                                                                                                                                                              |
@@ -97,6 +97,21 @@ Performance (library_tracks ~48K rows, hot HTTP paths):
    (see `080_user_listening_hotpath_indexes.py`). Write a real `downgrade()` (`DROP ... IF EXISTS`).
 5. If you add/change columns on a model in `ACTIVE_ORM_MODELS`, update the `orm/` mapping in the same PR.
 6. Update `tests/test_crate_schema_definition.py::test_crate_migration_follows_the_current_main_head` (`get_heads() == ["NNN"]`) and add a migration test (pattern: `RecordingExecutor` + monkeypatched `op`, or source assertions like `tests/test_user_listening_hotpath_migration.py`).
+
+## Listening stats projections
+
+`user_play_events` is the source of truth; `jobs/user_listening_projections.py` derives
+`user_track_daily`, `user_daily_listening`, `user_hourly_listening`, `user_entity_firsts`,
+`user_listening_sessions` and the `user_*_stats` windows (see
+`docs/technical/listening-stats-projections.md`).
+
+- Any write to `user_play_events` calls `mark_listening_day_dirty(session, ...)` in the same
+  transaction. The worker refresh only recomputes dirty local days.
+- Day boundaries use `users.timezone`; never bucket listening by UTC date.
+- `rebuild_user_listening_projections` is the reference result. Change the incremental path and the
+  rebuild together; `tests/test_user_listening_projections.py` compares them.
+- Stats queries read the projections, never `user_play_events` or `library_tracks` aggregates per
+  request.
 
 ## Testing
 
