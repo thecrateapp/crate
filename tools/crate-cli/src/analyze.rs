@@ -14,12 +14,14 @@ use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 
+use crate::loudness::{LoudnessMeter, LoudnessSummary, MEASUREMENT_VERSION};
 use crate::mix_profile::{to_camelot, SmartMixProfileResult, ANALYZER_VERSION};
 use crate::{collect_audio_files, parse_extensions};
 
 const TARGET_SAMPLE_RATE: u32 = 22050;
 const FFT_SIZE: usize = 2048;
 const HOP_SIZE: usize = 512;
+const MEASUREMENT_WINDOW_MS: u64 = 5_000;
 
 #[derive(Serialize)]
 pub struct AnalysisResult {
@@ -55,7 +57,7 @@ pub struct BatchAnalysisResult {
     pub failed: usize,
 }
 
-fn decode_audio(path: &Path) -> Result<(Vec<f32>, u32), String> {
+fn decode_audio(path: &Path) -> Result<(Vec<f32>, u32, Option<LoudnessSummary>), String> {
     let file = std::fs::File::open(path).map_err(|e| format!("open: {}", e))?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
@@ -89,6 +91,7 @@ fn decode_audio(path: &Path) -> Result<(Vec<f32>, u32), String> {
         .map_err(|e| format!("decoder: {}", e))?;
 
     let mut all_samples: Vec<f32> = Vec::new();
+    let mut meter = LoudnessMeter::new(channels, sample_rate);
 
     loop {
         let packet = match format.next_packet() {
@@ -115,6 +118,14 @@ fn decode_audio(path: &Path) -> Result<(Vec<f32>, u32), String> {
         let mut sample_buf = SampleBuffer::<f32>::new(num_frames as u64, spec);
         sample_buf.copy_interleaved_ref(decoded);
         let samples = sample_buf.samples();
+        if (spec.channels.count(), spec.rate) != (channels, sample_rate) {
+            meter = None;
+        }
+        if let Some(active_meter) = meter.as_mut() {
+            if active_meter.push_interleaved(samples).is_err() {
+                meter = None;
+            }
+        }
 
         // Mix to mono
         if channels > 1 {
@@ -129,6 +140,8 @@ fn decode_audio(path: &Path) -> Result<(Vec<f32>, u32), String> {
             all_samples.extend_from_slice(samples);
         }
     }
+
+    let loudness = meter.map(LoudnessMeter::finish);
 
     // Resample to target rate if needed (simple linear interpolation)
     if sample_rate != TARGET_SAMPLE_RATE && !all_samples.is_empty() {
@@ -145,10 +158,10 @@ fn decode_audio(path: &Path) -> Result<(Vec<f32>, u32), String> {
                 resampled.push(all_samples[idx]);
             }
         }
-        return Ok((resampled, TARGET_SAMPLE_RATE));
+        return Ok((resampled, TARGET_SAMPLE_RATE, loudness));
     }
 
-    Ok((all_samples, sample_rate))
+    Ok((all_samples, sample_rate, loudness))
 }
 
 /// Decode audio and return the original (pre-resample) mono samples + original sample rate.
@@ -661,10 +674,10 @@ fn detect_mix_cues(
     samples: &[f32],
     sample_rate: u32,
     beat_grid_ms: &[u64],
-) -> (Option<u64>, Option<u64>, Option<u64>) {
+) -> (Option<u64>, Option<u64>, Option<u64>, Option<u64>) {
     let (rms_values, frame_length, hop_length) = frame_rms(samples, sample_rate);
     if rms_values.is_empty() {
-        return (None, None, None);
+        return (None, None, None, None);
     }
     let dbfs: Vec<f32> = rms_values
         .iter()
@@ -678,7 +691,7 @@ fn detect_mix_cues(
         .filter_map(|(index, value)| (*value >= threshold).then_some(index))
         .collect();
     let (Some(first), Some(last)) = (active_frames.first(), active_frames.last()) else {
-        return (None, None, None);
+        return (None, None, None, None);
     };
     let duration_ms = samples.len() as u64 * 1_000 / u64::from(sample_rate);
     let active_start_ms = *first as u64 * hop_length as u64 * 1_000 / u64::from(sample_rate);
@@ -697,7 +710,12 @@ fn detect_mix_cues(
         .find(|position| **position <= outro_target)
         .copied()
         .unwrap_or(outro_target);
-    (Some(intro), Some(outro.max(intro)), Some(active_end_ms))
+    (
+        Some(active_start_ms),
+        Some(intro),
+        Some(outro.max(intro)),
+        Some(active_end_ms),
+    )
 }
 
 fn spectral_density(samples: &[f32], sample_rate: u32) -> Option<f32> {
@@ -757,6 +775,14 @@ fn window_samples(
 }
 
 pub fn analyze_smart_mix_samples(samples: &[f32], sample_rate: u32) -> SmartMixProfileResult {
+    analyze_smart_mix_samples_with_loudness(samples, sample_rate, None)
+}
+
+pub fn analyze_smart_mix_samples_with_loudness(
+    samples: &[f32],
+    sample_rate: u32,
+    loudness: Option<&LoudnessSummary>,
+) -> SmartMixProfileResult {
     let duration_ms = if sample_rate == 0 {
         0
     } else {
@@ -778,7 +804,7 @@ pub fn analyze_smart_mix_samples(samples: &[f32], sample_rate: u32) -> SmartMixP
         downbeat_features(&beat_frames, &beat_grid_ms, &onsets, bpm_confidence);
     let (key, scale, key_confidence) = detect_key(samples, sample_rate);
     let camelot = to_camelot(&key, &scale).map(str::to_owned);
-    let (intro_cue_ms, outro_cue_ms, active_end_ms) =
+    let (active_start_ms, intro_cue_ms, outro_cue_ms, active_end_ms) =
         detect_mix_cues(samples, sample_rate, &beat_grid_ms);
     let intro = signal_features(
         window_samples(samples, sample_rate, intro_cue_ms, false),
@@ -789,7 +815,12 @@ pub fn analyze_smart_mix_samples(samples: &[f32], sample_rate: u32) -> SmartMixP
         sample_rate,
     );
     let global = signal_features(samples, sample_rate);
-    let true_peak = samples.iter().copied().map(f32::abs).fold(0.0, f32::max);
+    let intro_lufs = loudness.zip(intro_cue_ms).and_then(|(summary, start_ms)| {
+        summary.window_lufs(start_ms, start_ms + MEASUREMENT_WINDOW_MS)
+    });
+    let outro_lufs = loudness.zip(active_end_ms).and_then(|(summary, end_ms)| {
+        summary.window_lufs(end_ms.saturating_sub(MEASUREMENT_WINDOW_MS), end_ms)
+    });
     let quality = if beat_grid_ms.len() >= 12
         && bpm_confidence >= 0.75
         && tempo_stability >= 0.8
@@ -819,9 +850,17 @@ pub fn analyze_smart_mix_samples(samples: &[f32], sample_rate: u32) -> SmartMixP
         key_confidence: Some(key_confidence),
         intro_cue_ms,
         outro_cue_ms,
-        intro_lufs: intro.0,
-        outro_lufs: outro.0,
-        true_peak_dbfs: Some(compute_loudness_db(true_peak)),
+        intro_lufs: intro_lufs.map(|value| value as f32),
+        outro_lufs: outro_lufs.map(|value| value as f32),
+        true_peak_dbfs: loudness
+            .and_then(|summary| summary.true_peak_dbfs)
+            .map(|value| value as f32),
+        integrated_lufs: loudness
+            .and_then(|summary| summary.integrated_lufs)
+            .map(|value| value as f32),
+        measurement_version: loudness.map(|_| MEASUREMENT_VERSION.to_string()),
+        active_start_ms,
+        active_end_ms,
         intro_energy: intro.1,
         outro_energy: outro.1,
         intro_spectral_density: intro.2,
@@ -875,7 +914,7 @@ pub fn analyze_track_with_ml(path: &Path, panns: Option<&crate::ml::PannsModel>)
 }
 
 pub fn analyze_track(path: &Path) -> AnalysisResult {
-    let (samples, sample_rate) = match decode_audio(path) {
+    let (samples, sample_rate, measured_loudness) = match decode_audio(path) {
         Ok(r) => r,
         Err(e) => {
             return AnalysisResult {
@@ -924,7 +963,11 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
     let dynamic_range = compute_dynamic_range(&samples);
     let bpm = estimate_bpm(&samples, sample_rate);
     let (key, scale, _) = detect_key(&samples, sample_rate);
-    let mix_profile = Some(analyze_smart_mix_samples(&samples, sample_rate));
+    let mix_profile = Some(analyze_smart_mix_samples_with_loudness(
+        &samples,
+        sample_rate,
+        measured_loudness.as_ref(),
+    ));
 
     // Average spectral centroid
     let mut planner = RealFftPlanner::<f32>::new();

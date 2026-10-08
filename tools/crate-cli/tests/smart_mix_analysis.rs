@@ -1,6 +1,7 @@
 #![cfg(feature = "analysis")]
 
-use crate_cli::analyze::analyze_smart_mix_samples;
+use crate_cli::analyze::{analyze_smart_mix_samples, analyze_smart_mix_samples_with_loudness};
+use crate_cli::loudness::LoudnessMeter;
 
 const SAMPLE_RATE: u32 = 22_050;
 
@@ -74,8 +75,12 @@ fn rust_cues_avoid_leading_and_trailing_silence() {
     assert!(profile.intro_cue_ms.unwrap() >= 1_500);
     assert!(profile.outro_cue_ms.unwrap() > 10_000);
     assert!(profile.outro_cue_ms.unwrap() < 22_000);
-    assert!(profile.intro_lufs.is_some());
-    assert!(profile.outro_lufs.is_some());
+    assert!(profile.active_start_ms.unwrap() >= 1_500);
+    assert!(profile.active_end_ms.unwrap() <= 22_500);
+    assert_eq!(profile.intro_lufs, None);
+    assert_eq!(profile.outro_lufs, None);
+    assert_eq!(profile.true_peak_dbfs, None);
+    assert_eq!(profile.measurement_version, None);
     assert!(profile.intro_energy.is_some());
     assert!(profile.outro_energy.is_some());
 }
@@ -88,10 +93,30 @@ fn rust_profile_serializes_the_shared_camel_case_schema() {
     let payload = serde_json::to_value(profile).unwrap();
 
     assert_eq!(payload["schemaVersion"], 1);
-    assert_eq!(payload["analyzerVersion"], "smart-mix-v1");
+    assert_eq!(payload["analyzerVersion"], "smart-mix-audio-v2");
+    assert!(payload.get("measurementVersion").is_some());
+    assert!(payload.get("integratedLufs").is_some());
+    assert!(payload.get("activeStartMs").is_some());
+    assert!(payload.get("activeEndMs").is_some());
     assert!(payload["beatGridMs"].is_array());
     assert!(payload.get("bpmConfidence").is_some());
     assert!(payload.get("tempoStability").is_some());
     assert!(payload.get("keyConfidence").is_some());
     assert!(payload.get("camelot").is_some());
+}
+
+#[test]
+fn measured_profile_publishes_bs1770_loudness_and_true_peak() {
+    let samples = click_track(128.0, 128.0, 24.0, 2.0, 2.0);
+    let mut meter = LoudnessMeter::new(1, SAMPLE_RATE).unwrap();
+    meter.push_interleaved(&samples).unwrap();
+    let loudness = meter.finish();
+
+    let profile = analyze_smart_mix_samples_with_loudness(&samples, SAMPLE_RATE, Some(&loudness));
+
+    assert_eq!(profile.measurement_version.as_deref(), Some("bs1770-v1"));
+    assert!(profile.integrated_lufs.is_some());
+    assert!(profile.intro_lufs.is_some());
+    assert!(profile.outro_lufs.is_some());
+    assert!(profile.true_peak_dbfs.unwrap() <= 0.5);
 }

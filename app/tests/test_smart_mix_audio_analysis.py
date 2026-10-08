@@ -129,12 +129,35 @@ def test_analyze_mix_profile_cues_and_windows_avoid_boundary_silence(
     assert profile.outro_cue_ms is not None
     assert profile.intro_cue_ms >= 1_500
     assert 10_000 < profile.outro_cue_ms < 22_000
-    assert profile.intro_lufs is not None
-    assert profile.outro_lufs is not None
     assert profile.intro_energy is not None
     assert profile.outro_energy is not None
-    assert profile.outro_lufs > profile.intro_lufs
     assert profile.outro_energy > profile.intro_energy
+    assert profile.active_start_ms is not None and profile.active_start_ms >= 1_500
+    assert profile.active_end_ms is not None and profile.active_end_ms <= 22_500
+
+
+def test_python_fallback_never_publishes_unmeasured_loudness(tmp_path: Path) -> None:
+    track = tmp_path / "fallback-loudness.wav"
+    _write_click_track(
+        track,
+        bpm=128.0,
+        duration_seconds=24.0,
+        leading_silence_seconds=2.0,
+        trailing_silence_seconds=2.0,
+        outro_gain=2.5,
+    )
+
+    from crate.audio_analysis import analyze_mix_profile
+    from crate.smart_mix.versions import ANALYZER_VERSION
+
+    profile = analyze_mix_profile(track)
+
+    assert profile.analyzer_version == ANALYZER_VERSION == "smart-mix-audio-v2"
+    assert profile.intro_lufs is None
+    assert profile.outro_lufs is None
+    assert profile.integrated_lufs is None
+    assert profile.true_peak_dbfs is None
+    assert profile.measurement_version is None
 
 
 def test_analyze_mix_profile_retains_key_confidence(tmp_path: Path) -> None:

@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy import text
 
 from crate.db.tx import transaction_scope
+from crate.smart_mix.versions import ANALYZER_VERSION
 
 
 def test_status_counts_profile_versions_quality_and_checkpoint_state(pg_db) -> None:
@@ -23,7 +24,7 @@ def test_status_counts_profile_versions_quality_and_checkpoint_state(pg_db) -> N
                 VALUES
                     (
                         :full_id, 1, 'full-v1', 'crate-rust',
-                        'smart-mix-v1', 'source-full', 'full', NOW()
+                        :current_version, 'source-full', 'full', NOW()
                     ),
                     (
                         :legacy_id, 0 + 2, 'partial-v2', 'crate-rust',
@@ -31,7 +32,11 @@ def test_status_counts_profile_versions_quality_and_checkpoint_state(pg_db) -> N
                     )
                 """
             ),
-            {"full_id": track_ids[0], "legacy_id": track_ids[1]},
+            {
+                "full_id": track_ids[0],
+                "legacy_id": track_ids[1],
+                "current_version": ANALYZER_VERSION,
+            },
         )
         session.execute(
             text(
@@ -53,7 +58,7 @@ def test_status_counts_profile_versions_quality_and_checkpoint_state(pg_db) -> N
 
     assert status == {
         "profile_version": 1,
-        "analyzer_version": "smart-mix-v1",
+        "analyzer_version": ANALYZER_VERSION,
         "total_tracks": 4,
         "current_profiles": 1,
         "missing_profiles": 3,

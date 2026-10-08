@@ -40,7 +40,7 @@ def test_planner_wire_literals_match_the_planner_identity() -> None:
 
 
 def test_version_strings_are_not_duplicated_outside_their_owners() -> None:
-    pattern = re.compile(r"[\"']smart-mix-v\d+[\"']")
+    pattern = re.compile(r"[\"']smart-mix-(?:audio-)?v\d+[\"']")
     offenders = [
         str(path.relative_to(APP_ROOT))
         for path in (APP_ROOT / "crate").rglob("*.py")
@@ -58,7 +58,7 @@ def test_rust_analyzer_version_matches_python() -> None:
 
     assert match is not None
     assert match.group(1) == versions.ANALYZER_VERSION
-    assert source.count('"smart-mix-v') == 1
+    assert source.count(f'"{versions.ANALYZER_VERSION}"') == 1
 
 
 def test_rust_beat_grid_format_matches_python() -> None:

@@ -6,7 +6,7 @@ description = "Audio analysis and library management CLI for Crate"
 
 [features]
 default = ["analysis", "bliss", "ml"]
-analysis = ["dep:realfft", "dep:symphonia"]
+analysis = ["dep:ebur128", "dep:realfft", "dep:symphonia"]
 bliss = ["dep:bliss-audio"]
 ml = ["analysis", "dep:ort"]
 
@@ -22,6 +22,7 @@ md-5 = "0.10"
 hex = "0.4"
 symphonia = { version = "0.5", features = ["all"], optional = true }
 realfft = { version = "3", optional = true }
+ebur128 = { version = "0.1.10", optional = true }
 ort = { version = "=2.0.0-rc.12", features = ["download-binaries"], optional = true }
 
 [dev-dependencies]

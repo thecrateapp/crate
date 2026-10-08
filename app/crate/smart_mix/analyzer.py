@@ -123,9 +123,8 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
         key_confidence=key_confidence,
         intro_cue_ms=cues.intro_cue_ms,
         outro_cue_ms=cues.outro_cue_ms,
-        intro_lufs=intro["lufs"],
-        outro_lufs=outro["lufs"],
-        true_peak_dbfs=global_features["true_peak_dbfs"],
+        active_start_ms=cues.active_start_ms,
+        active_end_ms=cues.active_end_ms,
         intro_energy=intro["energy"],
         outro_energy=outro["energy"],
         intro_spectral_density=intro["spectral_density"],
@@ -308,7 +307,7 @@ def _window_features(
     direction: str,
 ) -> dict[str, float | None]:
     if anchor_ms is None:
-        return {"lufs": None, "energy": None, "spectral_density": None}
+        return {"energy": None, "spectral_density": None}
     anchor_sample = round(anchor_ms * sample_rate / 1_000)
     window_samples = round(WINDOW_SECONDS * sample_rate)
     if direction == "forward":
@@ -327,12 +326,7 @@ def _signal_features(
     import librosa
 
     if audio.size == 0:
-        return {
-            "lufs": None,
-            "energy": None,
-            "spectral_density": None,
-            "true_peak_dbfs": None,
-        }
+        return {"energy": None, "spectral_density": None}
     rms = float(np.sqrt(np.mean(np.square(audio, dtype=np.float64))))
     dbfs = 20.0 * math.log10(rms + 1e-10)
     energy = max(0.0, min(1.0, (dbfs + 60.0) / 60.0))
@@ -349,12 +343,9 @@ def _signal_features(
         0.0,
         min(1.0, math.log1p(centroid) / math.log1p(sample_rate / 2.0)),
     )
-    true_peak = float(np.max(np.abs(audio)))
     return {
-        "lufs": round(dbfs, 3),
         "energy": round(energy, 4),
         "spectral_density": round(spectral_density, 4),
-        "true_peak_dbfs": round(20.0 * math.log10(true_peak + 1e-10), 3),
     }
 
 

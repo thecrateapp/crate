@@ -84,3 +84,10 @@ def test_python_and_rust_mix_profiles_stay_within_tolerance(tmp_path: Path) -> N
     assert rust_profile["quality"] == python_profile.quality
     assert 0.0 <= rust_profile["bpmConfidence"] <= 1.0
     assert 0.0 <= rust_profile["keyConfidence"] <= 1.0
+    assert rust_profile["analyzerVersion"] == python_profile.analyzer_version
+    assert rust_profile["measurementVersion"] == "bs1770-v1"
+    assert rust_profile["integratedLufs"] is not None
+    assert rust_profile["introLufs"] is not None
+    assert rust_profile["outroLufs"] is not None
+    assert rust_profile["truePeakDbfs"] <= 0.5
+    assert python_profile.measurement_version is None
