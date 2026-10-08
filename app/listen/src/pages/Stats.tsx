@@ -143,8 +143,8 @@ function StatsHeader({ page }: { page: StatsPageController }) {
           <span className="text-accent-action">{page.signalTitle.accent}</span>
         </h1>
       </div>
-      <div className="flex flex-col items-start gap-3 lg:items-end">
-        <div className="flex flex-wrap gap-2">
+      <div className="flex w-full flex-col gap-3 lg:w-auto lg:items-end">
+        <div className="grid grid-cols-2 gap-2 lg:flex">
           {!isUserStats ? (
             <>
               <ScopeLink active={!isGlobalStats} to="/stats">
@@ -160,32 +160,27 @@ function StatsHeader({ page }: { page: StatsPageController }) {
             </ScopeLink>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <StatsPeriodPicker
-            options={page.selectionOptions}
-            value={page.selectedMonth ? null : page.selection}
-            onChange={page.changeSelection}
-          />
+        <StatsPeriodPicker
+          options={page.selectionOptions}
+          value={page.selectedMonth ? null : page.selection}
+          onChange={page.changeSelection}
+        />
+        <div className="flex flex-wrap gap-2 empty:hidden *:grow lg:*:grow-0">
           {!isGlobalStats && !isUserStats && page.hasStats ? (
-            <Button asChild size="sm">
+            <Button asChild>
               <Link
                 to={`/stats/wrapped?window=${encodeURIComponent(
                   page.selection,
                 )}`}
               >
-                <Sparkles size={CRATE_ICON_SIZE.xs} />
+                <Sparkles size={CRATE_ICON_SIZE.sm} />
                 {t("stats.wrapped.open")}
               </Link>
             </Button>
           ) : null}
           {page.replayItems.length ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={page.playReplay}
-            >
-              <Play size={CRATE_ICON_SIZE.xs} />
+            <Button type="button" variant="outline" onClick={page.playReplay}>
+              <Play size={CRATE_ICON_SIZE.sm} />
               {t("stats.signal.playReplay")}
             </Button>
           ) : null}

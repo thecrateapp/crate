@@ -35,8 +35,9 @@ export function StatsPeriodPicker({
       }}
       as="radio"
       label={t("stats.window.label")}
-      className="max-w-full overflow-x-auto border-border-quiet bg-surface-canvas/25"
-      itemClassName="h-auto px-3.5 py-2 text-xs font-semibold text-text-muted data-[state=inactive]:hover:bg-text-primary/5 data-[state=inactive]:hover:text-text-primary data-[state=active]:text-accent-action-foreground"
+      fullWidth
+      className="border-border-quiet bg-surface-canvas/25 lg:inline-flex lg:w-auto"
+      itemClassName="font-semibold data-[state=inactive]:text-text-muted data-[state=inactive]:hover:bg-text-primary/5 data-[state=inactive]:hover:text-text-primary"
     />
   );
 }

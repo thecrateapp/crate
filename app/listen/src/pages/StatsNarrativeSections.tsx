@@ -34,7 +34,7 @@ export function ScopeLink({
     <Link
       to={to}
       className={cn(
-        "rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors",
+        "inline-flex h-10 items-center justify-center rounded-md border px-4 text-sm font-semibold transition-colors",
         active
           ? "border-accent-action/30 bg-accent-action/15 text-accent-action"
           : "stats-scope-link-inactive",
