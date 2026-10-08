@@ -2,6 +2,7 @@ import base64
 import hashlib
 import logging
 import os
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from threading import RLock
@@ -179,28 +180,32 @@ _login_failure_lock = RLock()
 _oauth_invite_lock = RLock()
 
 
-def _is_vdj_access_token_path(path: str) -> bool:
-    if path in {
-        "/api/search",
-        "/api/vdj/catalog/folders",
-        "/api/auth/media-access",
-        "/api/playback/transition-plans",
-        "/api/me/play-events",
-    }:
-        return True
-    if path.startswith("/api/vdj/catalog/folders/"):
-        return True
-    if not path.startswith("/api/tracks/by-entity/"):
-        return path.startswith("/api/vdj/tracks/by-entity/") and path.endswith(
-            ("/playback", "/stream")
-        )
-    return path.endswith(
+_ENTITY_SEGMENT = r"[^/]+"
+_VDJ_ACCESS_TOKEN_ROUTES: tuple[tuple[frozenset[str], re.Pattern[str]], ...] = tuple(
+    (frozenset(methods), re.compile(pattern))
+    for methods, pattern in (
+        ({"GET"}, r"/api/search"),
+        ({"GET"}, r"/api/vdj/catalog/folders"),
+        ({"GET"}, r"/api/vdj/catalog/folders/[^/]+"),
+        ({"POST"}, r"/api/auth/media-access"),
+        ({"POST"}, r"/api/playback/transition-plans"),
+        ({"POST"}, r"/api/me/play-events"),
         (
-            "/mix-profile",
-            "/compatible",
-            "/playback",
-            "/stream",
-        )
+            {"GET"},
+            rf"/api/tracks/by-entity/{_ENTITY_SEGMENT}/(?:mix-profile|compatible|playback)",
+        ),
+        ({"GET", "HEAD"}, rf"/api/tracks/by-entity/{_ENTITY_SEGMENT}/stream"),
+        ({"GET"}, rf"/api/vdj/tracks/by-entity/{_ENTITY_SEGMENT}/playback"),
+        ({"GET", "HEAD"}, rf"/api/vdj/tracks/by-entity/{_ENTITY_SEGMENT}/stream"),
+    )
+)
+
+
+def _is_vdj_access_token_request(method: str, path: str) -> bool:
+    normalized_method = method.upper()
+    return any(
+        normalized_method in methods and pattern.fullmatch(path)
+        for methods, pattern in _VDJ_ACCESS_TOKEN_ROUTES
     )
 
 
@@ -1633,7 +1638,7 @@ class AuthMiddleware:
                 }
 
         if user and user.get("auth_type") == "access_token":
-            if not _is_vdj_access_token_path(request.url.path):
+            if not _is_vdj_access_token_request(request.method, request.url.path):
                 return None
         return user
 
@@ -1646,7 +1651,7 @@ class AuthMiddleware:
         scope.setdefault("state", {})
         user = await self.resolve_user(request)
         if user and user.get("auth_type") == "access_token":
-            if not _is_vdj_access_token_path(request.url.path):
+            if not _is_vdj_access_token_request(request.method, request.url.path):
                 user = None
         scope["state"]["user"] = user
         await self.app(scope, receive, send)
