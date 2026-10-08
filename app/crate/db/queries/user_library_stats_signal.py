@@ -63,7 +63,9 @@ def _iso(value) -> str | None:
     return value.isoformat()
 
 
-def _range(session, user_id: int, period: StatsPeriod) -> tuple[date, date] | None:
+def _range(
+    session, user_id: int | None, period: StatsPeriod
+) -> tuple[date, date] | None:
     start = period.start
     end = period.end or period.today + timedelta(days=1)
     if start is None:
@@ -78,7 +80,7 @@ def _range(session, user_id: int, period: StatsPeriod) -> tuple[date, date] | No
     return start, end
 
 
-def _tape(session, user_id: int, period: StatsPeriod) -> dict | None:
+def _tape(session, user_id: int | None, period: StatsPeriod) -> dict | None:
     bounds = _range(session, user_id, period)
     if bounds is None:
         return None
@@ -220,7 +222,7 @@ def _tape(session, user_id: int, period: StatsPeriod) -> dict | None:
     }
 
 
-def _peaks(session, user_id: int, params: dict, weekly: bool) -> list[dict]:
+def _peaks(session, user_id: int | None, params: dict, weekly: bool) -> list[dict]:
     bucket = "date_trunc('week', td.day)::date" if weekly else "td.day"
     peaks: list[dict] = []
     obsession = (
@@ -496,7 +498,7 @@ def _highlights(session, user_id: int, period: StatsPeriod) -> dict:
     }
 
 
-def _artist_of_period(session, user_id: int, period: StatsPeriod) -> dict | None:
+def _artist_of_period(session, user_id: int | None, period: StatsPeriod) -> dict | None:
     params = {"user_id": user_id, **period_params(period)}
     row = (
         session.execute(
@@ -611,7 +613,7 @@ def _listener_standing(session, artist: str, plays: int, period: StatsPeriod):
     return {"listeners": int(row.listeners), "top_percent": int(top_percent)}
 
 
-def _heatmap(session, user_id: int, period: StatsPeriod) -> dict:
+def _heatmap(session, user_id: int | None, period: StatsPeriod) -> dict:
     cells = [[0.0] * 24 for _ in range(7)]
     total = 0.0
     night = 0.0
@@ -646,7 +648,7 @@ def _heatmap(session, user_id: int, period: StatsPeriod) -> dict:
     }
 
 
-def _music_age(session, user_id: int, period: StatsPeriod) -> dict | None:
+def _music_age(session, user_id: int | None, period: StatsPeriod) -> dict | None:
     rows = session.execute(
         text(
             f"""
@@ -708,7 +710,9 @@ def _music_age(session, user_id: int, period: StatsPeriod) -> dict | None:
     }
 
 
-def _genre_shares(session, user_id: int, filter_sql: str, params: dict) -> list[dict]:
+def _genre_shares(
+    session, user_id: int | None, filter_sql: str, params: dict
+) -> list[dict]:
     rows = session.execute(
         text(
             weighted_genre_split_sql(
@@ -731,7 +735,7 @@ def _genre_shares(session, user_id: int, filter_sql: str, params: dict) -> list[
     return format_weighted_genre_rows(list(rows))
 
 
-def _genre_trend(session, user_id: int, period: StatsPeriod) -> list[dict]:
+def _genre_trend(session, user_id: int | None, period: StatsPeriod) -> list[dict]:
     params = period_params(period)
     current = _genre_shares(session, user_id, period_day_filter(period), params)
     previous: dict[str, float] = {}
@@ -760,7 +764,7 @@ def _genre_trend(session, user_id: int, period: StatsPeriod) -> list[dict]:
     ]
 
 
-def _computed_until(session, user_id: int) -> str | None:
+def _computed_until(session, user_id: int | None) -> str | None:
     value = session.execute(
         text(
             "SELECT MAX(refreshed_at) FROM user_listening_projection_state "
