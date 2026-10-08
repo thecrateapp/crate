@@ -181,6 +181,10 @@ def upsert_track_mix_profile_draft(
             global_energy=draft.global_energy,
             danceability=draft.danceability,
             valence=draft.valence,
+            active_start_ms=draft.active_start_ms,
+            active_end_ms=draft.active_end_ms,
+            integrated_lufs=draft.integrated_lufs,
+            measurement_version=draft.measurement_version,
             analyzed_at=datetime.now(UTC),
         )
         return upsert_track_mix_profile(

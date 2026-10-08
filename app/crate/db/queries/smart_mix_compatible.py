@@ -44,6 +44,11 @@ _PROFILE_COLUMNS = """
     profile.danceability,
     profile.valence,
     profile.bliss_vector_revision,
+    profile.duration_ms,
+    profile.active_start_ms,
+    profile.active_end_ms,
+    profile.integrated_lufs,
+    profile.measurement_version,
     profile.analyzed_at,
     track.entity_uid::text AS track_entity_uid,
     track.title,
@@ -103,6 +108,11 @@ _CANDIDATE_SQL = text(
             profile.danceability,
             profile.valence,
             profile.bliss_vector_revision,
+            profile.duration_ms,
+            profile.active_start_ms,
+            profile.active_end_ms,
+            profile.integrated_lufs,
+            profile.measurement_version,
             profile.analyzed_at
         FROM track_mix_profiles profile
         WHERE profile.track_id <> :seed_track_id
@@ -209,7 +219,12 @@ def _candidate_from_row(row: Any) -> CompatibleTrackCandidate:
         analyzer=str(row["analyzer"]),
         analyzer_version=str(row["analyzer_version"]),
         source_revision=str(row["source_revision"]),
-        duration_ms=max(0, round(float(row["duration"] or 0.0) * 1_000)),
+        duration_ms=(
+            int(row["duration_ms"])
+            if row["duration_ms"] is not None
+            else max(0, round(float(row["duration"] or 0.0) * 1_000))
+        ),
+        duration_source="decoder" if row["duration_ms"] is not None else "library",
         quality=str(row["quality"]),
         bpm=row["bpm"],
         bpm_confidence=row["bpm_confidence"],
@@ -235,6 +250,10 @@ def _candidate_from_row(row: Any) -> CompatibleTrackCandidate:
         danceability=row["danceability"],
         valence=row["valence"],
         bliss_vector_revision=row["bliss_vector_revision"],
+        active_start_ms=row["active_start_ms"],
+        active_end_ms=row["active_end_ms"],
+        integrated_lufs=row["integrated_lufs"],
+        measurement_version=row["measurement_version"],
         analyzed_at=analyzed_at,
     )
     return CompatibleTrackCandidate(

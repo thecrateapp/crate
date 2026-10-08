@@ -65,6 +65,13 @@ class MixProfileResponse(SmartMixApiModel):
     intro_lufs: float | None = Field(default=None, alias="introLufs")
     outro_lufs: float | None = Field(default=None, alias="outroLufs")
     true_peak_dbfs: float | None = Field(default=None, alias="truePeakDbfs")
+    integrated_lufs: float | None = Field(default=None, alias="integratedLufs")
+    measurement_version: str | None = Field(default=None, alias="measurementVersion")
+    active_start_ms: int | None = Field(default=None, alias="activeStartMs", ge=0)
+    active_end_ms: int | None = Field(default=None, alias="activeEndMs", ge=0)
+    duration_source: Literal["decoder", "library"] = Field(
+        default="decoder", alias="durationSource"
+    )
     intro_energy: float | None = Field(
         default=None,
         alias="introEnergy",

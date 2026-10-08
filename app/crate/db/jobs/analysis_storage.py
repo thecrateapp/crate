@@ -603,6 +603,10 @@ def _draft_from_payload(payload: dict[str, Any]) -> TrackMixProfileDraft:
         global_energy=value("global_energy", "globalEnergy"),
         danceability=value("danceability", "danceability"),
         valence=value("valence", "valence"),
+        active_start_ms=value("active_start_ms", "activeStartMs"),
+        active_end_ms=value("active_end_ms", "activeEndMs"),
+        integrated_lufs=value("integrated_lufs", "integratedLufs"),
+        measurement_version=value("measurement_version", "measurementVersion"),
     )
 
 

@@ -137,3 +137,52 @@ def transition_plan(**overrides) -> TransitionPlan:
     }
     values.update(overrides)
     return TransitionPlan(**values)
+
+
+@pytest.mark.parametrize("bpm", [float("nan"), float("inf"), 0.0, -120.0])
+def test_profile_rejects_non_finite_or_non_positive_bpm(bpm: float) -> None:
+    with pytest.raises(ValueError):
+        profile(bpm=bpm)
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    ["intro_lufs", "outro_lufs", "integrated_lufs", "true_peak_dbfs"],
+)
+def test_profile_rejects_non_finite_measurements(field_name: str) -> None:
+    with pytest.raises(ValueError):
+        profile(**{field_name: float("nan")})
+
+
+@pytest.mark.parametrize(
+    ("active_start_ms", "active_end_ms"),
+    [(5_000, 5_000), (10_000, 2_000), (0, 245_001)],
+)
+def test_profile_rejects_active_bounds_outside_the_track(
+    active_start_ms: int, active_end_ms: int
+) -> None:
+    with pytest.raises(ValueError):
+        profile(active_start_ms=active_start_ms, active_end_ms=active_end_ms)
+
+
+def test_summary_exposes_measurement_provenance_additively() -> None:
+    payload = profile(
+        active_start_ms=120,
+        active_end_ms=244_000,
+        integrated_lufs=-9.5,
+        measurement_version="bs1770-v1",
+        duration_source="decoder",
+    ).to_summary_dict()
+
+    assert payload["activeStartMs"] == 120
+    assert payload["activeEndMs"] == 244_000
+    assert payload["integratedLufs"] == -9.5
+    assert payload["measurementVersion"] == "bs1770-v1"
+    assert payload["durationSource"] == "decoder"
+
+
+def test_legacy_profile_has_no_accredited_measurement() -> None:
+    payload = profile().to_summary_dict()
+
+    assert payload["measurementVersion"] is None
+    assert payload["integratedLufs"] is None

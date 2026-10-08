@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 import uuid
 
@@ -32,6 +33,50 @@ def test_repository_upserts_reads_and_skips_unchanged_revision(pg_db) -> None:
     assert summary.beat_grid_ms == ()
     assert full is not None
     assert full.beat_grid_ms == (500, 1_000, 1_500)
+
+
+def test_repository_keeps_the_decoder_duration_and_measurements(pg_db) -> None:
+    del pg_db
+    track_id, track_uid = _create_track("decoder-duration")
+    mix_profile = replace(
+        _profile(track_uid),
+        duration_ms=176_512,
+        active_start_ms=40,
+        active_end_ms=175_900,
+        integrated_lufs=-8.75,
+        measurement_version="bs1770-v1",
+    )
+
+    assert upsert_track_mix_profile(track_id, mix_profile) is True
+    stored = get_track_mix_profile(track_id)
+
+    assert stored is not None
+    assert stored.duration_ms == 176_512
+    assert stored.duration_source == "decoder"
+    assert stored.active_start_ms == 40
+    assert stored.active_end_ms == 175_900
+    assert stored.integrated_lufs == -8.75
+    assert stored.measurement_version == "bs1770-v1"
+
+
+def test_legacy_profile_without_decoder_duration_is_marked_as_library(pg_db) -> None:
+    del pg_db
+    track_id, track_uid = _create_track("legacy-duration")
+    assert upsert_track_mix_profile(track_id, _profile(track_uid)) is True
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "UPDATE track_mix_profiles SET duration_ms = NULL WHERE track_id = :id"
+            ),
+            {"id": track_id},
+        )
+
+    stored = get_track_mix_profile(track_id)
+
+    assert stored is not None
+    assert stored.duration_ms == 180_000
+    assert stored.duration_source == "library"
+    assert stored.measurement_version is None
 
 
 def test_batch_read_preserves_requested_order_and_missing_slots(pg_db) -> None:

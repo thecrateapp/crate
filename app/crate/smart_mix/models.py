@@ -60,10 +60,15 @@ class TrackMixProfileDraft:
     global_energy: float | None = None
     danceability: float | None = None
     valence: float | None = None
+    active_start_ms: int | None = None
+    active_end_ms: int | None = None
+    integrated_lufs: float | None = None
+    measurement_version: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "quality", MixProfileQuality(self.quality))
         _require_non_negative_ms("duration_ms", self.duration_ms)
+        _validate_measurements(self)
         for field_name in (
             "beat_anchor_ms",
             "downbeat_anchor_ms",
@@ -141,10 +146,19 @@ class TrackMixProfile:
     danceability: float | None = None
     valence: float | None = None
     bliss_vector_revision: str | None = None
+    active_start_ms: int | None = None
+    active_end_ms: int | None = None
+    integrated_lufs: float | None = None
+    measurement_version: str | None = None
+    duration_source: str = "decoder"
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "quality", MixProfileQuality(self.quality))
         _require_positive_int("profile_version", self.profile_version)
+        _require_non_negative_ms("duration_ms", self.duration_ms)
+        _validate_measurements(self)
+        if self.duration_source not in {"decoder", "library"}:
+            raise ValueError("duration_source must be decoder or library")
         for field_name in (
             "duration_ms",
             "beat_anchor_ms",
@@ -225,6 +239,11 @@ class TrackMixProfile:
             "danceability": self.danceability,
             "valence": self.valence,
             "blissVectorRevision": self.bliss_vector_revision,
+            "activeStartMs": self.active_start_ms,
+            "activeEndMs": self.active_end_ms,
+            "integratedLufs": self.integrated_lufs,
+            "measurementVersion": self.measurement_version,
+            "durationSource": self.duration_source,
             "quality": MixProfileQuality(self.quality).value,
             "analyzedAt": _isoformat(self.analyzed_at),
         }
@@ -338,6 +357,28 @@ class TransitionPlan:
                 else None
             ),
         }
+
+
+def _validate_measurements(profile: Any) -> None:
+    if profile.bpm is not None and not (math.isfinite(profile.bpm) and profile.bpm > 0):
+        raise ValueError("bpm must be a positive finite number")
+    for field_name in (
+        "intro_lufs",
+        "outro_lufs",
+        "integrated_lufs",
+        "true_peak_dbfs",
+    ):
+        value = getattr(profile, field_name)
+        if value is not None and not math.isfinite(value):
+            raise ValueError(f"{field_name} must be finite")
+    _require_non_negative_ms("active_start_ms", profile.active_start_ms)
+    _require_non_negative_ms("active_end_ms", profile.active_end_ms)
+    start_ms = profile.active_start_ms
+    end_ms = profile.active_end_ms
+    if start_ms is not None and end_ms is not None and start_ms >= end_ms:
+        raise ValueError("active_start_ms must be before active_end_ms")
+    if end_ms is not None and end_ms > profile.duration_ms:
+        raise ValueError("active_end_ms must not exceed duration_ms")
 
 
 def _require_positive_int(name: str, value: int) -> None:

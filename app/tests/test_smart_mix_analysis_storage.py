@@ -273,3 +273,26 @@ def _draft() -> TrackMixProfileDraft:
         intro_cue_ms=500,
         outro_cue_ms=175_000,
     )
+
+
+def test_rust_payload_carries_measurement_provenance_into_the_draft() -> None:
+    from crate.db.jobs.analysis_storage import _draft_from_payload
+
+    draft = _draft_from_payload(
+        {
+            "analyzer": "crate-rust",
+            "analyzerVersion": "smart-mix-v1",
+            "durationMs": 176_512,
+            "quality": "full",
+            "activeStartMs": 40,
+            "activeEndMs": 175_900,
+            "integratedLufs": -8.75,
+            "measurementVersion": "bs1770-v1",
+        }
+    )
+
+    assert draft.duration_ms == 176_512
+    assert draft.active_start_ms == 40
+    assert draft.active_end_ms == 175_900
+    assert draft.integrated_lufs == -8.75
+    assert draft.measurement_version == "bs1770-v1"

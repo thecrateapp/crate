@@ -14,6 +14,7 @@ from crate.smart_mix.models import (
     TransitionPlan,
 )
 from crate.smart_mix.policy import PLANNER_POLICY, PlannerPolicy
+from crate.smart_mix.versions import MEASUREMENT_VERSION
 
 
 HarmonicRelationshipValue = Literal[
@@ -149,9 +150,9 @@ def plan_transition(
     fallback_reason = _beatmatch_fallback_reason(outgoing, incoming, context, policy)
     compatibility = score_compatibility(outgoing, incoming, policy=policy)
     requested_ms = _transition_duration(context.preferred_duration_ms, policy)
-    outgoing_gain_db = _safe_deck_gain(outgoing.true_peak_dbfs, 0.0, policy)
+    outgoing_gain_db = _safe_deck_gain(outgoing, 0.0, policy)
     incoming_gain_db = _safe_deck_gain(
-        incoming.true_peak_dbfs,
+        incoming,
         _loudness_delta(outgoing, incoming, policy),
         policy,
     )
@@ -399,7 +400,7 @@ def _fit_window(
             fits=duration_ms >= policy.minimum_transition_ms,
         )
 
-    track_ms = outgoing.duration_ms
+    track_ms = _playable_end_ms(outgoing)
     earliest_cue_ms = min(
         int(track_ms * policy.minimum_outgoing_body_ratio),
         policy.minimum_outgoing_body_ms,
@@ -426,6 +427,16 @@ def _fit_window(
     )
 
 
+def _playable_end_ms(profile: TrackMixProfile) -> int:
+    if profile.active_end_ms is not None:
+        return min(profile.active_end_ms, profile.duration_ms)
+    return profile.duration_ms
+
+
+def _has_accredited_measurement(profile: TrackMixProfile) -> bool:
+    return profile.measurement_version == MEASUREMENT_VERSION
+
+
 def _incoming_cue(profile: TrackMixProfile) -> int:
     cue_ms = profile.intro_cue_ms or 0
     if cue_ms >= profile.duration_ms:
@@ -439,7 +450,7 @@ def _incoming_window(
     tempo_ratio: float,
     policy: PlannerPolicy,
 ) -> int:
-    playable_ms = profile.duration_ms - cue_ms - policy.minimum_incoming_body_ms
+    playable_ms = _playable_end_ms(profile) - cue_ms - policy.minimum_incoming_body_ms
     if playable_ms <= 0:
         return 0
     return math.floor(playable_ms / tempo_ratio)
@@ -535,18 +546,25 @@ def _loudness_delta(
     if outgoing.outro_lufs is None or incoming.intro_lufs is None:
         return 0.0
     desired = float(outgoing.outro_lufs) - float(incoming.intro_lufs)
-    return max(
-        -policy.max_loudness_adjustment_db,
-        min(policy.maximum_unaccredited_gain_db, desired),
+    maximum_gain_db = (
+        policy.max_loudness_adjustment_db
+        if _has_accredited_measurement(outgoing)
+        and _has_accredited_measurement(incoming)
+        else policy.maximum_unaccredited_gain_db
     )
+    return max(-policy.max_loudness_adjustment_db, min(maximum_gain_db, desired))
 
 
 def _safe_deck_gain(
-    true_peak_dbfs: float | None,
+    profile: TrackMixProfile,
     desired_gain_db: float,
     policy: PlannerPolicy,
 ) -> float:
-    peak = float(true_peak_dbfs) if true_peak_dbfs is not None else 0.0
+    peak = (
+        float(profile.true_peak_dbfs)
+        if profile.true_peak_dbfs is not None and _has_accredited_measurement(profile)
+        else 0.0
+    )
     safe_gain = (
         policy.combined_true_peak_ceiling_dbfs
         - policy.equal_power_midpoint_headroom_db

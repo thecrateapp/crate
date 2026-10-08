@@ -193,6 +193,11 @@ def _profile_values(
         "danceability": profile.danceability,
         "valence": profile.valence,
         "bliss_vector_revision": profile.bliss_vector_revision,
+        "duration_ms": profile.duration_ms,
+        "active_start_ms": profile.active_start_ms,
+        "active_end_ms": profile.active_end_ms,
+        "integrated_lufs": profile.integrated_lufs,
+        "measurement_version": profile.measurement_version,
         "analyzed_at": profile.analyzed_at,
     }
 
@@ -209,7 +214,12 @@ def _row_to_profile(
         if row.beat_grid_format != FORMAT_NAME:
             raise ValueError(f"Unsupported beat grid format: {row.beat_grid_format}")
         beat_grid_ms = tuple(decode_beat_grid(row.beat_grid_data))
-    duration_ms = max(0, round(float(duration_seconds or 0) * 1_000))
+    duration_source = "decoder" if row.duration_ms is not None else "library"
+    duration_ms = (
+        row.duration_ms
+        if row.duration_ms is not None
+        else max(0, round(float(duration_seconds or 0) * 1_000))
+    )
     analyzed_at = row.analyzed_at
     if analyzed_at.tzinfo is None:
         analyzed_at = analyzed_at.replace(tzinfo=UTC)
@@ -247,5 +257,10 @@ def _row_to_profile(
         danceability=row.danceability,
         valence=row.valence,
         bliss_vector_revision=row.bliss_vector_revision,
+        active_start_ms=row.active_start_ms,
+        active_end_ms=row.active_end_ms,
+        integrated_lufs=row.integrated_lufs,
+        measurement_version=row.measurement_version,
+        duration_source=duration_source,
         analyzed_at=analyzed_at,
     )

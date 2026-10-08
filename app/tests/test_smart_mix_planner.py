@@ -502,3 +502,48 @@ def test_planner_reproduces_the_shared_plan_fixture(case: dict) -> None:
     )
 
     assert plan.to_dict() == case["expected"]
+
+
+def test_accredited_loudness_may_raise_the_incoming_deck() -> None:
+    plan = plan_transition(
+        _profile(
+            "outgoing",
+            outro_lufs=-8.0,
+            true_peak_dbfs=-12.0,
+            measurement_version="bs1770-v1",
+        ),
+        _profile(
+            "incoming",
+            intro_lufs=-12.0,
+            true_peak_dbfs=-12.0,
+            measurement_version="bs1770-v1",
+        ),
+        _context(source="radio"),
+    )
+
+    assert plan.incoming_gain_db == pytest.approx(4.0)
+
+
+def test_unaccredited_true_peak_is_treated_as_full_scale() -> None:
+    plan = plan_transition(
+        _profile("outgoing", true_peak_dbfs=-12.0),
+        _profile("incoming", true_peak_dbfs=-12.0),
+        _context(source="radio"),
+    )
+
+    ceiling = PLANNER_POLICY.combined_true_peak_ceiling_dbfs
+    headroom = PLANNER_POLICY.equal_power_midpoint_headroom_db
+    assert plan.outgoing_gain_db == pytest.approx(ceiling - headroom)
+
+
+def test_active_end_bounds_the_transition_before_trailing_silence() -> None:
+    outgoing = _profile("outgoing", outro_cue_ms=176_000, active_end_ms=172_000)
+    incoming = _profile("incoming")
+
+    plan = plan_transition(
+        outgoing,
+        incoming,
+        _context(source="radio", preferred_duration_ms=12_000),
+    )
+
+    assert plan.outgoing_cue_ms + plan.duration_ms <= 172_000

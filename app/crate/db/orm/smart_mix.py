@@ -66,6 +66,11 @@ class TrackMixProfileRow(Base):
     danceability: Mapped[float | None] = mapped_column(Float)
     valence: Mapped[float | None] = mapped_column(Float)
     bliss_vector_revision: Mapped[str | None] = mapped_column(Text)
+    duration_ms: Mapped[int | None] = mapped_column(BIGINT)
+    active_start_ms: Mapped[int | None] = mapped_column(BIGINT)
+    active_end_ms: Mapped[int | None] = mapped_column(BIGINT)
+    integrated_lufs: Mapped[float | None] = mapped_column(Float)
+    measurement_version: Mapped[str | None] = mapped_column(Text)
     analyzed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
