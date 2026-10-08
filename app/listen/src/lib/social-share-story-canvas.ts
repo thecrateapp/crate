@@ -1,7 +1,7 @@
 import type {
   ShareCardLabels,
   SharePayload,
-  WrappedShareData,
+  DiggingShareData,
 } from "@/lib/social-share";
 
 import type { SocialShareColors } from "./social-share-colors";
@@ -1685,11 +1685,11 @@ function roundedRect(
   ctx.closePath();
 }
 
-const WRAPPED_COVER_GAP = 14;
+const DIGGING_COVER_GAP = 14;
 
-export function drawWrappedStoryCard(
+export function drawDiggingStoryCard(
   ctx: CanvasRenderingContext2D,
-  data: WrappedShareData,
+  data: DiggingShareData,
   covers: (HTMLImageElement | null)[],
   logo: HTMLImageElement | null,
   colors: SocialShareColors,
@@ -1730,10 +1730,10 @@ export function drawWrappedStoryCard(
   const coversTop = headlineEnd + 56;
   const coversBottom = listsLabelY - 70;
   const cell = Math.min(
-    (width - WRAPPED_COVER_GAP * 3) / 4,
-    (coversBottom - coversTop - WRAPPED_COVER_GAP) / 2,
+    (width - DIGGING_COVER_GAP * 3) / 4,
+    (coversBottom - coversTop - DIGGING_COVER_GAP) / 2,
   );
-  const gridWidth = cell * 4 + WRAPPED_COVER_GAP * 3;
+  const gridWidth = cell * 4 + DIGGING_COVER_GAP * 3;
   const gridLeft = left + (width - gridWidth) / 2;
   const slots: [number, number, number][] = [
     [0, 0, 2],
@@ -1743,9 +1743,9 @@ export function drawWrappedStoryCard(
     [3, 1, 1],
   ];
   slots.forEach(([column, row, span], index) => {
-    const size = cell * span + WRAPPED_COVER_GAP * (span - 1);
-    const x = gridLeft + column * (cell + WRAPPED_COVER_GAP);
-    const top = coversTop + row * (cell + WRAPPED_COVER_GAP);
+    const size = cell * span + DIGGING_COVER_GAP * (span - 1);
+    const x = gridLeft + column * (cell + DIGGING_COVER_GAP);
+    const top = coversTop + row * (cell + DIGGING_COVER_GAP);
     ctx.save();
     roundedRect(ctx, x, top, size, size, 14);
     ctx.clip();
@@ -1760,7 +1760,7 @@ export function drawWrappedStoryCard(
   });
 
   const columnWidth = (width - 48) / 2;
-  drawWrappedList(
+  drawDiggingList(
     ctx,
     data.topArtistsLabel,
     data.topArtists,
@@ -1769,7 +1769,7 @@ export function drawWrappedStoryCard(
     columnWidth,
     colors,
   );
-  drawWrappedList(
+  drawDiggingList(
     ctx,
     data.topTracksLabel,
     data.topTracks,
@@ -1802,7 +1802,7 @@ export function drawWrappedStoryCard(
   ctx.fillText(truncateToWidth(ctx, data.credit, width), left, limit + 72);
 }
 
-function drawWrappedList(
+function drawDiggingList(
   ctx: CanvasRenderingContext2D,
   label: string,
   items: string[],

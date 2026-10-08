@@ -12,12 +12,12 @@ import {
   type StatsDashboard,
 } from "@/components/stats/stats-model";
 import {
-  WrappedStory,
-  type WrappedChapter,
-} from "@/components/stats/wrapped/WrappedStory";
+  DiggingStory,
+  type DiggingChapter,
+} from "@/components/stats/digging/DiggingStory";
 import { useAuth } from "@/contexts/AuthContext";
 import { albumCoverApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
-import { openShareSheet, type WrappedShareData } from "@/lib/social-share";
+import { openShareSheet, type DiggingShareData } from "@/lib/social-share";
 import {
   formatMonthTitle,
   selectionDays,
@@ -36,7 +36,7 @@ function periodLabel(page: StatsPageController, locale: string): string {
   const year = selectionYear(page.selection);
   if (year !== null) return String(year);
   const days = selectionDays(page.selection);
-  if (days !== null) return t("stats.wrapped.lastDays", { count: days });
+  if (days !== null) return t("stats.digging.lastDays", { count: days });
   return t("stats.window.allTime");
 }
 
@@ -66,7 +66,7 @@ function buildShareData(
   t: Translate,
   kicker: string,
   owner: string,
-): WrappedShareData {
+): DiggingShareData {
   const artist = dashboard.artist_of_period?.artist_name;
   const highlights = dashboard.highlights;
   const stats = [
@@ -80,7 +80,7 @@ function buildShareData(
       ? [
           {
             value: dashboard.genre_trend[0].genre_name.toLowerCase(),
-            label: t("stats.wrapped.topGenre"),
+            label: t("stats.digging.topGenre"),
           },
         ]
       : []),
@@ -112,8 +112,8 @@ function buildShareData(
   return {
     kicker,
     headline: artist
-      ? t("stats.wrapped.summary.headline", { artist })
-      : t("stats.wrapped.summary.fallback"),
+      ? t("stats.digging.summary.headline", { artist })
+      : t("stats.digging.summary.fallback"),
     coverUrls: dashboard.top_albums.items
       .slice(0, 5)
       .map((item) => albumCover(item, 512))
@@ -125,22 +125,22 @@ function buildShareData(
     topTracksLabel: t("stats.topTracks.title"),
     topTracks: dashboard.top_tracks.items.slice(0, 5).map((item) => item.title),
     stats,
-    credit: t("stats.wrapped.credit", { owner }),
+    credit: t("stats.digging.credit", { owner }),
   };
 }
 
-export function StatsWrapped() {
+export function StatsDigging() {
   const page = useStatsPageController();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { i18n } = useTranslation();
   const { dashboard, t } = page;
   const label = periodLabel(page, i18n.language);
-  const kicker = t("stats.wrapped.kicker", { period: label });
+  const kicker = t("stats.digging.kicker", { period: label });
   const owner =
     user?.instagram_handle?.trim() || user?.username || user?.name || "Crate";
 
-  const chapters = useMemo<WrappedChapter[]>(
+  const chapters = useMemo<DiggingChapter[]>(
     () => (dashboard ? buildChapters(dashboard, t, kicker, owner) : []),
     [dashboard, kicker, owner, t],
   );
@@ -150,7 +150,7 @@ export function StatsWrapped() {
   if (!dashboard || !dashboard.overview.play_count || !chapters.length) {
     return null;
   }
-  return <WrappedStory chapters={chapters} onClose={close} />;
+  return <DiggingStory chapters={chapters} onClose={close} />;
 }
 
 function buildChapters(
@@ -158,29 +158,29 @@ function buildChapters(
   t: Translate,
   kicker: string,
   owner: string,
-): WrappedChapter[] {
-  const chapters: WrappedChapter[] = [];
+): DiggingChapter[] {
+  const chapters: DiggingChapter[] = [];
   const minutes = dashboard.overview.minutes_listened;
   chapters.push({
     key: "minutes",
-    label: t("stats.wrapped.minutes.label"),
+    label: t("stats.digging.minutes.label"),
     tone: "accent",
     render: () => (
-      <div className="stats-wrapped-body">
-        <span className="stats-wrapped-rings" aria-hidden="true">
+      <div className="stats-digging-body">
+        <span className="stats-digging-rings" aria-hidden="true">
           <i />
           <i />
           <i />
         </span>
-        <p className="stats-wrapped-kicker">{kicker}</p>
+        <p className="stats-digging-kicker">{kicker}</p>
         <CountUpNumber
           value={minutes}
           format={(value) => new Intl.NumberFormat().format(Math.round(value))}
-          className="stats-wrapped-giant"
+          className="stats-digging-giant"
         />
-        <p className="stats-wrapped-unit">{t("stats.wrapped.minutes.unit")}</p>
-        <p className="stats-wrapped-copy">
-          {t("stats.wrapped.minutes.body", {
+        <p className="stats-digging-unit">{t("stats.digging.minutes.unit")}</p>
+        <p className="stats-digging-copy">
+          {t("stats.digging.minutes.body", {
             days: Math.max(1, Math.round(minutes / 1440)),
           })}
         </p>
@@ -195,7 +195,7 @@ function buildChapters(
       label: t("stats.artistOfPeriod.kicker"),
       tone: "photo",
       render: () => (
-        <div className="stats-wrapped-artist">
+        <div className="stats-digging-artist">
           <CrateImage
             src={artistPhotoApiUrl(
               {
@@ -207,20 +207,20 @@ function buildChapters(
               { size: 1024 },
             )}
             alt=""
-            className="stats-wrapped-artist-photo"
+            className="stats-digging-artist-photo"
           />
-          <span className="stats-wrapped-rank" aria-hidden="true">
+          <span className="stats-digging-rank" aria-hidden="true">
             01
           </span>
-          <div className="stats-wrapped-artist-text">
-            <p className="stats-wrapped-kicker">
+          <div className="stats-digging-artist-text">
+            <p className="stats-digging-kicker">
               {t("stats.artistOfPeriod.kicker")}
             </p>
-            <h2 className="stats-wrapped-title stats-wrapped-rise">
+            <h2 className="stats-digging-title stats-digging-rise">
               {artist.artist_name}
             </h2>
-            <p className="stats-wrapped-copy">
-              {t("stats.wrapped.artist.body", {
+            <p className="stats-digging-copy">
+              {t("stats.digging.artist.body", {
                 plays: artist.plays,
                 time: formatStatsMinutes(artist.minutes),
               })}
@@ -238,14 +238,14 @@ function buildChapters(
       label: t("stats.topTracks.title"),
       tone: "dark",
       render: () => (
-        <div className="stats-wrapped-body">
-          <p className="stats-wrapped-kicker">
-            {t("stats.wrapped.tracks.kicker")}
+        <div className="stats-digging-body">
+          <p className="stats-digging-kicker">
+            {t("stats.digging.tracks.kicker")}
           </p>
-          <h2 className="stats-wrapped-heading stats-wrapped-rise">
+          <h2 className="stats-digging-heading stats-digging-rise">
             {t("stats.topTracks.title")}
           </h2>
-          <ol className="stats-wrapped-list">
+          <ol className="stats-digging-list">
             {tracks.map((track, position) => {
               const cover = albumCover(track, 256);
               return (
@@ -253,7 +253,7 @@ function buildChapters(
                   key={`${track.title}-${position}`}
                   style={{ animationDelay: `${200 + position * 120}ms` }}
                 >
-                  <span className="stats-wrapped-list-rank">
+                  <span className="stats-digging-list-rank">
                     {position + 1}
                   </span>
                   {cover ? <CrateImage src={cover} alt="" /> : <span />}
@@ -263,7 +263,7 @@ function buildChapters(
                       {track.artist}
                     </span>
                   </span>
-                  <span className="stats-wrapped-list-count">
+                  <span className="stats-digging-list-count">
                     {track.play_count}×
                   </span>
                 </li>
@@ -284,14 +284,14 @@ function buildChapters(
       label: t("stats.musicAge.title"),
       tone: "accent",
       render: () => (
-        <div className="stats-wrapped-body">
-          <p className="stats-wrapped-kicker">{t("stats.musicAge.title")}</p>
-          <p className="stats-wrapped-giant">{age.median_year}</p>
-          <p className="stats-wrapped-copy">
-            {t("stats.wrapped.age.body", { year: age.median_year })}
+        <div className="stats-digging-body">
+          <p className="stats-digging-kicker">{t("stats.musicAge.title")}</p>
+          <p className="stats-digging-giant">{age.median_year}</p>
+          <p className="stats-digging-copy">
+            {t("stats.digging.age.body", { year: age.median_year })}
           </p>
           <div
-            className="stats-decades stats-wrapped-decades"
+            className="stats-decades stats-digging-decades"
             aria-hidden="true"
           >
             {age.decades.map((item, position) => (
@@ -316,26 +316,26 @@ function buildChapters(
   if (highlights?.longest_streak || highlights?.obsession) {
     chapters.push({
       key: "habits",
-      label: t("stats.wrapped.habits.label"),
+      label: t("stats.digging.habits.label"),
       tone: "dark",
       render: () => (
-        <div className="stats-wrapped-body">
-          <p className="stats-wrapped-kicker">
-            {t("stats.wrapped.habits.label")}
+        <div className="stats-digging-body">
+          <p className="stats-digging-kicker">
+            {t("stats.digging.habits.label")}
           </p>
           {highlights.longest_streak ? (
             <>
-              <p className="stats-wrapped-giant">
+              <p className="stats-digging-giant">
                 {highlights.longest_streak.days}
               </p>
-              <p className="stats-wrapped-unit">
-                {t("stats.wrapped.habits.streak")}
+              <p className="stats-digging-unit">
+                {t("stats.digging.habits.streak")}
               </p>
             </>
           ) : null}
           {highlights.obsession ? (
-            <p className="stats-wrapped-copy">
-              {t("stats.wrapped.habits.obsession", {
+            <p className="stats-digging-copy">
+              {t("stats.digging.habits.obsession", {
                 count: highlights.obsession.plays,
                 title: highlights.obsession.track.title ?? "",
               })}
@@ -348,10 +348,10 @@ function buildChapters(
 
   chapters.push({
     key: "summary",
-    label: t("stats.wrapped.summary.label"),
+    label: t("stats.digging.summary.label"),
     tone: "dark",
     render: () => (
-      <WrappedSummary
+      <DiggingSummary
         dashboard={dashboard}
         t={t}
         kicker={kicker}
@@ -362,7 +362,7 @@ function buildChapters(
   return chapters;
 }
 
-function WrappedSummary({
+function DiggingSummary({
   dashboard,
   t,
   kicker,
@@ -375,17 +375,17 @@ function WrappedSummary({
 }) {
   const share = buildShareData(dashboard, t, kicker, owner);
   return (
-    <div className="stats-wrapped-body">
-      <p className="stats-wrapped-kicker">{kicker}</p>
-      <h2 className="stats-wrapped-heading stats-wrapped-rise">
+    <div className="stats-digging-body">
+      <p className="stats-digging-kicker">{kicker}</p>
+      <h2 className="stats-digging-heading stats-digging-rise">
         {share.headline}
       </h2>
-      <div className="stats-wrapped-covers">
+      <div className="stats-digging-covers">
         {share.coverUrls.map((url) => (
           <CrateImage key={url} src={url} alt="" />
         ))}
       </div>
-      <div className="stats-wrapped-columns">
+      <div className="stats-digging-columns">
         <div>
           <h3>{share.topArtistsLabel}</h3>
           <ol>
@@ -408,17 +408,17 @@ function WrappedSummary({
         className="mt-6 self-start"
         onClick={() =>
           openShareSheet({
-            kind: "wrapped",
+            kind: "digging",
             title: kicker,
             subtitle: share.headline,
             url: window.location.href,
             imageUrl: share.coverUrls[0] ?? null,
-            wrapped: share,
+            digging: share,
           })
         }
       >
         <Camera size={CRATE_ICON_SIZE.sm} />
-        {t("stats.wrapped.share")}
+        {t("stats.digging.share")}
       </Button>
     </div>
   );

@@ -14,20 +14,20 @@ import { IconButton } from "@crate/ui/primitives/IconButton";
 
 import { isMotionBlocked } from "@/lib/motion-availability";
 
-export const WRAPPED_CHAPTER_MS = 5200;
+export const DIGGING_CHAPTER_MS = 5200;
 
-export interface WrappedChapter {
+export interface DiggingChapter {
   key: string;
   label: string;
   tone?: "accent" | "photo" | "dark";
   render: () => ReactNode;
 }
 
-export function WrappedStory({
+export function DiggingStory({
   chapters,
   onClose,
 }: {
-  chapters: WrappedChapter[];
+  chapters: DiggingChapter[];
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -50,7 +50,7 @@ export function WrappedStory({
 
   useEffect(() => {
     if (!autoplay.current || paused || last) return;
-    const timer = window.setTimeout(() => step(1), WRAPPED_CHAPTER_MS);
+    const timer = window.setTimeout(() => step(1), DIGGING_CHAPTER_MS);
     return () => window.clearTimeout(timer);
   }, [index, last, paused, step]);
 
@@ -72,14 +72,14 @@ export function WrappedStory({
   return createPortal(
     <div
       ref={rootRef}
-      className="stats-wrapped z-app-upcoming-overlay"
+      className="stats-digging z-app-upcoming-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label={t("stats.wrapped.label")}
+      aria-label={t("stats.digging.label")}
       tabIndex={-1}
       onKeyDown={handleKeyDown}
     >
-      <div className="stats-wrapped-progress" aria-hidden="true">
+      <div className="stats-digging-progress" aria-hidden="true">
         {chapters.map((item, position) => (
           <span key={item.key}>
             <i
@@ -91,26 +91,26 @@ export function WrappedStory({
                     : "idle"
               }
               data-paused={paused || !autoplay.current ? "true" : undefined}
-              style={{ animationDuration: `${WRAPPED_CHAPTER_MS}ms` }}
+              style={{ animationDuration: `${DIGGING_CHAPTER_MS}ms` }}
             />
           </span>
         ))}
       </div>
       <IconButton
-        label={t("stats.wrapped.close")}
+        label={t("stats.digging.close")}
         variant="card"
         size="sm"
-        className="stats-wrapped-close"
+        className="stats-digging-close"
         onClick={onClose}
       >
         <X size={CRATE_ICON_SIZE.md} />
       </IconButton>
       <section
         key={chapter.key}
-        className="stats-wrapped-chapter"
+        className="stats-digging-chapter"
         data-tone={chapter.tone ?? "accent"}
-        aria-roledescription={t("stats.wrapped.chapter")}
-        aria-label={t("stats.wrapped.progress", {
+        aria-roledescription={t("stats.digging.chapter")}
+        aria-label={t("stats.digging.progress", {
           current: index + 1,
           total: count,
           label: chapter.label,
@@ -128,7 +128,7 @@ export function WrappedStory({
         {chapter.render()}
       </section>
       <div className="sr-only" aria-live="polite">
-        {t("stats.wrapped.progress", {
+        {t("stats.digging.progress", {
           current: index + 1,
           total: count,
           label: chapter.label,

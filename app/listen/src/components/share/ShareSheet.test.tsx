@@ -277,7 +277,7 @@ describe("ShareSheetHost", () => {
     expect(screen.queryByText("Story style")).not.toBeInTheDocument();
   });
 
-  it("offers only the story image for a private Wrapped", async () => {
+  it("offers only the story image for a private Crate Digging story", async () => {
     const user = userEvent.setup();
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -287,12 +287,12 @@ describe("ShareSheetHost", () => {
       configurable: true,
       value: vi.fn(() => true),
     });
-    const wrappedPayload: SharePayload = {
-      kind: "wrapped",
+    const diggingPayload: SharePayload = {
+      kind: "digging",
       title: "2026 on Crate",
       subtitle: "Converge, no doubt about it.",
-      url: "https://listen.example/stats/wrapped?window=year%3A2026",
-      wrapped: {
+      url: "https://listen.example/stats/digging?window=year%3A2026",
+      digging: {
         kicker: "2026 on Crate",
         headline: "Converge, no doubt about it.",
         coverUrls: [],
@@ -306,7 +306,7 @@ describe("ShareSheetHost", () => {
     };
     renderWithListenProviders(<ShareSheetHost />);
 
-    openPayload(wrappedPayload);
+    openPayload(diggingPayload);
     const story = await screen.findByText("Instagram Story");
     expect(screen.queryByText("WhatsApp")).not.toBeInTheDocument();
     expect(screen.queryByText("Copy link")).not.toBeInTheDocument();
@@ -315,7 +315,7 @@ describe("ShareSheetHost", () => {
 
     await waitFor(() =>
       expect(mocks.buildInstagramStoryBlob).toHaveBeenCalledWith(
-        wrappedPayload,
+        diggingPayload,
         expect.anything(),
       ),
     );

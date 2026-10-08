@@ -73,8 +73,8 @@ const HomeSection = React.lazy(() =>
 const Stats = React.lazy(() =>
   import("@/pages/Stats").then((m) => ({ default: m.Stats })),
 );
-const StatsWrapped = React.lazy(() =>
-  import("@/pages/StatsWrapped").then((m) => ({ default: m.StatsWrapped })),
+const StatsDigging = React.lazy(() =>
+  import("@/pages/StatsDigging").then((m) => ({ default: m.StatsDigging })),
 );
 const Shows = React.lazy(() =>
   import("@/pages/Shows").then((m) => ({ default: m.Shows })),
@@ -150,7 +150,7 @@ export const protectedAppRoutes: AppRouteDefinition[] = [
   { path: "collection/:section", element: deferred(<Library />) },
   { path: "stats", element: deferred(<Stats />) },
   { path: "stats/global", element: deferred(<Stats />) },
-  { path: "stats/wrapped", element: deferred(<StatsWrapped />) },
+  { path: "stats/digging", element: deferred(<StatsDigging />) },
   { path: "upload", element: deferred(<Upload />) },
   { path: "settings", element: deferred(<Settings />) },
   { path: "bandcamp", element: deferred(<Bandcamp />) },

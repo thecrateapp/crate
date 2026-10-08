@@ -33,11 +33,12 @@ export function ScopeLink({
   return (
     <Link
       to={to}
+      aria-current={active ? "page" : undefined}
       className={cn(
-        "inline-flex h-10 items-center justify-center rounded-md border px-4 text-sm font-semibold transition-colors",
+        "transition-colors",
         active
-          ? "border-accent-action/30 bg-accent-action/15 text-accent-action"
-          : "stats-scope-link-inactive",
+          ? "text-accent-action"
+          : "text-text-muted hover:text-text-primary",
       )}
     >
       {children}

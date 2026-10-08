@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
-import { WRAPPED_CHAPTER_MS, WrappedStory } from "./WrappedStory";
+import { DIGGING_CHAPTER_MS, DiggingStory } from "./DiggingStory";
 
 const chapters = ["One", "Two", "Three"].map((label) => ({
   key: label,
@@ -11,7 +11,7 @@ const chapters = ["One", "Two", "Three"].map((label) => ({
   render: () => <p>{`Chapter ${label}`}</p>,
 }));
 
-describe("WrappedStory", () => {
+describe("DiggingStory", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -22,16 +22,16 @@ describe("WrappedStory", () => {
 
   it("advances on its own and stops on the last chapter", () => {
     renderWithListenProviders(
-      <WrappedStory chapters={chapters} onClose={vi.fn()} />,
+      <DiggingStory chapters={chapters} onClose={vi.fn()} />,
     );
 
     expect(screen.getByText("Chapter One")).toBeInTheDocument();
     act(() => {
-      vi.advanceTimersByTime(WRAPPED_CHAPTER_MS);
+      vi.advanceTimersByTime(DIGGING_CHAPTER_MS);
     });
     expect(screen.getByText("Chapter Two")).toBeInTheDocument();
     act(() => {
-      vi.advanceTimersByTime(WRAPPED_CHAPTER_MS * 3);
+      vi.advanceTimersByTime(DIGGING_CHAPTER_MS * 3);
     });
     expect(screen.getByText("Chapter Three")).toBeInTheDocument();
   });
@@ -39,7 +39,7 @@ describe("WrappedStory", () => {
   it("navigates with the keyboard and closes with Escape", () => {
     const onClose = vi.fn();
     renderWithListenProviders(
-      <WrappedStory chapters={chapters} onClose={onClose} />,
+      <DiggingStory chapters={chapters} onClose={onClose} />,
     );
     const dialog = screen.getByRole("dialog");
 
@@ -53,13 +53,13 @@ describe("WrappedStory", () => {
 
   it("pauses while the chapter is held down", () => {
     renderWithListenProviders(
-      <WrappedStory chapters={chapters} onClose={vi.fn()} />,
+      <DiggingStory chapters={chapters} onClose={vi.fn()} />,
     );
     const chapter = screen.getByText("Chapter One").closest("section")!;
 
     fireEvent.pointerDown(chapter);
     act(() => {
-      vi.advanceTimersByTime(WRAPPED_CHAPTER_MS * 2);
+      vi.advanceTimersByTime(DIGGING_CHAPTER_MS * 2);
     });
     expect(screen.getByText("Chapter One")).toBeInTheDocument();
   });

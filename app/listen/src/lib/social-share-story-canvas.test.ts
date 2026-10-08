@@ -6,7 +6,7 @@ import type { SocialShareColors } from "./social-share-colors";
 import {
   CRATE_STORY_STYLES,
   drawCrateStoryCard,
-  drawWrappedStoryCard,
+  drawDiggingStoryCard,
   resolveCrateStoryStyle,
   STORY_HEIGHT,
   STORY_SAFE_BOTTOM,
@@ -160,7 +160,7 @@ describe("crate story styles", () => {
   });
 });
 
-describe("wrapped story card", () => {
+describe("digging story card", () => {
   const data = {
     kicker: "2026 on Crate",
     headline: "Converge, no doubt about it.",
@@ -195,7 +195,7 @@ describe("wrapped story card", () => {
     const [ctx, recorded] = fakeContext();
     const image = { naturalWidth: 600, naturalHeight: 600 } as HTMLImageElement;
 
-    drawWrappedStoryCard(
+    drawDiggingStoryCard(
       ctx,
       data,
       [image, image, null, image, image],

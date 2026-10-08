@@ -60,6 +60,7 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
           ) : dashboardLoading ? (
             <div className="stats-signal-skeleton" aria-hidden="true" />
           ) : null}
+          <StatsActionBand page={page} />
           {dashboard?.artist_of_period ? (
             <StatsReveal className="mt-12">
               <StatsArtistOfPeriod artist={dashboard.artist_of_period} />
@@ -135,57 +136,84 @@ function StatsHeader({ page }: { page: StatsPageController }) {
   return (
     <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <div className="text-sm font-semibold text-accent-action">
-          {page.kicker}
+        <div className="flex flex-wrap items-center gap-x-2 text-sm font-semibold">
+          {isUserStats ? (
+            <>
+              <span className="text-accent-action">{page.kicker}</span>
+              {username ? (
+                <>
+                  <span aria-hidden="true" className="text-text-muted">
+                    ·
+                  </span>
+                  <ScopeLink active={false} to={"/users/" + username}>
+                    {t("stats.scope.backToProfile")}
+                  </ScopeLink>
+                </>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <ScopeLink active={!isGlobalStats} to="/stats">
+                {t("stats.scope.yourDna")}
+              </ScopeLink>
+              <span aria-hidden="true" className="text-text-muted">
+                ·
+              </span>
+              <ScopeLink active={isGlobalStats} to="/stats/global">
+                {t("stats.scope.cratePulse")}
+              </ScopeLink>
+            </>
+          )}
         </div>
         <h1 className="stats-signal-title mt-1">
           {page.signalTitle.lead}{" "}
           <span className="text-accent-action">{page.signalTitle.accent}</span>
         </h1>
       </div>
-      <div className="flex w-full flex-col gap-3 lg:w-auto lg:items-end">
-        <div className="grid grid-cols-2 gap-2 lg:flex">
-          {!isUserStats ? (
-            <>
-              <ScopeLink active={!isGlobalStats} to="/stats">
-                {t("stats.scope.yourDna")}
-              </ScopeLink>
-              <ScopeLink active={isGlobalStats} to="/stats/global">
-                {t("stats.scope.cratePulse")}
-              </ScopeLink>
-            </>
-          ) : username ? (
-            <ScopeLink active={false} to={"/users/" + username}>
-              {t("stats.scope.backToProfile")}
-            </ScopeLink>
-          ) : null}
-        </div>
-        <StatsPeriodPicker
-          options={page.selectionOptions}
-          value={page.selectedMonth ? null : page.selection}
-          onChange={page.changeSelection}
-        />
-        <div className="flex flex-wrap gap-2 empty:hidden *:grow lg:*:grow-0">
-          {!isGlobalStats && !isUserStats && page.hasStats ? (
-            <Button asChild>
-              <Link
-                to={`/stats/wrapped?window=${encodeURIComponent(
-                  page.selection,
-                )}`}
-              >
-                <Sparkles size={CRATE_ICON_SIZE.sm} />
-                {t("stats.wrapped.open")}
-              </Link>
-            </Button>
-          ) : null}
-          {page.replayItems.length ? (
-            <Button type="button" variant="outline" onClick={page.playReplay}>
-              <Play size={CRATE_ICON_SIZE.sm} />
-              {t("stats.signal.playReplay")}
-            </Button>
-          ) : null}
-        </div>
-      </div>
+      <StatsPeriodPicker
+        options={page.selectionOptions}
+        value={page.selectedMonth ? null : page.selection}
+        onChange={page.changeSelection}
+      />
     </header>
+  );
+}
+
+function StatsActionBand({ page }: { page: StatsPageController }) {
+  const { t, isGlobalStats, isUserStats } = page;
+  const showDigging = !isGlobalStats && !isUserStats && page.hasStats;
+  const showReplay = page.replayItems.length > 0;
+  if (!showDigging && !showReplay) return null;
+  return (
+    <section className="mt-10 flex flex-col gap-4 rounded-panel border border-border-quiet bg-surface-card p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+      {showDigging ? (
+        <div>
+          <h2 className="text-lg font-bold text-text-primary">
+            {t("stats.digging.band.title")}
+          </h2>
+          <p className="mt-1 text-sm text-text-secondary">
+            {t("stats.digging.band.body")}
+          </p>
+        </div>
+      ) : null}
+      <div className="flex flex-wrap gap-2 *:grow sm:*:grow-0">
+        {showDigging ? (
+          <Button asChild>
+            <Link
+              to={`/stats/digging?window=${encodeURIComponent(page.selection)}`}
+            >
+              <Sparkles size={CRATE_ICON_SIZE.sm} />
+              {t("stats.digging.open")}
+            </Link>
+          </Button>
+        ) : null}
+        {showReplay ? (
+          <Button type="button" variant="outline" onClick={page.playReplay}>
+            <Play size={CRATE_ICON_SIZE.sm} />
+            {t("stats.signal.playReplay")}
+          </Button>
+        ) : null}
+      </div>
+    </section>
   );
 }

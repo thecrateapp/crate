@@ -89,12 +89,19 @@ describe("Stats page", () => {
       locale: "es",
     });
 
-    expect(screen.getByText("Tu sonido")).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "30 días de señal",
     );
-    expect(screen.getByText("Tu Crate DNA")).toBeInTheDocument();
-    expect(screen.getByText("Crate Pulse")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Crate DNA" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      screen.getByRole("link", { name: "Crate Pulse" }),
+    ).not.toHaveAttribute("aria-current");
+    expect(
+      screen.queryByRole("heading", { name: "Crate Digging" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByText("Tus estadísticas esperan una señal"),
     ).toBeInTheDocument();
@@ -120,6 +127,12 @@ describe("Stats page", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("minutos hoy")).toBeInTheDocument();
     expect(screen.getByText("artistas")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Crate Digging" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Ver la historia" }),
+    ).toHaveAttribute("href", "/stats/digging?window=30d");
     expect(screen.getByRole("link", { name: "Converge" })).toBeInTheDocument();
     expect(screen.getByText("Tu artista del periodo")).toBeInTheDocument();
     expect(screen.getByText("top 3%")).toBeInTheDocument();

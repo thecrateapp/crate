@@ -1,7 +1,7 @@
 # Listening stats projections
 
 How Listen Stats turns `user_play_events` into the dashboard, the signal tape, the live "today"
-counter and the Wrapped story, and which rules keep it cheap on hot paths.
+counter and the Crate Digging story, and which rules keep it cheap on hot paths.
 
 ## Source of truth
 
@@ -83,8 +83,8 @@ dashboard snapshot.
 
 - `/stats`: period picker, signal tape (custom SVG), headline numbers, artist of the period,
   highlights, heatmap, genre trend, music age and discoveries.
-- `/stats/wrapped`: full-screen story chapters built from the same payload. The share action
-  renders a 1080x1920 canvas card (`drawWrappedStoryCard`) for Instagram stories.
+- `/stats/digging`: full-screen story chapters built from the same payload. The share action
+  renders a 1080x1920 canvas card (`drawDiggingStoryCard`) for Instagram stories.
 
 ## Performance baseline
 

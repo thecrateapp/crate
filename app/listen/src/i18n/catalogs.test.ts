@@ -103,7 +103,9 @@ const fullyLocalizedNextCutPrefixes = [
 ] as const;
 const completedNextCutEnglishFallbackAllowlist = new Set<string>([
   "share.storyStyle.podium.title",
-  "share.kind.wrapped",
+  "share.kind.digging",
+  "stats.digging.band.title",
+  "stats.scope.yourDna",
   "stats.signal.playReplay",
   "jam.room.sessionFallback",
   "jam.room.roles.host",

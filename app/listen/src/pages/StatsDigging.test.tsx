@@ -10,7 +10,7 @@ import {
 } from "@/test/render-with-listen-providers";
 import { signalDashboard } from "@/test/stats-dashboard-fixture";
 
-import { StatsWrapped } from "./StatsWrapped";
+import { StatsDigging } from "./StatsDigging";
 
 vi.mock("@/hooks/use-api", () => ({ useApi: vi.fn() }));
 vi.mock("@/lib/social-share", async (importOriginal) => ({
@@ -18,7 +18,7 @@ vi.mock("@/lib/social-share", async (importOriginal) => ({
   openShareSheet: vi.fn(),
 }));
 
-describe("StatsWrapped", () => {
+describe("StatsDigging", () => {
   beforeEach(() => {
     vi.mocked(openShareSheet).mockReset();
     vi.mocked(useApi).mockImplementation((url: string | null) => ({
@@ -31,9 +31,9 @@ describe("StatsWrapped", () => {
 
   it("walks the chapters and shares the summary card", async () => {
     const user = userEvent.setup();
-    renderWithListenProviders(<StatsWrapped />, {
-      route: "/stats/wrapped?window=30d",
-      path: "/stats/wrapped",
+    renderWithListenProviders(<StatsDigging />, {
+      route: "/stats/digging?window=30d",
+      path: "/stats/digging",
       locale: "es",
       auth: {
         user: createMockAuthUser({
@@ -44,7 +44,7 @@ describe("StatsWrapped", () => {
     });
 
     const dialog = screen.getByRole("dialog", {
-      name: "Tu Wrapped de escucha",
+      name: "Tu Crate Digging",
     });
     expect(screen.getByText("minutos escuchados")).toBeInTheDocument();
     fireEvent.keyDown(dialog, { key: "ArrowRight" });
@@ -62,9 +62,9 @@ describe("StatsWrapped", () => {
 
     expect(openShareSheet).toHaveBeenCalledWith(
       expect.objectContaining({
-        kind: "wrapped",
+        kind: "digging",
         title: "Últimos 30 días en Crate",
-        wrapped: expect.objectContaining({
+        digging: expect.objectContaining({
           headline: "Converge, sin dudarlo.",
           credit: "Un año seleccionado por diego.trecedoce",
           topArtistsLabel: "Artistas top",

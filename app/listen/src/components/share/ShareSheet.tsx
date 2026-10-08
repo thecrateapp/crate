@@ -278,7 +278,7 @@ export function ShareSheetHost() {
           </div>
         ) : (
           <div className="relative space-y-2 p-4 ">
-            {payload.kind === "wrapped" ? (
+            {payload.kind === "digging" ? (
               <ShareAction
                 icon={busyAction === "story" ? Loader2 : Camera}
                 title={t("share.instagramStory")}

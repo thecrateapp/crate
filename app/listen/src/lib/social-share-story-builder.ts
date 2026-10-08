@@ -21,7 +21,7 @@ import {
   drawStoryArtworkBackground,
   drawStoryBackground,
   drawStoryBrand,
-  drawWrappedStoryCard,
+  drawDiggingStoryCard,
   type CrateStoryArtwork,
   SQUARE_POST_SIZE,
   STORY_HEIGHT,
@@ -105,13 +105,13 @@ async function renderShareCard(
       )
     : [];
 
-  const wrapped = payload.kind === "wrapped" ? payload.wrapped : undefined;
-  const gridUrls = wrapped
-    ? wrapped.coverUrls.slice(0, 5)
+  const digging = payload.kind === "digging" ? payload.digging : undefined;
+  const gridUrls = digging
+    ? digging.coverUrls.slice(0, 5)
     : crateAlbums.map((album) => album.imageUrl ?? null);
 
   const [artwork, logo, ...crateArtworks] = await Promise.all([
-    payload.imageUrl && !wrapped && (!isCrate || crateAlbums.length === 0)
+    payload.imageUrl && !digging && (!isCrate || crateAlbums.length === 0)
       ? loadOptionalCanvasImage(payload.imageUrl, "artwork")
       : Promise.resolve(null),
     loadOptionalCanvasImage(CRATE_LOGO_URL, "logo"),
@@ -122,11 +122,11 @@ async function renderShareCard(
     ),
   ]);
   try {
-    if (wrapped) {
+    if (digging) {
       drawStoryBackground(ctx, canvas.width, canvas.height, colors);
-      drawWrappedStoryCard(
+      drawDiggingStoryCard(
         ctx,
-        wrapped,
+        digging,
         crateArtworks.map((value) => value?.image ?? null),
         logo?.image ?? null,
         colors,
