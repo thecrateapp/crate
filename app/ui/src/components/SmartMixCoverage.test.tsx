@@ -30,6 +30,7 @@ const status = {
   analyzerVersion: "smart-mix-v1",
   totalTracks: 100,
   currentProfiles: 40,
+  staleProfiles: 7,
   missingProfiles: 60,
   coveragePercent: 40,
   quality: {
@@ -42,8 +43,10 @@ const status = {
     pending: 3,
     active: 2,
     failed: 1,
+    exhausted: 4,
     completed: 34,
   },
+  refreshedAt: "2026-07-30T10:00:00Z",
   controlState: "running",
   activeTask: {
     id: "task-active",
@@ -80,6 +83,8 @@ describe("SmartMixCoverage", () => {
     expect(screen.getByText("35")).toBeInTheDocument();
     expect(screen.getByText("5")).toBeInTheDocument();
     expect(screen.getByText("60")).toBeInTheDocument();
+    expect(screen.getByText("7")).toBeInTheDocument();
+    expect(screen.getByText("4")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Pause backfill" }));
 

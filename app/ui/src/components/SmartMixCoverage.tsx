@@ -21,6 +21,7 @@ interface SmartMixAdminStatus {
   analyzerVersion: string;
   totalTracks: number;
   currentProfiles: number;
+  staleProfiles: number;
   missingProfiles: number;
   coveragePercent: number;
   quality: {
@@ -33,8 +34,10 @@ interface SmartMixAdminStatus {
     pending: number;
     active: number;
     failed: number;
+    exhausted: number;
     completed: number;
   };
+  refreshedAt: string | null;
   controlState: SmartMixControlState;
   activeTask: {
     id: string;
@@ -212,13 +215,15 @@ export function SmartMixCoverage() {
         />
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid gap-2 sm:grid-cols-4 lg:grid-cols-8">
         <Metric label="Full" value={data.quality.full} />
         <Metric label="Partial" value={data.quality.partial} />
+        <Metric label="Stale" value={data.staleProfiles} />
         <Metric label="Missing" value={data.missingProfiles} />
         <Metric label="Pending" value={data.processing.pending} />
         <Metric label="Active" value={data.processing.active} />
         <Metric label="Failed" value={data.processing.failed} />
+        <Metric label="Exhausted" value={data.processing.exhausted} />
       </div>
     </div>
   );

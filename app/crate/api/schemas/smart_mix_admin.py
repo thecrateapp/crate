@@ -28,6 +28,7 @@ class SmartMixProcessingCounts(SmartMixAdminModel):
     pending: int = Field(ge=0)
     active: int = Field(ge=0)
     failed: int = Field(ge=0)
+    exhausted: int = Field(default=0, ge=0)
     completed: int = Field(ge=0)
 
 
@@ -38,16 +39,29 @@ class SmartMixBackfillTask(SmartMixAdminModel):
     updated_at: datetime | str | None = Field(default=None, alias="updatedAt")
 
 
+class SmartMixBackfillCampaign(SmartMixAdminModel):
+    target: str
+    status: Literal["running", "paused", "cancelled", "completed"]
+    batch_size: int = Field(alias="batchSize", ge=1, le=100)
+    max_attempts: int = Field(alias="maxAttempts", ge=1, le=10)
+    batches: int = Field(default=0, ge=0)
+    claimed: int = Field(default=0, ge=0)
+    updated_at: datetime | str | None = Field(default=None, alias="updatedAt")
+
+
 class SmartMixAdminStatusResponse(SmartMixAdminModel):
     profile_version: int = Field(alias="profileVersion", ge=1)
     analyzer_version: str = Field(alias="analyzerVersion")
     total_tracks: int = Field(alias="totalTracks", ge=0)
     current_profiles: int = Field(alias="currentProfiles", ge=0)
+    stale_profiles: int = Field(default=0, alias="staleProfiles", ge=0)
     missing_profiles: int = Field(alias="missingProfiles", ge=0)
     coverage_percent: float = Field(alias="coveragePercent", ge=0.0, le=100.0)
     quality: SmartMixProfileQualityCounts
     processing: SmartMixProcessingCounts
+    refreshed_at: datetime | str | None = Field(default=None, alias="refreshedAt")
     control_state: Literal["idle", "running", "paused"] = Field(alias="controlState")
+    campaign: SmartMixBackfillCampaign | None = None
     active_task: SmartMixBackfillTask | None = Field(
         default=None,
         alias="activeTask",

@@ -42,25 +42,34 @@ def test_status_counts_profile_versions_quality_and_checkpoint_state(pg_db) -> N
             text(
                 """
                 INSERT INTO track_processing_state (
-                    track_id, pipeline, state, attempts, priority, last_error
+                    track_id, pipeline, state, attempts, priority, last_error,
+                    target_generation
                 )
                 VALUES
-                    (:pending_id, 'smart_mix', 'pending', 0, 3, NULL),
-                    (:failed_id, 'smart_mix', 'failed', 2, 5, 'decoder')
+                    (:pending_id, 'smart_mix', 'pending', 0, 3, NULL, :target),
+                    (:failed_id, 'smart_mix', 'failed', 2, 5, 'decoder', :target)
                 """
             ),
-            {"pending_id": track_ids[2], "failed_id": track_ids[3]},
+            {
+                "pending_id": track_ids[2],
+                "failed_id": track_ids[3],
+                "target": ANALYZER_VERSION,
+            },
         )
 
+    from crate.db.jobs.smart_mix_backfill import refresh_smart_mix_coverage
     from crate.db.queries.smart_mix_admin import get_smart_mix_admin_status
 
+    refresh_smart_mix_coverage(max_attempts=3)
     status = get_smart_mix_admin_status()
+    assert status.pop("refreshed_at") is not None
 
     assert status == {
         "profile_version": 1,
         "analyzer_version": ANALYZER_VERSION,
         "total_tracks": 4,
         "current_profiles": 1,
+        "stale_profiles": 1,
         "missing_profiles": 3,
         "coverage_percent": 25.0,
         "quality": {
@@ -73,6 +82,7 @@ def test_status_counts_profile_versions_quality_and_checkpoint_state(pg_db) -> N
             "pending": 1,
             "active": 0,
             "failed": 1,
+            "exhausted": 0,
             "completed": 0,
         },
     }
@@ -93,74 +103,108 @@ def test_admin_routes_require_analysis_management_permission(test_app) -> None:
     assert backfill.status_code == 403
 
 
-def test_status_exposes_active_backfill_without_starting_work(
+def _coverage(refreshed_at: str | None = "2099-01-01T00:00:00+00:00") -> dict:
+    return {
+        "profile_version": 1,
+        "analyzer_version": ANALYZER_VERSION,
+        "total_tracks": 100,
+        "current_profiles": 40,
+        "stale_profiles": 10,
+        "missing_profiles": 60,
+        "coverage_percent": 40.0,
+        "quality": {"full": 35, "partial": 5, "legacy": 0, "unavailable": 0},
+        "processing": {
+            "pending": 3,
+            "active": 2,
+            "failed": 1,
+            "exhausted": 1,
+            "completed": 34,
+        },
+        "refreshed_at": refreshed_at,
+    }
+
+
+def _campaign(status: str = "running") -> dict:
+    return {
+        "target": ANALYZER_VERSION,
+        "status": status,
+        "batch_size": 25,
+        "max_attempts": 3,
+        "batches": 2,
+        "claimed": 50,
+        "sequence": 2,
+    }
+
+
+def test_status_serves_the_snapshot_without_starting_backfill_work(
     test_app,
     monkeypatch,
 ) -> None:
     from crate.api import smart_mix_admin
 
+    monkeypatch.setattr(smart_mix_admin, "get_smart_mix_admin_status", _coverage)
     monkeypatch.setattr(
-        smart_mix_admin,
-        "get_smart_mix_admin_status",
-        lambda: {
-            "profile_version": 1,
-            "analyzer_version": "smart-mix-v1",
-            "total_tracks": 100,
-            "current_profiles": 40,
-            "missing_profiles": 60,
-            "coverage_percent": 40.0,
-            "quality": {
-                "full": 35,
-                "partial": 5,
-                "legacy": 0,
-                "unavailable": 0,
-            },
-            "processing": {
-                "pending": 3,
-                "active": 2,
-                "failed": 1,
-                "completed": 34,
-            },
-        },
+        smart_mix_admin, "get_smart_mix_campaign_status", lambda: _campaign()
     )
     monkeypatch.setattr(
         smart_mix_admin,
         "_backfill_tasks",
-        lambda: [
-            {
-                "id": "task-active",
-                "status": "running",
-                "created_at": "2026-07-30T10:00:00Z",
-                "updated_at": "2026-07-30T10:01:00Z",
-            }
-        ],
+        lambda: [{"id": "task-active", "status": "running"}],
     )
     monkeypatch.setattr(
         smart_mix_admin,
         "create_task_dedup",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("status reads must not queue work")
+            AssertionError("a fresh snapshot must not queue work")
         ),
     )
 
     response = test_app.get("/api/admin/smart-mix/status")
 
     assert response.status_code == 200
-    assert response.json()["controlState"] == "running"
-    assert response.json()["activeTask"]["id"] == "task-active"
-    assert response.json()["coveragePercent"] == 40.0
+    payload = response.json()
+    assert payload["controlState"] == "running"
+    assert payload["activeTask"]["id"] == "task-active"
+    assert payload["coveragePercent"] == 40.0
+    assert payload["staleProfiles"] == 10
+    assert payload["processing"]["exhausted"] == 1
+    assert payload["campaign"]["batches"] == 2
 
 
-def test_backfill_is_bounded_and_deduplicated(test_app, monkeypatch) -> None:
+def test_missing_snapshot_queues_only_a_coverage_refresh(test_app, monkeypatch) -> None:
     from crate.api import smart_mix_admin
 
-    calls: list[tuple[str, dict, str]] = []
+    queued: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        smart_mix_admin, "get_smart_mix_admin_status", lambda: _coverage(None)
+    )
+    monkeypatch.setattr(smart_mix_admin, "get_smart_mix_campaign_status", lambda: None)
+    monkeypatch.setattr(smart_mix_admin, "_backfill_tasks", lambda: [])
     monkeypatch.setattr(
         smart_mix_admin,
         "create_task_dedup",
-        lambda task_type, params, *, dedup_key: (
-            calls.append((task_type, params, dedup_key)) or "task-new"
-        ),
+        lambda task_type, _params, *, dedup_key: queued.append((task_type, dedup_key)),
+    )
+
+    response = test_app.get("/api/admin/smart-mix/status")
+
+    assert response.status_code == 200
+    assert response.json()["controlState"] == "idle"
+    assert queued == [("refresh_smart_mix_coverage", "smart-mix:coverage")]
+
+
+def test_backfill_starts_a_bounded_campaign(test_app, monkeypatch) -> None:
+    from crate.api import smart_mix_admin
+
+    started: list[dict] = []
+    monkeypatch.setattr(smart_mix_admin, "_active_backfill_task", lambda: None)
+    monkeypatch.setattr(
+        smart_mix_admin,
+        "start_smart_mix_campaign",
+        lambda **kwargs: started.append(kwargs) or _campaign(),
+    )
+    monkeypatch.setattr(
+        smart_mix_admin, "queue_next_smart_mix_batch", lambda _campaign: "task-new"
     )
 
     response = test_app.post(
@@ -178,32 +222,25 @@ def test_backfill_is_bounded_and_deduplicated(test_app, monkeypatch) -> None:
         "status": "queued",
         "deduplicated": False,
     }
-    assert calls == [
-        (
-            "backfill_smart_mix_profiles",
-            {
-                "batch_size": 40,
-                "max_attempts": 4,
-                "triggered_by": "admin",
-            },
-            "smart-mix:backfill:v1",
-        )
-    ]
+    assert started == [{"batch_size": 40, "max_attempts": 4}]
     assert oversized.status_code == 422
 
 
-def test_duplicate_backfill_returns_existing_task(test_app, monkeypatch) -> None:
+def test_backfill_with_an_active_batch_reuses_it(test_app, monkeypatch) -> None:
     from crate.api import smart_mix_admin
 
     monkeypatch.setattr(
         smart_mix_admin,
-        "create_task_dedup",
-        lambda *_args, **_kwargs: None,
+        "_active_backfill_task",
+        lambda: {"id": "task-existing", "status": "delegated"},
+    )
+    monkeypatch.setattr(
+        smart_mix_admin, "start_smart_mix_campaign", lambda **_kwargs: _campaign()
     )
     monkeypatch.setattr(
         smart_mix_admin,
-        "_active_backfill_task",
-        lambda: {"id": "task-existing", "status": "delegated"},
+        "queue_next_smart_mix_batch",
+        lambda _campaign: (_ for _ in ()).throw(AssertionError("no second batch")),
     )
 
     response = test_app.post(
@@ -219,61 +256,55 @@ def test_duplicate_backfill_returns_existing_task(test_app, monkeypatch) -> None
     }
 
 
-def test_pause_cancel_and_resume_reuse_task_checkpoints(
-    test_app,
-    monkeypatch,
-) -> None:
+def test_pause_cancel_and_resume_drive_the_campaign(test_app, monkeypatch) -> None:
     from crate.api import smart_mix_admin
 
-    current = {"id": "task-active", "status": "running"}
-    updates: list[tuple[str, dict]] = []
+    transitions: list[tuple[str, set[str]]] = []
+    monkeypatch.setattr(smart_mix_admin, "_active_backfill_task", lambda: None)
     monkeypatch.setattr(
         smart_mix_admin,
-        "_active_backfill_task",
-        lambda: current,
+        "set_smart_mix_campaign_status",
+        lambda status, *, allowed_from: (
+            transitions.append((status, allowed_from)) or _campaign(status)
+        ),
     )
     monkeypatch.setattr(
-        smart_mix_admin,
-        "update_task",
-        lambda task_id, **kwargs: updates.append((task_id, kwargs)),
+        smart_mix_admin, "start_smart_mix_campaign", lambda **_kwargs: _campaign()
+    )
+    monkeypatch.setattr(
+        smart_mix_admin, "queue_next_smart_mix_batch", lambda _campaign: "task-resumed"
     )
 
     paused = test_app.post("/api/admin/smart-mix/backfill/pause")
     cancelled = test_app.post("/api/admin/smart-mix/backfill/cancel")
-
-    monkeypatch.setattr(
-        smart_mix_admin,
-        "create_task_dedup",
-        lambda *_args, **_kwargs: "task-resumed",
-    )
     resumed = test_app.post(
         "/api/admin/smart-mix/backfill/resume",
         json={"batchSize": 30, "maxAttempts": 3},
     )
 
-    assert paused.status_code == 200
     assert paused.json()["status"] == "paused"
-    assert cancelled.status_code == 200
     assert cancelled.json()["status"] == "cancelled"
-    assert updates == [
-        (
-            "task-active",
-            {
-                "status": "cancelled",
-                "result": {"control": "paused", "checkpointed": True},
-            },
-        ),
-        (
-            "task-active",
-            {
-                "status": "cancelled",
-                "result": {"control": "cancelled", "checkpointed": True},
-            },
-        ),
+    assert transitions == [
+        ("paused", {"running"}),
+        ("cancelled", {"running", "paused"}),
     ]
-    assert resumed.status_code == 200
-    assert resumed.json()["taskId"] == "task-resumed"
-    assert resumed.json()["status"] == "resumed"
+    assert resumed.json() == {
+        "taskId": "task-resumed",
+        "status": "resumed",
+        "deduplicated": False,
+    }
+
+
+def test_pause_without_a_running_campaign_conflicts(test_app, monkeypatch) -> None:
+    from crate.api import smart_mix_admin
+
+    monkeypatch.setattr(
+        smart_mix_admin,
+        "set_smart_mix_campaign_status",
+        lambda _status, *, allowed_from: None,
+    )
+
+    assert test_app.post("/api/admin/smart-mix/backfill/pause").status_code == 409
 
 
 def _create_tracks(count: int) -> list[int]:

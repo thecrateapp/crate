@@ -579,6 +579,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "compute_popularity",
             "compute_smart_mix_profile",
             "backfill_smart_mix_profiles",
+            "refresh_smart_mix_coverage",
             "backfill_track_audio_fingerprints",
             "analyze_tracks",
             "analyze_all",
