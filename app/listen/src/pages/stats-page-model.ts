@@ -5,7 +5,7 @@ import type {
 } from "@/components/stats/stats-model";
 
 export const STATS_DASHBOARD_LIMITS =
-  "tracks_limit=12&artists_limit=10&albums_limit=12&genres_limit=10&replay_limit=36";
+  "tracks_limit=12&artists_limit=10&albums_limit=14&genres_limit=10&replay_limit=36";
 
 export const WINDOW_COPY_KEYS: Record<
   StatsWindow,

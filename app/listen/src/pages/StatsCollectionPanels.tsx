@@ -1,6 +1,6 @@
+import { MediaGrid } from "@crate/ui/domain/lists";
 import { useMemo, type ComponentType, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { MediaGrid } from "@crate/ui/domain/lists";
 import { Disc3, Flame, Music2 } from "@crate/ui/icons";
 import { Link } from "react-router";
 
@@ -263,6 +263,12 @@ function TopArtistCardMenu({
   );
 }
 
+function albumRowFillClass(index: number): string | undefined {
+  if (index >= 12) return "sm:hidden 2xl:block";
+  if (index >= 10) return "lg:hidden xl:block";
+  return undefined;
+}
+
 export function TopAlbumsPanel({
   items,
   loading,
@@ -282,12 +288,10 @@ export function TopAlbumsPanel({
         <PanelLoading />
       ) : items.length ? (
         <MediaGrid>
-          {items.slice(0, 12).map((item, index) => (
-            <TopAlbumCard
-              key={statsAlbumKey(item)}
-              item={item}
-              rank={index + 1}
-            />
+          {items.slice(0, 14).map((item, index) => (
+            <div key={statsAlbumKey(item)} className={albumRowFillClass(index)}>
+              <TopAlbumCard item={item} rank={index + 1} />
+            </div>
           ))}
         </MediaGrid>
       ) : (

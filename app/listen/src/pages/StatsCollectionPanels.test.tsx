@@ -136,6 +136,21 @@ describe("Stats collection panels", () => {
     );
   });
 
+  it("hides albums that would leave an incomplete row at each breakpoint", () => {
+    const items = Array.from({ length: 14 }, (_, index) => ({
+      ...album,
+      album_id: index + 1,
+      album: `Album ${index + 1}`,
+    }));
+    renderWithListenProviders(<TopAlbumsPanel items={items} loading={false} />);
+
+    const cells = Array.from(screen.getByTestId("media-grid").children);
+    expect(cells).toHaveLength(14);
+    expect(cells[9]).not.toHaveAttribute("class");
+    expect(cells[10]).toHaveClass("lg:hidden", "xl:block");
+    expect(cells[13]).toHaveClass("sm:hidden", "2xl:block");
+  });
+
   it("uses the singular play label for a single play", () => {
     renderWithListenProviders(
       <TopAlbumsPanel items={[{ ...album, play_count: 1 }]} loading={false} />,

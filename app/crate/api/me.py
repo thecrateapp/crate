@@ -1096,7 +1096,7 @@ def stats_dashboard(
     month: str | None = Query(None, pattern=r"^\d{4}-\d{2}$"),
     tracks_limit: int = Query(12, ge=1, le=100),
     artists_limit: int = Query(10, ge=1, le=100),
-    albums_limit: int = Query(12, ge=1, le=100),
+    albums_limit: int = Query(14, ge=1, le=100),
     genres_limit: int = Query(10, ge=1, le=100),
     replay_limit: int = Query(36, ge=1, le=100),
 ):
