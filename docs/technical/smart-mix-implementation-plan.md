@@ -23,31 +23,34 @@ sources:
 
 > **Para agentes:** usar la guía `viterbit-ai-tools:executing-plans` para ejecutar y verificar las tareas. Este plan y el [diseño unificado](smart-mix-design.md) son las únicas guías de desarrollo vigentes de esta feature. No ejecutar los planes/spikes sustituidos ni crear planes paralelos.
 
-**Objetivo:** terminar Smart Mix, crossfade Android nativo y el plugin VirtualDJ A+B+C, incluidas sus extensiones y distribución, conservando el WIP útil.
+**Objetivo:** entregar Smart Mix, crossfade Android nativo y el plugin VirtualDJ en releases R1–R4 que se cierran de forma independiente (§1.1). Lo que no pertenece a ninguna release queda en el backlog de §1.1 y no bloquea cierres.
 
 **Arquitectura:** backend común de análisis, perfiles, ranking y planes; Android y VirtualDJ son executors con validación propia. PostgreSQL/Redis, workers existentes y media/auth compartidos mantienen sus responsabilidades. No se añade daemon local ni se replica el algoritmo en clientes.
 
 **Stack:** Python/FastAPI/Pydantic/SQLAlchemy/Alembic, Rust `crate-cli`, Go readplane, React/TypeScript/Vitest, Java/Media3/Gradle y C++20/CMake/CTest/SDK privado VirtualDJ.
 
-**Baseline:** 2026-09-09, `codex/feat-smart-mix-phase-1`, HEAD `140f9e347976eec0d27cb71919afd6f71bee4e86` **más working tree**. Este es un plan pendiente de ejecución; ninguna tarea futura está marcada completa por haber escrito el documento. Las rutas de código son relativas a la raíz del worktree. `Crear` identifica archivos propuestos, no existentes.
+**Baseline:** 2026-10-08, `codex/feat-smart-mix-phase-1` después de commitear el WIP (PAT, catálogo VDJ, routing, `tools/vdj-plugin/`) y de integrar `origin/main`. Las migraciones de la rama se renumeraron a `104_smart_mix_profiles` y `105_user_access_tokens` porque main ya ocupa 090–103. La baseline anterior (2026-09-09, `140f9e34` más working tree) queda como histórico en §8. Este es un plan pendiente de ejecución; ninguna tarea futura está marcada completa por haber escrito el documento. Las rutas de código son relativas a la raíz del worktree. `Crear` identifica archivos propuestos, no existentes.
 
 ## 1. Cómo continuar sin perder el WIP
 
-Trabajar en `worktrees/smart-mix-phase-1` o en una copia explícita que incluya sus cambios sin commit. No basta hacer checkout de HEAD: PAT, catálogo, migración 091 y todo `tools/vdj-plugin/` estaban sin seguir. No usar `git reset --hard`, `git clean`, checkout de archivos ni `git add .` para preparar la tarea.
+Todo el WIP está commiteado en la rama; un checkout limpio de la rama es suficiente. Antes de empezar un paquete, integrar `origin/main` si la rama lleva más de una semana sin hacerlo y comprobar `alembic heads`. No usar `git reset --hard`, `git clean` ni `git add .`.
 
 Cada paquete se descompone en las regresiones/contratos enumerados: RED que falla por la causa esperada, cambio mínimo, GREEN, revisión del diff y commit convencional acotado cuando corresponda. Los pasos son checkpoints separados, no una instrucción de escribir todos los tests y toda la feature antes de verificar. No se repiten refactors ya terminados para satisfacer numeración histórica.
 
 Una suite omitida, un build no ejecutado o un gate de host pendiente se registra como tal. Para marcar `hecho` se adjuntan commit(s), comandos/resultados, entorno y evidencia requerida. Un cambio de contrato actualiza ambos documentos y fixtures en el mismo cambio; no reabre diseño tácitamente desde un adapter.
 
-### 1.1 Orden y dependencias
+### 1.1 Releases, orden y backlog
 
-| Hito                      | Paquetes                                                     | Resultado verificable                                                      |
-| ------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------- |
-| M0 — Baseline y contrato  | C00 → P01                                                    | WIP preservado, versiones/scopes/gates congelados, reproducciones trazadas |
-| M1 — Fundamentos seguros  | SM01–SM06, P02–P05; V01–V04 y A01–A05 en paralelo según deps | Perfiles/planes seguros; Android adaptive integrado; fuente A real         |
-| M2 — Calidad y asistencia | SM07, A06–A07, V05, P06                                      | Evidencia musical/física; B completo; extensiones servidor                 |
-| M3 — Ejecución completa   | A08, V06–V09, X01–X02                                        | Beat-aware/bass certificados, C y extensiones completas, CI y regresión    |
-| M4 — Release conjunta     | X03, V10, X04                                                | Matrices reales, paquetes firmados, rollout y cierre auditado              |
+Cada release se cierra con su propio gate y se puede desplegar detrás de flags sin esperar a las siguientes. Un gate fallido mantiene abierta solo esa release.
+
+| Release                                        | Paquetes                                                                                                                          | Gate de cierre                                                                                                                                                                                 |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R1 — Smart Mix correcto en Android adaptive    | C00, P01 (versiones, contratos y migraciones), SM01–SM05, SM06 (claves de caché, elegibilidad antes del límite, R15–R17), A01–A05 | Suites automáticas verdes; R01–R06 y R15–R17 con regresión; reanálisis v2 en curso con status correcto; adaptive sin clipping ni underrun en un dispositivo de referencia (subconjunto de A06) |
+| R2 — VirtualDJ A (fuente local) en macOS arm64 | P02 (incluida UI de tokens en Listen), P03 (routing prod/home/dev y flags, sin lease), P04, P05, V01–V04                          | Conectar, buscar, navegar, cargar, seek tras TTL y revocar en VirtualDJ real macOS arm64; paquete instalable sin origen por defecto                                                            |
+| R3 — VirtualDJ B y plataformas                 | V05, SM07, V09 (filtros DJ y CI nativo), V10 (Windows x64 y macOS Intel)                                                          | Perfiles, compatibles y planes validados visibles en el plugin; paquetes de las tres plataformas; benchmarks de SM07 registrados                                                               |
+| R4 — Ejecución avanzada                        | A06 (matriz completa), A07, A08, P03 (lease), V06, X01–X04                                                                        | Gates de §7 del diseño para beatmatch, bass y VDJ C; soak y rollback                                                                                                                           |
+
+**Backlog fuera de R1–R4.** Entra en una release solo editando esta tabla con una decisión explícita: P06 y V07 (cues privados, radio, presencia en VDJ; la corrección de scope de play events sigue en P02), V08 (caché de audio cifrada, offline y prefetch; la materialización por carga que V04 necesite si el SDK no renueva tickets sigue en V04), recorrido federado de SM06, wrapper de compatibilidad v1 sin consumidor distribuido demostrado, y paridad PAT en el readplane de Go.
 
 Dependencias no implícitas: P01 precede a todas las modificaciones de contrato/migración. P02/P03 pueden avanzar junto con SM02–SM05. A01 puede corregir red usando fixtures tras P01; integración Android final requiere SM06. V01 usa P01; V02 usa P02/P03; V03 usa P04; V04 usa P05; V05 usa SM05/SM06; V06 usa V05/P03; V07 usa P06; V08 usa V04/V05; V09 integra resultados; V10 usa X03; X04 usa V10. P06 resuelve cues persistidos usando interfaces/fixtures que SM03/SM06 entregaron antes: no hay dependencia circular.
 
@@ -57,22 +60,30 @@ Los paquetes P02–P05 entregan primero contratos e implementación backend veri
 
 ### 1.2 Trazabilidad de hallazgos
 
-| ID  | Hallazgo reproducido o carencia comprobada                                     | Paquetes que lo cierran   |
-| --- | ------------------------------------------------------------------------------ | ------------------------- |
-| R01 | Cue176s + fade12s sobre track180s genera transición fuera de pista             | SM03, A02                 |
-| R02 | Downmix oculta peak estéreo; RMS publicado como LUFS                           | SM01–SM02, A03            |
-| R03 | Idempotencia impide partial Python → full Rust                                 | SM04                      |
-| R04 | Fuente se revisa después de analizar; done antiguo excluido de backfill nuevo  | SM04–SM05                 |
-| R05 | Planning bloquea startup, también hace red en offline y no tiene deadline      | A01                       |
-| R06 | Standby ready antes de seek, trigger global tardío, envelope por ticks de main | A02–A03                   |
-| R07 | Capabilities sin integrar y contrato desconocido no vacío aceptado             | P01, V01–V02              |
-| R08 | PAT catalog-only permite escribir play-events                                  | P02, P06                  |
-| R09 | Proxy prod/home envía PAT opaco a verificador JWT Go                           | P03, X02                  |
-| R10 | Caché devuelve éxito ante401/403/cancel; callbacks obsoletos sobreviven        | V01–V03                   |
-| R11 | Parsers JSON manuales, Unicode/body sin cubrir; sanitizer no enlaza            | V01, V09                  |
-| R12 | Catálogo plano/truncado, géneros normalizados excluidos, covers relativos      | P04, V03–V04              |
-| R13 | C solo spike; faltan estados/takeover/lease, B no presenta todo                | P03, V05–V06              |
-| R14 | Sin matriz física/host, settings completos, packaging/soak                     | A04–A08, V07–V10, X01–X04 |
+| ID  | Hallazgo reproducido o carencia comprobada                                                                     | Paquetes que lo cierran   |
+| --- | -------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| R01 | Cue176s + fade12s sobre track180s genera transición fuera de pista                                             | SM03, A02                 |
+| R02 | Downmix oculta peak estéreo; RMS publicado como LUFS                                                           | SM01–SM02, A03            |
+| R03 | Idempotencia impide partial Python → full Rust                                                                 | SM04                      |
+| R04 | Fuente se revisa después de analizar; done antiguo excluido de backfill nuevo                                  | SM04–SM05                 |
+| R05 | Planning bloquea startup, también hace red en offline y no tiene deadline                                      | A01                       |
+| R06 | Standby ready antes de seek, trigger global tardío, envelope por ticks de main                                 | A02–A03                   |
+| R07 | Capabilities sin integrar y contrato desconocido no vacío aceptado                                             | P01, V01–V02              |
+| R08 | PAT catalog-only permite escribir play-events                                                                  | P02, P06                  |
+| R09 | Proxy prod/home envía PAT opaco a verificador JWT Go                                                           | P03, X02                  |
+| R10 | Caché devuelve éxito ante401/403/cancel; callbacks obsoletos sobreviven                                        | V01–V03                   |
+| R11 | Parsers JSON manuales, Unicode/body sin cubrir; sanitizer no enlaza                                            | V01, V09                  |
+| R12 | Catálogo plano/truncado, géneros normalizados excluidos, covers relativos                                      | P04, V03–V04              |
+| R13 | C solo spike; faltan estados/takeover/lease, B no presenta todo                                                | P03, V05–V06              |
+| R14 | Sin matriz física/host, settings completos, packaging/soak                                                     | A04–A08, V07–V10, X01–X04 |
+| R15 | `GET /api/admin/smart-mix/status` cuenta ~48K `library_tracks` en cada request                                 | SM05                      |
+| R16 | Planes: get/set de caché por edge (hasta 64 round trips) y `DELETE LIKE` en request                            | SM06                      |
+| R17 | Compatibles aplican `LIMIT 500` antes de filtrar elegibilidad                                                  | SM06                      |
+| R18 | Catálogo VDJ recorre y ordena `library_tracks` por página con OFFSET sin límite                                | P04                       |
+| R19 | Respuesta de catálogo expone `path`; búsqueda PAT admite `scope=federated`; allowlist por sufijo sin método    | P02, P04                  |
+| R20 | `policy.py` usa techo −0.1 dBFS; el diseño fija ≤−1 dBTP                                                       | SM03, A03                 |
+| R21 | Spike: origen de producción por defecto, sin login, redacción de logs sin efecto, carrera al cancelar búsqueda | V02–V03                   |
+| R22 | Tests C++ con `assert` no comprueban nada en Release                                                           | V01                       |
 
 ## 2. Preparación y verificación comunes
 
@@ -122,7 +133,7 @@ Cada paquete comienza con un test focalizado de regresión/contrato que falle, i
 1. Registrar rama, HEAD real e inventario del working tree; utilizar `docs/technical/smart-mix-design.md` y el `smart-mix-implementation-plan.md` canónico como únicas fuentes activas de diseño/plan. Baseline revisado: `140f9e34`; main local tenía revisión 089, el worktree comiteado 090 y el WIP añade 091. Volver a ejecutar `alembic heads` al implementar: estos números son observaciones, no reservas de migraciones futuras.
 2. Fijar en fixtures compartidas con los clientes nativos el contrato `2026-09` de rutas/scopes/identidad, adiciones de schema `1`, grid `delta-ms-v1`, analyzer/implementación `smart-mix-audio-v2` y planner de lote `smart-mix-v2`/plan y score entero `2`, conservando los tipos wire actuales, junto con compatibilidad de versiones, campos aditivos, errores y flags por defecto. Incluir payloads anteriores de Listen/Android y contratos mínimo/máximo soportados del plugin.
 3. Antes de añadir schema de cues/búsqueda, volver a comprobar head de migraciones e historial de releases. Asignar entonces la siguiente revisión disponible; no fijar 092/093 de antemano. Renumerar sólo una cola conflictiva comprobada como no publicada/no aplicada, actualizando down-revision y tests conjuntamente. No crear branch heads de conveniencia ni reescribir historia desplegada.
-4. Probar instalación limpia, cadena soportada de upgrades incluido 090→091, repetición donde se soporte y actualización desde la fixture del schema de producción. Verificar supervivencia de usuarios/biblioteca/sesiones. Definir rollback mediante binarios/flags compatibles; un downgrade destructivo será una operación explícita de recuperación, no comportamiento automático del despliegue.
+4. Probar instalación limpia, cadena soportada de upgrades incluido 103→104→105, repetición donde se soporte y actualización desde la fixture del schema de producción. Verificar supervivencia de usuarios/biblioteca/sesiones. Definir rollback mediante binarios/flags compatibles; un downgrade destructivo será una operación explícita de recuperación, no comportamiento automático del despliegue.
 5. Incluir un manifiesto de finalización dentro del plan canónico: requisito/tarea responsable, artefacto, versión de contrato, commit tracked, evidencia automática, evidencia nativa/manual y limitaciones pendientes. Todos los requisitos aceptados de Android, A, B, C y extensiones deben mapear a tareas. Marcar correctamente WIP untracked y capacidades sólo demostradas con mocks; los planes obsoletos son referencias históricas, no fuentes competidoras de finalización.
 
 **Verificaciones (desde `app/`, PG aislada):** `alembic heads`; `python -m pytest -q tests/test_smart_mix_migration.py tests/test_federation_migration_matrix.py tests/test_vdj_contract_baseline.py tests/test_smart_mix_openapi.py tests/test_capabilities.py tests/test_vdj_capabilities.py`.
@@ -684,6 +695,17 @@ Actualizar estas tablas en cada checkpoint; no crear otro plan de seguimiento. L
 | C++ headless macarm64                             | 14/14 CTests                         | No SDKhost ni Windows/Intel          |
 | Sanitizers C++                                    | Fallo de link confirmado             | R11 pendiente                        |
 | Rust/Vitest completos/Gradle/dispositivos/VDJsoak | No ejecutados en revisión            | Evidencia pendiente                  |
+
+Evidencia 2026-10-08, rama antes de integrar main (el resultado posterior al merge se registra en el commit de merge):
+
+| Evidencia                                          | Resultado                                    | Límite                                     |
+| -------------------------------------------------- | -------------------------------------------- | ------------------------------------------ |
+| Python Smart Mix, capabilities, routing, migración | 156 pass / 1 skip (paridad Rust sin binario) | PostgreSQL vía Testcontainers              |
+| Python PAT/media/catálogo VDJ                      | 45 pass                                      | Sin proxy end-to-end                       |
+| Rust `--features analysis`                         | 43 pass                                      |                                            |
+| Go readplane                                       | `go test ./...` OK                           |                                            |
+| Vitest Listen/Admin Smart Mix                      | 61/61 y 2/2                                  |                                            |
+| C++ headless / con SDK local                       | 14/14 y 16/16 CTests                         | Sanitizers no enlazan; Release sin asserts |
 
 | Paquete     | Estado inicial | Commit / comandos / artefactos / siguiente bloqueo           |
 | ----------- | -------------- | ------------------------------------------------------------ |
