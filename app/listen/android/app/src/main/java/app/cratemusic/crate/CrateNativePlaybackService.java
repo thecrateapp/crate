@@ -1157,6 +1157,16 @@ public class CrateNativePlaybackService extends MediaSessionService {
         syncNativeMixTicker();
     }
 
+    public boolean setTransitionPlans(
+        String revision,
+        @Nullable List<JSONObject> transitionPlanPayloads
+    ) {
+        return queueState.replaceTransitionPlans(
+            revision,
+            resolveTransitionPlans(queueState.snapshot(), transitionPlanPayloads)
+        );
+    }
+
     private void applyQueueAuthorization(List<NativeTrack> tracks) {
         streamAuthorizationByOrigin = streamAuthorizationByOrigin(tracks);
         artworkAuthorizationByOrigin = artworkAuthorizationByOrigin(tracks);

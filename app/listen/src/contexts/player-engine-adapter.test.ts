@@ -438,14 +438,15 @@ describe("player engine adapter", () => {
     expect(
       snapshot.tracks.every((track) => track.url.startsWith("file:")),
     ).toBe(true);
-    expect(snapshot.transitionPlans).toHaveLength(2);
-    expect(snapshot.transitionPlans?.[0]).toMatchObject({
+    const transitionPlans = await snapshot.pendingTransitionPlans;
+    expect(transitionPlans).toHaveLength(2);
+    expect(transitionPlans?.[0]).toMatchObject({
       outgoingTrackId: "runtime-1",
       incomingTrackId: "runtime-2",
       fallbackReason: "capability_unavailable",
     });
-    expect(JSON.parse(JSON.stringify(snapshot)).transitionPlans).toEqual(
-      snapshot.transitionPlans,
+    expect(JSON.parse(JSON.stringify(transitionPlans))).toEqual(
+      transitionPlans,
     );
   });
 
@@ -495,7 +496,7 @@ describe("player engine adapter", () => {
       vi.unstubAllGlobals();
     });
 
-    it("loads the queue within the planning deadline when the planner hangs", async () => {
+    it("returns the queue without waiting for a hanging planner", async () => {
       vi.useFakeTimers();
       apiMock.mockImplementation(
         (
@@ -513,16 +514,15 @@ describe("player engine adapter", () => {
             : Promise.resolve(null),
       );
 
-      const snapshotPromise = toStartupEngineQueueSnapshot(
+      const snapshot = await toStartupEngineQueueSnapshot(
         nativeSnapshotOptions("hanging-planner"),
       );
-      await vi.advanceTimersByTimeAsync(1000);
-      const snapshot = await snapshotPromise;
 
       expect(snapshot.tracks).toHaveLength(2);
-      expect(snapshot.transitionPlans?.[0]?.fallbackReason).toBe(
-        "planner_timeout",
-      );
+      expect(snapshot.transitionPlans).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(1000);
+      const transitionPlans = await snapshot.pendingTransitionPlans;
+      expect(transitionPlans?.[0]?.fallbackReason).toBe("planner_timeout");
     });
 
     it("does not call the planner while the device is offline", async () => {
@@ -539,7 +539,9 @@ describe("player engine adapter", () => {
         expect.anything(),
         expect.anything(),
       );
-      expect(snapshot.transitionPlans?.[0]?.fallbackReason).toBe("offline");
+      expect((await snapshot.pendingTransitionPlans)?.[0]?.fallbackReason).toBe(
+        "offline",
+      );
     });
 
     it("cancels in-flight planning when Smart Mix becomes unavailable", async () => {

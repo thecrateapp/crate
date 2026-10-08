@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { EngineTransitionPlan } from "@/lib/playback-engine";
 
 const nativePlaybackMock = vi.hoisted(() => ({
   getState: vi.fn(),
   drainEvents: vi.fn(),
   setQueue: vi.fn(),
+  setTransitionPlans: vi.fn(),
   appendTracks: vi.fn(),
   insertTrack: vi.fn(),
   removeTrack: vi.fn(),
@@ -137,6 +139,73 @@ describe("android native engine flags", () => {
     await engine.setCrossfadeMs(5000);
     expect(nativePlaybackMock.setCrossfadeMs).toHaveBeenCalledWith({
       crossfadeMs: 0,
+    });
+  });
+
+  it("loads the queue before plans arrive and installs them for the current revision", async () => {
+    vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+    const state = {
+      revision: "queue-rev-1",
+      playbackState: "paused",
+      isPlaying: false,
+      index: 0,
+      positionMs: 0,
+      durationMs: 0,
+      queueSize: 2,
+      crossfadeMs: 0,
+      eqEnabled: false,
+    };
+    nativePlaybackMock.getState.mockResolvedValue(state);
+    nativePlaybackMock.setQueue.mockResolvedValue(state);
+    nativePlaybackMock.setTransitionPlans.mockResolvedValue({ accepted: true });
+    const { AndroidNativeEngine } = await import("@/lib/android-native-engine");
+    const engine = new AndroidNativeEngine();
+    const plan = {
+      plannerVersion: 1,
+      outgoingTrackId: "track-1",
+      incomingTrackId: "track-2",
+    } as unknown as EngineTransitionPlan;
+    let resolveCurrent: (plans: EngineTransitionPlan[]) => void = () => {};
+    let resolveStale: (plans: EngineTransitionPlan[]) => void = () => {};
+    const queue = {
+      tracks: [],
+      currentIndex: 0,
+      positionMs: 0,
+      autoplay: false,
+      repeat: "off" as const,
+      crossfadeMs: 0,
+      volume: 1,
+    };
+
+    await engine.loadQueue({
+      ...queue,
+      revision: "queue-rev-0",
+      pendingTransitionPlans: new Promise((resolve) => {
+        resolveStale = resolve;
+      }),
+    });
+    await engine.loadQueue({
+      ...queue,
+      revision: "queue-rev-1",
+      pendingTransitionPlans: new Promise((resolve) => {
+        resolveCurrent = resolve;
+      }),
+    });
+
+    expect(nativePlaybackMock.setQueue).toHaveBeenCalledTimes(2);
+    expect(nativePlaybackMock.setQueue.mock.calls[1]?.[0]).not.toHaveProperty(
+      "pendingTransitionPlans",
+    );
+    expect(nativePlaybackMock.setTransitionPlans).not.toHaveBeenCalled();
+
+    resolveStale([plan]);
+    resolveCurrent([plan]);
+    await vi.waitFor(() =>
+      expect(nativePlaybackMock.setTransitionPlans).toHaveBeenCalledTimes(1),
+    );
+    expect(nativePlaybackMock.setTransitionPlans).toHaveBeenCalledWith({
+      revision: "queue-rev-1",
+      transitionPlans: [plan],
     });
   });
 

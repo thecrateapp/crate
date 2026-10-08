@@ -13,6 +13,7 @@ import type {
   EngineRepeatMode,
   EngineState,
   EngineTrack,
+  EngineTransitionPlan,
   PlaybackEngine,
 } from "@/lib/playback-engine";
 import {
@@ -62,6 +63,10 @@ type CrateNativePlaybackPlugin = {
   getState(): Promise<EngineState>;
   drainEvents(): Promise<{ events?: NativeEventEnvelope[] }>;
   setQueue(options: EngineQueueSnapshot): Promise<EngineState>;
+  setTransitionPlans(options: {
+    revision: string;
+    transitionPlans: EngineTransitionPlan[];
+  }): Promise<{ accepted: boolean }>;
   appendTracks(options: {
     revision: string;
     tracks: EngineTrack[];
@@ -280,11 +285,29 @@ export class AndroidNativeEngine implements PlaybackEngine {
     if (snapshot.autoplay) {
       await this.ensureNotificationPermission();
     }
-    this.queueRevision = snapshot.revision;
-    return nativePlayback.setQueue({
-      ...snapshot,
-      crossfadeMs: effectiveNativeCrossfadeMs(snapshot.crossfadeMs),
+    const { pendingTransitionPlans, ...queue } = snapshot;
+    this.queueRevision = queue.revision;
+    const state = await nativePlayback.setQueue({
+      ...queue,
+      crossfadeMs: effectiveNativeCrossfadeMs(queue.crossfadeMs),
     });
+    if (pendingTransitionPlans) {
+      void this.installTransitionPlans(queue.revision, pendingTransitionPlans);
+    }
+    return state;
+  }
+
+  private async installTransitionPlans(
+    revision: string,
+    pendingPlans: Promise<EngineTransitionPlan[] | undefined>,
+  ): Promise<void> {
+    try {
+      const transitionPlans = await pendingPlans;
+      if (!transitionPlans?.length || revision !== this.queueRevision) return;
+      await nativePlayback.setTransitionPlans({ revision, transitionPlans });
+    } catch (error) {
+      console.warn("[native-playback] transition plans not installed:", error);
+    }
   }
 
   async play(): Promise<EngineState> {

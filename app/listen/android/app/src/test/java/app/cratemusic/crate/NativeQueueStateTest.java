@@ -95,6 +95,28 @@ public class NativeQueueStateTest {
     }
 
     @Test
+    public void installsLatePlansOnlyForTheCurrentRevision() {
+        NativeQueueState state = new NativeQueueState();
+        state.replace("revision-1", Arrays.asList(track("first"), track("second")));
+        NativeTransitionPlan plan = NativeTransitionPlan.safeFallback(
+            "first",
+            "second",
+            3000L,
+            "test"
+        );
+
+        assertFalse(state.replaceTransitionPlans("stale", Arrays.asList(plan)));
+        assertFalse(state.replaceTransitionPlans("", Arrays.asList(plan)));
+        assertNull(state.transitionPlanFor("first", "second"));
+
+        assertTrue(state.replaceTransitionPlans("revision-1", Arrays.asList(plan)));
+        assertSame(plan, state.transitionPlanFor("first", "second"));
+
+        assertTrue(state.replaceTransitionPlans("revision-1", Collections.emptyList()));
+        assertNull(state.transitionPlanFor("first", "second"));
+    }
+
+    @Test
     public void checkpointProjectionNeverContainsPlaybackCredentials() {
         NativeTrack track = new NativeTrack(
             "track-1",

@@ -63,6 +63,7 @@ export interface EngineQueueSnapshot {
   crossfadeMs: number;
   volume: number;
   transitionPlans?: EngineTransitionPlan[];
+  pendingTransitionPlans?: Promise<EngineTransitionPlan[] | undefined>;
 }
 
 export interface EngineState extends NativeEventMetadata {

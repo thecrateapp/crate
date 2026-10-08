@@ -265,15 +265,12 @@ export async function toStartupEngineQueueSnapshot(
           identity: getApiBase(),
         })
       : Promise.resolve(undefined);
-  const [engineTracks, transitionPlans] = await Promise.all([
-    toStartupEngineTracks(
-      options.tracks,
-      options.currentIndex,
-      options.eqGainsByTrackId,
-      streamOptions,
-    ),
-    transitionPlansPromise,
-  ]);
+  const engineTracks = await toStartupEngineTracks(
+    options.tracks,
+    options.currentIndex,
+    options.eqGainsByTrackId,
+    streamOptions,
+  );
 
   return {
     revision: options.revision,
@@ -284,7 +281,7 @@ export async function toStartupEngineQueueSnapshot(
     repeat: options.repeat,
     crossfadeMs: options.crossfadeMs,
     volume: options.volume,
-    transitionPlans,
+    pendingTransitionPlans: transitionPlansPromise,
   };
 }
 

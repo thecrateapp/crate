@@ -115,6 +115,31 @@ public class CrateNativePlaybackPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void setTransitionPlans(PluginCall call) {
+        if (!ensureService(call)) return;
+        List<JSONObject> parsedTransitionPlans;
+        try {
+            parsedTransitionPlans = parseTransitionPlans(
+                call.getArray("transitionPlans")
+            );
+        } catch (JSONException e) {
+            call.reject("Invalid transition plans payload");
+            return;
+        }
+        runOnMain(call, () -> {
+            JSObject result = new JSObject();
+            result.put(
+                "accepted",
+                service.setTransitionPlans(
+                    call.getString("revision", ""),
+                    parsedTransitionPlans
+                )
+            );
+            call.resolve(result);
+        });
+    }
+
+    @PluginMethod
     public void appendTracks(PluginCall call) {
         if (!ensureService(call)) return;
         try {

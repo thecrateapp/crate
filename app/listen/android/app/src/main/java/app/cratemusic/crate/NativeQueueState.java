@@ -53,6 +53,24 @@ final class NativeQueueState {
         }
     }
 
+    boolean replaceTransitionPlans(
+        String requestedRevision,
+        List<NativeTransitionPlan> replacementPlans
+    ) {
+        if (
+            requestedRevision == null ||
+            requestedRevision.isEmpty() ||
+            !revision.equals(requestedRevision)
+        ) {
+            return false;
+        }
+        transitionPlans.clear();
+        if (replacementPlans != null) {
+            transitionPlans.addAll(replacementPlans);
+        }
+        return true;
+    }
+
     @Nullable
     NativeTransitionPlan transitionPlanFor(
         String outgoingTrackId,
