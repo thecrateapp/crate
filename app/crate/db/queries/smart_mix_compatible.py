@@ -12,6 +12,8 @@ from crate.smart_mix.compatible import CompatibleTrackCandidate
 from crate.smart_mix.models import TrackMixProfile
 
 
+CANDIDATE_WINDOW_FACTOR = 2
+
 _PROFILE_COLUMNS = """
     profile.track_id,
     profile.profile_version,
@@ -146,7 +148,7 @@ _CANDIDATE_SQL = text(
                 ELSE ABS(profile.global_energy - :seed_energy)
             END,
             profile.track_id
-        LIMIT :max_candidates
+        LIMIT :candidate_window
     )
     SELECT {_PROFILE_COLUMNS}
     FROM profile_candidates profile
@@ -200,6 +202,7 @@ def get_compatible_track_inputs(
                     "seed_bpm": seed.profile.bpm,
                     "seed_energy": seed.profile.global_energy,
                     "max_candidates": capped_candidates,
+                    "candidate_window": capped_candidates * CANDIDATE_WINDOW_FACTOR,
                 },
             )
             .mappings()

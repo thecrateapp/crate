@@ -54,6 +54,50 @@ def test_query_loads_seed_and_at_most_500_local_candidates(
     assert all(item.profile.beat_grid_ms == () for item in candidates)
 
 
+def test_ineligible_tracks_do_not_consume_the_candidate_limit(
+    pg_db,
+    tmp_path: Path,
+) -> None:
+    del pg_db
+    seed_uid = _seed_tracks(tmp_path, count=520)
+    with transaction_scope() as session:
+        quarantined_album_id = session.execute(
+            text(
+                """
+                INSERT INTO library_albums
+                    (artist, name, path, entity_uid, quarantined_at)
+                SELECT artist, 'Quarantined', path || '-quarantined',
+                       CAST(:album_uid AS uuid), NOW()
+                FROM library_albums
+                WHERE id = (
+                    SELECT album_id FROM library_tracks
+                    WHERE entity_uid = CAST(:seed_uid AS uuid)
+                )
+                RETURNING id
+                """
+            ),
+            {"seed_uid": seed_uid, "album_uid": str(uuid.uuid4())},
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                UPDATE library_tracks track
+                SET album_id = :album_id
+                FROM track_mix_profiles profile
+                WHERE profile.track_id = track.id
+                  AND track.entity_uid <> CAST(:seed_uid AS uuid)
+                  AND profile.bpm BETWEEN 118 AND 122
+                """
+            ),
+            {"seed_uid": seed_uid, "album_id": quarantined_album_id},
+        )
+
+    _seed, candidates = get_compatible_track_inputs(seed_uid, max_candidates=5)
+
+    assert len(candidates) == 5
+    assert all(item.playable for item in candidates)
+
+
 def test_production_scale_candidate_query_uses_profile_indexes(
     pg_db,
     tmp_path: Path,
@@ -66,6 +110,7 @@ def test_production_scale_candidate_query_uses_profile_indexes(
         "seed_bpm": 120.0,
         "seed_energy": 0.7,
         "max_candidates": 500,
+        "candidate_window": 1_000,
     }
 
     with transaction_scope() as session:
