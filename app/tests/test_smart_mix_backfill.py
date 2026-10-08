@@ -125,21 +125,34 @@ def test_compute_profile_handler_resolves_track_inside_worker(monkeypatch) -> No
         raising=False,
     )
     monkeypatch.setattr("crate.audio_analysis.analyze_mix_profile", lambda _path: draft)
-    stored: list[tuple[int, str]] = []
+    captured: list[tuple[int, str, str | None]] = []
     monkeypatch.setattr(
         analysis,
-        "store_smart_mix_profile_result",
-        lambda track_id, path, _draft: stored.append((track_id, str(path))) or True,
-        raising=False,
+        "capture_smart_mix_source",
+        lambda track_id, path, *, claim_token=None: (
+            captured.append((track_id, str(path), claim_token)) or "capture"
+        ),
+    )
+    monkeypatch.setattr(
+        analysis,
+        "publish_smart_mix_profile",
+        lambda capture, _draft: analysis.SmartMixPublication.PUBLISHED,
     )
     monkeypatch.setattr(analysis, "emit_task_event", lambda *_args, **_kwargs: None)
 
     result = analysis._handle_compute_smart_mix_profile(
-        "task-1", {"track_entity_uid": str(uuid.uuid4())}, {}
+        "task-1",
+        {"track_entity_uid": str(uuid.uuid4()), "claim_token": "worker:claim"},
+        {},
     )
 
-    assert result == {"track_id": 7, "stored": True, "quality": "partial"}
-    assert stored == [(7, "/music/artist/album/track.flac")]
+    assert result == {
+        "track_id": 7,
+        "stored": True,
+        "outcome": "published",
+        "quality": "partial",
+    }
+    assert captured == [(7, "/music/artist/album/track.flac", "worker:claim")]
 
 
 def _create_tracks(tmp_path: Path, *, count: int) -> list[int]:

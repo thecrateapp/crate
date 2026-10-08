@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
 from datetime import datetime, timezone
+from enum import StrEnum
 import logging
 from pathlib import Path
 from typing import Any
@@ -27,9 +29,10 @@ from crate.db.orm.smart_mix import TrackMixProfileRow
 from crate.db.repositories.library_analysis_writes import (
     upsert_track_mix_profile_draft,
 )
+from crate.db.repositories.smart_mix import ANY_PROFILE_REVISION
 from crate.db.tx import read_scope, transaction_scope
 from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
-from crate.smart_mix.versions import ANALYZER_VERSION
+from crate.smart_mix.versions import ANALYZER_VERSION, PROFILE_SCHEMA_VERSION
 
 
 SMART_MIX_PIPELINE = "smart_mix"
@@ -371,12 +374,22 @@ def store_analysis_results(results: list[tuple[int, str, dict]]) -> None:
         for track_id, path, result in results:
             payload = result.get("mix_profile") or result.get("mixProfile")
             if isinstance(payload, dict):
+                current_revision = smart_mix_source_revision(path)
+                captured_revision = result.get("smart_mix_source_revision")
+                if captured_revision and captured_revision != current_revision:
+                    log.info("Smart Mix source changed during analysis: %s", path)
+                    continue
+                capture = SmartMixCapture(
+                    track_id=int(track_id),
+                    path=str(path),
+                    source_revision=current_revision,
+                    expected_profile_revision=ANY_PROFILE_REVISION,
+                )
                 try:
                     with session.begin_nested():
-                        _store_smart_mix_profile_result(
+                        _publish_smart_mix_profile(
                             session,
-                            int(track_id),
-                            Path(path),
+                            capture,
                             _draft_from_payload(payload),
                         )
                 except Exception as exc:
@@ -385,12 +398,7 @@ def store_analysis_results(results: list[tuple[int, str, dict]]) -> None:
                         path,
                         exc_info=True,
                     )
-                    _record_smart_mix_failure(
-                        session,
-                        int(track_id),
-                        Path(path),
-                        str(exc),
-                    )
+                    _record_smart_mix_failure(session, capture, str(exc))
         mark_ops_snapshot_dirty(session)
 
 
@@ -432,14 +440,75 @@ def resolve_smart_mix_track(
         return dict(row) if row else None
 
 
+class SmartMixPublication(StrEnum):
+    PUBLISHED = "published"
+    UNCHANGED = "unchanged"
+    SUPERSEDED = "superseded"
+    LOST_CLAIM = "lost_claim"
+    SOURCE_CHANGED = "source_changed"
+    TRACK_MOVED = "track_moved"
+
+
+@dataclass(frozen=True, slots=True)
+class SmartMixCapture:
+    track_id: int
+    path: str
+    source_revision: str
+    expected_profile_revision: Any
+    claim_token: str | None = None
+
+
+_QUALITY_RANK = {
+    MixProfileQuality.UNAVAILABLE: 0,
+    MixProfileQuality.LEGACY: 1,
+    MixProfileQuality.PARTIAL: 2,
+    MixProfileQuality.FULL: 3,
+}
+_RUST_ANALYZER = "crate-rust"
+
+
 def smart_mix_source_revision(path: str | Path) -> str:
     source = Path(path)
     try:
         stat = source.stat()
-        identity = f"{stat.st_size}:{stat.st_mtime_ns}"
+        identity = f"{stat.st_size}:{stat.st_mtime_ns}:{stat.st_ino}"
     except OSError:
         identity = f"missing:{source}"
     return hashlib.sha256(identity.encode()).hexdigest()
+
+
+def capture_smart_mix_source(
+    track_id: int,
+    path: str | Path,
+    *,
+    claim_token: str | None = None,
+) -> SmartMixCapture:
+    source_revision = smart_mix_source_revision(path)
+    with read_scope() as session:
+        expected_profile_revision = session.execute(
+            select(TrackMixProfileRow.profile_revision).where(
+                TrackMixProfileRow.track_id == int(track_id)
+            )
+        ).scalar_one_or_none()
+    return SmartMixCapture(
+        track_id=int(track_id),
+        path=str(path),
+        source_revision=source_revision,
+        expected_profile_revision=expected_profile_revision,
+        claim_token=claim_token,
+    )
+
+
+def publish_smart_mix_profile(
+    capture: SmartMixCapture,
+    draft: TrackMixProfileDraft,
+) -> SmartMixPublication:
+    if smart_mix_source_revision(capture.path) != capture.source_revision:
+        with transaction_scope() as session:
+            _release_smart_mix_claim(session, capture)
+        return SmartMixPublication.SOURCE_CHANGED
+    with transaction_scope() as session:
+        return _publish_smart_mix_profile(session, capture, draft)
 
 
 def store_smart_mix_profile_result(
@@ -447,104 +516,209 @@ def store_smart_mix_profile_result(
     path: str | Path,
     draft: TrackMixProfileDraft,
 ) -> bool:
-    with transaction_scope() as session:
-        return _store_smart_mix_profile_result(session, track_id, Path(path), draft)
+    capture = capture_smart_mix_source(track_id, path)
+    return publish_smart_mix_profile(capture, draft) is SmartMixPublication.PUBLISHED
 
 
-def _store_smart_mix_profile_result(
+def _publish_smart_mix_profile(
     session,
-    track_id: int,
-    path: Path,
+    capture: SmartMixCapture,
     draft: TrackMixProfileDraft,
-) -> bool:
-    source_revision = smart_mix_source_revision(path)
+) -> SmartMixPublication:
+    if capture.claim_token is not None and not _owns_smart_mix_claim(session, capture):
+        return SmartMixPublication.LOST_CLAIM
+    track_path = session.execute(
+        text("SELECT path FROM library_tracks WHERE id = :track_id FOR SHARE"),
+        {"track_id": capture.track_id},
+    ).scalar_one_or_none()
+    if track_path != capture.path:
+        _release_smart_mix_claim(session, capture)
+        return SmartMixPublication.TRACK_MOVED
     current = session.execute(
         select(
+            TrackMixProfileRow.profile_revision,
             TrackMixProfileRow.profile_version,
             TrackMixProfileRow.source_revision,
+            TrackMixProfileRow.analyzer,
             TrackMixProfileRow.analyzer_version,
             TrackMixProfileRow.quality,
-        ).where(TrackMixProfileRow.track_id == track_id)
+        )
+        .where(TrackMixProfileRow.track_id == capture.track_id)
+        .with_for_update()
     ).first()
+    current_revision = current.profile_revision if current else None
     if (
-        current
-        and current.profile_version == 1
-        and current.source_revision == source_revision
-        and (current.analyzer_version == draft.analyzer_version)
-        and current.quality != MixProfileQuality.UNAVAILABLE.value
+        capture.expected_profile_revision is not ANY_PROFILE_REVISION
+        and current_revision != capture.expected_profile_revision
     ):
-        _complete_smart_mix_state(session, track_id)
-        return False
+        _complete_smart_mix_claim(session, capture)
+        return SmartMixPublication.SUPERSEDED
+    if not _replaces_current_profile(current, capture.source_revision, draft):
+        _complete_smart_mix_claim(session, capture)
+        return SmartMixPublication.UNCHANGED
     stored = upsert_track_mix_profile_draft(
-        track_id,
-        source_revision,
+        capture.track_id,
+        capture.source_revision,
         draft,
+        expected_revision=current_revision,
         session=session,
     )
-    _complete_smart_mix_state(session, track_id)
-    return stored
+    _complete_smart_mix_claim(session, capture)
+    return SmartMixPublication.PUBLISHED if stored else SmartMixPublication.SUPERSEDED
+
+
+def _replaces_current_profile(
+    current: Any,
+    source_revision: str,
+    draft: TrackMixProfileDraft,
+) -> bool:
+    if current is None:
+        return True
+    if (
+        current.profile_version != PROFILE_SCHEMA_VERSION
+        or current.source_revision != source_revision
+        or current.analyzer_version != draft.analyzer_version
+    ):
+        return True
+    current_rank = _QUALITY_RANK[MixProfileQuality(current.quality)]
+    draft_rank = _QUALITY_RANK[MixProfileQuality(draft.quality)]
+    if draft_rank != current_rank:
+        return draft_rank > current_rank
+    return draft.analyzer == _RUST_ANALYZER and current.analyzer != _RUST_ANALYZER
 
 
 def record_smart_mix_failure(
     track_id: int,
     path: str | Path,
     reason: str,
+    *,
+    claim_token: str | None = None,
 ) -> None:
+    capture = SmartMixCapture(
+        track_id=int(track_id),
+        path=str(path),
+        source_revision=smart_mix_source_revision(path),
+        expected_profile_revision=ANY_PROFILE_REVISION,
+        claim_token=claim_token,
+    )
     with transaction_scope() as session:
-        _record_smart_mix_failure(session, track_id, Path(path), reason)
+        _record_smart_mix_failure(session, capture, reason)
 
 
 def _record_smart_mix_failure(
     session,
-    track_id: int,
-    path: Path,
+    capture: SmartMixCapture,
     reason: str,
 ) -> None:
+    if capture.claim_token is not None and not _owns_smart_mix_claim(session, capture):
+        return
     current_quality = session.execute(
         select(TrackMixProfileRow.quality).where(
-            TrackMixProfileRow.track_id == track_id
+            TrackMixProfileRow.track_id == capture.track_id
         )
     ).scalar_one_or_none()
     if current_quality is None:
         upsert_track_mix_profile_draft(
-            track_id,
-            smart_mix_source_revision(path),
+            capture.track_id,
+            capture.source_revision,
             TrackMixProfileDraft(
                 analyzer="crate-python",
                 analyzer_version=SMART_MIX_ANALYZER_VERSION,
                 duration_ms=0,
                 quality=MixProfileQuality.UNAVAILABLE,
             ),
+            expected_revision=None,
             session=session,
         )
+    _set_smart_mix_state(session, capture, "failed", last_error=str(reason)[:2_000])
+
+
+def _owns_smart_mix_claim(session, capture: SmartMixCapture) -> bool:
+    return (
+        session.execute(
+            text(
+                """
+                SELECT 1
+                FROM track_processing_state
+                WHERE track_id = :track_id
+                  AND pipeline = :pipeline
+                  AND state = 'analyzing'
+                  AND claimed_by = :claim_token
+                FOR UPDATE
+                """
+            ),
+            {
+                "track_id": capture.track_id,
+                "pipeline": SMART_MIX_PIPELINE,
+                "claim_token": capture.claim_token,
+            },
+        ).first()
+        is not None
+    )
+
+
+def _complete_smart_mix_claim(session, capture: SmartMixCapture) -> None:
+    _set_smart_mix_state(session, capture, "done")
+
+
+def _release_smart_mix_claim(session, capture: SmartMixCapture) -> None:
+    if capture.claim_token is None:
+        return
     session.execute(
         text(
             """
-            INSERT INTO track_processing_state (
-                track_id, pipeline, state, attempts, priority,
-                last_error, updated_at
-            )
-            VALUES (
-                :track_id, :pipeline, 'failed', 1, 5,
-                :last_error, NOW()
-            )
-            ON CONFLICT (track_id, pipeline) DO UPDATE SET
-                state = 'failed',
+            UPDATE track_processing_state
+            SET state = 'pending',
                 claimed_by = NULL,
                 claimed_at = NULL,
-                last_error = EXCLUDED.last_error,
+                attempts = GREATEST(attempts - 1, 0),
                 updated_at = NOW()
+            WHERE track_id = :track_id
+              AND pipeline = :pipeline
+              AND claimed_by = :claim_token
             """
         ),
         {
-            "track_id": track_id,
+            "track_id": capture.track_id,
             "pipeline": SMART_MIX_PIPELINE,
-            "last_error": str(reason)[:2_000],
+            "claim_token": capture.claim_token,
         },
     )
 
 
-def _complete_smart_mix_state(session, track_id: int) -> None:
+def _set_smart_mix_state(
+    session,
+    capture: SmartMixCapture,
+    state: str,
+    *,
+    last_error: str | None = None,
+) -> None:
+    params = {
+        "track_id": capture.track_id,
+        "pipeline": SMART_MIX_PIPELINE,
+        "state": state,
+        "last_error": last_error,
+        "claim_token": capture.claim_token,
+    }
+    if capture.claim_token is not None:
+        session.execute(
+            text(
+                """
+                UPDATE track_processing_state
+                SET state = :state,
+                    claimed_by = NULL,
+                    claimed_at = NULL,
+                    last_error = :last_error,
+                    completed_at = CASE WHEN :state = 'done' THEN NOW() END,
+                    updated_at = NOW()
+                WHERE track_id = :track_id
+                  AND pipeline = :pipeline
+                  AND claimed_by = :claim_token
+                """
+            ),
+            params,
+        )
+        return
     session.execute(
         text(
             """
@@ -553,19 +727,21 @@ def _complete_smart_mix_state(session, track_id: int) -> None:
                 last_error, completed_at, updated_at
             )
             VALUES (
-                :track_id, :pipeline, 'done', 1, 5,
-                NULL, NOW(), NOW()
+                :track_id, :pipeline, :state, 1, 5, :last_error,
+                CASE WHEN :state = 'done' THEN NOW() END, NOW()
             )
             ON CONFLICT (track_id, pipeline) DO UPDATE SET
-                state = 'done',
+                state = EXCLUDED.state,
                 claimed_by = NULL,
                 claimed_at = NULL,
-                last_error = NULL,
-                completed_at = NOW(),
+                last_error = EXCLUDED.last_error,
+                completed_at = EXCLUDED.completed_at,
                 updated_at = NOW()
+            WHERE track_processing_state.state <> 'analyzing'
+               OR track_processing_state.claimed_at < NOW() - INTERVAL '2 hours'
             """
         ),
-        {"track_id": track_id, "pipeline": SMART_MIX_PIPELINE},
+        params,
     )
 
 
@@ -613,6 +789,10 @@ def _draft_from_payload(payload: dict[str, Any]) -> TrackMixProfileDraft:
 __all__ = [
     "mark_done",
     "mark_failed",
+    "SmartMixCapture",
+    "SmartMixPublication",
+    "capture_smart_mix_source",
+    "publish_smart_mix_profile",
     "record_smart_mix_failure",
     "resolve_smart_mix_track",
     "smart_mix_source_revision",

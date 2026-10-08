@@ -16,9 +16,11 @@ from crate.db.jobs.analysis import (
     update_album_popularity as _db_update_album_popularity,
 )
 from crate.db.jobs.analysis_storage import (
+    SmartMixPublication,
+    capture_smart_mix_source,
+    publish_smart_mix_profile,
     record_smart_mix_failure,
     resolve_smart_mix_track,
-    store_smart_mix_profile_result,
 )
 from crate.db.jobs.smart_mix_backfill import (
     claim_smart_mix_backfill_batch,
@@ -1113,32 +1115,36 @@ def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) 
 
     track_id = int(track["id"])
     path = str(track["path"])
+    claim_token = params.get("claim_token")
+    capture = capture_smart_mix_source(track_id, path, claim_token=claim_token)
     try:
         from crate.audio_analysis import analyze_mix_profile
 
         draft = analyze_mix_profile(path)
-        stored = store_smart_mix_profile_result(track_id, path, draft)
     except Exception as exc:
-        record_smart_mix_failure(track_id, path, str(exc))
+        record_smart_mix_failure(track_id, path, str(exc), claim_token=claim_token)
         log.warning("Smart Mix analysis failed for %s", path, exc_info=True)
         return {
             "error": f"Smart Mix analysis failed: {exc}",
             "track_id": track_id,
         }
 
-    emit_task_event(
-        task_id,
-        "info",
-        {
-            "message": "Smart Mix profile ready",
-            "track_id": track_id,
-            "quality": str(draft.quality),
-            "stored": stored,
-        },
-    )
+    outcome = publish_smart_mix_profile(capture, draft)
+    stored = outcome is SmartMixPublication.PUBLISHED
+    if stored:
+        emit_task_event(
+            task_id,
+            "info",
+            {
+                "message": "Smart Mix profile ready",
+                "track_id": track_id,
+                "quality": str(draft.quality),
+            },
+        )
     return {
         "track_id": track_id,
         "stored": stored,
+        "outcome": str(outcome),
         "quality": str(draft.quality),
     }
 
@@ -1183,6 +1189,7 @@ def _handle_backfill_smart_mix_profiles(
             {
                 "track_id": track_id,
                 "track_entity_uid": track.get("entity_uid"),
+                "claim_token": track.get("claim_token"),
             },
             dedup_key=f"smart-mix-profile:{track_id}",
         )

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import socket
+import uuid
 from typing import Any, Sequence
 
 from sqlalchemy import text
@@ -145,7 +146,9 @@ def claim_smart_mix_backfill_batch(
             .mappings()
             .all()
         )
+        claimed = []
         for row in rows:
+            claim_token = f"{worker}:{uuid.uuid4().hex}"
             active_session.execute(
                 text(
                     """
@@ -171,11 +174,12 @@ def claim_smart_mix_backfill_batch(
                 {
                     "track_id": int(row["id"]),
                     "pipeline": SMART_MIX_PIPELINE,
-                    "claimed_by": worker,
+                    "claimed_by": claim_token,
                     "priority": int(row["priority"]),
                 },
             )
-        return [dict(row) for row in rows]
+            claimed.append({**dict(row), "claim_token": claim_token})
+        return claimed
 
 
 def release_smart_mix_claims(track_ids: Sequence[int], *, session=None) -> int:

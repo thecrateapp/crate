@@ -6,12 +6,16 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 import hashlib
 import json
+from typing import Any
 
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from crate.db.orm.library import LibraryTrack
-from crate.db.repositories.smart_mix import upsert_track_mix_profile
+from crate.db.repositories.smart_mix import (
+    ANY_PROFILE_REVISION,
+    upsert_track_mix_profile,
+)
 from crate.db.tx import optional_scope
 from crate.smart_mix.beat_grid import FORMAT_NAME
 from crate.smart_mix.models import TrackMixProfile, TrackMixProfileDraft
@@ -131,6 +135,7 @@ def upsert_track_mix_profile_draft(
     source_revision: str,
     draft: TrackMixProfileDraft,
     *,
+    expected_revision: Any = ANY_PROFILE_REVISION,
     session: Session | None = None,
 ) -> bool:
     def _impl(active_session: Session) -> bool:
@@ -190,6 +195,7 @@ def upsert_track_mix_profile_draft(
         return upsert_track_mix_profile(
             track_id,
             profile,
+            expected_revision=expected_revision,
             session=active_session,
         )
 

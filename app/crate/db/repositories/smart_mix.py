@@ -20,10 +20,14 @@ from crate.smart_mix.beat_grid import (
 from crate.smart_mix.models import MixProfileQuality, TrackMixProfile
 
 
+ANY_PROFILE_REVISION = object()
+
+
 def upsert_track_mix_profile(
     track_id: int,
     profile: TrackMixProfile,
     *,
+    expected_revision: Any = ANY_PROFILE_REVISION,
     session=None,
 ) -> bool:
     beat_grid_data = _encode_profile_grid(profile)
@@ -34,11 +38,20 @@ def upsert_track_mix_profile(
         key: getattr(excluded, key) for key in values if key not in {"track_id"}
     }
     update_values["updated_at"] = func.now()
-    statement = statement.on_conflict_do_update(
-        index_elements=[TrackMixProfileRow.track_id],
-        set_=update_values,
-        where=(TrackMixProfileRow.profile_revision != excluded.profile_revision),
-    ).returning(TrackMixProfileRow.track_id)
+    if expected_revision is None:
+        statement = statement.on_conflict_do_nothing(
+            index_elements=[TrackMixProfileRow.track_id]
+        ).returning(TrackMixProfileRow.track_id)
+    else:
+        statement = statement.on_conflict_do_update(
+            index_elements=[TrackMixProfileRow.track_id],
+            set_=update_values,
+            where=(
+                TrackMixProfileRow.profile_revision != excluded.profile_revision
+                if expected_revision is ANY_PROFILE_REVISION
+                else TrackMixProfileRow.profile_revision == expected_revision
+            ),
+        ).returning(TrackMixProfileRow.track_id)
     with optional_scope(session) as active_session:
         return active_session.execute(statement).scalar_one_or_none() is not None
 
