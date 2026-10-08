@@ -58,6 +58,7 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func update(_ call: CAPPluginCall) {
         configureAudioSession()
+        disableIntervalCommands()
 
         let title = call.getString("title", "Crate")
         let artist = call.getString("artist", "")
@@ -222,6 +223,7 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
         commandCenter.nextTrackCommand.isEnabled = true
         commandCenter.previousTrackCommand.isEnabled = true
         commandCenter.changePlaybackPositionCommand.isEnabled = true
+        disableIntervalCommands(commandCenter)
 
         remoteCommandTokens.append((commandCenter.playCommand, commandCenter.playCommand.addTarget { [weak self] _ in
             self?.sendControl("play")
@@ -246,6 +248,13 @@ class CrateMediaSessionPlugin: CAPPlugin, CAPBridgedPlugin {
             self?.sendControl("seekTo", position: event.positionTime)
             return .success
         }))
+    }
+
+    private func disableIntervalCommands(_ commandCenter: MPRemoteCommandCenter = .shared()) {
+        commandCenter.skipForwardCommand.isEnabled = false
+        commandCenter.skipBackwardCommand.isEnabled = false
+        commandCenter.seekForwardCommand.isEnabled = false
+        commandCenter.seekBackwardCommand.isEnabled = false
     }
 
     private func sendControl(

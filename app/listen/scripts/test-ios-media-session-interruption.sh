@@ -10,6 +10,14 @@ grep -q 'sendControl("pause", source: "audio-interruption")' \
   "$SOURCE_DIR/CrateMediaSessionPlugin.swift"
 grep -q 'sendControl("play", source: "audio-interruption-resume")' \
   "$SOURCE_DIR/CrateMediaSessionPlugin.swift"
+grep -q 'commandCenter.skipForwardCommand.isEnabled = false' \
+  "$SOURCE_DIR/CrateMediaSessionPlugin.swift"
+grep -q 'commandCenter.skipBackwardCommand.isEnabled = false' \
+  "$SOURCE_DIR/CrateMediaSessionPlugin.swift"
+grep -q 'commandCenter.nextTrackCommand.isEnabled = true' \
+  "$SOURCE_DIR/CrateMediaSessionPlugin.swift"
+grep -q 'commandCenter.previousTrackCommand.isEnabled = true' \
+  "$SOURCE_DIR/CrateMediaSessionPlugin.swift"
 
 swiftc \
   "$SOURCE_DIR/MediaSessionInterruptionState.swift" \
