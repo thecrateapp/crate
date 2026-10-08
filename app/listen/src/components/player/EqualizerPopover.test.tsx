@@ -27,4 +27,14 @@ describe("EqualizerPopover", () => {
     expect(container.innerHTML).not.toContain("bg-black");
     expect(container.innerHTML).not.toContain("rgba(");
   });
+
+  it("cancels the native dialog left inset so it anchors to the right", () => {
+    renderWithListenProviders(<EqualizerPopover open onClose={vi.fn()} />);
+
+    expect(screen.getByRole("dialog", { name: "Equalizer" })).toHaveClass(
+      "right-3",
+      "left-auto",
+      "m-0",
+    );
+  });
 });
