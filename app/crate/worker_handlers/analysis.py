@@ -194,6 +194,29 @@ def _handle_refresh_user_stats_dashboard_snapshot(
     return {"ok": True, "user_id": user_id, "window": window}
 
 
+def _handle_refresh_instance_stats_dashboard_snapshot(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    del task_id, config
+    from crate.api.cache_events import broadcast_invalidation
+    from crate.db.instance_stats_dashboard_surface import (
+        refresh_instance_stats_dashboard_snapshot,
+    )
+
+    window = str(params.get("window") or "30d")
+    refresh_instance_stats_dashboard_snapshot(
+        window=window,
+        month=params.get("month"),
+        tracks_limit=int(params.get("tracks_limit") or 12),
+        artists_limit=int(params.get("artists_limit") or 10),
+        albums_limit=int(params.get("albums_limit") or 12),
+        genres_limit=int(params.get("genres_limit") or 10),
+        replay_limit=int(params.get("replay_limit") or 36),
+    )
+    broadcast_invalidation("history")
+    return {"ok": True, "window": window}
+
+
 def _handle_analyze_album_full(task_id: str, params: dict, config: dict) -> dict:
     """Analyze audio + compute bliss vectors for a single album."""
     artist = params.get("artist", "")
@@ -1103,6 +1126,7 @@ ANALYSIS_TASK_HANDLERS: dict[str, TaskHandler] = {
     "refresh_user_listening_stats": _handle_refresh_user_listening_stats,
     "refresh_home_discovery_snapshot": _handle_refresh_home_discovery_snapshot,
     "refresh_user_stats_dashboard_snapshot": _handle_refresh_user_stats_dashboard_snapshot,
+    "refresh_instance_stats_dashboard_snapshot": _handle_refresh_instance_stats_dashboard_snapshot,
     "index_genres": _handle_index_genres,
     "infer_genre_taxonomy": _handle_infer_genre_taxonomy,
     "rebuild_genre_taxonomy_proposals": _handle_rebuild_genre_taxonomy_proposals,

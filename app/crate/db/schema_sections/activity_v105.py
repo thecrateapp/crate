@@ -83,3 +83,6 @@ def create_listening_projections_v105_schema(cur: Any) -> None:
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_user_listening_sessions_end ON user_listening_sessions(user_id, ended_at)"
     )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_artist_stats_artist ON user_artist_stats(stat_window, artist_name, play_count)"
+    )

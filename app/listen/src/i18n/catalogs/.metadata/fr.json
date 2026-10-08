@@ -6639,6 +6639,14 @@
     "sourceHash": "sha256:240fb9a9bd936caabcb180f8b54b49407f82d43e689d97073c720272b9f107c6",
     "reviewedAt": "2026-10-08T00:23:45.012Z"
   },
+  "stats.artistOfPeriod.topPercent": {
+    "sourceHash": "sha256:91b42c354bb3b709bdd8681c922ffa09b930b70dd53ac2b90fb1338087ffd7ea",
+    "reviewedAt": "2026-10-08T00:47:13.880Z"
+  },
+  "stats.artistOfPeriod.topPercentLabel": {
+    "sourceHash": "sha256:ef4849168114e27f19cd4c66c3420ef97136025de538475f5a51f2aaf2c83b12",
+    "reviewedAt": "2026-10-08T00:47:13.880Z"
+  },
   "stats.discoveries.empty": {
     "sourceHash": "sha256:abc05770067adcd5559b5f476f338232c87694eedc76f2446d560bf755538019",
     "reviewedAt": "2026-10-08T00:23:45.012Z"

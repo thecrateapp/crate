@@ -1868,6 +1868,8 @@
   "stats.artistOfPeriod.listened": "listened",
   "stats.artistOfPeriod.topAlbum": "most played album",
   "stats.artistOfPeriod.activeDays": "days with them",
+  "stats.artistOfPeriod.topPercent": "top {percent}%",
+  "stats.artistOfPeriod.topPercentLabel": "of their listeners on Crate",
   "stats.highlights.longestStreak": "Longest streak",
   "stats.highlights.streakDetail": "{count, plural, =0 {No current streak} one {Current streak: # day} other {Current streak: # days}}",
   "stats.highlights.newArtists": "New artists",

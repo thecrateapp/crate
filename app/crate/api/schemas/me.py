@@ -726,6 +726,8 @@ class StatsHighlightsResponse(BaseModel):
 
 class StatsArtistOfPeriodResponse(BaseModel):
     artist_name: str
+    listener_count: int | None = None
+    listener_top_percent: int | None = None
     artist_id: int | None = None
     artist_slug: str | None = None
     global_artist_uid: str | None = None

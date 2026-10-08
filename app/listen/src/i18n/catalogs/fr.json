@@ -1860,6 +1860,8 @@
   "stats.artistOfPeriod.listened": "écoutées",
   "stats.artistOfPeriod.topAlbum": "album le plus écouté",
   "stats.artistOfPeriod.activeDays": "jours avec lui",
+  "stats.artistOfPeriod.topPercent": "top {percent} %",
+  "stats.artistOfPeriod.topPercentLabel": "de ses auditeurs sur Crate",
   "stats.highlights.longestStreak": "Plus longue série",
   "stats.highlights.streakDetail": "{count, plural, =0 {Aucune série en cours} one {Série en cours : # jour} other {Série en cours : # jours}}",
   "stats.highlights.newArtists": "Nouveaux artistes",

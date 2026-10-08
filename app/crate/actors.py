@@ -122,6 +122,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "refresh_user_listening_stats": TaskPoolConfig("fast", 1, 300, 0),
     "refresh_home_discovery_snapshot": TaskPoolConfig("fast", 1, 120, 1),
     "refresh_user_stats_dashboard_snapshot": TaskPoolConfig("fast", 1, 300, 1),
+    "refresh_instance_stats_dashboard_snapshot": TaskPoolConfig("fast", 1, 600, 1),
     "refresh_probable_setlist": TaskPoolConfig("fast", 1, 180, 3),
     "generate_cast_spectrum": TaskPoolConfig("heavy", 1, 1200, 2),
     # New content processing (priority 1)

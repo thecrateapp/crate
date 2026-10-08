@@ -131,6 +131,7 @@ function signalDashboard(): StatsDashboard {
     },
     artist_of_period: {
       artist_name: "Converge",
+      listener_top_percent: 3,
       artist_id: 8,
       artist_slug: "converge",
       plays: 204,
@@ -270,6 +271,8 @@ describe("Stats page", () => {
     expect(screen.getByText("artistas")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Converge" })).toBeInTheDocument();
     expect(screen.getByText("Tu artista del periodo")).toBeInTheDocument();
+    expect(screen.getByText("top 3%")).toBeInTheDocument();
+    expect(screen.getByText("de sus oyentes en Crate")).toBeInTheDocument();
     expect(screen.getByText("Racha más larga")).toBeInTheDocument();
     expect(screen.getAllByText("Spectral Wound").length).toBeGreaterThan(0);
     expect(screen.getByText("31×")).toBeInTheDocument();

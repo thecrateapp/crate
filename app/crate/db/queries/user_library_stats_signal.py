@@ -6,6 +6,7 @@ every query is bounded by ``(user_id, day)``.
 
 from __future__ import annotations
 
+import math
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -67,7 +68,9 @@ def _range(session, user_id: int, period: StatsPeriod) -> tuple[date, date] | No
     end = period.end or period.today + timedelta(days=1)
     if start is None:
         start = session.execute(
-            text("SELECT MIN(day) FROM user_daily_listening WHERE user_id = :user_id"),
+            text(
+                "SELECT MIN(day) FROM user_daily_listening WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id)"
+            ),
             {"user_id": user_id},
         ).scalar_one_or_none()
         if start is None:
@@ -106,7 +109,7 @@ def _tape(session, user_id: int, period: StatsPeriod) -> dict | None:
                            SUM(minutes_listened) AS minutes,
                            SUM(play_count) AS plays
                     FROM user_daily_listening
-                    WHERE user_id = :user_id AND day >= :start AND day <= :last
+                    WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id) AND day >= :start AND day <= :last
                     GROUP BY 1
                 )
                 SELECT b.bucket, l.minutes, l.plays
@@ -136,7 +139,7 @@ def _tape(session, user_id: int, period: StatsPeriod) -> dict | None:
                          / NULLIF(SUM(td.minutes_listened) FILTER (WHERE lt.valence IS NOT NULL), 0) AS valence
                 FROM user_track_daily td
                 JOIN library_tracks lt ON lt.id = td.track_id
-                WHERE td.user_id = :user_id AND td.day >= :start AND td.day <= :last
+                WHERE (CAST(:user_id AS integer) IS NULL OR td.user_id = :user_id) AND td.day >= :start AND td.day <= :last
                 GROUP BY 1
                 ORDER BY 1
                 """
@@ -167,7 +170,7 @@ def _tape(session, user_id: int, period: StatsPeriod) -> dict | None:
                     SELECT date_trunc('month', day)::date AS month, artist, album,
                            SUM(play_count) AS plays, SUM(minutes_listened) AS minutes
                     FROM user_track_daily
-                    WHERE user_id = :user_id AND day >= :start AND day <= :last
+                    WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id) AND day >= :start AND day <= :last
                     GROUP BY 1, 2, 3
                 ),
                 totals AS (
@@ -227,7 +230,7 @@ def _peaks(session, user_id: int, params: dict, weekly: bool) -> list[dict]:
                 SELECT {bucket} AS bucket, td.day, td.play_count AS value, {_TRACK_REF_SQL}
                 FROM user_track_daily td
                 {_TRACK_REF_JOINS}
-                WHERE td.user_id = :user_id AND td.day >= :start AND td.day <= :last
+                WHERE (CAST(:user_id AS integer) IS NULL OR td.user_id = :user_id) AND td.day >= :start AND td.day <= :last
                   AND td.entity_key != 'unknown-track'
                 ORDER BY td.play_count DESC, td.minutes_listened DESC, td.day DESC
                 LIMIT 1
@@ -245,10 +248,11 @@ def _peaks(session, user_id: int, params: dict, weekly: bool) -> list[dict]:
             text(
                 f"""
                 SELECT {bucket.replace("td.", "d.")} AS bucket, d.day,
-                       d.minutes_listened AS value
+                       SUM(d.minutes_listened) AS value
                 FROM user_daily_listening d
-                WHERE d.user_id = :user_id AND d.day >= :start AND d.day <= :last
-                ORDER BY d.minutes_listened DESC, d.day DESC
+                WHERE (CAST(:user_id AS integer) IS NULL OR d.user_id = :user_id) AND d.day >= :start AND d.day <= :last
+                GROUP BY d.day
+                ORDER BY value DESC, d.day DESC
                 LIMIT 1
                 """
             ),
@@ -277,7 +281,7 @@ def _peaks(session, user_id: int, params: dict, weekly: bool) -> list[dict]:
                 JOIN user_track_daily td
                   ON td.user_id = f.user_id AND td.artist = f.entity_key
                  AND td.day >= :start AND td.day <= :last
-                WHERE f.user_id = :user_id AND f.entity_type = 'artist'
+                WHERE (CAST(:user_id AS integer) IS NULL OR f.user_id = :user_id) AND f.entity_type = 'artist'
                   AND f.first_day >= :start AND f.first_day <= :last
                 GROUP BY f.first_day, f.entity_key
                 ORDER BY value DESC, f.first_day
@@ -334,7 +338,7 @@ def _streaks(session, user_id: int, period: StatsPeriod) -> tuple[dict | None, d
                 WITH days AS (
                     SELECT day, day - (ROW_NUMBER() OVER (ORDER BY day))::integer AS run
                     FROM user_daily_listening
-                    WHERE user_id = :user_id AND play_count > 0
+                    WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id) AND play_count > 0
                       AND {period_day_filter(period)}
                 )
                 SELECT MIN(day) AS start, MAX(day) AS end, COUNT(*)::integer AS days
@@ -355,7 +359,7 @@ def _streaks(session, user_id: int, period: StatsPeriod) -> tuple[dict | None, d
             WITH recent AS (
                 SELECT day, day - (ROW_NUMBER() OVER (ORDER BY day DESC))::integer * -1 AS run
                 FROM user_daily_listening
-                WHERE user_id = :user_id AND play_count > 0 AND day <= :today
+                WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id) AND play_count > 0 AND day <= :today
             ),
             latest AS (
                 SELECT run FROM recent ORDER BY day DESC LIMIT 1
@@ -402,7 +406,7 @@ def _highlights(session, user_id: int, period: StatsPeriod) -> dict:
                 f"""
                 WITH new_artists AS (
                     SELECT entity_key FROM user_entity_firsts
-                    WHERE user_id = :user_id AND entity_type = 'artist'
+                    WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id) AND entity_type = 'artist'
                       AND {period_day_filter(period, "first_day")}
                 ),
                 minutes AS (
@@ -411,7 +415,7 @@ def _highlights(session, user_id: int, period: StatsPeriod) -> dict:
                                WHERE artist IN (SELECT entity_key FROM new_artists)
                            ) AS discovered
                     FROM user_track_daily
-                    WHERE user_id = :user_id AND {period_day_filter(period)}
+                    WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id) AND {period_day_filter(period)}
                 )
                 SELECT (SELECT COUNT(*) FROM new_artists)::integer AS count,
                        COALESCE(discovered / NULLIF(total, 0), 0) AS share
@@ -426,7 +430,7 @@ def _highlights(session, user_id: int, period: StatsPeriod) -> dict:
             f"""
             SELECT COUNT(DISTINCT artist)::integer
             FROM user_track_daily
-            WHERE user_id = :user_id AND artist != '' AND {period_day_filter(period)}
+            WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id) AND artist != '' AND {period_day_filter(period)}
             """
         ),
         params,
@@ -438,7 +442,7 @@ def _highlights(session, user_id: int, period: StatsPeriod) -> dict:
                 """
                 SELECT minutes_listened, started_at, ended_at, track_count
                 FROM user_listening_sessions
-                WHERE user_id = :user_id
+                WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id)
                   AND (CAST(:start_utc AS timestamptz) IS NULL OR started_at >= :start_utc)
                   AND (CAST(:end_utc AS timestamptz) IS NULL OR started_at < :end_utc)
                 ORDER BY minutes_listened DESC, started_at DESC
@@ -457,7 +461,7 @@ def _highlights(session, user_id: int, period: StatsPeriod) -> dict:
                 SELECT td.day, td.play_count AS plays, td.minutes_listened, {_TRACK_REF_SQL}
                 FROM user_track_daily td
                 {_TRACK_REF_JOINS}
-                WHERE td.user_id = :user_id AND td.entity_key != 'unknown-track'
+                WHERE (CAST(:user_id AS integer) IS NULL OR td.user_id = :user_id) AND td.entity_key != 'unknown-track'
                   AND {period_day_filter(period, "td.day")}
                 ORDER BY td.play_count DESC, td.minutes_listened DESC, td.day DESC
                 LIMIT 1
@@ -504,7 +508,7 @@ def _artist_of_period(session, user_id: int, period: StatsPeriod) -> dict | None
                            MIN(day) AS first_day_in_period,
                            COUNT(DISTINCT day) AS active_days
                     FROM user_track_daily
-                    WHERE user_id = :user_id AND artist != ''
+                    WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id) AND artist != ''
                       AND {period_day_filter(period)}
                     GROUP BY artist
                     ORDER BY plays DESC, minutes DESC, artist
@@ -514,7 +518,7 @@ def _artist_of_period(session, user_id: int, period: StatsPeriod) -> dict | None
                     SELECT td.album, SUM(td.play_count) AS plays
                     FROM user_track_daily td
                     JOIN artists a ON a.artist = td.artist
-                    WHERE td.user_id = :user_id AND td.album != ''
+                    WHERE (CAST(:user_id AS integer) IS NULL OR td.user_id = :user_id) AND td.album != ''
                       AND {period_day_filter(period, "td.day")}
                     GROUP BY td.album
                     ORDER BY plays DESC, td.album
@@ -528,9 +532,12 @@ def _artist_of_period(session, user_id: int, period: StatsPeriod) -> dict | None
                        alb.id AS album_id, alb.slug AS album_slug,
                        gcalb.global_album_uid::text AS global_album_uid
                 FROM artists a
-                LEFT JOIN user_entity_firsts f
-                  ON f.user_id = :user_id AND f.entity_type = 'artist'
-                 AND f.entity_key = a.artist
+                LEFT JOIN LATERAL (
+                    SELECT MIN(first_day) AS first_day
+                    FROM user_entity_firsts
+                    WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id)
+                      AND entity_type = 'artist' AND entity_key = a.artist
+                ) f ON TRUE
                 LEFT JOIN library_artists la ON la.name = a.artist
                 LEFT JOIN LATERAL (
                     SELECT global_artist_uid FROM global_catalog_artists
@@ -552,7 +559,14 @@ def _artist_of_period(session, user_id: int, period: StatsPeriod) -> dict | None
     )
     if not row:
         return None
+    standing = (
+        _listener_standing(session, row["artist"], int(row["plays"]), period)
+        if user_id is not None
+        else None
+    )
     return {
+        "listener_count": standing["listeners"] if standing else None,
+        "listener_top_percent": standing["top_percent"] if standing else None,
         "artist_name": row["artist"],
         "artist_id": row["artist_id"],
         "artist_slug": row["artist_slug"],
@@ -574,6 +588,29 @@ def _artist_of_period(session, user_id: int, period: StatsPeriod) -> dict | None
     }
 
 
+_MIN_LISTENERS_FOR_RANK = 5
+
+
+def _listener_standing(session, artist: str, plays: int, period: StatsPeriod):
+    if period.key.startswith("month:"):
+        return None
+    row = session.execute(
+        text(
+            """
+            SELECT COUNT(*)::integer AS listeners,
+                   COUNT(*) FILTER (WHERE play_count > :plays)::integer AS above
+            FROM user_artist_stats
+            WHERE stat_window = :window AND artist_name = :artist
+            """
+        ),
+        {"window": period.key, "artist": artist, "plays": plays},
+    ).one()
+    if row.listeners < _MIN_LISTENERS_FOR_RANK:
+        return None
+    top_percent = max(1, math.ceil((row.above + 1) * 100 / row.listeners))
+    return {"listeners": int(row.listeners), "top_percent": int(top_percent)}
+
+
 def _heatmap(session, user_id: int, period: StatsPeriod) -> dict:
     cells = [[0.0] * 24 for _ in range(7)]
     total = 0.0
@@ -584,7 +621,7 @@ def _heatmap(session, user_id: int, period: StatsPeriod) -> dict:
             SELECT (EXTRACT(ISODOW FROM day)::integer - 1) AS weekday, hour,
                    SUM(minutes_listened) AS minutes
             FROM user_hourly_listening
-            WHERE user_id = :user_id AND {period_day_filter(period)}
+            WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id) AND {period_day_filter(period)}
             GROUP BY 1, 2
             """
         ),
@@ -618,7 +655,7 @@ def _music_age(session, user_id: int, period: StatsPeriod) -> dict | None:
             FROM user_track_daily td
             JOIN library_tracks lt ON lt.id = td.track_id
             LEFT JOIN library_albums alb ON alb.id = lt.album_id
-            WHERE td.user_id = :user_id AND {period_day_filter(period, "td.day")}
+            WHERE (CAST(:user_id AS integer) IS NULL OR td.user_id = :user_id) AND {period_day_filter(period, "td.day")}
               AND COALESCE(alb.year, lt.year) ~ '^[0-9]{{4}}'
             GROUP BY 1
             ORDER BY 1
@@ -650,7 +687,7 @@ def _music_age(session, user_id: int, period: StatsPeriod) -> dict | None:
                 FROM user_track_daily td
                 JOIN library_tracks lt ON lt.id = td.track_id
                 JOIN library_albums alb ON alb.id = lt.album_id
-                WHERE td.user_id = :user_id AND {period_day_filter(period, "td.day")}
+                WHERE (CAST(:user_id AS integer) IS NULL OR td.user_id = :user_id) AND {period_day_filter(period, "td.day")}
                   AND alb.year ~ '^[0-9]{{4}}'
                 ORDER BY year, alb.name
                 LIMIT 1
@@ -683,7 +720,7 @@ def _genre_shares(session, user_id: int, filter_sql: str, params: dict) -> list[
                        MIN(first_played_at) AS first_played_at,
                        MAX(last_played_at) AS last_played_at
                 FROM user_track_daily
-                WHERE user_id = :user_id AND COALESCE(genre, '') != ''
+                WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id) AND COALESCE(genre, '') != ''
                   AND {filter_sql}
                 GROUP BY genre
                 """
@@ -726,21 +763,25 @@ def _genre_trend(session, user_id: int, period: StatsPeriod) -> list[dict]:
 def _computed_until(session, user_id: int) -> str | None:
     value = session.execute(
         text(
-            "SELECT refreshed_at FROM user_listening_projection_state WHERE user_id = :user_id"
+            "SELECT MAX(refreshed_at) FROM user_listening_projection_state "
+            "WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id)"
         ),
         {"user_id": user_id},
     ).scalar_one_or_none()
     return _iso(value)
 
 
-def get_stats_signal(session, user_id: int, period: StatsPeriod) -> dict:
+def get_stats_signal(session, user_id: int | None, period: StatsPeriod) -> dict:
+    """Signal sections for one user, or for the whole instance when ``user_id`` is None."""
     return {
         "timezone": period.timezone,
         "provisional": period.provisional,
         "computed_until": _computed_until(session, user_id),
         "metrics_version": METRICS_VERSION,
         "tape": _tape(session, user_id, period),
-        "highlights": _highlights(session, user_id, period),
+        "highlights": None
+        if user_id is None
+        else _highlights(session, user_id, period),
         "artist_of_period": _artist_of_period(session, user_id, period),
         "heatmap": _heatmap(session, user_id, period),
         "music_age": _music_age(session, user_id, period),

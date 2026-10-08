@@ -71,10 +71,19 @@ export function StatsArtistOfPeriod({ artist }: { artist: ArtistOfPeriod }) {
               label={t("stats.artistOfPeriod.topAlbum")}
             />
           ) : null}
-          <Metric
-            value={String(artist.active_days)}
-            label={t("stats.artistOfPeriod.activeDays")}
-          />
+          {artist.listener_top_percent ? (
+            <Metric
+              value={t("stats.artistOfPeriod.topPercent", {
+                percent: artist.listener_top_percent,
+              })}
+              label={t("stats.artistOfPeriod.topPercentLabel")}
+            />
+          ) : (
+            <Metric
+              value={String(artist.active_days)}
+              label={t("stats.artistOfPeriod.activeDays")}
+            />
+          )}
         </dl>
       </div>
     </section>

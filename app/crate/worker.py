@@ -570,6 +570,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "refresh_user_listening_stats",
             "refresh_home_discovery_snapshot",
             "refresh_user_stats_dashboard_snapshot",
+            "refresh_instance_stats_dashboard_snapshot",
             "index_genres",
             "infer_genre_taxonomy",
             "rebuild_genre_taxonomy_proposals",

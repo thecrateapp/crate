@@ -1868,6 +1868,8 @@
   "stats.artistOfPeriod.listened": "escuchado",
   "stats.artistOfPeriod.topAlbum": "disco más escuchado",
   "stats.artistOfPeriod.activeDays": "días con él",
+  "stats.artistOfPeriod.topPercent": "top {percent}%",
+  "stats.artistOfPeriod.topPercentLabel": "de sus oyentes en Crate",
   "stats.highlights.longestStreak": "Racha más larga",
   "stats.highlights.streakDetail": "{count, plural, =0 {Sin racha actual} one {Racha actual: # día} other {Racha actual: # días}}",
   "stats.highlights.newArtists": "Artistas nuevos",

@@ -346,6 +346,8 @@ export interface StatsHighlights {
 
 export interface StatsArtistOfPeriod {
   artist_name: string;
+  listener_count?: number | null;
+  listener_top_percent?: number | null;
   artist_id?: number | null;
   artist_slug?: string | null;
   global_artist_uid?: string | null;

@@ -1860,6 +1860,8 @@
   "stats.artistOfPeriod.listened": "entzunda",
   "stats.artistOfPeriod.topAlbum": "gehien entzundako diskoa",
   "stats.artistOfPeriod.activeDays": "egun berarekin",
+  "stats.artistOfPeriod.topPercent": "%{percent} onenak",
+  "stats.artistOfPeriod.topPercentLabel": "Crateko bere entzuleen artean",
   "stats.highlights.longestStreak": "Bolada luzeena",
   "stats.highlights.streakDetail": "{count, plural, =0 {Ez dago uneko boladarik} one {Uneko bolada: egun #} other {Uneko bolada: # egun}}",
   "stats.highlights.newArtists": "Artista berriak",

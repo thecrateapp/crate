@@ -1860,6 +1860,8 @@
   "stats.artistOfPeriod.listened": "escoltat",
   "stats.artistOfPeriod.topAlbum": "disc més escoltat",
   "stats.artistOfPeriod.activeDays": "dies amb ell",
+  "stats.artistOfPeriod.topPercent": "top {percent}%",
+  "stats.artistOfPeriod.topPercentLabel": "dels seus oients a Crate",
   "stats.highlights.longestStreak": "Ratxa més llarga",
   "stats.highlights.streakDetail": "{count, plural, =0 {Sense ratxa actual} one {Ratxa actual: # dia} other {Ratxa actual: # dies}}",
   "stats.highlights.newArtists": "Artistes nous",

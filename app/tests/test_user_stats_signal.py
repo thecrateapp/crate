@@ -111,3 +111,59 @@ def test_unknown_windows_are_rejected(pg_db):
 
     with pytest.raises(ValueError):
         get_user_stats_dashboard(1, window="year:1900")
+
+
+def test_artist_rank_needs_enough_listeners(pg_db):
+    from sqlalchemy import text
+
+    from crate.db.tx import transaction_scope
+
+    _seed_artist_listeners(listeners=[50, 10, 9, 8, 7, 6], artist="Converge")
+    payload = _dashboard("30d")
+    assert payload["artist_of_period"]["artist_name"] == "Converge"
+    assert payload["artist_of_period"]["listener_count"] == 6
+    assert payload["artist_of_period"]["listener_top_percent"] == 17
+
+    with transaction_scope() as session:
+        session.execute(text("DELETE FROM user_artist_stats WHERE user_id > 3"))
+    assert _dashboard("30d")["artist_of_period"]["listener_top_percent"] is None
+
+
+def _seed_artist_listeners(*, listeners: list[int], artist: str) -> None:
+    from sqlalchemy import text
+
+    from crate.db.tx import transaction_scope
+
+    end_at = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    seed_listening_history(events=200, days=20, end_at=end_at)
+    recompute_user_listening_aggregates(1)
+    with transaction_scope() as session:
+        mine = session.execute(
+            text(
+                "SELECT play_count FROM user_artist_stats "
+                "WHERE user_id = 1 AND stat_window = '30d' ORDER BY play_count DESC LIMIT 1"
+            )
+        ).scalar_one()
+        session.execute(
+            text(
+                "UPDATE user_artist_stats SET play_count = :plays "
+                "WHERE user_id = 1 AND stat_window = '30d' AND artist_name = :artist"
+            ),
+            {"plays": max(listeners[0], mine), "artist": artist},
+        )
+        for index, plays in enumerate(listeners[1:], start=2):
+            session.execute(
+                text(
+                    "INSERT INTO users (id, email, name, role, password_hash, created_at) "
+                    "VALUES (:id, :email, :email, 'user', 'x', NOW()) ON CONFLICT (id) DO NOTHING"
+                ),
+                {"id": 100 + index, "email": f"listener{index}@example.com"},
+            )
+            session.execute(
+                text(
+                    "INSERT INTO user_artist_stats (user_id, stat_window, artist_name, play_count, "
+                    "complete_play_count, minutes_listened, first_played_at, last_played_at) "
+                    "VALUES (:u, '30d', :artist, :plays, 0, 0, NOW(), NOW())"
+                ),
+                {"u": 100 + index, "artist": artist, "plays": plays},
+            )
