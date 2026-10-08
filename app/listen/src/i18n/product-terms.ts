@@ -4,6 +4,7 @@ export const PRODUCT_TERMS = {
   cratePulse: "Crate Pulse",
   crossfade: "Crossfade",
   discoveryRadio: "Discovery Radio",
+  replay: "Replay",
   wrapped: "Wrapped",
 } as const;
 
@@ -16,6 +17,7 @@ export const EXACT_PRODUCT_TERM_KEYS = [
   ["settings.playback.crossfade", PRODUCT_TERMS.crossfade],
   ["radio.discovery", PRODUCT_TERMS.discoveryRadio],
   ["share.kind.wrapped", PRODUCT_TERMS.wrapped],
+  ["stats.signal.playReplay", PRODUCT_TERMS.replay],
 ] as const;
 
 export const CONTAINED_PRODUCT_TERM_KEYS = [

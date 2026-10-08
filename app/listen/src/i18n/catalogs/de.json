@@ -1848,7 +1848,7 @@
   "stats.signal.tip.weekOf": "Woche vom {date}",
   "stats.signal.tip.minutes": "{minutes} · {plays, plural, one {# Wiedergabe} other {# Wiedergaben}}",
   "stats.signal.tip.obsession": "{count}× {title}",
-  "stats.signal.playReplay": "Replay abspielen",
+  "stats.signal.playReplay": "Replay",
   "stats.headline.minutes": "Minuten",
   "stats.headline.plays": "Wiedergaben",
   "stats.headline.activeDays": "aktive Tage",

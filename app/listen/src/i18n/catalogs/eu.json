@@ -1848,7 +1848,7 @@
   "stats.signal.tip.weekOf": "{date}(e)ko astea",
   "stats.signal.tip.minutes": "{minutes} · {plays, plural, one {entzunaldi #} other {# entzunaldi}}",
   "stats.signal.tip.obsession": "{count}× {title}",
-  "stats.signal.playReplay": "Erreproduzitu replay-a",
+  "stats.signal.playReplay": "Replay",
   "stats.headline.minutes": "minutu",
   "stats.headline.plays": "entzunaldi",
   "stats.headline.activeDays": "egun aktibo",

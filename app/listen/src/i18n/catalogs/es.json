@@ -1856,7 +1856,7 @@
   "stats.signal.tip.weekOf": "Semana del {date}",
   "stats.signal.tip.minutes": "{minutes} · {plays, plural, one {# escucha} other {# escuchas}}",
   "stats.signal.tip.obsession": "{count}× {title}",
-  "stats.signal.playReplay": "Reproducir el replay",
+  "stats.signal.playReplay": "Replay",
   "stats.headline.minutes": "minutos",
   "stats.headline.plays": "escuchas",
   "stats.headline.activeDays": "días activos",

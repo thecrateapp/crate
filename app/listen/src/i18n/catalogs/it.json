@@ -1848,7 +1848,7 @@
   "stats.signal.tip.weekOf": "Settimana del {date}",
   "stats.signal.tip.minutes": "{minutes} · {plays, plural, one {# ascolto} other {# ascolti}}",
   "stats.signal.tip.obsession": "{count}× {title}",
-  "stats.signal.playReplay": "Riproduci il replay",
+  "stats.signal.playReplay": "Replay",
   "stats.headline.minutes": "minuti",
   "stats.headline.plays": "ascolti",
   "stats.headline.activeDays": "giorni attivi",

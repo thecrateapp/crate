@@ -1856,7 +1856,7 @@
   "stats.signal.tip.weekOf": "Week of {date}",
   "stats.signal.tip.minutes": "{minutes} · {plays, plural, one {# play} other {# plays}}",
   "stats.signal.tip.obsession": "{count}× {title}",
-  "stats.signal.playReplay": "Play the replay",
+  "stats.signal.playReplay": "Replay",
   "stats.headline.minutes": "minutes",
   "stats.headline.plays": "plays",
   "stats.headline.activeDays": "active days",

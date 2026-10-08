@@ -1848,7 +1848,7 @@
   "stats.signal.tip.weekOf": "Setmana del {date}",
   "stats.signal.tip.minutes": "{minutes} · {plays, plural, one {# escolta} other {# escoltes}}",
   "stats.signal.tip.obsession": "{count}× {title}",
-  "stats.signal.playReplay": "Reprodueix el replay",
+  "stats.signal.playReplay": "Replay",
   "stats.headline.minutes": "minuts",
   "stats.headline.plays": "escoltes",
   "stats.headline.activeDays": "dies actius",
