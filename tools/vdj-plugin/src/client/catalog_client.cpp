@@ -98,7 +98,7 @@ ParseResult<CatalogResults> CatalogClient::get_folder(
     if (!cursor.empty()) {
         url += "cursor=" + encode_path_segment(cursor) + "&";
     }
-    url += "limit=100";
+    url += "limit=500";
     return request(
         std::move(url),
         "folder:" + std::string(folder_id) + ":cursor:" +

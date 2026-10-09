@@ -4,7 +4,10 @@ from unittest.mock import patch
 
 import pytest
 
-from crate.db.queries.vdj_catalog import list_vdj_folders
+
+@pytest.fixture(autouse=True)
+def _vdj_enabled(monkeypatch):
+    monkeypatch.setenv("CRATE_VDJ_ENABLED", "true")
 
 
 async def _catalog_user(_middleware, _request):
@@ -29,14 +32,16 @@ async def _media_only_user(_middleware, _request):
     }
 
 
-def test_vdj_catalog_lists_root_folders(test_app):
+def test_vdj_catalog_lists_the_folders_visible_to_the_token_owner(test_app):
     folders = [
-        {"id": "crate:artists", "name": "Artists"},
-        {"id": "crate:albums", "name": "Albums"},
+        {"id": "crate:recently-played", "name": "Recently Played"},
+        {"id": "crate:playlist:3", "name": "Warmup"},
     ]
     with (
         patch("crate.api.auth.AuthMiddleware.resolve_user", _catalog_user),
-        patch("crate.api.vdj_catalog.list_vdj_folders", return_value=folders),
+        patch(
+            "crate.api.vdj_catalog.list_vdj_folders", return_value=folders
+        ) as list_folders,
     ):
         response = test_app.get("/api/vdj/catalog/folders")
 
@@ -46,17 +51,7 @@ def test_vdj_catalog_lists_root_folders(test_app):
         "tracks": [],
         "next_cursor": None,
     }
-
-
-def test_vdj_catalog_omits_flat_artist_and_album_collections():
-    folder_ids = {folder["id"] for folder in list_vdj_folders()}
-
-    assert folder_ids == {
-        "crate:playlists",
-        "crate:genres",
-        "crate:moods",
-        "crate:recently-played",
-    }
+    list_folders.assert_called_once_with(7)
 
 
 def test_vdj_catalog_folder_returns_bounded_page(test_app):
@@ -78,7 +73,7 @@ def test_vdj_catalog_folder_returns_bounded_page(test_app):
                 "cover_url": "/api/vdj/albums/3/cover?size=512",
             }
         ],
-        "next_cursor": "cursor-1",
+        "next_cursor": None,
     }
     with (
         patch("crate.api.auth.AuthMiddleware.resolve_user", _catalog_user),
@@ -87,18 +82,28 @@ def test_vdj_catalog_folder_returns_bounded_page(test_app):
             return_value=page,
         ) as get_page,
     ):
-        response = test_app.get(
-            "/api/vdj/catalog/folders/crate:artists?cursor=cursor-0&limit=37"
-        )
+        response = test_app.get("/api/vdj/catalog/folders/crate:playlist:3:part:2")
 
     assert response.status_code == 200
     assert response.json() == page
-    get_page.assert_called_once_with(
-        "crate:artists",
-        user_id=7,
-        cursor="cursor-0",
-        limit=37,
-    )
+    get_page.assert_called_once_with("crate:playlist:3:part:2", user_id=7, limit=500)
+
+
+def test_vdj_catalog_folder_rejects_more_than_500_tracks(test_app):
+    with patch("crate.api.auth.AuthMiddleware.resolve_user", _catalog_user):
+        response = test_app.get("/api/vdj/catalog/folders/crate:mood:happy?limit=501")
+
+    assert response.status_code == 422
+
+
+def test_vdj_catalog_unknown_folder_is_not_found(test_app):
+    with (
+        patch("crate.api.auth.AuthMiddleware.resolve_user", _catalog_user),
+        patch("crate.api.vdj_catalog.get_vdj_folder_page", side_effect=KeyError("x")),
+    ):
+        response = test_app.get("/api/vdj/catalog/folders/crate:genres")
+
+    assert response.status_code == 404
 
 
 def test_vdj_catalog_requires_catalog_scope(test_app):
@@ -155,7 +160,7 @@ def test_vdj_catalog_response_never_exposes_server_paths(test_app):
         patch("crate.api.auth.AuthMiddleware.resolve_user", _catalog_user),
         patch("crate.api.vdj_catalog.get_vdj_folder_page", return_value=page),
     ):
-        response = test_app.get("/api/vdj/catalog/folders/crate:genres")
+        response = test_app.get("/api/vdj/catalog/folders/crate:genre:1")
 
     assert response.status_code == 200
     assert "path" not in response.json()["tracks"][0]
@@ -166,4 +171,4 @@ def test_vdj_catalog_query_does_not_select_track_paths():
 
     from crate.db.queries import vdj_catalog
 
-    assert "t.path" not in inspect.getsource(vdj_catalog.get_vdj_folder_page)
+    assert "t.path" not in inspect.getsource(vdj_catalog)

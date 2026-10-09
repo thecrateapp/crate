@@ -22,21 +22,22 @@ int main()
     assert(open_in_crate_menu_label("Spanish") == "Abrir en Crate");
 
     assert(catalog_folder_label(
-               "crate:playlists", "Playlists", "Spanish"
-           ) == "Listas de reproducción");
-    assert(catalog_folder_label("crate:genres", "Genres", "Spanish") ==
-           "Géneros");
-    assert(catalog_folder_label("crate:moods", "Moods", "Spanish") ==
-           "Estados de ánimo");
-    assert(catalog_folder_label(
                "crate:recently-played", "Recently Played", "Spanish"
            ) == "Reproducido recientemente");
-
-    assert(catalog_folder_label(
-               "crate:playlists", "Listas de reproducción", "English"
-           ) == "Playlists");
+    assert(catalog_folder_label("crate:playlist:3", "Warmup", "Spanish") ==
+           "Warmup");
+    assert(catalog_folder_label("crate:genre:7", "post-hardcore", "Spanish") ==
+           "Géneros · post-hardcore");
+    assert(catalog_folder_label("crate:genre:7", "post-hardcore", "English") ==
+           "Genres · post-hardcore");
+    assert(catalog_folder_label("crate:mood:happy", "Happy", "Spanish") ==
+           "Estados de ánimo · Alegre");
+    assert(catalog_folder_label("crate:mood:party", "Party", "English") ==
+           "Moods · Party");
+    assert(catalog_folder_label("crate:mood:unknown", "Unknown", "Spanish") ==
+           "Estados de ánimo · Unknown");
     assert(catalog_folder_label("crate:unknown", "Server label", "Spanish") ==
-           std::string_view("Server label"));
+           "Server label");
 
     return 0;
 }

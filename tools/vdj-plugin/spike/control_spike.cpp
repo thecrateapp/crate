@@ -525,13 +525,13 @@ public:
         }
         const std::string language = language_from_vdj(this);
         for (const auto& folder : result.value->folders) {
-            const std::string_view folder_label =
+            const std::string folder_label =
                 crate::vdj::catalog_folder_label(
                     folder.id,
                     folder.name,
                     language
                 );
-            subfolders_list->add(folder.id.c_str(), folder_label.data());
+            subfolders_list->add(folder.id.c_str(), folder_label.c_str());
         }
         const std::string_view folder_label =
             crate::vdj::compatible_folder_label(language);

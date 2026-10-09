@@ -92,7 +92,7 @@ int main()
     assert(page.value->tracks[0].entity_uid == "track-1");
     assert(page.value->next_cursor == "cursor-1");
     assert(http.request_seen.url ==
-           "https://api.dev.lespedants.org/api/vdj/catalog/folders/crate%3Aplaylists?cursor=cursor-0&limit=100");
+           "https://api.dev.lespedants.org/api/vdj/catalog/folders/crate%3Aplaylists?cursor=cursor-0&limit=500");
 
     MetadataCacheStore cache(":memory:");
     CatalogClient cached_client(

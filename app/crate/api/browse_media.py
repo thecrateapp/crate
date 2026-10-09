@@ -69,6 +69,7 @@ from crate.db.queries.browse_media import (
     get_track_path_by_entity_uid,
 )
 from crate.db.queries.browse_media_favorites import list_favorites
+from crate.db.queries.browse_media_search import parse_dj_query, search_dj_tracks
 from crate.subsonic.services import preferences
 from crate.local_search import search_local_library
 from crate.metrics import record_later
@@ -161,6 +162,16 @@ def _queue_completeness_refresh() -> str:
     return task_id
 
 
+def _without_server_paths(results: dict) -> dict:
+    return {
+        **results,
+        "tracks": [
+            {key: value for key, value in track.items() if key != "path"}
+            for track in results.get("tracks", [])
+        ],
+    }
+
+
 @router.get(
     "/api/search",
     response_model=SearchResponse,
@@ -173,21 +184,34 @@ def api_search(
     q: str = "",
     limit: int = 20,
     scope: str = "local",
+    fields: str | None = None,
 ):
     user = _require_vdj_scope(request, "vdj.catalog.read")
     q_stripped = q.strip()
     capped_limit = max(1, min(limit, 50))
     if len(q_stripped) < 2:
         return {"artists": [], "albums": [], "tracks": []}
+    is_access_token = user.get("auth_type") == "access_token"
+    if fields == "dj":
+        try:
+            parse_dj_query(q_stripped)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {
+            "artists": [],
+            "albums": [],
+            "tracks": search_dj_tracks(q_stripped, capped_limit),
+        }
 
     scope = scope if scope in ("local", "auto", "federated") else "local"
-    if scope != "local" and user.get("auth_type") == "access_token":
+    if scope != "local" and is_access_token:
         raise HTTPException(
             status_code=403,
             detail="Access tokens can only search the local library",
         )
     if scope == "local":
-        return search_local_library(q_stripped, capped_limit)
+        results = search_local_library(q_stripped, capped_limit)
+        return _without_server_paths(results) if is_access_token else results
 
     use_global_catalog = scope == "auto"
     global_catalog_revision = ""

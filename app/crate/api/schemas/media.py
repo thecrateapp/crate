@@ -67,6 +67,8 @@ class TrackRefResponse(IdentityFieldsMixin):
     danceability: float | None = None
     valence: float | None = None
     bliss_vector: list[float] | None = None
+    camelot: str | None = None
+    analysis_required: bool | None = None
 
 
 class FederationSearchStatusResponse(BaseModel):

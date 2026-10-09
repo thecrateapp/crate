@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import re
+import shlex
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import text
@@ -336,7 +338,291 @@ def search_all_hybrid(query: str, limit: int) -> dict[str, list[dict]]:
     }
 
 
+DJ_SEARCH_LIMIT = 50
+_DJ_CANDIDATE_LIMIT = 500
+_CAMELOT_KEY = re.compile(r"^(1[0-2]|[1-9])([AB])$")
+_RANGE = re.compile(r"^(\d+(?:\.\d+)?)(?:-(\d+(?:\.\d+)?))?$")
+
+
+@dataclass(frozen=True, slots=True)
+class DjSearchQuery:
+    text: str = ""
+    artist: str | None = None
+    album: str | None = None
+    bpm_min: float | None = None
+    bpm_max: float | None = None
+    camelot: str | None = None
+    energy_min: float | None = None
+    energy_max: float | None = None
+    analyzed: bool | None = None
+
+    @property
+    def has_filters(self) -> bool:
+        return any(
+            value is not None
+            for value in (
+                self.artist,
+                self.album,
+                self.bpm_min,
+                self.camelot,
+                self.energy_min,
+                self.analyzed,
+            )
+        )
+
+    @property
+    def has_profile_filters(self) -> bool:
+        return (
+            self.bpm_min is not None
+            or self.camelot is not None
+            or self.energy_min is not None
+        )
+
+
+def parse_dj_query(raw: str) -> DjSearchQuery:
+    try:
+        tokens = shlex.split(str(raw or ""))
+    except ValueError as exc:
+        raise ValueError("Unbalanced quotes in search") from exc
+    words: list[str] = []
+    fields: dict[str, Any] = {}
+    for token in tokens:
+        name, separator, value = token.partition(":")
+        name = name.lower()
+        if not separator or name not in {
+            "artist",
+            "album",
+            "bpm",
+            "key",
+            "energy",
+            "analyzed",
+        }:
+            words.append(token)
+            continue
+        if not value:
+            raise ValueError(f"Missing value for {name}:")
+        if name in {"artist", "album"}:
+            fields[name] = value
+        elif name == "bpm":
+            low, high = _parse_range(value, single_margin=1.0)
+            fields["bpm_min"], fields["bpm_max"] = low, high
+        elif name == "energy":
+            low, high = _parse_range(value, single_margin=0.0)
+            if high > 1.0:
+                raise ValueError("energy must be between 0 and 1")
+            fields["energy_min"], fields["energy_max"] = low, high
+        elif name == "key":
+            match = _CAMELOT_KEY.match(value.upper())
+            if match is None:
+                raise ValueError("key must be a Camelot key such as 8A")
+            fields["camelot"] = f"{match.group(1)}{match.group(2)}"
+        elif value.lower() in {"no", "yes"}:
+            fields["analyzed"] = value.lower() == "yes"
+        else:
+            raise ValueError("analyzed must be yes or no")
+    return DjSearchQuery(text=" ".join(words), **fields)
+
+
+def _parse_range(value: str, *, single_margin: float) -> tuple[float, float]:
+    match = _RANGE.match(value)
+    if match is None:
+        raise ValueError(f"Invalid range: {value}")
+    low = float(match.group(1))
+    if match.group(2) is None:
+        return low - single_margin, low + single_margin
+    high = float(match.group(2))
+    if high < low:
+        raise ValueError(f"Invalid range: {value}")
+    return low, high
+
+
+_DJ_TEXT_CANDIDATES = """
+    SELECT id FROM (
+        SELECT id
+        FROM library_tracks
+        WHERE :fts_query IS NOT NULL
+          AND search_vector @@ to_tsquery('simple', :fts_query)
+        ORDER BY ts_rank(search_vector, to_tsquery('simple', :fts_query)) DESC, id
+        LIMIT :candidate_limit
+    ) fts
+    UNION
+    SELECT id FROM (
+        SELECT id
+        FROM library_tracks t
+        WHERE t.title ILIKE :substring ESCAPE '\\'
+           OR t.artist ILIKE :substring ESCAPE '\\'
+           OR t.album ILIKE :substring ESCAPE '\\'
+        ORDER BY id
+        LIMIT :candidate_limit
+    ) substring_matches
+"""
+
+_DJ_NAME_CANDIDATES = """
+    SELECT t.id
+    FROM library_tracks t
+    WHERE (CAST(:artist AS text) IS NULL OR t.artist ILIKE :artist ESCAPE '\\')
+      AND (CAST(:album AS text) IS NULL OR t.album ILIKE :album ESCAPE '\\')
+    ORDER BY t.id
+    LIMIT :candidate_limit
+"""
+
+_DJ_PROFILE_CANDIDATES = """
+    SELECT p.track_id AS id
+    FROM track_mix_profiles p
+    WHERE p.quality <> 'unavailable'
+      AND p.bpm IS NOT NULL
+      AND (CAST(:bpm_min AS double precision) IS NULL OR p.bpm >= :bpm_min)
+      AND (CAST(:bpm_max AS double precision) IS NULL OR p.bpm <= :bpm_max)
+      AND (CAST(:camelot AS text) IS NULL OR p.key_camelot = :camelot)
+      AND (
+          CAST(:energy_min AS double precision) IS NULL
+          OR p.global_energy >= :energy_min
+      )
+      AND (
+          CAST(:energy_max AS double precision) IS NULL
+          OR p.global_energy <= :energy_max
+      )
+    ORDER BY p.bpm, p.track_id
+    LIMIT :candidate_limit
+"""
+
+_DJ_UNANALYZED_CANDIDATES = """
+    SELECT t.id
+    FROM library_tracks t
+    WHERE NOT EXISTS (
+        SELECT 1 FROM track_mix_profiles p
+        WHERE p.track_id = t.id AND p.quality <> 'unavailable'
+    )
+    ORDER BY t.id
+    LIMIT :candidate_limit
+"""
+
+_DJ_RESULTS = """
+    WITH candidates AS MATERIALIZED ({candidates})
+    SELECT
+        t.id,
+        t.entity_uid::text AS entity_uid,
+        t.slug,
+        COALESCE(NULLIF(t.title, ''), t.filename) AS title,
+        t.artist,
+        a.id AS album_id,
+        a.slug AS album_slug,
+        a.entity_uid::text AS album_entity_uid,
+        a.name AS album,
+        a.has_cover,
+        t.duration,
+        COALESCE(NULLIF(t.year, ''), a.year) AS year,
+        COALESCE(
+            NULLIF(t.genre, ''),
+            NULLIF(a.genre, ''),
+            (
+                SELECT g.name
+                FROM album_genres ag
+                JOIN genres g ON g.id = ag.genre_id
+                WHERE ag.album_id = a.id
+                ORDER BY ag.weight DESC NULLS LAST, g.name ASC
+                LIMIT 1
+            )
+        ) AS genre,
+        COALESCE(p.bpm, t.bpm) AS bpm,
+        t.audio_key,
+        t.audio_scale,
+        p.key_camelot AS camelot,
+        p.global_energy AS energy,
+        (p.track_id IS NULL) AS analysis_required,
+        COALESCE(
+            ts_rank(t.search_vector, to_tsquery('simple', :fts_query)), 0
+        ) AS fts_rank
+    FROM candidates c
+    JOIN library_tracks t ON t.id = c.id
+    JOIN library_albums a ON a.id = t.album_id
+    LEFT JOIN track_mix_profiles p
+      ON p.track_id = t.id AND p.quality <> 'unavailable'
+    WHERE (CAST(:artist AS text) IS NULL OR t.artist ILIKE :artist ESCAPE '\\')
+      AND (CAST(:album AS text) IS NULL OR a.name ILIKE :album ESCAPE '\\')
+      AND (CAST(:bpm_min AS double precision) IS NULL OR p.bpm >= :bpm_min)
+      AND (CAST(:bpm_max AS double precision) IS NULL OR p.bpm <= :bpm_max)
+      AND (CAST(:camelot AS text) IS NULL OR p.key_camelot = :camelot)
+      AND (
+          CAST(:energy_min AS double precision) IS NULL
+          OR p.global_energy >= :energy_min
+      )
+      AND (
+          CAST(:energy_max AS double precision) IS NULL
+          OR p.global_energy <= :energy_max
+      )
+      AND (
+          CAST(:analyzed AS boolean) IS NULL
+          OR (p.track_id IS NOT NULL) = :analyzed
+      )
+    ORDER BY fts_rank DESC, LOWER(t.artist), LOWER(a.name), t.track_number, t.id
+    LIMIT :limit
+"""
+
+
+def dj_search_statement(query: DjSearchQuery, limit: int) -> tuple[Any, dict[str, Any]]:
+    normalized = normalize_search_query(query.text)
+    if normalized:
+        candidates = _DJ_TEXT_CANDIDATES
+    elif query.artist is not None or query.album is not None:
+        candidates = _DJ_NAME_CANDIDATES
+    elif query.has_profile_filters:
+        candidates = _DJ_PROFILE_CANDIDATES
+    elif query.analyzed is False:
+        candidates = _DJ_UNANALYZED_CANDIDATES
+    else:
+        candidates = None
+    if candidates is None:
+        raise ValueError("Empty DJ search")
+    params = {
+        "fts_query": build_fts_query(normalized) if normalized else None,
+        "substring": build_substring_pattern(normalized),
+        "artist": build_substring_pattern(query.artist) if query.artist else None,
+        "album": build_substring_pattern(query.album) if query.album else None,
+        "bpm_min": query.bpm_min,
+        "bpm_max": query.bpm_max,
+        "camelot": query.camelot,
+        "energy_min": query.energy_min,
+        "energy_max": query.energy_max,
+        "analyzed": query.analyzed,
+        "candidate_limit": _DJ_CANDIDATE_LIMIT,
+        "limit": max(1, min(int(limit), DJ_SEARCH_LIMIT)),
+    }
+    return text(_DJ_RESULTS.format(candidates=candidates)), params
+
+
+def search_dj_tracks(raw_query: str, limit: int) -> list[dict]:
+    query = parse_dj_query(raw_query)
+    try:
+        statement, params = dj_search_statement(query, limit)
+    except ValueError:
+        return []
+    with read_scope() as session:
+        rows = session.execute(statement, params).mappings().all()
+    return [_dj_track_payload(row) for row in rows]
+
+
+def _dj_track_payload(row: Mapping[Any, Any]) -> dict:
+    item = _serialize_track_row(row)
+    item.pop("fts_rank", None)
+    album_id = item.get("album_id")
+    has_cover = bool(item.get("has_cover"))
+    item["has_cover"] = has_cover
+    item["analysis_required"] = bool(item.get("analysis_required"))
+    item["cover_url"] = (
+        f"/api/vdj/albums/{album_id}/cover?size=512"
+        if album_id is not None and has_cover
+        else None
+    )
+    return item
+
+
 __all__ = [
+    "DJ_SEARCH_LIMIT",
+    "DjSearchQuery",
+    "dj_search_statement",
+    "parse_dj_query",
+    "search_dj_tracks",
     "build_fts_query",
     "build_prefix_pattern",
     "build_substring_pattern",

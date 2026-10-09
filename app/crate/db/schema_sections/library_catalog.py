@@ -3,6 +3,9 @@
 from crate.db.schema_sections.smart_mix_v106 import (
     create_smart_mix_measurement_v106_schema,
 )
+from crate.db.schema_sections.vdj_catalog_v108 import (
+    create_vdj_mood_indexes_v108_schema,
+)
 
 
 def create_library_catalog_schema(cur) -> None:
@@ -377,6 +380,7 @@ def create_library_catalog_schema(cur) -> None:
         ON track_mix_profiles(updated_at DESC)
     """)
     create_smart_mix_measurement_v106_schema(cur)
+    create_vdj_mood_indexes_v108_schema(cur)
     cur.execute("""
         CREATE INDEX IF NOT EXISTS idx_track_mix_profiles_source_revision
         ON track_mix_profiles(source_revision)
