@@ -63,12 +63,12 @@ public class NativeMixControllerTest {
         assertTrue(deckB.calls.contains("envelope:INCOMING:4000:0.0"));
         deckB.envelopeProgress = 0.5f;
         assertEquals(0.5f, controller.transitionProgress(), 0.0f);
-        controller.applyProgress(controller.transitionProgress());
+        controller.applyProgress(controller.executionId(), controller.transitionProgress());
         assertEquals(1, controller.logicalIndex());
         assertEquals(1, listener.handoffs);
 
-        controller.applyProgress(1.0f);
-        controller.applyProgress(1.0f);
+        controller.applyProgress(controller.executionId(), 1.0f);
+        controller.applyProgress(controller.executionId(), 1.0f);
 
         assertEquals(1, controller.logicalIndex());
         assertEquals(1, listener.handoffs);
@@ -141,12 +141,12 @@ public class NativeMixControllerTest {
                 "local_fallback"
             )
         );
-        controller.applyProgress(0.5f);
+        controller.applyProgress(controller.executionId(), 0.5f);
 
         assertEquals(0.5f, deckA.volume, 0.0001f);
         assertEquals(0.5f, deckB.volume, 0.0001f);
 
-        controller.applyProgress(1.0f);
+        controller.applyProgress(controller.executionId(), 1.0f);
         assertEquals(0.5f, deckB.volume, 0.0001f);
         assertEquals("clear-envelope", deckB.calls.get(deckB.calls.size() - 1));
     }
@@ -168,7 +168,7 @@ public class NativeMixControllerTest {
                 "local_fallback"
             )
         );
-        controller.applyProgress(0.25f);
+        controller.applyProgress(controller.executionId(), 0.25f);
 
         assertEquals(0.2f, deckA.volume, 0.0001f);
         assertEquals(0.2f, deckB.volume, 0.0001f);
@@ -214,7 +214,7 @@ public class NativeMixControllerTest {
             )
         );
 
-        controller.applyProgress(0.25f);
+        controller.applyProgress(controller.executionId(), 0.25f);
         controller.cancel("seek");
 
         assertSame(deckA, controller.activeDeck());
@@ -244,7 +244,7 @@ public class NativeMixControllerTest {
         );
         assertTrue(controller.isTransitionActive());
 
-        controller.applyProgress(1.0f);
+        controller.applyProgress(controller.executionId(), 1.0f);
         assertFalse(controller.isTransitionActive());
     }
 
@@ -323,12 +323,23 @@ public class NativeMixControllerTest {
         int failures;
 
         @Override
-        public void onHandoff(int newIndex, NativePlaybackDeck activeDeck) {
+        public void onHandoff(
+            long executionId,
+            int newIndex,
+            NativePlaybackDeck activeDeck
+        ) {
             handoffs++;
         }
 
         @Override
-        public void onCancelled(String reason, boolean afterHandoff) {
+        public void onCompleted(long executionId, int finalIndex) {}
+
+        @Override
+        public void onCancelled(
+            long executionId,
+            String reason,
+            boolean afterHandoff
+        ) {
             cancellations++;
         }
 

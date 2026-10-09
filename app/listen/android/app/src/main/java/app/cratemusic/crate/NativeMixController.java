@@ -5,10 +5,14 @@ import java.util.Collections;
 import java.util.List;
 
 final class NativeMixController {
-    interface Listener {
-        void onHandoff(int newIndex, NativePlaybackDeck activeDeck);
+    static final long STALL_TIMEOUT_MS = 3_000L;
 
-        void onCancelled(String reason, boolean afterHandoff);
+    interface Listener {
+        void onHandoff(long executionId, int newIndex, NativePlaybackDeck activeDeck);
+
+        void onCompleted(long executionId, int finalIndex);
+
+        void onCancelled(long executionId, String reason, boolean afterHandoff);
 
         void onFailed(String reason);
     }
@@ -29,6 +33,9 @@ final class NativeMixController {
     private boolean handoffComplete;
     private boolean standbyPreparationFailed;
     private long standbyPreparedCueMs;
+    private long executionId;
+    private float observedProgress = -1.0f;
+    private long observedProgressAtMs;
     private float outputVolume = 1.0f;
     private float duckMultiplier = 1.0f;
 
@@ -90,6 +97,14 @@ final class NativeMixController {
     }
 
     void updateQueue(List<NativeTrack> tracks, String currentTrackId) {
+        if (activePlan != null && keepsMixedEdge(tracks)) {
+            queue.clear();
+            queue.addAll(tracks);
+            logicalIndex = indexOf(
+                handoffComplete ? activePlan.incomingTrackId : activePlan.outgoingTrackId
+            );
+            return;
+        }
         cancel("queue_updated");
         queue.clear();
         if (tracks != null) {
@@ -187,6 +202,8 @@ final class NativeMixController {
         stateMachine.transitionTo(NativeTransitionState.PREPARING);
         stateMachine.transitionTo(NativeTransitionState.ARMED);
 
+        executionId++;
+        observedProgress = -1.0f;
         activePlan = plan;
         mixOutgoingDeck = activeDeck;
         mixIncomingDeck = standbyDeck;
@@ -207,9 +224,51 @@ final class NativeMixController {
         return true;
     }
 
-    void applyProgress(float requestedProgress) {
+    long executionId() {
+        return executionId;
+    }
+
+    void observeProgress(long requestedExecutionId, float progress, long nowMs) {
+        if (activePlan == null || requestedExecutionId != executionId) {
+            return;
+        }
+        if (progress > observedProgress) {
+            observedProgress = progress;
+            observedProgressAtMs = nowMs;
+        } else if (nowMs - observedProgressAtMs >= STALL_TIMEOUT_MS) {
+            if (handoffComplete) {
+                completeTransition();
+            } else {
+                cancel("transition_stalled");
+            }
+            return;
+        }
+        applyProgress(requestedExecutionId, progress);
+    }
+
+    void onDeckError(NativePlaybackDeck deck) {
+        if (activePlan == null) {
+            if (deck == standbyDeck) {
+                standbyDeck.releasePreparedSource();
+                standbyPreparationFailed = true;
+                listener.onFailed("standby_deck_error");
+            }
+            return;
+        }
+        if (deck == mixOutgoingDeck) {
+            completeTransition();
+        } else if (deck == mixIncomingDeck) {
+            if (!handoffComplete) {
+                standbyPreparationFailed = true;
+            }
+            cancel(handoffComplete ? "active_deck_error" : "incoming_deck_error");
+        }
+    }
+
+    void applyProgress(long requestedExecutionId, float requestedProgress) {
         if (
             activePlan == null ||
+            requestedExecutionId != executionId ||
             stateMachine.state() == NativeTransitionState.IDLE
         ) {
             return;
@@ -246,9 +305,10 @@ final class NativeMixController {
             mixIncomingDeck.stop();
             mixIncomingDeck.releasePreparedSource();
         }
+        long cancelledExecutionId = executionId;
         resetTransition();
         stateMachine.transitionTo(NativeTransitionState.IDLE);
-        listener.onCancelled(reason, afterHandoff);
+        listener.onCancelled(cancelledExecutionId, reason, afterHandoff);
         prepareStandby();
     }
 
@@ -265,7 +325,7 @@ final class NativeMixController {
     }
 
     void prepareStandbyAt(long incomingCueMs) {
-        if (activePlan != null || !canMixNext()) {
+        if (activePlan != null || standbyPreparationFailed || !canMixNext()) {
             return;
         }
         NativeTrack incoming = queue.get(logicalIndex + 1);
@@ -334,6 +394,9 @@ final class NativeMixController {
             standbyDeck.releasePreparedSource();
             return false;
         }
+        if (standbyPreparationFailed) {
+            return false;
+        }
         if (standbyDeck.isReadyFor(queue.get(logicalIndex + 1))) {
             return true;
         }
@@ -365,6 +428,21 @@ final class NativeMixController {
         );
     }
 
+    private boolean keepsMixedEdge(List<NativeTrack> tracks) {
+        if (tracks == null) {
+            return false;
+        }
+        for (int index = 0; index + 1 < tracks.size(); index++) {
+            if (
+                tracks.get(index).id.equals(activePlan.outgoingTrackId) &&
+                tracks.get(index + 1).id.equals(activePlan.incomingTrackId)
+            ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private int indexOf(String trackId) {
         if (trackId == null || trackId.isEmpty()) {
             return -1;
@@ -383,7 +461,7 @@ final class NativeMixController {
         logicalIndex++;
         activeDeck = mixIncomingDeck;
         standbyDeck = mixOutgoingDeck;
-        listener.onHandoff(logicalIndex, activeDeck);
+        listener.onHandoff(executionId, logicalIndex, activeDeck);
     }
 
     private void completeTransition() {
@@ -397,6 +475,7 @@ final class NativeMixController {
         mixIncomingDeck.clearEnvelope();
         resetTransition();
         stateMachine.transitionTo(NativeTransitionState.IDLE);
+        listener.onCompleted(executionId, logicalIndex);
         prepareStandby();
     }
 

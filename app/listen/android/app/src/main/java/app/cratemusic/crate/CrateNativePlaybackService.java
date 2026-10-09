@@ -249,6 +249,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
             new NativeMixController.Listener() {
                 @Override
                 public void onHandoff(
+                    long executionId,
                     int newIndex,
                     NativePlaybackDeck activeDeck
                 ) {
@@ -260,12 +261,23 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 }
 
                 @Override
+                public void onCompleted(long executionId, int finalIndex) {
+                    if (activeTransitionPlan == null) return;
+                    JSObject payload = transitionPayload(activeTransitionPlan, 1.0f);
+                    payload.put("finalIndex", finalIndex);
+                    clearNativeTransitionState();
+                    emit("transitionEnded", payload);
+                }
+
+                @Override
                 public void onCancelled(
+                    long executionId,
                     String reason,
                     boolean afterHandoff
                 ) {
                     clearNativeTransitionState();
                     JSObject payload = basePayload();
+                    payload.put("executionId", executionId);
                     payload.put("reason", reason);
                     payload.put("afterHandoff", afterHandoff);
                     emit("transitionCancelled", payload);
@@ -281,6 +293,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 }
             }
         );
+        watchDeckErrors(deckAPlayer, deckA);
+        watchDeckErrors(deckBPlayer, deckB);
         interruptionCoordinator = new NativeInterruptionCoordinator(
             new NativeInterruptionCoordinator.Playback() {
                 @Override
@@ -635,6 +649,17 @@ public class CrateNativePlaybackService extends MediaSessionService {
             renderersFactory,
             mediaSourceFactory
         ).build();
+    }
+
+    private void watchDeckErrors(ExoPlayer physicalPlayer, NativePlaybackDeck deck) {
+        physicalPlayer.addListener(new Player.Listener() {
+            @Override
+            public void onPlayerError(PlaybackException error) {
+                if (mixController != null) {
+                    mixController.onDeckError(deck);
+                }
+            }
+        });
     }
 
     private void configurePhysicalPlayer(ExoPlayer physicalPlayer) {
@@ -1561,7 +1586,6 @@ public class CrateNativePlaybackService extends MediaSessionService {
         long nowElapsedMs = SystemClock.elapsedRealtime();
         if (activeTransitionPlan != null) {
             float progress = mixController.transitionProgress();
-            mixController.applyProgress(progress);
             if (
                 progress >= 1.0f ||
                 nowElapsedMs - lastTransitionProgressEventElapsedMs >=
@@ -1570,17 +1594,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 emitNativeTransitionProgress(progress);
                 lastTransitionProgressEventElapsedMs = nowElapsedMs;
             }
-            if (progress >= 1.0f) {
-                NativeTransitionPlan completedPlan = activeTransitionPlan;
-                int finalIndex = mixController.logicalIndex();
-                JSObject payload = transitionPayload(
-                    completedPlan,
-                    1.0f
-                );
-                payload.put("finalIndex", finalIndex);
-                clearNativeTransitionState();
-                emit("transitionEnded", payload);
-            }
+            mixController.observeProgress(
+                mixController.executionId(),
+                progress,
+                nowElapsedMs
+            );
             return;
         }
 
@@ -1714,6 +1732,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     ) {
         JSObject payload = basePayload();
         payload.put("type", "crossfade");
+        payload.put("executionId", mixController.executionId());
         payload.put("outgoingTrackId", plan.outgoingTrackId);
         payload.put("incomingTrackId", plan.incomingTrackId);
         payload.put("outgoingIndex", transitionOutgoingIndex);
