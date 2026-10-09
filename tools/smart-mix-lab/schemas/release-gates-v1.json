@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "required_provenance": [
+    "command",
+    "commit",
+    "environment",
+    "dataset",
+    "warmup",
+    "iterations",
+    "concurrency"
+  ],
+  "required_environment": ["hardware", "versions"],
+  "required_suites": ["rust_parity"],
+  "server": {
+    "cached_batch32": { "p95_ms": 50 },
+    "uncached_batch32": { "p95_ms": 150 },
+    "compatible500": { "p95_ms": 250 }
+  }
+}
