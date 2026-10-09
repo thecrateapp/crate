@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 import { Link } from "react-router";
+import { artistPagePath } from "@/lib/library-routes";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { cn, timeAgo } from "@/lib/utils";
@@ -45,6 +46,15 @@ interface HealthIssue {
   auto_fixable: boolean;
   status: string;
   created_at: string;
+  artist_id?: number | null;
+  album_id?: number | null;
+  last_seen_at?: string | null;
+}
+
+interface HealthCheckRun {
+  last_run_at: string | null;
+  duration_ms: number;
+  issue_count: number;
 }
 
 interface HealthSnapshotData {
@@ -59,6 +69,7 @@ interface HealthSnapshotData {
   counts: Record<string, number>;
   total: number;
   filter: string | null;
+  runs?: Record<string, HealthCheckRun>;
 }
 
 interface RepairCatalogEntry {
@@ -147,6 +158,8 @@ const CHECK_LABELS: Record<string, string> = {
   tag_mismatch: "Tag Mismatch",
   folder_naming: "Folder Naming",
   missing_cover: "Missing Covers",
+  duplicate_tracks: "Duplicate Tracks",
+  shadow_quality_tracks: "Lower Quality Copies",
 };
 
 const CHECK_DESCRIPTIONS: Record<string, string> = {
@@ -167,6 +180,10 @@ const CHECK_DESCRIPTIONS: Record<string, string> = {
   tag_mismatch: "Album artist tag doesn't match folder artist name",
   folder_naming: "Folder structure doesn't match the configured naming pattern",
   missing_cover: "Albums without cover art (cover.jpg/cover.png)",
+  duplicate_tracks:
+    "The same track appears more than once inside an album; the automatic cleanup skipped these",
+  shadow_quality_tracks:
+    "Lower quality copies of tracks that already exist in a better format",
 };
 
 const RISK_TONES: Record<string, string> = {
@@ -271,6 +288,7 @@ export function Health() {
   const { isAdmin } = useAuth();
   const [issues, setIssues] = useState<HealthIssue[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [runs, setRuns] = useState<Record<string, HealthCheckRun>>({});
   const [catalogByCheck, setCatalogByCheck] = useState<
     Record<string, RepairCatalogEntry>
   >({});
@@ -333,6 +351,7 @@ export function Health() {
         if (signal?.aborted) return;
         setIssues(data.issues);
         setCounts(data.counts);
+        setRuns(data.runs ?? {});
         setError(null);
       } catch {
         setError("Failed to load health issues");
@@ -374,6 +393,7 @@ export function Health() {
           const payload = JSON.parse(event.data) as HealthSnapshotData;
           setIssues(payload.issues);
           setCounts(payload.counts);
+          setRuns(payload.runs ?? {});
           setError(null);
           setLoading(false);
         } catch {
@@ -532,7 +552,7 @@ export function Health() {
   }
 
   async function handleDismissType(checkType: string) {
-    await api(`/api/manage/health-issues/resolve-type/${checkType}`, "POST");
+    await api(`/api/manage/health-issues/dismiss-type/${checkType}`, "POST");
     setIssues((prev) => prev.filter((i) => i.check_type !== checkType));
     setCounts((prev) => {
       const n = { ...prev };
@@ -556,12 +576,13 @@ export function Health() {
 
   const totalOpen = Object.values(counts).reduce((a, b) => a + b, 0);
   const lastScan =
-    issues.length > 0
-      ? issues.reduce(
-          (latest, i) => (i.created_at > latest ? i.created_at : latest),
-          "",
-        )
-      : null;
+    Object.values(runs).reduce<string | null>(
+      (latest, run) =>
+        run.last_run_at && (!latest || run.last_run_at > latest)
+          ? run.last_run_at
+          : latest,
+      null,
+    ) ?? null;
   const catalogItems = Object.values(catalogByCheck).sort((a, b) => {
     const countDiff = (counts[b.check_type] || 0) - (counts[a.check_type] || 0);
     if (countDiff !== 0) return countDiff;
@@ -581,11 +602,6 @@ export function Health() {
       entry.auto_fixable &&
       !entry.supports_global_scope &&
       entry.supports_artist_scope,
-  ).length;
-  const manualOnlyCount = catalogItems.filter(
-    (entry) =>
-      (counts[entry.check_type] || 0) > 0 &&
-      (!entry.auto_fixable || entry.support === "manual"),
   ).length;
   const healthyCatalogCount = catalogItems.filter(
     (entry) => (counts[entry.check_type] || 0) === 0,
@@ -767,7 +783,7 @@ export function Health() {
                   catalog.
                 </div>
               </div>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-3 md:grid-cols-3">
                 <div className="rounded-md border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3">
                   <div className="text-xs uppercase tracking-[0.12em] text-emerald-200/75">
                     Global batch
@@ -788,17 +804,6 @@ export function Health() {
                   </div>
                   <div className="mt-1 text-xs text-amber-100/70">
                     Checks that need artist-level preview before applying.
-                  </div>
-                </div>
-                <div className="rounded-md border border-white/10 bg-white/[0.04] px-4 py-3">
-                  <div className="text-xs uppercase tracking-[0.12em] text-white/55">
-                    Manual only
-                  </div>
-                  <div className="mt-2 text-2xl font-semibold text-white">
-                    {manualOnlyCount}
-                  </div>
-                  <div className="mt-1 text-xs text-white/45">
-                    Open issues without an automatic fixer yet.
                   </div>
                 </div>
                 <div className="rounded-md border border-cyan-400/20 bg-cyan-400/[0.05] px-4 py-3">
@@ -990,6 +995,11 @@ export function Health() {
                         {description}
                       </div>
                     )}
+                    {runs[check]?.last_run_at ? (
+                      <div className="mt-1 text-xs text-white/35">
+                        Checked {timeAgo(runs[check]!.last_run_at!)}
+                      </div>
+                    ) : null}
                     {catalogEntry?.requires_confirmation ? (
                       <div className="mt-1 text-xs text-amber-200/80">
                         Review artist-by-artist before applying this fix.
@@ -1057,15 +1067,25 @@ export function Health() {
                           : "This repair is available from the artist repair flow, not as a global batch."}
                     </div>
                   ) : null}
-                  <div className="px-2 pb-2">
-                    {items.map((issue) => (
-                      <IssueRow
-                        key={issue.id}
-                        issue={issue}
-                        catalogEntry={catalogEntry}
-                        onResolve={() => handleResolve(issue.id)}
-                        onDismiss={() => handleDismiss(issue.id)}
-                      />
+                  <div className="space-y-3 px-2 pb-2">
+                    {groupIssuesByArtist(items).map((artistGroup) => (
+                      <div key={artistGroup.key} className="space-y-1">
+                        <ArtistGroupHeader
+                          group={artistGroup}
+                          canRepair={Boolean(
+                            catalogEntry?.supports_artist_scope,
+                          )}
+                        />
+                        {artistGroup.items.map((issue) => (
+                          <IssueRow
+                            key={issue.id}
+                            issue={issue}
+                            catalogEntry={catalogEntry}
+                            onResolve={() => handleResolve(issue.id)}
+                            onDismiss={() => handleDismiss(issue.id)}
+                          />
+                        ))}
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -1090,6 +1110,9 @@ function IssueRow({
 }) {
   const details = issue.details_json || {};
   const path = details.path as string | undefined;
+  const paths = Array.isArray(details.paths)
+    ? (details.paths as unknown[]).map(String).slice(0, 4)
+    : [];
 
   return (
     <div className="group flex items-center gap-3 rounded-md border border-white/6 bg-white/[0.04] px-3 py-3 transition-colors hover:bg-white/[0.06]">
@@ -1114,6 +1137,14 @@ function IssueRow({
             {path}
           </div>
         )}
+        {paths.map((item) => (
+          <div
+            key={item}
+            className="mt-0.5 truncate font-mono text-[10px] text-white/35"
+          >
+            {item}
+          </div>
+        ))}
         {catalogEntry ? (
           <div className="mt-2 flex flex-wrap gap-2">
             <CrateChip
@@ -1163,11 +1194,91 @@ function IssueRow({
             onDismiss();
           }}
           className="hover:bg-white/10 hover:text-white"
-          title="Dismiss (won't show again until next scan finds it)"
+          title="Dismiss: it stays hidden unless its details change"
         >
           <EyeOff size={13} />
         </ActionIconButton>
       </div>
+    </div>
+  );
+}
+
+interface ArtistIssueGroup {
+  key: string;
+  artistId: number | null;
+  artistName: string | null;
+  items: HealthIssue[];
+}
+
+export function groupIssuesByArtist(items: HealthIssue[]): ArtistIssueGroup[] {
+  const groups = new Map<string, ArtistIssueGroup>();
+  for (const issue of items) {
+    const details = issue.details_json || {};
+    const artistName =
+      (typeof details.artist === "string" && details.artist) ||
+      (typeof details.db_artist === "string" && details.db_artist) ||
+      null;
+    const key = issue.artist_id
+      ? `id:${issue.artist_id}`
+      : artistName
+        ? `name:${artistName}`
+        : "none";
+    const group = groups.get(key) ?? {
+      key,
+      artistId: issue.artist_id ?? null,
+      artistName,
+      items: [],
+    };
+    group.items.push(issue);
+    groups.set(key, group);
+  }
+  return [...groups.values()].sort((a, b) => {
+    if (a.key === "none") return 1;
+    if (b.key === "none") return -1;
+    return b.items.length - a.items.length;
+  });
+}
+
+function ArtistGroupHeader({
+  group,
+  canRepair,
+}: {
+  group: ArtistIssueGroup;
+  canRepair: boolean;
+}) {
+  if (!group.artistName && !group.artistId) {
+    return (
+      <div className="px-2 pt-1 text-xs font-medium text-white/45">
+        Not linked to an artist ({group.items.length})
+      </div>
+    );
+  }
+  const href = artistPagePath({
+    artistId: group.artistId ?? undefined,
+    artistName: group.artistName ?? undefined,
+  });
+  return (
+    <div className="flex items-center justify-between gap-3 px-2 pt-1">
+      <Link
+        to={href}
+        className="truncate text-xs font-medium text-white hover:text-primary"
+      >
+        {group.artistName ?? `Artist #${group.artistId}`}
+        <span className="ml-2 text-white/40">{group.items.length}</span>
+      </Link>
+      {canRepair && group.artistId ? (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2 text-xs"
+          asChild
+        >
+          <Link to={`${href}?repair=1`}>
+            <Wrench size={12} className="mr-1" />
+            Review and repair
+          </Link>
+        </Button>
+      ) : null}
     </div>
   );
 }

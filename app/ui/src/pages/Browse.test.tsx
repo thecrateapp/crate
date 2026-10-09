@@ -79,4 +79,26 @@ describe("Browse featured artists", () => {
       ).toBe(true);
     });
   });
+
+  it("filters artists with open health issues", async () => {
+    render(
+      <MemoryRouter initialEntries={["/browse"]}>
+        <Browse />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Converge");
+    await userEvent.click(screen.getByRole("button", { name: "Issues" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "With open issues" }),
+    );
+
+    await waitFor(() => {
+      expect(
+        apiMock.mock.calls.some(([url]) =>
+          String(url).includes("has_issues=true"),
+        ),
+      ).toBe(true);
+    });
+  });
 });
