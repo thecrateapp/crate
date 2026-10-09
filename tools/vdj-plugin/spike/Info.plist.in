@@ -22,9 +22,9 @@
   <key>CFBundlePackageType</key>
   <string>BNDL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>@PROJECT_VERSION@</string>
   <key>CFBundleVersion</key>
-  <string>0.1.0</string>
+  <string>@PROJECT_VERSION@</string>
   <key>NSHumanReadableCopyright</key>
   <string>Crate</string>
 </dict>

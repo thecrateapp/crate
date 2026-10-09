@@ -2,14 +2,17 @@
 
 #include "crate_vdj/mix_profile.hpp"
 #include "crate_vdj/models.hpp"
+#include "crate_vdj/version.hpp"
 
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace crate::vdj {
 
 enum class NegotiationErrorCode {
+    IntegrationUnavailable,
     PluginVersionOutOfRange,
     ContractMismatch,
     ProfileSchemaMismatch,
@@ -18,7 +21,8 @@ enum class NegotiationErrorCode {
 };
 
 struct NegotiationRequirements {
-    std::string plugin_version = "1.0.0";
+    std::string plugin_version = std::string(kPluginVersion);
+    std::vector<std::string> supported_contract_versions = {"2026-08"};
     bool require_online_source = false;
     bool require_smart_mix_assistant = false;
     bool require_automation = false;

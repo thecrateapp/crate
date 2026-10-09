@@ -1,5 +1,7 @@
 #include "crate_vdj/contract_negotiator.hpp"
 
+#include <algorithm>
+
 #include <charconv>
 #include <string>
 #include <string_view>
@@ -97,6 +99,12 @@ NegotiationResult negotiate_capabilities(
     const NegotiationRequirements& requirements
 )
 {
+    if (!capabilities.available) {
+        return failure(
+            NegotiationErrorCode::IntegrationUnavailable,
+            "the server has disabled the VirtualDJ integration"
+        );
+    }
     if (!is_within_range(
             requirements.plugin_version,
             capabilities.min_plugin_version,
@@ -107,35 +115,51 @@ NegotiationResult negotiate_capabilities(
             "plugin version is outside the server compatibility range"
         );
     }
-    if (capabilities.contract_version.empty()) {
+    if (std::find(
+            requirements.supported_contract_versions.begin(),
+            requirements.supported_contract_versions.end(),
+            capabilities.contract_version
+        ) == requirements.supported_contract_versions.end()) {
         return failure(
             NegotiationErrorCode::ContractMismatch,
-            "server contract version is missing"
+            "server contract version is not supported by this plugin"
         );
     }
-    if (capabilities.profile_schema_version != requirements.profile_schema_version) {
+
+    const bool profile_compatible =
+        capabilities.profile_schema_version == requirements.profile_schema_version;
+    const bool planner_compatible =
+        capabilities.planner_version == requirements.planner_version;
+    const bool needs_smart_mix =
+        requirements.require_smart_mix_assistant || requirements.require_automation;
+    if (needs_smart_mix && !profile_compatible) {
         return failure(
             NegotiationErrorCode::ProfileSchemaMismatch,
             "profile schema is incompatible"
         );
     }
-    if (capabilities.planner_version != requirements.planner_version) {
+    if (needs_smart_mix && !planner_compatible) {
         return failure(
             NegotiationErrorCode::PlannerMismatch,
             "planner version is incompatible"
         );
     }
-    if ((requirements.require_online_source && !capabilities.online_source) ||
-        (requirements.require_smart_mix_assistant &&
-         !capabilities.smart_mix_assistant) ||
-        (requirements.require_automation && !capabilities.automation)) {
+
+    Capabilities effective = capabilities;
+    effective.smart_mix_assistant =
+        capabilities.smart_mix_assistant && profile_compatible && planner_compatible;
+    effective.automation =
+        capabilities.automation && profile_compatible && planner_compatible;
+    if ((requirements.require_online_source && !effective.online_source) ||
+        (requirements.require_smart_mix_assistant && !effective.smart_mix_assistant) ||
+        (requirements.require_automation && !effective.automation)) {
         return failure(
             NegotiationErrorCode::RequiredFeatureUnavailable,
             "a required VirtualDJ feature is unavailable"
         );
     }
     return NegotiationResult{
-        .value = capabilities,
+        .value = std::move(effective),
         .error_code = NegotiationErrorCode::ContractMismatch,
         .error = {},
     };

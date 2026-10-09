@@ -10,6 +10,7 @@
 #include "crate_vdj/stream_resolver.hpp"
 #include "crate_vdj/translations.hpp"
 #include "crate_vdj/vdj_track_path.hpp"
+#include "crate_vdj/version.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -230,7 +231,7 @@ public:
         info->PluginName = "Crate Control Spike";
         info->Author = "Crate";
         info->Description = "VirtualDJ command and state boundary probe";
-        info->Version = "0.1.0";
+        info->Version = crate::vdj::kPluginVersion.data();
         info->Bitmap = nullptr;
         info->Flags = 0;
         return S_OK;
@@ -364,7 +365,7 @@ public:
         info->PluginName = "Crate";
         info->Author = "Crate";
         info->Description = "Crate catalog Online Source";
-        info->Version = "0.2.0";
+        info->Version = crate::vdj::kPluginVersion.data();
 #if defined(VDJ_MAC)
         info->Bitmap = crate_bitmap(hInstance);
         trace(

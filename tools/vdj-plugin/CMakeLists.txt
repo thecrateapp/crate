@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(CrateVirtualDJPlugin LANGUAGES CXX)
+project(CrateVirtualDJPlugin VERSION 1.0.0 LANGUAGES CXX)
 
 include(FetchContent)
 set(JSON_BuildTests OFF CACHE INTERNAL "")
@@ -72,7 +72,15 @@ elseif(WIN32)
     target_link_libraries(crate_vdj_core PRIVATE Advapi32)
 endif()
 target_compile_features(crate_vdj_core PUBLIC cxx_std_20)
-target_include_directories(crate_vdj_core PUBLIC include)
+configure_file(
+    cmake/version.hpp.in
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/crate_vdj/version.hpp"
+    @ONLY
+)
+target_include_directories(crate_vdj_core PUBLIC
+    include
+    "${CMAKE_CURRENT_BINARY_DIR}/generated"
+)
 target_link_libraries(crate_vdj_core PUBLIC
     CURL::libcurl
     SQLite3::SQLite3

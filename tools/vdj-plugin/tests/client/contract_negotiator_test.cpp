@@ -1,5 +1,6 @@
 #include "crate_vdj/contract_negotiator.hpp"
 #include "crate_vdj/credential_store.hpp"
+#include "crate_vdj/version.hpp"
 
 #include "../support/check.hpp"
 
@@ -67,11 +68,23 @@ int main()
         NegotiationErrorCode::RequiredFeatureUnavailable
     );
 
-    auto wrong_profile = supported_capabilities();
-    const auto profile_mismatch = negotiate_capabilities(
-        wrong_profile,
+    const auto source_only = negotiate_capabilities(
+        supported_capabilities(),
         NegotiationRequirements{
             .plugin_version = "1.0.0",
+            .profile_schema_version = 2,
+        }
+    );
+    CRATE_CHECK(source_only.ok());
+    CRATE_CHECK(source_only.value->online_source);
+    CRATE_CHECK(!source_only.value->smart_mix_assistant);
+    CRATE_CHECK(!source_only.value->automation);
+
+    const auto profile_mismatch = negotiate_capabilities(
+        supported_capabilities(),
+        NegotiationRequirements{
+            .plugin_version = "1.0.0",
+            .require_smart_mix_assistant = true,
             .profile_schema_version = 2,
         }
     );
@@ -80,6 +93,36 @@ int main()
         profile_mismatch.error_code ==
         NegotiationErrorCode::ProfileSchemaMismatch
     );
+
+    auto planner_changed = supported_capabilities();
+    planner_changed.planner_version = "smart-mix-v9";
+    const auto planner_source_only = negotiate_capabilities(
+        planner_changed,
+        NegotiationRequirements{.plugin_version = "1.0.0"}
+    );
+    CRATE_CHECK(planner_source_only.ok());
+    CRATE_CHECK(!planner_source_only.value->smart_mix_assistant);
+
+    auto unknown_contract = supported_capabilities();
+    unknown_contract.contract_version = "2099-01";
+    const auto contract_mismatch = negotiate_capabilities(
+        unknown_contract,
+        NegotiationRequirements{.plugin_version = "1.0.0"}
+    );
+    CRATE_CHECK(!contract_mismatch.ok());
+    CRATE_CHECK(contract_mismatch.error_code == NegotiationErrorCode::ContractMismatch);
+
+    auto disabled = supported_capabilities();
+    disabled.available = false;
+    const auto integration_off = negotiate_capabilities(
+        disabled,
+        NegotiationRequirements{.plugin_version = "1.0.0"}
+    );
+    CRATE_CHECK(!integration_off.ok());
+    CRATE_CHECK(integration_off.error_code == NegotiationErrorCode::IntegrationUnavailable);
+
+    CRATE_CHECK(NegotiationRequirements{}.plugin_version == kPluginVersion);
+    CRATE_CHECK(!kPluginVersion.empty());
 
     const std::string diagnostic = redact_sensitive(
         "Authorization: Bearer crv_super-secret media_ticket=mt_secret "

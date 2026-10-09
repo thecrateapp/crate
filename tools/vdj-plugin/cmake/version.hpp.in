@@ -1,0 +1,9 @@
+#pragma once
+
+#include <string_view>
+
+namespace crate::vdj {
+
+inline constexpr std::string_view kPluginVersion = "@PROJECT_VERSION@";
+
+} // namespace crate::vdj
