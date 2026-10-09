@@ -97,8 +97,8 @@ class TestRepairCatalog:
         assert result["items"][0]["plan_item_id"].startswith("repair-plan:")
         assert result["items"][0]["item_key"] == "issue:9"
         assert result["items"][0]["executable"] is True
-        assert result["items"][0]["risk"] == "destructive"
-        assert result["items"][0]["scope"] == "hybrid"
+        assert result["items"][0]["risk"] == "caution"
+        assert result["items"][0]["scope"] == "db"
         assert result["items"][0]["requires_confirmation"] is True
         assert (
             result["items"][0]["message"]
@@ -690,7 +690,11 @@ class TestDuplicateTrackRepair:
             ):
                 result = repair._fix_duplicate_tracks(issue, dry_run=True)
 
-            assert result is None
+            assert result["applied"] is False
+            assert (
+                result["details"]["reason"]
+                == "audio fingerprints differ and the tags are not conclusive"
+            )
 
     def test_duplicate_track_stays_manual_when_metadata_is_broken(self):
         from crate.repair import LibraryRepair
@@ -742,7 +746,11 @@ class TestDuplicateTrackRepair:
             with patch("crate.repair.get_tracks_by_paths", return_value=tracks):
                 result = repair._fix_duplicate_tracks(issue, dry_run=True)
 
-            assert result is None
+            assert result["applied"] is False
+            assert (
+                result["details"]["reason"]
+                == "missing artist, album, title or paths to compare"
+            )
 
     def test_shadow_quality_tracks_apply_removes_legacy_upgrade_residue(self):
         from crate.repair import LibraryRepair

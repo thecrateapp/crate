@@ -2284,7 +2284,7 @@ class TestHealthAPI:
         assert by_check["artist_layout_fix"]["scope"] == "hybrid"
         assert by_check["duplicate_albums"]["auto_fixable"] is True
         assert by_check["duplicate_albums"]["support"] == "automatic"
-        assert by_check["duplicate_albums"]["risk"] == "destructive"
+        assert by_check["duplicate_albums"]["risk"] == "caution"
         assert by_check["duplicate_albums"]["supports_global_scope"] is False
         assert by_check["duplicate_tracks"]["auto_fixable"] is True
         assert by_check["duplicate_tracks"]["support"] == "automatic"
@@ -2516,7 +2516,11 @@ class TestHealthAPI:
         task_type, params = mock_create.call_args.args
         assert task_type == "health_check"
         assert params["artists"] == ["Birds In Row"]
-        assert set(params["check_types"]) == {"artist_layout_fix", "duplicate_tracks"}
+        assert set(params["check_types"]) == {
+            "artist_layout_fix",
+            "duplicate_albums",
+            "duplicate_tracks",
+        }
 
     def test_artist_health_recheck_reports_an_already_queued_check(self, test_app):
         with (

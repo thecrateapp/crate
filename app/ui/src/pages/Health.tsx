@@ -498,6 +498,23 @@ export function Health() {
     }
   }
 
+  async function runDuplicateCleanup() {
+    try {
+      const result = await api<{ task_id: string; status?: string }>(
+        "/api/manage/repair-duplicate-tracks",
+        "POST",
+      );
+      toast.success(
+        result.status === "already_queued"
+          ? "Duplicate cleanup is already running"
+          : "Duplicate cleanup queued",
+      );
+      if (result.task_id) setActiveTaskId(result.task_id);
+    } catch {
+      toast.error("Failed to start the duplicate cleanup");
+    }
+  }
+
   async function handleResolve(id: number) {
     await api(`/api/manage/health-issues/${id}/resolve`, "POST");
     removeIssue(id);
@@ -1025,7 +1042,19 @@ export function Health() {
                         )}
                         Fix all ({fixableCount})
                       </Button>
-                    ) : reviewOnly || manualOnly ? (
+                    ) : null}
+                    {check === "duplicate_tracks" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-9 rounded-md px-3 text-xs"
+                        onClick={() => void runDuplicateCleanup()}
+                      >
+                        <Wrench size={12} className="mr-1" />
+                        Run cleanup now
+                      </Button>
+                    ) : null}
+                    {canRunGlobalFix ? null : reviewOnly || manualOnly ? (
                       <div className="inline-flex h-9 items-center gap-2 rounded-md border border-white/10 bg-black/20 px-3 text-xs text-white/55">
                         <AlertTriangle size={12} />
                         {manualOnly ? "Manual only" : "Review per artist"}
@@ -1110,6 +1139,10 @@ function IssueRow({
 }) {
   const details = issue.details_json || {};
   const path = details.path as string | undefined;
+  const blockedReason =
+    typeof details.cleanup_blocked_reason === "string"
+      ? details.cleanup_blocked_reason
+      : null;
   const paths = Array.isArray(details.paths)
     ? (details.paths as unknown[]).map(String).slice(0, 4)
     : [];
@@ -1137,6 +1170,11 @@ function IssueRow({
             {path}
           </div>
         )}
+        {blockedReason ? (
+          <div className="mt-1 text-[11px] text-amber-200/80">
+            Automatic cleanup skipped it: {blockedReason}
+          </div>
+        ) : null}
         {paths.map((item) => (
           <div
             key={item}

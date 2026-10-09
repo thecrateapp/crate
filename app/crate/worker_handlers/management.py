@@ -111,7 +111,8 @@ def _handle_health_check(task_id: str, params: dict, config: dict) -> dict:
     check_types = [str(check) for check in params.get("check_types") or []]
     if artists:
         report = checker.run_selected_for_artists(
-            check_types or ["artist_layout_fix", "duplicate_tracks"],
+            check_types
+            or ["artist_layout_fix", "duplicate_albums", "duplicate_tracks"],
             artists,
             progress_callback=_hc_progress,
         )

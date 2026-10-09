@@ -202,6 +202,13 @@ export function CommandPalette() {
       run: () => api("/api/manage/health-check", "POST"),
     },
     {
+      label: "Remove Duplicate Tracks",
+      toastLabel: "Duplicate track cleanup",
+      capabilities: COMMAND_REPAIR_RUN,
+      icon: Trash2,
+      run: () => api("/api/manage/repair-duplicate-tracks", "POST"),
+    },
+    {
       label: "Analyze All Tracks (BPM, Key, Energy)",
       toastLabel: "Audio Analysis",
       capabilities: COMMAND_ANALYSIS_MANAGE,

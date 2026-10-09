@@ -60,6 +60,7 @@ class LibraryHealthCheck:
     )
 
     def __init__(self, config: dict):
+        self.config = config
         self.library_path = Path(config["library_path"])
         self.extensions = set(
             config.get("audio_extensions", [".flac", ".mp3", ".m4a", ".ogg", ".opus"])
@@ -119,6 +120,12 @@ class LibraryHealthCheck:
                 if check_type == "artist_layout_fix":
                     issues.extend(
                         self._check_artist_layout_fix_for_artists([artist_name])
+                    )
+                elif check_type == "duplicate_albums":
+                    issues.extend(
+                        self._duplicate_album_issues(
+                            get_duplicate_albums(artist_name=artist_name)
+                        )
                     )
                 elif check_type == "duplicate_tracks":
                     issues.extend(
@@ -484,16 +491,20 @@ class LibraryHealthCheck:
         return issues
 
     def _check_duplicate_albums(self) -> list[dict]:
-        rows = get_duplicate_albums()
+        return self._duplicate_album_issues(get_duplicate_albums())
+
+    def _duplicate_album_issues(self, rows: list[dict]) -> list[dict]:
         return [
             {
                 "check": "duplicate_albums",
                 "severity": "medium",
+                "auto_fixable": True,
                 "details": {
                     "artist": r["artist"],
                     "album": r["album_name"],
                     "count": r["cnt"],
                     "paths": r.get("paths", []),
+                    "copies": r.get("copies", []),
                 },
             }
             for r in rows
@@ -505,6 +516,23 @@ class LibraryHealthCheck:
         return self._duplicate_track_issues(get_duplicate_tracks())
 
     def _duplicate_track_issues(self, rows: list[dict]) -> list[dict]:
+        issues = self._duplicate_track_issue_rows(rows)
+        if not issues:
+            return issues
+        from crate.repair import LibraryRepair
+
+        repairer = LibraryRepair(self.config)
+        for issue in issues:
+            try:
+                resolution = repairer.duplicate_track_resolution(issue)
+            except Exception:
+                log.debug("Duplicate track resolution failed", exc_info=True)
+                continue
+            if isinstance(resolution, str):
+                issue["details"]["cleanup_blocked_reason"] = resolution
+        return issues
+
+    def _duplicate_track_issue_rows(self, rows: list[dict]) -> list[dict]:
         return [
             {
                 "check": "duplicate_tracks",

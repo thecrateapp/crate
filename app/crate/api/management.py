@@ -264,6 +264,25 @@ def run_health_check(request: Request):
     return {"task_id": task_id}
 
 
+@router.post(
+    "/repair-duplicate-tracks",
+    response_model=TaskEnqueueResponse,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Queue the duplicate track cleanup now instead of waiting for its schedule",
+)
+def run_duplicate_track_cleanup(request: Request):
+    _require_repair_operator(request)
+    params = {"triggered_by": "console"}
+    dedup_key = "repair-duplicate-tracks"
+    task_id = create_task_dedup("repair_duplicate_tracks", params, dedup_key=dedup_key)
+    if task_id:
+        return {"task_id": task_id, "status": "queued", "deduplicated": False}
+    existing = find_active_task_by_type_params(
+        "repair_duplicate_tracks", params, dedup_key=dedup_key
+    )
+    return {"task_id": existing or "", "status": "already_queued", "deduplicated": True}
+
+
 @router.get(
     "/repair-catalog",
     response_model=RepairCatalogResponse,
@@ -534,7 +553,7 @@ def recheck_artist_health(request: Request, name: str):
     _require_repair_operator(request)
     params = {
         "artists": [name],
-        "check_types": ["artist_layout_fix", "duplicate_tracks"],
+        "check_types": ["artist_layout_fix", "duplicate_albums", "duplicate_tracks"],
     }
     dedup_key = f"health-recheck:{name}"
     task_id = create_task_dedup("health_check", params, dedup_key=dedup_key)
