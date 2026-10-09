@@ -111,6 +111,8 @@ bool should_abort(
 
 HttpError normalize_http_failure(const HttpFailure& failure);
 
+bool allows_stale_fallback(const HttpError& error);
+
 bool append_bounded_body(std::string& body, std::string_view chunk, std::size_t limit);
 
 } // namespace crate::vdj

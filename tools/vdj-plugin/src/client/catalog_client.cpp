@@ -156,7 +156,7 @@ ParseResult<CatalogResults> CatalogClient::request(
     };
     const auto response = http_.request(request);
     if (const auto* error = std::get_if<HttpError>(&response)) {
-        if (stale_results.has_value()) {
+        if (stale_results.has_value() && allows_stale_fallback(*error)) {
             return from_cache(std::move(*stale_results));
         }
         return failure(ModelErrorCode::TransportError, error->message);
@@ -164,7 +164,7 @@ ParseResult<CatalogResults> CatalogClient::request(
 
     const auto& http_response = std::get<HttpResponse>(response);
     if (http_response.status_code < 200 || http_response.status_code >= 300) {
-        if (stale_results.has_value()) {
+        if (stale_results.has_value() && http_response.status_code >= 500) {
             return from_cache(std::move(*stale_results));
         }
         return failure(
@@ -184,9 +184,6 @@ ParseResult<CatalogResults> CatalogClient::request(
             );
         }
         return parsed;
-    }
-    if (stale_results.has_value()) {
-        return from_cache(std::move(*stale_results));
     }
     return parsed;
 }

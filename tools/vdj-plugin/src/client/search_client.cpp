@@ -130,7 +130,7 @@ ParseResult<SearchResults> SearchClient::search(
 
     const auto response = http_.request(request);
     if (const auto* error = std::get_if<HttpError>(&response)) {
-        if (stale_results.has_value()) {
+        if (stale_results.has_value() && allows_stale_fallback(*error)) {
             return from_cache(std::move(*stale_results));
         }
         return failure(ModelErrorCode::TransportError, error->message);
@@ -148,9 +148,6 @@ ParseResult<SearchResults> SearchClient::search(
             );
         }
         return parsed;
-    }
-    if (stale_results.has_value()) {
-        return from_cache(std::move(*stale_results));
     }
     return parsed;
 }

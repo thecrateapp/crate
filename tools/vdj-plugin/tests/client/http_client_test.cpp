@@ -144,6 +144,14 @@ int main()
     CRATE_CHECK(append_bounded_body(body, "abc", 5));
     CRATE_CHECK(append_bounded_body(body, "de", 5));
     CRATE_CHECK(!append_bounded_body(body, "f", 5));
+
+    CRATE_CHECK(allows_stale_fallback({.code = HttpErrorCode::Network, .status_code = 0, .message = {}}));
+    CRATE_CHECK(allows_stale_fallback({.code = HttpErrorCode::Timeout, .status_code = 0, .message = {}}));
+    CRATE_CHECK(allows_stale_fallback({.code = HttpErrorCode::HttpStatus, .status_code = 502, .message = {}}));
+    CRATE_CHECK(!allows_stale_fallback({.code = HttpErrorCode::HttpStatus, .status_code = 401, .message = {}}));
+    CRATE_CHECK(!allows_stale_fallback({.code = HttpErrorCode::HttpStatus, .status_code = 429, .message = {}}));
+    CRATE_CHECK(!allows_stale_fallback({.code = HttpErrorCode::Cancelled, .status_code = 0, .message = {}}));
+    CRATE_CHECK(!allows_stale_fallback({.code = HttpErrorCode::InvalidResponse, .status_code = 200, .message = {}}));
     CRATE_CHECK(body == "abcde");
 
     const auto insecure = http.request(HttpRequest{

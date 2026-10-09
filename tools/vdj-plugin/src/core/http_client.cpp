@@ -77,6 +77,21 @@ HttpError normalize_http_failure(const HttpFailure& failure)
     };
 }
 
+bool allows_stale_fallback(const HttpError& error)
+{
+    switch (error.code) {
+    case HttpErrorCode::Network:
+    case HttpErrorCode::Timeout:
+        return true;
+    case HttpErrorCode::HttpStatus:
+        return error.status_code >= 500;
+    case HttpErrorCode::Cancelled:
+    case HttpErrorCode::InvalidResponse:
+        return false;
+    }
+    return false;
+}
+
 bool append_bounded_body(std::string& body, std::string_view chunk, std::size_t limit)
 {
     if (chunk.size() > limit || body.size() > limit - chunk.size()) {

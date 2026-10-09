@@ -1,6 +1,7 @@
 #include "crate_vdj/catalog_client.hpp"
 
 #include "../support/check.hpp"
+#include <chrono>
 #include <optional>
 #include <string>
 #include <variant>
@@ -14,13 +15,18 @@ public:
     HttpRequest request_seen;
     int request_count = 0;
     bool fail_requests = false;
+    HttpError failure{
+        .code = HttpErrorCode::Network,
+        .status_code = 0,
+        .message = "test network failure",
+    };
 
     HttpResult request(const HttpRequest& request) override
     {
         ++request_count;
         request_seen = request;
         if (fail_requests) {
-            return HttpError{.message = "test network failure"};
+            return failure;
         }
         if (request.url.ends_with("/api/vdj/catalog/folders")) {
             return HttpResponse{
@@ -119,12 +125,17 @@ int main()
         &stale_cache
     );
     http.fail_requests = false;
-    const auto initial_stale = stale_client.get_folder(
-        "crate:playlists",
-        "cursor-stale",
-        CancellationToken{}
-    );
-    CRATE_CHECK(initial_stale.ok());
+    const auto seed = client.get_folder("crate:playlists", "cursor-stale", CancellationToken{});
+    CRATE_CHECK(seed.ok());
+    CRATE_CHECK(stale_cache.put_catalog(
+        {.origin = "https://api.dev.lespedants.org",
+         .account_key = metadata_cache_account_key("crv_catalog-token")},
+        "folder:crate:playlists:cursor:cursor-stale",
+        *seed.value,
+        std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::system_clock::now().time_since_epoch()
+        ).count() - 60
+    ));
     http.fail_requests = true;
     const auto fallback = stale_client.get_folder(
         "crate:playlists",
@@ -133,4 +144,33 @@ int main()
     );
     CRATE_CHECK(fallback.ok());
     CRATE_CHECK(fallback.value->tracks[0].entity_uid == "track-1");
+
+    const auto reject_stale = [&](HttpError error) {
+        http.failure = std::move(error);
+        const int requests_before = http.request_count;
+        const auto result = stale_client.get_folder(
+            "crate:playlists",
+            "cursor-stale",
+            CancellationToken{}
+        );
+        CRATE_CHECK(http.request_count == requests_before + 1);
+        CRATE_CHECK(!result.ok());
+    };
+    reject_stale({.code = HttpErrorCode::HttpStatus, .status_code = 401, .message = "unauthorized"});
+    reject_stale({.code = HttpErrorCode::HttpStatus, .status_code = 403, .message = "forbidden"});
+    reject_stale({.code = HttpErrorCode::Cancelled, .status_code = 0, .message = "cancelled"});
+    reject_stale({.code = HttpErrorCode::InvalidResponse, .status_code = 200, .message = "too large"});
+
+    http.failure = {.code = HttpErrorCode::HttpStatus, .status_code = 503, .message = "unavailable"};
+    CRATE_CHECK((stale_client.get_folder(
+        "crate:playlists",
+        "cursor-stale",
+        CancellationToken{}
+    )).ok());
+    http.failure = {.code = HttpErrorCode::Timeout, .status_code = 0, .message = "timeout"};
+    CRATE_CHECK((stale_client.get_folder(
+        "crate:playlists",
+        "cursor-stale",
+        CancellationToken{}
+    )).ok());
 }
