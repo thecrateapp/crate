@@ -1,7 +1,7 @@
 def _stats_snapshot(payload: dict) -> dict:
     return {
         "scope": "stats:dashboard",
-        "subject_key": "user:7:30d:default:12:10:12:10:36",
+        "subject_key": "v2:user:7:30d:default:12:10:14:10:36",
         "payload_json": payload,
         "version": 2,
         "built_at": "2026-07-18T10:00:00+00:00",
@@ -63,7 +63,7 @@ def test_cold_stats_dashboard_returns_minimal_payload_and_queues_projection(
             "month": None,
             "tracks_limit": 12,
             "artists_limit": 10,
-            "albums_limit": 12,
+            "albums_limit": 14,
             "genres_limit": 10,
             "replay_limit": 36,
         }
@@ -97,7 +97,7 @@ def test_stats_projection_refresh_persists_built_payload(monkeypatch):
 
     assert payload["overview"]["play_count"] == 9
     assert saved[0][0] == "stats:dashboard"
-    assert saved[0][1].startswith("user:7:30d:")
+    assert saved[0][1].startswith("v2:user:7:30d:")
     assert ensured == [7]
 
 
@@ -138,7 +138,9 @@ def test_stats_bootstrap_queues_only_missing_canonical_snapshots(monkeypatch):
         surface,
         "get_ui_snapshot",
         lambda _scope, subject_key, **_kwargs: (
-            {"subject_key": subject_key} if subject_key.startswith("user:8:") else None
+            {"subject_key": subject_key}
+            if subject_key.startswith("v2:user:8:")
+            else None
         ),
     )
     monkeypatch.setattr(
@@ -151,10 +153,10 @@ def test_stats_bootstrap_queues_only_missing_canonical_snapshots(monkeypatch):
 
     assert count == 4
     assert queued == [
-        (7, "user:7:30d:default:12:10:12:10:36"),
-        (7, "user:7:90d:default:12:10:12:10:36"),
-        (7, "user:7:year:2026:default:12:10:12:10:36"),
-        (7, "user:7:all_time:default:12:10:12:10:36"),
+        (7, "v2:user:7:30d:default:12:10:14:10:36"),
+        (7, "v2:user:7:90d:default:12:10:14:10:36"),
+        (7, "v2:user:7:year:2026:default:12:10:14:10:36"),
+        (7, "v2:user:7:all_time:default:12:10:14:10:36"),
     ]
 
 

@@ -1,3 +1,4 @@
+import { ANONYMOUS_APP_ROUTE_PATTERNS } from "@/app-shell/AppLayoutRoute";
 import { describe, expect, it } from "vitest";
 
 import { protectedAppRoutes, publicAppRoutes } from "@/app-shell/route-table";
@@ -24,17 +25,15 @@ describe("protected app routes", () => {
 });
 
 describe("public app routes", () => {
-  it("keeps shared Crate pages outside the authenticated shell", () => {
-    const paths = publicAppRoutes
+  it("serves shared Crate pages from the app layout so playback survives navigation", () => {
+    const publicPaths = publicAppRoutes
       .map((route) => route.path)
       .filter((path): path is string => Boolean(path));
+    const appPaths = protectedAppRoutes.map((route) => route.path);
 
-    expect(paths).toContain("/crate/:crateRef");
-    expect(protectedAppRoutes.map((route) => route.path)).toContain(
-      "crate/invite/:token",
-    );
-    expect(protectedAppRoutes.map((route) => route.path)).not.toContain(
-      "crate/:crateRef",
-    );
+    expect(publicPaths).not.toContain("/crate/:crateRef");
+    expect(appPaths).toContain("crate/:crateRef");
+    expect(appPaths).toContain("crate/invite/:token");
+    expect(ANONYMOUS_APP_ROUTE_PATTERNS).toEqual(["/crate/:crateRef"]);
   });
 });

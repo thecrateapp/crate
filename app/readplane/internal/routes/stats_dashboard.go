@@ -19,7 +19,7 @@ var statsDashboardLimits = []struct {
 }{
 	{name: "tracks_limit", defaultValue: 12},
 	{name: "artists_limit", defaultValue: 10},
-	{name: "albums_limit", defaultValue: 12},
+	{name: "albums_limit", defaultValue: 14},
 	{name: "genres_limit", defaultValue: 10},
 	{name: "replay_limit", defaultValue: 36},
 }
@@ -74,7 +74,7 @@ func statsDashboardSubjectKey(userID int64, query url.Values) (string, error) {
 	}
 
 	return fmt.Sprintf(
-		"user:%d:%s:%s:%d:%d:%d:%d:%d",
+		"v2:user:%d:%s:%s:%d:%d:%d:%d:%d",
 		userID,
 		period,
 		monthKey,

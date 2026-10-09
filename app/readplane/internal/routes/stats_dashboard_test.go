@@ -20,7 +20,7 @@ func TestStatsDashboardSubjectKey(t *testing.T) {
 			name:   "defaults",
 			userID: 17,
 			query:  url.Values{},
-			want:   "user:17:30d:default:12:10:12:10:36",
+			want:   "v2:user:17:30d:default:12:10:14:10:36",
 		},
 		{
 			name:   "custom window and limits",
@@ -33,19 +33,19 @@ func TestStatsDashboardSubjectKey(t *testing.T) {
 				"genres_limit":  {"2"},
 				"replay_limit":  {"9"},
 			},
-			want: "user:3:90d:default:5:4:3:2:9",
+			want: "v2:user:3:90d:default:5:4:3:2:9",
 		},
 		{
 			name:   "month overrides period",
 			userID: 9,
 			query:  url.Values{"month": {"2026-04"}},
-			want:   "user:9:month:2026-04:2026-04:12:10:12:10:36",
+			want:   "v2:user:9:month:2026-04:2026-04:12:10:14:10:36",
 		},
 		{
 			name:   "calendar year window",
 			userID: 4,
 			query:  url.Values{"window": {"YEAR:2026"}},
-			want:   "user:4:year:2026:default:12:10:12:10:36",
+			want:   "v2:user:4:year:2026:default:12:10:14:10:36",
 		},
 		{
 			name:    "year before the history",
