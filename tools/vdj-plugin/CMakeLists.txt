@@ -143,6 +143,13 @@ if(CRATE_VDJ_BUILD_REAL_PLUGIN)
 
     function(configure_vdj_plugin_target target output_name)
         add_library(${target} MODULE spike/control_spike.cpp)
+        if(APPLE)
+            target_sources(${target} PRIVATE src/platform/connection_dialog_macos.mm)
+            target_link_libraries(${target} PRIVATE "-framework AppKit")
+        elseif(WIN32)
+            target_sources(${target} PRIVATE src/platform/connection_dialog_windows.cpp)
+            target_link_libraries(${target} PRIVATE User32)
+        endif()
         target_compile_features(${target} PRIVATE cxx_std_20)
         target_link_libraries(
             ${target}
@@ -247,7 +254,7 @@ if(CRATE_VDJ_BUILD_TESTS)
     target_link_libraries(crate_vdj_json_mapping_test PRIVATE crate_vdj_core)
     add_test(NAME crate_vdj_json_mapping_test COMMAND crate_vdj_json_mapping_test)
 
-    foreach(connection_test connection_settings capability_client connection_session)
+    foreach(connection_test connection_settings capability_client connection_session plugin_identity)
         add_executable(crate_vdj_${connection_test}_test
             tests/connection/${connection_test}_test.cpp
         )
@@ -372,6 +379,7 @@ if(CRATE_VDJ_BUILD_TESTS)
     if(CRATE_VDJ_BUILD_REAL_PLUGIN)
         add_executable(crate_vdj_factory_contract
             tests/sdk/factory_contract.cpp
+            tests/sdk/fake_connection_dialog.cpp
             spike/control_spike.cpp
         )
         target_compile_features(crate_vdj_factory_contract PRIVATE cxx_std_20)

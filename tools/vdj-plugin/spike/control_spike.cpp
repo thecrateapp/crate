@@ -1,6 +1,8 @@
 #include "vdjOnlineSource.h"
 #include "vdjPlugin8.h"
 
+#include "crate_vdj/connection_session.hpp"
+#include "crate_vdj/connection_settings.hpp"
 #include "crate_vdj/credential_store.hpp"
 #include "crate_vdj/catalog_client.hpp"
 #include "crate_vdj/compatible_tracks.hpp"
@@ -11,12 +13,17 @@
 #include "crate_vdj/translations.hpp"
 #include "crate_vdj/vdj_track_path.hpp"
 #include "crate_vdj/version.hpp"
+#include "../src/platform/connection_dialog.hpp"
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <algorithm>
 #include <array>
+#include <chrono>
+#include <condition_variable>
+#include <memory>
+#include <thread>
 #include <cctype>
 #include <cstdint>
 #include <filesystem>
@@ -317,42 +324,70 @@ private:
     char auto_crossfade_command_[1] = {};
 };
 
+struct PendingConnect {
+    std::string origin;
+    std::string token;
+};
+
+struct ServerClients {
+    ServerClients(
+        HttpClient& http,
+        std::shared_ptr<CredentialStore> store,
+        std::string server_origin,
+        MetadataCacheStore* cache
+    )
+        : credentials(std::move(store))
+        , origin(std::move(server_origin))
+        , search(http, *credentials, origin, cache)
+        , stream(http, *credentials, origin)
+        , catalog(http, *credentials, origin, cache)
+        , compatible(http, *credentials, origin)
+    {
+    }
+
+    std::shared_ptr<CredentialStore> credentials;
+    std::string origin;
+    SearchClient search;
+    StreamResolver stream;
+    CatalogClient catalog;
+    CompatibleTracksClient compatible;
+};
+
 class OnlineSourceProbe final : public IVdjPluginOnlineSource {
 public:
     OnlineSourceProbe()
-        : credentials_(
-              "org.cratemusic.virtualdj",
-              "access-token"
-          )
-        , metadata_cache_(metadata_cache_path().string())
-        , search_client_(
-              http_,
-              credentials_,
-              api_origin(),
-              &metadata_cache_
-          )
-        , stream_resolver_(
-              http_,
-              credentials_,
-              api_origin()
-          )
-        , catalog_client_(
-              http_,
-              credentials_,
-              api_origin(),
-              &metadata_cache_
-          )
-        , compatible_tracks_client_(
-              http_,
-              credentials_,
-              api_origin()
+        : metadata_cache_(metadata_cache_path().string())
+        , settings_(default_connection_settings_path())
+        , session_(
+              settings_,
+              [](const std::string& account) {
+                  return std::make_unique<SystemCredentialStore>(
+                      std::string(kCredentialService),
+                      account
+                  );
+              },
+              http_
           )
     {
     }
 
+    ~OnlineSourceProbe() override
+    {
+        {
+            std::lock_guard lock(connection_mutex_);
+            stopping_ = true;
+        }
+        connection_wakeup_.notify_all();
+        connection_cancellation_.cancel();
+        if (connection_thread_.joinable()) {
+            connection_thread_.join();
+        }
+    }
+
     HRESULT VDJ_API OnLoad() override
     {
-        trace("online source plugin loaded origin=" + api_origin());
+        trace("online source plugin loaded");
+        connection_thread_ = std::thread([this] { connection_loop(); });
         return S_OK;
     }
 
@@ -362,7 +397,7 @@ public:
             return E_FAIL;
         }
 
-        info->PluginName = "Crate";
+        info->PluginName = crate::vdj::kPluginName.data();
         info->Author = "Crate";
         info->Description = "Crate catalog Online Source";
         info->Version = crate::vdj::kPluginVersion.data();
@@ -381,20 +416,40 @@ public:
 
     HRESULT VDJ_API IsLogged() override
     {
-        trace("online login state callback");
-        return E_NOTIMPL;
+        return session_.logged_in() ? S_OK : S_FALSE;
     }
 
     HRESULT VDJ_API OnLogin() override
     {
         trace("online login callback");
-        return E_NOTIMPL;
+        const auto choice = show_connection_dialog(ConnectionDialogRequest{
+            .current_origin = session_.origin().value_or(""),
+        });
+        if (choice.action == ConnectionDialogAction::Disconnect) {
+            return OnLogout();
+        }
+        if (choice.action != ConnectionDialogAction::Connect) {
+            return S_OK;
+        }
+        {
+            std::lock_guard lock(connection_mutex_);
+            pending_connect_ = PendingConnect{choice.origin, choice.token};
+        }
+        connection_wakeup_.notify_all();
+        return S_OK;
     }
 
     HRESULT VDJ_API OnLogout() override
     {
         trace("online logout callback");
-        return E_NOTIMPL;
+        if (!session_.disconnect()) {
+            show_connection_message(
+                "Crate",
+                "Crate was disconnected, but the saved token could not be removed from the system keychain."
+            );
+        }
+        sync_clients();
+        return S_OK;
     }
 
     HRESULT VDJ_API OnSearch(
@@ -418,7 +473,12 @@ public:
             active_search_ = cancellation;
         }
 
-        const auto result = search_client_.search(query, cancellation.token());
+        const auto server = clients();
+        if (server == nullptr) {
+            tracks_list->finish();
+            return S_OK;
+        }
+        const auto result = server->search.search(query, cancellation.token());
         {
             std::lock_guard lock(search_mutex_);
             active_search_.reset();
@@ -446,7 +506,7 @@ public:
                 : track.album.c_str();
             const std::string cover_url = track.cover_url.empty()
                 ? ""
-                : api_asset_url(track.cover_url);
+                : api_asset_url(server->origin, track.cover_url);
             tracks_list->add(
                 track.entity_uid.c_str(),
                 track.title.c_str(),
@@ -489,7 +549,13 @@ public:
     {
         const std::string id = unique_id == nullptr ? "" : unique_id;
         CancellationSource cancellation;
-        const auto result = stream_resolver_.resolve(id, cancellation.token());
+        const auto server = clients();
+        if (server == nullptr) {
+            url = "";
+            error_message = "Connect Crate before loading tracks.";
+            return E_FAIL;
+        }
+        const auto result = server->stream.resolve(id, cancellation.token());
         if (!result.ok()) {
             const std::string error = redact_sensitive(result.error);
             url = "";
@@ -516,7 +582,11 @@ public:
         }
 
         CancellationSource cancellation;
-        const auto result = catalog_client_.list_folders(cancellation.token());
+        const auto server = clients();
+        if (server == nullptr) {
+            return S_OK;
+        }
+        const auto result = server->catalog.list_folders(cancellation.token());
         if (!result.ok()) {
             trace(
                 "online folder list failed error=" +
@@ -585,10 +655,15 @@ public:
         }
 
         CancellationSource cancellation;
+        const auto server = clients();
+        if (server == nullptr) {
+            tracks_list->finish();
+            return S_OK;
+        }
         std::string cursor;
         constexpr int kMaxFolderPages = 5;
         for (int page = 0; page < kMaxFolderPages; ++page) {
-            const auto result = catalog_client_.get_folder(
+            const auto result = server->catalog.get_folder(
                 folder_unique_id,
                 cursor,
                 cancellation.token()
@@ -601,7 +676,7 @@ public:
                 return E_FAIL;
             }
             for (const auto& track : result.value->tracks) {
-                add_track(tracks_list, track);
+                add_track(tracks_list, server->origin, track);
             }
             if (!result.value->next_cursor.has_value()) {
                 break;
@@ -719,7 +794,12 @@ private:
             request_generation = ++compatible_request_generation_;
         }
 
-        const auto result = compatible_tracks_client_.fetch(
+        const auto server = clients();
+        if (server == nullptr) {
+            tracks_list->finish();
+            return S_OK;
+        }
+        const auto result = server->compatible.fetch(
             seed_uid,
             cancellation.token()
         );
@@ -748,6 +828,7 @@ private:
             auto track = compatible_track_as_search_track(compatible);
             add_track(
                 tracks_list,
+                server->origin,
                 track,
                 "Album: " + track.album + " | " +
                     compatible_track_comment(compatible)
@@ -759,6 +840,7 @@ private:
 
     static void add_track(
         IVdjTracksList* tracks_list,
+        const std::string& origin,
         const SearchTrack& track,
         std::string comment = {}
     )
@@ -772,9 +854,10 @@ private:
         const char* album = track.album.empty()
             ? nullptr
             : track.album.c_str();
-        const char* cover = track.cover_url.empty()
-            ? nullptr
-            : track.cover_url.c_str();
+        const std::string cover_url = track.cover_url.empty()
+            ? ""
+            : api_asset_url(origin, track.cover_url);
+        const char* cover = cover_url.empty() ? nullptr : cover_url.c_str();
         tracks_list->add(
             track.entity_uid.c_str(),
             track.title.c_str(),
@@ -794,22 +877,123 @@ private:
         );
     }
 
-    static std::string api_asset_url(std::string_view path)
+    static std::string api_asset_url(const std::string& origin, std::string_view path)
     {
-        if (path.starts_with("http://") || path.starts_with("https://")) {
+        if (path.starts_with("https://")) {
             return std::string(path);
         }
-        return api_origin() +
+        if (path.starts_with("http://")) {
+            return {};
+        }
+        return origin +
             (path.starts_with('/') ? std::string(path) : "/" + std::string(path));
     }
 
-    static std::string api_origin()
+    std::shared_ptr<ServerClients> clients()
     {
-        const char* configured = std::getenv("CRATE_VDJ_API_ORIGIN");
-        if (configured != nullptr && configured[0] != '\0') {
-            return configured;
+        std::lock_guard lock(clients_mutex_);
+        return clients_;
+    }
+
+    void sync_clients()
+    {
+        std::shared_ptr<ServerClients> next;
+        if (session_.logged_in()) {
+            const auto origin = session_.origin();
+            const auto credentials = session_.credentials();
+            std::lock_guard lock(clients_mutex_);
+            if (clients_ != nullptr && clients_->origin == *origin &&
+                clients_->credentials == credentials) {
+                return;
+            }
+            next = std::make_shared<ServerClients>(http_, credentials, *origin, &metadata_cache_);
+            clients_ = std::move(next);
+            return;
         }
-        return "https://api.lespedants.org";
+        std::lock_guard lock(clients_mutex_);
+        clients_.reset();
+    }
+
+    void connection_loop()
+    {
+        session_.restore(
+            ConnectionSession::Clock::now(),
+            connection_cancellation_.token()
+        );
+        sync_clients();
+        trace("online source connection restored logged_in=" +
+              std::string(session_.logged_in() ? "true" : "false"));
+        std::unique_lock lock(connection_mutex_);
+        while (!stopping_) {
+            connection_wakeup_.wait_for(lock, std::chrono::seconds(30), [this] {
+                return stopping_ || pending_connect_.has_value();
+            });
+            if (stopping_) {
+                break;
+            }
+            auto request = std::move(pending_connect_);
+            pending_connect_.reset();
+            lock.unlock();
+            if (request.has_value()) {
+                complete_connect(*request);
+            } else {
+                session_.refresh_if_due(
+                    ConnectionSession::Clock::now(),
+                    connection_cancellation_.token()
+                );
+                sync_clients();
+            }
+            lock.lock();
+        }
+    }
+
+    void complete_connect(const PendingConnect& request)
+    {
+        const auto result = session_.connect(
+            request.origin,
+            request.token,
+            ConnectionSession::Clock::now(),
+            connection_cancellation_.token()
+        );
+        sync_clients();
+        trace("online source connect result=" +
+              std::to_string(static_cast<int>(result.error)));
+        show_connection_message("Crate", connect_message(result));
+    }
+
+    static std::string connect_message(const ConnectResult& result)
+    {
+        switch (result.error) {
+        case ConnectError::None: {
+            const auto& identity = result.status.identity;
+            const auto& name = identity.username.empty() ? identity.name : identity.username;
+            return "Connected to Crate as " + name + ".";
+        }
+        case ConnectError::InvalidOrigin:
+            return "Enter the HTTPS address of your Crate server, for example https://api.example.org.";
+        case ConnectError::MissingToken:
+            return "Paste an access token created in Crate Listen, Settings, Access tokens.";
+        case ConnectError::CredentialWriteFailed:
+            return "The token could not be saved in the system keychain.";
+        case ConnectError::SettingsWriteFailed:
+            return "The connection settings could not be saved.";
+        case ConnectError::Rejected:
+            break;
+        }
+        switch (result.status.state) {
+        case ConnectionState::Unauthorized:
+            return "Crate rejected this token. Create a new one in Crate Listen, Settings, Access tokens.";
+        case ConnectionState::MissingScopes:
+            return "This token cannot browse or play your library. Create one with the VirtualDJ permissions.";
+        case ConnectionState::Incompatible:
+            return "This Crate server is not compatible with this plugin version.";
+        case ConnectionState::ServerDisabled:
+            return "VirtualDJ is disabled on this Crate server.";
+        case ConnectionState::Unreachable:
+            return "Crate could not be reached. Check the address and your connection.";
+        default:
+            return "Crate could not be connected.";
+        }
     }
 
     static std::filesystem::path metadata_cache_path()
@@ -838,12 +1022,17 @@ private:
     }
 
     CurlHttpClient http_;
-    SystemCredentialStore credentials_;
     MetadataCacheStore metadata_cache_;
-    SearchClient search_client_;
-    StreamResolver stream_resolver_;
-    CatalogClient catalog_client_;
-    CompatibleTracksClient compatible_tracks_client_;
+    FileConnectionSettingsStore settings_;
+    ConnectionSession session_;
+    std::mutex clients_mutex_;
+    std::shared_ptr<ServerClients> clients_;
+    std::mutex connection_mutex_;
+    std::condition_variable connection_wakeup_;
+    CancellationSource connection_cancellation_;
+    std::optional<PendingConnect> pending_connect_;
+    bool stopping_ = false;
+    std::thread connection_thread_;
     std::mutex search_mutex_;
     std::optional<CancellationSource> active_search_;
     std::mutex compatible_mutex_;

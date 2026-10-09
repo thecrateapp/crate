@@ -179,6 +179,12 @@ int main()
     }
 
     auto* online_source = static_cast<IVdjPluginOnlineSource*>(raw_object);
+    if (online_source->IsLogged() != S_FALSE) {
+        std::cerr << "Online Source reported a login before connecting\n";
+        online_source->Release();
+        return 1;
+    }
+
     CallbackProbe callbacks;
     callbacks.vdj_folder = test_vdj_folder;
     online_source->cb = &callbacks;
