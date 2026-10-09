@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -47,12 +48,14 @@ def _write_click_track(
 
 
 def _crate_cli_binary() -> Path:
-    binary = next(
-        (candidate for candidate in CLI_CANDIDATES if candidate.is_file()), None
-    )
-    if binary is None:
-        pytest.skip("crate-cli is not built; Rust parity runs in the crate-cli CI job")
-    return binary
+    explicit = os.environ.get("CRATE_CLI_BINARY")
+    candidates = (Path(explicit),) if explicit else CLI_CANDIDATES
+    binary = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if binary is not None:
+        return binary
+    if os.environ.get("CRATE_REQUIRE_CRATE_CLI") == "1":
+        pytest.fail("crate-cli is required for Rust parity but was not found")
+    pytest.skip("crate-cli is not built; Rust parity runs in the crate-cli CI job")
 
 
 def test_python_and_rust_mix_profiles_stay_within_tolerance(tmp_path: Path) -> None:
@@ -91,3 +94,26 @@ def test_python_and_rust_mix_profiles_stay_within_tolerance(tmp_path: Path) -> N
     assert rust_profile["outroLufs"] is not None
     assert rust_profile["truePeakDbfs"] <= 0.5
     assert python_profile.measurement_version is None
+
+
+def test_missing_crate_cli_fails_when_ci_requires_it(
+    monkeypatch, tmp_path: Path
+) -> None:
+    import tests.test_smart_mix_rust_parity as parity
+
+    monkeypatch.setattr(parity, "CLI_CANDIDATES", (tmp_path / "missing",))
+    monkeypatch.delenv("CRATE_CLI_BINARY", raising=False)
+    monkeypatch.setenv("CRATE_REQUIRE_CRATE_CLI", "1")
+
+    with pytest.raises(pytest.fail.Exception):
+        parity._crate_cli_binary()
+
+
+def test_explicit_crate_cli_binary_is_used(monkeypatch, tmp_path: Path) -> None:
+    import tests.test_smart_mix_rust_parity as parity
+
+    binary = tmp_path / "crate-cli"
+    binary.write_text("")
+    monkeypatch.setenv("CRATE_CLI_BINARY", str(binary))
+
+    assert parity._crate_cli_binary() == binary
