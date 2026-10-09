@@ -119,6 +119,7 @@ def claim_smart_mix_backfill_batch(
                           OR profile.profile_version <> 1
                           OR profile.analyzer_version <> :analyzer_version
                           OR profile.quality = 'unavailable'
+                          OR profile.source_stale_at IS NOT NULL
                       )
                       AND (
                           processing.track_id IS NULL
@@ -260,12 +261,14 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                                 AND profile.quality <> 'unavailable'
                                 AND profile.profile_version = :profile_version
                                 AND profile.analyzer_version = :analyzer_version
+                                AND profile.source_stale_at IS NULL
                                 AS is_current,
                             profile.track_id IS NOT NULL
                                 AND profile.quality <> 'unavailable'
                                 AND (
                                     profile.profile_version <> :profile_version
                                     OR profile.analyzer_version <> :analyzer_version
+                                    OR profile.source_stale_at IS NOT NULL
                                 )
                                 AS is_stale,
                             processing.state,

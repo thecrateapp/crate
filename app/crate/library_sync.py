@@ -37,6 +37,7 @@ from crate.db.jobs.sync import (
 )
 from crate.storage_layout import canonical_entity_uid, entity_uid_for
 from crate.utils import COVER_NAMES, PHOTO_NAMES, normalize_key, to_datetime
+from crate.smart_mix.source import smart_mix_source_revision_from_stat
 
 log = logging.getLogger(__name__)
 
@@ -693,6 +694,9 @@ class LibrarySync:
                                 "bit_depth": bit_depth,
                                 "duration": duration,
                                 "size": fstat.st_size,
+                                "smart_mix_source_revision": smart_mix_source_revision_from_stat(
+                                    fstat
+                                ),
                                 "year": existing.get("year"),
                                 "genre": existing.get("genre"),
                                 "albumartist": existing.get("albumartist"),
@@ -759,6 +763,9 @@ class LibrarySync:
                     "bit_depth": bit_depth or None,
                     "duration": duration,
                     "size": fstat.st_size,
+                    "smart_mix_source_revision": smart_mix_source_revision_from_stat(
+                        fstat
+                    ),
                     "year": tags.get("date", "")[:4] if tags.get("date") else None,
                     "genre": tags.get("genre"),
                     "albumartist": tags.get("albumartist"),

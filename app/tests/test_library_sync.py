@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from crate.entity_ids import artist_entity_uid
+from crate.smart_mix.source import smart_mix_source_revision
 
 
 ALBUM_ENTITY_UID = "22222222-2222-5222-8222-222222222222"
@@ -242,6 +243,9 @@ class TestSyncAlbum:
                 payload = mock_upsert_scanned.call_args.kwargs["track_payloads"][0]
                 assert payload["sample_rate"] == 44100
                 assert payload["bit_depth"] == 16
+                assert payload["smart_mix_source_revision"] == (
+                    smart_mix_source_revision(track_path)
+                )
 
     def test_sync_album_reads_tracks(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -293,6 +297,14 @@ class TestSyncAlbum:
                 assert result["total_size"] == 3072
                 assert "flac" in result["formats"]
                 assert len(mock_upsert_scanned.call_args.kwargs["track_payloads"]) == 2
+                payloads = mock_upsert_scanned.call_args.kwargs["track_payloads"]
+                assert {
+                    payload["path"]: payload["smart_mix_source_revision"]
+                    for payload in payloads
+                } == {
+                    str(album_dir / name): smart_mix_source_revision(album_dir / name)
+                    for name in ("01.flac", "02.flac")
+                }
                 queued_asset = mock_queue.call_args.args[0]
                 assert queued_asset.kind == "album-cover"
                 assert queued_asset.entity_key == ALBUM_ENTITY_UID

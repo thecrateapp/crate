@@ -4,7 +4,7 @@ from contextlib import nullcontext
 from datetime import UTC
 from typing import Any, Sequence
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import defer
 
@@ -56,6 +56,46 @@ def upsert_track_mix_profile(
         return active_session.execute(statement).scalar_one_or_none() is not None
 
 
+def mark_track_mix_source_revision(
+    track_id: int,
+    source_revision: str,
+    *,
+    session=None,
+) -> bool:
+    with optional_scope(session) as active_session:
+        stale = active_session.execute(
+            update(TrackMixProfileRow)
+            .where(
+                TrackMixProfileRow.track_id == int(track_id),
+                TrackMixProfileRow.source_revision != source_revision,
+                TrackMixProfileRow.source_stale_at.is_(None),
+            )
+            .values(source_stale_at=func.now())
+            .returning(TrackMixProfileRow.track_id)
+        ).scalar_one_or_none()
+        if stale is None:
+            return False
+        active_session.execute(
+            text(
+                """
+                UPDATE track_processing_state
+                SET state = 'pending',
+                    attempts = 0,
+                    target_generation = NULL,
+                    claimed_by = NULL,
+                    claimed_at = NULL,
+                    completed_at = NULL,
+                    updated_at = NOW()
+                WHERE track_id = :track_id
+                  AND pipeline = 'smart_mix'
+                  AND state <> 'analyzing'
+                """
+            ),
+            {"track_id": int(track_id)},
+        )
+        return True
+
+
 def get_track_mix_profile(
     track_id: int,
     *,
@@ -87,7 +127,10 @@ def get_track_mix_profiles(
             LibraryTrack.duration,
         )
         .join(LibraryTrack, LibraryTrack.id == TrackMixProfileRow.track_id)
-        .where(TrackMixProfileRow.track_id.in_(set(requested_ids)))
+        .where(
+            TrackMixProfileRow.track_id.in_(set(requested_ids)),
+            TrackMixProfileRow.source_stale_at.is_(None),
+        )
     )
     if not include_beat_grid:
         statement = statement.options(defer(TrackMixProfileRow.beat_grid_data))
@@ -138,7 +181,10 @@ def get_track_mix_profiles_by_entity_uids(
             LibraryTrack.duration,
         )
         .join(LibraryTrack, LibraryTrack.id == TrackMixProfileRow.track_id)
-        .where(LibraryTrack.entity_uid.in_(set(requested_uids)))
+        .where(
+            LibraryTrack.entity_uid.in_(set(requested_uids)),
+            TrackMixProfileRow.source_stale_at.is_(None),
+        )
     )
     if not include_beat_grid:
         statement = statement.options(defer(TrackMixProfileRow.beat_grid_data))
@@ -211,6 +257,7 @@ def _profile_values(
         "active_end_ms": profile.active_end_ms,
         "integrated_lufs": profile.integrated_lufs,
         "measurement_version": profile.measurement_version,
+        "source_stale_at": None,
         "analyzed_at": profile.analyzed_at,
     }
 

@@ -69,6 +69,7 @@ _SEED_SQL = text(
     JOIN library_albums album ON album.id = track.album_id
     JOIN track_mix_profiles profile ON profile.track_id = track.id
     WHERE track.entity_uid = CAST(:entity_uid AS uuid)
+      AND profile.source_stale_at IS NULL
       AND album.quarantined_at IS NULL
       AND NULLIF(track.path, '') IS NOT NULL
     LIMIT 1
@@ -118,6 +119,7 @@ _CANDIDATE_SQL = text(
             profile.analyzed_at
         FROM track_mix_profiles profile
         WHERE profile.track_id <> :seed_track_id
+          AND profile.source_stale_at IS NULL
           AND profile.quality <> 'unavailable'
           AND profile.bpm IS NOT NULL
           AND (

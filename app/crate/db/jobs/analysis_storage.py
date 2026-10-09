@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import hashlib
 import json
 from datetime import datetime, timezone
 from enum import StrEnum
@@ -36,6 +35,7 @@ from crate.smart_mix.models import (
     TrackMixProfileDraft,
     mix_profile_draft_from_payload,
 )
+from crate.smart_mix.source import smart_mix_source_revision
 from crate.smart_mix.versions import ANALYZER_VERSION, PROFILE_SCHEMA_VERSION
 
 
@@ -469,16 +469,6 @@ _QUALITY_RANK = {
     MixProfileQuality.FULL: 3,
 }
 _RUST_ANALYZER = "crate-rust"
-
-
-def smart_mix_source_revision(path: str | Path) -> str:
-    source = Path(path)
-    try:
-        stat = source.stat()
-        identity = f"{stat.st_size}:{stat.st_mtime_ns}:{stat.st_ino}"
-    except OSError:
-        identity = f"missing:{source}"
-    return hashlib.sha256(identity.encode()).hexdigest()
 
 
 def capture_smart_mix_source(
