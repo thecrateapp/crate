@@ -14,12 +14,19 @@ vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
     error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
   },
 }));
 
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
-import { CommandPalette } from "./CommandPalette";
+import { toast } from "sonner";
+import {
+  CommandPalette,
+  describeActionResult,
+  matchesCommandQuery,
+} from "./CommandPalette";
 
 beforeAll(() => {
   class TestResizeObserver {
@@ -415,5 +422,84 @@ describe("CommandPalette", () => {
         release_dates_only: true,
       }),
     );
+  });
+
+  it("opens as an accessible modal dialog", () => {
+    mockAuth(["admin.access", "library.repair.run"]);
+    render(
+      <MemoryRouter>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+
+    expect(
+      screen.getByRole("dialog", { name: "Command palette" }),
+    ).toBeInTheDocument();
+  });
+
+  it("finds actions and pages by typing their name", () => {
+    mockAuth(["admin.access", "library.repair.run", "library.import.manage"]);
+    render(
+      <MemoryRouter>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+
+    fireEvent.change(
+      screen.getByPlaceholderText("Type a command or search..."),
+      {
+        target: { value: "sync lib" },
+      },
+    );
+
+    expect(screen.getByText("Sync Library")).toBeInTheDocument();
+    expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
+  });
+
+  it("tells the user when the backend did not start the task", async () => {
+    mockAuth(["library.import.manage"]);
+    vi.mocked(api).mockResolvedValue({
+      task_id: null,
+      reason: "global_scope_not_supported",
+    });
+    render(
+      <MemoryRouter>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+
+    fireEvent.click(screen.getByText("Sync Library"));
+
+    await waitFor(() =>
+      expect(toast.warning).toHaveBeenCalledWith(
+        "Sync Library not started: global scope not supported",
+      ),
+    );
+  });
+});
+
+describe("command palette helpers", () => {
+  it.each([
+    [{ task_id: "abc" }, { kind: "queued" }],
+    [{ status: "already_running" }, { kind: "already" }],
+    [{ task_id: null }, { kind: "already" }],
+    [
+      { task_id: null, reason: "not_fixable" },
+      { kind: "skipped", reason: "not fixable" },
+    ],
+    [undefined, { kind: "queued" }],
+  ])("describes %j as %j", (result, expected) => {
+    expect(describeActionResult(result)).toEqual(expected);
+  });
+
+  it("matches every word of the query in any order", () => {
+    expect(matchesCommandQuery("Remove duplicate tracks", "dup rem")).toBe(
+      true,
+    );
+    expect(matchesCommandQuery("Sync Library", "health")).toBe(false);
   });
 });
