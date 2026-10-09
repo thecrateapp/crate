@@ -227,3 +227,24 @@ def test_concurrent_first_builds_for_one_user_do_not_collide(pg_db):
     built = _snapshot()
     recompute_user_listening_aggregates(1)
     assert _snapshot() == built
+
+
+def test_refresh_survives_tracks_removed_from_the_library(pg_db):
+    history = seed_listening_history(events=300, days=60)
+    recompute_user_listening_aggregates(1)
+    removed = history.track_ids[0]
+
+    with transaction_scope() as session:
+        session.execute(
+            text("DELETE FROM library_tracks WHERE id = :id"), {"id": removed}
+        )
+    _play(pg_db, history.track_ids[1], "2026-10-06T21:40:00+00:00")
+
+    refresh_user_listening_aggregates(1)
+
+    with read_scope() as session:
+        stale = session.execute(
+            text("SELECT count(*) FROM user_track_stats WHERE track_id = :id"),
+            {"id": removed},
+        ).scalar_one()
+    assert stale == 0

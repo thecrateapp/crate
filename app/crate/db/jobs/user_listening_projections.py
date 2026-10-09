@@ -362,7 +362,13 @@ _WINDOW_STATS_SQL = (
             complete_play_count, minutes_listened, first_played_at, last_played_at
         )
         SELECT
-            :user_id, :window, entity_key, MAX(track_id),
+            :user_id, :window, entity_key,
+            MAX(track_id) FILTER (
+                WHERE EXISTS (
+                    SELECT 1 FROM library_tracks lt
+                    WHERE lt.id = user_track_daily.track_id
+                )
+            ),
             MAX(global_track_uid::text)::uuid, MAX(track_entity_uid::text)::uuid,
             MAX(track_path), MAX(title), MAX(NULLIF(artist, '')),
             MAX(NULLIF(album, '')), SUM(play_count)::INTEGER,
