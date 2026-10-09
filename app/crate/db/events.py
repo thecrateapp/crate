@@ -82,20 +82,25 @@ def _publish_to_redis(task_id: str, event_type: str, data: dict, timestamp: str)
         pass  # Non-critical — SSE will fall back to polling
 
 
-def get_task_events(task_id: str, after_id: int = 0, limit: int = 100) -> list[dict]:
-    """Get events for a task after a given ID."""
+def get_task_events(
+    task_id: str, after_id: int = 0, limit: int = 100, *, tail: bool = False
+) -> list[dict]:
+    """Get events for a task after a given ID, or its latest ``limit`` events."""
+    order = "DESC" if tail else "ASC"
     with transaction_scope() as session:
         rows = (
             session.execute(
                 text(
                     "SELECT id, event_type, data_json, created_at FROM task_events "
-                    "WHERE task_id = :task_id AND id > :after_id ORDER BY id LIMIT :lim"
+                    f"WHERE task_id = :task_id AND id > :after_id ORDER BY id {order} LIMIT :lim"
                 ),
                 {"task_id": task_id, "after_id": after_id, "lim": limit},
             )
             .mappings()
             .all()
         )
+    if tail:
+        rows = list(reversed(rows))
     results = []
     for r in rows:
         d = serialize_row(r)

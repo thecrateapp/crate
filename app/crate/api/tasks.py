@@ -1,4 +1,5 @@
 import asyncio
+import time
 import json as _json
 from typing import AsyncIterator
 
@@ -76,18 +77,31 @@ def _require_analysis_manager(request: Request) -> dict:
     return require_permission(request, "library.analysis.manage")
 
 
+TASKS_STREAM_REFRESH_SECONDS = 2.0
+
+
 async def _tasks_stream(limit: int) -> AsyncIterator[str]:
     yield f"data: {json_dumps(get_cached_tasks_surface(limit=limit))}\n\n"
     pubsub = None
     try:
         pubsub = await open_pubsub(TASKS_SURFACE_STREAM_CHANNEL)
         heartbeat_counter = 0
+        pending = False
+        last_sent = 0.0
         while True:
             message = await pubsub.get_message(
                 ignore_subscribe_messages=True, timeout=1.0
             )
             if message and message.get("type") == "message":
-                yield f"data: {json_dumps(get_cached_tasks_surface(limit=limit))}\n\n"
+                pending = True
+            now = time.monotonic()
+            if pending and now - last_sent >= TASKS_STREAM_REFRESH_SECONDS:
+                snapshot = await asyncio.to_thread(
+                    get_cached_tasks_surface, limit=limit, fresh=True
+                )
+                yield f"data: {json_dumps(snapshot)}\n\n"
+                pending = False
+                last_sent = now
                 heartbeat_counter = 0
                 continue
             heartbeat_counter += 1
