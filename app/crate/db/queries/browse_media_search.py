@@ -470,6 +470,7 @@ _DJ_PROFILE_CANDIDATES = """
     SELECT p.track_id AS id
     FROM track_mix_profiles p
     WHERE p.quality <> 'unavailable'
+      AND p.source_stale_at IS NULL
       AND p.bpm IS NOT NULL
       AND (CAST(:bpm_min AS double precision) IS NULL OR p.bpm >= :bpm_min)
       AND (CAST(:bpm_max AS double precision) IS NULL OR p.bpm <= :bpm_max)
@@ -492,6 +493,7 @@ _DJ_UNANALYZED_CANDIDATES = """
     WHERE NOT EXISTS (
         SELECT 1 FROM track_mix_profiles p
         WHERE p.track_id = t.id AND p.quality <> 'unavailable'
+          AND p.source_stale_at IS NULL
     )
     ORDER BY t.id
     LIMIT :candidate_limit
@@ -538,6 +540,7 @@ _DJ_RESULTS = """
     JOIN library_albums a ON a.id = t.album_id
     LEFT JOIN track_mix_profiles p
       ON p.track_id = t.id AND p.quality <> 'unavailable'
+      AND p.source_stale_at IS NULL
     WHERE (CAST(:artist AS text) IS NULL OR t.artist ILIKE :artist ESCAPE '\\')
       AND (CAST(:album AS text) IS NULL OR a.name ILIKE :album ESCAPE '\\')
       AND (CAST(:bpm_min AS double precision) IS NULL OR p.bpm >= :bpm_min)

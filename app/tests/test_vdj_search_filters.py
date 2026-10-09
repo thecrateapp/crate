@@ -307,3 +307,14 @@ def _has_seq_scan(plan: object, relation: str) -> bool:
     if plan.get("Node Type") == "Seq Scan" and plan.get("Relation Name") == relation:
         return True
     return any(_has_seq_scan(value, relation) for value in plan.values())
+
+
+def test_dj_search_never_reads_stale_profiles() -> None:
+    from pathlib import Path
+
+    source = (
+        Path(__file__).resolve().parents[1] / "crate/db/queries/browse_media_search.py"
+    ).read_text()
+
+    assert source.count("track_mix_profiles p") == 3
+    assert source.count("p.source_stale_at IS NULL") == 3

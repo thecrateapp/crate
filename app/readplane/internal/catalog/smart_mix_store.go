@@ -47,6 +47,7 @@ const smartMixProfileSummaryQuery = `
 	FROM library_tracks track
 	JOIN track_mix_profiles profile ON profile.track_id = track.id
 	WHERE track.entity_uid = $1::uuid
+	  AND profile.source_stale_at IS NULL
 	LIMIT 1
 `
 

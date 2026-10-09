@@ -17,6 +17,7 @@ func TestSmartMixProfileSummaryQueryIsCompact(t *testing.T) {
 	assert.Contains(t, smartMixProfileSummaryQuery, "analyzed_at")
 	assert.NotContains(t, smartMixProfileSummaryQuery, "beat_grid_data")
 	assert.NotContains(t, smartMixProfileSummaryQuery, "profile.bliss_vector,")
+	assert.Contains(t, smartMixProfileSummaryQuery, "profile.source_stale_at IS NULL")
 }
 
 func TestSmartMixProfileSummaryFromRow(t *testing.T) {
