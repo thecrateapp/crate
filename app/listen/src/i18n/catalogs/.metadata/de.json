@@ -5331,6 +5331,182 @@
     "sourceHash": "sha256:a8d310862e8eccfe7e9fc27229bd4bf929f845f3ac34db2b2697a26d1d6e1ac4",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "settings.accessTokens.copy": {
+    "sourceHash": "sha256:d26080296ddc0f6a426a81cbc624ab6d02afc93cac19a292b867fa530be8d063",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.create": {
+    "sourceHash": "sha256:a854017cf41991b9408d96fb5394d7336e9b1cd63c7ee697094c8d0fb25f381c",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.created": {
+    "sourceHash": "sha256:bab47bc185bb13306c877f697d9b609a2a1075b70082ce992671a9d6a8535b16",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.description": {
+    "sourceHash": "sha256:9f3cb11c1d3734403ce2e401ea9b39d4edd9b752d0d44d4ec1d7022e009a0519",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.empty": {
+    "sourceHash": "sha256:9575412913c529a7dcf35ba5ca464605aea08dd8e5818ea81a2bb40a72f1d2c0",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.errors.copy": {
+    "sourceHash": "sha256:45c031f9a42e8eafc27bd35c4831bc9dd2ef228c75a6a2c410a5653c52ea6e49",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.errors.create": {
+    "sourceHash": "sha256:69829c476d9043851139e2547d92a8e11b74d89ec18155274f1c48d0c4779ad5",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.errors.load": {
+    "sourceHash": "sha256:f1e64d4143426974ceab546ae250a023254ad56427c5f6dfc507b31c1a27da9d",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.errors.revoke": {
+    "sourceHash": "sha256:4d7135c86f1ce33395a13b01a08f9f8a240622e9b9fb0cec6a8bb2c2a4b369a0",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.errors.rotate": {
+    "sourceHash": "sha256:96e1492318770e06ca38da24e1c899bde983fe4287019a1d8017dce20849477c",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.expires": {
+    "sourceHash": "sha256:6779ae25daa6f5eb1e99941aa0259112909764a21aba98c489f08862282bcc0b",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.expiry.days30": {
+    "sourceHash": "sha256:6b47565bec831f3466112379fe5e2537fdf474964f3829e540fa21e7113d746c",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.expiry.days90": {
+    "sourceHash": "sha256:0f32d5aca7b7300761a4e050e2e88feab7b14b9dadff367a51960a62b0b627b2",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.expiry.never": {
+    "sourceHash": "sha256:b1dbc5deb411364070e5d66c7cc31c2de5a8a9f0b99d81c5e9d013d447fb6732",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.expiry.year": {
+    "sourceHash": "sha256:cc7c746f33738a073b6ec9f7631cc1830e5debd00bfeeea2e1042031de1c15de",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.expiryLabel": {
+    "sourceHash": "sha256:c77447b828a79a4d408b85b602aabf8d85cd9a96991d0a26489d2051acfae3cf",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.hide": {
+    "sourceHash": "sha256:fbf85c2eb7aefd9420fb3b2b0bfe5eb4fa978d16c1328f55cd3b27aad475e349",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.lastUsed": {
+    "sourceHash": "sha256:c55a00501780e127111f7d22e2a4a5db3c355b7cc572b35a50feead11a3c3c33",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.loading": {
+    "sourceHash": "sha256:323b16c9bf0a6e000214b0ec3f36fa998cfb392e3a6673fb84e1719c186c565d",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.nameLabel": {
+    "sourceHash": "sha256:2e065455c5694d808d3d6acf1e60a0e046f6fce0fb547a420aee7b49ca738b14",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.namePlaceholder": {
+    "sourceHash": "sha256:73076ba7f55077be08a334e855643ea87cb036f715b5a4f3c5bc66edf5d90d65",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.neverUsed": {
+    "sourceHash": "sha256:69cc8c535d9af0f2118fc750e40e7c9523fc1b91a00016b2b82c659e37a24a88",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.newToken": {
+    "sourceHash": "sha256:e5a610aa128d238ea3fc26fe78e20d5144e12eece920134e8553202b7788fa14",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.noExpiry": {
+    "sourceHash": "sha256:54c4e52ef2bd4452acf051b9e65827403c7d79f6bbaf05df3cf87f8e84b5c919",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.permissions": {
+    "sourceHash": "sha256:cc0c9e253160c0320572e0a61c1b409aa8a623da76cbd35afe2e6963b09e0ebb",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.proLicense": {
+    "sourceHash": "sha256:798c51c6a663f80d0f4fd85db7ffff87e066cdaab01796c34528ee062533ae61",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.retry": {
+    "sourceHash": "sha256:b11b0afe31f08d877a32f771d673066828eab4e86acde7ff82532496c1b0f938",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.revoke": {
+    "sourceHash": "sha256:2688a6f8b17b7d3bd115aa997e299653680e04ae39838c7c604d1552678e7294",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.revokeConfirmAction": {
+    "sourceHash": "sha256:183a682a5e3e7aa06e9a148ef6ba4fc7216cadbb51db4c6cb54cfe9d6fa262a8",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.revokeConfirmDescription": {
+    "sourceHash": "sha256:94d708040aca1e8778efd080a5f1b3cc4165d5efeca67015f37fe68f25b6c4b7",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.revokeConfirmTitle": {
+    "sourceHash": "sha256:6e728cdcdac8e89097a3ffccd831bfa6bb9be5a7ba53713884df096246a58f88",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.revokeNamed": {
+    "sourceHash": "sha256:056230ed9b258c1b71e8e79bddae9c18d9d0b543a91a549b572ba7971dcae5c4",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.rotate": {
+    "sourceHash": "sha256:7a63b19d9ac87bdfbddbb7f4cdcfa18fa9eed020188cd263614a85c9f791934c",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.rotateConfirmAction": {
+    "sourceHash": "sha256:cd67fb10c1d30da51317c865721a3a85a60638c338300317da0b3a56619806b4",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.rotateConfirmDescription": {
+    "sourceHash": "sha256:416b147a351c9403a7bc8832066ac5c413ff8ea8272e38194efa0891395a3140",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.rotateConfirmTitle": {
+    "sourceHash": "sha256:f15cf210bff197a81ea9f652f08a9c7398cac2c73566229b15e17bced159336c",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.rotateNamed": {
+    "sourceHash": "sha256:1af410288cd2f6a9ac54b4ea297215d144acd153ed9c4f027026efd92d943e75",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.scopes.catalog": {
+    "sourceHash": "sha256:d8c778b438657010dd45039d315d9e869ca71d053bad95506bb1acac0badc27c",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.scopes.legacyAutomation": {
+    "sourceHash": "sha256:22da32b628307d9a8514734fc328de2a686dc082a7012620c41066ef18af69eb",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.scopes.media": {
+    "sourceHash": "sha256:773093357e31d09b601d4df18c43a574c6b3d3f7ff2e34b6cac2fc1c3a0f5ce0",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.scopes.playEvents": {
+    "sourceHash": "sha256:bb2f31b3f03d01aba82827e4f98eeaeea5c025657179107671ead25ea662dba5",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.scopes.smartMix": {
+    "sourceHash": "sha256:6d0e42e72c2134de69c3d2cf5393deaaf7519f37c42133d0cb933e8db6482730",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.secretShownOnce": {
+    "sourceHash": "sha256:4ed2872f492a2f70cc0b72e9ddd367c171be31c03ea53a3d32e078cb353de6ae",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
+  "settings.accessTokens.title": {
+    "sourceHash": "sha256:7c88d7b5d80389ec5528e1e49a9ce28b049f21313dcca0c7c7fe7609f3d7fcbc",
+    "reviewedAt": "2026-10-09T09:26:54.342Z"
+  },
   "settings.account.bio": {
     "sourceHash": "sha256:46ca2f31bad36379365ea4d2705d4f258e181857bb69ebc9f833f67b7d782f14",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
