@@ -27,6 +27,8 @@ private:
     std::string account_;
 };
 
+std::string redact_secrets(std::string_view message);
+
 std::string redact_sensitive(
     std::string_view message,
     std::string_view bearer_token = {},

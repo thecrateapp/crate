@@ -62,7 +62,7 @@ void trace(const std::string& message)
     std::lock_guard lock(g_log_mutex);
     std::ofstream output(log_path(), std::ios::app);
     if (output.is_open()) {
-        output << message << '\n';
+        output << crate::vdj::redact_secrets(message) << '\n';
     }
 }
 

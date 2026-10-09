@@ -244,6 +244,12 @@ if(CRATE_VDJ_BUILD_TESTS)
     target_link_libraries(crate_vdj_json_mapping_test PRIVATE crate_vdj_core)
     add_test(NAME crate_vdj_json_mapping_test COMMAND crate_vdj_json_mapping_test)
 
+    add_executable(crate_vdj_redaction_test
+        tests/security/redaction_test.cpp
+    )
+    target_link_libraries(crate_vdj_redaction_test PRIVATE crate_vdj_core)
+    add_test(NAME crate_vdj_redaction_test COMMAND crate_vdj_redaction_test)
+
     add_executable(crate_vdj_contract_negotiator_test
         tests/client/contract_negotiator_test.cpp
     )
