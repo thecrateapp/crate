@@ -15,14 +15,16 @@ public:
         return token_;
     }
 
-    void save_token(std::string token) override
+    bool save_token(std::string token) override
     {
         token_ = std::move(token);
+        return true;
     }
 
-    void clear_token() override
+    bool clear_token() override
     {
         token_.reset();
+        return true;
     }
 
 private:

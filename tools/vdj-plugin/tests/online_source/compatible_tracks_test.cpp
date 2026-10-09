@@ -94,8 +94,8 @@ public:
         return "crv_compatible-token";
     }
 
-    void save_token(std::string) override {}
-    void clear_token() override {}
+    bool save_token(std::string) override { return true; }
+    bool clear_token() override { return true; }
 };
 
 } // namespace

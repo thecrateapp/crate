@@ -58,7 +58,7 @@ std::optional<std::string> SystemCredentialStore::load_token()
     return token;
 }
 
-void SystemCredentialStore::save_token(std::string token)
+bool SystemCredentialStore::save_token(std::string token)
 {
     const auto target = to_wide(service_ + ":" + account_);
     CREDENTIALW credential{};
@@ -67,13 +67,14 @@ void SystemCredentialStore::save_token(std::string token)
     credential.CredentialBlobSize = static_cast<DWORD>(token.size());
     credential.CredentialBlob = reinterpret_cast<LPBYTE>(token.data());
     credential.Persist = CRED_PERSIST_LOCAL_MACHINE;
-    CredWriteW(&credential, 0);
+    return CredWriteW(&credential, 0) != FALSE;
 }
 
-void SystemCredentialStore::clear_token()
+bool SystemCredentialStore::clear_token()
 {
     const auto target = to_wide(service_ + ":" + account_);
-    CredDeleteW(target.c_str(), CRED_TYPE_GENERIC, 0);
+    return CredDeleteW(target.c_str(), CRED_TYPE_GENERIC, 0) != FALSE ||
+        GetLastError() == ERROR_NOT_FOUND;
 }
 
 } // namespace crate::vdj

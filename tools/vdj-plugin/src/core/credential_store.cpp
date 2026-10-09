@@ -25,6 +25,48 @@ void replace_all(
 
 } // namespace
 
+CachedCredentialStore::CachedCredentialStore(std::unique_ptr<CredentialStore> backing)
+    : backing_(std::move(backing))
+{
+}
+
+std::optional<std::string> CachedCredentialStore::load_token()
+{
+    std::lock_guard lock(mutex_);
+    if (!loaded_) {
+        token_ = backing_->load_token();
+        loaded_ = true;
+    }
+    return token_;
+}
+
+bool CachedCredentialStore::save_token(std::string token)
+{
+    std::lock_guard lock(mutex_);
+    if (!backing_->save_token(token)) {
+        return false;
+    }
+    token_ = std::move(token);
+    loaded_ = true;
+    return true;
+}
+
+bool CachedCredentialStore::clear_token()
+{
+    std::lock_guard lock(mutex_);
+    if (!backing_->clear_token()) {
+        return false;
+    }
+    token_.reset();
+    loaded_ = true;
+    return true;
+}
+
+std::string credential_account_for_origin(std::string_view origin)
+{
+    return "access-token:" + std::string(origin);
+}
+
 std::string redact_secrets(std::string_view message)
 {
     static const std::regex json_secret(

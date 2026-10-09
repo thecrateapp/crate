@@ -37,8 +37,8 @@ public:
         return "crv_private-token";
     }
 
-    void save_token(std::string) override {}
-    void clear_token() override {}
+    bool save_token(std::string) override { return true; }
+    bool clear_token() override { return true; }
 };
 
 std::string replace(std::string text, std::string_view from, std::string_view to)

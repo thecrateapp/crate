@@ -69,8 +69,8 @@ public:
         return "crv_smart-mix-token";
     }
 
-    void save_token(std::string) override {}
-    void clear_token() override {}
+    bool save_token(std::string) override { return true; }
+    bool clear_token() override { return true; }
 };
 
 std::string profile_json_with(std::string_view field, std::string_view value)

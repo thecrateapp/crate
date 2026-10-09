@@ -43,6 +43,8 @@ add_custom_target(crate_vdj_headless ALL
 
 add_library(crate_vdj_core STATIC
     src/core/contract_negotiator.cpp
+    src/core/connection_session.cpp
+    src/core/connection_settings.cpp
     src/core/credential_store.cpp
     src/core/http_client.cpp
     src/core/json_mapping.cpp
@@ -51,6 +53,7 @@ add_library(crate_vdj_core STATIC
     src/core/search_results.cpp
     src/cache/sqlite_metadata_cache.cpp
     src/client/curl_http_client.cpp
+    src/client/capability_client.cpp
     src/client/catalog_client.cpp
     src/client/media_access_client.cpp
     src/client/search_client.cpp
@@ -243,6 +246,17 @@ if(CRATE_VDJ_BUILD_TESTS)
     )
     target_link_libraries(crate_vdj_json_mapping_test PRIVATE crate_vdj_core)
     add_test(NAME crate_vdj_json_mapping_test COMMAND crate_vdj_json_mapping_test)
+
+    foreach(connection_test connection_settings capability_client connection_session)
+        add_executable(crate_vdj_${connection_test}_test
+            tests/connection/${connection_test}_test.cpp
+        )
+        target_link_libraries(crate_vdj_${connection_test}_test PRIVATE crate_vdj_core)
+        add_test(
+            NAME crate_vdj_${connection_test}_test
+            COMMAND crate_vdj_${connection_test}_test
+        )
+    endforeach()
 
     add_executable(crate_vdj_redaction_test
         tests/security/redaction_test.cpp

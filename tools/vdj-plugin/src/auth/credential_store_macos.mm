@@ -68,7 +68,7 @@ std::optional<std::string> SystemCredentialStore::load_token()
     return token;
 }
 
-void SystemCredentialStore::save_token(std::string token)
+bool SystemCredentialStore::save_token(std::string token)
 {
     auto query = base_query(service_, account_);
     auto data = CFDataCreate(
@@ -95,13 +95,15 @@ void SystemCredentialStore::save_token(std::string token)
     }
     CFRelease(data);
     CFRelease(query);
+    return status == errSecSuccess;
 }
 
-void SystemCredentialStore::clear_token()
+bool SystemCredentialStore::clear_token()
 {
     auto query = base_query(service_, account_);
-    SecItemDelete(query);
+    const auto status = SecItemDelete(query);
     CFRelease(query);
+    return status == errSecSuccess || status == errSecItemNotFound;
 }
 
 } // namespace crate::vdj
