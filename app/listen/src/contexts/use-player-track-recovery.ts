@@ -25,6 +25,7 @@ import {
   seekTo as gpSeekTo,
 } from "@/lib/gapless-player";
 import { createQueueRevision } from "@/lib/playback-engine";
+import { getNativeCrossfadeMs } from "@/lib/player-playback-prefs";
 
 interface Ref<T> {
   current: T;
@@ -98,7 +99,7 @@ export function usePlayerTrackRecovery({
         positionMs,
         autoplay: true,
         repeat: repeatRef.current,
-        crossfadeMs: effectiveCrossfadeMsRef.current,
+        crossfadeMs: getNativeCrossfadeMs(),
         volume: lastNonZeroVolumeRef.current,
         playSource: playSourceRef.current,
         shuffle: shuffleRef.current,

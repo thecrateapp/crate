@@ -20,6 +20,7 @@ import {
   subscribeNativePlaybackIntentChanges,
 } from "@/lib/native-playback-intent";
 import { notify } from "@crate/ui/lib/notify";
+import { getNativeCrossfadeMs } from "@/lib/player-playback-prefs";
 
 const NATIVE_BUFFERING_WATCHDOG_MS = 12000;
 const NATIVE_PLAYBACK_DIAGNOSTIC_KEY = "listen-native-playback-diagnostic:v1";
@@ -203,7 +204,7 @@ export function useNativeBufferingRecovery({
           positionMs,
           autoplay: options.autoplay ?? true,
           repeat: repeatRef.current,
-          crossfadeMs: effectiveCrossfadeMsRef.current,
+          crossfadeMs: getNativeCrossfadeMs(),
           volume: lastNonZeroVolumeRef.current,
           playSource: playSourceRef.current,
           shuffle: shuffleRef.current,
@@ -392,7 +393,7 @@ export function useNativeBufferingRecovery({
           positionMs,
           autoplay: true,
           repeat: repeatRef.current,
-          crossfadeMs: effectiveCrossfadeMsRef.current,
+          crossfadeMs: getNativeCrossfadeMs(),
           volume: lastNonZeroVolumeRef.current,
           playSource: playSourceRef.current,
           shuffle: shuffleRef.current,

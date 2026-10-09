@@ -21,6 +21,7 @@ import {
 } from "@/lib/android-native-engine";
 import { primeOfflineRuntimeProfile } from "@/lib/offline";
 import { createQueueRevision } from "@/lib/playback-engine";
+import { getNativeCrossfadeMs } from "@/lib/player-playback-prefs";
 
 interface UsePlayerEngineQueueSyncParams {
   repeatRef: { current: RepeatMode };
@@ -151,7 +152,7 @@ export function usePlayerEngineQueueSync({
             positionMs,
             autoplay,
             repeat: repeatRef.current,
-            crossfadeMs: effectiveCrossfadeMsRef.current,
+            crossfadeMs: getNativeCrossfadeMs(),
             volume: 1,
             playSource: playSourceRef.current,
             shuffle: shuffleRef.current,

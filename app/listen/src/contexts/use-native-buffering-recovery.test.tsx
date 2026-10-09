@@ -25,6 +25,11 @@ vi.mock("@/contexts/player-engine-adapter", () => ({
   toStartupEngineQueueSnapshot: mocks.toStartupEngineQueueSnapshot,
 }));
 
+vi.mock("@/lib/player-playback-prefs", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/player-playback-prefs")>()),
+  getNativeCrossfadeMs: () => 6_000,
+}));
+
 vi.mock("@crate/ui/lib/notify", () => ({
   notify: { error: mocks.toastError },
 }));
@@ -309,6 +314,7 @@ describe("useNativeBufferingRecovery", () => {
         currentIndex: 1,
         positionMs: 23_000,
         autoplay: false,
+        crossfadeMs: 6_000,
         target: "android-native",
       }),
     );

@@ -244,6 +244,10 @@ export function setNativeSmartMixSecondsPreference(seconds: number) {
   }
 }
 
+export function getNativeCrossfadeMs(): number {
+  return Math.max(0, getCrossfadeDurationPreference() * 1000);
+}
+
 export function getCrossfadeDurationPreference(): number {
   if (isNativeMixRuntime()) {
     return getNativeSmartMixEnabledPreference()
