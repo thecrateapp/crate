@@ -1,9 +1,12 @@
 #include "crate_vdj/connection_session.hpp"
 
 #include "../support/check.hpp"
+#include "../support/connection_fakes.hpp"
 #include "../support/scripted_http.hpp"
 
 #include <chrono>
+#include <future>
+#include <thread>
 #include <map>
 #include <memory>
 #include <optional>
@@ -14,78 +17,6 @@ using namespace crate::vdj::testing;
 using namespace std::chrono_literals;
 
 namespace {
-
-struct SharedVault {
-    std::map<std::string, std::string> tokens;
-    int loads = 0;
-    bool fail_writes = false;
-};
-
-class VaultCredentialStore final : public CredentialStore {
-public:
-    VaultCredentialStore(std::shared_ptr<SharedVault> vault, std::string account)
-        : vault_(std::move(vault)), account_(std::move(account))
-    {
-    }
-
-    std::optional<std::string> load_token() override
-    {
-        ++vault_->loads;
-        const auto found = vault_->tokens.find(account_);
-        if (found == vault_->tokens.end()) {
-            return std::nullopt;
-        }
-        return found->second;
-    }
-
-    bool save_token(std::string token) override
-    {
-        if (vault_->fail_writes) {
-            return false;
-        }
-        vault_->tokens[account_] = std::move(token);
-        return true;
-    }
-
-    bool clear_token() override
-    {
-        if (vault_->fail_writes) {
-            return false;
-        }
-        vault_->tokens.erase(account_);
-        return true;
-    }
-
-private:
-    std::shared_ptr<SharedVault> vault_;
-    std::string account_;
-};
-
-class MemorySettingsStore final : public ConnectionSettingsStore {
-public:
-    std::optional<std::string> origin;
-    bool fail_writes = false;
-
-    std::optional<std::string> load_origin() override
-    {
-        return origin;
-    }
-
-    bool save_origin(std::string_view value) override
-    {
-        if (fail_writes) {
-            return false;
-        }
-        origin = std::string(value);
-        return true;
-    }
-
-    bool clear() override
-    {
-        origin.reset();
-        return true;
-    }
-};
 
 struct Harness {
     std::shared_ptr<SharedVault> vault = std::make_shared<SharedVault>();
@@ -328,6 +259,82 @@ void disconnect_forgets_everything()
     CRATE_CHECK(session.status().state == ConnectionState::Disconnected);
 }
 
+void session_reads_stay_responsive_during_a_check()
+{
+    Harness harness;
+    harness.settings.origin = kOrigin;
+    harness.vault->tokens[credential_account_for_origin(kOrigin)] = "crv_saved";
+    GatedHttpClient gated;
+    gated.blocked_prefix = kOrigin;
+    ConnectionSession session(
+        harness.settings,
+        [vault = harness.vault](const std::string& account) {
+            return std::make_unique<VaultCredentialStore>(vault, account);
+        },
+        gated
+    );
+    CancellationSource cancellation;
+    auto restoring = std::async(std::launch::async, [&] {
+        return session.restore(kStart, cancellation.token());
+    });
+    CRATE_CHECK(gated.wait_until_blocked());
+
+    auto reading = std::async(std::launch::async, [&] {
+        return std::make_pair(session.logged_in(), session.origin());
+    });
+    const bool answered = reading.wait_for(200ms) == std::future_status::ready;
+    cancellation.cancel();
+    static_cast<void>(restoring.get());
+
+    CRATE_CHECK(answered);
+    const auto [logged_in, origin] = reading.get();
+    CRATE_CHECK(!logged_in);
+    CRATE_CHECK(origin == kOrigin);
+}
+
+void cancelled_connect_persists_nothing()
+{
+    Harness harness;
+    harness.http.serve_connected();
+    CancellationSource cancellation;
+
+    class CancelAfterVerification final : public HttpClient {
+    public:
+        CancelAfterVerification(HttpClient& inner, CancellationSource& source)
+            : inner_(inner), source_(source)
+        {
+        }
+
+        HttpResult request(const HttpRequest& request) override
+        {
+            auto result = inner_.request(request);
+            if (request.url.ends_with("/api/capabilities")) {
+                source_.cancel();
+            }
+            return result;
+        }
+
+    private:
+        HttpClient& inner_;
+        CancellationSource& source_;
+    } http(harness.http, cancellation);
+
+    ConnectionSession session(
+        harness.settings,
+        [vault = harness.vault](const std::string& account) {
+            return std::make_unique<VaultCredentialStore>(vault, account);
+        },
+        http
+    );
+
+    const auto result = session.connect(kOrigin, "crv_valid", kStart, cancellation.token());
+
+    CRATE_CHECK(result.error == ConnectError::Cancelled);
+    CRATE_CHECK(harness.vault->tokens.empty());
+    CRATE_CHECK(!harness.settings.origin.has_value());
+    CRATE_CHECK(!session.logged_in());
+}
+
 } // namespace
 
 int main()
@@ -347,4 +354,6 @@ int main()
     revoked_token_on_refresh_logs_out();
     transient_failure_on_refresh_keeps_the_session();
     disconnect_forgets_everything();
+    session_reads_stay_responsive_during_a_check();
+    cancelled_connect_persists_nothing();
 }

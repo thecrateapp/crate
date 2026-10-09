@@ -42,23 +42,23 @@ ConnectionStatus ConnectionSession::restore(
     const CancellationToken& cancellation
 )
 {
-    std::lock_guard lock(mutex_);
-    origin_ = settings_.load_origin();
-    credentials_.reset();
-    status_ = {};
-    if (!origin_.has_value()) {
-        return status_;
+    const auto origin = settings_.load_origin();
+    std::shared_ptr<CredentialStore> credentials;
+    if (origin.has_value()) {
+        credentials = std::make_shared<CachedCredentialStore>(
+            credential_factory_(credential_account_for_origin(*origin))
+        );
     }
-    credentials_ = std::make_shared<CachedCredentialStore>(
-        credential_factory_(credential_account_for_origin(*origin_))
-    );
-    const auto token = credentials_->load_token();
-    if (!token.has_value() || token->empty()) {
-        status_.state = ConnectionState::Unauthorized;
-        status_.message = "no access token saved for this server";
-        return status_;
+    {
+        std::lock_guard lock(mutex_);
+        origin_ = origin;
+        credentials_ = credentials;
+        status_ = {};
+        if (!origin_.has_value()) {
+            return status_;
+        }
     }
-    return check_locked(*token, now, cancellation);
+    return check(*origin, credentials, now, cancellation);
 }
 
 ConnectResult ConnectionSession::connect(
@@ -78,6 +78,9 @@ ConnectResult ConnectionSession::connect(
     }
 
     const auto verified = CapabilityClient(http_, *origin).check(token, cancellation);
+    if (cancellation.cancelled()) {
+        return {ConnectError::Cancelled, verified};
+    }
     if (verified.state != ConnectionState::Connected) {
         return {ConnectError::Rejected, verified};
     }
@@ -85,6 +88,10 @@ ConnectResult ConnectionSession::connect(
     auto credentials = std::make_shared<CachedCredentialStore>(
         credential_factory_(credential_account_for_origin(*origin))
     );
+    std::lock_guard lock(mutex_);
+    if (cancellation.cancelled()) {
+        return {ConnectError::Cancelled, verified};
+    }
     if (!credentials->save_token(token)) {
         return {ConnectError::CredentialWriteFailed, verified};
     }
@@ -92,8 +99,6 @@ ConnectResult ConnectionSession::connect(
         credentials->clear_token();
         return {ConnectError::SettingsWriteFailed, verified};
     }
-
-    std::lock_guard lock(mutex_);
     if (origin_.has_value() && *origin_ != *origin && credentials_ != nullptr) {
         credentials_->clear_token();
     }
@@ -122,27 +127,40 @@ ConnectionStatus ConnectionSession::refresh_if_due(
     const CancellationToken& cancellation
 )
 {
-    std::lock_guard lock(mutex_);
-    if (credentials_ == nullptr || status_.state != ConnectionState::Connected ||
-        now - last_check_ < refresh_interval_) {
-        return status_;
+    std::string origin;
+    std::shared_ptr<CredentialStore> credentials;
+    {
+        std::lock_guard lock(mutex_);
+        if (credentials_ == nullptr || status_.state != ConnectionState::Connected ||
+            now - last_check_ < refresh_interval_) {
+            return status_;
+        }
+        origin = *origin_;
+        credentials = credentials_;
     }
-    const auto token = credentials_->load_token();
-    if (!token.has_value() || token->empty()) {
-        status_ = {};
-        status_.state = ConnectionState::Unauthorized;
-        return status_;
-    }
-    return check_locked(*token, now, cancellation);
+    return check(origin, credentials, now, cancellation);
 }
 
-ConnectionStatus ConnectionSession::check_locked(
-    std::string_view token,
+ConnectionStatus ConnectionSession::check(
+    const std::string& origin,
+    const std::shared_ptr<CredentialStore>& credentials,
     Clock::time_point now,
     const CancellationToken& cancellation
 )
 {
-    auto checked = CapabilityClient(http_, *origin_).check(token, cancellation);
+    const auto token = credentials->load_token();
+    ConnectionStatus checked;
+    if (!token.has_value() || token->empty()) {
+        checked.state = ConnectionState::Unauthorized;
+        checked.message = "no access token saved for this server";
+    } else {
+        checked = CapabilityClient(http_, origin).check(*token, cancellation);
+    }
+
+    std::lock_guard lock(mutex_);
+    if (credentials_ != credentials || cancellation.cancelled()) {
+        return status_;
+    }
     last_check_ = now;
     if (keeps_session(checked.state) && status_.state == ConnectionState::Connected) {
         return status_;

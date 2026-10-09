@@ -3,6 +3,7 @@
 
 #include "crate_vdj/connection_session.hpp"
 #include "crate_vdj/connection_settings.hpp"
+#include "crate_vdj/connection_worker.hpp"
 #include "crate_vdj/credential_store.hpp"
 #include "crate_vdj/catalog_client.hpp"
 #include "crate_vdj/compatible_tracks.hpp"
@@ -20,10 +21,7 @@
 #include <cstring>
 #include <algorithm>
 #include <array>
-#include <chrono>
-#include <condition_variable>
 #include <memory>
-#include <thread>
 #include <cctype>
 #include <cstdint>
 #include <filesystem>
@@ -324,11 +322,6 @@ private:
     char auto_crossfade_command_[1] = {};
 };
 
-struct PendingConnect {
-    std::string origin;
-    std::string token;
-};
-
 struct ServerClients {
     ServerClients(
         HttpClient& http,
@@ -368,26 +361,22 @@ public:
               },
               http_
           )
+        , connection_(
+              session_,
+              [this] { sync_clients(); },
+              [](const ConnectResult& result) {
+                  trace("online source connect result=" +
+                        std::to_string(static_cast<int>(result.error)));
+                  show_connection_message("Crate", connect_message(result));
+              }
+          )
     {
-    }
-
-    ~OnlineSourceProbe() override
-    {
-        {
-            std::lock_guard lock(connection_mutex_);
-            stopping_ = true;
-        }
-        connection_wakeup_.notify_all();
-        connection_cancellation_.cancel();
-        if (connection_thread_.joinable()) {
-            connection_thread_.join();
-        }
     }
 
     HRESULT VDJ_API OnLoad() override
     {
         trace("online source plugin loaded");
-        connection_thread_ = std::thread([this] { connection_loop(); });
+        connection_.start();
         return S_OK;
     }
 
@@ -431,24 +420,19 @@ public:
         if (choice.action != ConnectionDialogAction::Connect) {
             return S_OK;
         }
-        {
-            std::lock_guard lock(connection_mutex_);
-            pending_connect_ = PendingConnect{choice.origin, choice.token};
-        }
-        connection_wakeup_.notify_all();
+        connection_.connect(choice.origin, choice.token);
         return S_OK;
     }
 
     HRESULT VDJ_API OnLogout() override
     {
         trace("online logout callback");
-        if (!session_.disconnect()) {
+        if (!connection_.disconnect()) {
             show_connection_message(
                 "Crate",
                 "Crate was disconnected, but the saved token could not be removed from the system keychain."
             );
         }
-        sync_clients();
         return S_OK;
     }
 
@@ -914,53 +898,6 @@ private:
         clients_.reset();
     }
 
-    void connection_loop()
-    {
-        session_.restore(
-            ConnectionSession::Clock::now(),
-            connection_cancellation_.token()
-        );
-        sync_clients();
-        trace("online source connection restored logged_in=" +
-              std::string(session_.logged_in() ? "true" : "false"));
-        std::unique_lock lock(connection_mutex_);
-        while (!stopping_) {
-            connection_wakeup_.wait_for(lock, std::chrono::seconds(30), [this] {
-                return stopping_ || pending_connect_.has_value();
-            });
-            if (stopping_) {
-                break;
-            }
-            auto request = std::move(pending_connect_);
-            pending_connect_.reset();
-            lock.unlock();
-            if (request.has_value()) {
-                complete_connect(*request);
-            } else {
-                session_.refresh_if_due(
-                    ConnectionSession::Clock::now(),
-                    connection_cancellation_.token()
-                );
-                sync_clients();
-            }
-            lock.lock();
-        }
-    }
-
-    void complete_connect(const PendingConnect& request)
-    {
-        const auto result = session_.connect(
-            request.origin,
-            request.token,
-            ConnectionSession::Clock::now(),
-            connection_cancellation_.token()
-        );
-        sync_clients();
-        trace("online source connect result=" +
-              std::to_string(static_cast<int>(result.error)));
-        show_connection_message("Crate", connect_message(result));
-    }
-
     static std::string connect_message(const ConnectResult& result)
     {
         switch (result.error) {
@@ -977,6 +914,7 @@ private:
             return "The token could not be saved in the system keychain.";
         case ConnectError::SettingsWriteFailed:
             return "The connection settings could not be saved.";
+        case ConnectError::Cancelled:
         case ConnectError::Rejected:
             break;
         }
@@ -1027,18 +965,13 @@ private:
     ConnectionSession session_;
     std::mutex clients_mutex_;
     std::shared_ptr<ServerClients> clients_;
-    std::mutex connection_mutex_;
-    std::condition_variable connection_wakeup_;
-    CancellationSource connection_cancellation_;
-    std::optional<PendingConnect> pending_connect_;
-    bool stopping_ = false;
-    std::thread connection_thread_;
     std::mutex search_mutex_;
     std::optional<CancellationSource> active_search_;
     std::mutex compatible_mutex_;
     std::optional<std::string> active_compatible_seed_;
     std::optional<CancellationSource> active_compatible_request_;
     std::uint64_t compatible_request_generation_ = 0;
+    ConnectionWorker connection_;
 
 };
 

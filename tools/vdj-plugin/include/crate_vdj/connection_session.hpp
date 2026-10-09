@@ -22,6 +22,7 @@ enum class ConnectError {
     Rejected,
     CredentialWriteFailed,
     SettingsWriteFailed,
+    Cancelled,
 };
 
 struct ConnectResult {
@@ -58,8 +59,9 @@ public:
     std::shared_ptr<CredentialStore> credentials() const;
 
 private:
-    ConnectionStatus check_locked(
-        std::string_view token,
+    ConnectionStatus check(
+        const std::string& origin,
+        const std::shared_ptr<CredentialStore>& credentials,
         Clock::time_point now,
         const CancellationToken& cancellation
     );

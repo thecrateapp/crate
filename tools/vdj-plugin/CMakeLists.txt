@@ -44,6 +44,7 @@ add_custom_target(crate_vdj_headless ALL
 add_library(crate_vdj_core STATIC
     src/core/contract_negotiator.cpp
     src/core/connection_session.cpp
+    src/core/connection_worker.cpp
     src/core/connection_settings.cpp
     src/core/credential_store.cpp
     src/core/http_client.cpp
@@ -248,13 +249,24 @@ if(CRATE_VDJ_BUILD_TESTS)
     target_link_libraries(crate_vdj_http_client_test PRIVATE crate_vdj_core)
     add_test(NAME crate_vdj_http_client_test COMMAND crate_vdj_http_client_test)
 
+    if(UNIX)
+        add_executable(crate_vdj_curl_cancellation_test
+            tests/client/curl_cancellation_test.cpp
+        )
+        target_link_libraries(crate_vdj_curl_cancellation_test PRIVATE crate_vdj_core)
+        add_test(
+            NAME crate_vdj_curl_cancellation_test
+            COMMAND crate_vdj_curl_cancellation_test
+        )
+    endif()
+
     add_executable(crate_vdj_json_mapping_test
         tests/client/json_mapping_test.cpp
     )
     target_link_libraries(crate_vdj_json_mapping_test PRIVATE crate_vdj_core)
     add_test(NAME crate_vdj_json_mapping_test COMMAND crate_vdj_json_mapping_test)
 
-    foreach(connection_test connection_settings capability_client connection_session plugin_identity)
+    foreach(connection_test connection_settings capability_client connection_session connection_worker plugin_identity)
         add_executable(crate_vdj_${connection_test}_test
             tests/connection/${connection_test}_test.cpp
         )

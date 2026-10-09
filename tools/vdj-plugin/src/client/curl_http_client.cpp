@@ -33,24 +33,69 @@ void initialize_curl_once()
     std::call_once(initialized, [] { curl_global_init(CURL_GLOBAL_DEFAULT); });
 }
 
-CURL* thread_handle()
-{
-    struct HandleOwner {
-        CURL* handle = nullptr;
-        ~HandleOwner()
-        {
-            if (handle != nullptr) {
-                curl_easy_cleanup(handle);
-            }
+struct ThreadHandles {
+    CURLM* multi = nullptr;
+    CURL* easy = nullptr;
+
+    ~ThreadHandles()
+    {
+        if (easy != nullptr) {
+            curl_easy_cleanup(easy);
         }
-    };
-    thread_local HandleOwner owner;
-    if (owner.handle == nullptr) {
-        owner.handle = curl_easy_init();
-    } else {
-        curl_easy_reset(owner.handle);
+        if (multi != nullptr) {
+            curl_multi_cleanup(multi);
+        }
     }
-    return owner.handle;
+};
+
+ThreadHandles* thread_handles()
+{
+    thread_local ThreadHandles handles;
+    if (handles.multi == nullptr) {
+        handles.multi = curl_multi_init();
+    }
+    if (handles.easy == nullptr) {
+        handles.easy = curl_easy_init();
+    } else {
+        curl_easy_reset(handles.easy);
+    }
+    if (handles.multi == nullptr || handles.easy == nullptr) {
+        return nullptr;
+    }
+    return &handles;
+}
+
+CURLcode perform_cancellable(
+    CURLM* multi,
+    CURL* easy,
+    const CancellationToken& cancellation
+)
+{
+    constexpr int kCancellationPollMs = 50;
+    if (curl_multi_add_handle(multi, easy) != CURLM_OK) {
+        return CURLE_FAILED_INIT;
+    }
+    CURLcode result = CURLE_ABORTED_BY_CALLBACK;
+    int running = 1;
+    while (running > 0 && !cancellation.cancelled()) {
+        if (curl_multi_perform(multi, &running) != CURLM_OK) {
+            result = CURLE_FAILED_INIT;
+            break;
+        }
+        if (running > 0 &&
+            curl_multi_poll(multi, nullptr, 0, kCancellationPollMs, nullptr) != CURLM_OK) {
+            result = CURLE_FAILED_INIT;
+            break;
+        }
+    }
+    int queued = 0;
+    while (CURLMsg* message = curl_multi_info_read(multi, &queued)) {
+        if (message->msg == CURLMSG_DONE && message->easy_handle == easy) {
+            result = message->data.result;
+        }
+    }
+    curl_multi_remove_handle(multi, easy);
+    return result;
 }
 
 HttpError cancelled_error()
@@ -116,8 +161,8 @@ HttpResult CurlHttpClient::request(const HttpRequest& request)
     }
 
     initialize_curl_once();
-    auto* handle = thread_handle();
-    if (handle == nullptr) {
+    auto* handles = thread_handles();
+    if (handles == nullptr) {
         return HttpError{
             .code = HttpErrorCode::Network,
             .status_code = 0,
@@ -125,6 +170,7 @@ HttpResult CurlHttpClient::request(const HttpRequest& request)
         };
     }
 
+    auto* handle = handles->easy;
     BodySink sink{.body = {}, .limit = request.max_body_bytes, .overflowed = false};
     char error_buffer[CURL_ERROR_SIZE] = {};
     curl_slist* headers = nullptr;
@@ -167,7 +213,7 @@ HttpResult CurlHttpClient::request(const HttpRequest& request)
         curl_easy_setopt(handle, CURLOPT_POSTFIELDS, request.body.c_str());
     }
 
-    const auto result = curl_easy_perform(handle);
+    const auto result = perform_cancellable(handles->multi, handle, request.cancellation);
     long status_code = 0;
     curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &status_code);
     curl_slist_free_all(headers);
