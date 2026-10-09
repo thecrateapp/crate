@@ -539,6 +539,14 @@ crate-cli-linux: ## Build crate-cli for production Linux workers into app/bin/
 	@chmod +x app/bin/crate-cli-linux-amd64
 	@echo "$(GREEN)Built app/bin/crate-cli-linux-amd64$(NC)"
 
+.PHONY: crate-cli-linux-arm64
+crate-cli-linux-arm64: ## Build crate-cli for local ARM analysis workers into app/bin/
+	@mkdir -p app/bin /tmp/crate-cli-build-arm64
+	@docker build --platform linux/arm64 --output type=local,dest=/tmp/crate-cli-build-arm64 tools/crate-cli
+	@cp /tmp/crate-cli-build-arm64/crate-cli app/bin/crate-cli-linux-arm64
+	@chmod +x app/bin/crate-cli-linux-arm64
+	@echo "$(GREEN)Built app/bin/crate-cli-linux-arm64$(NC)"
+
 # ===========================================================================
 # READPLANE (Go read-only acceleration service)
 # ===========================================================================

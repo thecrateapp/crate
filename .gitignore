@@ -58,6 +58,7 @@ __pycache__/
 .DS_Store
 Thumbs.db
 app/bin/grooveyard-bliss-linux-amd64
+app/bin/crate-cli-linux-arm64
 *.tsbuildinfo
 worktrees/
 .vite/

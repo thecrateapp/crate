@@ -113,11 +113,17 @@ COPY crate ./crate
 COPY scripts ./scripts
 COPY bin ./bin
 
-# Install crate-cli binary for production Linux analysis workers (x86_64 only).
+# Install crate-cli: required on x86_64 production images, optional on ARM
+# (build it with `make crate-cli-linux-arm64`; without it the Python fallback runs).
 RUN if [ "$(uname -m)" = "x86_64" ]; then \
         test -f bin/crate-cli-linux-amd64 || (echo "bin/crate-cli-linux-amd64 is required for x86_64 worker images" >&2; exit 1); \
         cp bin/crate-cli-linux-amd64 /usr/local/bin/crate-cli && \
         chmod +x /usr/local/bin/crate-cli; \
+    elif [ "$(uname -m)" = "aarch64" ] && [ -f bin/crate-cli-linux-arm64 ]; then \
+        cp bin/crate-cli-linux-arm64 /usr/local/bin/crate-cli && \
+        chmod +x /usr/local/bin/crate-cli; \
+    else \
+        echo "crate-cli not installed for $(uname -m); Smart Mix uses the Python analyzer" >&2; \
     fi
 
 ENTRYPOINT ["python", "-m", "crate"]
