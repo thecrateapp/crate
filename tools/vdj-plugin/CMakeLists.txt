@@ -70,11 +70,12 @@ target_compile_options(crate_vdj_core PRIVATE
 
 if(CRATE_VDJ_ENABLE_SANITIZERS AND
    CMAKE_CXX_COMPILER_ID MATCHES "AppleClang|Clang|GNU")
-    target_compile_options(crate_vdj_core PRIVATE
+    target_compile_options(crate_vdj_core PUBLIC
         -fsanitize=address,undefined
+        -fno-sanitize-recover=undefined
         -fno-omit-frame-pointer
     )
-    target_link_options(crate_vdj_core PRIVATE
+    target_link_options(crate_vdj_core PUBLIC
         -fsanitize=address,undefined
     )
 endif()
@@ -200,6 +201,13 @@ endif()
 
 if(CRATE_VDJ_BUILD_TESTS)
     enable_testing()
+
+    add_executable(crate_vdj_check_self_test
+        tests/support/check_self_test.cpp
+    )
+    target_compile_features(crate_vdj_check_self_test PRIVATE cxx_std_20)
+    add_test(NAME crate_vdj_check_self_test COMMAND crate_vdj_check_self_test)
+    set_tests_properties(crate_vdj_check_self_test PROPERTIES WILL_FAIL TRUE)
 
     add_executable(crate_vdj_http_client_test
         tests/client/http_client_test.cpp
@@ -343,4 +351,13 @@ if(CRATE_VDJ_BUILD_TESTS)
             COMMAND crate_vdj_factory_contract
         )
     endif()
+endif()
+
+option(
+    CRATE_VDJ_BUILD_PROBE
+    "Build the VH01 host probe Online Source (development only, never packaged)"
+    OFF
+)
+if(CRATE_VDJ_BUILD_PROBE)
+    add_subdirectory(probe)
 endif()

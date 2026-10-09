@@ -1,6 +1,6 @@
 #include "crate_vdj/compatible_tracks.hpp"
 
-#include <cassert>
+#include "../support/check.hpp"
 #include <optional>
 #include <string>
 #include <variant>
@@ -103,28 +103,28 @@ public:
 int main()
 {
     const auto parsed = parse_compatible_tracks_json(kCompatibleTracksJson);
-    assert(parsed.ok());
-    assert(parsed.value->seed_track_entity_uid == "seed-track");
-    assert(parsed.value->scope == "local");
-    assert(parsed.value->planner_version == "smart-mix-v2");
-    assert(parsed.value->items.size() == 2);
-    assert(parsed.value->items[0].track_entity_uid == "compatible-first");
-    assert(parsed.value->items[0].score_breakdown.planner_version == 2);
-    assert(parsed.value->items[0].score_breakdown.harmonic_relationship ==
+    CRATE_CHECK(parsed.ok());
+    CRATE_CHECK(parsed.value->seed_track_entity_uid == "seed-track");
+    CRATE_CHECK(parsed.value->scope == "local");
+    CRATE_CHECK(parsed.value->planner_version == "smart-mix-v2");
+    CRATE_CHECK(parsed.value->items.size() == 2);
+    CRATE_CHECK(parsed.value->items[0].track_entity_uid == "compatible-first");
+    CRATE_CHECK(parsed.value->items[0].score_breakdown.planner_version == 2);
+    CRATE_CHECK(parsed.value->items[0].score_breakdown.harmonic_relationship ==
            "adjacent");
-    assert(parsed.value->items[1].fallback_reasons[0] == "low_confidence");
+    CRATE_CHECK(parsed.value->items[1].fallback_reasons[0] == "low_confidence");
 
     const auto mapped = compatible_track_as_search_track(
         parsed.value->items[0]
     );
-    assert(mapped.entity_uid == "compatible-first");
-    assert(mapped.title == "First Track");
-    assert(mapped.artist == "Artist One");
-    assert(mapped.album == "Album One");
+    CRATE_CHECK(mapped.entity_uid == "compatible-first");
+    CRATE_CHECK(mapped.title == "First Track");
+    CRATE_CHECK(mapped.artist == "Artist One");
+    CRATE_CHECK(mapped.album == "Album One");
     const auto comment = compatible_track_comment(parsed.value->items[0]);
-    assert(comment.find("score=0.91") != std::string::npos);
-    assert(comment.find("harmonic=adjacent") != std::string::npos);
-    assert(comment.find("tempo=1.00") != std::string::npos);
+    CRATE_CHECK(comment.find("score=0.91") != std::string::npos);
+    CRATE_CHECK(comment.find("harmonic=adjacent") != std::string::npos);
+    CRATE_CHECK(comment.find("tempo=1.00") != std::string::npos);
 
     FakeHttpClient http;
     MemoryCredentialStore credentials;
@@ -134,12 +134,12 @@ int main()
         "https://api.dev.lespedants.org"
     );
     const auto fetched = client.fetch("seed-track", CancellationToken{});
-    assert(fetched.ok());
-    assert(http.request_seen.url ==
+    CRATE_CHECK(fetched.ok());
+    CRATE_CHECK(http.request_seen.url ==
            "https://api.dev.lespedants.org/api/tracks/by-entity/seed-track/"
            "compatible?scope=local&limit=20&planner_version=smart-mix-v2");
-    assert(http.request_seen.headers.size() == 2);
-    assert(http.request_seen.headers[1].second ==
+    CRATE_CHECK(http.request_seen.headers.size() == 2);
+    CRATE_CHECK(http.request_seen.headers[1].second ==
            "Bearer crv_compatible-token");
 
     http.response = HttpError{
@@ -151,15 +151,15 @@ int main()
         "missing-seed",
         CancellationToken{}
     );
-    assert(missing_profile.ok());
-    assert(missing_profile.value->items.empty());
-    assert(missing_profile.value->fallback_reason == "missing_profile");
+    CRATE_CHECK(missing_profile.ok());
+    CRATE_CHECK(missing_profile.value->items.empty());
+    CRATE_CHECK(missing_profile.value->fallback_reason == "missing_profile");
 
     CancellationSource stale_request;
     stale_request.cancel();
     const auto cancelled = client.fetch("stale-seed", stale_request.token());
-    assert(!cancelled.ok());
-    assert(cancelled.error_code == ModelErrorCode::TransportError);
+    CRATE_CHECK(!cancelled.ok());
+    CRATE_CHECK(cancelled.error_code == ModelErrorCode::TransportError);
 
     return 0;
 }

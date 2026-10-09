@@ -1,7 +1,7 @@
 #include "crate_vdj/contract_negotiator.hpp"
 #include "crate_vdj/credential_store.hpp"
 
-#include <cassert>
+#include "../support/check.hpp"
 
 using namespace crate::vdj;
 
@@ -36,10 +36,10 @@ int main()
             .planner_version = "smart-mix-v2",
         }
     );
-    assert(accepted.ok());
-    assert(accepted.value->online_source);
-    assert(accepted.value->smart_mix_assistant);
-    assert(!accepted.value->automation);
+    CRATE_CHECK(accepted.ok());
+    CRATE_CHECK(accepted.value->online_source);
+    CRATE_CHECK(accepted.value->smart_mix_assistant);
+    CRATE_CHECK(!accepted.value->automation);
 
     const auto incompatible_plugin = negotiate_capabilities(
         supported_capabilities(),
@@ -47,8 +47,8 @@ int main()
             .plugin_version = "2.0.0",
         }
     );
-    assert(!incompatible_plugin.ok());
-    assert(
+    CRATE_CHECK(!incompatible_plugin.ok());
+    CRATE_CHECK(
         incompatible_plugin.error_code ==
         NegotiationErrorCode::PluginVersionOutOfRange
     );
@@ -61,8 +61,8 @@ int main()
             .require_automation = true,
         }
     );
-    assert(!missing_feature.ok());
-    assert(
+    CRATE_CHECK(!missing_feature.ok());
+    CRATE_CHECK(
         missing_feature.error_code ==
         NegotiationErrorCode::RequiredFeatureUnavailable
     );
@@ -75,8 +75,8 @@ int main()
             .profile_schema_version = 2,
         }
     );
-    assert(!profile_mismatch.ok());
-    assert(
+    CRATE_CHECK(!profile_mismatch.ok());
+    CRATE_CHECK(
         profile_mismatch.error_code ==
         NegotiationErrorCode::ProfileSchemaMismatch
     );
@@ -87,7 +87,7 @@ int main()
         "crv_super-secret",
         "mt_secret"
     );
-    assert(diagnostic.find("crv_super-secret") == std::string::npos);
-    assert(diagnostic.find("mt_secret") == std::string::npos);
-    assert(diagnostic.find("[REDACTED]") != std::string::npos);
+    CRATE_CHECK(diagnostic.find("crv_super-secret") == std::string::npos);
+    CRATE_CHECK(diagnostic.find("mt_secret") == std::string::npos);
+    CRATE_CHECK(diagnostic.find("[REDACTED]") != std::string::npos);
 }

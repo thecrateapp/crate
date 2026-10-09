@@ -2,14 +2,14 @@
 
 #include <sqlite3.h>
 
-#include <cassert>
+#include "../support/check.hpp"
 #include <filesystem>
 
 namespace {
 
 void execute(sqlite3* database, const char* sql)
 {
-    assert(sqlite3_exec(database, sql, nullptr, nullptr, nullptr) == SQLITE_OK);
+    CRATE_CHECK(sqlite3_exec(database, sql, nullptr, nullptr, nullptr) == SQLITE_OK);
 }
 
 } // namespace
@@ -21,7 +21,7 @@ int main()
     std::filesystem::remove(database_path);
 
     sqlite3* legacy_database = nullptr;
-    assert(
+    CRATE_CHECK(
         sqlite3_open_v2(
             database_path.c_str(),
             &legacy_database,
@@ -53,15 +53,15 @@ int main()
         ") VALUES (1, 'https://api.dev.lespedants.org', 'token:a', 'search', "
         "'high vis', X'01', 10, 10, 20)"
     );
-    assert(sqlite3_close(legacy_database) == SQLITE_OK);
+    CRATE_CHECK(sqlite3_close(legacy_database) == SQLITE_OK);
 
     {
         crate::vdj::MetadataCacheStore cache(database_path.string());
-        assert(cache.ready());
+        CRATE_CHECK(cache.ready());
     }
 
     sqlite3* migrated_database = nullptr;
-    assert(
+    CRATE_CHECK(
         sqlite3_open_v2(
             database_path.c_str(),
             &migrated_database,
@@ -70,7 +70,7 @@ int main()
         ) == SQLITE_OK
     );
     sqlite3_stmt* statement = nullptr;
-    assert(
+    CRATE_CHECK(
         sqlite3_prepare_v2(
             migrated_database,
             "PRAGMA user_version",
@@ -79,10 +79,10 @@ int main()
             nullptr
         ) == SQLITE_OK
     );
-    assert(sqlite3_step(statement) == SQLITE_ROW);
-    assert(sqlite3_column_int64(statement, 0) == 2);
+    CRATE_CHECK(sqlite3_step(statement) == SQLITE_ROW);
+    CRATE_CHECK(sqlite3_column_int64(statement, 0) == 2);
     sqlite3_finalize(statement);
-    assert(
+    CRATE_CHECK(
         sqlite3_prepare_v2(
             migrated_database,
             "SELECT COUNT(*), stale_until, payload_version "
@@ -92,12 +92,12 @@ int main()
             nullptr
         ) == SQLITE_OK
     );
-    assert(sqlite3_step(statement) == SQLITE_ROW);
-    assert(sqlite3_column_int64(statement, 0) == 1);
-    assert(sqlite3_column_int64(statement, 1) == 86420);
-    assert(sqlite3_column_int64(statement, 2) == 1);
+    CRATE_CHECK(sqlite3_step(statement) == SQLITE_ROW);
+    CRATE_CHECK(sqlite3_column_int64(statement, 0) == 1);
+    CRATE_CHECK(sqlite3_column_int64(statement, 1) == 86420);
+    CRATE_CHECK(sqlite3_column_int64(statement, 2) == 1);
     sqlite3_finalize(statement);
-    assert(sqlite3_close(migrated_database) == SQLITE_OK);
+    CRATE_CHECK(sqlite3_close(migrated_database) == SQLITE_OK);
 
     std::filesystem::remove(database_path);
     std::filesystem::remove(database_path.string() + "-wal");

@@ -1,6 +1,6 @@
 #include "crate_vdj/stream_resolver.hpp"
 
-#include <cassert>
+#include "../support/check.hpp"
 #include <string>
 #include <vector>
 
@@ -49,21 +49,21 @@ int main()
 
     const auto result = resolver.resolve("track-1", CancellationToken{});
 
-    assert(result.ok());
-    assert(*result.value ==
+    CRATE_CHECK(result.ok());
+    CRATE_CHECK(*result.value ==
            "https://api.dev.lespedants.org/api/vdj/tracks/by-entity/track-1/stream?media_ticket=opaque-ticket");
-    assert(http.requests.size() == 2);
-    assert(http.requests[0].url ==
+    CRATE_CHECK(http.requests.size() == 2);
+    CRATE_CHECK(http.requests[0].url ==
            "https://api.dev.lespedants.org/api/vdj/tracks/by-entity/track-1/playback");
-    assert(http.requests[1].method == "POST");
-    assert(http.requests[1].url ==
+    CRATE_CHECK(http.requests[1].method == "POST");
+    CRATE_CHECK(http.requests[1].url ==
            "https://api.dev.lespedants.org/api/auth/media-access");
-    assert(http.requests[1].body.find("track-1") != std::string::npos);
-    assert(http.requests[1].body.find("crv_private-token") == std::string::npos);
+    CRATE_CHECK(http.requests[1].body.find("track-1") != std::string::npos);
+    CRATE_CHECK(http.requests[1].body.find("crv_private-token") == std::string::npos);
 
     CancellationSource cancelled;
     cancelled.cancel();
     const auto cancelled_result = resolver.resolve("track-1", cancelled.token());
-    assert(!cancelled_result.ok());
-    assert(cancelled_result.error_code == ModelErrorCode::TransportError);
+    CRATE_CHECK(!cancelled_result.ok());
+    CRATE_CHECK(cancelled_result.error_code == ModelErrorCode::TransportError);
 }

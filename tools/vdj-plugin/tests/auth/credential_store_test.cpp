@@ -1,6 +1,6 @@
 #include "crate_vdj/credential_store.hpp"
 
-#include <cassert>
+#include "../support/check.hpp"
 #include <optional>
 #include <string>
 
@@ -34,9 +34,9 @@ private:
 int main()
 {
     MemoryCredentialStore store;
-    assert(!store.load_token().has_value());
+    CRATE_CHECK(!store.load_token().has_value());
     store.save_token("crv_test-only-token");
-    assert(store.load_token() == "crv_test-only-token");
+    CRATE_CHECK(store.load_token() == "crv_test-only-token");
     store.clear_token();
-    assert(!store.load_token().has_value());
+    CRATE_CHECK(!store.load_token().has_value());
 }

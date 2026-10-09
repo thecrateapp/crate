@@ -1,6 +1,6 @@
 #include "crate_vdj/translations.hpp"
 
-#include <cassert>
+#include "../support/check.hpp"
 #include <string_view>
 
 using crate::vdj::catalog_folder_label;
@@ -11,32 +11,32 @@ using crate::vdj::open_in_crate_menu_label;
 
 int main()
 {
-    assert(is_spanish_language("Spanish"));
-    assert(is_spanish_language("es-ES"));
-    assert(is_spanish_language("Español"));
-    assert(!is_spanish_language("English"));
+    CRATE_CHECK(is_spanish_language("Spanish"));
+    CRATE_CHECK(is_spanish_language("es-ES"));
+    CRATE_CHECK(is_spanish_language("Español"));
+    CRATE_CHECK(!is_spanish_language("English"));
 
-    assert(compatible_folder_label("Spanish") ==
+    CRATE_CHECK(compatible_folder_label("Spanish") ==
            "Pistas compatibles de Smart Mix");
-    assert(compatible_menu_label("Spanish") == "Mostrar pistas compatibles");
-    assert(open_in_crate_menu_label("Spanish") == "Abrir en Crate");
+    CRATE_CHECK(compatible_menu_label("Spanish") == "Mostrar pistas compatibles");
+    CRATE_CHECK(open_in_crate_menu_label("Spanish") == "Abrir en Crate");
 
-    assert(catalog_folder_label(
+    CRATE_CHECK(catalog_folder_label(
                "crate:recently-played", "Recently Played", "Spanish"
            ) == "Reproducido recientemente");
-    assert(catalog_folder_label("crate:playlist:3", "Warmup", "Spanish") ==
+    CRATE_CHECK(catalog_folder_label("crate:playlist:3", "Warmup", "Spanish") ==
            "Warmup");
-    assert(catalog_folder_label("crate:genre:7", "post-hardcore", "Spanish") ==
+    CRATE_CHECK(catalog_folder_label("crate:genre:7", "post-hardcore", "Spanish") ==
            "Géneros · post-hardcore");
-    assert(catalog_folder_label("crate:genre:7", "post-hardcore", "English") ==
+    CRATE_CHECK(catalog_folder_label("crate:genre:7", "post-hardcore", "English") ==
            "Genres · post-hardcore");
-    assert(catalog_folder_label("crate:mood:happy", "Happy", "Spanish") ==
+    CRATE_CHECK(catalog_folder_label("crate:mood:happy", "Happy", "Spanish") ==
            "Estados de ánimo · Alegre");
-    assert(catalog_folder_label("crate:mood:party", "Party", "English") ==
+    CRATE_CHECK(catalog_folder_label("crate:mood:party", "Party", "English") ==
            "Moods · Party");
-    assert(catalog_folder_label("crate:mood:unknown", "Unknown", "Spanish") ==
+    CRATE_CHECK(catalog_folder_label("crate:mood:unknown", "Unknown", "Spanish") ==
            "Estados de ánimo · Unknown");
-    assert(catalog_folder_label("crate:unknown", "Server label", "Spanish") ==
+    CRATE_CHECK(catalog_folder_label("crate:unknown", "Server label", "Spanish") ==
            "Server label");
 
     return 0;

@@ -1,7 +1,7 @@
 #include "crate_vdj/mix_profile.hpp"
 #include "crate_vdj/smart_mix_client.hpp"
 
-#include <cassert>
+#include "../support/check.hpp"
 #include <optional>
 #include <string>
 #include <variant>
@@ -78,10 +78,10 @@ std::string profile_json_with(std::string_view field, std::string_view value)
     std::string json(kValidProfileJson);
     const std::string marker = "\"" + std::string(field) + "\":";
     const std::size_t position = json.find(marker);
-    assert(position != std::string::npos);
+    CRATE_CHECK(position != std::string::npos);
     const std::size_t value_start = position + marker.size();
     const std::size_t value_end = json.find(',', value_start);
-    assert(value_end != std::string::npos);
+    CRATE_CHECK(value_end != std::string::npos);
     json.replace(value_start, value_end - value_start, value);
     return json;
 }
@@ -91,20 +91,20 @@ std::string profile_json_with(std::string_view field, std::string_view value)
 int main()
 {
     const auto parsed = parse_mix_profile_json(kValidProfileJson);
-    assert(parsed.ok());
-    assert(parsed.value->track_entity_uid ==
+    CRATE_CHECK(parsed.ok());
+    CRATE_CHECK(parsed.value->track_entity_uid ==
            "550e8400-e29b-41d4-a716-446655440000");
-    assert(parsed.value->profile_version == 1);
-    assert(parsed.value->quality == MixProfileQuality::Full);
-    assert(parsed.value->bpm.has_value());
-    assert(*parsed.value->bpm == 128.1);
-    assert(parsed.value->bpm_confidence.has_value());
-    assert(*parsed.value->bpm_confidence == 0.94);
-    assert(parsed.value->camelot == "8A");
-    assert(parsed.value->intro_energy.has_value());
-    assert(*parsed.value->intro_energy == 0.7);
-    assert(parsed.value->intro_cue_ms == 8000);
-    assert(parsed.value->beat_grid_format == "delta-ms-v1");
+    CRATE_CHECK(parsed.value->profile_version == 1);
+    CRATE_CHECK(parsed.value->quality == MixProfileQuality::Full);
+    CRATE_CHECK(parsed.value->bpm.has_value());
+    CRATE_CHECK(*parsed.value->bpm == 128.1);
+    CRATE_CHECK(parsed.value->bpm_confidence.has_value());
+    CRATE_CHECK(*parsed.value->bpm_confidence == 0.94);
+    CRATE_CHECK(parsed.value->camelot == "8A");
+    CRATE_CHECK(parsed.value->intro_energy.has_value());
+    CRATE_CHECK(*parsed.value->intro_energy == 0.7);
+    CRATE_CHECK(parsed.value->intro_cue_ms == 8000);
+    CRATE_CHECK(parsed.value->beat_grid_format == "delta-ms-v1");
 
     const auto partial = parse_mix_profile_json(R"json({
         "trackEntityUid": "track-partial",
@@ -119,18 +119,18 @@ int main()
         "bpm": 98.0,
         "bpmConfidence": 0.2
     })json");
-    assert(partial.ok());
-    assert(partial.value->quality == MixProfileQuality::Partial);
-    assert(partial.value->bpm_confidence.has_value());
-    assert(*partial.value->bpm_confidence == 0.2);
-    assert(!partial.value->key.has_value());
-    assert(!partial.value->intro_cue_ms.has_value());
+    CRATE_CHECK(partial.ok());
+    CRATE_CHECK(partial.value->quality == MixProfileQuality::Partial);
+    CRATE_CHECK(partial.value->bpm_confidence.has_value());
+    CRATE_CHECK(*partial.value->bpm_confidence == 0.2);
+    CRATE_CHECK(!partial.value->key.has_value());
+    CRATE_CHECK(!partial.value->intro_cue_ms.has_value());
 
     const auto unsupported = parse_mix_profile_json(
         profile_json_with("profileVersion", "2")
     );
-    assert(!unsupported.ok());
-    assert(unsupported.error_code == ModelErrorCode::UnsupportedSchema);
+    CRATE_CHECK(!unsupported.ok());
+    CRATE_CHECK(unsupported.error_code == ModelErrorCode::UnsupportedSchema);
 
     FakeHttpClient http;
     MemoryCredentialStore credentials;
@@ -139,12 +139,12 @@ int main()
         "550e8400-e29b-41d4-a716-446655440000",
         CancellationToken{}
     );
-    assert(fetched.ok());
-    assert(http.request_seen.url ==
+    CRATE_CHECK(fetched.ok());
+    CRATE_CHECK(http.request_seen.url ==
            "https://api.dev.lespedants.org/api/tracks/by-entity/"
            "550e8400-e29b-41d4-a716-446655440000/mix-profile?detail=summary");
-    assert(http.request_seen.headers.size() == 2);
-    assert(http.request_seen.headers[1].second ==
+    CRATE_CHECK(http.request_seen.headers.size() == 2);
+    CRATE_CHECK(http.request_seen.headers[1].second ==
            "Bearer crv_smart-mix-token");
 
     http.response = HttpError{
@@ -156,9 +156,9 @@ int main()
         "missing-track",
         CancellationToken{}
     );
-    assert(unavailable.ok());
-    assert(unavailable.value->quality == MixProfileQuality::Unavailable);
-    assert(unavailable.value->track_entity_uid == "missing-track");
+    CRATE_CHECK(unavailable.ok());
+    CRATE_CHECK(unavailable.value->quality == MixProfileQuality::Unavailable);
+    CRATE_CHECK(unavailable.value->track_entity_uid == "missing-track");
 
     http.response = HttpResponse{
         .status_code = 200,
@@ -171,7 +171,7 @@ int main()
         "550e8400-e29b-41d4-a716-446655440000",
         CancellationToken{}
     );
-    assert(newer_analyzer.ok());
-    assert(newer_analyzer.value->analyzer_version == "smart-mix-audio-v2");
+    CRATE_CHECK(newer_analyzer.ok());
+    CRATE_CHECK(newer_analyzer.value->analyzer_version == "smart-mix-audio-v2");
 
 }

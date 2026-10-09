@@ -1,6 +1,6 @@
 #include "crate_vdj/catalog_client.hpp"
 
-#include <cassert>
+#include "../support/check.hpp"
 #include <optional>
 #include <string>
 #include <variant>
@@ -76,22 +76,22 @@ int main()
     CatalogClient client(http, credentials, "https://api.dev.lespedants.org");
 
     const auto folders = client.list_folders(CancellationToken{});
-    assert(folders.ok());
-    assert(folders.value->folders.size() == 2);
-    assert(folders.value->folders[0].id == "crate:playlists");
-    assert(folders.value->folders[1].name == "Genres");
-    assert(http.request_seen.headers[1].second == "Bearer crv_catalog-token");
+    CRATE_CHECK(folders.ok());
+    CRATE_CHECK(folders.value->folders.size() == 2);
+    CRATE_CHECK(folders.value->folders[0].id == "crate:playlists");
+    CRATE_CHECK(folders.value->folders[1].name == "Genres");
+    CRATE_CHECK(http.request_seen.headers[1].second == "Bearer crv_catalog-token");
 
     const auto page = client.get_folder(
         "crate:playlists",
         "cursor-0",
         CancellationToken{}
     );
-    assert(page.ok());
-    assert(page.value->tracks.size() == 1);
-    assert(page.value->tracks[0].entity_uid == "track-1");
-    assert(page.value->next_cursor == "cursor-1");
-    assert(http.request_seen.url ==
+    CRATE_CHECK(page.ok());
+    CRATE_CHECK(page.value->tracks.size() == 1);
+    CRATE_CHECK(page.value->tracks[0].entity_uid == "track-1");
+    CRATE_CHECK(page.value->next_cursor == "cursor-1");
+    CRATE_CHECK(http.request_seen.url ==
            "https://api.dev.lespedants.org/api/vdj/catalog/folders/crate%3Aplaylists?cursor=cursor-0&limit=500");
 
     MetadataCacheStore cache(":memory:");
@@ -102,11 +102,11 @@ int main()
         &cache
     );
     const auto first_cached = cached_client.list_folders(CancellationToken{});
-    assert(first_cached.ok());
+    CRATE_CHECK(first_cached.ok());
     const int requests_after_first_cached = http.request_count;
     const auto second_cached = cached_client.list_folders(CancellationToken{});
-    assert(second_cached.ok());
-    assert(http.request_count == requests_after_first_cached);
+    CRATE_CHECK(second_cached.ok());
+    CRATE_CHECK(http.request_count == requests_after_first_cached);
 
     MetadataCacheStore stale_cache(
         ":memory:",
@@ -124,13 +124,13 @@ int main()
         "cursor-stale",
         CancellationToken{}
     );
-    assert(initial_stale.ok());
+    CRATE_CHECK(initial_stale.ok());
     http.fail_requests = true;
     const auto fallback = stale_client.get_folder(
         "crate:playlists",
         "cursor-stale",
         CancellationToken{}
     );
-    assert(fallback.ok());
-    assert(fallback.value->tracks[0].entity_uid == "track-1");
+    CRATE_CHECK(fallback.ok());
+    CRATE_CHECK(fallback.value->tracks[0].entity_uid == "track-1");
 }
