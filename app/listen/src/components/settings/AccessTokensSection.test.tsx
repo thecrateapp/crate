@@ -141,6 +141,36 @@ describe("AccessTokensSection", () => {
     expect(screen.getByText("Booth")).toBeInTheDocument();
   });
 
+  it("adds Crate Automix only when the user opts in", async () => {
+    const user = setupUser();
+    apiMock.mockResolvedValueOnce([]);
+    apiMock.mockResolvedValueOnce({ ...EXISTING_TOKEN, id: 10, token: SECRET });
+
+    renderSection();
+    await user.click(await screen.findByRole("button", { name: "New token" }));
+    await user.type(screen.getByLabelText("Token name"), "Automix");
+    const automix = screen.getByRole("switch", {
+      name: "Let Crate Automix queue tracks",
+    });
+    expect(automix).not.toBeChecked();
+    await user.click(automix);
+    await user.click(screen.getByRole("button", { name: "Create token" }));
+
+    expect(apiMock).toHaveBeenLastCalledWith(
+      "/api/auth/access-tokens",
+      "POST",
+      expect.objectContaining({
+        scopes: [
+          "vdj.catalog.read",
+          "vdj.media.read",
+          "vdj.smart_mix.read",
+          "vdj.play_events.write",
+          "vdj.automation.execute",
+        ],
+      }),
+    );
+  });
+
   it("requires a name and at least one permission before creating", async () => {
     const user = setupUser();
     apiMock.mockResolvedValueOnce([]);

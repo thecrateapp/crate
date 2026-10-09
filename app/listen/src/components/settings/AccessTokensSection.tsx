@@ -17,6 +17,7 @@ const SCOPE_LABEL_KEYS: Record<string, string> = {
   "vdj.media.read": "settings.accessTokens.scopes.media",
   "vdj.smart_mix.read": "settings.accessTokens.scopes.smartMix",
   "vdj.play_events.write": "settings.accessTokens.scopes.playEvents",
+  "vdj.automation.execute": "settings.accessTokens.scopes.automation",
   "vdj.automation": "settings.accessTokens.scopes.legacyAutomation",
 };
 
@@ -34,10 +35,18 @@ const SELECTABLE_SCOPE_OPTIONS = [
     scope: "vdj.play_events.write",
     labelKey: "settings.accessTokens.scopes.playEvents",
   },
+  {
+    scope: "vdj.automation.execute",
+    labelKey: "settings.accessTokens.scopes.automation",
+  },
 ];
 
 const SELECTABLE_SCOPES = SELECTABLE_SCOPE_OPTIONS.map(
   (option) => option.scope,
+);
+
+const DEFAULT_SCOPES = SELECTABLE_SCOPES.filter(
+  (scope) => scope !== "vdj.automation.execute",
 );
 
 const EXPIRY_OPTIONS: { days: number | null; labelKey: string }[] = [
@@ -74,7 +83,7 @@ export function AccessTokensSection() {
   const [refreshAttempt, setRefreshAttempt] = useState(0);
   const [formOpen, setFormOpen] = useState(false);
   const [name, setName] = useState("");
-  const [scopes, setScopes] = useState<string[]>(SELECTABLE_SCOPES);
+  const [scopes, setScopes] = useState<string[]>(DEFAULT_SCOPES);
   const [expiresInDays, setExpiresInDays] = useState<number | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<RequestError | null>(null);
@@ -132,7 +141,7 @@ export function AccessTokensSection() {
   function resetForm() {
     setFormOpen(false);
     setName("");
-    setScopes(SELECTABLE_SCOPES);
+    setScopes(DEFAULT_SCOPES);
     setExpiresInDays(null);
   }
 

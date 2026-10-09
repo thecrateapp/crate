@@ -1902,6 +1902,7 @@
   "settings.accessTokens.scopes.media": "Titel abspielen und laden",
   "settings.accessTokens.scopes.smartMix": "Smart-Mix-Profile und passende Titel",
   "settings.accessTokens.scopes.playEvents": "Melden, was du abspielst",
+  "settings.accessTokens.scopes.automation": "Crate Automix darf Titel in die Warteschlange stellen",
   "settings.accessTokens.scopes.legacyAutomation": "Automatisierung (alte Berechtigung)",
   "settings.accessTokens.created": "Erstellt am {date}",
   "settings.accessTokens.expires": "Läuft ab am {date}",

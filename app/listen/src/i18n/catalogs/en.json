@@ -1902,6 +1902,7 @@
   "settings.accessTokens.scopes.media": "Play and load tracks",
   "settings.accessTokens.scopes.smartMix": "Smart Mix profiles and compatible tracks",
   "settings.accessTokens.scopes.playEvents": "Report what you play",
+  "settings.accessTokens.scopes.automation": "Let Crate Automix queue tracks",
   "settings.accessTokens.scopes.legacyAutomation": "Automation (legacy permission)",
   "settings.accessTokens.created": "Created {date}",
   "settings.accessTokens.expires": "Expires {date}",

@@ -1902,6 +1902,7 @@
   "settings.accessTokens.scopes.media": "Abestiak erreproduzitu eta kargatu",
   "settings.accessTokens.scopes.smartMix": "Smart Mix profilak eta abesti bateragarriak",
   "settings.accessTokens.scopes.playEvents": "Erreproduzitzen duzuna jakinarazi",
+  "settings.accessTokens.scopes.automation": "Utzi Crate Automix-i pistak ilaran jartzen",
   "settings.accessTokens.scopes.legacyAutomation": "Automatizazioa (baimen zaharra)",
   "settings.accessTokens.created": "Sortze-data: {date}",
   "settings.accessTokens.expires": "Iraungitze-data: {date}",

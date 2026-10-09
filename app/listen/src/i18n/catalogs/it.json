@@ -1902,6 +1902,7 @@
   "settings.accessTokens.scopes.media": "Riprodurre e caricare brani",
   "settings.accessTokens.scopes.smartMix": "Profili Smart Mix e brani compatibili",
   "settings.accessTokens.scopes.playEvents": "Registrare quello che ascolti",
+  "settings.accessTokens.scopes.automation": "Consenti a Crate Automix di accodare i brani",
   "settings.accessTokens.scopes.legacyAutomation": "Automazione (autorizzazione precedente)",
   "settings.accessTokens.created": "Creato il {date}",
   "settings.accessTokens.expires": "Scade il {date}",

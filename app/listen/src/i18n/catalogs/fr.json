@@ -1902,6 +1902,7 @@
   "settings.accessTokens.scopes.media": "Lire et charger des titres",
   "settings.accessTokens.scopes.smartMix": "Profils Smart Mix et titres compatibles",
   "settings.accessTokens.scopes.playEvents": "Signaler ce que vous écoutez",
+  "settings.accessTokens.scopes.automation": "Autoriser Crate Automix à ajouter des titres à la file",
   "settings.accessTokens.scopes.legacyAutomation": "Automatisation (ancienne autorisation)",
   "settings.accessTokens.created": "Créé le {date}",
   "settings.accessTokens.expires": "Expire le {date}",

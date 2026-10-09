@@ -1902,6 +1902,7 @@
   "settings.accessTokens.scopes.media": "Reproducir y cargar pistas",
   "settings.accessTokens.scopes.smartMix": "Perfiles de Smart Mix y pistas compatibles",
   "settings.accessTokens.scopes.playEvents": "Registrar lo que reproduces",
+  "settings.accessTokens.scopes.automation": "Permitir que Crate Automix añada pistas a la cola",
   "settings.accessTokens.scopes.legacyAutomation": "Automatización (permiso antiguo)",
   "settings.accessTokens.created": "Creado el {date}",
   "settings.accessTokens.expires": "Caduca el {date}",

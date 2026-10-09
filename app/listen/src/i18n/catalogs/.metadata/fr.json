@@ -5479,6 +5479,10 @@
     "sourceHash": "sha256:1af410288cd2f6a9ac54b4ea297215d144acd153ed9c4f027026efd92d943e75",
     "reviewedAt": "2026-10-09T09:26:54.342Z"
   },
+  "settings.accessTokens.scopes.automation": {
+    "sourceHash": "sha256:d5c586634079d6f3f21ee79b5306ebabe8401a5100347e8272378378cc06a6bb",
+    "reviewedAt": "2026-10-09T10:01:43.236Z"
+  },
   "settings.accessTokens.scopes.catalog": {
     "sourceHash": "sha256:d8c778b438657010dd45039d315d9e869ca71d053bad95506bb1acac0badc27c",
     "reviewedAt": "2026-10-09T09:26:54.342Z"
