@@ -45,11 +45,12 @@ from crate.db.ui_snapshot_shared import decorate_snapshot
 from crate.db.ui_snapshot_writes import upsert_ui_snapshot
 
 _MAX_AGE_SECONDS = 300
+_SUBJECT_KEY_VERSION = "v2"
 _STALE_MAX_AGE_SECONDS = 86_400
 _DEFAULT_LIMITS = {
     "tracks_limit": 12,
     "artists_limit": 10,
-    "albums_limit": 12,
+    "albums_limit": 14,
     "genres_limit": 10,
     "replay_limit": 36,
 }
@@ -68,7 +69,7 @@ def stats_dashboard_subject_key(
 ) -> str:
     period = month_period_key(month) if month else window
     return (
-        f"user:{user_id}:{period}:{month or 'default'}:{tracks_limit}:"
+        f"{_SUBJECT_KEY_VERSION}:user:{user_id}:{period}:{month or 'default'}:{tracks_limit}:"
         f"{artists_limit}:{albums_limit}:{genres_limit}:{replay_limit}"
     )
 
@@ -251,7 +252,7 @@ def get_user_stats_dashboard(
     month: str | None = None,
     tracks_limit: int = 12,
     artists_limit: int = 10,
-    albums_limit: int = 12,
+    albums_limit: int = 14,
     genres_limit: int = 10,
     replay_limit: int = 36,
 ) -> dict[str, Any]:
@@ -288,7 +289,7 @@ def refresh_user_stats_dashboard_snapshot(
     month: str | None = None,
     tracks_limit: int = 12,
     artists_limit: int = 10,
-    albums_limit: int = 12,
+    albums_limit: int = 14,
     genres_limit: int = 10,
     replay_limit: int = 36,
 ) -> dict[str, Any]:
