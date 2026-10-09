@@ -246,23 +246,26 @@ final class NativeMixController {
         applyProgress(requestedExecutionId, progress);
     }
 
-    void onDeckError(NativePlaybackDeck deck) {
+    boolean onDeckError(NativePlaybackDeck deck) {
         if (activePlan == null) {
             if (deck == standbyDeck) {
                 standbyDeck.releasePreparedSource();
                 standbyPreparationFailed = true;
                 listener.onFailed("standby_deck_error");
             }
-            return;
+            return false;
         }
         if (deck == mixOutgoingDeck) {
             completeTransition();
-        } else if (deck == mixIncomingDeck) {
+            return true;
+        }
+        if (deck == mixIncomingDeck) {
             if (!handoffComplete) {
                 standbyPreparationFailed = true;
             }
             cancel(handoffComplete ? "active_deck_error" : "incoming_deck_error");
         }
+        return false;
     }
 
     void applyProgress(long requestedExecutionId, float requestedProgress) {

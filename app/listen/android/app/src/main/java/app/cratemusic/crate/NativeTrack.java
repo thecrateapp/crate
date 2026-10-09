@@ -45,6 +45,21 @@ final class NativeTrack {
         return id;
     }
 
+    static NativeTrack fromCheckpoint(PlaybackCheckpointStore.SafeTrack track) {
+        return new NativeTrack(
+            track.id,
+            "",
+            "",
+            track.title,
+            track.artist,
+            track.album,
+            track.artwork,
+            "",
+            track.durationMs,
+            null
+        );
+    }
+
     PlaybackCheckpointStore.SafeTrack toSafeCheckpointTrack() {
         return new PlaybackCheckpointStore.SafeTrack(
             id,

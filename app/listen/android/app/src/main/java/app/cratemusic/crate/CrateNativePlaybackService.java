@@ -121,8 +121,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private int crossfadeMs = 0;
     private boolean positionTickerStarted = false;
     private boolean nativeMixTickerStarted = false;
-    private int lastPlayEventCheckpointIndex = -1;
-    private long lastPlayEventCheckpointPositionMs = 0L;
+    private final NativePlayEventCheckpoints playEventCheckpoints =
+        new NativePlayEventCheckpoints(PLAY_EVENT_CHECKPOINT_MS);
+    private final NativeDeckErrorRouter deckErrorRouter = new NativeDeckErrorRouter(
+        deck -> mixController != null && mixController.onDeckError(deck)
+    );
     private float[] currentEqGains = new float[10];
     private boolean eqEnabled = false;
     private boolean sessionRegistered = false;
@@ -431,6 +434,13 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
             @Override
             public void onPlayerError(PlaybackException error) {
+                if (
+                    mixController != null &&
+                    deckErrorRouter.onFacadeError(error, mixController.activeDeck())
+                ) {
+                    Log.w(TAG, "Deck error resolved by the active Smart Mix transition", error);
+                    return;
+                }
                 JSObject payload = basePayload();
                 NativeTrack currentTrack = getCurrentNativeTrack();
                 Throwable rootCause = rootCause(error);
@@ -655,9 +665,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
         physicalPlayer.addListener(new Player.Listener() {
             @Override
             public void onPlayerError(PlaybackException error) {
-                if (mixController != null) {
-                    mixController.onDeckError(deck);
-                }
+                deckErrorRouter.onPhysicalDeckError(
+                    error,
+                    deck,
+                    activePhysicalPlayer() == physicalPlayer
+                );
             }
         });
     }
@@ -897,18 +909,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         List<NativeTrack> restoredTracks = new ArrayList<>();
         List<MediaItem> mediaItems = new ArrayList<>();
         for (PlaybackCheckpointStore.SafeTrack track : checkpoint.tracks) {
-            NativeTrack restoredTrack = new NativeTrack(
-                track.id,
-                "",
-                "",
-                track.title,
-                track.artist,
-                track.album,
-                track.artwork,
-                "",
-                track.durationMs,
-                null
-            );
+            NativeTrack restoredTrack = NativeTrack.fromCheckpoint(track);
             restoredTracks.add(restoredTrack);
             mediaItems.add(toCheckpointMediaItem(restoredTrack));
         }
@@ -1780,20 +1781,19 @@ public class CrateNativePlaybackService extends MediaSessionService {
         int index = player.getCurrentMediaItemIndex();
         if (index < 0) return;
 
-        long positionMs = Math.max(0L, player.getCurrentPosition());
-        boolean trackChanged = index != lastPlayEventCheckpointIndex;
-        boolean movedBackwards = positionMs < lastPlayEventCheckpointPositionMs;
-        boolean intervalElapsed = positionMs - lastPlayEventCheckpointPositionMs >= PLAY_EVENT_CHECKPOINT_MS;
-        if (!trackChanged && !movedBackwards && !intervalElapsed) return;
-
-        lastPlayEventCheckpointIndex = index;
-        lastPlayEventCheckpointPositionMs = positionMs;
+        MediaItem mediaItem = player.getCurrentMediaItem();
+        NativePlayEventCheckpoints.Checkpoint checkpoint = playEventCheckpoints.observe(
+            index,
+            mediaItem == null ? "" : mediaItem.mediaId,
+            player.getCurrentPosition(),
+            true
+        );
+        if (checkpoint == null) return;
 
         JSObject payload = basePayload();
-        MediaItem mediaItem = player.getCurrentMediaItem();
-        payload.put("index", index);
-        payload.put("trackId", mediaItem == null ? "" : mediaItem.mediaId);
-        payload.put("positionMs", positionMs);
+        payload.put("index", checkpoint.index);
+        payload.put("trackId", checkpoint.trackId);
+        payload.put("positionMs", checkpoint.positionMs);
         payload.put("durationMs", safeDuration(player.getDuration()));
         payload.put("isPlaying", true);
         payload.put("checkpointMs", PLAY_EVENT_CHECKPOINT_MS);
@@ -1801,8 +1801,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     private void resetPlayEventCheckpoint() {
-        lastPlayEventCheckpointIndex = -1;
-        lastPlayEventCheckpointPositionMs = 0L;
+        playEventCheckpoints.reset();
     }
 
     private void emitState(String eventName) {
