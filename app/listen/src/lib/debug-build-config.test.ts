@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/platform", () => ({
   usesConfigurableServer: true,
+  usesSecureSessionStore: false,
   isCapacitorRuntime: true,
   isTauriRuntime: false,
   getListenAppId: () => "listen-android",
