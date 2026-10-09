@@ -190,18 +190,46 @@ describe("useMediaSession", () => {
     );
   });
 
-  it("leaves seek actions unset on iOS so the lock screen shows track skipping", () => {
+  it("clears seek actions on iOS so the lock screen shows track skipping", () => {
     runtime.isIosBrowser = true;
     renderSession();
 
-    const actions = mediaSession.setActionHandler.mock.calls.map(
-      ([action]) => action,
-    );
-    expect(actions).toEqual(
+    const calls = mediaSession.setActionHandler.mock.calls;
+    expect(calls.map(([action]) => action)).toEqual(
       expect.arrayContaining(["previoustrack", "nexttrack"]),
     );
-    expect(actions).not.toContain("seekbackward");
-    expect(actions).not.toContain("seekforward");
+    const seekCalls = calls.filter(([action]) =>
+      ["seekbackward", "seekforward"].includes(action as string),
+    );
+    expect(seekCalls.length).toBeGreaterThan(0);
+    expect(seekCalls.every(([, handler]) => handler === null)).toBe(true);
+  });
+
+  it("registers the actions again once playback starts and on a new track", () => {
+    const { rerender } = renderSession(TRACK_A, 0, false);
+    const countNextTrack = () =>
+      mediaSession.setActionHandler.mock.calls.filter(
+        ([action, handler]) => action === "nexttrack" && handler !== null,
+      ).length;
+    const initial = countNextTrack();
+
+    rerender({ track: TRACK_A, time: 0, playing: true });
+    expect(countNextTrack()).toBe(initial + 1);
+
+    rerender({ track: TRACK_B, time: 0, playing: true });
+    expect(countNextTrack()).toBe(initial + 2);
+  });
+
+  it("registers the actions again when the page becomes visible", () => {
+    renderSession();
+    const before = mediaSession.setActionHandler.mock.calls.length;
+
+    document.dispatchEvent(new Event("visibilitychange"));
+    window.dispatchEvent(new Event("pageshow"));
+
+    expect(mediaSession.setActionHandler.mock.calls.length).toBeGreaterThan(
+      before,
+    );
   });
 
   it("requests an immediate pause from the Web MediaSession handler", () => {
