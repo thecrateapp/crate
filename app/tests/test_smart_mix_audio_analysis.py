@@ -261,3 +261,52 @@ def test_backfill_analysis_falls_back_to_python_without_crate_cli(
     draft = audio_analysis.analyze_mix_profile(track)
 
     assert draft.analyzer == "crate-python"
+
+
+def test_long_tracks_are_analysed_from_a_bounded_head_and_tail(
+    monkeypatch, tmp_path: Path
+) -> None:
+    from crate.smart_mix import analyzer
+
+    monkeypatch.setattr(analyzer, "FULL_SCAN_HEAD_SECONDS", 10)
+    monkeypatch.setattr(analyzer, "FULL_SCAN_TAIL_SECONDS", 10)
+    track = tmp_path / "long.wav"
+    _write_click_track(
+        track,
+        bpm=124.0,
+        duration_seconds=40.0,
+        trailing_silence_seconds=3.0,
+    )
+    loaded_sizes: list[int] = []
+    original_resample = analyzer._to_analysis_rate
+
+    def record(audio, sample_rate):
+        loaded_sizes.append(audio.size)
+        return original_resample(audio, sample_rate)
+
+    monkeypatch.setattr(analyzer, "_to_analysis_rate", record)
+
+    profile = analyzer.analyze_mix_profile(track)
+
+    assert profile.duration_ms == 40_000
+    assert profile.quality == "partial"
+    assert max(loaded_sizes) <= 10 * SAMPLE_RATE
+    assert all(position <= 10_000 for position in profile.beat_grid_ms)
+    assert profile.active_end_ms is not None
+    assert 36_000 <= profile.active_end_ms <= 37_500
+    assert profile.outro_cue_ms is not None and profile.outro_cue_ms > 30_000
+
+
+def test_short_tracks_are_still_scanned_in_full(monkeypatch, tmp_path: Path) -> None:
+    from crate.smart_mix import analyzer
+
+    monkeypatch.setattr(analyzer, "FULL_SCAN_HEAD_SECONDS", 10)
+    monkeypatch.setattr(analyzer, "FULL_SCAN_TAIL_SECONDS", 10)
+    track = tmp_path / "short.wav"
+    _write_click_track(track, bpm=124.0, duration_seconds=15.0)
+
+    profile = analyzer.analyze_mix_profile(track)
+
+    assert profile.duration_ms == 15_000
+    assert profile.quality == "full"
+    assert max(profile.beat_grid_ms) > 10_000

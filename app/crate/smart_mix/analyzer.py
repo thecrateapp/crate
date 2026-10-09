@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import warnings
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -16,6 +17,9 @@ ANALYZER_NAME = "crate-python"
 TARGET_SAMPLE_RATE = 22_050
 HOP_LENGTH = 256
 WINDOW_SECONDS = 5.0
+FULL_SCAN_HEAD_SECONDS = 240
+FULL_SCAN_TAIL_SECONDS = 120
+_READ_BLOCK_FRAMES = 65_536
 
 _KEY_NAMES = (
     "C",
@@ -42,8 +46,9 @@ _MINOR_PROFILE = np.array(
 def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
     import librosa
 
-    audio, sample_rate = _load_audio(Path(filepath))
-    duration_ms = round(audio.size * 1_000 / sample_rate)
+    loaded = _load_audio(Path(filepath))
+    audio, sample_rate = loaded.head, loaded.sample_rate
+    duration_ms = loaded.duration_ms
     if audio.size < sample_rate * 2:
         return TrackMixProfileDraft(
             analyzer=ANALYZER_NAME,
@@ -91,18 +96,34 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
         cues.intro_cue_ms,
         direction="forward",
     )
-    outro = _window_features(
-        audio,
-        sample_rate,
-        cues.active_end_ms,
-        direction="backward",
-    )
+    outro_cue_ms, active_end_ms = cues.outro_cue_ms, cues.active_end_ms
+    if loaded.tail is None:
+        outro = _window_features(
+            audio,
+            sample_rate,
+            cues.active_end_ms,
+            direction="backward",
+        )
+    else:
+        tail_cues = detect_mix_cues(loaded.tail, sample_rate)
+        outro_cue_ms = _offset_ms(tail_cues.outro_cue_ms, loaded.tail_start_ms)
+        active_end_ms = _offset_ms(tail_cues.active_end_ms, loaded.tail_start_ms)
+        outro = _window_features(
+            loaded.tail,
+            sample_rate,
+            tail_cues.active_end_ms,
+            direction="backward",
+        )
     global_features = _signal_features(audio, sample_rate)
-    quality = _profile_quality(
-        beat_grid_ms=beat_grid_ms,
-        bpm_confidence=bpm_confidence,
-        tempo_stability=tempo_stability,
-        downbeat_anchor_ms=downbeat_anchor_ms,
+    quality = (
+        MixProfileQuality.PARTIAL
+        if loaded.tail is not None
+        else _profile_quality(
+            beat_grid_ms=beat_grid_ms,
+            bpm_confidence=bpm_confidence,
+            tempo_stability=tempo_stability,
+            downbeat_anchor_ms=downbeat_anchor_ms,
+        )
     )
 
     return TrackMixProfileDraft(
@@ -122,9 +143,9 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
         camelot=camelot,
         key_confidence=key_confidence,
         intro_cue_ms=cues.intro_cue_ms,
-        outro_cue_ms=cues.outro_cue_ms,
+        outro_cue_ms=outro_cue_ms,
         active_start_ms=cues.active_start_ms,
-        active_end_ms=cues.active_end_ms,
+        active_end_ms=active_end_ms,
         intro_energy=intro["energy"],
         outro_energy=outro["energy"],
         intro_spectral_density=intro["spectral_density"],
@@ -135,33 +156,103 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
     )
 
 
-def _load_audio(path: Path) -> tuple[np.ndarray, int]:
+@dataclass(frozen=True, slots=True)
+class _LoadedAudio:
+    head: np.ndarray
+    tail: np.ndarray | None
+    tail_start_ms: int
+    sample_rate: int
+    duration_ms: int
+
+
+def _load_audio(path: Path) -> _LoadedAudio:
     if not path.is_file():
         raise FileNotFoundError(path)
-
-    import librosa
-
     try:
         import soundfile as sf
 
-        audio, sample_rate = sf.read(path, dtype="float32", always_2d=False)
-        if getattr(audio, "ndim", 1) > 1:
-            audio = np.mean(audio, axis=1)
+        with sf.SoundFile(path) as source:
+            return _load_bounded(
+                lambda frames: _read_mono(source, frames),
+                lambda frame: source.seek(frame),
+                total_frames=source.frames,
+                sample_rate=source.samplerate,
+            )
     except Exception:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            audio, sample_rate = librosa.load(path, sr=None, mono=True)
+        return _load_with_librosa(path)
 
-    audio = np.asarray(audio, dtype=np.float32)
-    audio = np.nan_to_num(audio, copy=False)
-    if sample_rate > TARGET_SAMPLE_RATE:
-        audio = librosa.resample(
-            audio,
-            orig_sr=sample_rate,
-            target_sr=TARGET_SAMPLE_RATE,
+
+def _load_bounded(read, seek, *, total_frames: int, sample_rate: int) -> _LoadedAudio:
+    head_frames = FULL_SCAN_HEAD_SECONDS * sample_rate
+    tail_frames = FULL_SCAN_TAIL_SECONDS * sample_rate
+    duration_ms = round(total_frames * 1_000 / sample_rate)
+    if total_frames <= head_frames + tail_frames:
+        head, rate = _to_analysis_rate(read(total_frames), sample_rate)
+        return _LoadedAudio(head, None, 0, rate, duration_ms)
+    head, rate = _to_analysis_rate(read(head_frames), sample_rate)
+    tail_start = total_frames - tail_frames
+    seek(tail_start)
+    tail, _ = _to_analysis_rate(read(tail_frames), sample_rate)
+    tail_start_ms = round(tail_start * 1_000 / sample_rate)
+    return _LoadedAudio(head, tail, tail_start_ms, rate, duration_ms)
+
+
+def _read_mono(source, frames: int) -> np.ndarray:
+    blocks = []
+    remaining = frames
+    while remaining > 0:
+        block = source.read(
+            min(_READ_BLOCK_FRAMES, remaining),
+            dtype="float32",
+            always_2d=True,
         )
-        sample_rate = TARGET_SAMPLE_RATE
+        if block.size == 0:
+            break
+        blocks.append(block.mean(axis=1))
+        remaining -= block.shape[0]
+    return np.concatenate(blocks) if blocks else np.zeros(0, dtype=np.float32)
+
+
+def _load_with_librosa(path: Path) -> _LoadedAudio:
+    import librosa
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        duration_seconds = float(librosa.get_duration(path=path))
+        if duration_seconds <= FULL_SCAN_HEAD_SECONDS + FULL_SCAN_TAIL_SECONDS:
+            audio, sample_rate = librosa.load(path, sr=None, mono=True)
+            head, rate = _to_analysis_rate(audio, int(sample_rate))
+            return _LoadedAudio(head, None, 0, rate, round(duration_seconds * 1_000))
+        head_audio, sample_rate = librosa.load(
+            path, sr=None, mono=True, duration=FULL_SCAN_HEAD_SECONDS
+        )
+        tail_offset = duration_seconds - FULL_SCAN_TAIL_SECONDS
+        tail_audio, _ = librosa.load(path, sr=None, mono=True, offset=tail_offset)
+    head, rate = _to_analysis_rate(head_audio, int(sample_rate))
+    tail, _ = _to_analysis_rate(tail_audio, int(sample_rate))
+    return _LoadedAudio(
+        head,
+        tail,
+        round(tail_offset * 1_000),
+        rate,
+        round(duration_seconds * 1_000),
+    )
+
+
+def _to_analysis_rate(audio: np.ndarray, sample_rate: int) -> tuple[np.ndarray, int]:
+    import librosa
+
+    audio = np.nan_to_num(np.asarray(audio, dtype=np.float32), copy=False)
+    if sample_rate > TARGET_SAMPLE_RATE:
+        return (
+            librosa.resample(audio, orig_sr=sample_rate, target_sr=TARGET_SAMPLE_RATE),
+            TARGET_SAMPLE_RATE,
+        )
     return audio, int(sample_rate)
+
+
+def _offset_ms(position_ms: int | None, offset_ms: int) -> int | None:
+    return None if position_ms is None else position_ms + offset_ms
 
 
 def _tempo_features(
