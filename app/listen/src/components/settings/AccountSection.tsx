@@ -10,6 +10,7 @@ import {
   ConnectedAccounts,
   PasswordChangeForm,
 } from "@/components/settings/AccountSectionForms";
+import { AccountPulseListingField } from "@/components/settings/AccountPulseListingField";
 import { AccountTimezoneField } from "@/components/settings/AccountTimezoneField";
 import { Section } from "@/components/settings/SettingsPrimitives";
 import { useAuth } from "@/contexts/AuthContext";
@@ -266,6 +267,7 @@ export function AccountSection() {
           onSave={handleSaveName}
         />
         <AccountTimezoneField />
+        <AccountPulseListingField />
         <ConnectedAccounts
           providers={socialProviders}
           linkedProviders={linkedProviders}

@@ -700,10 +700,40 @@ def _music_age(session, user_id: int | None, period: StatsPeriod) -> dict | None
         .mappings()
         .first()
     )
+    top_albums = {
+        int(row["decade"]): {key: row[key] for key in row.keys() if key != "decade"}
+        for row in session.execute(
+            text(
+                f"""
+                WITH per_album AS (
+                    SELECT alb.id AS album_id, alb.name AS album, alb.artist,
+                           alb.slug AS album_slug,
+                           CAST(SUBSTRING(alb.year FROM '^[0-9]{{4}}') AS integer) AS year,
+                           SUM(td.minutes_listened) AS minutes
+                    FROM user_track_daily td
+                    JOIN library_tracks lt ON lt.id = td.track_id
+                    JOIN library_albums alb ON alb.id = lt.album_id
+                    WHERE (CAST(:user_id AS integer) IS NULL OR td.user_id = :user_id) AND {period_day_filter(period, "td.day")}
+                      AND alb.year ~ '^[0-9]{{4}}'
+                    GROUP BY alb.id
+                )
+                SELECT DISTINCT ON (year / 10) (year / 10) * 10 AS decade,
+                       album_id, album, artist, album_slug, year
+                FROM per_album
+                ORDER BY year / 10, minutes DESC, album
+                """
+            ),
+            {"user_id": user_id, **period_params(period)},
+        ).mappings()
+    }
     return {
         "median_year": int(median_year),
         "decades": [
-            {"decade": decade, "share": round(minutes / total, 4)}
+            {
+                "decade": decade,
+                "share": round(minutes / total, 4),
+                "top_album": top_albums.get(decade),
+            }
             for decade, minutes in sorted(decades.items())
         ],
         "oldest_album": dict(oldest) if oldest else None,

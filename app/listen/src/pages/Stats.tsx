@@ -24,6 +24,7 @@ import { SoundProfileCard } from "./StatsAnalyticsSections";
 import {
   TopAlbumsPanel,
   TopArtistsPanel,
+  TopListenersPanel,
   TopTracksPanel,
 } from "./StatsCollectionPanels";
 import {
@@ -69,6 +70,11 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
           {highlights ? (
             <StatsReveal className="mt-4">
               <StatsHighlights highlights={highlights} />
+            </StatsReveal>
+          ) : null}
+          {page.isGlobalStats && dashboard?.top_listeners?.length ? (
+            <StatsReveal className="mt-10">
+              <TopListenersPanel listeners={dashboard.top_listeners} />
             </StatsReveal>
           ) : null}
           <StatsReveal className="mt-10 grid gap-5 xl:grid-cols-2">

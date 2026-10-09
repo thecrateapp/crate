@@ -750,12 +750,7 @@ class StatsHeatmapResponse(BaseModel):
     night_share: float = 0
 
 
-class StatsDecadeShareResponse(BaseModel):
-    decade: int
-    share: float
-
-
-class StatsOldestAlbumResponse(BaseModel):
+class StatsYearAlbumResponse(BaseModel):
     album: str
     artist: str | None = None
     album_id: int | None = None
@@ -763,10 +758,16 @@ class StatsOldestAlbumResponse(BaseModel):
     year: int
 
 
+class StatsDecadeShareResponse(BaseModel):
+    decade: int
+    share: float
+    top_album: StatsYearAlbumResponse | None = None
+
+
 class StatsMusicAgeResponse(BaseModel):
     median_year: int
     decades: list[StatsDecadeShareResponse] = Field(default_factory=list)
-    oldest_album: StatsOldestAlbumResponse | None = None
+    oldest_album: StatsYearAlbumResponse | None = None
 
 
 class StatsGenreTrendResponse(BaseModel):
@@ -774,6 +775,16 @@ class StatsGenreTrendResponse(BaseModel):
     slug: str | None = None
     share: float
     delta_vs_previous: float | None = None
+
+
+class StatsTopListenerResponse(BaseModel):
+    user_id: int
+    username: str | None = None
+    display_name: str | None = None
+    avatar: str | None = None
+    minutes: float
+    plays: int
+    active_days: int
 
 
 class StatsDashboardResponse(BaseModel):
@@ -798,6 +809,7 @@ class StatsDashboardResponse(BaseModel):
     heatmap: StatsHeatmapResponse | None = None
     music_age: StatsMusicAgeResponse | None = None
     genre_trend: list[StatsGenreTrendResponse] = Field(default_factory=list)
+    top_listeners: list[StatsTopListenerResponse] = Field(default_factory=list)
 
 
 class HomeArtworkRefResponse(IdentityFieldsMixin):

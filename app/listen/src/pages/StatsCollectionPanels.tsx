@@ -1,10 +1,11 @@
 import { MediaGrid } from "@crate/ui/domain/lists";
 import { useMemo, type ComponentType, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Disc3, Flame, Music2 } from "@crate/ui/icons";
+import { Disc3, Flame, Music2, Users } from "@crate/ui/icons";
 import { Link } from "react-router";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
+import { UserAvatar } from "@/components/social/UserAvatar";
 import {
   ItemActionMenu,
   ItemActionMenuButton,
@@ -21,6 +22,7 @@ import {
   formatStatsMinutes,
   type StatsAlbum,
   type StatsArtist,
+  type StatsTopListener,
   type StatsTrack,
 } from "@/components/stats/stats-model";
 import { artistPhotoApiUrl, artistPagePath } from "@/lib/library-routes";
@@ -319,6 +321,70 @@ function TopAlbumCard({ item, rank }: { item: StatsAlbum; rank: number }) {
       artistSlug={item.artist_slug ?? undefined}
       meta={meta}
     />
+  );
+}
+
+export function TopListenersPanel({
+  listeners,
+}: {
+  listeners: StatsTopListener[];
+}) {
+  const { t } = useTranslation();
+  return (
+    <StatsPanel
+      title={t("stats.topListeners.title")}
+      subtitle={t("stats.topListeners.subtitle")}
+      icon={Users}
+    >
+      <ol className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+        {listeners.map((listener, index) => {
+          const name =
+            listener.display_name ||
+            listener.username ||
+            `#${listener.user_id}`;
+          const meta = t("stats.topListeners.meta", {
+            time: formatStatsMinutes(listener.minutes),
+            plays: listener.plays,
+          });
+          const body = (
+            <>
+              <span className="w-6 shrink-0 text-right text-sm font-bold tabular-nums text-text-muted">
+                {index + 1}
+              </span>
+              <UserAvatar
+                name={name}
+                avatar={listener.avatar}
+                userId={listener.user_id}
+                alt=""
+                size="sm"
+              />
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-text-primary">
+                  {name}
+                </span>
+                <span className="block truncate text-xs text-text-muted">
+                  {meta}
+                </span>
+              </span>
+            </>
+          );
+          return (
+            <li key={listener.user_id}>
+              {listener.username ? (
+                <Link
+                  to={`/users/${encodeURIComponent(listener.username)}`}
+                  className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-text-primary/5"
+                >
+                  {body}
+                </Link>
+              ) : (
+                <div className="flex items-center gap-3 px-2 py-2">{body}</div>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </StatsPanel>
   );
 }
 

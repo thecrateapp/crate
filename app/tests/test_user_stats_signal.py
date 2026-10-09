@@ -98,6 +98,11 @@ def test_highlights_heatmap_and_music_age(history):
         1, abs=0.01
     )
     assert music_age["oldest_album"]["year"] == 1998
+    for item in music_age["decades"]:
+        top = item["top_album"]
+        assert top is not None
+        assert item["decade"] <= top["year"] < item["decade"] + 10
+        assert top["album_id"] and top["album"]
 
     artist = payload["artist_of_period"]
     assert artist["artist_name"] and artist["plays"] > 0

@@ -365,9 +365,31 @@ export interface StatsHeatmap {
   night_share: number;
 }
 
+export interface StatsDecadeAlbum {
+  album: string;
+  artist?: string | null;
+  album_id?: number | null;
+  album_slug?: string | null;
+  year: number;
+}
+
+export interface StatsTopListener {
+  user_id: number;
+  username?: string | null;
+  display_name?: string | null;
+  avatar?: string | null;
+  minutes: number;
+  plays: number;
+  active_days: number;
+}
+
 export interface StatsMusicAge {
   median_year: number;
-  decades: { decade: number; share: number }[];
+  decades: {
+    decade: number;
+    share: number;
+    top_album?: StatsDecadeAlbum | null;
+  }[];
   oldest_album?: {
     album: string;
     artist?: string | null;
@@ -413,6 +435,7 @@ export interface StatsDashboard {
   artist_of_period?: StatsArtistOfPeriod | null;
   heatmap?: StatsHeatmap | null;
   music_age?: StatsMusicAge | null;
+  top_listeners?: StatsTopListener[];
   genre_trend?: StatsGenreTrend[];
 }
 

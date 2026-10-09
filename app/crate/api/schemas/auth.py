@@ -131,6 +131,7 @@ class UpdateProfileRequest(BaseModel):
     bio: str | None = None
     instagram_handle: str | None = None
     timezone: str | None = None
+    pulse_listed: bool | None = None
 
     @field_validator("instagram_handle")
     @classmethod
@@ -242,6 +243,7 @@ class AuthMeResponse(AuthUserPublicResponse):
     bio: str | None = None
     instagram_handle: str | None = None
     timezone: str | None = None
+    pulse_listed: bool = True
     session_id: str | None = None
     capabilities: list[str] = Field(default_factory=list)
     connected_accounts: list[AuthExternalIdentityResponse] = Field(default_factory=list)
