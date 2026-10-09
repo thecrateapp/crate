@@ -1,12 +1,33 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useEffect } from "react";
+import {
+  MemoryRouter,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthContext, type AuthContextValue } from "@/contexts/auth-context";
 import { I18nProvider } from "@/i18n";
 import { shouldRedirectToLoginOnUnauthorized } from "@/lib/auth-route-policy";
 
-import { PublicCrate } from "./PublicCrate";
+import { Crate } from "@/pages/Crate";
+
+import { AppLayoutRoute } from "./AppLayoutRoute";
+
+const authenticatedApp = vi.hoisted(() => ({ mounts: 0 }));
+
+vi.mock("@/app-shell/AuthenticatedApp", () => ({
+  AuthenticatedApp: function AuthenticatedAppProbe() {
+    useEffect(() => {
+      authenticatedApp.mounts += 1;
+    }, []);
+    return <Outlet />;
+  },
+}));
 
 const crateId = "2d89b6b2-0a62-41a4-b7aa-c2cd3dab69d6";
 const publicRef = "year-end-records-c6VS1y82";
@@ -69,21 +90,46 @@ function LocationProbe() {
   return <output data-testid="location">{location.pathname}</output>;
 }
 
-function renderPublicCrate(auth: AuthContextValue) {
+function NavigateButton({ to }: { to: string }) {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate(to)}>
+      go {to}
+    </button>
+  );
+}
+
+function renderAppLayout(
+  auth: AuthContextValue,
+  path = `/crate/${crateId}`,
+  cratePage: React.ReactNode = <Crate />,
+) {
   return render(
-    <MemoryRouter initialEntries={[`/crate/${crateId}`]}>
+    <MemoryRouter initialEntries={[path]}>
       <I18nProvider initialLocale="en">
         <AuthContext.Provider value={auth}>
           <Routes>
-            <Route
-              path="/crate/:crateRef"
-              element={
-                <>
-                  <PublicCrate />
-                  <LocationProbe />
-                </>
-              }
-            />
+            <Route element={<AppLayoutRoute />}>
+              <Route
+                path="crate/:crateRef"
+                element={
+                  <>
+                    {cratePage}
+                    <LocationProbe />
+                    <NavigateButton to="/library" />
+                  </>
+                }
+              />
+              <Route
+                path="library"
+                element={
+                  <>
+                    <div>Library page</div>
+                    <NavigateButton to={`/crate/${crateId}`} />
+                  </>
+                }
+              />
+            </Route>
             <Route path="/login" element={<div>Login page</div>} />
           </Routes>
         </AuthContext.Provider>
@@ -92,7 +138,7 @@ function renderPublicCrate(auth: AuthContextValue) {
   );
 }
 
-describe("PublicCrate", () => {
+describe("AppLayoutRoute", () => {
   const fetchMock = vi.fn<typeof fetch>();
 
   beforeEach(() => {
@@ -112,33 +158,16 @@ describe("PublicCrate", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     fetchMock.mockReset();
+    authenticatedApp.mounts = 0;
   });
 
   it("renders the public shell for anonymous visitors without redirecting to login", async () => {
-    const t0 = performance.now();
-    renderPublicCrate(anonymousAuth());
-    const t1 = performance.now();
+    renderAppLayout(anonymousAuth());
     expect(await screen.findByTestId("public-shell")).toBeInTheDocument();
-    const t2 = performance.now();
-    let t3 = 0;
-    try {
-      await waitFor(
-        () =>
-          expect(screen.getAllByText("Year-end records")).not.toHaveLength(0),
-        { timeout: 10000 },
-      );
-      t3 = performance.now();
-    } finally {
-      process.stdout.write(
-        `PHASES render=${Math.round(t1 - t0)} shell=${Math.round(
-          t2 - t1,
-        )} title=${Math.round(
-          (t3 || performance.now()) - t2,
-        )} fetches=${JSON.stringify(
-          fetchMock.mock.calls.map(([i]) => String(i)),
-        )}\n`,
-      );
-    }
+    await waitFor(
+      () => expect(screen.getAllByText("Year-end records")).not.toHaveLength(0),
+      { timeout: 10000 },
+    );
     expect(screen.queryByText("Login page")).not.toBeInTheDocument();
     await waitFor(() =>
       expect(screen.getByTestId("location")).toHaveTextContent(
@@ -164,10 +193,38 @@ describe("PublicCrate", () => {
   });
 
   it("waits for the session check before choosing a shell", () => {
-    renderPublicCrate(anonymousAuth({ loading: true }));
+    renderAppLayout(anonymousAuth({ loading: true }));
 
     expect(screen.queryByTestId("public-shell")).not.toBeInTheDocument();
     expect(screen.queryByText("Login page")).not.toBeInTheDocument();
+  });
+
+  it("sends anonymous visitors on other app routes to login", async () => {
+    renderAppLayout(anonymousAuth(), "/library");
+
+    expect(await screen.findByText("Login page")).toBeInTheDocument();
+  });
+
+  it("keeps the authenticated app mounted when entering and leaving a Crate", async () => {
+    renderAppLayout(
+      anonymousAuth({
+        user: { id: 1, email: "a@b.c", username: "a", role: "user" } as never,
+        accessMode: "authenticated" as never,
+      }),
+      "/library",
+      <div>Crate page</div>,
+    );
+
+    expect(await screen.findByText("Library page")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: `go /crate/${crateId}` }),
+    );
+    expect(await screen.findByText("Crate page")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "go /library" }));
+    expect(await screen.findByText("Library page")).toBeInTheDocument();
+
+    expect(screen.queryByTestId("public-shell")).not.toBeInTheDocument();
+    expect(authenticatedApp.mounts).toBe(1);
   });
 
   it("keeps public Crate routes out of the unauthorized login redirect", () => {
