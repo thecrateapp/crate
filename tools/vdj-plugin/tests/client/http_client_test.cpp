@@ -129,4 +129,26 @@ int main()
         std::get<HttpError>(invalid_origin).code ==
         HttpErrorCode::InvalidResponse
     );
+
+    CancellationSource cancelled_before;
+    cancelled_before.cancel();
+    const auto not_sent = http.request(HttpRequest{
+        .url = "https://api.example.test/api/search",
+        .allowed_origin = "https://api.example.test",
+        .cancellation = cancelled_before.token(),
+    });
+    CRATE_CHECK(std::holds_alternative<HttpError>(not_sent));
+    CRATE_CHECK(std::get<HttpError>(not_sent).code == HttpErrorCode::Cancelled);
+
+    std::string body;
+    CRATE_CHECK(append_bounded_body(body, "abc", 5));
+    CRATE_CHECK(append_bounded_body(body, "de", 5));
+    CRATE_CHECK(!append_bounded_body(body, "f", 5));
+    CRATE_CHECK(body == "abcde");
+
+    const auto insecure = http.request(HttpRequest{
+        .url = "http://api.example.test/api/search",
+        .allowed_origin = "http://api.example.test",
+    });
+    CRATE_CHECK(std::holds_alternative<HttpError>(insecure));
 }

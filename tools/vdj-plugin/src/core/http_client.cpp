@@ -77,4 +77,13 @@ HttpError normalize_http_failure(const HttpFailure& failure)
     };
 }
 
+bool append_bounded_body(std::string& body, std::string_view chunk, std::size_t limit)
+{
+    if (chunk.size() > limit || body.size() > limit - chunk.size()) {
+        return false;
+    }
+    body.append(chunk);
+    return true;
+}
+
 } // namespace crate::vdj

@@ -3,17 +3,63 @@
 #include <curl/curl.h>
 
 #include <chrono>
+#include <mutex>
+#include <string_view>
 #include <cstdlib>
 #include <string>
 
 namespace crate::vdj {
 namespace {
 
+struct BodySink {
+    std::string body;
+    std::size_t limit = 0;
+    bool overflowed = false;
+};
+
 size_t write_body(char* data, size_t size, size_t count, void* user_data)
 {
-    auto* body = static_cast<std::string*>(user_data);
-    body->append(data, size * count);
+    auto* sink = static_cast<BodySink*>(user_data);
+    if (!append_bounded_body(sink->body, std::string_view(data, size * count), sink->limit)) {
+        sink->overflowed = true;
+        return 0;
+    }
     return size * count;
+}
+
+void initialize_curl_once()
+{
+    static std::once_flag initialized;
+    std::call_once(initialized, [] { curl_global_init(CURL_GLOBAL_DEFAULT); });
+}
+
+CURL* thread_handle()
+{
+    struct HandleOwner {
+        CURL* handle = nullptr;
+        ~HandleOwner()
+        {
+            if (handle != nullptr) {
+                curl_easy_cleanup(handle);
+            }
+        }
+    };
+    thread_local HandleOwner owner;
+    if (owner.handle == nullptr) {
+        owner.handle = curl_easy_init();
+    } else {
+        curl_easy_reset(owner.handle);
+    }
+    return owner.handle;
+}
+
+HttpError cancelled_error()
+{
+    return {
+        .code = HttpErrorCode::Cancelled,
+        .status_code = 0,
+        .message = "request cancelled",
+    };
 }
 
 int progress(
@@ -35,11 +81,7 @@ HttpError error_from_curl(
 )
 {
     if (code == CURLE_ABORTED_BY_CALLBACK && request.cancellation.cancelled()) {
-        return {
-            .code = HttpErrorCode::Cancelled,
-            .status_code = 0,
-            .message = "request cancelled",
-        };
+        return cancelled_error();
     }
     if (code == CURLE_OPERATION_TIMEDOUT) {
         return {
@@ -69,7 +111,12 @@ HttpResult CurlHttpClient::request(const HttpRequest& request)
         };
     }
 
-    auto* handle = curl_easy_init();
+    if (request.cancellation.cancelled()) {
+        return cancelled_error();
+    }
+
+    initialize_curl_once();
+    auto* handle = thread_handle();
     if (handle == nullptr) {
         return HttpError{
             .code = HttpErrorCode::Network,
@@ -78,7 +125,7 @@ HttpResult CurlHttpClient::request(const HttpRequest& request)
         };
     }
 
-    std::string response_body;
+    BodySink sink{.body = {}, .limit = request.max_body_bytes, .overflowed = false};
     char error_buffer[CURL_ERROR_SIZE] = {};
     curl_slist* headers = nullptr;
     for (const auto& [name, value] : request.headers) {
@@ -92,7 +139,14 @@ HttpResult CurlHttpClient::request(const HttpRequest& request)
     curl_easy_setopt(handle, CURLOPT_CUSTOMREQUEST, request.method.c_str());
     curl_easy_setopt(handle, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, write_body);
-    curl_easy_setopt(handle, CURLOPT_WRITEDATA, &response_body);
+    curl_easy_setopt(handle, CURLOPT_WRITEDATA, &sink);
+    curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1L);
+    curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 0L);
+#if LIBCURL_VERSION_NUM >= 0x075500
+    curl_easy_setopt(handle, CURLOPT_PROTOCOLS_STR, "https");
+#else
+    curl_easy_setopt(handle, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
+#endif
     curl_easy_setopt(handle, CURLOPT_ERRORBUFFER, error_buffer);
     if (const char* ca_bundle = std::getenv("CRATE_VDJ_CA_BUNDLE");
         ca_bundle != nullptr && ca_bundle[0] != '\0') {
@@ -117,8 +171,17 @@ HttpResult CurlHttpClient::request(const HttpRequest& request)
     long status_code = 0;
     curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &status_code);
     curl_slist_free_all(headers);
-    curl_easy_cleanup(handle);
 
+    if (sink.overflowed) {
+        return HttpError{
+            .code = HttpErrorCode::InvalidResponse,
+            .status_code = static_cast<int>(status_code),
+            .message = "response body too large",
+        };
+    }
+    if (request.cancellation.cancelled()) {
+        return cancelled_error();
+    }
     if (result != CURLE_OK) {
         return error_from_curl(result, request, error_buffer);
     }
@@ -132,7 +195,7 @@ HttpResult CurlHttpClient::request(const HttpRequest& request)
     }
     return HttpResponse{
         .status_code = static_cast<int>(status_code),
-        .body = std::move(response_body),
+        .body = std::move(sink.body),
     };
 }
 

@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -80,6 +81,7 @@ struct HttpRequest {
     std::string body;
     std::chrono::milliseconds timeout = std::chrono::seconds(15);
     CancellationToken cancellation;
+    std::size_t max_body_bytes = 2 * 1024 * 1024;
 };
 
 struct HttpResponse {
@@ -108,5 +110,7 @@ bool should_abort(
 );
 
 HttpError normalize_http_failure(const HttpFailure& failure);
+
+bool append_bounded_body(std::string& body, std::string_view chunk, std::size_t limit);
 
 } // namespace crate::vdj
