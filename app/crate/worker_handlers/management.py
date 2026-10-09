@@ -107,8 +107,19 @@ def _handle_health_check(task_id: str, params: dict, config: dict) -> dict:
         emit_progress(task_id, p_hc)
 
     checker = LibraryHealthCheck(config)
-    report = checker.run(progress_callback=_hc_progress)
-    set_cache("health_report", report, ttl=3600)
+    artists = [str(name) for name in params.get("artists") or [] if str(name).strip()]
+    check_types = [str(check) for check in params.get("check_types") or []]
+    if artists:
+        report = checker.run_selected_for_artists(
+            check_types or ["artist_layout_fix", "duplicate_tracks"],
+            artists,
+            progress_callback=_hc_progress,
+        )
+    elif check_types:
+        report = checker.run_selected(check_types, progress_callback=_hc_progress)
+    else:
+        report = checker.run(progress_callback=_hc_progress)
+        set_cache("health_report", report, ttl=3600)
     issue_count = len(report.get("issues", []))
     emit_task_event(
         task_id,

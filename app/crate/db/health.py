@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from sqlalchemy import text
 
 from crate.db.tx import read_scope, transaction_scope
+from crate.health_issue_text import health_issue_identity
 
 
 def upsert_health_issue(
@@ -16,38 +17,67 @@ def upsert_health_issue(
     auto_fixable: bool = False,
     *,
     session=None,
-) -> int:
-    """Insert or update an open health issue. Returns issue ID.
-    Uses check_type + md5(description) as dedup key for open issues."""
+) -> int | None:
+    """Insert or refresh an open health issue keyed by its stable identity.
+
+    Returns the issue id, or None when the same issue was dismissed before."""
     if session is None:
         with transaction_scope() as s:
             return upsert_health_issue(
                 check_type, severity, description, details, auto_fixable, session=s
             )
+    details = details or {}
+    album_id = details.get("album_id")
     now = datetime.now(timezone.utc).isoformat()
     row = (
         session.execute(
             text("""
-            INSERT INTO health_issues (check_type, severity, description, details_json, auto_fixable, status, created_at)
-            VALUES (:check_type, :severity, :description, :details_json, :auto_fixable, 'open', :created_at)
-            ON CONFLICT (check_type, md5(description)) WHERE status = 'open'
-            DO UPDATE SET severity = EXCLUDED.severity, details_json = EXCLUDED.details_json,
-                         auto_fixable = EXCLUDED.auto_fixable
+            INSERT INTO health_issues (
+                check_type, severity, description, details_json, auto_fixable,
+                status, created_at, identity_key, artist_id, album_id, last_seen_at
+            )
+            SELECT :check_type, :severity, :description, :details_json, :auto_fixable,
+                   'open', :now, :identity_key,
+                   COALESCE(
+                       (SELECT id FROM library_artists WHERE name = :artist LIMIT 1),
+                       (SELECT la.id FROM library_albums al
+                        JOIN library_artists la ON la.name = al.artist
+                        WHERE al.id = :album_id LIMIT 1)
+                   ),
+                   (SELECT id FROM library_albums WHERE id = :album_id),
+                   :now
+            WHERE NOT EXISTS (
+                SELECT 1 FROM health_issues dismissed
+                WHERE dismissed.check_type = :check_type
+                  AND dismissed.identity_key = :identity_key
+                  AND dismissed.status = 'dismissed'
+            )
+            ON CONFLICT (check_type, identity_key) WHERE status = 'open'
+            DO UPDATE SET severity = EXCLUDED.severity,
+                          description = EXCLUDED.description,
+                          details_json = EXCLUDED.details_json,
+                          auto_fixable = EXCLUDED.auto_fixable,
+                          artist_id = EXCLUDED.artist_id,
+                          album_id = EXCLUDED.album_id,
+                          last_seen_at = EXCLUDED.last_seen_at
             RETURNING id
         """),
             {
                 "check_type": check_type,
                 "severity": severity,
                 "description": description,
-                "details_json": json.dumps(details or {}, default=str),
+                "details_json": json.dumps(details, default=str),
                 "auto_fixable": auto_fixable,
-                "created_at": now,
+                "now": now,
+                "identity_key": health_issue_identity(check_type, details, description),
+                "artist": details.get("artist") or details.get("db_artist"),
+                "album_id": album_id if isinstance(album_id, int) else None,
             },
         )
         .mappings()
         .first()
     )
-    return row["id"]
+    return row["id"] if row else None
 
 
 def get_open_issues(check_type: str | None = None, limit: int = 500) -> list[dict]:
@@ -136,17 +166,17 @@ def dismiss_issue(issue_id: int, *, session=None):
 
 
 def resolve_stale_issues(
-    current_descriptions: set[str], check_type: str, *, session=None
+    current_identities: set[str], check_type: str, *, session=None
 ):
     """Resolve open issues of a check_type that no longer appear in a fresh scan.
     This auto-cleans issues that were fixed externally."""
     if session is None:
         with transaction_scope() as s:
-            return resolve_stale_issues(current_descriptions, check_type, session=s)
+            return resolve_stale_issues(current_identities, check_type, session=s)
     rows = (
         session.execute(
             text(
-                "SELECT id, description FROM health_issues WHERE check_type = :check_type AND status = 'open'"
+                "SELECT id, identity_key FROM health_issues WHERE check_type = :check_type AND status = 'open'"
             ),
             {"check_type": check_type},
         )
@@ -154,12 +184,12 @@ def resolve_stale_issues(
         .all()
     )
     for row in rows:
-        if row["description"] not in current_descriptions:
+        if row["identity_key"] not in current_identities:
             resolve_issue(row["id"], session=session)
 
 
 def resolve_stale_artist_issues(
-    current_descriptions: set[str],
+    current_identities: set[str],
     check_type: str,
     artist_names: list[str] | set[str] | tuple[str, ...],
     *,
@@ -172,13 +202,13 @@ def resolve_stale_artist_issues(
     if session is None:
         with transaction_scope() as s:
             return resolve_stale_artist_issues(
-                current_descriptions, check_type, artists, session=s
+                current_identities, check_type, artists, session=s
             )
     rows = (
         session.execute(
             text(
                 """
-            SELECT id, description
+            SELECT id, identity_key
             FROM health_issues
             WHERE check_type = :check_type
               AND status = 'open'
@@ -194,19 +224,19 @@ def resolve_stale_artist_issues(
         .all()
     )
     for row in rows:
-        if row["description"] not in current_descriptions:
+        if row["identity_key"] not in current_identities:
             resolve_issue(row["id"], session=session)
 
 
 def cleanup_old_resolved(days: int = 30, *, session=None):
-    """Delete resolved/dismissed issues older than N days."""
+    """Delete fixed issues older than N days; dismissals are kept so they stay dismissed."""
     if session is None:
         with transaction_scope() as s:
             return cleanup_old_resolved(days, session=s)
     session.execute(
         text("""
         DELETE FROM health_issues
-        WHERE status IN ('fixed', 'dismissed')
+        WHERE status = 'fixed'
         AND resolved_at < NOW() - make_interval(days => :days)
     """),
         {"days": days},

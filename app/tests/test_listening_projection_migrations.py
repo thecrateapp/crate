@@ -64,3 +64,17 @@ def test_pulse_listed_migration_defaults_users_into_the_ranking(monkeypatch):
     assert migration == [
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS pulse_listed BOOLEAN NOT NULL DEFAULT TRUE"
     ]
+
+
+def test_health_identity_migration_matches_its_schema_section(monkeypatch):
+    migration, section = _replay(
+        "107_health_issue_identity",
+        "health_v107",
+        "create_health_issue_identity_v107_schema",
+        monkeypatch,
+    )
+    assert migration == section
+    joined = "\n".join(migration)
+    assert "DROP INDEX IF EXISTS idx_health_issues_dedup" in joined
+    assert "idx_health_issues_open_identity" in joined
+    assert "CREATE TABLE IF NOT EXISTS health_check_runs" in joined

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from crate.db.cache_runtime import get_redis
 from crate.db.health import get_issue_counts, get_open_issues
+from crate.db.queries.health_issues import get_health_check_runs
 from crate.db.ui_snapshot_store import get_or_build_ui_snapshot
 
 HEALTH_SNAPSHOT_SCOPE = "ops:health"
@@ -25,6 +26,7 @@ def build_health_surface_payload(
         "counts": counts,
         "total": len(issues),
         "filter": check_type or None,
+        "runs": get_health_check_runs(),
     }
 
 

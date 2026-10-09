@@ -75,7 +75,6 @@ from crate.db.health import (
     resolve_issue,
     resolve_issues_by_type,
 )
-from crate.db.queries import health as health_queries
 from crate.db.ops_snapshot import get_cached_ops_snapshot
 from crate.db.queries.management import (
     get_last_analyzed_track,
@@ -85,7 +84,6 @@ from crate.db.queries.management import (
 from crate.db.repositories.library import (
     get_library_album_by_entity_uid,
     get_library_album_by_id,
-    get_library_artist,
     get_library_artist_by_entity_uid,
     get_library_artist_by_id,
 )
@@ -94,7 +92,12 @@ from crate.db.repositories.library_track_reads import (
     get_library_track_by_entity_uid,
     get_library_track_by_id,
 )
-from crate.db.repositories.tasks import create_task
+from crate.db.repositories.health_issues import dismiss_issues_by_type
+from crate.db.repositories.tasks import (
+    create_task,
+    create_task_dedup,
+    find_active_task_by_type_params,
+)
 from crate.repair_catalog import REPAIR_CATALOG_BY_CHECK, repair_catalog_payload
 from crate.utils import AUDIO_EXTENSIONS
 
@@ -107,136 +110,8 @@ def _build_repair_preview(issues: list[dict], *, auto_only: bool = False) -> dic
     return repairer.preview({"issues": issues}, auto_only=auto_only)
 
 
-def _build_artist_fix_preview(artist_name: str) -> dict:
-    from pathlib import Path
-
-    from crate.config import load_config
-    from crate.worker_handlers.migration import preview_fix_artist
-
-    config = load_config()
-    artist = get_library_artist(artist_name)
-    if not artist:
-        return {
-            "status": "unavailable",
-            "applicable": False,
-            "artist": artist_name,
-            "message": f"Artist {artist_name} was not found",
-            "target_artist_dir": None,
-            "candidate_dirs": [],
-            "album_moves": [],
-            "artist_files": [],
-            "folder_name_mismatch": False,
-            "skipped_existing": 0,
-            "skipped_foreign": 0,
-            "preview_errors": [],
-        }
-    return preview_fix_artist(Path(config["library_path"]), artist, config)
-
-
-def _augment_artist_layout_issues(issues: list[dict], artist_name: str) -> list[dict]:
-    from crate.worker_handlers.migration import build_artist_layout_fix_issue
-
-    fix_preview = _build_artist_fix_preview(artist_name)
-    artist_fix_issue = build_artist_layout_fix_issue(fix_preview)
-
-    normalized: list[dict] = []
-    existing_artist_fix_issue_id: int | None = None
-    for issue in issues:
-        check = issue.get("check") or issue.get("check_type")
-        if check == "artist_layout_fix":
-            issue_id = issue.get("id")
-            if isinstance(issue_id, int):
-                existing_artist_fix_issue_id = issue_id
-            continue
-        normalized.append(issue)
-
-    if (
-        artist_fix_issue is None
-        and existing_artist_fix_issue_id is not None
-        and fix_preview.get("status") == "already_canonical"
-    ):
-        resolve_issue(existing_artist_fix_issue_id)
-        publish_health_surface_signal()
-
-    if artist_fix_issue:
-        if existing_artist_fix_issue_id is not None:
-            artist_fix_issue["id"] = existing_artist_fix_issue_id
-        normalized.append(artist_fix_issue)
-
-    return normalized
-
-
 def _issue_check_type(issue: Mapping[str, Any]) -> str:
     return str(issue.get("check") or issue.get("check_type") or "")
-
-
-def _issue_details(issue: Mapping[str, Any]) -> dict[str, Any]:
-    details = issue.get("details")
-    if isinstance(details, dict):
-        return details
-    details_json = issue.get("details_json")
-    if isinstance(details_json, dict):
-        return details_json
-    return {}
-
-
-def _duplicate_track_issue_key(issue: Mapping[str, Any]) -> tuple:
-    details = _issue_details(issue)
-    return (
-        int(details.get("album_id") or 0),
-        str(details.get("title") or "").casefold(),
-        int(details.get("track_number") or 0),
-        int(details.get("disc_number") or 0),
-    )
-
-
-def _duplicate_track_issue_from_row(row: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        "check": "duplicate_tracks",
-        "severity": "medium",
-        "details": {
-            "album_id": row["album_id"],
-            "artist": row["artist"],
-            "album": row["album"],
-            "title": row["title"],
-            "track_number": row.get("track_number"),
-            "disc_number": row.get("disc_number"),
-            "count": row["cnt"],
-            "paths": row.get("paths", []),
-            "track_ids": row.get("track_ids", []),
-            "tracks": row.get("tracks", []),
-            "fingerprinted_count": row.get("fingerprinted_count", 0),
-            "missing_fingerprint_count": row.get("missing_fingerprint_count", 0),
-        },
-    }
-
-
-def _refresh_artist_duplicate_track_issues(
-    issues: list[dict], artist_name: str
-) -> list[dict]:
-    duplicate_issue_ids = {
-        _duplicate_track_issue_key(issue): issue.get("id")
-        for issue in issues
-        if _issue_check_type(issue) == "duplicate_tracks"
-        and issue.get("id") is not None
-    }
-
-    try:
-        duplicate_rows = health_queries.get_duplicate_tracks(artist_name=artist_name)
-    except Exception:
-        return issues
-
-    normalized = [
-        issue for issue in issues if _issue_check_type(issue) != "duplicate_tracks"
-    ]
-    for row in duplicate_rows:
-        issue = _duplicate_track_issue_from_row(row)
-        existing_id = duplicate_issue_ids.get(_duplicate_track_issue_key(issue))
-        if existing_id is not None:
-            issue["id"] = existing_id
-        normalized.append(issue)
-
-    return normalized
 
 
 router = APIRouter(prefix="/api/manage", tags=["management"])
@@ -557,6 +432,19 @@ def api_resolve_type(request: Request, check_type: str):
 
 
 @router.post(
+    "/health-issues/dismiss-type/{check_type}",
+    response_model=CheckTypeMutationResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Dismiss all open health issues of a given type",
+)
+def api_dismiss_type(request: Request, check_type: str):
+    _require_repair_operator(request)
+    dismiss_issues_by_type(check_type)
+    publish_health_surface_signal()
+    return {"ok": True, "check_type": check_type}
+
+
+@router.post(
     "/health-issues/fix-type/{check_type}",
     response_model=HealthFixTypeResponse,
     responses=_MANAGEMENT_RESPONSES,
@@ -638,10 +526,24 @@ def repair_artist(request: Request, name: str):
 
 def preview_artist_repair_plan(request: Request, name: str):
     _require_repair_operator(request)
-    issues = _refresh_artist_duplicate_track_issues(get_artist_issues(name), name)
-    issues = _augment_artist_layout_issues(issues, name)
-    preview = _build_repair_preview(issues, auto_only=False)
+    preview = _build_repair_preview(get_artist_issues(name), auto_only=False)
     return {"artist": name, **preview}
+
+
+def recheck_artist_health(request: Request, name: str):
+    _require_repair_operator(request)
+    params = {
+        "artists": [name],
+        "check_types": ["artist_layout_fix", "duplicate_tracks"],
+    }
+    dedup_key = f"health-recheck:{name}"
+    task_id = create_task_dedup("health_check", params, dedup_key=dedup_key)
+    if task_id:
+        return {"task_id": task_id, "status": "queued", "deduplicated": False}
+    existing = find_active_task_by_type_params(
+        "health_check", params, dedup_key=dedup_key
+    )
+    return {"task_id": existing or "", "status": "already_queued", "deduplicated": True}
 
 
 def fix_artist(request: Request, name: str):
@@ -714,6 +616,32 @@ def preview_artist_repair_plan_by_entity_uid(request: Request, artist_entity_uid
     if not artist_name:
         raise HTTPException(status_code=404, detail="Artist not found")
     return preview_artist_repair_plan(request, artist_name)
+
+
+@router.post(
+    "/artists/{artist_id}/health-recheck",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Re-run the artist-scoped health checks in the worker",
+)
+def recheck_artist_health_by_id(request: Request, artist_id: int):
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        raise HTTPException(status_code=404, detail="Artist not found")
+    return recheck_artist_health(request, artist_name)
+
+
+@router.post(
+    "/artists/by-entity/{artist_entity_uid}/health-recheck",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Re-run the artist-scoped health checks in the worker by entity UID",
+)
+def recheck_artist_health_by_entity_uid(request: Request, artist_entity_uid: str):
+    artist_name = artist_name_from_entity_uid(artist_entity_uid)
+    if not artist_name:
+        raise HTTPException(status_code=404, detail="Artist not found")
+    return recheck_artist_health(request, artist_name)
 
 
 @router.post(
