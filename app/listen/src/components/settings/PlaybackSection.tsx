@@ -27,6 +27,7 @@ import {
   Section,
   ToggleRow,
 } from "@/components/settings/SettingsPrimitives";
+import { SmartMixSettings } from "@/components/settings/SmartMixSettings";
 
 const PLAYBACK_DELIVERY_OPTIONS: {
   value: PlaybackDeliveryPreference;
@@ -166,6 +167,7 @@ export function PlaybackSection() {
           />
         </>
       ) : null}
+      <SmartMixSettings />
       {!mobilePlaybackRuntime || androidNativePlayerEnabled ? (
         <ToggleRow
           label={t("player.equalizer")}

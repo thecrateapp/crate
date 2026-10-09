@@ -209,7 +209,7 @@ describe("android native engine flags", () => {
     });
   });
 
-  it("only forwards crossfade after every Smart Mix rollout gate is enabled", async () => {
+  it("forwards the requested crossfade once the server enables native mixing", async () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
     const state = {
       revision: "queue-rev-1",
@@ -225,48 +225,91 @@ describe("android native engine flags", () => {
     nativePlaybackMock.getState.mockResolvedValue(state);
     nativePlaybackMock.setQueue.mockResolvedValue(state);
     const nativeEngineModule = await import("@/lib/android-native-engine");
+    const queue = {
+      revision: "queue-rev-1",
+      tracks: [],
+      currentIndex: 0,
+      positionMs: 0,
+      autoplay: false,
+      repeat: "off" as const,
+      crossfadeMs: 4000,
+      volume: 1,
+    };
 
-    expect("setAndroidNativeSmartMixCapabilities" in nativeEngineModule).toBe(
-      true,
-    );
     expect("setAndroidNativeSmartMixRolloutEnabled" in nativeEngineModule).toBe(
-      true,
+      false,
+    );
+    const engine = new nativeEngineModule.AndroidNativeEngine();
+    await engine.loadQueue(queue);
+    expect(nativePlaybackMock.setQueue).toHaveBeenLastCalledWith(
+      expect.objectContaining({ crossfadeMs: 0 }),
     );
 
-    const configureCapabilities = (
-      nativeEngineModule as typeof nativeEngineModule & {
-        setAndroidNativeSmartMixCapabilities: (capabilities: {
-          available: boolean;
-          androidNativeCrossfade: boolean;
-        }) => void;
-      }
-    ).setAndroidNativeSmartMixCapabilities;
-    const configureRollout = (
-      nativeEngineModule as typeof nativeEngineModule & {
-        setAndroidNativeSmartMixRolloutEnabled: (enabled: boolean) => void;
-      }
-    ).setAndroidNativeSmartMixRolloutEnabled;
-
-    configureCapabilities({
+    nativeEngineModule.setAndroidNativeSmartMixCapabilities({
       available: true,
       androidNativeCrossfade: true,
+      androidBeatmatch: false,
     });
-    configureRollout(true);
+    await engine.loadQueue(queue);
+    expect(nativePlaybackMock.setQueue).toHaveBeenLastCalledWith(
+      expect.objectContaining({ crossfadeMs: 4000 }),
+    );
 
+    nativeEngineModule.setAndroidNativeSmartMixKillSwitch(true);
+    await engine.loadQueue(queue);
+    expect(nativePlaybackMock.setQueue).toHaveBeenLastCalledWith(
+      expect.objectContaining({ crossfadeMs: 0 }),
+    );
+  });
+
+  it("applies a Smart Mix opt-out to the loaded native queue", async () => {
+    vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+    const state = {
+      revision: "queue-rev-1",
+      playbackState: "playing",
+      isPlaying: true,
+      index: 0,
+      positionMs: 0,
+      durationMs: 180_000,
+      queueSize: 2,
+      crossfadeMs: 6000,
+      eqEnabled: false,
+    };
+    nativePlaybackMock.getState.mockResolvedValue(state);
+    nativePlaybackMock.setQueue.mockResolvedValue(state);
+    nativePlaybackMock.setCrossfadeMs.mockResolvedValue(state);
+    const nativeEngineModule = await import("@/lib/android-native-engine");
+    const prefs = await import("@/lib/player-playback-prefs");
+    nativeEngineModule.setAndroidNativeSmartMixCapabilities({
+      available: true,
+      androidNativeCrossfade: true,
+      androidBeatmatch: false,
+    });
     const engine = new nativeEngineModule.AndroidNativeEngine();
     await engine.loadQueue({
       revision: "queue-rev-1",
       tracks: [],
       currentIndex: 0,
       positionMs: 0,
-      autoplay: false,
+      autoplay: true,
       repeat: "off",
-      crossfadeMs: 4000,
+      crossfadeMs: 6000,
       volume: 1,
     });
 
-    expect(nativePlaybackMock.setQueue).toHaveBeenCalledWith(
-      expect.objectContaining({ crossfadeMs: 4000 }),
+    prefs.setNativeSmartMixEnabledPreference(false);
+    await vi.waitFor(() =>
+      expect(nativePlaybackMock.setCrossfadeMs).toHaveBeenLastCalledWith({
+        crossfadeMs: 0,
+      }),
+    );
+
+    prefs.setNativeSmartMixEnabledPreference(true);
+    prefs.setNativeSmartMixSecondsPreference(9);
+    await vi.waitFor(() =>
+      expect(nativePlaybackMock.setCrossfadeMs).toHaveBeenLastCalledWith({
+        crossfadeMs: 9000,
+      }),
     );
   });
 
@@ -290,19 +333,24 @@ describe("android native engine flags", () => {
     const { AndroidNativeEngine } = await import("@/lib/android-native-engine");
     const engine = new AndroidNativeEngine();
 
-    await engine.loadQueue({
+    const queue = {
       revision: "local-smart-mix",
       tracks: [],
       currentIndex: 0,
       positionMs: 0,
       autoplay: true,
-      repeat: "off",
-      crossfadeMs: 0,
+      repeat: "off" as const,
       volume: 1,
-    });
+    };
 
-    expect(nativePlaybackMock.setQueue).toHaveBeenCalledWith(
+    await engine.loadQueue({ ...queue, crossfadeMs: 6000 });
+    expect(nativePlaybackMock.setQueue).toHaveBeenLastCalledWith(
       expect.objectContaining({ crossfadeMs: 3000 }),
+    );
+
+    await engine.loadQueue({ ...queue, crossfadeMs: 0 });
+    expect(nativePlaybackMock.setQueue).toHaveBeenLastCalledWith(
+      expect.objectContaining({ crossfadeMs: 0 }),
     );
   });
 

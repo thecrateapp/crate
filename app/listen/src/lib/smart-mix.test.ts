@@ -3,6 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PlaySource, Track } from "@/contexts/player-types";
 import type { EngineQueueSnapshot } from "@/lib/playback-engine";
 import {
+  getServerSmartMixCapabilities,
+  getSmartMixCapabilities,
+  setSmartMixCapabilities,
+  subscribeSmartMixCapabilities,
   legacySmartTransitionSeconds,
   SMART_TRANSITION_LONG_SECONDS,
   SMART_TRANSITION_SHORT_SECONDS,
@@ -10,6 +14,13 @@ import {
   type SmartMixCapabilities,
   type SmartMixRequest,
 } from "@/lib/smart-mix";
+import {
+  registerNativeMixRuntime,
+  setNativeSmartMixEnabledPreference,
+} from "@/lib/player-playback-prefs";
+
+const runtime = { androidNative: false };
+registerNativeMixRuntime(() => runtime.androidNative);
 
 const ENABLED_CAPABILITIES: SmartMixCapabilities = {
   available: true,
@@ -562,5 +573,57 @@ describe("legacySmartTransitionSeconds", () => {
         false,
       ),
     ).toBe(SMART_TRANSITION_SHORT_SECONDS);
+  });
+});
+
+describe("effective Smart Mix capabilities", () => {
+  afterEach(() => {
+    runtime.androidNative = false;
+    localStorage.clear();
+    setSmartMixCapabilities({
+      available: false,
+      androidNativeCrossfade: false,
+      androidBeatmatch: false,
+    });
+  });
+
+  it("applies the native opt-out without hiding the server capability", () => {
+    runtime.androidNative = true;
+    setSmartMixCapabilities(ENABLED_CAPABILITIES);
+    setNativeSmartMixEnabledPreference(false);
+
+    expect(getSmartMixCapabilities().androidNativeCrossfade).toBe(false);
+    expect(getSmartMixCapabilities().androidBeatmatch).toBe(false);
+    expect(getServerSmartMixCapabilities().androidNativeCrossfade).toBe(true);
+  });
+
+  it("notifies subscribers when the user turns Smart Mix off", () => {
+    runtime.androidNative = true;
+    setSmartMixCapabilities(ENABLED_CAPABILITIES);
+    const listener = vi.fn();
+    const unsubscribe = subscribeSmartMixCapabilities(listener);
+
+    setNativeSmartMixEnabledPreference(false);
+    unsubscribe();
+
+    expect(listener).toHaveBeenLastCalledWith(
+      expect.objectContaining({ androidNativeCrossfade: false }),
+    );
+  });
+
+  it("does not let a new capability re-enable an explicit opt-out", () => {
+    runtime.androidNative = true;
+    setNativeSmartMixEnabledPreference(false);
+
+    setSmartMixCapabilities(ENABLED_CAPABILITIES);
+
+    expect(getSmartMixCapabilities().androidNativeCrossfade).toBe(false);
+  });
+
+  it("leaves non-native runtimes on the server capability", () => {
+    setSmartMixCapabilities(ENABLED_CAPABILITIES);
+    setNativeSmartMixEnabledPreference(false);
+
+    expect(getSmartMixCapabilities().androidNativeCrossfade).toBe(true);
   });
 });

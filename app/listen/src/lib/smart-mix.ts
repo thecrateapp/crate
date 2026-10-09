@@ -1,5 +1,10 @@
 import type { PlaySource, Track } from "@/contexts/player-types";
 import type { EngineTransitionPlan } from "@/lib/playback-engine";
+import {
+  getCrossfadeDurationPreference,
+  isNativeMixRuntime,
+  PLAYER_PLAYBACK_PREFS_EVENT,
+} from "@/lib/player-playback-prefs";
 
 export const SMART_TRANSITION_SHORT_SECONDS = 2;
 export const SMART_TRANSITION_BALANCED_SECONDS = 4;
@@ -62,9 +67,21 @@ export function setSmartMixCapabilities(
     androidBeatmatch: capabilities.androidBeatmatch === true,
     plannerVersion: capabilities.plannerVersion ?? null,
   };
+  notifyCapabilityListeners();
+}
+
+function notifyCapabilityListeners(): void {
+  const capabilities = getSmartMixCapabilities();
   for (const listener of capabilityListeners) {
-    listener(getSmartMixCapabilities());
+    listener(capabilities);
   }
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener(
+    PLAYER_PLAYBACK_PREFS_EVENT,
+    notifyCapabilityListeners,
+  );
 }
 
 export function subscribeSmartMixCapabilities(
@@ -76,8 +93,19 @@ export function subscribeSmartMixCapabilities(
   };
 }
 
-export function getSmartMixCapabilities(): SmartMixCapabilities {
+export function getServerSmartMixCapabilities(): SmartMixCapabilities {
   return { ...smartMixCapabilities };
+}
+
+export function getSmartMixCapabilities(): SmartMixCapabilities {
+  const userEnabled =
+    !isNativeMixRuntime() || getCrossfadeDurationPreference() > 0;
+  return {
+    ...smartMixCapabilities,
+    androidNativeCrossfade:
+      smartMixCapabilities.androidNativeCrossfade && userEnabled,
+    androidBeatmatch: smartMixCapabilities.androidBeatmatch && userEnabled,
+  };
 }
 
 interface SmartMixPlanInput {

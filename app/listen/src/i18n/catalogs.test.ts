@@ -42,6 +42,7 @@ const fullyLocalizedPrefixes = [
 const completedSettingsEnglishFallbackAllowlist = new Set<string>([
   "settings.account.instagram",
   "settings.playback.crossfade",
+  "settings.playback.smartMix",
   "settings.sleep.modes.15min",
   "settings.sleep.modes.30min",
   "settings.sleep.modes.45min",
