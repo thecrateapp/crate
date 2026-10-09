@@ -571,20 +571,32 @@ bool MetadataCacheStore::initialize()
     if (!execute("PRAGMA busy_timeout = 5000")) {
         return false;
     }
-
-    Statement statement;
-    if (sqlite3_prepare_v2(
-            database_,
-            "PRAGMA user_version",
-            -1,
-            &statement.value,
-            nullptr
-        ) != SQLITE_OK ||
-        sqlite3_step(statement.value) != SQLITE_ROW) {
-        return set_error(sqlite3_errmsg(database_));
+    if (!execute("BEGIN IMMEDIATE")) {
+        return false;
     }
-    const auto schema_version = sqlite3_column_int64(statement.value, 0);
-    return migrate(schema_version);
+
+    bool migrated = false;
+    {
+        Statement statement;
+        if (sqlite3_prepare_v2(
+                database_,
+                "PRAGMA user_version",
+                -1,
+                &statement.value,
+                nullptr
+            ) != SQLITE_OK ||
+            sqlite3_step(statement.value) != SQLITE_ROW) {
+            set_error(sqlite3_errmsg(database_));
+        } else {
+            migrated = migrate(sqlite3_column_int64(statement.value, 0));
+        }
+    }
+    if (migrated && execute("COMMIT")) {
+        return true;
+    }
+    const auto migration_error = error_;
+    execute("ROLLBACK");
+    return set_error(migration_error);
 }
 
 bool MetadataCacheStore::migrate(std::int64_t schema_version)
