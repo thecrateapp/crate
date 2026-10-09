@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+import pytest
 from unittest.mock import patch
+
+
+@pytest.fixture(autouse=True)
+def _vdj_enabled(monkeypatch):
+    monkeypatch.setenv("CRATE_VDJ_ENABLED", "true")
 
 
 async def _catalog_only_user(_middleware, _request):

@@ -1,6 +1,12 @@
 """Contracts for rich user play-event tracking."""
 
+import pytest
 from unittest.mock import patch
+
+
+@pytest.fixture(autouse=True)
+def _vdj_enabled(monkeypatch):
+    monkeypatch.setenv("CRATE_VDJ_ENABLED", "true")
 
 
 class TestPlayEventContract:

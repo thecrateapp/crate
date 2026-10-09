@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SmartMixCapabilities(BaseModel):
@@ -20,6 +20,14 @@ class VDJCapabilities(BaseModel):
     automation: bool
 
 
+class AccessTokenCapabilities(BaseModel):
+    scopes: list[str]
+    automation: bool
+
+
 class CapabilitiesResponse(BaseModel):
     smart_mix: SmartMixCapabilities
     vdj: VDJCapabilities
+    access_token: AccessTokenCapabilities | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )

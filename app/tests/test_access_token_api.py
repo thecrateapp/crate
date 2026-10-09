@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import pytest
 from datetime import datetime, timezone
 from unittest.mock import patch
+
+
+@pytest.fixture(autouse=True)
+def _vdj_enabled(monkeypatch):
+    monkeypatch.setenv("CRATE_VDJ_ENABLED", "true")
 
 
 def test_create_access_token_returns_secret_once(test_app):

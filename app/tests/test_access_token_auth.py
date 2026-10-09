@@ -203,3 +203,104 @@ def test_middleware_drops_access_token_user_outside_the_allowlist(method, path):
         asyncio.run(middleware(scope, None, None))
 
     assert seen["user"] is None
+
+
+@pytest.mark.parametrize("path", ["/api/auth/me", "/api/capabilities"])
+def test_access_token_reaches_identity_and_capability_routes(path):
+    assert _resolve_with_access_token("GET", path) is not None
+
+
+def _access_token_user() -> dict:
+    return {
+        "id": 42,
+        "email": "dj@example.com",
+        "role": "admin",
+        "username": "dj",
+        "name": "DJ",
+        "session_id": None,
+        "auth_type": "access_token",
+        "access_token_id": 11,
+        "scopes": ["vdj.catalog.read", "vdj.automation.execute"],
+    }
+
+
+def test_auth_me_returns_minimal_identity_for_access_tokens():
+    from crate.api import auth
+
+    request = _request_with_path("/api/auth/me")
+    request.state.user = _access_token_user()
+    with (
+        patch.object(
+            auth,
+            "get_user_by_id",
+            return_value={
+                "id": 42,
+                "email": "dj@example.com",
+                "name": "DJ",
+                "avatar": None,
+                "role": "admin",
+                "username": "dj",
+                "bio": "private bio",
+            },
+        ),
+        patch.object(auth, "list_user_external_identities") as identities,
+    ):
+        payload = auth.auth_me(request)
+
+    assert payload["id"] == 42
+    assert payload["auth_type"] == "access_token"
+    assert payload["scopes"] == ["vdj.catalog.read", "vdj.automation.execute"]
+    assert payload["capabilities"] == []
+    assert "session_id" not in payload
+    assert "bio" not in payload
+    assert "connected_accounts" not in payload
+    identities.assert_not_called()
+
+
+def test_auth_me_keeps_the_session_response_for_sessions():
+    from crate.api import auth
+
+    request = _request_with_path("/api/auth/me")
+    request.state.user = {"id": 42, "email": "dj@example.com", "session_id": "s-1"}
+    with (
+        patch.object(
+            auth,
+            "get_user_by_id",
+            return_value={
+                "id": 42,
+                "email": "dj@example.com",
+                "name": "DJ",
+                "avatar": None,
+                "role": "user",
+                "username": "dj",
+            },
+        ),
+        patch.object(auth, "list_user_external_identities", return_value=[]),
+    ):
+        payload = auth.auth_me(request)
+
+    assert payload["session_id"] == "s-1"
+    assert "auth_type" not in payload
+    assert "scopes" not in payload
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("POST", "/api/auth/tokens"),
+        ("DELETE", "/api/auth/tokens/1"),
+        ("POST", "/api/auth/tokens/1/rotate"),
+        ("PUT", "/api/me/profile"),
+        ("PATCH", "/api/auth/me"),
+        ("DELETE", "/api/auth/sessions/s-1"),
+    ],
+)
+def test_access_tokens_never_reach_token_profile_or_session_mutations(method, path):
+    assert _resolve_with_access_token(method, path) is None
+
+
+def test_automation_execute_scope_can_be_issued_without_legacy_equivalence():
+    from crate.db.repositories.access_tokens import _normalize_scopes
+
+    assert _normalize_scopes(["vdj.automation.execute"]) == ["vdj.automation.execute"]
+    assert _normalize_scopes(["vdj.automation"]) == ["vdj.automation"]

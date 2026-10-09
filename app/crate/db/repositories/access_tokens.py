@@ -23,6 +23,7 @@ SUPPORTED_ACCESS_TOKEN_SCOPES = frozenset(
         "vdj.smart_mix.read",
         "vdj.play_events.write",
         "vdj.automation",
+        "vdj.automation.execute",
     }
 )
 

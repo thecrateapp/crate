@@ -161,6 +161,7 @@ from crate.user_avatars import (
     fetch_avatar,
     is_proxyable_avatar_url,
 )
+from crate.config import vdj_enabled
 
 log = logging.getLogger(__name__)
 
@@ -185,6 +186,8 @@ _VDJ_ACCESS_TOKEN_ROUTES: tuple[tuple[frozenset[str], re.Pattern[str]], ...] = t
     (frozenset(methods), re.compile(pattern))
     for methods, pattern in (
         ({"GET"}, r"/api/search"),
+        ({"GET"}, r"/api/auth/me"),
+        ({"GET"}, r"/api/capabilities"),
         ({"GET"}, r"/api/vdj/catalog/folders"),
         ({"GET"}, r"/api/vdj/catalog/folders/[^/]+"),
         ({"POST"}, r"/api/auth/media-access"),
@@ -1709,6 +1712,11 @@ def _require_vdj_scope(request: Request, scope: str) -> dict:
     user = _require_auth(request)
     if user.get("auth_type") != "access_token":
         return user
+    if not vdj_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="VirtualDJ integration is disabled on this server",
+        )
     if scope not in set(user.get("scopes") or []):
         raise HTTPException(
             status_code=403,
@@ -1930,6 +1938,13 @@ def auth_me(request: Request):
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     db_user = get_user_by_id(user["id"]) if user.get("id") else None
+    if db_user and user.get("auth_type") == "access_token":
+        payload = _user_public(db_user)
+        payload["username"] = db_user.get("username")
+        payload["auth_type"] = "access_token"
+        payload["scopes"] = list(user.get("scopes") or [])
+        payload["capabilities"] = []
+        return payload
     if db_user:
         payload = _user_public(db_user)
         payload["username"] = db_user.get("username")
