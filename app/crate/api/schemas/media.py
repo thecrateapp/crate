@@ -302,6 +302,7 @@ class PlaybackResolutionResponse(BaseModel):
     variant_status: str | None = None
     playback_session: str
     content_origin: Literal["local", "remote", "imported"]
+    entity_uid: str | None = None
 
 
 class PlaybackPrepareTrackRequest(BaseModel):

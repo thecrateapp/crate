@@ -1166,6 +1166,10 @@ def api_stream_by_entity_uid(
     responses=_STREAM_RESPONSES,
     summary="Stream a VirtualDJ track by entity UID",
 )
+@router.head(
+    "/api/vdj/tracks/by-entity/{entity_uid}/stream",
+    include_in_schema=False,
+)
 def api_vdj_stream_by_entity_uid(
     request: Request, entity_uid: str, delivery: str = Query("original")
 ):
@@ -1189,7 +1193,9 @@ def api_vdj_playback_by_entity_uid(
     track = get_track_delivery_row_by_entity_uid(entity_uid)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
-    return _playback_payload_for_track(track, delivery, user_id=user["id"])
+    payload = _playback_payload_for_track(track, delivery, user_id=user["id"])
+    payload["entity_uid"] = str(track["entity_uid"])
+    return payload
 
 
 @router.get(

@@ -17,6 +17,7 @@ from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 MediaAudience = Literal["artwork", "stream", "sse", "ws"]
 
 MEDIA_ACCESS_TTL_SECONDS = 60
+ACCESS_TOKEN_MEDIA_TTL_SECONDS = 15 * 60
 _KEY_PREFIX = "media-access:v1:"
 _VALID_AUDIENCES = frozenset({"artwork", "stream", "sse", "ws"})
 _memory_lock = threading.Lock()
@@ -59,11 +60,11 @@ def _ticket_key(ticket: str) -> str:
     return f"{_KEY_PREFIX}{digest}"
 
 
-def _store(key: str, payload: str) -> None:
+def _store(key: str, payload: str, ttl_seconds: int) -> None:
     try:
         redis_client = _redis_client()
         if redis_client is not None:
-            redis_client.set(key, payload, ex=MEDIA_ACCESS_TTL_SECONDS)
+            redis_client.set(key, payload, ex=ttl_seconds)
             return
     except Exception as exc:
         raise MediaAccessUnavailable(
@@ -73,7 +74,7 @@ def _store(key: str, payload: str) -> None:
         raise MediaAccessUnavailable("Media access ticket storage is unavailable")
     with _memory_lock:
         _memory_tickets[key] = (
-            time.monotonic() + MEDIA_ACCESS_TTL_SECONDS,
+            time.monotonic() + ttl_seconds,
             payload,
         )
 
@@ -182,13 +183,17 @@ def issue_media_access_ticket(
     if access_token_id is not None:
         payload_data["access_token_id"] = access_token_id
     payload = json.dumps(payload_data, separators=(",", ":"))
-    _store(_ticket_key(ticket), payload)
+    ttl_seconds = (
+        ACCESS_TOKEN_MEDIA_TTL_SECONDS
+        if access_token_id is not None
+        else MEDIA_ACCESS_TTL_SECONDS
+    )
+    _store(_ticket_key(ticket), payload, ttl_seconds)
     return IssuedMediaAccessTicket(
         ticket=ticket,
         audience=audience,
         path=normalized_path,
-        expires_at=datetime.now(timezone.utc)
-        + timedelta(seconds=MEDIA_ACCESS_TTL_SECONDS),
+        expires_at=datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds),
     )
 
 
