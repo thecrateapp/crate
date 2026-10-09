@@ -1,5 +1,7 @@
 #include "crate_vdj/media_access_client.hpp"
 
+#include "crate_vdj/json_mapping.hpp"
+
 #include <cctype>
 #include <string>
 #include <utility>
@@ -14,88 +16,6 @@ ParseResult<std::string> failure(ModelErrorCode code, std::string message)
         .error_code = code,
         .error = std::move(message),
     };
-}
-
-std::optional<std::string> string_field(
-    std::string_view json,
-    std::string_view name
-)
-{
-    const std::string marker = "\"" + std::string(name) + "\"";
-    std::size_t position = json.find(marker);
-    while (position != std::string_view::npos) {
-        position += marker.size();
-        while (position < json.size() &&
-               std::isspace(static_cast<unsigned char>(json[position]))) {
-            ++position;
-        }
-        if (position >= json.size() || json[position++] != ':') {
-            position = json.find(marker, position);
-            continue;
-        }
-        while (position < json.size() &&
-               std::isspace(static_cast<unsigned char>(json[position]))) {
-            ++position;
-        }
-        if (position >= json.size() || json[position++] != '"') {
-            return std::nullopt;
-        }
-
-        std::string value;
-        while (position < json.size()) {
-            const char character = json[position++];
-            if (character == '"') {
-                return value;
-            }
-            if (character != '\\' || position >= json.size()) {
-                if (character == '\\') {
-                    return std::nullopt;
-                }
-                value.push_back(character);
-                continue;
-            }
-            const char escaped = json[position++];
-            switch (escaped) {
-            case '"':
-            case '\\':
-            case '/':
-                value.push_back(escaped);
-                break;
-            case 'b':
-                value.push_back('\b');
-                break;
-            case 'f':
-                value.push_back('\f');
-                break;
-            case 'n':
-                value.push_back('\n');
-                break;
-            case 'r':
-                value.push_back('\r');
-                break;
-            case 't':
-                value.push_back('\t');
-                break;
-            default:
-                return std::nullopt;
-            }
-        }
-        return std::nullopt;
-    }
-    return std::nullopt;
-}
-
-std::string json_escape(std::string_view value)
-{
-    std::string escaped;
-    escaped.reserve(value.size());
-    for (const char character : value) {
-        if (character == '\\' || character == '"') {
-            escaped.push_back('\\');
-        }
-        escaped.push_back(character);
-    }
-    return escaped;
 }
 
 bool is_stream_path(std::string_view path)
@@ -160,8 +80,12 @@ ParseResult<std::string> MediaAccessClient::issue_stream_url(
             {"Authorization", "Bearer " + std::string(bearer_token)},
             {"Content-Type", "application/json"},
         },
-        .body = "{\"targets\":[{\"audience\":\"stream\",\"path\":\"" +
-            json_escape(path) + "\"}]}",
+        .body = json::Value{
+            {"targets", json::Value::array({{
+                {"audience", "stream"},
+                {"path", std::string(path)},
+            }})},
+        }.dump(),
         .cancellation = cancellation,
     };
 
@@ -170,11 +94,24 @@ ParseResult<std::string> MediaAccessClient::issue_stream_url(
         return failure(ModelErrorCode::TransportError, error->message);
     }
 
-    const auto& http_response = std::get<HttpResponse>(response);
-    const auto ticket = string_field(http_response.body, "ticket");
-    const auto returned_path = string_field(http_response.body, "path");
-    if (!ticket.has_value() || ticket->empty() ||
-        !returned_path.has_value() || *returned_path != path) {
+    const auto parsed = json::parse_object(std::get<HttpResponse>(response).body);
+    const auto* tickets = parsed.ok() ? json::member(*parsed.value, "tickets") : nullptr;
+    std::optional<std::string> ticket;
+    if (tickets != nullptr && tickets->is_array()) {
+        for (const auto& item : *tickets) {
+            std::string audience;
+            std::string returned_path;
+            std::string value;
+            if (json::required_string(item, "audience", audience) &&
+                json::required_string(item, "path", returned_path) &&
+                json::required_string(item, "ticket", value) &&
+                audience == "stream" && returned_path == path) {
+                ticket = std::move(value);
+                break;
+            }
+        }
+    }
+    if (!ticket.has_value()) {
         return failure(
             ModelErrorCode::InvalidResponse,
             "media access response did not contain the requested stream ticket"

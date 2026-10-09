@@ -2,6 +2,16 @@ cmake_minimum_required(VERSION 3.24)
 
 project(CrateVirtualDJPlugin LANGUAGES CXX)
 
+include(FetchContent)
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+set(JSON_Install OFF CACHE INTERNAL "")
+FetchContent_Declare(
+    nlohmann_json
+    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+    URL_HASH SHA256=d6c65aca6b1ed68e7a182f4757257b107ae403032760ed6ef121c9d55e81757d
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 find_package(CURL REQUIRED)
 find_package(SQLite3 REQUIRED)
 if(NOT TARGET SQLite3::SQLite3)
@@ -35,6 +45,7 @@ add_library(crate_vdj_core STATIC
     src/core/contract_negotiator.cpp
     src/core/credential_store.cpp
     src/core/http_client.cpp
+    src/core/json_mapping.cpp
     src/core/catalog_results.cpp
     src/core/models.cpp
     src/core/search_results.cpp
@@ -62,7 +73,11 @@ elseif(WIN32)
 endif()
 target_compile_features(crate_vdj_core PUBLIC cxx_std_20)
 target_include_directories(crate_vdj_core PUBLIC include)
-target_link_libraries(crate_vdj_core PUBLIC CURL::libcurl SQLite3::SQLite3)
+target_link_libraries(crate_vdj_core PUBLIC
+    CURL::libcurl
+    SQLite3::SQLite3
+    nlohmann_json::nlohmann_json
+)
 target_compile_options(crate_vdj_core PRIVATE
     $<$<CXX_COMPILER_ID:AppleClang,Clang,GNU>:-Wall -Wextra -Wpedantic>
     $<$<CXX_COMPILER_ID:MSVC>:/W4>
@@ -214,6 +229,12 @@ if(CRATE_VDJ_BUILD_TESTS)
     )
     target_link_libraries(crate_vdj_http_client_test PRIVATE crate_vdj_core)
     add_test(NAME crate_vdj_http_client_test COMMAND crate_vdj_http_client_test)
+
+    add_executable(crate_vdj_json_mapping_test
+        tests/client/json_mapping_test.cpp
+    )
+    target_link_libraries(crate_vdj_json_mapping_test PRIVATE crate_vdj_core)
+    add_test(NAME crate_vdj_json_mapping_test COMMAND crate_vdj_json_mapping_test)
 
     add_executable(crate_vdj_contract_negotiator_test
         tests/client/contract_negotiator_test.cpp

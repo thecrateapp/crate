@@ -1,5 +1,7 @@
 #include "crate_vdj/stream_resolver.hpp"
 
+#include "crate_vdj/json_mapping.hpp"
+
 #include <cctype>
 #include <string>
 #include <utility>
@@ -34,6 +36,28 @@ std::string encode_path_segment(std::string_view value)
         encoded.push_back(hex[character & 0x0F]);
     }
     return encoded;
+}
+
+bool is_playable_local_track(const HttpResponse& response, std::string_view entity_uid)
+{
+    if (response.status_code != 200) {
+        return false;
+    }
+    const auto parsed = json::parse_object(response.body);
+    if (!parsed.ok()) {
+        return false;
+    }
+    const auto& root = *parsed.value;
+    std::string returned_uid;
+    std::string origin;
+    std::string format;
+    bool preparing = true;
+    const auto* delivery = json::member(root, "delivery");
+    return json::required_string(root, "entity_uid", returned_uid) &&
+        returned_uid == entity_uid &&
+        json::required_string(root, "content_origin", origin) && origin == "local" &&
+        json::required_boolean(root, "preparing", preparing) && !preparing &&
+        delivery != nullptr && json::required_string(*delivery, "format", format);
 }
 
 } // namespace
@@ -87,11 +111,10 @@ ParseResult<std::string> StreamResolver::resolve(
         return failure(ModelErrorCode::TransportError, error->message);
     }
 
-    const auto& playback = std::get<HttpResponse>(playback_response);
-    if (playback.body.empty()) {
+    if (!is_playable_local_track(std::get<HttpResponse>(playback_response), entity_uid)) {
         return failure(
             ModelErrorCode::InvalidResponse,
-            "playback response was empty"
+            "playback response is not a ready local track"
         );
     }
 

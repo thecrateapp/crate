@@ -17,6 +17,10 @@ Do not copy SDK headers or sample sources into Git.
 - C++20 compiler
 - VirtualDJ SDK v8 for the real plugin target
 - VIRTUALDJ_SDK_ROOT pointing to the private SDK directory
+- libcurl and SQLite 3 from the system
+- [nlohmann/json](https://github.com/nlohmann/json) 3.11.3, MIT license, fetched by CMake
+  from the pinned release archive (SHA-256 checked); it is the only JSON parser in the
+  plugin and every response goes through the bounded reader in `json_mapping`
 
 The SDK must contain at least:
 

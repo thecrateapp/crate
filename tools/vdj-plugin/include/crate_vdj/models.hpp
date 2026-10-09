@@ -34,6 +34,7 @@ struct Capabilities {
     std::string contract_version;
     int profile_schema_version = 0;
     std::string planner_version;
+    bool available = true;
     bool online_source = false;
     bool smart_mix_assistant = false;
     bool automation = false;
