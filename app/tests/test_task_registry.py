@@ -28,15 +28,11 @@ def test_every_type_uses_a_known_category():
 
 
 def test_actions_point_at_existing_routes_task_types_and_capabilities(test_app):
-    routes = {
-        (route.path, method)
-        for route in test_app.app.routes
-        for method in getattr(route, "methods", set()) or set()
-    }
+    paths = test_app.get("/openapi.json").json()["paths"]
     ids = [action.id for action in TASK_ACTIONS]
     assert len(ids) == len(set(ids))
     for action in TASK_ACTIONS:
-        assert (action.path, "POST") in routes, action.path
+        assert "post" in paths.get(action.path, {}), action.path
         assert action.task_type in TASK_TYPES, action.task_type
         assert action.capability in ALL_CAPABILITIES, action.capability
 
