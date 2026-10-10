@@ -377,6 +377,12 @@ def test_cast_spectrum_worker_completes_only_its_fenced_claim(tmp_path, monkeypa
         "complete_cast_spectrum_generation",
         lambda *_args, **kwargs: completed.append(kwargs) or True,
     )
+    progress: list[dict] = []
+    monkeypatch.setattr(
+        handler,
+        "emit_progress",
+        lambda task_id, value, force=False: progress.append(value.to_dict()),
+    )
 
     result = handler._handle_generate_cast_spectrum(
         "task-1",
@@ -386,6 +392,12 @@ def test_cast_spectrum_worker_completes_only_its_fenced_claim(tmp_path, monkeypa
 
     assert result["status"] == "ready"
     assert result["frame_count"] == 2
+    assert [(p["phase"], p["done"], p["total"]) for p in progress] == [
+        ("resolve_source", 0, 3),
+        ("generate", 1, 3),
+        ("store", 2, 3),
+        ("store", 3, 3),
+    ]
     assert completed[0]["artifact_etag"] == "etag"
     assert completed[0]["artifact_path"].startswith("cast-spectrum/aa/")
 

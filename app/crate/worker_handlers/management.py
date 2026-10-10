@@ -2205,6 +2205,8 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
 
     set_generation_status(playlist_id, "running")
     log_id = log_generation_start(playlist_id, rules, triggered_by)
+    progress = TaskProgress(phase="evaluate_rules", phase_count=2, total=2, item=name)
+    emit_progress(task_id, progress, force=True)
 
     try:
         tracks = execute_smart_rules(rules)
@@ -2224,6 +2226,10 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
             for t in tracks
         ]
         target_count = int(rules.get("limit") or len(track_dicts) or 50)
+        progress.phase = "write_tracks"
+        progress.phase_index = 1
+        progress.done = 1
+        emit_progress(task_id, progress, force=True)
         track_count = regenerate_playlist_tracks(
             playlist_id,
             track_dicts,
@@ -2234,6 +2240,8 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
 
         set_generation_status(playlist_id, "idle")
         log_generation_complete(log_id, track_count, total_duration)
+        progress.done = 2
+        emit_progress(task_id, progress, force=True)
         emit_task_event(
             task_id,
             "info",
@@ -2278,7 +2286,12 @@ def _handle_refresh_system_smart_playlists(
     )
 
     enqueued = 0
+    progress = TaskProgress(phase="enqueue_playlists", total=len(playlists))
+    emit_progress(task_id, progress, force=True)
     for pl in playlists:
+        progress.done += 1
+        progress.item = str(pl.get("name") or pl["id"])
+        emit_progress(task_id, progress)
         create_task(
             "generate_system_playlist",
             {

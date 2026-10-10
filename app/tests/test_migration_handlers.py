@@ -70,6 +70,11 @@ def test_fix_artist_consolidates_legacy_artist_dir_and_resyncs(monkeypatch, tmp_
     monkeypatch.setattr(
         "crate.worker_handlers.migration.is_cancelled", lambda task_id: False
     )
+    progress: list[dict] = []
+    monkeypatch.setattr(
+        "crate.worker_handlers.migration.emit_progress",
+        lambda task_id, value, force=False: progress.append(value.to_dict()),
+    )
 
     result = _handle_fix_artist(
         "task-fix-artist-1",
@@ -86,6 +91,11 @@ def test_fix_artist_consolidates_legacy_artist_dir_and_resyncs(monkeypatch, tmp_
     assert not legacy_artist_dir.exists()
     assert sync_calls == [("Terror", [target_artist_dir])]
     assert update_calls == [("Terror", artist_uid), ("Terror", artist_uid)]
+    assert [p["phase"] for p in progress][0] == "preview"
+    assert progress[-1]["phase"] == "sync"
+    assert progress[-1]["phase_index"] == 2 and progress[-1]["phase_count"] == 3
+    consolidate = [p for p in progress if p["phase"] == "consolidate"]
+    assert consolidate[-1]["done"] == consolidate[-1]["total"] == 1
 
 
 def test_fix_artist_discovers_tag_matched_legacy_dir_when_folder_name_already_points_to_empty_target(
