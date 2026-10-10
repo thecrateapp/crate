@@ -546,6 +546,30 @@ const statsDashboard = {
   ],
 };
 
+function userPlaylist(id: number, overrides: Record<string, unknown>) {
+  return {
+    id,
+    name: `Shared mix ${id}`,
+    description: "Picked by Jane.",
+    cover_data_url: null,
+    user_id: 9,
+    owner_username: "jane",
+    owner_name: "Jane",
+    visibility: "public",
+    is_collaborative: true,
+    is_smart: false,
+    track_count: 0,
+    total_duration: 0,
+    created_at: "2026-09-01T12:00:00Z",
+    updated_at: "2026-09-01T12:00:00Z",
+    artwork_tracks: [],
+    tracks: [],
+    is_followed: false,
+    follower_count: 3,
+    ...overrides,
+  };
+}
+
 function responseFor(pathname: string): unknown {
   if (pathname === "/api/auth/me" || pathname === "/api/me") {
     return {
@@ -572,7 +596,33 @@ function responseFor(pathname: string): unknown {
     return { day: "2026-09-12", timezone: "UTC", minutes: 38, plays: 9 };
   }
   if (pathname === "/api/me/playlists-page") {
-    return { playlists: [], followed_curated_playlists: [] };
+    return {
+      playlists: [
+        userPlaylist(43, { name: "Van rides", access: "collaborator" }),
+      ],
+      followed_playlists: [
+        userPlaylist(42, { name: "Late shift", is_followed: true }),
+      ],
+      followed_curated_playlists: [],
+    };
+  }
+  if (pathname === "/api/playlists/42") {
+    return userPlaylist(42, {
+      name: "Late shift",
+      access: "public",
+      can_edit: false,
+    });
+  }
+  if (pathname === "/api/playlists/42/follow") {
+    return { ok: true, is_followed: true, follower_count: 4 };
+  }
+  if (pathname === "/api/playlists/43") {
+    return userPlaylist(43, {
+      name: "Van rides",
+      access: "collaborator",
+      can_edit: true,
+      members: [],
+    });
   }
   if (pathname === "/api/catalog/me/albums") return [];
   if (pathname === "/api/artists/7/top-tracks") return artistPage.top_tracks;
