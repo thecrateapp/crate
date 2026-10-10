@@ -51,6 +51,8 @@ from crate.db.repositories.playlists import (
     reorder_playlist,
     update_playlist,
 )
+from crate.db.repositories.playlists_collection_reads import get_playlist_follow_state
+from crate.db.repositories.playlists_membership_reads import get_playlist_access
 from crate.playlist_covers import delete_playlist_cover, playlist_cover_abspath
 
 router = APIRouter(prefix="/api/playlists", tags=["playlists"])
@@ -151,11 +153,16 @@ def get_one(request: Request, playlist_id: int):
     pl = get_playlist(playlist_id)
     if not pl:
         raise HTTPException(status_code=404, detail="Playlist not found")
-    if user.get("role") != "admin" and not can_view_playlist(pl, user["id"]):
+    access = get_playlist_access(pl, user["id"])
+    if access == "none" and user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Playlist is private")
-    tracks = get_playlist_tracks(playlist_id)
-    pl["tracks"] = tracks
-    pl["members"] = get_playlist_members(playlist_id)
+    pl["tracks"] = get_playlist_tracks(playlist_id)
+    pl["access"] = access
+    pl["can_edit"] = access in {"owner", "collaborator"}
+    pl.update(get_playlist_follow_state(playlist_id, user["id"]))
+    pl["members"] = (
+        get_playlist_members(playlist_id) if access in {"owner", "collaborator"} else []
+    )
     return pl
 
 

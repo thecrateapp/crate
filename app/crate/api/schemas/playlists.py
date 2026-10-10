@@ -153,6 +153,10 @@ class PlaylistSummaryResponse(BaseModel):
 class PlaylistDetailResponse(PlaylistSummaryResponse):
     tracks: list[PlaylistTrackResponse] = Field(default_factory=list)
     members: list[PlaylistMemberResponse] = Field(default_factory=list)
+    access: str = "public"
+    can_edit: bool = False
+    is_followed: bool = False
+    follower_count: int = 0
 
 
 class PlaylistFilterOptionsResponse(BaseModel):
