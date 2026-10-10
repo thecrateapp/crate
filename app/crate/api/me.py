@@ -160,7 +160,8 @@ from crate.db.repositories.library_contributions import (
 )
 from crate.db.repositories.global_user_library import get_user_global_library_counts
 from crate.db.repositories.user_listening_today import get_listening_today
-from crate.db.repositories.playlists import get_followed_system_playlists, get_playlists
+from crate.db.repositories.playlists import get_followed_system_playlists
+from crate.db.repositories.playlists_library_reads import get_library_playlists_page
 from crate.db.repositories.recommendations import (
     record_recommendation_exposure,
     record_recommendation_feedback,
@@ -609,10 +610,7 @@ def my_followed_playlists(request: Request):
 )
 def my_playlists_page(request: Request):
     user = _require_auth(request)
-    return {
-        "playlists": get_playlists(user_id=user["id"]),
-        "followed_curated_playlists": my_followed_playlists(request),
-    }
+    return get_library_playlists_page(int(user["id"]))
 
 
 # ── Contributions ────────────────────────────────────────────

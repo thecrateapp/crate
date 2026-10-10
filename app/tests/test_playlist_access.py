@@ -191,3 +191,39 @@ def test_public_viewers_follow_and_copy_but_invites_are_gone(
         == 410
     )
     assert test_app.post("/api/playlists/invites/abc/accept").status_code == 410
+
+
+@pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+def test_library_page_separates_owned_shared_and_followed_playlists(pg_db):
+    from crate.db.repositories.playlists_collaboration import add_playlist_collaborator
+    from crate.db.repositories.playlists_create import create_playlist
+    from crate.db.repositories.playlists_follows import follow_playlist
+    from crate.db.repositories.playlists_library_reads import get_library_playlists_page
+    from crate.db.tx import transaction_scope
+
+    with transaction_scope() as session:
+        me = _user(session, "lib-me")
+        friend = _user(session, "lib-friend")
+    mine = create_playlist(name="Mine", user_id=me)
+    shared = create_playlist(name="Shared", user_id=friend)
+    followed = create_playlist(name="Followed", user_id=friend, visibility="public")
+    hidden = create_playlist(name="Hidden", user_id=friend, visibility="public")
+    with transaction_scope() as session:
+        add_playlist_collaborator(shared, me, added_by=friend, session=session)
+    follow_playlist(me, followed)
+    follow_playlist(me, hidden)
+    with transaction_scope() as session:
+        session.execute(
+            text("UPDATE playlists SET visibility = 'private' WHERE id = :id"),
+            {"id": hidden},
+        )
+
+    page = get_library_playlists_page(me)
+
+    by_id = {p["id"]: p for p in page["playlists"]}
+    assert set(by_id) == {mine, shared}
+    assert by_id[mine]["owner_username"] == "lib-me"
+    assert by_id[shared]["owner_username"] == "lib-friend"
+    assert [p["id"] for p in page["followed_playlists"]] == [followed]
+    assert page["followed_playlists"][0]["owner_username"] == "lib-friend"
+    assert page["followed_curated_playlists"] == []

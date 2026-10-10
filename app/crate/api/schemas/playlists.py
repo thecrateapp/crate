@@ -141,6 +141,8 @@ class PlaylistSummaryResponse(BaseModel):
     cover_data_url: str | None = None
     cover_path: str | None = None
     user_id: int | None = None
+    owner_username: str | None = None
+    owner_name: str | None = None
     is_smart: bool | None = None
     smart_rules: dict[str, Any] | None = None
     scope: str | None = None
