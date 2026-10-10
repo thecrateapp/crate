@@ -29,6 +29,7 @@ import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
 import { useOpsSnapshot } from "@/contexts/OpsSnapshotContext";
+import { taskLabel, useTaskCatalog } from "@/lib/task-catalog";
 import { toast } from "sonner";
 import {
   Loader2,
@@ -38,6 +39,7 @@ import {
   XCircle,
   RefreshCw,
   Clock,
+  Play,
   Wifi,
   Info,
   X,
@@ -169,14 +171,6 @@ async function saveSettingsSection(
 }
 
 // ── Helpers ────────────────────────────────────────────────────
-
-const SCHEDULE_LABELS: Record<string, string> = {
-  library_sync: "Library Sync",
-  compute_analytics: "Compute Analytics",
-  enrich_artists: "Artist Enrichment",
-  fetch_artwork_all: "Fetch Artwork",
-  scan: "Library Scan",
-};
 
 const ENRICHMENT_LABELS: Record<string, string> = {
   lastfm: "Last.fm",
@@ -1185,6 +1179,28 @@ function SchedulesSection({
     return m;
   });
   const [saving, setSaving] = useState(false);
+  const [runningType, setRunningType] = useState<string | null>(null);
+  useTaskCatalog();
+
+  async function runNow(taskType: string) {
+    const label = taskLabel(taskType);
+    setRunningType(taskType);
+    try {
+      const result = await api<{ status: string }>(
+        `/api/worker/schedules/${encodeURIComponent(taskType)}/run`,
+        "POST",
+      );
+      if (result.status === "already_queued") {
+        toast.info(`${label} is already queued`);
+      } else {
+        toast.success(`${label} queued`);
+      }
+    } catch {
+      toast.error(`${label} could not be started`);
+    } finally {
+      setRunningType(null);
+    }
+  }
 
   async function save() {
     setSaving(true);
@@ -1228,10 +1244,7 @@ function SchedulesSection({
           const mins = draft[key] ?? "0";
           const active = mins !== "0" && mins !== "";
           return (
-            <FieldRow
-              key={key}
-              label={SCHEDULE_LABELS[key] ?? key.replace(/_/g, " ")}
-            >
+            <FieldRow key={key} label={taskLabel(key)}>
               <Input
                 type="number"
                 min={0}
@@ -1248,6 +1261,20 @@ function SchedulesSection({
               >
                 {active ? "Active" : "Off"}
               </Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void runNow(key)}
+                disabled={runningType !== null}
+                aria-label={`Run ${taskLabel(key)} now`}
+              >
+                {runningType === key ? (
+                  <Loader2 size={12} className="mr-1.5 animate-spin" />
+                ) : (
+                  <Play size={12} className="mr-1.5" />
+                )}
+                Run now
+              </Button>
             </FieldRow>
           );
         })}

@@ -3,7 +3,7 @@ import time
 import json as _json
 from typing import AsyncIterator
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.responses import StreamingResponse
 
@@ -19,6 +19,8 @@ from crate.api.schemas.common import TaskEnqueueResponse
 from crate.api.schemas.tasks import (
     AdminTasksSnapshotResponse,
     CancelAllTasksResponse,
+    ScheduleRunResponse,
+    TaskCatalogResponse,
     TaskCancelResponse,
     TaskCleanupRequest,
     TaskCleanupResponse,
@@ -49,7 +51,14 @@ from crate.db.repositories.tasks import (
 )
 from crate.docker_ctl import restart_container
 from crate.media_worker_progress import cancel_media_worker_job
-from crate.scheduler import get_schedules, set_schedules
+from crate.scheduler import enqueue_scheduled_task, get_schedules, set_schedules
+from crate.task_registry import (
+    TASK_ACTIONS,
+    TASK_CATEGORIES,
+    TASK_TYPES,
+    task_category,
+    task_label,
+)
 from crate.api.redis_sse import close_pubsub, open_pubsub
 
 router = APIRouter(tags=["tasks"])
@@ -77,7 +86,7 @@ def _require_analysis_manager(request: Request) -> dict:
     return require_permission(request, "library.analysis.manage")
 
 
-TASKS_STREAM_REFRESH_SECONDS = 2.0
+TASKS_STREAM_REFRESH_SECONDS = 2
 
 
 async def _tasks_stream(limit: int) -> AsyncIterator[str]:
@@ -97,7 +106,9 @@ async def _tasks_stream(limit: int) -> AsyncIterator[str]:
             now = time.monotonic()
             if pending and now - last_sent >= TASKS_STREAM_REFRESH_SECONDS:
                 snapshot = await asyncio.to_thread(
-                    get_cached_tasks_surface, limit=limit, fresh=True
+                    get_cached_tasks_surface,
+                    limit=limit,
+                    max_age_seconds=TASKS_STREAM_REFRESH_SECONDS,
                 )
                 yield f"data: {json_dumps(snapshot)}\n\n"
                 pending = False
@@ -433,6 +444,7 @@ def api_get_schedules(request: Request):
         last_key = f"schedule:last_run:{task_type}"
         last_run = get_setting(last_key)
         result[task_type] = {
+            "label": task_label(task_type),
             "interval_seconds": interval,
             "interval_human": _format_interval(interval),
             "last_run": last_run,
@@ -456,6 +468,57 @@ def api_set_schedules(request: Request, body: WorkerSchedulesUpdateRequest):
             current[k] = int(v)
     set_schedules(current)
     return {"schedules": current}
+
+
+@router.post(
+    "/api/worker/schedules/{task_type}/run",
+    response_model=ScheduleRunResponse,
+    responses=merge_responses(
+        _TASK_RESPONSES, {404: error_response("Schedule not found")}
+    ),
+    summary="Run a scheduled task now",
+)
+def api_run_schedule_now(request: Request, task_type: str):
+    _require_task_operator(request)
+    if task_type not in get_schedules():
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    task_id = enqueue_scheduled_task(task_type)
+    return {
+        "task_type": task_type,
+        "task_id": task_id,
+        "status": "queued" if task_id else "already_queued",
+    }
+
+
+@router.get(
+    "/api/admin/task-catalog",
+    response_model=TaskCatalogResponse,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Get task type labels and manual task actions",
+)
+def api_task_catalog(request: Request):
+    _require_auth(request)
+    return {
+        "categories": TASK_CATEGORIES,
+        "types": [
+            {"type": name, "label": info.label, "category": info.category}
+            for name, info in TASK_TYPES.items()
+        ],
+        "actions": [
+            {
+                "id": action.id,
+                "label": action.label,
+                "task_type": action.task_type,
+                "task_label": task_label(action.task_type),
+                "category": task_category(action.task_type),
+                "path": action.path,
+                "capability": action.capability,
+                "icon": action.icon,
+                "body": action.body,
+            }
+            for action in TASK_ACTIONS
+        ],
+    }
 
 
 def _format_interval(seconds: int) -> str:

@@ -10,6 +10,7 @@ import {
 import { api } from "@/lib/api";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTaskCatalog } from "@/lib/task-catalog";
 import { toast } from "sonner";
 import {
   LayoutDashboard,
@@ -41,6 +42,7 @@ import {
   ShieldCheck,
   Trash2,
   HandHeart,
+  type LucideIcon,
 } from "lucide-react";
 
 interface SearchResults {
@@ -56,16 +58,22 @@ interface SearchResults {
   }[];
 }
 
-const COMMAND_SYNC_LIBRARY = ["library.import.manage"] as const;
-const COMMAND_REPAIR_RUN = ["library.repair.run"] as const;
-const COMMAND_METADATA_WRITE = ["library.metadata.write"] as const;
-const COMMAND_ANALYSIS_MANAGE = ["library.analysis.manage"] as const;
-const COMMAND_SYNC_SHOWS = ["curation.shows.write"] as const;
-const COMMAND_GENRE_CURATION = ["curation.genres.write"] as const;
-const COMMAND_RELEASE_CURATION = ["curation.releases.write"] as const;
 const COMMAND_FEDERATION_VIEW = ["federation.nodes.view"] as const;
-const COMMAND_FEDERATION_SYNC = ["federation.catalog.sync.manage"] as const;
-const COMMAND_GLOBAL_CATALOG_MANAGE = ["federation.policy.manage"] as const;
+
+const ACTION_ICONS: Record<string, LucideIcon> = {
+  archive: Archive,
+  brain: BrainCircuit,
+  calendar: Calendar,
+  chart: BarChart2,
+  "file-input": FileInput,
+  "file-json": FileJson,
+  radio: Radio,
+  refresh: RefreshCw,
+  sparkles: Sparkles,
+  stethoscope: Stethoscope,
+  tags: Tags,
+  trash: Trash2,
+};
 
 type ActionOutcome =
   | { kind: "queued" }
@@ -100,6 +108,7 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const { hasAnyCapability } = useAuth();
+  const taskCatalog = useTaskCatalog();
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResults | null>(
     null,
@@ -160,164 +169,16 @@ export function CommandPalette() {
     close();
   }
 
-  const commandActions = [
-    {
-      label: "Sync Library",
-      capabilities: COMMAND_SYNC_LIBRARY,
-      icon: RefreshCw,
-      run: () => api("/api/tasks/sync-library", "POST"),
-    },
-    {
-      label: "Sync Federated Catalogs",
-      toastLabel: "Federated catalog sync",
-      capabilities: COMMAND_FEDERATION_SYNC,
-      icon: RefreshCw,
-      run: () => api("/api/admin/federation/sync-catalog", "POST"),
-    },
-    {
-      label: "Reconcile Global Catalog",
-      toastLabel: "Global catalog reconciliation",
-      capabilities: COMMAND_GLOBAL_CATALOG_MANAGE,
-      icon: RefreshCw,
+  const commandActions = (taskCatalog?.actions ?? [])
+    .filter((item) => hasAnyCapability([item.capability]))
+    .map((item) => ({
+      id: item.id,
+      label: item.label,
+      taskLabel: item.task_label,
+      icon: ACTION_ICONS[item.icon] ?? Sparkles,
       run: () =>
-        api("/api/admin/global-catalog/reconcile", "POST", {
-          mode: "incremental",
-        }),
-    },
-    {
-      label: "Full Global Catalog Reconciliation",
-      toastLabel: "Full global catalog reconciliation",
-      capabilities: COMMAND_GLOBAL_CATALOG_MANAGE,
-      icon: RefreshCw,
-      run: () =>
-        api("/api/admin/global-catalog/reconcile", "POST", {
-          mode: "full",
-        }),
-    },
-    {
-      label: "Run Health Check",
-      toastLabel: "Health Check",
-      capabilities: COMMAND_REPAIR_RUN,
-      icon: Stethoscope,
-      run: () => api("/api/manage/health-check", "POST"),
-    },
-    {
-      label: "Remove Duplicate Tracks",
-      toastLabel: "Duplicate track cleanup",
-      capabilities: COMMAND_REPAIR_RUN,
-      icon: Trash2,
-      run: () => api("/api/manage/repair-duplicate-tracks", "POST"),
-    },
-    {
-      label: "Analyze All Tracks (BPM, Key, Energy)",
-      toastLabel: "Audio Analysis",
-      capabilities: COMMAND_ANALYSIS_MANAGE,
-      icon: BrainCircuit,
-      run: () => api("/api/manage/analyze-all", "POST"),
-    },
-    {
-      label: "Compute Bliss Vectors",
-      toastLabel: "Compute Bliss vectors",
-      capabilities: COMMAND_ANALYSIS_MANAGE,
-      icon: Radio,
-      run: () => api("/api/manage/compute-bliss", "POST"),
-    },
-    {
-      label: "Compute Popularity (Last.fm)",
-      toastLabel: "Compute Popularity",
-      capabilities: COMMAND_ANALYSIS_MANAGE,
-      icon: BarChart2,
-      run: () => api("/api/manage/compute-popularity", "POST"),
-    },
-    {
-      label: "Backfill Audio Fingerprints (Chromaprint)",
-      toastLabel: "Backfill audio fingerprints",
-      capabilities: COMMAND_ANALYSIS_MANAGE,
-      icon: BrainCircuit,
-      run: () => api("/api/tasks/backfill-track-fingerprints", "POST"),
-    },
-    {
-      label: "Enrich MusicBrainz IDs",
-      toastLabel: "Enrich MBIDs",
-      capabilities: COMMAND_METADATA_WRITE,
-      icon: Sparkles,
-      run: () => api("/api/manage/enrich-mbids", "POST"),
-    },
-    {
-      label: "Backfill Album Release Dates",
-      toastLabel: "Backfill album release dates",
-      capabilities: COMMAND_METADATA_WRITE,
-      icon: Calendar,
-      run: () =>
-        api("/api/manage/enrich-mbids", "POST", {
-          release_dates_only: true,
-        }),
-    },
-    {
-      label: "Sync Missing Lyrics",
-      toastLabel: "Sync Lyrics",
-      capabilities: COMMAND_METADATA_WRITE,
-      icon: FileJson,
-      run: () => api("/api/manage/sync-lyrics", "POST", { limit: 1000 }),
-    },
-    {
-      label: "Write Portable Metadata",
-      toastLabel: "Portable Metadata",
-      capabilities: COMMAND_METADATA_WRITE,
-      icon: Tags,
-      run: () =>
-        api("/api/manage/portable-metadata", "POST", {
-          write_audio_tags: true,
-          write_sidecars: true,
-        }),
-    },
-    {
-      label: "Rehydrate From Portable Metadata",
-      toastLabel: "Portable Metadata Rehydrate",
-      capabilities: COMMAND_METADATA_WRITE,
-      icon: FileInput,
-      run: () => api("/api/manage/portable-metadata/rehydrate", "POST"),
-    },
-    {
-      label: "Export Rich Metadata Index",
-      toastLabel: "Rich Metadata Export",
-      capabilities: COMMAND_METADATA_WRITE,
-      icon: Archive,
-      run: () =>
-        api("/api/manage/portable-metadata/export-rich", "POST", {
-          include_audio: false,
-          write_rich_tags: false,
-        }),
-    },
-    {
-      label: "Backfill Artist Similarities",
-      toastLabel: "Backfill Similarities",
-      capabilities: COMMAND_METADATA_WRITE,
-      icon: Sparkles,
-      run: () => api("/api/tasks/backfill-similarities", "POST"),
-    },
-    {
-      label: "Sync Shows (Ticketmaster)",
-      toastLabel: "Sync Shows",
-      capabilities: COMMAND_SYNC_SHOWS,
-      icon: Sparkles,
-      run: () => api("/api/tasks/sync-shows", "POST"),
-    },
-    {
-      label: "Clean Invalid Genre Taxonomy Nodes",
-      toastLabel: "Genre taxonomy cleanup",
-      capabilities: COMMAND_GENRE_CURATION,
-      icon: Sparkles,
-      run: () => api("/api/genres/taxonomy/cleanup-invalid", "POST"),
-    },
-    {
-      label: "Check New Releases (MusicBrainz)",
-      toastLabel: "Check New Releases",
-      capabilities: COMMAND_RELEASE_CURATION,
-      icon: Sparkles,
-      run: () => api("/api/acquisition/new-releases/check", "POST"),
-    },
-  ].filter((item) => hasAnyCapability(item.capabilities));
+        item.body ? api(item.path, "POST", item.body) : api(item.path, "POST"),
+    }));
 
   const navigationItems = [
     {
@@ -462,7 +323,7 @@ export function CommandPalette() {
       matchesCommandQuery(item.label, query),
   );
   const visibleActions = commandActions.filter((item) =>
-    matchesCommandQuery(item.label, query),
+    matchesCommandQuery(`${item.label} ${item.taskLabel}`, query),
   );
   const itemClassName =
     "flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent";
@@ -509,11 +370,9 @@ export function CommandPalette() {
                   const Icon = item.icon;
                   return (
                     <Command.Item
-                      key={item.label}
-                      value={`action:${item.label}`}
-                      onSelect={() =>
-                        action(item.run, item.toastLabel ?? item.label)
-                      }
+                      key={item.id}
+                      value={`action:${item.id}`}
+                      onSelect={() => action(item.run, item.label)}
                       className={itemClassName}
                     >
                       <Icon size={14} className="text-muted-foreground" />

@@ -1678,3 +1678,19 @@ def test_openapi_types_management_routes_and_marks_them_authenticated(test_app):
     assert sync_lyrics_operation["responses"]["200"]["content"]["application/json"][
         "schema"
     ]["$ref"].endswith("/TaskEnqueueResponse")
+
+
+def test_openapi_types_task_catalog_and_schedule_run(test_app):
+    data = test_app.get("/openapi.json").json()
+    auth = [{"cookieAuth": []}, {"bearerAuth": []}]
+    catalog = data["paths"]["/api/admin/task-catalog"]["get"]
+    run_now = data["paths"]["/api/worker/schedules/{task_type}/run"]["post"]
+
+    assert catalog["security"] == auth
+    assert catalog["responses"]["200"]["content"]["application/json"]["schema"][
+        "$ref"
+    ].endswith("/TaskCatalogResponse")
+    assert run_now["security"] == auth
+    assert run_now["responses"]["200"]["content"]["application/json"]["schema"][
+        "$ref"
+    ].endswith("/ScheduleRunResponse")
