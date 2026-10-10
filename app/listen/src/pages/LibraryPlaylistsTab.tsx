@@ -68,9 +68,7 @@ export function LibraryPlaylistsTab() {
   async function toggleSystemPlaylistFollow(playlist: CuratedPlaylist) {
     try {
       await api(`/api/curation/playlists/${playlist.id}/follow`, "DELETE");
-      notify.success(
-        t("playlist.toasts.removedNamedLibrary", { name: playlist.name }),
-      );
+      notify.success(t("playlist.toasts.unfollowed", { name: playlist.name }));
       refetch();
     } catch {
       notify.error(t("playlist.toasts.updateFailed"));
@@ -80,9 +78,7 @@ export function LibraryPlaylistsTab() {
   async function unfollowPlaylist(playlist: Playlist) {
     try {
       await api(`/api/playlists/${playlist.id}/follow`, "DELETE");
-      notify.success(
-        t("playlist.toasts.removedNamedLibrary", { name: playlist.name }),
-      );
+      notify.success(t("playlist.toasts.unfollowed", { name: playlist.name }));
       refetch();
     } catch {
       notify.error(t("playlist.toasts.updateFailed"));

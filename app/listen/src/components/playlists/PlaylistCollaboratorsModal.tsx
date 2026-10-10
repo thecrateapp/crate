@@ -92,8 +92,7 @@ export function PlaylistCollaboratorsModal({
                   <div className="truncate text-xs text-text-muted">
                     {member.username
                       ? `@${member.username}`
-                      : t("playlist.collaborators.profile")}{" "}
-                    · {member.role}
+                      : t("playlist.collaborators.profile")}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

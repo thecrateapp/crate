@@ -139,8 +139,8 @@ export function buildPlaylistMenuItems({
       action({
         key: "follow",
         label: follow.followed
-          ? t("actions.playlist.removeFromLibrary")
-          : t("actions.playlist.addToLibrary"),
+          ? t("actions.playlist.unfollow")
+          : t("actions.playlist.follow"),
         icon: follow.followed ? HeartBold : Heart,
         active: follow.followed,
         disabled: follow.disabled,

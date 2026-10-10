@@ -365,8 +365,8 @@ export function buildPlaylistActions({
       );
       notify.success(
         data.is_followed
-          ? t("playlist.toasts.removedLibrary")
-          : t("playlist.toasts.addedLibrary"),
+          ? t("playlist.toasts.unfollowed", { name: data.name })
+          : t("playlist.toasts.followed", { name: data.name }),
       );
       refetch();
     } catch {

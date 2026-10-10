@@ -154,7 +154,7 @@ export function buildPlaylistPageActions({
       key: "follow",
       label: follow.followed ? t("common.following") : t("common.follow"),
       ariaLabel: follow.followed
-        ? t("playlist.actions.removeFromLibrary")
+        ? t("actions.playlist.unfollow")
         : t("common.follow"),
       icon: follow.pending ? Loader2 : follow.followed ? HeartBold : Heart,
       iconClassName: follow.pending ? "animate-spin" : undefined,
