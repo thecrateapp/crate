@@ -1,0 +1,125 @@
+{
+  "schedules": {
+    "enrich_artists": 86400,
+    "library_pipeline": 86400,
+    "compute_analytics": 14400,
+    "check_new_releases": 43200,
+    "repair_duplicate_tracks": 43200,
+    "cleanup_incomplete_downloads": 172800,
+    "cleanup_artwork_variants": 172800,
+    "cleanup_stream_variants": 3600,
+    "sync_shows": 86400,
+    "federation_health_poll": 60,
+    "federation_sync_catalog": 120,
+    "federation_directory_refresh": 300,
+    "global_catalog_reconcile_incremental": 300,
+    "global_catalog_reconcile_full": 43200
+  },
+  "worker": {
+    "max_workers": 5
+  },
+  "enrichment": {
+    "lastfm": true,
+    "spotify": true,
+    "fanart": true,
+    "setlistfm": true,
+    "musicbrainz": true
+  },
+  "cache_stats": {
+    "l1_size": 0,
+    "redis_used_memory": "3.28M",
+    "redis_keys": 4178,
+    "redis_connected": true
+  },
+  "db_stats": {
+    "library_artists": {
+      "size": 557056,
+      "rows": 29
+    },
+    "library_albums": {
+      "size": 622592,
+      "rows": 91
+    },
+    "library_tracks": {
+      "size": 10788864,
+      "rows": 863
+    },
+    "tasks": {
+      "size": 1572864,
+      "rows": 1713
+    },
+    "cache": {
+      "size": 32768,
+      "rows": 1
+    },
+    "mb_cache": {
+      "size": 24576,
+      "rows": 0
+    },
+    "settings": {
+      "size": 32768,
+      "rows": 15
+    },
+    "audit_log": {
+      "size": 90112,
+      "rows": 81
+    },
+    "scan_results": {
+      "size": 24576,
+      "rows": 0
+    },
+    "dir_mtimes": {
+      "size": 73728,
+      "rows": 30
+    },
+    "users": {
+      "size": 98304,
+      "rows": 2
+    },
+    "sessions": {
+      "size": 147456,
+      "rows": 44
+    }
+  },
+  "library": {
+    "path": "/music",
+    "storage_layout": "v2-uuid",
+    "audio_extensions": [".flac", ".mp3", ".m4a", ".ogg", ".opus"]
+  },
+  "processing": {
+    "mb_auto_apply_threshold": 95,
+    "enrichment_min_age_hours": 24,
+    "max_track_popularity": 50
+  },
+  "paths": {
+    "llm_refinement_enabled": true,
+    "llm_refinement_cache_ttl_hours": 168
+  },
+  "shows": {
+    "active_cities": [],
+    "upcoming_shows": 110
+  },
+  "soulseek": {
+    "url": "http://slskd:5030",
+    "quality": "flac",
+    "min_bitrate": 320,
+    "username": "",
+    "shares_music": true
+  },
+  "telegram": {
+    "enabled": false,
+    "bot_token": "",
+    "chat_id": "",
+    "has_token": false
+  },
+  "about": {
+    "version": "1.0.0",
+    "git_commit": "unknown",
+    "python": "3.13.16",
+    "uptime_seconds": 0,
+    "artists": 29,
+    "albums": 91,
+    "tracks": 863,
+    "total_size_gb": 28.08
+  }
+}

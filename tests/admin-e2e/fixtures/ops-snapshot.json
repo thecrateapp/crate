@@ -1,0 +1,368 @@
+{
+  "snapshot": {
+    "scope": "ops",
+    "subject_key": "dashboard",
+    "version": 80,
+    "built_at": "2026-10-10T21:00:35.571015Z",
+    "stale_after": "2026-10-10T21:01:35.571015Z",
+    "stale": false,
+    "generation_ms": 239
+  },
+  "status": {
+    "scanning": false,
+    "last_scan": null,
+    "issue_count": 5,
+    "progress": {},
+    "pending_imports": 0,
+    "running_tasks": 1
+  },
+  "stats": {
+    "artists": 29,
+    "albums": 91,
+    "tracks": 863,
+    "formats": {
+      "m4a": 105,
+      "flac": 758
+    },
+    "total_size_gb": 28.08,
+    "last_scan": null,
+    "pending_imports": 0,
+    "pending_tasks": 0,
+    "total_duration_hours": 53.3,
+    "avg_bitrate": 1256352,
+    "top_genres": [
+      {
+        "name": "Screamo, Hardcore Punk",
+        "count": 22
+      },
+      {
+        "name": "Rock",
+        "count": 16
+      },
+      {
+        "name": "Post-Hardcore, Alternative Rock",
+        "count": 13
+      }
+    ],
+    "recent_albums": [
+      {
+        "id": 69,
+        "slug": "quicksand-get-to-it-regenerate",
+        "artist": "Quicksand",
+        "artist_id": 23,
+        "artist_slug": "quicksand",
+        "name": "Get to It & Regenerate",
+        "display_name": "Get to It & Regenerate",
+        "year": "2026",
+        "updated_at": null
+      },
+      {
+        "id": 68,
+        "slug": "quicksand-crystallize",
+        "artist": "Quicksand",
+        "artist_id": 23,
+        "artist_slug": "quicksand",
+        "name": "Crystallize",
+        "display_name": "Crystallize",
+        "year": "2026",
+        "updated_at": null
+      },
+      {
+        "id": 71,
+        "slug": "quicksand-cool-guy",
+        "artist": "Quicksand",
+        "artist_id": 23,
+        "artist_slug": "quicksand",
+        "name": "Cool Guy",
+        "display_name": "Cool Guy",
+        "year": "2026",
+        "updated_at": null
+      }
+    ],
+    "analyzed_tracks": 758,
+    "avg_album_duration_min": 35.1,
+    "avg_tracks_per_album": 9.5
+  },
+  "analytics": {
+    "computing": false,
+    "formats": {
+      "m4a": 105,
+      "flac": 758
+    },
+    "decades": {
+      "1990s": 3,
+      "2000s": 16,
+      "2010s": 31,
+      "2020s": 40
+    },
+    "top_artists": [
+      {
+        "id": 21,
+        "slug": "primitive-man",
+        "name": "Primitive Man",
+        "albums": 9
+      },
+      {
+        "id": 8,
+        "slug": "converge",
+        "name": "Converge",
+        "albums": 9
+      },
+      {
+        "id": 23,
+        "slug": "quicksand",
+        "name": "Quicksand",
+        "albums": 8
+      }
+    ],
+    "bitrates": {
+      "320k": 32,
+      ">320k": 831
+    },
+    "genres": {
+      "Rock": 16,
+      "Post-Punk, Punk Rock": 11,
+      "Screamo, Hardcore Punk": 22,
+      "Post-Hardcore, Alternative Rock": 13
+    },
+    "sizes_by_format_gb": {
+      "m4a": 0.88,
+      "flac": 27.2
+    },
+    "avg_tracks_per_album": 9.5,
+    "total_duration_hours": 53.3
+  },
+  "live": {
+    "engine": "dramatiq",
+    "running_tasks": [
+      {
+        "id": "2d12449111d8",
+        "type": "enrich_artists",
+        "status": "delegated",
+        "pool": "maintenance",
+        "progress": "{\"phase\": \"processing\", \"phase_index\": 0, \"phase_count\": 1, \"item\": \"1/2 chunks\", \"done\": 1, \"total\": 2, \"percent\": 50.0, \"rate\": 0.0, \"eta_sec\": 0, \"errors\": 0, \"warnings\": 0}",
+        "created_at": "2026-10-01T15:19:09.401996+00:00",
+        "started_at": "2026-10-01T15:20:37.639047+00:00",
+        "updated_at": "2026-10-01T15:27:03.642952+00:00"
+      }
+    ],
+    "pending_tasks": [],
+    "recent_tasks": [
+      {
+        "id": "862ae64c807c",
+        "type": "global_catalog_reconcile_incremental",
+        "status": "completed",
+        "updated_at": "2026-10-10T20:55:11.698969+00:00"
+      },
+      {
+        "id": "f99b413f5d56",
+        "type": "cleanup_stream_variants",
+        "status": "completed",
+        "updated_at": "2026-10-10T20:49:07.690543+00:00"
+      },
+      {
+        "id": "2a10a0076c09",
+        "type": "global_catalog_reconcile_incremental",
+        "status": "completed",
+        "updated_at": "2026-10-10T20:49:07.563765+00:00"
+      }
+    ],
+    "worker_slots": {
+      "max": 6,
+      "active": 1
+    },
+    "queue_breakdown": {
+      "running": {
+        "fast": 0,
+        "default": 0,
+        "heavy": 0,
+        "maintenance": 1,
+        "playback": 0
+      },
+      "pending": {
+        "fast": 0,
+        "default": 0,
+        "heavy": 0,
+        "maintenance": 0,
+        "playback": 0
+      }
+    },
+    "db_heavy_gate": {
+      "active": 0,
+      "pending": 0,
+      "blocking": false
+    },
+    "systems": {
+      "postgres": true,
+      "watcher": true
+    }
+  },
+  "recent": {
+    "tasks": [
+      {
+        "id": "862ae64c807c",
+        "type": "global_catalog_reconcile_incremental",
+        "status": "completed",
+        "created_at": null,
+        "updated_at": "2026-10-10T20:55:11.698969+00:00"
+      },
+      {
+        "id": "f99b413f5d56",
+        "type": "cleanup_stream_variants",
+        "status": "completed",
+        "created_at": null,
+        "updated_at": "2026-10-10T20:49:07.690543+00:00"
+      },
+      {
+        "id": "2a10a0076c09",
+        "type": "global_catalog_reconcile_incremental",
+        "status": "completed",
+        "created_at": null,
+        "updated_at": "2026-10-10T20:49:07.563765+00:00"
+      }
+    ],
+    "pending_imports": 0,
+    "last_scan": null
+  },
+  "analysis": {
+    "total": 863,
+    "analysis_done": 758,
+    "analysis_pending": 0,
+    "analysis_active": 0,
+    "analysis_failed": 105,
+    "bliss_done": 0,
+    "bliss_pending": 863,
+    "bliss_active": 0,
+    "bliss_failed": 0,
+    "fingerprint_done": 863,
+    "fingerprint_pending": 0,
+    "fingerprint_chromaprint": 863,
+    "fingerprint_pcm": 0,
+    "chromaprint_available": true,
+    "fingerprint_strategy": "chromaprint-v1",
+    "total_albums": 91,
+    "lyrics_cached": 853,
+    "lyrics_found": 630,
+    "lyrics_missing": 233,
+    "portable_sidecar_albums": 91,
+    "portable_audio_tag_albums": 91,
+    "portable_audio_tag_tracks": 863,
+    "portable_tag_errors": 0,
+    "rich_export_albums": 0,
+    "rich_export_tracks": 0,
+    "last_analyzed": {
+      "title": "Erich Zann Environment",
+      "artist": "Adrift",
+      "album": "Black Heart Bleeds Black",
+      "bpm": 99.4,
+      "audio_key": "F",
+      "energy": 0.632,
+      "danceability": 0.258,
+      "has_mood": true,
+      "updated_at": "2026-10-01 15:33:21.561752+00:00"
+    },
+    "last_bliss": {
+      "title": null,
+      "artist": null,
+      "album": null,
+      "updated_at": null
+    }
+  },
+  "health_counts": {
+    "unindexed_files": 4,
+    "artist_layout_fix": 1
+  },
+  "upcoming_shows": [
+    {
+      "url": "https://www.ticketmaster.com/the-menzingers-everything-i-ever-saw-seattle-washington-10-10-2026/event/0F00649CABE3A792",
+      "city": "Seattle",
+      "date": "2026-10-10",
+      "venue": "Neptune Theatre",
+      "country": "United States Of America",
+      "artist_name": "Hot Water Music"
+    },
+    {
+      "url": "https://www.ticketweb.ca/event/the-menzingers-everything-i-ever-the-pearl-tickets/14088854",
+      "city": "Vancouver",
+      "date": "2026-10-11",
+      "venue": "The Pearl",
+      "country": "Canada",
+      "artist_name": "Hot Water Music"
+    },
+    {
+      "url": "https://www.ticketweb.ca/event/the-menzingers-everything-i-ever-the-palace-theatre-tickets/14725253",
+      "city": "Calgary",
+      "date": "2026-10-13",
+      "venue": "The Palace Theatre",
+      "country": "Canada",
+      "artist_name": "Hot Water Music"
+    }
+  ],
+  "runtime": {
+    "active_users_5m": 0,
+    "streams_3m": 0
+  },
+  "eventing": {
+    "redis_connected": true,
+    "domain_events": {
+      "redis_connected": true,
+      "stream_key": "crate:domain_events",
+      "consumer_group": "projector",
+      "latest_sequence": 2271,
+      "stream_length": 2271,
+      "pending": 0,
+      "consumers": 1,
+      "lag": 2271,
+      "last_delivered_id": "0-0",
+      "recent_events": [
+        {
+          "id": "1791630835523-0",
+          "event_type": "global_catalog.reconcile.completed",
+          "scope": "global_catalog",
+          "subject_key": "982b75f3-5a6a-4ebc-99c9-392675823524"
+        },
+        {
+          "id": "1791630825505-0",
+          "event_type": "global_catalog.reconcile.started",
+          "scope": "global_catalog",
+          "subject_key": "982b75f3-5a6a-4ebc-99c9-392675823524"
+        },
+        {
+          "id": "1791585920851-0",
+          "event_type": "global_catalog.reconcile.completed",
+          "scope": "global_catalog",
+          "subject_key": "fdd3d195-47a0-426e-923f-c55dca406c6a"
+        }
+      ]
+    },
+    "cache_invalidation": {
+      "redis_connected": true,
+      "events_key": "cache:invalidation:events",
+      "latest_event_id": 270,
+      "retained_events": 270
+    },
+    "sse_surfaces": [
+      {
+        "name": "Global Task Feed",
+        "endpoint": "/api/events",
+        "channel": "crate:sse:global",
+        "mode": "pubsub",
+        "description": "Global status stream for running tasks and scan state."
+      },
+      {
+        "name": "Task Detail Feed",
+        "endpoint": "/api/events/task/{task_id}",
+        "channel": "crate:sse:task:{task_id}",
+        "mode": "pubsub",
+        "description": "Per-task SSE channel for progress and completion events."
+      },
+      {
+        "name": "Cache Invalidation Feed",
+        "endpoint": "/api/cache/events",
+        "channel": "cache:invalidation:events",
+        "mode": "replay",
+        "description": "Replayable invalidation stream keyed by Last-Event-ID."
+      }
+    ]
+  }
+}
