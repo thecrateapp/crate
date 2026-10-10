@@ -123,7 +123,8 @@ class TestArtistsAPI:
         with (
             patch("crate.api.browse_artist.has_library_data", return_value=True),
             patch(
-                "crate.api.browse_artist.get_all_artist_issue_counts", return_value={}
+                "crate.api.browse_artist.get_open_issue_counts_for_artists",
+                return_value={},
             ),
             patch("crate.db.queries.browse_artist_listing.read_scope", mock_scope),
         ):
@@ -160,7 +161,8 @@ class TestArtistsAPI:
         with (
             patch("crate.api.browse_artist.has_library_data", return_value=True),
             patch(
-                "crate.api.browse_artist.get_all_artist_issue_counts", return_value={}
+                "crate.api.browse_artist.get_open_issue_counts_for_artists",
+                return_value={},
             ),
             patch("crate.db.queries.browse_artist_listing.read_scope", mock_scope),
         ):
@@ -201,7 +203,8 @@ class TestArtistsAPI:
         with (
             patch("crate.api.browse_artist.has_library_data", return_value=True),
             patch(
-                "crate.api.browse_artist.get_all_artist_issue_counts", return_value={}
+                "crate.api.browse_artist.get_open_issue_counts_for_artists",
+                return_value={},
             ),
             patch(
                 "crate.api.browse_artist.get_artist_list_genres_map",
@@ -227,7 +230,8 @@ class TestArtistsAPI:
         with (
             patch("crate.api.browse_artist.has_library_data", return_value=True),
             patch(
-                "crate.api.browse_artist.get_all_artist_issue_counts", return_value={}
+                "crate.api.browse_artist.get_open_issue_counts_for_artists",
+                return_value={},
             ),
             patch("crate.db.queries.browse_artist_listing.read_scope", mock_scope),
         ):
@@ -248,7 +252,8 @@ class TestArtistsAPI:
         with (
             patch("crate.api.browse_artist.has_library_data", return_value=True),
             patch(
-                "crate.api.browse_artist.get_all_artist_issue_counts", return_value={}
+                "crate.api.browse_artist.get_open_issue_counts_for_artists",
+                return_value={},
             ),
             patch("crate.api.browse_artist.get_artists_count", return_value=0),
             patch(
@@ -374,7 +379,10 @@ class TestArtistDetailAPI:
                     1: {"format": "flac", "bit_depth": 16, "sample_rate": 44100}
                 },
             ),
-            patch("crate.api.browse_artist.get_artist_issue_count", return_value=0),
+            patch(
+                "crate.api.browse_artist.get_open_issue_counts_for_artists",
+                return_value={},
+            ),
             patch("crate.db.queries.browse_artist_genres.read_scope", mock_scope),
         ):
             resp = test_app.get("/api/artists/7")
@@ -2276,7 +2284,7 @@ class TestHealthAPI:
         assert by_check["artist_layout_fix"]["scope"] == "hybrid"
         assert by_check["duplicate_albums"]["auto_fixable"] is True
         assert by_check["duplicate_albums"]["support"] == "automatic"
-        assert by_check["duplicate_albums"]["risk"] == "destructive"
+        assert by_check["duplicate_albums"]["risk"] == "caution"
         assert by_check["duplicate_albums"]["supports_global_scope"] is False
         assert by_check["duplicate_tracks"]["auto_fixable"] is True
         assert by_check["duplicate_tracks"]["support"] == "automatic"
@@ -2453,69 +2461,31 @@ class TestHealthAPI:
         assert resp.json()["task_id"] == "task-fix-1"
         mock_create_task.assert_called_once_with("fix_artist", {"artist": "Terror"})
 
-    def test_artist_repair_plan_by_entity_uid(self, test_app):
-        preview = {
-            "items": [
-                {
-                    "issue_id": None,
-                    "check_type": "artist_layout_fix",
-                    "severity": "high",
-                    "description": "Artist layout fix needed for Birds In Row",
-                    "support": "automatic",
-                    "auto_fixable": True,
-                    "executable": True,
-                    "action": "fix_artist_layout",
-                    "target": "Birds In Row",
-                    "message": "Would consolidate 1 album directory into canonical entity_uid layout",
-                    "fs_write": True,
-                    "details": {
-                        "target_artist_dir": "/music/695179a0-3863-50c2-9302-61f5cf144daa"
-                    },
-                    "issue": {
-                        "check": "artist_layout_fix",
-                        "details": {"artist": "Birds In Row"},
-                    },
-                }
-            ],
-            "total": 1,
-            "executable": 1,
-            "manual_only": 0,
-        }
-        fix_preview = {
-            "status": "needs_fix",
-            "applicable": True,
-            "artist": "Birds In Row",
-            "message": "Would consolidate 1 album directory into canonical entity_uid layout",
-            "target_artist_dir": "/music/695179a0-3863-50c2-9302-61f5cf144daa",
-            "candidate_dirs": ["/music/6e7e3e43-7834-4677-8192-8fd9fc47bf5e"],
-            "album_moves": [
-                {
-                    "album": "You, Me & the Violence",
-                    "source": "/music/6e7e3e43-7834-4677-8192-8fd9fc47bf5e/You, Me & the Violence",
-                    "target": "/music/695179a0-3863-50c2-9302-61f5cf144daa/564b0e79-0978-40ad-b764-059bf15410ff",
-                }
-            ],
-            "artist_files": [],
-            "folder_name_mismatch": False,
-            "skipped_existing": 0,
-            "skipped_foreign": 0,
-            "preview_errors": [],
-        }
+    def test_artist_repair_plan_reads_stored_issues_only(self, test_app):
+        stored = [
+            {
+                "id": 7,
+                "check_type": "duplicate_tracks",
+                "severity": "medium",
+                "description": "Birds In Row / Gris Klein: 'Water Wings' appears 2 times",
+                "details": {"artist": "Birds In Row", "album_id": 3},
+            }
+        ]
+        preview = {"items": [], "total": 0, "executable": 0}
         with (
             patch(
                 "crate.api.management.artist_name_from_entity_uid",
                 return_value="Birds In Row",
             ),
             patch(
+                "crate.api.management.get_artist_issues", return_value=stored
+            ) as mock_get_issues,
+            patch(
                 "crate.api.management._build_repair_preview", return_value=preview
             ) as mock_preview,
             patch(
-                "crate.api.management._build_artist_fix_preview",
-                return_value=fix_preview,
-            ) as mock_fix_preview,
-            patch(
-                "crate.api.management.get_artist_issues", return_value=[]
-            ) as mock_get_issues,
+                "crate.db.queries.health.get_duplicate_tracks"
+            ) as mock_duplicate_tracks,
         ):
             resp = test_app.get(
                 "/api/manage/artists/by-entity/695179a0-3863-50c2-9302-61f5cf144daa/repair-plan"
@@ -2523,228 +2493,56 @@ class TestHealthAPI:
 
         assert resp.status_code == 200
         assert resp.json()["artist"] == "Birds In Row"
-        assert resp.json()["total"] == 1
-        assert resp.json()["items"][0]["check_type"] == "artist_layout_fix"
-        assert resp.json()["items"][0]["executable"] is True
         mock_get_issues.assert_called_once_with("Birds In Row")
-        mock_preview.assert_called_once()
-        preview_issues = mock_preview.call_args.args[0]
-        assert preview_issues == [
-            {
-                "check": "artist_layout_fix",
-                "severity": "high",
-                "description": "Artist layout fix needed for Birds In Row",
-                "auto_fixable": True,
-                "details": {
-                    "artist": "Birds In Row",
-                    "target_artist_dir": "/music/695179a0-3863-50c2-9302-61f5cf144daa",
-                    "candidate_dirs": ["/music/6e7e3e43-7834-4677-8192-8fd9fc47bf5e"],
-                    "album_move_count": 1,
-                    "artist_file_count": 0,
-                    "folder_name_mismatch": False,
-                    "skipped_existing": 0,
-                    "skipped_foreign": 0,
-                    "preview_errors": [],
-                },
-            }
-        ]
-        mock_fix_preview.assert_called_once_with("Birds In Row")
+        assert mock_preview.call_args.args[0] == stored
+        mock_duplicate_tracks.assert_not_called()
 
-    def test_artist_repair_plan_refreshes_duplicate_tracks_from_local_catalog(
-        self, test_app
-    ):
-        preview = {
-            "items": [
-                {
-                    "issue_id": None,
-                    "check_type": "duplicate_tracks",
-                    "severity": "medium",
-                    "description": "Duplicate tracks",
-                    "support": "automatic",
-                    "auto_fixable": True,
-                    "executable": True,
-                    "action": "quarantine_duplicate_tracks",
-                    "target": "Birds In Row/Gris Klein/0151",
-                    "message": "Would quarantine 1 duplicate track copy",
-                    "fs_write": True,
-                    "supports_artist_scope": True,
-                    "supports_global_scope": False,
-                    "issue": {
-                        "check": "duplicate_tracks",
-                        "details": {"artist": "Birds In Row"},
-                    },
-                }
-            ],
-            "total": 1,
-            "executable": 1,
-            "manual_only": 0,
-        }
-        stale_issue = {
-            "id": 41,
-            "check_type": "duplicate_tracks",
-            "details_json": {
-                "artist": "Birds In Row",
-                "album": "Old Album",
-                "title": "Old Duplicate",
-                "paths": ["/music/stale-a.flac", "/music/stale-b.flac"],
-            },
-        }
-        duplicate_row = {
-            "album_id": 7,
-            "artist": "Birds In Row",
-            "album": "Gris Klein",
-            "title": "0151",
-            "track_number": 1,
-            "disc_number": 1,
-            "cnt": 2,
-            "paths": [
-                "/music/birds-in-row/gris-klein/01-0151.flac",
-                "/music/birds-in-row/gris-klein/01-0151-copy.flac",
-            ],
-            "track_ids": [100, 101],
-            "tracks": [
-                {
-                    "id": 100,
-                    "path": "/music/birds-in-row/gris-klein/01-0151.flac",
-                    "filename": "01-0151.flac",
-                    "format": "flac",
-                    "duration": 131.0,
-                    "size": 1024,
-                    "has_audio_fingerprint": True,
-                    "audio_fingerprint_source": "fpcalc",
-                },
-                {
-                    "id": 101,
-                    "path": "/music/birds-in-row/gris-klein/01-0151-copy.flac",
-                    "filename": "01-0151-copy.flac",
-                    "format": "flac",
-                    "duration": 131.0,
-                    "size": 1000,
-                    "has_audio_fingerprint": True,
-                    "audio_fingerprint_source": "fpcalc",
-                },
-            ],
-            "fingerprinted_count": 2,
-            "missing_fingerprint_count": 0,
-        }
-        fix_preview = {
-            "status": "already_canonical",
-            "applicable": False,
-            "artist": "Birds In Row",
-            "message": "Birds In Row already uses canonical entity_uid layout",
-            "target_artist_dir": "/music/695179a0-3863-50c2-9302-61f5cf144daa",
-            "candidate_dirs": [],
-            "album_moves": [],
-            "artist_files": [],
-            "folder_name_mismatch": False,
-            "skipped_existing": 0,
-            "skipped_foreign": 0,
-            "preview_errors": [],
-        }
-
+    def test_artist_health_recheck_queues_a_targeted_worker_check(self, test_app):
         with (
             patch(
                 "crate.api.management.artist_name_from_entity_uid",
                 return_value="Birds In Row",
             ),
             patch(
-                "crate.db.queries.health.get_duplicate_tracks",
-                return_value=[duplicate_row],
-            ) as mock_duplicate_tracks,
-            patch(
-                "crate.api.management._build_repair_preview", return_value=preview
-            ) as mock_preview,
-            patch(
-                "crate.api.management._build_artist_fix_preview",
-                return_value=fix_preview,
-            ),
-            patch("crate.api.management.get_artist_issues", return_value=[stale_issue]),
+                "crate.api.management.create_task_dedup", return_value="task-1"
+            ) as mock_create,
         ):
-            resp = test_app.get(
-                "/api/manage/artists/by-entity/695179a0-3863-50c2-9302-61f5cf144daa/repair-plan"
+            resp = test_app.post(
+                "/api/manage/artists/by-entity/695179a0-3863-50c2-9302-61f5cf144daa/health-recheck"
             )
 
         assert resp.status_code == 200
-        mock_duplicate_tracks.assert_called_once_with(artist_name="Birds In Row")
-        preview_issues = mock_preview.call_args.args[0]
-        assert preview_issues == [
-            {
-                "check": "duplicate_tracks",
-                "severity": "medium",
-                "details": {
-                    "album_id": 7,
-                    "artist": "Birds In Row",
-                    "album": "Gris Klein",
-                    "title": "0151",
-                    "track_number": 1,
-                    "disc_number": 1,
-                    "count": 2,
-                    "paths": [
-                        "/music/birds-in-row/gris-klein/01-0151.flac",
-                        "/music/birds-in-row/gris-klein/01-0151-copy.flac",
-                    ],
-                    "track_ids": [100, 101],
-                    "tracks": duplicate_row["tracks"],
-                    "fingerprinted_count": 2,
-                    "missing_fingerprint_count": 0,
-                },
-            }
-        ]
+        assert resp.json()["task_id"] == "task-1"
+        task_type, params = mock_create.call_args.args
+        assert task_type == "health_check"
+        assert params["artists"] == ["Birds In Row"]
+        assert set(params["check_types"]) == {
+            "artist_layout_fix",
+            "duplicate_albums",
+            "duplicate_tracks",
+        }
 
-    def test_artist_repair_plan_filters_stale_artist_layout_issue(self, test_app):
-        preview = {
-            "items": [],
-            "total": 0,
-            "executable": 0,
-            "manual_only": 0,
-        }
-        fix_preview = {
-            "status": "already_canonical",
-            "applicable": False,
-            "artist": "Quicksand",
-            "message": "Quicksand already uses canonical entity_uid layout",
-            "target_artist_dir": "/music/b81635c8-3132-57d2-8d22-920251dc2627",
-            "candidate_dirs": ["/music/b81635c8-3132-57d2-8d22-920251dc2627"],
-            "album_moves": [],
-            "artist_files": [],
-            "folder_name_mismatch": False,
-            "skipped_existing": 0,
-            "skipped_foreign": 0,
-            "preview_errors": [],
-        }
-        stale_issue = {
-            "id": 12,
-            "check_type": "artist_layout_fix",
-            "details_json": {"artist": "Quicksand"},
-        }
+    def test_artist_health_recheck_reports_an_already_queued_check(self, test_app):
         with (
             patch(
                 "crate.api.management.artist_name_from_entity_uid",
-                return_value="Quicksand",
+                return_value="Birds In Row",
             ),
+            patch("crate.api.management.create_task_dedup", return_value=None),
             patch(
-                "crate.api.management._build_repair_preview", return_value=preview
-            ) as mock_preview,
-            patch(
-                "crate.api.management._build_artist_fix_preview",
-                return_value=fix_preview,
+                "crate.api.management.find_active_task_by_type_params",
+                return_value="task-0",
             ),
-            patch("crate.api.management.get_artist_issues", return_value=[stale_issue]),
-            patch("crate.api.management.resolve_issue") as mock_resolve_issue,
-            patch(
-                "crate.api.management.publish_health_surface_signal"
-            ) as mock_publish_health,
         ):
-            resp = test_app.get(
-                "/api/manage/artists/by-entity/b81635c8-3132-57d2-8d22-920251dc2627/repair-plan"
+            resp = test_app.post(
+                "/api/manage/artists/by-entity/695179a0-3863-50c2-9302-61f5cf144daa/health-recheck"
             )
 
-        assert resp.status_code == 200
-        assert resp.json()["items"] == []
-        assert resp.json()["total"] == 0
-        assert mock_preview.call_args.args[0] == []
-        mock_resolve_issue.assert_called_once_with(12)
-        mock_publish_health.assert_called_once()
+        assert resp.json() == {
+            "task_id": "task-0",
+            "status": "already_queued",
+            "deduplicated": True,
+        }
 
     def test_health_issues_reads_from_snapshot(self, test_app):
         snapshot = {

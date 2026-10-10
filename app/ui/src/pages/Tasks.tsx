@@ -46,7 +46,7 @@ import {
   taskRevalidationIssueCount,
 } from "@/lib/task-insights";
 import { cn, timeAgo } from "@/lib/utils";
-import { taskLabel } from "@/lib/task-labels";
+import { taskLabel, useTaskCatalog } from "@/lib/task-catalog";
 
 interface TaskProgress {
   phase?: string;
@@ -1428,6 +1428,7 @@ function HistoryTaskRow({
 }
 
 export function Tasks() {
+  const taskCatalog = useTaskCatalog();
   const [tasksSnapshot, setTasksSnapshot] = useState<TasksSnapshotData | null>(
     null,
   );
@@ -1613,7 +1614,7 @@ export function Tasks() {
         value: type,
         label: taskLabel(type),
       }));
-  }, [tasks]);
+  }, [tasks, taskCatalog]);
 
   const taskFamilies = useMemo(() => {
     return [

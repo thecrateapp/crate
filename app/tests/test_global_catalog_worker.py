@@ -721,3 +721,76 @@ def test_global_catalog_tasks_use_maintenance_queue():
         TASK_POOL_CONFIG["global_catalog_reconcile_incremental"].queue == "maintenance"
     )
     assert TASK_POOL_CONFIG["global_catalog_reconcile_full"].queue == "maintenance"
+
+
+def test_incremental_worker_reports_reconcile_and_snapshot_phases(monkeypatch):
+    from crate.worker_handlers import global_catalog
+
+    progress: list[dict] = []
+    monkeypatch.setattr(
+        global_catalog, "refresh_global_catalog_genre_snapshots", lambda: None
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "reconcile_dirty_catalog_sources",
+        lambda limit: {"claimed": 1, "completed": 1, "failed": 0, "remaining": 0},
+    )
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation", lambda *scopes: None
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "emit_progress",
+        lambda task_id, value, force=False: progress.append(value.to_dict()),
+    )
+
+    global_catalog._handle_reconcile_incremental("task-1", {}, {})
+
+    assert [(p["phase"], p["phase_index"], p["phase_count"]) for p in progress] == [
+        ("reconcile_dirty_sources", 0, 2),
+        ("refresh_genre_snapshots", 1, 2),
+    ]
+
+
+def test_full_worker_reports_its_position_in_the_phase_sequence(monkeypatch):
+    from crate.worker_handlers import global_catalog
+
+    _stub_full_run_tracking(monkeypatch, global_catalog)
+    progress: list[dict] = []
+    monkeypatch.setattr(
+        global_catalog,
+        "get_catalog_state",
+        lambda: {
+            "status": "backfilling",
+            "bootstrap_cursor_json": {"phase": "remote", "run_id": "run-1"},
+        },
+    )
+    monkeypatch.setattr(
+        global_catalog, "transition_catalog_state", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "reconcile_remote_catalog_batch",
+        lambda **kwargs: {"completed": False, "next_cursor": {"after_id": 1}},
+    )
+    monkeypatch.setattr(
+        global_catalog, "create_task", lambda *args, **kwargs: "next", raising=False
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "emit_progress",
+        lambda task_id, value, force=False: progress.append(value.to_dict()),
+    )
+
+    global_catalog._handle_reconcile_full("task-1", {"batch_size": 10}, {})
+
+    assert progress == [
+        {
+            **progress[0],
+            "phase": "remote",
+            "phase_index": 2,
+            "phase_count": 9,
+            "done": 2,
+            "total": 9,
+        }
+    ]

@@ -1066,12 +1066,18 @@ def test_catalog_sync_without_node_uid_iterates_approved_peers(monkeypatch):
             {"node_uid": "node-c", "disabled_at": None},
         ],
     )
+
+    def fake_sync(node_uid, params, *, on_page=None):
+        synced.append(node_uid)
+        on_page(2)
+        return {"synced": 2, "revision": f"rev-{node_uid}"}
+
+    progress: list[dict] = []
+    monkeypatch.setattr(federation_handlers, "_sync_single_peer_catalog", fake_sync)
     monkeypatch.setattr(
         federation_handlers,
-        "_sync_single_peer_catalog",
-        lambda node_uid, params: (
-            synced.append(node_uid) or {"synced": 2, "revision": f"rev-{node_uid}"}
-        ),
+        "emit_progress",
+        lambda task_id, value, force=False: progress.append(value.to_dict()),
     )
 
     result = federation_handlers._handle_catalog_sync("task-1", {}, {})
@@ -1079,6 +1085,9 @@ def test_catalog_sync_without_node_uid_iterates_approved_peers(monkeypatch):
     assert synced == ["node-a", "node-c"]
     assert result["peers"] == 2
     assert result["synced"] == 4
+    assert progress[0]["total"] == 2 and progress[0]["done"] == 0
+    assert progress[-1]["done"] == 2
+    assert {"node-a: 2", "node-c: 2"} <= {entry["item"] for entry in progress}
 
 
 def test_remote_stream_slot_limits_allow_browser_overlap(monkeypatch):

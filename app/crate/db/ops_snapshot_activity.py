@@ -14,6 +14,7 @@ from crate.db.ops_runtime_views import (
     DEFAULT_QUEUE_BREAKDOWN,
     get_worker_live_state,
 )
+from crate.db.queries.health_issues import get_open_issue_total
 from crate.db.queries.management import count_recent_active_users, count_recent_streams
 from crate.db.queries.shows import get_upcoming_shows
 from crate.db.queries.tasks import (
@@ -144,7 +145,7 @@ def build_public_status_payload(
     return {
         "scanning": running_scan,
         "last_scan": scan["scanned_at"] if scan else None,
-        "issue_count": len(scan["issues"]) if scan else 0,
+        "issue_count": get_open_issue_total(),
         "progress": progress,
         "pending_imports": pending_imports,
         "running_tasks": len((worker_live or {}).get("running_tasks") or []),

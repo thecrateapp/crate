@@ -86,6 +86,11 @@ const FEATURED_OPTIONS = [
   { value: "false", label: "Not featured" },
 ];
 
+const ISSUE_OPTIONS = [
+  { value: "true", label: "With open issues" },
+  { value: "false", label: "No open issues" },
+];
+
 export function Browse() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -96,6 +101,7 @@ export function Browse() {
   const format = searchParams.get("format") ?? "";
   const sort = searchParams.get("sort") ?? "recent";
   const featured = searchParams.get("featured") ?? "";
+  const hasIssues = searchParams.get("has_issues") ?? "";
   const view = (searchParams.get("view") ?? "grid") as "grid" | "list";
   const [filters, setFilters] = useState<BrowseFilters | null>(null);
   const [artists, setArtists] = useState<ArtistItem[]>([]);
@@ -275,6 +281,7 @@ export function Browse() {
       if (decade) params.set("decade", decade);
       if (format) params.set("format", format);
       if (featured) params.set("featured", featured);
+      if (hasIssues) params.set("has_issues", hasIssues);
       params.set("sort", sort);
       params.set("page", String(page));
       params.set("per_page", String(PER_PAGE));
@@ -292,7 +299,7 @@ export function Browse() {
           setLoadingMore(false);
         });
     },
-    [genre, country, decade, format, sort, featured, view],
+    [genre, country, decade, format, sort, featured, hasIssues, view],
   );
 
   const fetchPageEvent = useEffectEvent(fetchPage);
@@ -303,7 +310,7 @@ export function Browse() {
     hasMoreRef.current = true;
     setArtists([]);
     fetchPageEvent(1, true);
-  }, [genre, country, decade, format, sort, featured, view]);
+  }, [genre, country, decade, format, sort, featured, hasIssues, view]);
 
   // Infinite scroll: observe sentinel element
   useEffect(() => {
@@ -404,6 +411,14 @@ export function Browse() {
           value={featured}
           onChange={(nextValue) => setParam("featured", nextValue)}
           options={FEATURED_OPTIONS}
+          triggerClassName="min-w-[130px] max-w-[170px]"
+        />
+
+        <AdminSelect
+          placeholder="Issues"
+          value={hasIssues}
+          onChange={(nextValue) => setParam("has_issues", nextValue)}
+          options={ISSUE_OPTIONS}
           triggerClassName="min-w-[130px] max-w-[170px]"
         />
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useApi } from "@/hooks/use-api";
 import {
   useTopTracks,
@@ -689,7 +689,10 @@ function useArtistPageUiState() {
   const [bioExpanded, setBioExpanded] = useState(false);
   const [enrichment, setEnrichment] = useState<EnrichmentData | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showRepairDialog, setShowRepairDialog] = useState(false);
+  const [searchParams] = useSearchParams();
+  const [showRepairDialog, setShowRepairDialog] = useState(
+    () => searchParams.get("repair") === "1",
+  );
   const [showMetadataEditor, setShowMetadataEditor] = useState(false);
   const [showBioResearch, setShowBioResearch] = useState(false);
   const [showMergeArtist, setShowMergeArtist] = useState(false);

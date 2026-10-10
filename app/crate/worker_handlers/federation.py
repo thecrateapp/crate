@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 from crate.db.repositories import federation as repo
+from crate.task_progress import TaskProgress, emit_progress
 from crate.worker_handlers import TaskHandler
 
 log = logging.getLogger(__name__)
@@ -30,20 +31,49 @@ if TYPE_CHECKING:
 def _handle_catalog_sync(task_id: str, params: dict, config: dict) -> dict:
     """Sync federated catalog from a peer with pagination."""
     node_uid = params.get("node_uid", "")
+    progress = TaskProgress(phase="sync_catalog")
+
+    def on_page(peer_label: str, synced: int) -> None:
+        progress.item = f"{peer_label}: {synced}"
+        emit_progress(task_id, progress)
+
     if not node_uid:
-        peers = repo.list_peers(trust_state="approved")
+        peers = [
+            peer
+            for peer in repo.list_peers(trust_state="approved")
+            if peer.get("node_uid") and not peer.get("disabled_at")
+        ]
+        progress.total = len(peers)
+        emit_progress(task_id, progress, force=True)
         results: list[dict] = []
         total_synced = 0
         for peer in peers:
-            peer_uid = str(peer.get("node_uid") or "")
-            if not peer_uid or peer.get("disabled_at"):
-                continue
-            result = _sync_single_peer_catalog(peer_uid, params)
+            peer_uid = str(peer["node_uid"])
+            peer_label = str(peer.get("display_name") or peer_uid)
+            progress.item = peer_label
+            emit_progress(task_id, progress, force=True)
+            result = _sync_single_peer_catalog(
+                peer_uid,
+                params,
+                on_page=lambda synced, label=peer_label: on_page(label, synced),
+            )
             results.append({"node_uid": peer_uid, **result})
             total_synced += int(result.get("synced") or 0)
+            progress.done += 1
+            emit_progress(task_id, progress, force=True)
         return {"peers": len(results), "synced": total_synced, "results": results}
 
-    return _sync_single_peer_catalog(str(node_uid), params)
+    progress.total = 1
+    progress.item = str(node_uid)
+    emit_progress(task_id, progress, force=True)
+    result = _sync_single_peer_catalog(
+        str(node_uid),
+        params,
+        on_page=lambda synced: on_page(str(node_uid), synced),
+    )
+    progress.done = 1
+    emit_progress(task_id, progress, force=True)
+    return result
 
 
 def _duration_seconds(item: dict) -> int | None:
@@ -139,7 +169,12 @@ def _sync_peer_catalog_delta(
     }
 
 
-def _sync_single_peer_catalog(node_uid: str, params: dict) -> dict:
+def _sync_single_peer_catalog(
+    node_uid: str,
+    params: dict,
+    *,
+    on_page: Callable[[int], None] | None = None,
+) -> dict:
     from crate.federation.catalog import (
         get_cursor,
         record_catalog_sync_error,
@@ -362,6 +397,8 @@ def _sync_single_peer_catalog(node_uid: str, params: dict) -> dict:
                 )
             total_count += 1
 
+        if on_page is not None:
+            on_page(total_count)
         response_next_cursor = str(data.get("next_cursor") or "")
         if "has_more" in data and not data.get("has_more"):
             manifest_completed = True
@@ -524,6 +561,10 @@ def _handle_federation_import(task_id: str, params: dict, config: dict) -> dict:
         cancel_cached = is_cancelled(task_id) or current.get("status") == "cancelled"
         return cancel_cached
 
+    progress = TaskProgress(
+        phase="manifest", phase_count=3, item=str(req.get("title") or "")
+    )
+    emit_progress(task_id, progress, force=True)
     try:
         response = client.request(
             "GET",
@@ -568,12 +609,19 @@ def _handle_federation_import(task_id: str, params: dict, config: dict) -> dict:
         reserved = True
         staging_dir.mkdir(parents=True, exist_ok=True)
         update_import_request(request_id, status="downloading")
+        progress.phase = "download"
+        progress.phase_index = 1
+        progress.total = len(manifest["tracks"])
+        emit_progress(task_id, progress, force=True)
 
         received = 0
         for index, track in enumerate(manifest["tracks"], start=1):
             if should_cancel():
                 update_import_request(request_id, status="cancelled")
                 raise RuntimeError("Federated import cancelled")
+            progress.done = index - 1
+            progress.item = str(track.get("title") or track["entity_uid"])
+            emit_progress(task_id, progress)
             suffix = Path(str(track.get("title") or track["entity_uid"])).name
             extension = str(track.get("format") or "mp3").lower().lstrip(".")
             filename = f"{index:03d}-{suffix}.{extension}"
@@ -600,8 +648,14 @@ def _handle_federation_import(task_id: str, params: dict, config: dict) -> dict:
 
         if received != int(manifest["total_bytes"]):
             raise ValueError("Downloaded bytes do not match import manifest")
+        progress.done = progress.total
+        emit_progress(task_id, progress, force=True)
         update_import_request(request_id, status="verifying")
         update_import_request(request_id, status="importing")
+        progress.phase = "import"
+        progress.phase_index = 2
+        progress.item = str(manifest.get("title") or req["title"])
+        emit_progress(task_id, progress, force=True)
         result = ImportQueue(config).import_item(
             str(staging_dir),
             str(manifest.get("artist") or "Unknown Artist"),

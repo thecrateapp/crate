@@ -615,3 +615,71 @@ def test_handle_repair_revalidates_artist_layout_fix_for_target_artist_only(
         "Artist revalidation complete" in payload.get("message", "")
         for _, _, payload in emitted
     )
+
+
+def _capture_management_progress(monkeypatch):
+    from crate.worker_handlers import management
+
+    progress: list[dict] = []
+    monkeypatch.setattr(
+        management,
+        "emit_progress",
+        lambda task_id, value, force=False: progress.append(value.to_dict()),
+    )
+    monkeypatch.setattr(management, "emit_task_event", lambda *args, **kwargs: None)
+    return management, progress
+
+
+def test_smart_playlist_refresh_reports_each_enqueued_playlist(monkeypatch):
+    management, progress = _capture_management_progress(monkeypatch)
+    monkeypatch.setattr(
+        management,
+        "get_smart_playlists_for_refresh",
+        lambda: [{"id": 1, "name": "Daily"}, {"id": 2, "name": "Weekly"}],
+    )
+    monkeypatch.setattr(management, "create_task", lambda *args, **kwargs: "t")
+
+    result = management._handle_refresh_system_smart_playlists("task-1", {}, {})
+
+    assert result == {"eligible": 2, "enqueued": 2}
+    assert [(p["done"], p["total"], p["item"]) for p in progress] == [
+        (0, 2, ""),
+        (1, 2, "Daily"),
+        (2, 2, "Weekly"),
+    ]
+
+
+def test_system_playlist_generation_reports_rule_and_write_phases(monkeypatch):
+    management, progress = _capture_management_progress(monkeypatch)
+    monkeypatch.setattr(
+        management,
+        "get_playlist",
+        lambda playlist_id: {
+            "id": playlist_id,
+            "name": "Daily",
+            "smart_rules": {"limit": 1},
+            "total_duration": 120,
+        },
+    )
+    monkeypatch.setattr(management, "set_generation_status", lambda *args: None)
+    monkeypatch.setattr(management, "log_generation_start", lambda *args: 9)
+    monkeypatch.setattr(management, "log_generation_complete", lambda *args: None)
+    monkeypatch.setattr(
+        management, "execute_smart_rules", lambda rules: [{"id": 1, "path": "/a"}]
+    )
+    monkeypatch.setattr(
+        management, "regenerate_playlist_tracks", lambda *args, **kwargs: 1
+    )
+
+    result = management._handle_generate_system_playlist(
+        "task-1", {"playlist_id": 5}, {}
+    )
+
+    assert result["track_count"] == 1
+    assert [
+        (p["phase"], p["phase_index"], p["done"], p["total"]) for p in progress
+    ] == [
+        ("evaluate_rules", 0, 0, 2),
+        ("write_tracks", 1, 1, 2),
+        ("write_tracks", 1, 2, 2),
+    ]

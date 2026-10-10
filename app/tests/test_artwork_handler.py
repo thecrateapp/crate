@@ -1614,3 +1614,56 @@ class TestSearchMusicBrainzCover:
             lambda **kwargs: (_ for _ in ()).throw(RuntimeError("api down")),
         )
         assert _search_musicbrainz_cover("Artist", "Album") is None
+
+
+def test_artist_hero_backfill_reports_each_queued_artist(monkeypatch):
+    from crate.worker_handlers import artwork
+
+    progress: list[dict] = []
+    monkeypatch.setattr(
+        artwork,
+        "list_artist_hero_backfill_candidates",
+        lambda *, after_id, limit: [
+            {"id": 1, "name": "First"},
+            {"id": 2, "name": "Second"},
+        ],
+    )
+    monkeypatch.setattr(artwork, "create_task_dedup", lambda *args, **kwargs: "t")
+    monkeypatch.setattr(
+        artwork,
+        "emit_progress",
+        lambda task_id, value, force=False: progress.append(value.to_dict()),
+    )
+
+    result = artwork._handle_backfill_artist_heroes("task-1", {"batch_size": 5}, {})
+
+    assert result["queued"] == 2
+    assert [(p["phase"], p["done"], p["total"], p["item"]) for p in progress] == [
+        ("queue_heroes", 0, 2, ""),
+        ("queue_heroes", 1, 2, "First"),
+        ("queue_heroes", 2, 2, "Second"),
+    ]
+
+
+def test_artwork_variant_cleanup_reports_start_and_finish(monkeypatch, tmp_path):
+    from crate.worker_handlers import artwork
+
+    progress: list[dict] = []
+    monkeypatch.setattr(
+        artwork, "cleanup_artwork_variants", lambda **kwargs: {"deleted": 4}
+    )
+    monkeypatch.setattr(
+        artwork,
+        "emit_progress",
+        lambda task_id, value, force=False: progress.append(value.to_dict()),
+    )
+
+    result = artwork._handle_cleanup_artwork_variants(
+        "task-1", {}, {"library_path": str(tmp_path)}
+    )
+
+    assert result == {"deleted": 4}
+    assert [(p["phase"], p["done"], p["total"]) for p in progress] == [
+        ("cleanup", 0, 1),
+        ("cleanup", 1, 1),
+    ]

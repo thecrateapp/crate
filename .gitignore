@@ -38,6 +38,9 @@ playwright-report/appearance/
 test-results/appearance/
 playwright-report/listen-visual/
 test-results/listen-visual/
+playwright-report/admin-e2e/
+test-results/admin-e2e/
+.playwright-mcp/
 desktop-artifacts/
 artifacts/
 .artifacts/

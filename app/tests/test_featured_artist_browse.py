@@ -66,7 +66,9 @@ def test_browse_artists_defaults_to_recent_and_filters_featured(monkeypatch, tes
         ]
 
     monkeypatch.setattr(browse_artist, "get_artists_page", fake_get_artists_page)
-    monkeypatch.setattr(browse_artist, "get_all_artist_issue_counts", lambda: {})
+    monkeypatch.setattr(
+        browse_artist, "get_open_issue_counts_for_artists", lambda _ids: {}
+    )
     monkeypatch.setattr(browse_artist, "get_artist_list_genres_map", lambda _: {})
 
     response = test_app.get("/api/artists?featured=true&per_page=1")
@@ -85,6 +87,7 @@ def test_browse_artists_defaults_to_recent_and_filters_featured(monkeypatch, tes
             "primary_format": "flac",
             "has_photo": True,
             "has_issues": False,
+            "issue_count": 0,
             "popularity": 5,
             "popularity_score": 0.5,
             "popularity_confidence": 1.0,
@@ -140,7 +143,9 @@ def test_browse_artists_featured_false_returns_empty_featured_metadata(
             }
         ],
     )
-    monkeypatch.setattr(browse_artist, "get_all_artist_issue_counts", lambda: {})
+    monkeypatch.setattr(
+        browse_artist, "get_open_issue_counts_for_artists", lambda _ids: {}
+    )
 
     response = test_app.get("/api/artists?featured=false")
 

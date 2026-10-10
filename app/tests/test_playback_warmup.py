@@ -165,3 +165,71 @@ def test_admin_warmup_refuses_when_feature_is_not_enabled(monkeypatch):
         api_admin_playback_warmup(object(), PlaybackWarmupRequest())
 
     assert exc.value.status_code == 409
+
+
+def test_warmup_reports_progress_per_policy(monkeypatch):
+    from crate.worker_handlers import playback
+
+    tracks = [
+        {"id": 1, "path": "/music/one.flac", "title": "One", "size": 10},
+        {"id": 2, "path": "/music/two.flac", "title": "Two", "size": 10},
+    ]
+    progress: list[dict] = []
+    monkeypatch.setattr(playback, "_playback_warmup_enabled", lambda: True)
+    monkeypatch.setattr(playback, "_has_warmup_disk_headroom", lambda: True)
+    monkeypatch.setattr(
+        playback, "list_recent_local_delivery_tracks", lambda limit: tracks
+    )
+    monkeypatch.setattr(
+        playback,
+        "prepare_playback",
+        lambda track, policy, reason: SimpleNamespace(preparing=True),
+    )
+    monkeypatch.setattr(playback, "is_cancelled", lambda _: False)
+    monkeypatch.setattr(
+        playback,
+        "emit_progress",
+        lambda task_id, value, force=False: progress.append(value.to_dict()),
+    )
+
+    _handle_warmup_stream_variants(
+        "task-1",
+        {
+            "limit": 2,
+            "max_source_bytes": 1000,
+            "max_seconds": 30,
+            "include_data_saver": True,
+        },
+        {},
+    )
+
+    assert [(p["phase"], p["phase_index"], p["phase_count"]) for p in progress][0] == (
+        "balanced",
+        0,
+        2,
+    )
+    balanced = [p for p in progress if p["phase"] == "balanced"]
+    data_saver = [p for p in progress if p["phase"] == "data_saver"]
+    assert balanced[-1]["done"] == 2 and balanced[-1]["total"] == 2
+    assert balanced[-1]["item"] == "Two"
+    assert data_saver[0]["phase_index"] == 1 and data_saver[-1]["done"] == 2
+
+
+def test_stream_variant_cleanup_reports_start_and_finish(monkeypatch):
+    from crate.worker_handlers import playback
+
+    progress: list[dict] = []
+    monkeypatch.setattr(playback, "cleanup_stream_variants", lambda: {"deleted": 3})
+    monkeypatch.setattr(
+        playback,
+        "emit_progress",
+        lambda task_id, value, force=False: progress.append(value.to_dict()),
+    )
+
+    result = playback._handle_cleanup_stream_variants("task-1", {}, {})
+
+    assert result == {"deleted": 3}
+    assert [(p["phase"], p["done"], p["total"]) for p in progress] == [
+        ("cleanup", 0, 1),
+        ("cleanup", 1, 1),
+    ]

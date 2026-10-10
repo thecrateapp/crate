@@ -7,10 +7,13 @@ from pathlib import Path
 
 from crate.audio import read_tags
 from crate.db.health import (
+    cleanup_old_resolved,
     upsert_health_issue,
     resolve_stale_artist_issues,
     resolve_stale_issues,
 )
+from crate.db.repositories.health_issues import record_health_check_runs
+from crate.health_issue_text import describe_health_issue, health_issue_identity
 from crate.db.queries.health import (
     get_albums_with_year,
     get_all_albums,
@@ -57,6 +60,7 @@ class LibraryHealthCheck:
     )
 
     def __init__(self, config: dict):
+        self.config = config
         self.library_path = Path(config["library_path"])
         self.extensions = set(
             config.get("audio_extensions", [".flac", ".mp3", ".m4a", ".ogg", ".opus"])
@@ -117,6 +121,18 @@ class LibraryHealthCheck:
                     issues.extend(
                         self._check_artist_layout_fix_for_artists([artist_name])
                     )
+                elif check_type == "duplicate_albums":
+                    issues.extend(
+                        self._duplicate_album_issues(
+                            get_duplicate_albums(artist_name=artist_name)
+                        )
+                    )
+                elif check_type == "duplicate_tracks":
+                    issues.extend(
+                        self._duplicate_track_issues(
+                            get_duplicate_tracks(artist_name=artist_name)
+                        )
+                    )
                 else:
                     log.debug(
                         "No artist-scoped revalidation implemented for %s", check_type
@@ -134,14 +150,14 @@ class LibraryHealthCheck:
 
         if persist:
             self._persist_targeted_issues(issues)
-            descriptions_by_check: dict[str, set[str]] = defaultdict(set)
+            identities_by_check: dict[str, set[str]] = defaultdict(set)
             for issue in issues:
-                descriptions_by_check[issue["check"]].add(
-                    self._issue_description(issue)
+                identities_by_check[issue["check"]].add(
+                    self._issue_identity(issue, self._issue_description(issue))
                 )
             for check_type in selected:
                 resolve_stale_artist_issues(
-                    descriptions_by_check.get(check_type, set()), check_type, artists
+                    identities_by_check.get(check_type, set()), check_type, artists
                 )
 
         summary: dict[str, int] = {}
@@ -159,12 +175,15 @@ class LibraryHealthCheck:
         }
 
     def _persist_issues(
-        self, issues: list[dict], entries: list[RepairCatalogEntry]
+        self,
+        issues: list[dict],
+        entries: list[RepairCatalogEntry],
+        duration_ms: int = 0,
     ) -> None:
         by_type: dict[str, set[str]] = defaultdict(set)
         for issue in issues:
             desc = self._issue_description(issue)
-            by_type[issue["check"]].add(desc)
+            by_type[issue["check"]].add(self._issue_identity(issue, desc))
             upsert_health_issue(
                 check_type=issue["check"],
                 severity=issue.get("severity", "medium"),
@@ -173,8 +192,16 @@ class LibraryHealthCheck:
                 auto_fixable=issue.get("auto_fixable", False),
             )
         for entry in entries:
-            descriptions = by_type.get(entry.check_type, set())
-            resolve_stale_issues(descriptions, entry.check_type)
+            identities = by_type.get(entry.check_type, set())
+            resolve_stale_issues(identities, entry.check_type)
+        record_health_check_runs(
+            {
+                entry.check_type: len(by_type.get(entry.check_type, ()))
+                for entry in entries
+            },
+            duration_ms,
+        )
+        cleanup_old_resolved()
 
     def _persist_targeted_issues(self, issues: list[dict]) -> None:
         for issue in issues:
@@ -188,13 +215,12 @@ class LibraryHealthCheck:
             )
 
     def _issue_description(self, issue: dict) -> str:
-        return (
-            issue.get("description")
-            or str(issue.get("details", {}))
-            .replace("{", "")
-            .replace("}", "")
-            .replace("'", "")[:200]
+        return issue.get("description") or describe_health_issue(
+            issue["check"], issue.get("details")
         )
+
+    def _issue_identity(self, issue: dict, description: str) -> str:
+        return health_issue_identity(issue["check"], issue.get("details"), description)
 
     def _run_entries(
         self,
@@ -225,7 +251,7 @@ class LibraryHealthCheck:
             summary[key] = summary.get(key, 0) + 1
 
         if persist:
-            self._persist_issues(issues, [entry for entry, _ in checks])
+            self._persist_issues(issues, [entry for entry, _ in checks], duration_ms)
 
         return {
             "issues": issues,
@@ -465,16 +491,20 @@ class LibraryHealthCheck:
         return issues
 
     def _check_duplicate_albums(self) -> list[dict]:
-        rows = get_duplicate_albums()
+        return self._duplicate_album_issues(get_duplicate_albums())
+
+    def _duplicate_album_issues(self, rows: list[dict]) -> list[dict]:
         return [
             {
                 "check": "duplicate_albums",
                 "severity": "medium",
+                "auto_fixable": True,
                 "details": {
                     "artist": r["artist"],
                     "album": r["album_name"],
                     "count": r["cnt"],
                     "paths": r.get("paths", []),
+                    "copies": r.get("copies", []),
                 },
             }
             for r in rows
@@ -483,7 +513,26 @@ class LibraryHealthCheck:
     def _check_duplicate_tracks(self) -> list[dict]:
         """Detect tracks that appear multiple times in the same album
         (same artist + title + track number, different file paths)."""
-        rows = get_duplicate_tracks()
+        return self._duplicate_track_issues(get_duplicate_tracks())
+
+    def _duplicate_track_issues(self, rows: list[dict]) -> list[dict]:
+        issues = self._duplicate_track_issue_rows(rows)
+        if not issues:
+            return issues
+        from crate.repair import LibraryRepair
+
+        repairer = LibraryRepair(self.config)
+        for issue in issues:
+            try:
+                resolution = repairer.duplicate_track_resolution(issue)
+            except Exception:
+                log.debug("Duplicate track resolution failed", exc_info=True)
+                continue
+            if isinstance(resolution, str):
+                issue["details"]["cleanup_blocked_reason"] = resolution
+        return issues
+
+    def _duplicate_track_issue_rows(self, rows: list[dict]) -> list[dict]:
         return [
             {
                 "check": "duplicate_tracks",

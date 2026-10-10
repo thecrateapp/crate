@@ -266,11 +266,24 @@ def _handle_warmup_stream_variants(task_id: str, params: dict, config: dict) -> 
     enqueued = 0
     skipped = 0
 
+    policies = ["balanced", "data_saver"] if include_data_saver else ["balanced"]
+
     def warm(policy: str) -> None:
         nonlocal consumed_source_bytes, enqueued, skipped
-        for track in list_recent_local_delivery_tracks(limit):
+        tracks = list_recent_local_delivery_tracks(limit)
+        progress = TaskProgress(
+            phase=policy,
+            phase_index=policies.index(policy),
+            phase_count=len(policies),
+            total=len(tracks),
+        )
+        emit_progress(task_id, progress, force=True)
+        for track in tracks:
             if is_cancelled(task_id) or time.monotonic() - started_at >= max_seconds:
                 return
+            progress.done += 1
+            progress.item = str(track.get("title") or track.get("path") or "")
+            emit_progress(task_id, progress)
             try:
                 source_size = max(0, int(track.get("size") or 0))
             except (TypeError, ValueError):
@@ -294,8 +307,11 @@ def _handle_warmup_stream_variants(task_id: str, params: dict, config: dict) -> 
 
 
 def _handle_cleanup_stream_variants(task_id: str, params: dict, config: dict) -> dict:
-    del task_id, params, config
-    return cleanup_stream_variants()
+    del params, config
+    emit_progress(task_id, TaskProgress(phase="cleanup", total=1), force=True)
+    result = cleanup_stream_variants()
+    emit_progress(task_id, TaskProgress(phase="cleanup", done=1, total=1), force=True)
+    return result
 
 
 PLAYBACK_TASK_HANDLERS: dict[str, TaskHandler] = {

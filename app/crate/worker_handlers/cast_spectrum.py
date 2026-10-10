@@ -20,6 +20,7 @@ from crate.db.repositories.cast_spectrum import (
 from crate.db.repositories.streaming import get_track_delivery_row_by_id
 from crate.streaming.paths import data_root
 from crate.streaming.service import resolve_source_path
+from crate.task_progress import TaskProgress, emit_progress
 from crate.worker_handlers import TaskHandler, is_cancelled
 
 
@@ -38,6 +39,8 @@ def _handle_generate_cast_spectrum(task_id: str, params: dict, config: dict) -> 
     requested_fingerprint = str(params.get("source_fingerprint") or "").strip()
     relative_path = spectrum_artifact_relative_path(requested_fingerprint)
 
+    progress = TaskProgress(phase="resolve_source", phase_count=3, total=3)
+    emit_progress(task_id, progress, force=True)
     track = get_track_delivery_row_by_id(track_id)
     if track is None:
         raise ValueError(f"Track {track_id} does not exist")
@@ -64,6 +67,11 @@ def _handle_generate_cast_spectrum(task_id: str, params: dict, config: dict) -> 
         )
         return {"status": "cancelled"}
 
+    progress.phase = "generate"
+    progress.phase_index = 1
+    progress.done = 1
+    progress.item = str(track.get("title") or track_id)
+    emit_progress(task_id, progress, force=True)
     try:
         result = generate_spectrum_artifact(
             source_path,
@@ -76,6 +84,10 @@ def _handle_generate_cast_spectrum(task_id: str, params: dict, config: dict) -> 
                 track_id, requested_fingerprint, generation_token
             )
             return {"status": "cancelled"}
+        progress.phase = "store"
+        progress.phase_index = 2
+        progress.done = 2
+        emit_progress(task_id, progress, force=True)
         completed = complete_cast_spectrum_generation(
             track_id,
             requested_fingerprint,
@@ -113,6 +125,8 @@ def _handle_generate_cast_spectrum(task_id: str, params: dict, config: dict) -> 
         record("cast.spectrum.bytes", result.byte_size, {"format_version": "1"})
     except Exception:
         log.debug("Failed to record Cast spectrum metrics", exc_info=True)
+    progress.done = 3
+    emit_progress(task_id, progress, force=True)
     return {
         "status": "ready",
         "track_id": track_id,

@@ -540,6 +540,8 @@ def _fix_artist(
     if not artist_entity_uid:
         raise RuntimeError(f"Artist {artist_name} has no entity_uid")
 
+    progress = TaskProgress(phase="preview", phase_count=3, item=artist_name)
+    emit_progress(task_id, progress, force=True)
     preview_config = dict(config or {})
     preview_config["artist_layout_fix_deep_discovery"] = True
     preview = preview_fix_artist(lib, artist, preview_config)
@@ -580,10 +582,17 @@ def _fix_artist(
             },
         )
 
+        progress.phase = "consolidate"
+        progress.phase_index = 1
+        progress.total = len(candidate_dirs)
+        emit_progress(task_id, progress, force=True)
         for candidate_dir in candidate_dirs:
             if is_cancelled(task_id):
                 break
 
+            progress.done += 1
+            progress.item = candidate_dir.name
+            emit_progress(task_id, progress)
             if candidate_dir != target_artist_dir:
                 moved_artist_files += _move_artist_level_files(
                     candidate_dir, target_artist_dir
@@ -631,6 +640,7 @@ def _fix_artist(
                     fixed_albums += 1
                 except Exception:
                     failed_albums += 1
+                    progress.errors += 1
                     log.warning(
                         "Failed to consolidate album dir %s for %s",
                         album_dir,
@@ -653,6 +663,10 @@ def _fix_artist(
                 f"No album audio directories found for {artist_name} after consolidation"
             )
 
+        progress.phase = "sync"
+        progress.phase_index = 2
+        progress.item = artist_name
+        emit_progress(task_id, progress, force=True)
         sync = LibrarySync(dict(config))
         synced_tracks = sync.sync_artist_dirs(artist_name, [target_artist_dir])
         update_artist_folder_name(artist_name, artist_entity_uid)

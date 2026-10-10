@@ -67,7 +67,7 @@ from crate.api.schemas.browse import (
 )
 from crate.artist_bio import normalize_artist_bio
 from crate.db.cache_store import get_cache, set_cache
-from crate.db.health import get_all_artist_issue_counts, get_artist_issue_count
+from crate.db.queries.health_issues import get_open_issue_counts_for_artists
 from crate.external_artist_artwork import (
     get_cached_external_artist_artwork_path,
     is_external_artist_artwork_missing,
@@ -731,6 +731,7 @@ def api_artists(
     per_page: int = Query(60, ge=1, le=120),
     sort: str = "recent",
     featured: str = Query("all", pattern="^(all|true|false)$"),
+    has_issues: str = Query("all", pattern="^(all|true|false)$"),
     genre: str = "",
     country: str = "",
     decade: str = "",
@@ -845,6 +846,15 @@ def api_artists(
     elif featured == "false":
         where_clauses.append("la.is_featured = FALSE")
 
+    open_issue_sql = (
+        "EXISTS (SELECT 1 FROM health_issues hi "
+        "WHERE hi.artist_id = la.id AND hi.status = 'open')"
+    )
+    if has_issues == "true":
+        where_clauses.append(open_issue_sql)
+    elif has_issues == "false":
+        where_clauses.append(f"NOT {open_issue_sql}")
+
     if q:
         where_clauses.append("la.name ILIKE :q")
         params["q"] = f"%{q}%"
@@ -863,7 +873,7 @@ def api_artists(
         (page - 1) * per_page,
     )
 
-    issue_counts = get_all_artist_issue_counts()
+    issue_counts = get_open_issue_counts_for_artists([row.get("id") for row in rows])
     list_genres = (
         get_artist_list_genres_map([row["name"] for row in rows])
         if view == "list"
@@ -904,7 +914,8 @@ def api_artists(
             else [],
             "primary_format": row.get("primary_format"),
             "has_photo": bool(row.get("has_photo")),
-            "has_issues": bool(issue_counts.get(row["name"], 0)),
+            "has_issues": bool(issue_counts.get(row.get("id") or 0, 0)),
+            "issue_count": issue_counts.get(row.get("id") or 0, 0),
             "popularity": row.get("popularity"),
             "popularity_score": row.get("popularity_score"),
             "popularity_confidence": row.get("popularity_confidence"),
@@ -2312,7 +2323,9 @@ def api_artist(request: Request, name: str):
         "genres": top_genres,
         "genre_profile": genre_profile,
         "manual_genres": manual_genres,
-        "issue_count": get_artist_issue_count(canonical),
+        "issue_count": get_open_issue_counts_for_artists([artist.get("id")]).get(
+            artist.get("id"), 0
+        ),
         "is_v2": is_v2,
         "popularity": artist.get("popularity"),
         "popularity_score": artist.get("popularity_score"),
