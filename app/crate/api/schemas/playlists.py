@@ -51,8 +51,19 @@ class ReorderRequest(BaseModel):
 
 
 class PlaylistMemberRequest(BaseModel):
-    user_id: int
+    user_id: int | None = None
+    username: str | None = None
     role: str = "collab"
+
+
+class PlaylistFollowResponse(BaseModel):
+    ok: bool = True
+    is_followed: bool
+    follower_count: int
+
+
+class PlaylistCopyResponse(BaseModel):
+    id: int
 
 
 class PlaylistInviteRequest(BaseModel):

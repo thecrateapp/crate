@@ -8,14 +8,15 @@ from crate.api.openapi_responses import (
     merge_responses,
 )
 from crate.api.playlist_utils import apply_playlist_cover_payload
-from crate.api.public_urls import public_share_url
 from crate.api.schemas.common import OkResponse
 from crate.api.schemas.playlists import (
     AddTracksRequest,
     CreatePlaylistRequest,
+    PlaylistCopyResponse,
     PlaylistCreateResponse,
     PlaylistDetailResponse,
     PlaylistFilterOptionsResponse,
+    PlaylistFollowResponse,
     PlaylistGenerateResponse,
     PlaylistInviteAcceptResponse,
     PlaylistInviteRequest,
@@ -30,13 +31,10 @@ from crate.api.schemas.playlists import (
 )
 from crate.db.genres import get_all_genres
 from crate.db.repositories.playlists import (
-    add_playlist_member,
     add_playlist_tracks,
     can_edit_playlist,
     can_view_playlist,
-    consume_playlist_invite,
     create_playlist,
-    create_playlist_invite,
     delete_playlist,
     execute_smart_rules,
     get_playlist,
@@ -52,7 +50,14 @@ from crate.db.repositories.playlists import (
     update_playlist,
 )
 from crate.db.repositories.playlists_collection_reads import get_playlist_follow_state
+from crate.db.repositories.playlists_collaboration import (
+    add_playlist_collaborator,
+    copy_playlist,
+    leave_playlist,
+)
+from crate.db.repositories.playlists_follows import follow_playlist, unfollow_playlist
 from crate.db.repositories.playlists_membership_reads import get_playlist_access
+from crate.db.repositories.users import get_user_by_username
 from crate.playlist_covers import delete_playlist_cover, playlist_cover_abspath
 
 router = APIRouter(prefix="/api/playlists", tags=["playlists"])
@@ -362,8 +367,11 @@ def members(request: Request, playlist_id: int):
     pl = get_playlist(playlist_id)
     if not pl:
         raise HTTPException(status_code=404, detail="Playlist not found")
-    if user.get("role") != "admin" and not can_view_playlist(pl, user["id"]):
-        raise HTTPException(status_code=403, detail="Playlist is private")
+    if user.get("role") != "admin" and get_playlist_access(pl, user["id"]) not in {
+        "owner",
+        "collaborator",
+    }:
+        raise HTTPException(status_code=403, detail="Only collaborators see members")
     return get_playlist_members(playlist_id)
 
 
@@ -382,11 +390,80 @@ def add_member(request: Request, playlist_id: int, body: PlaylistMemberRequest):
         raise HTTPException(status_code=403, detail="Only the owner can manage members")
     if body.role != "collab":
         raise HTTPException(status_code=422, detail="Invalid member role")
-    add_playlist_member(
-        playlist_id, body.user_id, role=body.role, invited_by=user["id"]
-    )
-    update_playlist(playlist_id, is_collaborative=True)
+    target_id = body.user_id
+    if target_id is None and body.username:
+        target = get_user_by_username(body.username.strip().lstrip("@"))
+        target_id = int(target["id"]) if target else None
+    if target_id is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target_id == pl.get("user_id"):
+        raise HTTPException(status_code=400, detail="The owner is already a member")
+    add_playlist_collaborator(playlist_id, target_id, added_by=user["id"])
     return {"ok": True, "members": get_playlist_members(playlist_id)}
+
+
+@router.post(
+    "/{playlist_id}/leave",
+    response_model=OkResponse,
+    responses=_PLAYLIST_RESPONSES,
+    summary="Leave a playlist you collaborate on",
+)
+def leave(request: Request, playlist_id: int):
+    user = _require_auth(request)
+    if not leave_playlist(playlist_id, user["id"]):
+        raise HTTPException(status_code=404, detail="Not a collaborator")
+    return {"ok": True}
+
+
+def _followable_playlist(request: Request, playlist_id: int) -> tuple[dict, dict]:
+    user = _require_auth(request)
+    pl = get_playlist(playlist_id)
+    if not pl:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    if get_playlist_access(pl, user["id"]) != "public":
+        raise HTTPException(status_code=403, detail="Playlist cannot be followed")
+    return user, pl
+
+
+@router.post(
+    "/{playlist_id}/follow",
+    response_model=PlaylistFollowResponse,
+    responses=_PLAYLIST_RESPONSES,
+    summary="Follow a public playlist",
+)
+def follow(request: Request, playlist_id: int):
+    user, _pl = _followable_playlist(request, playlist_id)
+    follow_playlist(user["id"], playlist_id)
+    return {"ok": True, **get_playlist_follow_state(playlist_id, user["id"])}
+
+
+@router.delete(
+    "/{playlist_id}/follow",
+    response_model=PlaylistFollowResponse,
+    responses=_PLAYLIST_RESPONSES,
+    summary="Stop following a playlist",
+)
+def unfollow(request: Request, playlist_id: int):
+    user = _require_auth(request)
+    unfollow_playlist(user["id"], playlist_id)
+    return {"ok": True, **get_playlist_follow_state(playlist_id, user["id"])}
+
+
+@router.post(
+    "/{playlist_id}/copy",
+    response_model=PlaylistCopyResponse,
+    responses=_PLAYLIST_RESPONSES,
+    summary="Copy a playlist into the current user's playlists",
+)
+def copy(request: Request, playlist_id: int):
+    user = _require_auth(request)
+    pl = get_playlist(playlist_id)
+    if not pl:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    if get_playlist_access(pl, user["id"]) == "none":
+        raise HTTPException(status_code=403, detail="Playlist is private")
+    new_id = copy_playlist(pl, get_playlist_tracks(playlist_id), user["id"])
+    return {"id": new_id}
 
 
 @router.delete(
@@ -417,25 +494,11 @@ def delete_member(request: Request, playlist_id: int, user_id: int):
     summary="Create a playlist invite",
 )
 def invite(request: Request, playlist_id: int, body: PlaylistInviteRequest):
-    user = _require_auth(request)
-    pl = get_playlist(playlist_id)
-    if not pl:
-        raise HTTPException(status_code=404, detail="Playlist not found")
-    if user.get("role") != "admin" and not is_playlist_owner(pl, user["id"]):
-        raise HTTPException(status_code=403, detail="Only the owner can create invites")
-    invite_row = create_playlist_invite(
-        playlist_id,
-        user["id"],
-        expires_in_hours=body.expires_in_hours,
-        max_uses=body.max_uses,
+    _require_auth(request)
+    raise HTTPException(
+        status_code=410,
+        detail="Invite links are disabled; the owner adds collaborators directly",
     )
-    invite_path = f"/playlist/invite/{invite_row['token']}"
-    return {
-        **invite_row,
-        "join_url": invite_path,
-        "qr_value": invite_path,
-        "public_url": public_share_url(invite_path),
-    }
 
 
 @router.post(
@@ -445,19 +508,8 @@ def invite(request: Request, playlist_id: int, body: PlaylistInviteRequest):
     summary="Accept a playlist invite",
 )
 def accept_invite(request: Request, token: str):
-    user = _require_auth(request)
-    invite_row = consume_playlist_invite(token)
-    if not invite_row:
-        raise HTTPException(status_code=404, detail="Invite not found or expired")
-    pl = get_playlist(invite_row["playlist_id"])
-    if not pl:
-        raise HTTPException(status_code=404, detail="Playlist not found")
-    add_playlist_member(
-        pl["id"], user["id"], role="collab", invited_by=invite_row.get("created_by")
+    _require_auth(request)
+    raise HTTPException(
+        status_code=410,
+        detail="Invite links are disabled; ask the owner to add you",
     )
-    update_playlist(pl["id"], is_collaborative=True)
-    return {
-        "ok": True,
-        "playlist_id": pl["id"],
-        "members": get_playlist_members(pl["id"]),
-    }
