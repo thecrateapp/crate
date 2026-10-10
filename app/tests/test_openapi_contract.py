@@ -1694,3 +1694,25 @@ def test_openapi_types_task_catalog_and_schedule_run(test_app):
     assert run_now["responses"]["200"]["content"]["application/json"]["schema"][
         "$ref"
     ].endswith("/ScheduleRunResponse")
+
+
+def test_openapi_types_playlist_and_crate_collaboration_routes(test_app):
+    data = test_app.get("/openapi.json").json()
+    auth = [{"cookieAuth": []}, {"bearerAuth": []}]
+    expected = {
+        ("/api/playlists/{playlist_id}/follow", "post"): "/PlaylistFollowResponse",
+        ("/api/playlists/{playlist_id}/follow", "delete"): "/PlaylistFollowResponse",
+        ("/api/playlists/{playlist_id}/copy", "post"): "/PlaylistCopyResponse",
+        ("/api/crates/{crate_id}/copy", "post"): "/CrateCopyResponse",
+    }
+    for (path, method), schema in expected.items():
+        operation = data["paths"][path][method]
+        assert operation["security"] == auth
+        assert operation["responses"]["200"]["content"]["application/json"]["schema"][
+            "$ref"
+        ].endswith(schema)
+
+    assert (
+        data["paths"]["/api/playlists/{playlist_id}/leave"]["post"]["security"] == auth
+    )
+    assert data["paths"]["/api/crates/{crate_id}/members"]["post"]["security"] == auth

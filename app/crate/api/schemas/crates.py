@@ -42,6 +42,15 @@ class ReorderCrateAlbumsRequest(BaseModel):
     global_album_uids: list[UUID]
 
 
+class AddCrateMemberRequest(BaseModel):
+    user_id: int | None = None
+    username: str | None = None
+
+
+class CrateCopyResponse(BaseModel):
+    id: str
+
+
 class CreateCrateInviteRequest(BaseModel):
     expires_in_hours: int = Field(
         default=168,

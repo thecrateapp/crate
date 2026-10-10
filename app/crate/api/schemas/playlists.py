@@ -51,8 +51,19 @@ class ReorderRequest(BaseModel):
 
 
 class PlaylistMemberRequest(BaseModel):
-    user_id: int
+    user_id: int | None = None
+    username: str | None = None
     role: str = "collab"
+
+
+class PlaylistFollowResponse(BaseModel):
+    ok: bool = True
+    is_followed: bool
+    follower_count: int
+
+
+class PlaylistCopyResponse(BaseModel):
+    id: int
 
 
 class PlaylistInviteRequest(BaseModel):
@@ -130,6 +141,8 @@ class PlaylistSummaryResponse(BaseModel):
     cover_data_url: str | None = None
     cover_path: str | None = None
     user_id: int | None = None
+    owner_username: str | None = None
+    owner_name: str | None = None
     is_smart: bool | None = None
     smart_rules: dict[str, Any] | None = None
     scope: str | None = None
@@ -153,6 +166,10 @@ class PlaylistSummaryResponse(BaseModel):
 class PlaylistDetailResponse(PlaylistSummaryResponse):
     tracks: list[PlaylistTrackResponse] = Field(default_factory=list)
     members: list[PlaylistMemberResponse] = Field(default_factory=list)
+    access: str = "public"
+    can_edit: bool = False
+    is_followed: bool = False
+    follower_count: int = 0
 
 
 class PlaylistFilterOptionsResponse(BaseModel):

@@ -292,6 +292,7 @@ class FollowedPlaylistResponse(PlaylistSummaryResponse):
 
 class LibraryPlaylistsPageResponse(BaseModel):
     playlists: list[PlaylistSummaryResponse] = Field(default_factory=list)
+    followed_playlists: list[FollowedPlaylistResponse] = Field(default_factory=list)
     followed_curated_playlists: list[FollowedPlaylistResponse] = Field(
         default_factory=list
     )

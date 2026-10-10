@@ -836,13 +836,13 @@ def test_private_crates_are_hidden_and_collaborators_cannot_manage_owner_setting
     assert removal_response.json()["detail"] == (
         "Only the owner can manage Crate members"
     )
-    invite_response = crate_api_client.post(
-        f"{url}/invites",
-        json={},
+    add_response = crate_api_client.post(
+        f"{url}/members",
+        json={"user_id": collaborator_id},
         headers=_headers(collaborator_id),
     )
-    assert invite_response.status_code == 403
-    assert invite_response.json()["detail"] == "Only the owner can manage Crate invites"
+    assert add_response.status_code == 403
+    assert add_response.json()["detail"] == "Only the owner can manage Crate members"
     delete_response = crate_api_client.delete(url, headers=_headers(collaborator_id))
     assert delete_response.status_code == 403
     assert delete_response.json()["detail"] == "Only the owner can delete this Crate"
@@ -982,163 +982,6 @@ def test_add_album_returns_inserted_snapshot_if_album_is_removed_afterward(
     }
 
 
-def test_invites_are_owner_managed_and_acceptance_does_not_publish_crate(
-    pg_db,
-    crate_api_client,
-    monkeypatch,
-):
-    monkeypatch.setenv("CRATE_LISTEN_PUBLIC_BASE_URL", "https://listen.example.test/")
-    invitee_id = _create_user(f"crate-invitee-{uuid4()}@example.test")
-    second_invitee_id = _create_user(f"crate-second-invitee-{uuid4()}@example.test")
-    crate_id = _create_crate(is_collaborative=True)
-    crate_url = f"/api/crates/{crate_id}"
-
-    response = crate_api_client.post(
-        f"{crate_url}/invites",
-        json={"expires_in_hours": 168, "max_uses": 1},
-        headers=_headers(1),
-    )
-    assert response.status_code == 201
-    invite = response.json()
-    token = invite["token"]
-    assert invite["join_url"] == f"https://listen.example.test/crate/invite/{token}"
-    assert invite["qr_value"] == invite["join_url"]
-    assert (
-        crate_api_client.get(
-            f"/api/crates/invites/{token}", headers=_headers(invitee_id)
-        ).status_code
-        == 200
-    )
-
-    accepted = crate_api_client.post(
-        f"/api/crates/invites/{token}/accept",
-        headers=_headers(invitee_id),
-    )
-    assert accepted.status_code == 200
-    assert accepted.json()["crate_id"] == crate_id
-    assert (
-        crate_api_client.get(
-            f"/api/crates/invites/{token}", headers=_headers(invitee_id)
-        ).status_code
-        == 200
-    )
-    assert (
-        crate_api_client.get(
-            f"/api/crates/invites/{token}", headers=_headers(second_invitee_id)
-        ).status_code
-        == 404
-    )
-    detail = crate_api_client.get(crate_url, headers=_headers(invitee_id)).json()
-    assert detail["visibility"] == "private"
-    assert crate_id in {
-        crate["id"]
-        for crate in crate_api_client.get(
-            "/api/me/crates", headers=_headers(invitee_id)
-        ).json()
-    }
-    assert (
-        crate_api_client.post(
-            f"/api/crates/invites/{token}/accept",
-            headers=_headers(second_invitee_id),
-        ).status_code
-        == 410
-    )
-
-    members = crate_api_client.get(f"{crate_url}/members", headers=_headers(1))
-    assert members.status_code == 200
-    assert [(member["user_id"], member["role"]) for member in members.json()] == [
-        (1, "owner"),
-        (invitee_id, "collaborator"),
-    ]
-    assert (
-        crate_api_client.delete(
-            f"{crate_url}/members/{invitee_id}",
-            headers=_headers(1),
-        ).status_code
-        == 200
-    )
-    assert [
-        member["user_id"]
-        for member in crate_api_client.get(
-            f"{crate_url}/members", headers=_headers(1)
-        ).json()
-    ] == [1]
-
-
-def test_active_invites_are_listed_for_the_owner_only(pg_db, crate_api_client):
-    from crate.db.tx import transaction_scope
-
-    collaborator_id = _create_user(f"crate-invite-list-{uuid4()}@example.test")
-    crate_id = _create_crate(is_collaborative=True)
-    _add_member(crate_id, collaborator_id)
-    crate_url = f"/api/crates/{crate_id}"
-    tokens = [
-        crate_api_client.post(
-            f"{crate_url}/invites", json=body, headers=_headers(1)
-        ).json()["token"]
-        for body in (
-            {"expires_in_hours": 24, "max_uses": 3},
-            {"expires_in_hours": 0, "max_uses": None},
-            {"expires_in_hours": 24, "max_uses": 1},
-            {"expires_in_hours": 24, "max_uses": 2},
-            {"expires_in_hours": 24, "max_uses": 2},
-        )
-    ]
-    active_token, unlimited_token, exhausted_token, expired_token, revoked_token = (
-        tokens
-    )
-    with transaction_scope() as session:
-        session.execute(
-            text("UPDATE crate_invites SET use_count = 1 WHERE token = :token"),
-            {"token": exhausted_token},
-        )
-        session.execute(
-            text(
-                """
-                UPDATE crate_invites
-                SET expires_at = NOW() - INTERVAL '1 minute'
-                WHERE token = :token
-                """
-            ),
-            {"token": expired_token},
-        )
-    assert (
-        crate_api_client.delete(
-            f"{crate_url}/invites/{revoked_token}", headers=_headers(1)
-        ).status_code
-        == 200
-    )
-
-    response = crate_api_client.get(f"{crate_url}/invites", headers=_headers(1))
-
-    assert response.status_code == 200
-    invites = response.json()
-    assert {invite["token"] for invite in invites} == {active_token, unlimited_token}
-    active = next(invite for invite in invites if invite["token"] == active_token)
-    assert active["join_url"] == (
-        f"https://listen.testserver/crate/invite/{active_token}"
-    )
-    assert active["max_uses"] == 3
-    assert active["use_count"] == 0
-    assert active["expires_at"] is not None
-    assert active["created_at"] is not None
-    unlimited = next(invite for invite in invites if invite["token"] == unlimited_token)
-    assert unlimited["expires_at"] is None
-    assert unlimited["max_uses"] is None
-
-    collaborator_response = crate_api_client.get(
-        f"{crate_url}/invites", headers=_headers(collaborator_id)
-    )
-    assert collaborator_response.status_code == 403
-    stranger_id = _create_user(f"crate-invite-stranger-{uuid4()}@example.test")
-    assert (
-        crate_api_client.get(
-            f"{crate_url}/invites", headers=_headers(stranger_id)
-        ).status_code
-        == 404
-    )
-
-
 def test_collaborator_can_leave_but_owner_cannot(pg_db, crate_api_client):
     collaborator_id = _create_user(f"crate-leaver-{uuid4()}@example.test")
     other_id = _create_user(f"crate-other-member-{uuid4()}@example.test")
@@ -1181,45 +1024,6 @@ def test_collaborator_can_leave_but_owner_cannot(pg_db, crate_api_client):
     ] == [1, other_id]
 
 
-def test_cannot_create_invite_when_crate_collaboration_is_disabled(
-    pg_db,
-    crate_api_client,
-):
-    crate_id = _create_crate()
-
-    response = crate_api_client.post(
-        f"/api/crates/{crate_id}/invites",
-        json={},
-        headers=_headers(1),
-    )
-
-    assert response.status_code == 409
-    assert response.json()["detail"] == (
-        "Enable collaboration before creating an invite"
-    )
-
-
-def test_invite_value_error_is_mapped_to_unprocessable_entity(monkeypatch):
-    from fastapi import HTTPException
-
-    from crate.api import crates as crate_routes
-    from crate.api.schemas.crates import CreateCrateInviteRequest
-
-    monkeypatch.setattr(crate_routes, "_require_auth", lambda _request: {"id": 1})
-    monkeypatch.setattr(crate_routes, "_require_owner", lambda *args, **kwargs: None)
-    monkeypatch.setenv("CRATE_LISTEN_PUBLIC_BASE_URL", "https://listen.testserver")
-
-    def raise_value_error(*args, **kwargs):
-        raise ValueError("expires_in_hours must be non-negative")
-
-    monkeypatch.setattr(crate_routes, "create_crate_invite", raise_value_error)
-
-    with pytest.raises(HTTPException) as error:
-        crate_routes.invite(None, uuid4(), CreateCrateInviteRequest())
-
-    assert error.value.status_code == 422
-
-
 def test_update_maps_crate_not_found_to_not_found(monkeypatch):
     from fastapi import HTTPException
 
@@ -1243,38 +1047,6 @@ def test_update_maps_crate_not_found_to_not_found(monkeypatch):
     assert error.value.status_code == 404
 
 
-def test_accepting_crate_invite_does_not_return_member_directory(
-    pg_db,
-    crate_api_client,
-):
-    existing_member_id = _create_user(f"crate-existing-member-{uuid4()}@example.test")
-    invitee_id = _create_user(f"crate-new-member-{uuid4()}@example.test")
-    crate_id = _create_crate(is_collaborative=True)
-
-    invite = crate_api_client.post(
-        f"/api/crates/{crate_id}/invites",
-        json={"expires_in_hours": 168, "max_uses": 2},
-        headers=_headers(1),
-    )
-    assert invite.status_code == 201
-    token = invite.json()["token"]
-
-    existing_member_acceptance = crate_api_client.post(
-        f"/api/crates/invites/{token}/accept",
-        headers=_headers(existing_member_id),
-    )
-    assert existing_member_acceptance.status_code == 200
-
-    accepted = crate_api_client.post(
-        f"/api/crates/invites/{token}/accept",
-        headers=_headers(invitee_id),
-    )
-
-    assert accepted.status_code == 200
-    assert accepted.json()["crate_id"] == crate_id
-    assert "members" not in accepted.json()
-
-
 def test_invite_join_url_uses_configured_listen_origin(monkeypatch):
     from crate.api import crates as crate_routes
 
@@ -1283,96 +1055,6 @@ def test_invite_join_url_uses_configured_listen_origin(monkeypatch):
     assert (
         crate_routes._invite_join_url("invite-token")
         == "https://listen.example.test/crate/invite/invite-token"
-    )
-
-
-def test_invite_requires_public_listen_url_before_persisting(monkeypatch):
-    from fastapi import HTTPException
-
-    from crate.api import crates as crate_routes
-    from crate.api.schemas.crates import CreateCrateInviteRequest
-
-    monkeypatch.delenv("CRATE_LISTEN_PUBLIC_BASE_URL", raising=False)
-    monkeypatch.delenv("DOMAIN", raising=False)
-    monkeypatch.setattr(crate_routes, "_require_auth", lambda _request: {"id": 1})
-    monkeypatch.setattr(crate_routes, "_require_owner", lambda *args, **kwargs: None)
-    monkeypatch.setattr(
-        crate_routes,
-        "create_crate_invite",
-        lambda *args, **kwargs: pytest.fail("invite must not be persisted"),
-    )
-
-    with pytest.raises(HTTPException) as error:
-        crate_routes.invite(None, uuid4(), CreateCrateInviteRequest())
-
-    assert error.value.status_code == 503
-
-
-def test_zero_hour_crate_invite_is_explicitly_non_expiring(
-    pg_db,
-    crate_api_client,
-):
-    crate_id = _create_crate(is_collaborative=True)
-
-    response = crate_api_client.post(
-        f"/api/crates/{crate_id}/invites",
-        json={"expires_in_hours": 0},
-        headers=_headers(1),
-    )
-
-    assert response.status_code == 201
-    assert response.json()["expires_at"] is None
-
-
-def test_expired_and_revoked_invites_cannot_be_accepted(pg_db, crate_api_client):
-    from crate.db.tx import transaction_scope
-
-    invitee_id = _create_user(f"crate-expired-invitee-{uuid4()}@example.test")
-    crate_id = _create_crate(is_collaborative=True)
-    crate_url = f"/api/crates/{crate_id}"
-
-    expired = crate_api_client.post(
-        f"{crate_url}/invites",
-        json={"expires_in_hours": 12, "max_uses": 2},
-        headers=_headers(1),
-    ).json()["token"]
-    with transaction_scope() as session:
-        session.execute(
-            text(
-                """
-                UPDATE crate_invites
-                SET expires_at = NOW() - INTERVAL '1 hour'
-                WHERE token = :token
-                """
-            ),
-            {"token": expired},
-        )
-    assert (
-        crate_api_client.post(
-            f"/api/crates/invites/{expired}/accept",
-            headers=_headers(invitee_id),
-        ).status_code
-        == 404
-    )
-
-    revoked = crate_api_client.post(
-        f"{crate_url}/invites",
-        json={"max_uses": 2},
-        headers=_headers(1),
-    ).json()["token"]
-    assert (
-        crate_api_client.delete(
-            f"{crate_url}/invites/{revoked}",
-            headers=_headers(1),
-        ).status_code
-        == 200
-    )
-    assert (
-        crate_api_client.post(
-            f"/api/crates/invites/{revoked}/accept",
-            headers=_headers(invitee_id),
-        ).status_code
-        == 404
     )
 
 
@@ -1388,13 +1070,6 @@ def test_only_owner_can_delete_crate_and_delete_cascades_contents(
     _add_member(crate_id, collaborator_id)
     add_crate_album(crate_id, _seed_album("Cascade album"), added_by=1)
     url = f"/api/crates/{crate_id}"
-
-    invite = crate_api_client.post(
-        f"{url}/invites",
-        json={},
-        headers=_headers(1),
-    )
-    assert invite.status_code == 201
 
     assert (
         crate_api_client.delete(url, headers=_headers(collaborator_id)).status_code
@@ -1415,13 +1090,6 @@ def test_only_owner_can_delete_crate_and_delete_cascades_contents(
         assert (
             session.execute(
                 text("SELECT count(*) FROM crate_members WHERE crate_id = :crate_id"),
-                {"crate_id": crate_id},
-            ).scalar_one()
-            == 0
-        )
-        assert (
-            session.execute(
-                text("SELECT count(*) FROM crate_invites WHERE crate_id = :crate_id"),
                 {"crate_id": crate_id},
             ).scalar_one()
             == 0
@@ -1574,3 +1242,111 @@ def test_crate_detail_exposes_the_owner_instagram_handle(pg_db, crate_api_client
 
     assert detail.status_code == 200
     assert detail.json()["owner_instagram_handle"] == "diego.trecedoce"
+
+
+def test_invite_links_are_disabled_in_favour_of_owner_added_collaborators(
+    pg_db, crate_api_client
+):
+    crate_id = _create_crate(is_collaborative=True)
+    url = f"/api/crates/{crate_id}"
+
+    assert (
+        crate_api_client.post(
+            f"{url}/invites", json={}, headers=_headers(1)
+        ).status_code
+        == 410
+    )
+    assert (
+        crate_api_client.get(f"{url}/invites", headers=_headers(1)).status_code == 410
+    )
+    assert (
+        crate_api_client.get("/api/crates/invites/abc", headers=_headers(1)).status_code
+        == 410
+    )
+    assert (
+        crate_api_client.post(
+            "/api/crates/invites/abc/accept", headers=_headers(1)
+        ).status_code
+        == 410
+    )
+
+
+def test_owner_adds_collaborators_by_username_who_can_then_leave(
+    pg_db, crate_api_client
+):
+    from crate.db.tx import transaction_scope
+
+    collaborator_id = _create_user(f"crate-add-{uuid4()}@example.test")
+    with transaction_scope() as session:
+        username = session.execute(
+            text("SELECT username FROM users WHERE id = :id"), {"id": collaborator_id}
+        ).scalar_one()
+        if not username:
+            username = f"collab{collaborator_id}"
+            session.execute(
+                text("UPDATE users SET username = :u WHERE id = :id"),
+                {"u": username, "id": collaborator_id},
+            )
+    crate_id = _create_crate()
+    url = f"/api/crates/{crate_id}"
+
+    added = crate_api_client.post(
+        f"{url}/members", json={"username": f"@{username}"}, headers=_headers(1)
+    )
+    assert added.status_code == 200
+    assert collaborator_id in {member["user_id"] for member in added.json()["members"]}
+    detail = crate_api_client.get(url, headers=_headers(collaborator_id)).json()
+    assert detail["access"] == "collaborator"
+    assert detail["is_collaborative"] is True
+
+    missing = crate_api_client.post(
+        f"{url}/members", json={"username": "nobody-here"}, headers=_headers(1)
+    )
+    assert missing.status_code == 404
+
+    left = crate_api_client.delete(
+        f"{url}/members/{collaborator_id}", headers=_headers(collaborator_id)
+    )
+    assert left.status_code == 200
+
+
+def test_public_crates_can_be_copied_into_a_private_crate(pg_db, crate_api_client):
+    from crate.db.repositories.crates import add_crate_album
+    from crate.db.tx import transaction_scope
+
+    viewer_id = _create_user(f"crate-copy-{uuid4()}@example.test")
+    crate_id = _create_crate()
+    first = _seed_album("Copy first")
+    second = _seed_album("Copy second")
+    add_crate_album(crate_id, first, added_by=1)
+    add_crate_album(crate_id, second, added_by=1)
+    with transaction_scope() as session:
+        session.execute(
+            text("UPDATE crates SET visibility = 'public' WHERE id = :id"),
+            {"id": crate_id},
+        )
+
+    copied = crate_api_client.post(
+        f"/api/crates/{crate_id}/copy", headers=_headers(viewer_id)
+    )
+    assert copied.status_code == 200
+    with transaction_scope() as session:
+        owner, visibility = session.execute(
+            text(
+                "SELECT owner_id, visibility FROM crates WHERE id = CAST(:id AS uuid)"
+            ),
+            {"id": copied.json()["id"]},
+        ).one()
+        albums = (
+            session.execute(
+                text(
+                    "SELECT global_album_uid::text FROM crate_albums "
+                    "WHERE crate_id = CAST(:id AS uuid) ORDER BY position"
+                ),
+                {"id": copied.json()["id"]},
+            )
+            .scalars()
+            .all()
+        )
+    assert (owner, visibility) == (viewer_id, "private")
+    assert albums == [first, second]

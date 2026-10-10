@@ -83,16 +83,6 @@ export interface CrateMember {
   role?: "owner" | "collaborator";
 }
 
-export interface CrateInvite {
-  token: string;
-  crate_id: string;
-  join_url: string;
-  created_at?: string | null;
-  expires_at?: string | null;
-  max_uses?: number | null;
-  use_count: number;
-}
-
 export interface CatalogAlbum {
   id?: number;
   global_album_uid?: string;

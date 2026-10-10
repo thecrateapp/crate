@@ -381,6 +381,32 @@ def is_playlist_followed(
         return _impl(s)
 
 
+def get_playlist_follow_state(
+    playlist_id: int, user_id: int | None, *, session: Session | None = None
+) -> dict:
+    def _impl(s: Session) -> dict:
+        row = s.execute(
+            text(
+                """
+                SELECT COUNT(*) AS follower_count,
+                       COALESCE(BOOL_OR(user_id = :user_id), FALSE) AS is_followed
+                FROM user_followed_playlists
+                WHERE playlist_id = :playlist_id
+                """
+            ),
+            {"playlist_id": playlist_id, "user_id": user_id},
+        ).one()
+        return {
+            "follower_count": int(row.follower_count),
+            "is_followed": bool(row.is_followed),
+        }
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as s:
+        return _impl(s)
+
+
 def get_smart_playlists_for_refresh() -> list[dict]:
     with read_scope() as s:
         rows = (
@@ -407,6 +433,7 @@ def get_smart_playlists_for_refresh() -> list[dict]:
 
 
 __all__ = [
+    "get_playlist_follow_state",
     "get_followed_system_playlists",
     "get_open_subsonic_playlists",
     "get_playlist",

@@ -2830,35 +2830,51 @@ class TestSocialProfilePage:
 
 
 class TestLibraryPlaylistsPage:
-    def test_playlists_page_bundles_personal_and_curated(self, test_app):
-        playlists = [
-            {
-                "id": 1,
-                "name": "Personal",
-                "track_count": 5,
-                "is_smart": False,
-                "total_duration": 1000,
-            }
-        ]
-        followed = [
-            {
-                "id": 2,
-                "name": "Crate Picks",
-                "track_count": 9,
-                "is_smart": True,
-                "follower_count": 10,
-            }
-        ]
+    def test_playlists_page_bundles_owned_shared_and_followed(self, test_app):
+        page = {
+            "playlists": [
+                {
+                    "id": 1,
+                    "name": "Personal",
+                    "user_id": 1,
+                    "owner_username": "admin",
+                    "track_count": 5,
+                    "is_smart": False,
+                    "total_duration": 1000,
+                }
+            ],
+            "followed_playlists": [
+                {
+                    "id": 3,
+                    "name": "Friend mix",
+                    "user_id": 7,
+                    "owner_username": "friend",
+                    "track_count": 4,
+                    "is_smart": False,
+                }
+            ],
+            "followed_curated_playlists": [
+                {
+                    "id": 2,
+                    "name": "Crate Picks",
+                    "track_count": 9,
+                    "is_smart": True,
+                    "follower_count": 10,
+                }
+            ],
+        }
 
-        with (
-            patch("crate.api.me.get_playlists", return_value=playlists),
-            patch("crate.api.me.get_followed_system_playlists", return_value=followed),
-        ):
+        with patch(
+            "crate.api.me.get_library_playlists_page", return_value=page
+        ) as page_mock:
             resp = test_app.get("/api/me/playlists-page")
 
         assert resp.status_code == 200
+        page_mock.assert_called_once_with(1)
         data = resp.json()
-        assert data["playlists"][0]["name"] == "Personal"
+        assert data["playlists"][0]["owner_username"] == "admin"
+        assert data["followed_playlists"][0]["name"] == "Friend mix"
+        assert data["followed_playlists"][0]["is_followed"] is True
         assert data["followed_curated_playlists"][0]["name"] == "Crate Picks"
         assert data["followed_curated_playlists"][0]["is_followed"] is True
 

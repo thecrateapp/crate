@@ -16,6 +16,7 @@ import {
 import { PlaylistHeroSection } from "@/components/playlists/PlaylistHeroSection";
 import { PlaylistTrackFilterBar } from "@/components/playlists/PlaylistTrackFilterBar";
 import type { AuthUser } from "@/contexts/auth-context";
+import { canManage } from "@/lib/collaboration-access";
 import type { PlaylistData } from "@/pages/playlist-types";
 import type { PlaylistPageController } from "@/pages/use-playlist-page-controller";
 
@@ -140,6 +141,7 @@ export function PlaylistContent({
         initialCoverDataUrl={data.cover_data_url}
         initialVisibility={data.visibility || "private"}
         initialCollaborative={Boolean(data.is_collaborative)}
+        canManageSettings={canManage(data)}
         initialTracks={page.editableTracks as PlaylistComposerTrack[]}
         submitting={page.saving}
         onClose={() => page.setEditorOpen(false)}
@@ -159,14 +161,12 @@ export function PlaylistContent({
         open={page.membersOpen}
         data={data}
         members={page.members}
-        isOwner={page.isOwner}
         user={user}
-        inviteLink={page.inviteLink}
-        creatingInvite={page.creatingInvite}
+        leaving={page.leaving}
         removingMemberId={page.removingMemberId}
         onClose={() => page.setMembersOpen(false)}
-        onCreateInvite={() => void page.handleCreateCollaboratorInvite()}
-        onCopyInviteLink={() => void page.handleCopyInviteLink()}
+        onAddMember={page.handleAddMember}
+        onLeave={() => void page.handleLeave()}
         onRemoveMember={(memberUserId) =>
           void page.handleRemoveMember(memberUserId)
         }

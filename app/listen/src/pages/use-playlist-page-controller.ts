@@ -4,13 +4,11 @@ import { useNavigate, useParams } from "react-router";
 
 import { filterPlaylistTracks } from "@/components/playlists/PlaylistTrackFilterBar";
 import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
-import { useAuth } from "@/contexts/AuthContext";
 import { useOffline } from "@/contexts/OfflineContext";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
 import { useApi } from "@/hooks/use-api";
 import { isOfflineBusy } from "@/lib/offline";
-import { inviteShareUrl } from "@/lib/share-url";
 import {
   buildPlaylistEditableTracks,
   buildPlaylistMetaItems,
@@ -21,11 +19,7 @@ import {
   buildPlaylistActions,
   type PlaylistActions,
 } from "@/pages/playlist-actions";
-import type {
-  PlaylistData,
-  PlaylistInvite,
-  PlaylistMember,
-} from "@/pages/playlist-types";
+import type { PlaylistData, PlaylistMember } from "@/pages/playlist-types";
 
 export interface PlaylistPageController extends PlaylistActions {
   data: PlaylistData | undefined;
@@ -37,9 +31,7 @@ export interface PlaylistPageController extends PlaylistActions {
   error: unknown;
   filterQuery: string;
   filteredTracks: PlaylistData["tracks"];
-  inviteData: PlaylistInvite | null;
-  inviteLink: string | null;
-  isOwner: boolean;
+  leaving: boolean;
   loading: boolean;
   members: PlaylistMember[];
   membersOpen: boolean;
@@ -62,14 +54,13 @@ export interface PlaylistPageController extends PlaylistActions {
   setFilterQuery: (value: string) => void;
   setMembersOpen: (value: boolean) => void;
   t: ReturnType<typeof useTranslation>["t"];
-  creatingInvite: boolean;
+  copying: boolean;
   ensurePlaylistOptionsLoaded: () => void;
 }
 
 export function usePlaylistPageController(): PlaylistPageController {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { id } = useParams<{ id: string }>();
   const { data, loading, error, refetch } = useApi<PlaylistData>(
     id ? `/api/playlists/${id}` : null,
@@ -92,8 +83,9 @@ export function usePlaylistPageController(): PlaylistPageController {
   const [membersOpen, setMembersOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [creatingInvite, setCreatingInvite] = useState(false);
-  const [inviteData, setInviteData] = useState<PlaylistInvite | null>(null);
+  const [copying, setCopying] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [togglingFollow, setTogglingFollow] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState<number | null>(null);
   const [filterQuery, setFilterQuery] = useState("");
   const deferredFilterQuery = useDeferredValue(filterQuery);
@@ -115,13 +107,6 @@ export function usePlaylistPageController(): PlaylistPageController {
     [playlistOptions, resolvedData?.id],
   );
   const members = resolvedData?.members ?? [];
-  const isOwner = Boolean(
-    user &&
-      members.some(
-        (member) => member.user_id === user.id && member.role === "owner",
-      ),
-  );
-  const inviteLink = inviteData ? inviteShareUrl(inviteData) : null;
   const offlineState = getPlaylistState(resolvedData?.id);
   const offlineRecord = getPlaylistRecord(resolvedData?.id);
   const offlinePresentation = buildPlaylistOfflinePresentation(
@@ -139,20 +124,21 @@ export function usePlaylistPageController(): PlaylistPageController {
     offlineSupported,
     openCreatePlaylist,
     navigate,
-    onInviteCreated: setInviteData,
     playerTracks,
     playAll,
     refetch,
-    setCreatingInvite,
+    setCopying,
     setDeleteOpen,
     setDeleting,
     setEditorOpen,
+    setLeaving,
     setMembersOpen,
     setRemovingMemberId,
     setSaving,
+    setTogglingFollow,
     t,
     togglePlaylistOffline,
-    inviteData,
+    togglingFollow,
   });
 
   return {
@@ -166,9 +152,7 @@ export function usePlaylistPageController(): PlaylistPageController {
     error,
     filterQuery,
     filteredTracks,
-    inviteData,
-    inviteLink,
-    isOwner,
+    leaving,
     loading,
     members,
     membersOpen,
@@ -194,7 +178,7 @@ export function usePlaylistPageController(): PlaylistPageController {
     setFilterQuery,
     setMembersOpen,
     t,
-    creatingInvite,
+    copying,
     ensurePlaylistOptionsLoaded,
   };
 }

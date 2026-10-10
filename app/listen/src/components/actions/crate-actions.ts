@@ -6,6 +6,7 @@ import {
   Download,
   Heart,
   HeartBold,
+  ListPlus,
   Pencil,
   Play,
   Radio,
@@ -37,6 +38,7 @@ export interface CrateActionInput {
   onDownload?: Handler;
   onShare?: Handler;
   onToggleFollow?: Handler;
+  onCopy?: Handler;
   followed?: boolean;
   followPending?: boolean;
   offlineActionLabel?: string;
@@ -103,6 +105,16 @@ export function buildCrateMenuItems(
         active: input.followed,
         disabled: input.followPending,
         onSelect: input.onToggleFollow,
+      }),
+    );
+  }
+  if (input.onCopy) {
+    more.push(
+      action({
+        key: "copy",
+        label: t("collaboration.addToMyCrates"),
+        icon: ListPlus,
+        onSelect: input.onCopy,
       }),
     );
   }
