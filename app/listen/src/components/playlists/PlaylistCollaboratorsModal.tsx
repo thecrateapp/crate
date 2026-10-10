@@ -1,43 +1,53 @@
+import { useState } from "react";
 import type { TFunction } from "i18next";
-import { CRATE_ICON_SIZE, Copy, UserMinus, Users, Star } from "@crate/ui/icons";
+import {
+  CRATE_ICON_SIZE,
+  LogOut,
+  UserMinus,
+  Users,
+  Star,
+} from "@crate/ui/icons";
 
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
 import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 import { Button } from "@crate/ui/shadcn/button";
-import { QrCodeImage } from "@crate/ui/primitives/QrCodeImage";
+import { CollaboratorPicker } from "@/components/social/CollaboratorPicker";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
 import type { AuthUser } from "@/contexts/auth-context";
+import { canLeave, canManage } from "@/lib/collaboration-access";
+import type { UserSearchResult } from "@/pages/people-types";
 import type { PlaylistData, PlaylistMember } from "@/pages/playlist-types";
 
 export function PlaylistCollaboratorsModal({
-  creatingInvite,
   data,
-  inviteLink,
-  isOwner,
+  leaving,
   members,
+  onAddMember,
   onClose,
-  onCopyInviteLink,
-  onCreateInvite,
+  onLeave,
   onRemoveMember,
   open,
   removingMemberId,
   t,
   user,
 }: {
-  creatingInvite: boolean;
   data: PlaylistData;
-  inviteLink: string | null;
-  isOwner: boolean;
+  leaving: boolean;
   members: PlaylistMember[];
+  onAddMember: (candidate: UserSearchResult) => Promise<void>;
   onClose: () => void;
-  onCopyInviteLink: () => void;
-  onCreateInvite: () => void;
+  onLeave: () => void;
   onRemoveMember: (memberUserId: number) => void;
   open: boolean;
   removingMemberId: number | null;
   t: TFunction;
   user: AuthUser | null;
 }) {
+  const isOwner = canManage(data);
+  const [leaveConfirmation, setLeaveConfirmation] = useState(false);
+  const memberIds = [data.user_id, ...members.map((member) => member.user_id)];
+
   return (
     <AppModal
       open={open}
@@ -50,55 +60,9 @@ export function PlaylistCollaboratorsModal({
           : t("playlist.collaborators.notCollaborative")
       }
       closeLabel={t("common.close")}
+      closeOnEscape={!leaveConfirmation}
     >
       <ModalBody className="space-y-5 p-5 ">
-        {data.is_collaborative && isOwner ? (
-          <div className="rounded-xl border border-accent-action/15 bg-accent-action/5 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-medium text-text-primary">
-                  {t("playlist.collaborators.inviteTitle")}
-                </div>
-                <div className="mt-1 text-xs text-text-muted">
-                  {t("playlist.collaborators.inviteSubtitle")}
-                </div>
-              </div>
-              <Button
-                onClick={onCreateInvite}
-                loading={creatingInvite}
-                className="rounded-lg"
-              >
-                {creatingInvite ? null : <Users size={CRATE_ICON_SIZE.sm} />}
-                {t("playlist.collaborators.createInvite")}
-              </Button>
-            </div>
-            {inviteLink ? (
-              <div className="mt-4 grid gap-4 sm:grid-cols-[0.9fr_1.1fr]">
-                <div className="flex justify-center">
-                  <QrCodeImage
-                    value={inviteLink}
-                    size={160}
-                    className="rounded-xl border border-border-quiet bg-surface-canvas p-3"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <div className="break-all border-l-2 border-border-quiet px-4 py-3 text-xs text-text-muted">
-                    {inviteLink}
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={onCopyInviteLink}
-                    className="rounded-lg"
-                  >
-                    <Copy size={CRATE_ICON_SIZE.sm} />
-                    {t("playlist.collaborators.copyInvite")}
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
         <div className="space-y-3">
           {members.map((member) => {
             const label =
@@ -160,6 +124,37 @@ export function PlaylistCollaboratorsModal({
             );
           })}
         </div>
+
+        {isOwner ? (
+          <CollaboratorPicker excludeUserIds={memberIds} onAdd={onAddMember} />
+        ) : null}
+
+        {canLeave(data) ? (
+          <section className="border-t border-border-quiet pt-4">
+            <Button
+              variant="ghost"
+              onClick={() => setLeaveConfirmation(true)}
+              className="text-state-danger hover:text-state-danger"
+            >
+              <LogOut size={CRATE_ICON_SIZE.sm} />
+              {t("collaboration.leavePlaylist")}
+            </Button>
+            <ConfirmDialog
+              open={leaveConfirmation}
+              tone="danger"
+              pending={leaving}
+              title={t("collaboration.leavePlaylist")}
+              body={t("collaboration.leavePlaylistConfirmation", {
+                name: data.name,
+              })}
+              confirmLabel={t("collaboration.leave")}
+              cancelLabel={t("common.cancel")}
+              closeLabel={t("common.close")}
+              onCancel={() => setLeaveConfirmation(false)}
+              onConfirm={onLeave}
+            />
+          </section>
+        ) : null}
       </ModalBody>
     </AppModal>
   );

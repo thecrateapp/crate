@@ -193,7 +193,7 @@ function usePlaylistCardBase(props: PlaylistCardProps) {
   const [togglingFollow, runToggleFollow] = usePendingHandler(
     () => latest.current.onToggleFollow,
   );
-  const canFollow = Boolean(props.systemPlaylist && props.onToggleFollow);
+  const canFollow = Boolean(props.onToggleFollow);
 
   return {
     t,

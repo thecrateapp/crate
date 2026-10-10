@@ -37,6 +37,7 @@ export interface PlaylistPageActionInput {
   onShare: Handler;
   offline?: PlaylistPageOffline;
   follow?: { followed: boolean; pending: boolean; onToggle: Handler };
+  onCopy?: Handler;
   onCollaborators?: Handler;
   onEdit?: Handler;
   onRegenerate?: Handler;
@@ -75,6 +76,7 @@ export function buildPlaylistPageActions({
   onShare,
   offline,
   follow,
+  onCopy,
   onCollaborators,
   onEdit,
   onRegenerate,
@@ -106,6 +108,7 @@ export function buildPlaylistPageActions({
           onToggle: offline.onToggle,
         }
       : undefined,
+    onCopy,
     onCollaborators,
     onEdit,
     onRegenerate,

@@ -1,5 +1,6 @@
 import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 import type { PlaylistComposerTrack } from "@/components/playlists/PlaylistCreateModal";
+import type { CollaborationAccess } from "@/lib/collaboration-access";
 
 export interface PlaylistTrack {
   id: number;
@@ -33,6 +34,10 @@ export interface PlaylistTrack {
 
 export interface PlaylistData {
   id: number;
+  access?: CollaborationAccess;
+  can_edit?: boolean;
+  is_followed?: boolean;
+  follower_count?: number;
   name: string;
   description?: string;
   cover_data_url?: string | null;
@@ -59,14 +64,6 @@ export interface PlaylistMember {
   username?: string | null;
   display_name?: string | null;
   avatar?: string | null;
-}
-
-export interface PlaylistInvite {
-  token: string;
-  join_url: string;
-  qr_value: string;
-  public_url?: string | null;
-  expires_at?: string | null;
 }
 
 export interface PlaylistSavePayload {

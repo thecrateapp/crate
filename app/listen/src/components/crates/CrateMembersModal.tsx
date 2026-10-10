@@ -1,49 +1,20 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  CRATE_ICON_SIZE,
-  Copy,
-  Link,
-  Loader2,
-  LogOut,
-  Trash2,
-  UserMinus,
-  Users,
-} from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, LogOut, UserMinus, Users } from "@crate/ui/icons";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
-import { FormField } from "@crate/ui/primitives/FormField";
-import { IconButton } from "@crate/ui/primitives/IconButton";
-import { QrCodeImage } from "@crate/ui/primitives/QrCodeImage";
 import { Button } from "@crate/ui/shadcn/button";
-import { Input } from "@crate/ui/shadcn/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@crate/ui/shadcn/select";
 import { notify } from "@crate/ui/lib/notify";
 
+import { CollaboratorPicker } from "@/components/social/CollaboratorPicker";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
-import { formatRelativeTime } from "@/lib/utils";
+import { canLeave, canManage } from "@/lib/collaboration-access";
 import { UserProfileAvatar } from "@/pages/UserProfileAvatar";
-import type {
-  CrateDetail,
-  CrateInvite,
-  CrateMember,
-} from "@/pages/crates-types";
-
-const EXPIRY_OPTIONS = [
-  { hours: 24, labelKey: "crate.members.expiry24h" },
-  { hours: 168, labelKey: "crate.members.expiry7d" },
-  { hours: 720, labelKey: "crate.members.expiry30d" },
-  { hours: 0, labelKey: "crate.members.expiryNever" },
-] as const;
+import type { UserSearchResult } from "@/pages/people-types";
+import type { CrateDetail, CrateMember } from "@/pages/crates-types";
 
 interface MemberRow {
   userId: number;
@@ -51,25 +22,6 @@ interface MemberRow {
   username?: string | null;
   avatar?: string | null;
   role: "owner" | "collaborator";
-}
-
-const FIELD_LABEL_CLASS_NAME = "text-xs font-medium text-text-muted";
-
-function absoluteInviteUrl(joinUrl: string) {
-  return new URL(joinUrl, window.location.origin).toString();
-}
-
-async function copyToClipboard(value: string, t: (key: string) => string) {
-  if (!navigator.clipboard) {
-    notify.error(t("share.toasts.copyFailed"));
-    return;
-  }
-  try {
-    await navigator.clipboard.writeText(value);
-    notify.success(t("share.toasts.linkCopied"));
-  } catch {
-    notify.error(t("share.toasts.copyFailed"));
-  }
 }
 
 export function CrateMembersModal({
@@ -85,10 +37,10 @@ export function CrateMembersModal({
   onCrateChange: () => void;
   onLeft: () => void;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { user } = useAuth();
-  const isOwner = crate.access === "owner";
-  const isCollaborator = crate.access === "collaborator";
+  const isOwner = canManage(crate);
+  const isCollaborator = canLeave(crate);
   const [enabledLocally, setEnabledLocally] = useState(false);
   const [syncedCollaborative, setSyncedCollaborative] = useState(
     crate.is_collaborative,
@@ -100,19 +52,11 @@ export function CrateMembersModal({
   const collaborative = crate.is_collaborative || enabledLocally;
   const [enabling, setEnabling] = useState(false);
   const [removingUserId, setRemovingUserId] = useState<number | null>(null);
-  const [revokingToken, setRevokingToken] = useState<string | null>(null);
   const [leaveConfirmation, setLeaveConfirmation] = useState(false);
   const [leaving, setLeaving] = useState(false);
-  const [expiresInHours, setExpiresInHours] = useState("168");
-  const [maxUses, setMaxUses] = useState("");
-  const [creatingInvite, setCreatingInvite] = useState(false);
-  const [createdInviteUrl, setCreatedInviteUrl] = useState<string | null>(null);
   const crateBase = `/api/crates/${encodeURIComponent(crate.id)}`;
   const members = useApi<CrateMember[]>(
     open && (isOwner || isCollaborator) ? `${crateBase}/members` : null,
-  );
-  const invites = useApi<CrateInvite[]>(
-    open && isOwner && collaborative ? `${crateBase}/invites` : null,
   );
 
   const apiOwner = members.data?.find(
@@ -187,42 +131,18 @@ export function CrateMembersModal({
     }
   }
 
-  async function createInvite(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const parsedMaxUses = Number.parseInt(maxUses, 10);
-    setCreatingInvite(true);
+  async function addCollaborator(candidate: UserSearchResult) {
     try {
-      const invite = await api<CrateInvite>(`${crateBase}/invites`, "POST", {
-        expires_in_hours: Number(expiresInHours),
-        max_uses: Number.isFinite(parsedMaxUses) ? parsedMaxUses : null,
-      });
-      setCreatedInviteUrl(absoluteInviteUrl(invite.join_url));
-      invites.refetch();
-    } catch {
-      notify.error(t("library.crates.inviteFailed"));
-    } finally {
-      setCreatingInvite(false);
-    }
-  }
-
-  async function revokeInvite(invite: CrateInvite) {
-    setRevokingToken(invite.token);
-    try {
-      await api(
-        `${crateBase}/invites/${encodeURIComponent(invite.token)}`,
-        "DELETE",
+      await api(`${crateBase}/members`, "POST", { user_id: candidate.id });
+      notify.success(
+        t("collaboration.added", {
+          name: candidate.display_name || candidate.username,
+        }),
       );
-      if (
-        createdInviteUrl &&
-        createdInviteUrl === absoluteInviteUrl(invite.join_url)
-      ) {
-        setCreatedInviteUrl(null);
-      }
-      invites.refetch();
+      members.refetch();
+      onCrateChange();
     } catch {
-      notify.error(t("crate.members.revokeFailed"));
-    } finally {
-      setRevokingToken(null);
+      notify.error(t("collaboration.addFailed"));
     }
   }
 
@@ -235,7 +155,7 @@ export function CrateMembersModal({
       description={
         isOwner
           ? collaborative
-            ? t("library.crates.inviteDescription")
+            ? t("collaboration.ownerDescription")
             : t("crate.members.collaborationOff")
           : t("crate.members.readOnlySubtitle")
       }
@@ -346,133 +266,11 @@ export function CrateMembersModal({
             ) : null}
           </section>
 
-          {isOwner && collaborative ? (
-            <>
-              <section className="space-y-3">
-                <h3 className="text-sm font-semibold text-text-primary">
-                  {t("crate.members.activeInvites")}
-                </h3>
-                {invites.data?.length ? (
-                  <ul className="space-y-2">
-                    {invites.data.map((invite) => (
-                      <InviteRow
-                        key={invite.token}
-                        invite={invite}
-                        locale={i18n.language}
-                        revoking={revokingToken === invite.token}
-                        onCopy={() =>
-                          void copyToClipboard(
-                            absoluteInviteUrl(invite.join_url),
-                            t,
-                          )
-                        }
-                        onRevoke={() => void revokeInvite(invite)}
-                      />
-                    ))}
-                  </ul>
-                ) : invites.loading ? (
-                  <div className="flex justify-center py-3">
-                    <Loader2
-                      size={CRATE_ICON_SIZE.md}
-                      className="animate-spin text-accent-action"
-                    />
-                  </div>
-                ) : (
-                  <p className="text-sm text-text-muted">
-                    {invites.error
-                      ? t("crate.members.invitesFailed")
-                      : t("crate.members.noInvites")}
-                  </p>
-                )}
-              </section>
-
-              <form
-                onSubmit={(event) => void createInvite(event)}
-                className="space-y-4 rounded-xl border border-accent-action/15 bg-accent-action/5 p-4"
-              >
-                <h3 className="text-sm font-semibold text-text-primary">
-                  {t("crate.members.newInvite")}
-                </h3>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <FormField
-                    className="gap-2"
-                    label={t("crate.members.expiry")}
-                    labelClassName={FIELD_LABEL_CLASS_NAME}
-                  >
-                    {(control) => (
-                      <Select
-                        value={expiresInHours}
-                        onValueChange={setExpiresInHours}
-                      >
-                        <SelectTrigger {...control} className="h-11 w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {EXPIRY_OPTIONS.map((option) => (
-                            <SelectItem
-                              key={option.hours}
-                              value={String(option.hours)}
-                            >
-                              {t(option.labelKey)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </FormField>
-                  <FormField
-                    className="gap-2"
-                    label={t("crate.members.maxUses")}
-                    labelClassName={FIELD_LABEL_CLASS_NAME}
-                  >
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      max={500}
-                      value={maxUses}
-                      onChange={(event) => setMaxUses(event.target.value)}
-                      placeholder={t("crate.members.unlimited")}
-                      className="h-11"
-                    />
-                  </FormField>
-                </div>
-                <Button type="submit" loading={creatingInvite}>
-                  {creatingInvite ? null : <Link size={CRATE_ICON_SIZE.sm} />}
-                  {t("library.crates.createInvite")}
-                </Button>
-                {createdInviteUrl ? (
-                  <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-center">
-                    <div className="flex justify-center">
-                      <QrCodeImage
-                        value={createdInviteUrl}
-                        size={140}
-                        darkColor="#000000"
-                        lightColor="#ffffff"
-                        className="rounded-xl bg-white p-2"
-                      />
-                    </div>
-                    <div className="min-w-0 space-y-3">
-                      <Input
-                        aria-label={t("library.crates.inviteLink")}
-                        readOnly
-                        value={createdInviteUrl}
-                        className="h-10 rounded-lg bg-text-primary/[0.04] px-3 text-xs text-text-muted md:text-xs"
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={() =>
-                          void copyToClipboard(createdInviteUrl, t)
-                        }
-                      >
-                        <Copy size={CRATE_ICON_SIZE.sm} />
-                        {t("share.copyLink")}
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-              </form>
-            </>
+          {isOwner ? (
+            <CollaboratorPicker
+              excludeUserIds={rows.map((row) => row.userId)}
+              onAdd={addCollaborator}
+            />
           ) : null}
 
           {isCollaborator ? (
@@ -504,63 +302,5 @@ export function CrateMembersModal({
         </ModalBody>
       </div>
     </AppModal>
-  );
-}
-
-function InviteRow({
-  invite,
-  locale,
-  revoking,
-  onCopy,
-  onRevoke,
-}: {
-  invite: CrateInvite;
-  locale: string;
-  revoking: boolean;
-  onCopy: () => void;
-  onRevoke: () => void;
-}) {
-  const { t } = useTranslation();
-  const expiry = invite.expires_at
-    ? t("crate.members.expires", {
-        time: formatRelativeTime(invite.expires_at, locale),
-      })
-    : t("crate.members.expiryNever");
-  const uses =
-    invite.max_uses != null
-      ? t("crate.members.usesLimited", {
-          count: invite.use_count,
-          max: invite.max_uses,
-        })
-      : t("crate.members.usesUnlimited", { count: invite.use_count });
-
-  return (
-    <li className="flex items-center justify-between gap-3 rounded-lg border border-border-quiet bg-text-primary/[0.03] px-3 py-2.5">
-      <div className="min-w-0">
-        <p className="truncate text-sm text-text-primary">{invite.join_url}</p>
-        <p className="truncate text-xs text-text-muted">
-          {expiry} · {uses}
-        </p>
-      </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <IconButton
-          label={t("share.copyLink")}
-          size="sm"
-          className="size-9"
-          onClick={onCopy}
-        >
-          <Copy size={CRATE_ICON_SIZE.sm} />
-        </IconButton>
-        <IconButton
-          label={t("crate.members.revoke")}
-          size="sm"
-          className="size-9 hover:text-state-danger hover:drop-shadow-none"
-          onClick={onRevoke}
-          loading={revoking}
-        >
-          <Trash2 size={CRATE_ICON_SIZE.sm} />
-        </IconButton>
-      </div>
-    </li>
   );
 }

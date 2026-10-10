@@ -33,7 +33,8 @@ describe("public app routes", () => {
 
     expect(publicPaths).not.toContain("/crate/:crateRef");
     expect(appPaths).toContain("crate/:crateRef");
-    expect(appPaths).toContain("crate/invite/:token");
+    expect(appPaths).not.toContain("crate/invite/:token");
+    expect(appPaths).not.toContain("playlist/invite/:token");
     expect(ANONYMOUS_APP_ROUTE_PATTERNS).toEqual(["/crate/:crateRef"]);
   });
 });

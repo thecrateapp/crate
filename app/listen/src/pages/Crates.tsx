@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { CRATE_ICON_SIZE, Loader2, Plus } from "@crate/ui/icons";
 import { Button } from "@crate/ui/shadcn/button";
@@ -21,6 +21,32 @@ import { shuffleArray } from "@/lib/utils";
 import { toPlayableTrack } from "@/lib/playable-track";
 import type { CratePlaybackTrack, CrateSummary } from "@/pages/crates-types";
 
+function CrateGridSection({
+  titleId,
+  title,
+  testId,
+  children,
+}: {
+  titleId: string;
+  title: string;
+  testId: string;
+  children: ReactNode;
+}) {
+  return (
+    <section aria-labelledby={titleId} className="mt-10 space-y-4">
+      <h2 id={titleId} className="text-lg font-semibold text-text-primary">
+        {title}
+      </h2>
+      <div
+        data-testid={testId}
+        className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6"
+      >
+        {children}
+      </div>
+    </section>
+  );
+}
+
 interface CratesProps {
   onCrateChange?: () => void | Promise<void>;
 }
@@ -42,6 +68,12 @@ export function Crates({ onCrateChange }: CratesProps) {
   const { data: followedCrates, loading: followedLoading } = useApi<
     CrateSummary[]
   >("/api/me/crates/followed");
+  const ownedCrates = crates?.filter(
+    (crate) => crate.access !== "collaborator",
+  );
+  const sharedCrates = crates?.filter(
+    (crate) => crate.access === "collaborator",
+  );
   const [selectedCrateId, setSelectedCrateId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const downloadCrate = useCrateDownload();
@@ -185,12 +217,12 @@ export function Crates({ onCrateChange }: CratesProps) {
           >
             {t("library.crates.loadFailed")}
           </p>
-        ) : crates?.length ? (
+        ) : ownedCrates?.length ? (
           <div
             data-testid="crate-grid"
             className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6"
           >
-            {crates.map((crate) => renderCrateCard(crate, true))}
+            {ownedCrates.map((crate) => renderCrateCard(crate, true))}
           </div>
         ) : (
           <EmptyState
@@ -200,6 +232,15 @@ export function Crates({ onCrateChange }: CratesProps) {
           />
         )}
       </section>
+      {sharedCrates?.length ? (
+        <CrateGridSection
+          titleId="shared-crates-title"
+          title={t("library.crates.sharedTitle")}
+          testId="shared-crate-grid"
+        >
+          {sharedCrates.map((crate) => renderCrateCard(crate, true))}
+        </CrateGridSection>
+      ) : null}
       <section
         aria-labelledby="followed-crates-title"
         className="mt-10 space-y-4"

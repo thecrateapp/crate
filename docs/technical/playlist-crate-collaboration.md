@@ -53,9 +53,11 @@ Listen derives every affordance from this field through one helper
 
 ## Collaboration management
 
-- The owner adds collaborators directly by username (`POST .../collaborators`) and removes them
-  (`DELETE .../collaborators/{user_id}`).
-- A collaborator can leave (`POST .../leave`).
+- The owner adds collaborators directly (`POST .../members` with `user_id` or `username`) and
+  removes them (`DELETE .../members/{user_id}`). Adding a collaborator turns collaboration on.
+  Listen picks people through the instance user search.
+- A collaborator can leave: `POST /api/playlists/{id}/leave`, or
+  `DELETE /api/crates/{id}/members/{own user_id}` for Crates.
 - Invite links are disabled: creating and accepting invites returns 410 Gone and Listen no longer
   exposes them. The tables stay for history; members who joined through an invite remain
   collaborators.
@@ -66,10 +68,18 @@ Listen derives every affordance from this field through one helper
 
 - Public user playlists can be followed (`/api/playlists/{id}/follow`); the system playlist
   follow endpoints under `/api/curation` keep working.
-- "Add to my playlists" / "Add to my Crates" copies a public entity into a new private one owned
-  by the viewer, with the same tracks or albums in the same order. The copy is independent.
+- "Add to my playlists" / "Add to my Crates" (`POST .../copy`) copies a public entity into a new
+  private one owned by the viewer, with the same tracks or albums in the same order. The copy is
+  independent.
 
 ## Library
 
 Listen's library separates playlists the viewer owns, playlists shared with them as a
-collaborator (with the owner shown), and followed playlists (system and user).
+collaborator (with the owner shown), followed user playlists and followed Crate playlists.
+`/api/me/playlists-page` returns all of them from one read transaction, with owner names
+attached in a single batched lookup. Crates split the same way into owned, shared and followed.
+
+## Migration
+
+Migration 107 constrains `playlists.visibility` to `private`/`public` (normalising anything else to
+`private`) and expires every outstanding playlist and Crate invite.

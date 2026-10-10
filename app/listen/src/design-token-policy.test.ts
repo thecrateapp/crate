@@ -85,10 +85,8 @@ const ICON_SIZE_BUDGET: Record<string, Record<string, number>> = {
   "components/player/SpinningDiscArtwork.tsx": { "88": 1 },
   "components/player/SpinningDiscControl.tsx": { "22": 3 },
   "components/player/extended/InfoTabHeroArtwork.tsx": { "28": 1 },
-  "pages/CrateInvite.tsx": { "22": 1 },
   "pages/JamInvite.tsx": { "22": 1 },
   "pages/Paths.tsx": { "22": 1 },
-  "pages/PlaylistInvite.tsx": { "22": 1 },
   "pages/SearchAlbumResults.tsx": { "32": 1 },
   "pages/StatsCollectionPanels.tsx": { "22": 1 },
 };

@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { notify } from "@crate/ui/lib/notify";
 import { Button } from "@crate/ui/shadcn/button";
 import { EmptyState, LoadingState } from "@crate/ui/domain/states";
+import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
 import { PlaylistCard } from "@/components/playlists/PlaylistCard";
@@ -21,11 +22,13 @@ import {
   toTrackReferencePayload,
 } from "@/lib/track-reference";
 
-import type {
-  CuratedPlaylist,
-  LibraryPlaylistsPageData,
-  Playlist,
-  PlaylistDetail,
+import {
+  playlistOwnerLabel,
+  splitLibraryPlaylists,
+  type CuratedPlaylist,
+  type LibraryPlaylistsPageData,
+  type Playlist,
+  type PlaylistDetail,
 } from "./library-playlists-model";
 
 function editableTracks(playlist: PlaylistDetail): PlaylistComposerTrack[] {
@@ -38,6 +41,7 @@ function editableTracks(playlist: PlaylistDetail): PlaylistComposerTrack[] {
 
 export function LibraryPlaylistsTab() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const { data, loading, refetch } = useApi<LibraryPlaylistsPageData>(
     "/api/me/playlists-page",
   );
@@ -50,8 +54,14 @@ export function LibraryPlaylistsTab() {
     null,
   );
   const [deleting, setDeleting] = useState(false);
-  const playlists = data?.playlists;
+  const { owned, shared } = splitLibraryPlaylists(data?.playlists, user?.id);
+  const followed = data?.followed_playlists ?? [];
   const followedCurated = data?.followed_curated_playlists;
+  const isEmpty =
+    owned.length === 0 &&
+    shared.length === 0 &&
+    followed.length === 0 &&
+    !followedCurated?.length;
 
   if (loading) return <LoadingState label={t("common.loadingShort")} />;
 
@@ -65,6 +75,41 @@ export function LibraryPlaylistsTab() {
     } catch {
       notify.error(t("playlist.toasts.updateFailed"));
     }
+  }
+
+  async function unfollowPlaylist(playlist: Playlist) {
+    try {
+      await api(`/api/playlists/${playlist.id}/follow`, "DELETE");
+      notify.success(
+        t("playlist.toasts.removedNamedLibrary", { name: playlist.name }),
+      );
+      refetch();
+    } catch {
+      notify.error(t("playlist.toasts.updateFailed"));
+    }
+  }
+
+  function renderReadOnlyRow(playlist: Playlist, followedRow: boolean) {
+    return (
+      <PlaylistCard
+        variant="row"
+        key={`${followedRow ? "followed" : "shared"}-${playlist.id}`}
+        playlistId={playlist.id}
+        name={playlist.name}
+        isSmart={playlist.is_smart}
+        description={playlist.description}
+        coverDataUrl={playlist.cover_data_url}
+        tracks={playlist.artwork_tracks}
+        trackCount={playlist.track_count}
+        meta={playlistOwnerLabel(playlist) ?? undefined}
+        href={`/playlist/${playlist.id}`}
+        detailEndpoint={`/api/playlists/${playlist.id}`}
+        isFollowed={followedRow || undefined}
+        onToggleFollow={
+          followedRow ? () => unfollowPlaylist(playlist) : undefined
+        }
+      />
+    );
   }
 
   async function openPlaylistEditor(playlistId: number) {
@@ -171,57 +216,20 @@ export function LibraryPlaylistsTab() {
         {t("library.playlists.new")}
       </Button>
 
-      {followedCurated && followedCurated.length > 0 ? (
-        <div className="space-y-1">
-          <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-text-primary/40">
-            {t("explore.fromCrate.title")}
-          </div>
-          {followedCurated.map((playlist) => (
-            <PlaylistCard
-              variant="row"
-              key={`curated-${playlist.id}`}
-              playlistId={playlist.id}
-              name={playlist.name}
-              isSmart={playlist.is_smart}
-              description={playlist.description}
-              coverDataUrl={playlist.cover_data_url}
-              tracks={playlist.artwork_tracks}
-              trackCount={playlist.track_count}
-              meta={[
-                playlist.category,
-                playlist.follower_count > 0
-                  ? t("common.followerCountLabel", {
-                      count: playlist.follower_count,
-                    })
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-              href={`/curation/playlist/${playlist.id}`}
-              detailEndpoint={`/api/curation/playlists/${playlist.id}`}
-              crateManaged
-              systemPlaylist
-              isFollowed
-              onToggleFollow={() => toggleSystemPlaylistFollow(playlist)}
-            />
-          ))}
-        </div>
+      {isEmpty ? (
+        <EmptyState
+          variant="dashed"
+          title={t("library.playlists.emptyTitle")}
+          description={t("library.playlists.empty")}
+        />
       ) : null}
 
-      {!playlists || playlists.length === 0 ? (
-        !followedCurated || followedCurated.length === 0 ? (
-          <EmptyState
-            variant="dashed"
-            title={t("library.playlists.emptyTitle")}
-            description={t("library.playlists.empty")}
-          />
-        ) : null
-      ) : (
+      {owned.length > 0 ? (
         <div className="space-y-1">
           <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-text-primary/40">
             {t("library.playlists.yours")}
           </div>
-          {playlists.map((pl) => (
+          {owned.map((pl) => (
             <PlaylistCard
               variant="row"
               key={pl.id}
@@ -258,7 +266,62 @@ export function LibraryPlaylistsTab() {
             />
           ))}
         </div>
-      )}
+      ) : null}
+
+      {shared.length > 0 ? (
+        <div className="space-y-1">
+          <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-text-primary/40">
+            {t("library.playlists.shared")}
+          </div>
+          {shared.map((playlist) => renderReadOnlyRow(playlist, false))}
+        </div>
+      ) : null}
+
+      {followed.length > 0 ? (
+        <div className="space-y-1">
+          <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-text-primary/40">
+            {t("library.playlists.followed")}
+          </div>
+          {followed.map((playlist) => renderReadOnlyRow(playlist, true))}
+        </div>
+      ) : null}
+
+      {followedCurated && followedCurated.length > 0 ? (
+        <div className="space-y-1">
+          <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-text-primary/40">
+            {t("explore.fromCrate.title")}
+          </div>
+          {followedCurated.map((playlist) => (
+            <PlaylistCard
+              variant="row"
+              key={`curated-${playlist.id}`}
+              playlistId={playlist.id}
+              name={playlist.name}
+              isSmart={playlist.is_smart}
+              description={playlist.description}
+              coverDataUrl={playlist.cover_data_url}
+              tracks={playlist.artwork_tracks}
+              trackCount={playlist.track_count}
+              meta={[
+                playlist.category,
+                playlist.follower_count > 0
+                  ? t("common.followerCountLabel", {
+                      count: playlist.follower_count,
+                    })
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+              href={`/curation/playlist/${playlist.id}`}
+              detailEndpoint={`/api/curation/playlists/${playlist.id}`}
+              crateManaged
+              systemPlaylist
+              isFollowed
+              onToggleFollow={() => toggleSystemPlaylistFollow(playlist)}
+            />
+          ))}
+        </div>
+      ) : null}
 
       <PlaylistCreateModal
         open={!!editingPlaylist}

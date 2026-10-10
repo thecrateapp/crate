@@ -7,9 +7,7 @@ const mocks = vi.hoisted(() => ({
   useApi: vi.fn(),
   api: vi.fn(),
   members: [] as unknown[],
-  invites: [] as unknown[],
   refetchMembers: vi.fn(),
-  refetchInvites: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-api", () => ({ useApi: mocks.useApi }));
@@ -18,12 +16,6 @@ vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return { ...actual, api: mocks.api };
 });
-
-vi.mock("@crate/ui/primitives/QrCodeImage", () => ({
-  QrCodeImage: ({ value }: { value: string }) => (
-    <img alt="QR" data-value={value} />
-  ),
-}));
 
 import { CrateMembersModal } from "@/components/crates/CrateMembersModal";
 import type { CrateDetail } from "@/pages/crates-types";
@@ -101,33 +93,12 @@ describe("CrateMembersModal", () => {
     mocks.api.mockResolvedValue({ ok: true });
     mocks.useApi.mockClear();
     mocks.refetchMembers.mockReset();
-    mocks.refetchInvites.mockReset();
     mocks.members = [ownerMember, collaboratorMember];
-    mocks.invites = [
-      {
-        token: "tok-1",
-        crate_id: crateId,
-        join_url: "/crate/invite/tok-1",
-        created_at: "2026-10-01T10:00:00Z",
-        expires_at: new Date(Date.now() + 3 * 86400 * 1000).toISOString(),
-        max_uses: 5,
-        use_count: 2,
-      },
-    ];
     mocks.useApi.mockImplementation((path: string | null) => ({
-      data:
-        path === null
-          ? null
-          : path.endsWith("/members")
-            ? mocks.members
-            : path.endsWith("/invites")
-              ? mocks.invites
-              : null,
+      data: path?.endsWith("/members") ? mocks.members : null,
       loading: false,
       error: null,
-      refetch: path?.endsWith("/members")
-        ? mocks.refetchMembers
-        : mocks.refetchInvites,
+      refetch: mocks.refetchMembers,
     }));
   });
 
@@ -154,95 +125,59 @@ describe("CrateMembersModal", () => {
     expect(mocks.refetchMembers).toHaveBeenCalled();
   });
 
-  it("shows active invites with expiry and uses, and revokes them", async () => {
-    renderModal(crate());
+  it("lets the owner add collaborators from people search", async () => {
+    const onCrateChange = vi.fn();
+    mocks.api.mockImplementation((path: string) =>
+      Promise.resolve(
+        path.startsWith("/api/users/search")
+          ? [
+              {
+                id: 2,
+                username: "jane",
+                display_name: "Jane",
+                avatar: null,
+                bio: null,
+                joined_at: "2026-01-01",
+              },
+              {
+                id: 3,
+                username: "sam",
+                display_name: "Sam",
+                avatar: null,
+                bio: null,
+                joined_at: "2026-01-01",
+              },
+            ]
+          : { ok: true },
+      ),
+    );
+    renderModal(crate(), { onCrateChange });
 
-    expect(screen.getByText(/in 3 days · 2\/5 uses/)).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Revoke invite" }));
+    await userEvent.type(
+      screen.getByRole("searchbox", {
+        name: "Search people by name or username",
+      }),
+      "sa",
+    );
+    const add = await screen.findByRole("button", {
+      name: "Add Sam as a collaborator",
+    });
+    expect(
+      screen.queryByRole("button", { name: "Add Jane as a collaborator" }),
+    ).toBeNull();
+    fireEvent.click(add);
 
     await waitFor(() =>
       expect(mocks.api).toHaveBeenCalledWith(
-        `/api/crates/${crateId}/invites/tok-1`,
-        "DELETE",
+        `/api/crates/${crateId}/members`,
+        "POST",
+        { user_id: 3 },
       ),
     );
-    expect(mocks.refetchInvites).toHaveBeenCalled();
-  });
-
-  it("creates an invite with expiry and max uses and shows the link with a QR", async () => {
-    const user = userEvent.setup();
-    mocks.api.mockResolvedValue({
-      token: "tok-2",
-      crate_id: crateId,
-      join_url: "/crate/invite/tok-2",
-      use_count: 0,
-    });
-    renderModal(crate());
-
-    await user.click(screen.getByRole("combobox", { name: "Expires after" }));
-    await user.click(screen.getByRole("option", { name: "24 hours" }));
-    await user.type(
-      screen.getByRole("spinbutton", { name: "Maximum uses" }),
-      "3",
-    );
-    await user.click(
-      screen.getByRole("button", { name: "Create collaboration invite" }),
-    );
-
-    expect(mocks.api).toHaveBeenCalledWith(
+    expect(mocks.refetchMembers).toHaveBeenCalled();
+    expect(onCrateChange).toHaveBeenCalled();
+    expect(mocks.useApi).not.toHaveBeenCalledWith(
       `/api/crates/${crateId}/invites`,
-      "POST",
-      { expires_in_hours: 24, max_uses: 3 },
-    );
-    expect(
-      await screen.findByRole("textbox", { name: "Collaboration invite link" }),
-    ).toHaveValue("http://localhost:3000/crate/invite/tok-2");
-    expect(screen.getByAltText("QR")).toHaveAttribute(
-      "data-value",
-      "http://localhost:3000/crate/invite/tok-2",
-    );
-  });
-
-  it("preserves an absolute collaboration invite URL returned by the API", async () => {
-    const user = userEvent.setup();
-    const inviteUrl = "https://listen.example.test/crate/invite/invite-token";
-    mocks.api.mockResolvedValue({
-      token: "invite-token",
-      crate_id: crateId,
-      join_url: inviteUrl,
-      use_count: 0,
-    });
-    renderModal(crate());
-
-    await user.click(
-      screen.getByRole("button", { name: "Create collaboration invite" }),
-    );
-
-    expect(
-      await screen.findByRole("textbox", { name: "Collaboration invite link" }),
-    ).toHaveValue(inviteUrl);
-  });
-
-  it("creates a non-expiring unlimited invite", async () => {
-    const user = userEvent.setup();
-    mocks.api.mockResolvedValue({
-      token: "tok-3",
-      crate_id: crateId,
-      join_url: "/crate/invite/tok-3",
-      use_count: 0,
-    });
-    renderModal(crate());
-
-    await user.click(screen.getByRole("combobox", { name: "Expires after" }));
-    await user.click(screen.getByRole("option", { name: "No expiry" }));
-    await user.click(
-      screen.getByRole("button", { name: "Create collaboration invite" }),
-    );
-
-    expect(mocks.api).toHaveBeenCalledWith(
-      `/api/crates/${crateId}/invites`,
-      "POST",
-      { expires_in_hours: 0, max_uses: null },
     );
   });
 
@@ -251,12 +186,6 @@ describe("CrateMembersModal", () => {
     mocks.members = [ownerMember];
     renderModal(crate({ is_collaborative: false }), { onCrateChange });
 
-    expect(
-      screen.queryByRole("button", { name: "Create collaboration invite" }),
-    ).toBeNull();
-    expect(mocks.useApi).not.toHaveBeenCalledWith(
-      `/api/crates/${crateId}/invites`,
-    );
     fireEvent.click(
       screen.getByRole("button", { name: "Turn on collaboration" }),
     );
@@ -267,11 +196,11 @@ describe("CrateMembersModal", () => {
       }),
     );
     expect(onCrateChange).toHaveBeenCalled();
-    expect(
-      await screen.findByRole("button", {
-        name: "Create collaboration invite",
-      }),
-    ).toBeVisible();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Turn on collaboration" }),
+      ).toBeNull(),
+    );
   });
 
   it("resyncs the collaboration state when the Crate prop changes", () => {
@@ -318,9 +247,6 @@ describe("CrateMembersModal", () => {
     expect(
       screen.queryByRole("button", { name: "Turn on collaboration" }),
     ).toBeNull();
-    expect(
-      screen.getByRole("button", { name: "Create collaboration invite" }),
-    ).toBeVisible();
 
     toggle();
     expect(
@@ -333,9 +259,7 @@ describe("CrateMembersModal", () => {
       data: null,
       loading: false,
       error: path?.endsWith("/members") ? new Error("boom") : null,
-      refetch: path?.endsWith("/members")
-        ? mocks.refetchMembers
-        : mocks.refetchInvites,
+      refetch: mocks.refetchMembers,
     }));
     renderModal(crate());
 
