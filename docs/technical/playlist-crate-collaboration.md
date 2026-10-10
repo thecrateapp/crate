@@ -81,5 +81,5 @@ attached in a single batched lookup. Crates split the same way into owned, share
 
 ## Migration
 
-Migration 107 constrains `playlists.visibility` to `private`/`public` (normalising anything else to
+Migration 108 constrains `playlists.visibility` to `private`/`public` (normalising anything else to
 `private`) and expires every outstanding playlist and Crate invite.
