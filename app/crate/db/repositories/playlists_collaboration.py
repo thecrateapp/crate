@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from sqlalchemy import text
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from crate.db.repositories.playlists_create import create_playlist
@@ -58,9 +61,11 @@ def copy_playlist(source: dict, user_id: int, *, session: Session | None = None)
             visibility="private",
             session=s,
         )
-        copied = s.execute(
-            text(
-                """
+        copied = cast(
+            CursorResult,
+            s.execute(
+                text(
+                    """
                 INSERT INTO playlist_tracks (
                     playlist_id, track_id, track_entity_uid, track_storage_id, track_path,
                     title, artist, album, duration, position, source, locked, added_at,
@@ -74,8 +79,9 @@ def copy_playlist(source: dict, user_id: int, *, session: Session | None = None)
                 WHERE playlist_id = :source_id
                 ORDER BY position
                 """
+                ),
+                {"playlist_id": playlist_id, "source_id": int(source["id"])},
             ),
-            {"playlist_id": playlist_id, "source_id": int(source["id"])},
         ).rowcount
         s.execute(
             text(
