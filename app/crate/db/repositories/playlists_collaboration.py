@@ -11,7 +11,6 @@ from crate.db.repositories.playlists_follows import (
     remove_playlist_member,
 )
 from crate.db.repositories.playlists_shared import emit_playlist_domain_event
-from crate.db.repositories.playlists_tracks import add_playlist_tracks
 from crate.db.tx import optional_scope
 
 
@@ -50,9 +49,7 @@ def leave_playlist(
         return remove_playlist_member(playlist_id, user_id, session=s)
 
 
-def copy_playlist(
-    source: dict, tracks: list[dict], user_id: int, *, session: Session | None = None
-) -> int:
+def copy_playlist(source: dict, user_id: int, *, session: Session | None = None) -> int:
     with optional_scope(session) as s:
         playlist_id = create_playlist(
             name=str(source.get("name") or "Playlist"),
@@ -61,8 +58,44 @@ def copy_playlist(
             visibility="private",
             session=s,
         )
-        if tracks:
-            add_playlist_tracks(playlist_id, tracks, session=s)
+        copied = s.execute(
+            text(
+                """
+                INSERT INTO playlist_tracks (
+                    playlist_id, track_id, track_entity_uid, track_storage_id, track_path,
+                    title, artist, album, duration, position, source, locked, added_at,
+                    global_track_uid
+                )
+                SELECT
+                    :playlist_id, track_id, track_entity_uid, track_storage_id, track_path,
+                    title, artist, album, duration, position, 'manual', FALSE, NOW(),
+                    global_track_uid
+                FROM playlist_tracks
+                WHERE playlist_id = :source_id
+                ORDER BY position
+                """
+            ),
+            {"playlist_id": playlist_id, "source_id": int(source["id"])},
+        ).rowcount
+        s.execute(
+            text(
+                """
+                UPDATE playlists
+                SET track_count = source.track_count,
+                    total_duration = source.total_duration,
+                    updated_at = NOW()
+                FROM playlists AS source
+                WHERE playlists.id = :playlist_id AND source.id = :source_id
+                """
+            ),
+            {"playlist_id": playlist_id, "source_id": int(source["id"])},
+        )
+        emit_playlist_domain_event(
+            s,
+            playlist_id=playlist_id,
+            action="tracks_added",
+            payload={"track_count_delta": copied, "copied_from": int(source["id"])},
+        )
         return playlist_id
 
 

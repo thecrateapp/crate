@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from crate.db.orm.playlist import Playlist, UserFollowedPlaylist
+from crate.db.orm.playlist import Playlist, PlaylistMember, UserFollowedPlaylist
 from crate.db.orm.user import User
 from crate.db.repositories.playlists_collection_reads import (
     get_followed_system_playlists,
@@ -27,6 +27,12 @@ def _followed_user_playlists(s: Session, user_id: int) -> list[dict]:
             Playlist.scope == "user",
             Playlist.visibility == "public",
             Playlist.user_id != user_id,
+            ~select(PlaylistMember.playlist_id)
+            .where(
+                PlaylistMember.playlist_id == Playlist.id,
+                PlaylistMember.user_id == user_id,
+            )
+            .exists(),
         )
         .order_by(UserFollowedPlaylist.followed_at.desc())
     ).all()

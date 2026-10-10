@@ -462,7 +462,7 @@ def copy(request: Request, playlist_id: int):
         raise HTTPException(status_code=404, detail="Playlist not found")
     if get_playlist_access(pl, user["id"]) == "none":
         raise HTTPException(status_code=403, detail="Playlist is private")
-    new_id = copy_playlist(pl, get_playlist_tracks(playlist_id), user["id"])
+    new_id = copy_playlist(pl, user["id"])
     return {"id": new_id}
 
 

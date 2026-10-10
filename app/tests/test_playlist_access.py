@@ -209,6 +209,12 @@ def test_library_page_separates_owned_shared_and_followed_playlists(pg_db):
     followed = create_playlist(name="Followed", user_id=friend, visibility="public")
     hidden = create_playlist(name="Hidden", user_id=friend, visibility="public")
     with transaction_scope() as session:
+        session.execute(
+            text("UPDATE playlists SET visibility = 'public' WHERE id = :id"),
+            {"id": shared},
+        )
+    follow_playlist(me, shared)
+    with transaction_scope() as session:
         add_playlist_collaborator(shared, me, added_by=friend, session=session)
     follow_playlist(me, followed)
     follow_playlist(me, hidden)
@@ -227,3 +233,72 @@ def test_library_page_separates_owned_shared_and_followed_playlists(pg_db):
     assert [p["id"] for p in page["followed_playlists"]] == [followed]
     assert page["followed_playlists"][0]["owner_username"] == "lib-friend"
     assert page["followed_curated_playlists"] == []
+
+
+@pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+def test_copy_keeps_every_track_reference_and_order(pg_db):
+    from uuid import uuid4
+
+    from crate.db.repositories.playlists_collaboration import copy_playlist
+    from crate.db.repositories.playlists_create import create_playlist
+    from crate.db.repositories.playlists_collection_reads import get_playlist
+    from crate.db.tx import read_scope, transaction_scope
+
+    with transaction_scope() as session:
+        owner = _user(session, "copy-owner")
+        fan = _user(session, "copy-fan")
+    source_id = create_playlist(name="Source", user_id=owner, visibility="public")
+    rows = [
+        {
+            "entity": str(uuid4()),
+            "global": str(uuid4()),
+            "path": f"/music/{name}.flac",
+            "title": name,
+            "position": position,
+        }
+        for position, name in ((2, "Second"), (1, "First"))
+    ]
+    with transaction_scope() as session:
+        for row in rows:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO playlist_tracks (
+                        playlist_id, track_entity_uid, track_path, title, artist, album,
+                        duration, position, added_at, global_track_uid
+                    ) VALUES (
+                        :pid, CAST(:entity AS uuid), :path, :title, 'Band', 'Album',
+                        100, :position, NOW(), CAST(:global AS uuid)
+                    )
+                    """
+                ),
+                {"pid": source_id, **row},
+            )
+        session.execute(
+            text(
+                "UPDATE playlists SET track_count = 2, total_duration = 200 WHERE id = :id"
+            ),
+            {"id": source_id},
+        )
+
+    copy_id = copy_playlist(get_playlist(source_id), fan)
+
+    query = text(
+        """
+        SELECT track_entity_uid::text, global_track_uid::text, track_path, title, position
+        FROM playlist_tracks WHERE playlist_id = :id ORDER BY position
+        """
+    )
+    with read_scope() as session:
+        source_rows = session.execute(query, {"id": source_id}).all()
+        copied_rows = session.execute(query, {"id": copy_id}).all()
+        copied = session.execute(
+            text(
+                "SELECT user_id, visibility, track_count, total_duration "
+                "FROM playlists WHERE id = :id"
+            ),
+            {"id": copy_id},
+        ).one()
+    assert copied_rows == source_rows
+    assert [row.title for row in copied_rows] == ["First", "Second"]
+    assert tuple(copied) == (fan, "private", 2, 200)
