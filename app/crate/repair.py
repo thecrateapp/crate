@@ -238,7 +238,8 @@ class LibraryRepair:
             "action": str(action or check),
         }
         digest = hashlib.sha1(
-            json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
+            json.dumps(payload, sort_keys=True, default=str).encode("utf-8"),
+            usedforsecurity=False,
         ).hexdigest()
         return f"repair-plan:{digest[:16]}"
 

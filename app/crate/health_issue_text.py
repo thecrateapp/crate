@@ -14,7 +14,9 @@ def health_issue_identity(
     payload = (
         json.dumps(details, sort_keys=True, default=str) if details else description
     )
-    return hashlib.md5(f"{check_type}\n{payload}".encode()).hexdigest()
+    return hashlib.md5(
+        f"{check_type}\n{payload}".encode(), usedforsecurity=False
+    ).hexdigest()
 
 
 def _name(path: Any) -> str:

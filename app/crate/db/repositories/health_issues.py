@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import cast
 
 from sqlalchemy import text
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from crate.db.tx import optional_scope
@@ -59,7 +61,7 @@ def dismiss_issues_by_type(check_type: str, *, session: Session | None = None) -
             ),
             {"now": now, "check_type": check_type},
         )
-        return int(result.rowcount or 0)
+        return int(cast(CursorResult, result).rowcount or 0)
 
     with optional_scope(session) as current:
         return _impl(current)
