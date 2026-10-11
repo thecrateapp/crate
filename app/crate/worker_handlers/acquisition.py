@@ -59,7 +59,9 @@ from crate.task_progress import (
     entity_label,
 )
 from crate.storage_import import (
+    ManagedTrackPlacement,
     infer_album_identity,
+    install_managed_track,
     resolve_import_album_target,
     resolve_managed_track_destination,
 )
@@ -1921,7 +1923,7 @@ def _move_soulseek_completed_files(
         found = _locate_soulseek_download_file(slsk_download_dir, download)
 
         if found:
-            dest = (
+            placement = (
                 resolve_managed_track_destination(
                     found,
                     target_dir,
@@ -1931,12 +1933,15 @@ def _move_soulseek_completed_files(
                     replace_existing_audio=replace_existing_audio,
                 )
                 if managed_track_names
-                else target_dir / found.name
+                else ManagedTrackPlacement(target_dir / found.name)
             )
+            if placement is None:
+                found.unlink(missing_ok=True)
+                continue
             try:
-                shutil.move(str(found), str(dest))
+                install_managed_track(found, placement, library_root=lib)
                 moved += 1
-                log.info("Moved %s -> %s", found.name, dest)
+                log.info("Moved %s -> %s", found.name, placement.dest)
             except Exception as exc:
                 log.warning("Failed to move %s: %s", found.name, exc)
 

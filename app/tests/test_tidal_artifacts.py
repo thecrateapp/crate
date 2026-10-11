@@ -252,6 +252,36 @@ def test_move_to_library_detailed_imports_loose_tiddl_audio_root(tmp_path, monke
     ).exists()
 
 
+def test_move_to_library_detailed_drops_redownloaded_track_already_in_library(
+    tmp_path, monkeypatch
+):
+    processing = tmp_path / "processing"
+    library = tmp_path / "library"
+    target = library / "artist-uid" / "album-uid"
+    target.mkdir(parents=True)
+    processing.mkdir()
+    loose_track = processing / "02 - Terminate.flac"
+    loose_track.write_bytes(b"fLaC")
+
+    monkeypatch.setattr(
+        tidal, "infer_album_identity", lambda _path: ("Peace Test", "Repercussion")
+    )
+    monkeypatch.setattr(
+        tidal,
+        "resolve_import_album_target",
+        lambda root, artist, album: ({}, target, True),
+    )
+    monkeypatch.setattr(
+        tidal, "resolve_managed_track_destination", lambda *_args, **_kwargs: None
+    )
+
+    moved = tidal.move_to_library_detailed(str(processing), str(library))
+
+    assert moved[0]["moved"] == 0
+    assert not loose_track.exists()
+    assert list(target.iterdir()) == []
+
+
 def test_refresh_token_keeps_tiddl_cli_success_path(tmp_path, monkeypatch):
     auth_dir = tmp_path / ".tiddl"
     auth_dir.mkdir()
