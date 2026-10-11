@@ -82,6 +82,9 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "tidal_download": TaskTypeInfo("Tidal Download", "acquisition"),
     "soulseek_download": TaskTypeInfo("Soulseek Download", "acquisition"),
     "check_new_releases": TaskTypeInfo("Check New Releases", "acquisition"),
+    "promote_due_releases": TaskTypeInfo(
+        "Download Released Pre-releases", "acquisition"
+    ),
     "cleanup_incomplete_downloads": TaskTypeInfo(
         "Clean Incomplete Downloads", "acquisition"
     ),

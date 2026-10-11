@@ -19,7 +19,9 @@ from crate.db.cache_store import delete_cache, get_cache, set_cache
 from crate.db.domain_events import append_domain_event
 from crate.db.events import emit_task_event
 from crate.db.jobs.acquisition import (
+    get_due_prereleases,
     mark_artist_new_releases_checked,
+    set_new_release_tidal_source,
     update_artist_latest_release_date,
 )
 from crate.db.repositories.library import (
@@ -70,6 +72,8 @@ from crate.worker_handlers import TaskHandler, is_cancelled, start_scan
 log = logging.getLogger(__name__)
 
 NEW_RELEASE_SCAN_TTL = timedelta(hours=12)
+PRERELEASE_PROMOTION_LOOKBACK_DAYS = 60
+PRERELEASE_PROMOTION_MAX_DOWNLOADS = 10
 
 
 def _emit_acquisition_domain_event(
@@ -1041,9 +1045,12 @@ def _find_tidal_release_match(artist_name: str, title: str) -> dict:
         tidal_results = tidal_mod.search(
             f"{artist_name} {title}", content_type="albums", limit=3
         )
+        wanted = title.strip().lower()
         for tidal_album in tidal_results.get("albums", []):
-            title_match = tidal_album.get("title", "").lower()
-            if title.lower() in title_match or title_match in title.lower():
+            title_match = str(tidal_album.get("title") or "").strip().lower()
+            if not wanted or not title_match or not tidal_album.get("url"):
+                continue
+            if wanted in title_match or title_match in wanted:
                 return {
                     "tidal_url": _normalize_tidal_url(tidal_album.get("url", "")),
                     "tidal_id": str(tidal_album.get("id", "")),
@@ -1560,6 +1567,79 @@ def _handle_check_new_releases(task_id: str, params: dict, config: dict) -> dict
         "checked": checked,
         "skipped_recent": skipped_recent,
         "new_releases": new_count,
+    }
+
+
+def _handle_promote_due_releases(task_id: str, params: dict, config: dict) -> dict:
+    today = datetime.now(timezone.utc).date()
+    releases = get_due_prereleases(
+        today, lookback_days=PRERELEASE_PROMOTION_LOOKBACK_DAYS
+    )
+    quality = get_setting("tidal_quality", "max")
+    queued = 0
+    already_in_library = 0
+    waiting_for_source = 0
+    p = TaskProgress(phase="promoting", phase_count=1, total=len(releases))
+
+    for index, release in enumerate(releases, start=1):
+        if is_cancelled(task_id) or queued >= PRERELEASE_PROMOTION_MAX_DOWNLOADS:
+            break
+        release_id = int(release["id"])
+        artist_name = str(release.get("artist_name") or "")
+        album_title = str(release.get("album_title") or "")
+        p.done = index
+        p.item = entity_label(artist=artist_name, album=album_title)
+        emit_progress(task_id, p)
+
+        expected_tracks = int(release.get("tracks") or 0)
+        library_tracks = int(release.get("library_track_count") or 0)
+        if expected_tracks and library_tracks >= expected_tracks:
+            mark_release_downloaded(release_id)
+            already_in_library += 1
+            continue
+
+        tidal_url = _normalize_tidal_url(str(release.get("tidal_url") or ""))
+        if not tidal_url:
+            match = _find_tidal_release_match(artist_name, album_title)
+            tidal_url = match["tidal_url"]
+            if not tidal_url:
+                waiting_for_source += 1
+                continue
+            set_new_release_tidal_source(
+                release_id, tidal_id=match["tidal_id"], tidal_url=tidal_url
+            )
+
+        task_params = build_tidal_download_params(
+            url=tidal_url,
+            quality=quality,
+            artist=artist_name,
+            album=album_title,
+            cover_url=str(release.get("cover_url") or ""),
+            new_release_id=release_id,
+        )
+        create_task_dedup(
+            "tidal_download",
+            task_params,
+            dedup_key=tidal_download_dedup_key(task_params),
+        )
+        mark_release_downloading(release_id)
+        queued += 1
+        emit_task_event(
+            task_id,
+            "info",
+            {
+                "message": f"Released today or earlier, downloading: {artist_name} - {album_title}",
+                "artist": artist_name,
+                "album": album_title,
+                "release_date": release.get("release_date"),
+            },
+        )
+
+    return {
+        "due": len(releases),
+        "queued": queued,
+        "already_in_library": already_in_library,
+        "waiting_for_source": waiting_for_source,
     }
 
 
@@ -2657,6 +2737,7 @@ def _handle_import_queue_remove(task_id: str, params: dict, config: dict) -> dic
 
 ACQUISITION_TASK_HANDLERS: dict[str, TaskHandler] = {
     "tidal_download": _handle_tidal_download,
+    "promote_due_releases": _handle_promote_due_releases,
     "check_new_releases": _handle_check_new_releases,
     "soulseek_download": _handle_soulseek_download,
     "cleanup_incomplete_downloads": _handle_cleanup_incomplete_downloads,
