@@ -1293,6 +1293,38 @@ def test_promote_due_releases_caps_downloads_per_run(monkeypatch):
     assert len(calls["tasks"]) == acquisition.PRERELEASE_PROMOTION_MAX_DOWNLOADS
 
 
+def test_promote_due_releases_caps_tidal_lookups_per_run(monkeypatch):
+    from crate.worker_handlers import acquisition
+
+    releases = [
+        {
+            "id": index,
+            "artist_name": "Artist",
+            "album_title": f"Unlisted {index}",
+            "release_date": "2026-10-09",
+            "tidal_url": "",
+            "tracks": 10,
+            "library_track_count": 0,
+        }
+        for index in range(1, acquisition.PRERELEASE_PROMOTION_MAX_LOOKUPS + 4)
+    ]
+    searched: list[str] = []
+    _patch_promotion(monkeypatch, releases)
+    monkeypatch.setattr(
+        acquisition,
+        "_find_tidal_release_match",
+        lambda artist, title: (
+            searched.append(title) or {"tidal_url": "", "tidal_id": ""}
+        ),
+    )
+
+    result = _handle_promote_due_releases("promote-3", {}, {})
+
+    assert len(searched) == acquisition.PRERELEASE_PROMOTION_MAX_LOOKUPS
+    assert result["waiting_for_source"] == len(releases)
+    assert result["queued"] == 0
+
+
 def test_due_prereleases_only_returns_released_items_detected_early(pg_db):
     from datetime import date
 

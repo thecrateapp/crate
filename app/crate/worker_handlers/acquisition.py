@@ -74,6 +74,7 @@ log = logging.getLogger(__name__)
 NEW_RELEASE_SCAN_TTL = timedelta(hours=12)
 PRERELEASE_PROMOTION_LOOKBACK_DAYS = 60
 PRERELEASE_PROMOTION_MAX_DOWNLOADS = 10
+PRERELEASE_PROMOTION_MAX_LOOKUPS = 10
 
 
 def _emit_acquisition_domain_event(
@@ -1577,6 +1578,7 @@ def _handle_promote_due_releases(task_id: str, params: dict, config: dict) -> di
     )
     quality = get_setting("tidal_quality", "max")
     queued = 0
+    lookups = 0
     already_in_library = 0
     waiting_for_source = 0
     p = TaskProgress(phase="promoting", phase_count=1, total=len(releases))
@@ -1600,6 +1602,10 @@ def _handle_promote_due_releases(task_id: str, params: dict, config: dict) -> di
 
         tidal_url = _normalize_tidal_url(str(release.get("tidal_url") or ""))
         if not tidal_url:
+            if lookups >= PRERELEASE_PROMOTION_MAX_LOOKUPS:
+                waiting_for_source += 1
+                continue
+            lookups += 1
             match = _find_tidal_release_match(artist_name, album_title)
             tidal_url = match["tidal_url"]
             if not tidal_url:
