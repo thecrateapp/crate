@@ -96,7 +96,7 @@ def _unmark_processing(artist_name: str):
 
 
 def _handle_health_check(task_id: str, params: dict, config: dict) -> dict:
-    from crate.health_check import LibraryHealthCheck
+    from crate.health_check import ARTIST_SCOPED_CHECKS, LibraryHealthCheck
 
     p_hc = TaskProgress(phase="health_check", phase_count=1)
 
@@ -111,8 +111,7 @@ def _handle_health_check(task_id: str, params: dict, config: dict) -> dict:
     check_types = [str(check) for check in params.get("check_types") or []]
     if artists:
         report = checker.run_selected_for_artists(
-            check_types
-            or ["artist_layout_fix", "duplicate_albums", "duplicate_tracks"],
+            check_types or list(ARTIST_SCOPED_CHECKS),
             artists,
             progress_callback=_hc_progress,
         )
@@ -134,7 +133,7 @@ def _handle_health_check(task_id: str, params: dict, config: dict) -> dict:
 
 
 def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
-    from crate.health_check import LibraryHealthCheck
+    from crate.health_check import ARTIST_SCOPED_CHECKS, LibraryHealthCheck
     from crate.repair import LibraryRepair
     from crate.db.admin_health_surface import publish_health_surface_signal
     from crate.db.domain_events import append_domain_event
@@ -255,7 +254,7 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
                     catalog_entry is not None
                     and not catalog_entry.supports_global_scope
                 ):
-                    if check_type == "artist_layout_fix":
+                    if check_type in ARTIST_SCOPED_CHECKS:
                         artist_revalidation_check_types.append(check_type)
                     else:
                         skipped_revalidation_check_types.append(check_type)

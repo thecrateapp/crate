@@ -111,6 +111,19 @@ def _read_audio_quality_native(filepath: Path) -> dict[str, int | float | None] 
     }
 
 
+def audio_format_rank(format_value: str) -> int:
+    normalized = str(format_value or "").strip().lstrip(".").casefold()
+    if normalized in {"flac", "alac", "wav", "aiff", "aif"}:
+        return 100
+    if normalized in {"m4a", "aac"}:
+        return 60
+    if normalized in {"opus", "ogg"}:
+        return 50
+    if normalized == "mp3":
+        return 40
+    return 0
+
+
 def read_audio_quality(filepath: Path) -> dict[str, int | float | None]:
     """Read lightweight technical audio metadata from a file."""
     native = _read_audio_quality_native(filepath)
