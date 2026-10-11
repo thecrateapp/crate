@@ -341,24 +341,20 @@ def install_managed_track(
     failed write never leaves the library without the track."""
     root = Path(library_root)
     dest = placement.dest
-    replaced = placement.replaces
-    parked: Path | None = None
-    if replaced is not None and replaced == dest and replaced.exists():
-        parked = _quarantine_replaced_copy(replaced, root)
+    parked = _quarantine_replaced_copy(dest, root) if dest.exists() else None
     try:
         dest.parent.mkdir(parents=True, exist_ok=True)
-        if dest.exists():
-            dest.unlink()
         if copy:
             shutil.copy2(str(src), str(dest))
         else:
             shutil.move(str(src), str(dest))
     except Exception:
+        dest.unlink(missing_ok=True)
         if parked is not None:
-            dest.unlink(missing_ok=True)
             shutil.move(str(parked), str(dest))
         raise
-    if replaced is not None and parked is None and replaced.exists():
+    replaced = placement.replaces
+    if replaced is not None and replaced != dest and replaced.exists():
         _quarantine_replaced_copy(replaced, root)
 
 

@@ -113,7 +113,7 @@ def _read_audio_quality_native(filepath: Path) -> dict[str, int | float | None] 
 
 def audio_format_rank(format_value: str) -> int:
     normalized = str(format_value or "").strip().lstrip(".").casefold()
-    if normalized in {"flac", "alac", "wav", "aiff", "aif"}:
+    if normalized in {"flac", "alac", "wav", "aiff", "aif", "ape", "wv", "dsf"}:
         return 100
     if normalized in {"m4a", "aac"}:
         return 60

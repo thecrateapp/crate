@@ -249,3 +249,26 @@ def test_move_album_tree_does_not_add_copies_on_redownload(tmp_path, monkeypatch
         "existing.flac",
     ]
     assert not staged.exists()
+
+
+def test_install_quarantines_any_file_already_at_the_destination(tmp_path):
+    library, target = _managed_album(tmp_path)
+    occupant = target / "existing.flac"
+    occupant.write_bytes(b"unrelated")
+    src = tmp_path / "new.flac"
+    src.write_bytes(b"new")
+
+    storage_import.install_managed_track(
+        src, storage_import.ManagedTrackPlacement(dest=occupant), library_root=library
+    )
+
+    assert occupant.read_bytes() == b"new"
+    trashed = library / ".crate-trash" / "tracks" / "artist-uid" / "album-uid"
+    assert (trashed / "existing.flac").read_bytes() == b"unrelated"
+
+
+def test_lossless_formats_outrank_lossy_ones():
+    from crate.audio import audio_format_rank
+
+    assert {audio_format_rank(fmt) for fmt in ("flac", ".ape", "wv", "dsf")} == {100}
+    assert audio_format_rank("mp3") < audio_format_rank("m4a") < 100
