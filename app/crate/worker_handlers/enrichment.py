@@ -715,7 +715,7 @@ def _handle_enrich_mbids(task_id: str, params: dict, config: dict) -> dict:
 
 def _match_album_mbids(
     task_id: str,
-    albums: list[dict],
+    albums: Sequence[Mapping[str, Any]],
     config: dict,
     *,
     min_score: int = 70,
