@@ -13,6 +13,7 @@ _COMPILATION_TITLE_RE = re.compile(
     re.IGNORECASE,
 )
 _EP_SINGLE_TITLE_RE = re.compile(r"\b(?:ep|single)\b", re.IGNORECASE)
+SINGLE_MAX_TRACKS = 3
 
 
 def classify_release(
@@ -57,7 +58,7 @@ def classify_release(
         return "compilation"
     if _EP_SINGLE_TITLE_RE.search(title or ""):
         return "ep_single"
-    if track_count is not None and int(track_count or 0) == 1:
+    if track_count is not None and 0 < int(track_count or 0) <= SINGLE_MAX_TRACKS:
         return "ep_single"
     return "album"
 

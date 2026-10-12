@@ -46,6 +46,8 @@ def test_release_type_uses_conservative_fallbacks_without_metadata():
     assert classify_release(title="The Best of Pantera") == "compilation"
     assert classify_release(title="Walk EP") == "ep_single"
     assert classify_release(title="Standalone Song", track_count=1) == "ep_single"
+    assert classify_release(title="Exalted Eagles", track_count=3) == "ep_single"
+    assert classify_release(title="Untitled", track_count=0) == "album"
     assert classify_release(title="Four Songs", track_count=4) == "album"
 
 
