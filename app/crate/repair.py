@@ -10,7 +10,7 @@ from crate.artist_lifecycle import (
     delete_artist,
     run_artist_merge,
 )
-from crate.audio import read_tags
+from crate.audio import audio_format_rank, read_tags
 from crate.db.repositories.library_quarantine import quarantine_album
 from crate.db.audit import log_audit
 from crate.db.jobs.repair import (
@@ -39,6 +39,7 @@ log = logging.getLogger(__name__)
 DUPLICATE_TRACK_MAX_DURATION_DELTA_SEC = 1.0
 LOSSLESS_FORMATS = frozenset({"flac", "alac", "wav", "aiff", "ape", "wv", "dsf"})
 DUPLICATE_TRACK_CONFLICTING_FINGERPRINT_MAX_DURATION_DELTA_SEC = 0.25
+DUPLICATE_TRACK_ALREADY_RESOLVED_REASON = "the copies are no longer in the library"
 
 
 class LibraryRepair:
@@ -434,6 +435,9 @@ class LibraryRepair:
                                 fs_changed = True
                             else:
                                 db_changed = True
+                        if result.get("applied") or (
+                            result.get("resolved") and not dry_run
+                        ):
                             issue_id = issue.get("id")
                             if isinstance(issue_id, int):
                                 resolved_ids.append(issue_id)
@@ -1032,17 +1036,8 @@ class LibraryRepair:
     def _duplicate_track_format_rank(track: dict) -> int:
         format_value = str(track.get("format") or "").strip().casefold()
         if not format_value:
-            path = Path(str(track.get("path") or ""))
-            format_value = path.suffix.lstrip(".").casefold()
-        if format_value in {"flac", "alac", "wav", "aiff", "aif"}:
-            return 100
-        if format_value in {"m4a", "aac"}:
-            return 60
-        if format_value in {"opus", "ogg"}:
-            return 50
-        if format_value == "mp3":
-            return 40
-        return 0
+            format_value = Path(str(track.get("path") or "")).suffix
+        return audio_format_rank(format_value)
 
     @staticmethod
     def _duplicate_track_keep_key(
@@ -1087,7 +1082,7 @@ class LibraryRepair:
 
         tracks = get_tracks_by_paths(paths)
         if len(tracks) < 2:
-            return "the copies are no longer in the library"
+            return DUPLICATE_TRACK_ALREADY_RESOLVED_REASON
 
         album_ids = {
             track.get("album_id")
@@ -1215,6 +1210,16 @@ class LibraryRepair:
         title = str(details.get("title") or "").strip()
 
         resolution = self.duplicate_track_resolution(issue)
+        if resolution == DUPLICATE_TRACK_ALREADY_RESOLVED_REASON:
+            return {
+                "action": "fix_duplicate_tracks",
+                "target": f"{artist}/{album}/{title}",
+                "details": {"reason": resolution},
+                "applied": False,
+                "resolved": True,
+                "fs_write": False,
+                "message": f"Already resolved {artist}/{album}/{title}: {resolution}",
+            }
         if isinstance(resolution, str):
             return {
                 "action": "fix_duplicate_tracks",

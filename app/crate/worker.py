@@ -535,6 +535,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         (
             "tidal_download",
             "check_new_releases",
+            "promote_due_releases",
             "soulseek_download",
             "cleanup_incomplete_downloads",
             "library_upload",

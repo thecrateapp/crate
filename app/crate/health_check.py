@@ -46,6 +46,8 @@ from crate.worker_handlers.migration import (
 
 log = logging.getLogger(__name__)
 
+ARTIST_SCOPED_CHECKS = ("artist_layout_fix", "duplicate_albums", "duplicate_tracks")
+
 
 def artwork_variant_health_sample(*, max_assets: int = 100) -> dict[str, int]:
     """Return a bounded integrity sample suitable for interactive health views."""

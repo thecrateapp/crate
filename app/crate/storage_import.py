@@ -4,9 +4,11 @@ import logging
 import re
 import shutil
 import uuid
+from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
-from crate.audio import read_tags
+from crate.audio import audio_format_rank, read_audio_quality, read_tags
 from crate.db.repositories.library import (
     get_library_album,
     get_library_artist,
@@ -17,6 +19,8 @@ from crate.storage_layout import album_dir as managed_album_dir
 from crate.storage_layout import entity_uid_for, looks_like_entity_uid
 
 log = logging.getLogger(__name__)
+
+SAME_TRACK_MAX_DURATION_DELTA_SEC = 2.0
 
 DEFAULT_AUDIO_EXTENSIONS = {
     ".flac",
@@ -200,6 +204,70 @@ def move_file(src: Path, dest: Path):
     shutil.move(str(src), str(dest))
 
 
+def _track_identity(tags: dict) -> tuple[int, int, str] | None:
+    track_number = _parse_tag_integer(tags.get("tracknumber"))
+    title = " ".join(str(tags.get("title") or "").split()).casefold()
+    if not track_number or not title:
+        return None
+    return (_parse_tag_integer(tags.get("discnumber")) or 1, track_number, title)
+
+
+@lru_cache(maxsize=8192)
+def _cached_track_identity(
+    path: str, _mtime_ns: int, _size: int
+) -> tuple[int, int, str] | None:
+    return _track_identity(read_tags(Path(path)))
+
+
+def _find_existing_copy(
+    target_album_dir: Path, identity: tuple[int, int, str], exclude: Path
+) -> Path | None:
+    if not target_album_dir.is_dir():
+        return None
+    for candidate in sorted(target_album_dir.iterdir()):
+        if (
+            candidate == exclude
+            or not candidate.is_file()
+            or candidate.suffix.lower() not in DEFAULT_AUDIO_EXTENSIONS
+        ):
+            continue
+        stat = candidate.stat()
+        if _cached_track_identity(str(candidate), stat.st_mtime_ns, stat.st_size) == (
+            identity
+        ):
+            return candidate
+    return None
+
+
+def _audio_quality_key(path: Path, quality: dict) -> tuple[int, int, int, int]:
+    return (
+        audio_format_rank(path.suffix),
+        int(quality.get("bit_depth") or 0),
+        int(quality.get("sample_rate") or 0),
+        int(quality.get("bitrate") or 0),
+    )
+
+
+def _quarantine_replaced_copy(existing: Path, library_root: Path) -> Path:
+    destination = (
+        library_root / ".crate-trash" / "tracks" / existing.relative_to(library_root)
+    )
+    if destination.exists():
+        destination = destination.with_name(
+            f"{destination.stem}.{uuid.uuid4().hex[:8]}{destination.suffix}"
+        )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(existing), str(destination))
+    log.info("Quarantined replaced copy %s -> %s", existing, destination)
+    return destination
+
+
+@dataclass(frozen=True)
+class ManagedTrackPlacement:
+    dest: Path
+    replaces: Path | None = None
+
+
 def resolve_managed_track_destination(
     src: Path,
     target_album_dir: Path,
@@ -208,7 +276,12 @@ def resolve_managed_track_destination(
     album_name: str,
     album_entity_uid: str,
     replace_existing_audio: bool = False,
-) -> Path:
+) -> ManagedTrackPlacement | None:
+    """Decide where ``src`` lands in a managed album without touching the disk.
+
+    Returns ``None`` when the album already holds an equal or better copy of the
+    same track. When ``src`` replaces a worse copy it takes that copy's file stem
+    so the library row (and everything pointing at it) survives the swap."""
     tags = read_tags(src)
     track_uid = track_entity_uid(
         album_uid=album_entity_uid,
@@ -222,12 +295,75 @@ def resolve_managed_track_destination(
         musicbrainz_albumid=tags.get("musicbrainz_albumid"),
     )
     dest = target_album_dir / f"{track_uid}{src.suffix.lower()}"
+
+    identity = _track_identity(tags)
+    existing = (
+        _find_existing_copy(target_album_dir, identity, exclude=src)
+        if identity
+        else None
+    )
+    if existing is not None:
+        new_quality = read_audio_quality(src)
+        existing_quality = read_audio_quality(existing)
+        new_duration = float(new_quality.get("duration") or 0)
+        existing_duration = float(existing_quality.get("duration") or 0)
+        if (
+            new_duration
+            and existing_duration
+            and abs(new_duration - existing_duration)
+            <= SAME_TRACK_MAX_DURATION_DELTA_SEC
+        ):
+            if not replace_existing_audio and _audio_quality_key(
+                src, new_quality
+            ) <= _audio_quality_key(existing, existing_quality):
+                log.info("Skipping %s: %s is an equal or better copy", src, existing)
+                return None
+            return ManagedTrackPlacement(
+                dest=existing.with_suffix(src.suffix.lower()), replaces=existing
+            )
+
     if dest.exists() and not replace_existing_audio:
         collision_uid = uuid.uuid5(
             track_uid, f"collision:{src.name.lower()}:{src.stat().st_size}"
         )
         dest = target_album_dir / f"{collision_uid}{src.suffix.lower()}"
-    return dest
+    return ManagedTrackPlacement(dest=dest)
+
+
+def install_managed_track(
+    src: Path,
+    placement: ManagedTrackPlacement,
+    *,
+    library_root: str | Path,
+    copy: bool = False,
+) -> None:
+    """Put ``src`` in place first and only then retire the copy it replaces, so a
+    failed write never leaves the library without the track."""
+    root = Path(library_root)
+    dest = placement.dest
+    parked = _quarantine_replaced_copy(dest, root) if dest.exists() else None
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if copy:
+            shutil.copy2(str(src), str(dest))
+        else:
+            shutil.move(str(src), str(dest))
+    except Exception:
+        dest.unlink(missing_ok=True)
+        if parked is not None:
+            shutil.move(str(parked), str(dest))
+        raise
+    replaced = placement.replaces
+    if replaced is not None and replaced != dest and replaced.exists():
+        try:
+            _quarantine_replaced_copy(replaced, root)
+        except OSError:
+            log.warning(
+                "Installed %s but could not quarantine %s",
+                dest,
+                replaced,
+                exc_info=True,
+            )
 
 
 def move_album_tree(
@@ -238,16 +374,19 @@ def move_album_tree(
     artist_name: str,
     album_name: str,
     replace_existing_audio: bool = False,
+    library_root: str | Path | None = None,
 ) -> int:
     moved = 0
     if managed_track_names:
+        root = Path(library_root) if library_root else target_album_dir.parent.parent
         target_album_dir.mkdir(parents=True, exist_ok=True)
         album_entity_uid = target_album_dir.name
         for src in sorted(staged_album_dir.rglob("*")):
             if not src.is_file():
                 continue
-            if src.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS:
-                dest = resolve_managed_track_destination(
+            is_audio = src.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
+            placement = (
+                resolve_managed_track_destination(
                     src,
                     target_album_dir,
                     artist_name=artist_name,
@@ -255,13 +394,21 @@ def move_album_tree(
                     album_entity_uid=album_entity_uid,
                     replace_existing_audio=replace_existing_audio,
                 )
-            else:
-                dest = target_album_dir / src.name
+                if is_audio
+                else None
+            )
+            if is_audio and placement is None:
+                continue
             try:
-                move_file(src, dest)
+                if placement is None:
+                    move_file(src, target_album_dir / src.name)
+                else:
+                    install_managed_track(src, placement, library_root=root)
                 moved += 1
             except Exception:
-                log.warning("Failed to move %s -> %s", src, dest, exc_info=True)
+                log.warning(
+                    "Failed to move %s into %s", src, target_album_dir, exc_info=True
+                )
         shutil.rmtree(staged_album_dir, ignore_errors=True)
         return moved
 

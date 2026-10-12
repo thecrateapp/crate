@@ -9,6 +9,8 @@ from threading import Lock
 from crate.audio import get_audio_files, read_tags
 from crate.storage_import import (
     DEFAULT_AUDIO_EXTENSIONS,
+    ManagedTrackPlacement,
+    install_managed_track,
     resolve_import_album_target,
     resolve_managed_track_destination,
 )
@@ -138,21 +140,23 @@ class ImportQueue:
                 continue
             relative = f.relative_to(src)
             if managed_track_names and f.suffix.lower() in audio_extensions:
-                target = resolve_managed_track_destination(
+                placement = resolve_managed_track_destination(
                     f,
                     dest,
                     artist_name=artist,
                     album_name=album,
                     album_entity_uid=dest.name,
-                    replace_existing_audio=True,
                 )
             else:
-                target = dest / relative
-            if target.exists():
+                placement = ManagedTrackPlacement(dest / relative)
+            if placement is None or (
+                placement.replaces is None and placement.dest.exists()
+            ):
                 skipped += 1
                 continue
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(str(f), str(target))
+            install_managed_track(
+                f, placement, library_root=self.library_path, copy=True
+            )
             copied += 1
 
         if skipped:

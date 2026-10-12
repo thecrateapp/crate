@@ -16,7 +16,9 @@ from crate.db.cache_settings import get_setting
 from crate.storage_import import (
     DEFAULT_AUDIO_EXTENSIONS,
     infer_album_identity,
+    install_managed_track,
     move_album_tree,
+    move_file,
     resolve_import_album_target,
     resolve_managed_track_destination,
 )
@@ -878,7 +880,7 @@ def move_to_library_detailed(
                 managed_track_names
                 and file_path.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
             ):
-                dest_file = resolve_managed_track_destination(
+                placement = resolve_managed_track_destination(
                     file_path,
                     target_album_dir,
                     artist_name=artist_name,
@@ -886,19 +888,22 @@ def move_to_library_detailed(
                     album_entity_uid=target_album_dir.name,
                     replace_existing_audio=replace_existing_audio,
                 )
+                if placement is None:
+                    file_path.unlink(missing_ok=True)
+                    continue
             else:
-                dest_file = target_album_dir / file_path.name
+                placement = None
             try:
-                if dest_file.exists():
-                    dest_file.unlink()
-                dest_file.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(file_path), str(dest_file))
+                if placement is None:
+                    move_file(file_path, target_album_dir / file_path.name)
+                else:
+                    install_managed_track(file_path, placement, library_root=dst)
                 moved += 1
             except Exception:
                 log.warning(
-                    "move_to_library: failed to move root file %s -> %s",
+                    "move_to_library: failed to move root file %s into %s",
                     file_path,
-                    dest_file,
+                    target_album_dir,
                     exc_info=True,
                 )
         key = (artist_name, album_name, str(target_album_dir))
@@ -930,6 +935,7 @@ def move_to_library_detailed(
                         artist_name=artist_name,
                         album_name=album_name,
                         replace_existing_audio=replace_existing_audio,
+                        library_root=dst,
                     )
                     key = (artist_name, album_name, str(target_album_dir))
                     imported_targets[key] = {
@@ -954,7 +960,11 @@ def move_to_library_detailed(
                     dst, artist_name, album_name
                 )
                 target_album_dir.mkdir(parents=True, exist_ok=True)
-                dest_file = (
+                is_managed_audio = (
+                    managed_track_names
+                    and album_item.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
+                )
+                placement = (
                     resolve_managed_track_destination(
                         album_item,
                         target_album_dir,
@@ -963,13 +973,17 @@ def move_to_library_detailed(
                         album_entity_uid=target_album_dir.name,
                         replace_existing_audio=replace_existing_audio,
                     )
-                    if managed_track_names
-                    else target_album_dir / album_item.name
+                    if is_managed_audio
+                    else None
                 )
+                if is_managed_audio and placement is None:
+                    album_item.unlink(missing_ok=True)
+                    continue
                 try:
-                    if dest_file.exists():
-                        dest_file.unlink()
-                    shutil.move(str(album_item), str(dest_file))
+                    if placement is None:
+                        move_file(album_item, target_album_dir / album_item.name)
+                    else:
+                        install_managed_track(album_item, placement, library_root=dst)
                     key = (artist_name, album_name, str(target_album_dir))
                     existing = imported_targets.get(key)
                     moved_count = (
@@ -984,9 +998,9 @@ def move_to_library_detailed(
                     }
                 except Exception:
                     log.warning(
-                        "move_to_library: failed to move file %s -> %s",
+                        "move_to_library: failed to move file %s into %s",
                         album_item,
-                        dest_file,
+                        target_album_dir,
                         exc_info=True,
                     )
         try:

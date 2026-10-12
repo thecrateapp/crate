@@ -4,10 +4,12 @@ from pathlib import Path
 from crate.worker_handlers.acquisition import (
     _finalize_upgrade_quarantine,
     _find_cover_art_archive_release_group_cover,
+    _find_tidal_release_match,
     _find_tidal_preview_tracks,
     _handle_check_new_releases,
     _handle_tidal_download,
     _handle_library_upload,
+    _handle_promote_due_releases,
     _locate_soulseek_download_file,
     _queue_release_preview_download,
     _register_new_release,
@@ -1151,3 +1153,229 @@ def test_finalize_upgrade_deletes_old_row_for_relocated_replacement(monkeypatch)
     )
 
     assert calls == [("delete", 42)]
+
+
+def _patch_promotion(monkeypatch, releases, *, tidal_matches=None):
+    from crate.worker_handlers import acquisition
+
+    calls = {"downloaded": [], "downloading": [], "sources": [], "tasks": []}
+    monkeypatch.setattr(
+        acquisition, "get_due_prereleases", lambda today, lookback_days: releases
+    )
+    monkeypatch.setattr(acquisition, "get_setting", lambda key, default: "max")
+    monkeypatch.setattr(acquisition, "emit_progress", lambda *a, **k: None)
+    monkeypatch.setattr(acquisition, "emit_task_event", lambda *a, **k: None)
+    monkeypatch.setattr(acquisition, "is_cancelled", lambda _task_id: False)
+    monkeypatch.setattr(
+        acquisition, "mark_release_downloaded", calls["downloaded"].append
+    )
+    monkeypatch.setattr(
+        acquisition, "mark_release_downloading", calls["downloading"].append
+    )
+    monkeypatch.setattr(
+        acquisition,
+        "set_new_release_tidal_source",
+        lambda release_id, **kwargs: calls["sources"].append((release_id, kwargs)),
+    )
+    monkeypatch.setattr(
+        acquisition,
+        "_find_tidal_release_match",
+        lambda artist, title: (tidal_matches or {}).get(
+            title, {"tidal_url": "", "tidal_id": ""}
+        ),
+    )
+    monkeypatch.setattr(
+        acquisition,
+        "create_task_dedup",
+        lambda task_type, params, dedup_key=None: (
+            calls["tasks"].append((task_type, params)) or "task"
+        ),
+    )
+    return calls
+
+
+def test_promote_due_releases_downloads_released_prereleases(monkeypatch):
+    releases = [
+        {
+            "id": 10094,
+            "artist_name": "Toundra",
+            "album_title": "Siete",
+            "release_date": "2026-10-09",
+            "tidal_url": "https://tidal.com/album/563771095",
+            "tracks": 7,
+            "library_track_count": 0,
+        },
+        {
+            "id": 3476,
+            "artist_name": "Bonobo",
+            "album_title": "Distance in Static",
+            "release_date": "2026-09-11",
+            "tidal_url": "",
+            "tracks": 12,
+            "library_track_count": 0,
+        },
+        {
+            "id": 9294,
+            "artist_name": "Queens Of The Stone Age",
+            "album_title": "Where the Goth Girls At?",
+            "release_date": "2026-09-23",
+            "tidal_url": "",
+            "tracks": 1,
+            "library_track_count": 0,
+        },
+        {
+            "id": 5111,
+            "artist_name": "Swans",
+            "album_title": "Newly Sentient Being",
+            "release_date": "2026-10-02",
+            "tidal_url": "https://tidal.com/album/564646846",
+            "tracks": 5,
+            "library_track_count": 5,
+        },
+    ]
+    calls = _patch_promotion(
+        monkeypatch,
+        releases,
+        tidal_matches={
+            "Distance in Static": {
+                "tidal_url": "https://tidal.com/album/532092074",
+                "tidal_id": "532092074",
+            }
+        },
+    )
+
+    result = _handle_promote_due_releases("promote-1", {}, {})
+
+    assert result == {
+        "due": 4,
+        "queued": 2,
+        "already_in_library": 1,
+        "waiting_for_source": 1,
+    }
+    assert calls["downloaded"] == [5111]
+    assert calls["downloading"] == [10094, 3476]
+    assert calls["sources"] == [
+        (
+            3476,
+            {
+                "tidal_id": "532092074",
+                "tidal_url": "https://tidal.com/album/532092074",
+            },
+        )
+    ]
+    assert [params["new_release_id"] for _type, params in calls["tasks"]] == [
+        10094,
+        3476,
+    ]
+    assert {task_type for task_type, _params in calls["tasks"]} == {"tidal_download"}
+
+
+def test_promote_due_releases_caps_downloads_per_run(monkeypatch):
+    from crate.worker_handlers import acquisition
+
+    releases = [
+        {
+            "id": index,
+            "artist_name": "Artist",
+            "album_title": f"Album {index}",
+            "release_date": "2026-10-09",
+            "tidal_url": f"https://tidal.com/album/{index}",
+            "tracks": 10,
+            "library_track_count": 0,
+        }
+        for index in range(1, acquisition.PRERELEASE_PROMOTION_MAX_DOWNLOADS + 5)
+    ]
+    calls = _patch_promotion(monkeypatch, releases)
+
+    result = _handle_promote_due_releases("promote-2", {}, {})
+
+    assert result["queued"] == acquisition.PRERELEASE_PROMOTION_MAX_DOWNLOADS
+    assert len(calls["tasks"]) == acquisition.PRERELEASE_PROMOTION_MAX_DOWNLOADS
+
+
+def test_promote_due_releases_caps_tidal_lookups_per_run(monkeypatch):
+    from crate.worker_handlers import acquisition
+
+    releases = [
+        {
+            "id": index,
+            "artist_name": "Artist",
+            "album_title": f"Unlisted {index}",
+            "release_date": "2026-10-09",
+            "tidal_url": "",
+            "tracks": 10,
+            "library_track_count": 0,
+        }
+        for index in range(1, acquisition.PRERELEASE_PROMOTION_MAX_LOOKUPS + 4)
+    ]
+    searched: list[str] = []
+    _patch_promotion(monkeypatch, releases)
+    monkeypatch.setattr(
+        acquisition,
+        "_find_tidal_release_match",
+        lambda artist, title: (
+            searched.append(title) or {"tidal_url": "", "tidal_id": ""}
+        ),
+    )
+
+    result = _handle_promote_due_releases("promote-3", {}, {})
+
+    assert len(searched) == acquisition.PRERELEASE_PROMOTION_MAX_LOOKUPS
+    assert result["waiting_for_source"] == len(releases)
+    assert result["queued"] == 0
+
+
+def test_due_prereleases_only_returns_released_items_detected_early(pg_db):
+    from datetime import date
+
+    from sqlalchemy import text
+
+    from crate.db.jobs.acquisition import get_due_prereleases
+    from crate.db.releases import mark_release_downloaded, upsert_new_release
+    from crate.db.tx import transaction_scope
+
+    def release(title: str, release_date: str, detected_at: str) -> int:
+        release_id = upsert_new_release(
+            artist_name="Toundra", album_title=title, release_date=release_date
+        )
+        with transaction_scope() as session:
+            session.execute(
+                text("UPDATE new_releases SET detected_at = :at WHERE id = :id"),
+                {"at": detected_at, "id": release_id},
+            )
+        return release_id
+
+    due = release("Siete", "2026-10-09", "2026-10-03T10:00:00+00:00")
+    release("Found After Release", "2026-10-01", "2026-10-05T10:00:00+00:00")
+    release("Still Upcoming", "2026-11-20", "2026-10-03T10:00:00+00:00")
+    release("Too Old", "2026-01-10", "2025-12-01T10:00:00+00:00")
+    downloaded = release(
+        "Already Downloaded", "2026-10-02", "2026-09-01T10:00:00+00:00"
+    )
+    mark_release_downloaded(downloaded)
+
+    rows = get_due_prereleases(date(2026, 10, 12), lookback_days=60)
+
+    assert [row["id"] for row in rows] == [due]
+    assert rows[0]["library_track_count"] == 0
+
+
+def test_find_tidal_release_match_ignores_untitled_or_urlless_results(monkeypatch):
+    from crate import tidal as tidal_mod
+
+    monkeypatch.setattr(
+        tidal_mod,
+        "search",
+        lambda *_args, **_kwargs: {
+            "albums": [
+                {"id": 1, "title": "", "url": "https://tidal.com/album/1"},
+                {"id": 2, "title": "Siete", "url": ""},
+                {"id": 3, "title": "Siete", "url": "https://tidal.com/album/3"},
+            ]
+        },
+    )
+
+    match = _find_tidal_release_match("Toundra", "Siete")
+
+    assert match["tidal_id"] == "3"
+    assert match["tidal_url"].endswith("/album/3")

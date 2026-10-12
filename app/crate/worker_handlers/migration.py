@@ -636,6 +636,7 @@ def _fix_artist(
                         managed_track_names=True,
                         artist_name=artist_name,
                         album_name=inferred_album,
+                        library_root=lib,
                     )
                     fixed_albums += 1
                 except Exception:
