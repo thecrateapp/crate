@@ -6,6 +6,7 @@ import {
 } from "@/components/artist/artist-model";
 
 export const ARTIST_ALBUM_IMAGE_WIDTHS = [160, 256, 320, 480] as const;
+const SINGLE_MAX_TRACKS = 3;
 
 export type ArtistReleaseCategory = NonNullable<
   ArtistAlbum["release_category"]
@@ -61,7 +62,10 @@ export function releaseCategory(album: ArtistAlbum): ArtistReleaseCategory {
   ) {
     return "compilation";
   }
-  if (/\b(?:ep|single)\b/i.test(title) || album.tracks === 1) {
+  if (
+    /\b(?:ep|single)\b/i.test(title) ||
+    (album.tracks > 0 && album.tracks <= SINGLE_MAX_TRACKS)
+  ) {
     return "ep_single";
   }
   return "album";

@@ -18,6 +18,7 @@ DEFAULT_SCHEDULES = {
     "compute_analytics": 14400,  # 4h — recompute analytics from DB
     "check_new_releases": 43200,  # 12h — check MusicBrainz for new releases
     "promote_due_releases": 3600,  # 1h — download pre-releases once they are out
+    "rematch_album_mbids": 21600,  # 6h — retry MusicBrainz for albums without one
     "repair_duplicate_tracks": 43200,  # 12h — clean high-confidence duplicate tracks
     "cleanup_incomplete_downloads": 172800,  # 48h — remove incomplete soulseek downloads
     "cleanup_artwork_variants": 172800,  # 48h — retain current + previous revisions
