@@ -579,6 +579,35 @@ def test_rematch_album_mbids_retries_a_bounded_batch_with_cooldown(monkeypatch):
     assert broadcasts == [True]
 
 
+def test_rematch_album_mbids_keeps_albums_retryable_when_the_run_fails(monkeypatch):
+    import pytest
+
+    from crate.worker_handlers import enrichment
+
+    cache: dict[str, object] = {}
+    monkeypatch.setattr(
+        enrichment,
+        "get_albums_missing_release_group",
+        lambda: [{"id": 7, "name": "Exalted Eagles"}],
+    )
+    monkeypatch.setattr(enrichment, "get_cache", cache.get)
+    monkeypatch.setattr(
+        enrichment,
+        "set_cache",
+        lambda key, value, ttl=None: cache.__setitem__(key, value),
+    )
+
+    def boom(task_id, batch, config):
+        raise RuntimeError("MusicBrainz down")
+
+    monkeypatch.setattr(enrichment, "_match_album_mbids", boom)
+
+    with pytest.raises(RuntimeError):
+        enrichment._handle_rematch_album_mbids("rematch-3", {}, {})
+
+    assert cache == {}
+
+
 def test_rematch_album_mbids_skips_invalidation_without_matches(monkeypatch):
     from crate.worker_handlers import enrichment
 

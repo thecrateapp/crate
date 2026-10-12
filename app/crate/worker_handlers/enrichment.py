@@ -874,17 +874,19 @@ ALBUM_MBID_REMATCH_COOLDOWN_SECONDS = 7 * 86400
 
 
 def _handle_rematch_album_mbids(task_id: str, params: dict, config: dict) -> dict:
-    batch: list[dict] = []
-    for album in get_albums_missing_release_group():
-        cooldown_key = f"album-mbid-rematch:{album['id']}"
-        if get_cache(cooldown_key):
-            continue
-        set_cache(cooldown_key, True, ttl=ALBUM_MBID_REMATCH_COOLDOWN_SECONDS)
-        batch.append(album)
-        if len(batch) >= ALBUM_MBID_REMATCH_BATCH:
-            break
+    batch = [
+        album
+        for album in get_albums_missing_release_group()
+        if not get_cache(f"album-mbid-rematch:{album['id']}")
+    ][:ALBUM_MBID_REMATCH_BATCH]
 
     result = _match_album_mbids(task_id, batch, config)
+    for album in batch:
+        set_cache(
+            f"album-mbid-rematch:{album['id']}",
+            True,
+            ttl=ALBUM_MBID_REMATCH_COOLDOWN_SECONDS,
+        )
     if result["enriched"]:
         _broadcast_release_metadata_invalidation()
     return result

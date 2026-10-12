@@ -59,10 +59,16 @@ def get_albums_missing_release_group() -> list[dict]:
             session.execute(
                 text(
                     """
-                    SELECT album.*, artist.mbid AS artist_mbid
+                    SELECT
+                        album.*,
+                        (
+                            SELECT artist.mbid
+                            FROM library_artists artist
+                            WHERE LOWER(artist.name) = LOWER(album.artist)
+                            ORDER BY artist.mbid IS NULL, artist.id
+                            LIMIT 1
+                        ) AS artist_mbid
                     FROM library_albums album
-                    LEFT JOIN library_artists artist
-                      ON LOWER(artist.name) = LOWER(album.artist)
                     WHERE COALESCE(album.release_group_primary_type, '') = ''
                       AND album.quarantined_at IS NULL
                     ORDER BY album.id DESC
