@@ -132,6 +132,9 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "sync_lyrics": TaskTypeInfo("Lyrics Sync", "enrichment"),
     "reset_enrichment": TaskTypeInfo("Reset Enrichment", "enrichment"),
     "enrich_mbids": TaskTypeInfo("MusicBrainz ID Enrichment", "enrichment"),
+    "rematch_album_mbids": TaskTypeInfo(
+        "Retry MusicBrainz Album Matching", "enrichment"
+    ),
     "compute_completeness": TaskTypeInfo("Discography Completeness", "enrichment"),
     "refresh_probable_setlist": TaskTypeInfo("Probable Setlist Refresh", "enrichment"),
     "normalize_artist_bios": TaskTypeInfo("Normalize Artist Bios", "enrichment"),

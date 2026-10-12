@@ -626,6 +626,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "sync_lyrics",
             "reset_enrichment",
             "enrich_mbids",
+            "rematch_album_mbids",
             "process_new_content",
             "compute_completeness",
             "refresh_probable_setlist",

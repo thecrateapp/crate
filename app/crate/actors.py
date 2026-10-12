@@ -155,6 +155,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     # Background batch (priority 3)
     "enrich_artists": TaskPoolConfig("maintenance", 3, 86400, 0),
     "enrich_mbids": TaskPoolConfig("maintenance", 3, 86400, 0),
+    "rematch_album_mbids": TaskPoolConfig("maintenance", 3, 1800, 0),
     "compute_popularity": TaskPoolConfig("maintenance", 3, 3600, 0),
     "compute_bliss": TaskPoolConfig(
         "fast", 3, 60, 0
