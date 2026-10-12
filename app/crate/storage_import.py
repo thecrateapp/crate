@@ -376,21 +376,26 @@ def move_album_tree(
         for src in sorted(staged_album_dir.rglob("*")):
             if not src.is_file():
                 continue
+            is_audio = src.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
+            placement = (
+                resolve_managed_track_destination(
+                    src,
+                    target_album_dir,
+                    artist_name=artist_name,
+                    album_name=album_name,
+                    album_entity_uid=album_entity_uid,
+                    replace_existing_audio=replace_existing_audio,
+                )
+                if is_audio
+                else None
+            )
+            if is_audio and placement is None:
+                continue
             try:
-                if src.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS:
-                    placement = resolve_managed_track_destination(
-                        src,
-                        target_album_dir,
-                        artist_name=artist_name,
-                        album_name=album_name,
-                        album_entity_uid=album_entity_uid,
-                        replace_existing_audio=replace_existing_audio,
-                    )
-                    if placement is None:
-                        continue
-                    install_managed_track(src, placement, library_root=root)
-                else:
+                if placement is None:
                     move_file(src, target_album_dir / src.name)
+                else:
+                    install_managed_track(src, placement, library_root=root)
                 moved += 1
             except Exception:
                 log.warning(

@@ -435,7 +435,9 @@ class LibraryRepair:
                                 fs_changed = True
                             else:
                                 db_changed = True
-                        if result.get("applied") or result.get("resolved"):
+                        if result.get("applied") or (
+                            result.get("resolved") and not dry_run
+                        ):
                             issue_id = issue.get("id")
                             if isinstance(issue_id, int):
                                 resolved_ids.append(issue_id)

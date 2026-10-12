@@ -84,6 +84,14 @@ class TestRepairCatalog:
 
         assert result["resolved_ids"] == [179813]
         assert result["summary"]["applied"] == 0
+
+        with patch(
+            "crate.repair.get_tracks_by_paths",
+            return_value=[{"id": 1, "path": "/music/a.flac", "album_id": 7}],
+        ):
+            preview = repair.repair(report, dry_run=True, auto_only=False)
+
+        assert preview["resolved_ids"] == []
         assert result["fs_changed"] is False
         assert result["db_changed"] is False
         assert result["actions"][0]["details"]["reason"] == (
