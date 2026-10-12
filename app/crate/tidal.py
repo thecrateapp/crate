@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import shutil
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -28,6 +29,7 @@ log = logging.getLogger(__name__)
 TIDDL_CONFIG_DIR = os.environ.get("TIDDL_CONFIG_DIR", "/data/.tiddl")
 # tiddl 3.x uses ~/.tiddl — we set HOME to parent of .tiddl
 TIDDL_HOME = str(Path(TIDDL_CONFIG_DIR).parent)
+APP_ROOT = str(Path(__file__).resolve().parent.parent)
 PROCESSING_DIR = "/tmp/tidal-processing"
 TIDDL_OUTPUT_TEMPLATE = (
     "{album.artist}/{album.title}/"
@@ -685,7 +687,9 @@ def download(
     q = quality_map.get(quality, "max")
 
     cmd = [
-        "tiddl",
+        sys.executable,
+        "-m",
+        "crate.tiddl_stereo",
         "download",
         "--path",
         str(processing_dir),
@@ -707,6 +711,7 @@ def download(
             stderr=subprocess.STDOUT,
             text=True,
             env={**os.environ, "HOME": TIDDL_HOME},
+            cwd=APP_ROOT,
         )
         if proc.stdout is None:
             return {
