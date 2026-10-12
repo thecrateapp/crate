@@ -355,7 +355,15 @@ def install_managed_track(
         raise
     replaced = placement.replaces
     if replaced is not None and replaced != dest and replaced.exists():
-        _quarantine_replaced_copy(replaced, root)
+        try:
+            _quarantine_replaced_copy(replaced, root)
+        except OSError:
+            log.warning(
+                "Installed %s but could not quarantine %s",
+                dest,
+                replaced,
+                exc_info=True,
+            )
 
 
 def move_album_tree(
