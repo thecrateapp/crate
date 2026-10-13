@@ -12,6 +12,7 @@ on:
       - "app/listen-desktop/**"
       - "app/docs/**"
       - "app/site/**"
+      - "app/web/**"
       - "package.json"
       - "package-lock.json"
       - "scripts/design-system/**"
@@ -32,6 +33,7 @@ on:
       - "app/listen-desktop/**"
       - "app/docs/**"
       - "app/site/**"
+      - "app/web/**"
       - "package.json"
       - "package-lock.json"
       - "scripts/design-system/**"
@@ -63,6 +65,7 @@ jobs:
         run: |
           npm ci --prefix app/site
           npm ci --prefix app/docs
+          npm ci --prefix app/web
 
       - name: Test and build marketing site
         env:
@@ -76,6 +79,11 @@ jobs:
         run: |
           npm test --prefix app/site
           npm run build --prefix app/site
+
+      - name: Test and build new site
+        run: |
+          npm test --prefix app/web
+          npm run build --prefix app/web
 
       - name: Test and build docs site
         env:
