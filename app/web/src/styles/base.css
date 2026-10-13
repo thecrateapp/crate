@@ -447,6 +447,11 @@ body::after {
     grid-template-columns: 1fr;
     gap: 10px;
   }
+  .explore a {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
   .cta {
     width: 100%;
     max-width: calc(100vw - 40px);
