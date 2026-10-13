@@ -1,5 +1,7 @@
 ---
+import Explore from "../components/Explore.astro";
 import Hero from "../components/Hero.astro";
+import Statement from "../components/Statement.astro";
 import Base from "../layouts/Base.astro";
 ---
 
@@ -8,20 +10,30 @@ import Base from "../layouts/Base.astro";
   description="Crate is free, open-source, self-hosted music software. Own your music. Support your artists. Refuse the middleman."
 >
   <Hero />
+  <Statement />
+  <Explore />
 </Base>
 
 <script>
+  import { initReveals } from "../scripts/motion/reveal";
   import { initSmoothScroll } from "../scripts/motion/smooth-scroll";
+  import { splitWords } from "../scripts/motion/split-words";
 
-  let cleanup: (() => void) | undefined;
+  let cleanups: (() => void)[] = [];
+
+  function teardown() {
+    cleanups.forEach((cleanup) => cleanup());
+    cleanups = [];
+  }
 
   document.addEventListener("astro:page-load", () => {
-    cleanup?.();
-    cleanup = document.querySelector(".hero-pin") ? initSmoothScroll() : undefined;
+    teardown();
+    if (!document.querySelector(".hero-pin")) return;
+    document.querySelectorAll<HTMLElement>(".statement [data-split]").forEach((element) => {
+      if (!element.querySelector(".w")) splitWords(element);
+    });
+    cleanups = [initSmoothScroll(), initReveals()];
   });
 
-  document.addEventListener("astro:before-swap", () => {
-    cleanup?.();
-    cleanup = undefined;
-  });
+  document.addEventListener("astro:before-swap", teardown);
 </script>

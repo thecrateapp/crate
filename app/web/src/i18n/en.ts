@@ -25,6 +25,7 @@ export const en = {
   "get.clients": "Apps",
   "get.ios":
     "On iPhone, open your server in Safari and add it to the Home Screen.",
+  "explore.label": "Explore Crate",
   "explore.listen": "Player, radio, paths, offline",
   "explore.admin": "Library health, enrichment, analysis",
   "explore.architecture": "Workers, read plane, events",
