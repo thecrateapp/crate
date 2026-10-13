@@ -487,7 +487,7 @@ def api_fix_type(request: Request, check_type: str):
             "allowed": False,
             "reason": "not_auto_fixable",
         }
-    if not catalog_entry.supports_global_scope:
+    if not (catalog_entry.supports_global_scope or catalog_entry.supports_bulk_fix):
         return {
             "task_id": None,
             "fixable": 0,
@@ -503,21 +503,52 @@ def api_fix_type(request: Request, check_type: str):
             "allowed": True,
             "reason": "no_fixable_issues",
         }
-    task_id = create_task(
-        "repair",
-        {
-            "dry_run": False,
-            "auto_only": False,
-            "issues": fixable,
-        },
+    batches = (
+        _issue_batches_by_artist(fixable, BULK_FIX_ARTISTS_PER_TASK)
+        if catalog_entry.supports_bulk_fix
+        else [fixable]
     )
+    task_ids = [
+        create_task(
+            "repair",
+            {
+                "dry_run": False,
+                "auto_only": False,
+                "issues": batch,
+            },
+        )
+        for batch in batches
+    ]
     publish_health_surface_signal()
     return {
-        "task_id": task_id,
+        "task_id": task_ids[0],
+        "task_ids": task_ids,
         "fixable": len(fixable),
         "allowed": True,
         "reason": None,
     }
+
+
+BULK_FIX_ARTISTS_PER_TASK = 20
+
+
+def _issue_batches_by_artist(
+    issues: list[dict], artists_per_batch: int
+) -> list[list[dict]]:
+    by_artist: dict[str, list[dict]] = {}
+    for issue in issues:
+        details = issue.get("details") or issue.get("details_json") or {}
+        artist = str(details.get("artist") or issue.get("artist_id") or "")
+        by_artist.setdefault(artist, []).append(issue)
+    groups = list(by_artist.values())
+    return [
+        [
+            issue
+            for group in groups[start : start + artists_per_batch]
+            for issue in group
+        ]
+        for start in range(0, len(groups), artists_per_batch)
+    ]
 
 
 # ── Per-Artist Health ────────────────────────────────────────────

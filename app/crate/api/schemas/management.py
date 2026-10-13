@@ -146,6 +146,7 @@ class RepairCatalogEntryResponse(BaseModel):
     supports_batch: bool = True
     supports_artist_scope: bool = True
     supports_global_scope: bool = True
+    supports_bulk_fix: bool = False
     auto_fixable: bool
 
 
@@ -296,6 +297,7 @@ class CheckTypeMutationResponse(OkResponse):
 
 class HealthFixTypeResponse(BaseModel):
     task_id: str | None = None
+    task_ids: list[str] = []
     fixable: int
     allowed: bool = True
     reason: str | None = None

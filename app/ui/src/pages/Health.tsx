@@ -12,6 +12,7 @@ import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { cn, timeAgo } from "@/lib/utils";
 import { Button } from "@crate/ui/shadcn/button";
 import { Card } from "@crate/ui/shadcn/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import {
@@ -72,7 +73,7 @@ interface HealthSnapshotData {
   runs?: Record<string, HealthCheckRun>;
 }
 
-interface RepairCatalogEntry {
+export interface RepairCatalogEntry {
   check_type: string;
   scanner_method: string;
   fixer_method?: string | null;
@@ -83,6 +84,7 @@ interface RepairCatalogEntry {
   supports_batch: boolean;
   supports_artist_scope: boolean;
   supports_global_scope: boolean;
+  supports_bulk_fix?: boolean;
   auto_fixable: boolean;
 }
 
@@ -219,6 +221,16 @@ function scopeLabel(scope: string | undefined) {
   return "Unknown scope";
 }
 
+export function fixAllMode(
+  entry: RepairCatalogEntry | undefined,
+  fixableCount: number,
+): "none" | "global" | "bulk" {
+  if (!entry?.auto_fixable || fixableCount <= 0) return "none";
+  if (entry.supports_global_scope) return "global";
+  if (entry.supports_bulk_fix) return "bulk";
+  return "none";
+}
+
 function executionLane(entry: RepairCatalogEntry | undefined) {
   if (!entry) return "Unknown";
   if (entry.support === "manual" || !entry.auto_fixable) return "Manual only";
@@ -300,6 +312,10 @@ export function Health() {
   const [filter, setFilter] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [fixing, setFixing] = useState<string | null>(null);
+  const [pendingBulkFix, setPendingBulkFix] = useState<{
+    check: string;
+    count: number;
+  } | null>(null);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const taskReconnectTimerRef = useRef<number | null>(null);
@@ -545,6 +561,7 @@ export function Health() {
     try {
       const res = await api<{
         task_id: string | null;
+        task_ids?: string[];
         fixable: number;
         allowed: boolean;
         reason?: string | null;
@@ -560,7 +577,12 @@ export function Health() {
         setFixing(null);
         return;
       }
-      toast.success(`Fixing ${res.fixable} issues...`);
+      const batches = res.task_ids?.length ?? 1;
+      toast.success(
+        batches > 1
+          ? `Fixing ${res.fixable} issues in ${batches} batches...`
+          : `Fixing ${res.fixable} issues...`,
+      );
       setActiveTaskId(res.task_id);
     } catch {
       setFixing(null);
@@ -948,11 +970,9 @@ export function Health() {
           const catalogEntry = catalogByCheck[check];
           const fixableCount = items.filter((i) => i.auto_fixable).length;
           const isFixing = fixing === check;
-          const canRunGlobalFix = Boolean(
-            catalogEntry?.auto_fixable &&
-              catalogEntry.supports_global_scope &&
-              fixableCount > 0,
-          );
+          const fixAll = fixAllMode(catalogEntry, fixableCount);
+          const canRunBulkFix = fixAll === "bulk";
+          const canRunGlobalFix = fixAll !== "none";
           const reviewOnly = Boolean(
             catalogEntry?.auto_fixable && !catalogEntry.supports_global_scope,
           );
@@ -1032,7 +1052,11 @@ export function Health() {
                         size="sm"
                         variant="outline"
                         className="h-9 rounded-md border-green-500/30 px-3 text-xs text-green-300 hover:bg-green-500/10"
-                        onClick={() => handleFixType(check)}
+                        onClick={() =>
+                          canRunBulkFix
+                            ? setPendingBulkFix({ check, count: fixableCount })
+                            : handleFixType(check)
+                        }
                         disabled={isFixing}
                       >
                         {isFixing ? (
@@ -1093,7 +1117,9 @@ export function Health() {
                         ? "Automatic fix is not available for this repair type yet."
                         : catalogEntry.supports_global_scope
                           ? "Global fix can be queued directly from here."
-                          : "This repair is available from the artist repair flow, not as a global batch."}
+                          : catalogEntry.supports_bulk_fix
+                            ? "Fix all queues the artist repairs in batches of 20 artists, or repair one artist at a time below."
+                            : "This repair is available from the artist repair flow, not as a global batch."}
                     </div>
                   ) : null}
                   <div className="space-y-3 px-2 pb-2">
@@ -1122,6 +1148,20 @@ export function Health() {
             </Card>
           );
         })}
+      <ConfirmDialog
+        open={pendingBulkFix !== null}
+        onOpenChange={(open) => !open && setPendingBulkFix(null)}
+        title="Fix all artists"
+        description={`Queue repairs for ${pendingBulkFix?.count ?? 0} ${
+          CHECK_LABELS[pendingBulkFix?.check ?? ""] ?? "issues"
+        }? Files move on disk and each artist is re-synced afterwards.`}
+        confirmLabel="Queue repairs"
+        onConfirm={() => {
+          const check = pendingBulkFix?.check;
+          setPendingBulkFix(null);
+          if (check) void handleFixType(check);
+        }}
+      />
     </div>
   );
 }

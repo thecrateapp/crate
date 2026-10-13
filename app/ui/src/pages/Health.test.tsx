@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { groupIssuesByArtist } from "./Health";
+import {
+  fixAllMode,
+  groupIssuesByArtist,
+  type RepairCatalogEntry,
+} from "./Health";
 
 function issue(
   id: number,
@@ -45,5 +49,53 @@ describe("groupIssuesByArtist", () => {
       artistId: null,
       artistName: "Converge",
     });
+  });
+});
+
+function catalogEntry(
+  overrides: Partial<RepairCatalogEntry>,
+): RepairCatalogEntry {
+  return {
+    check_type: "artist_layout_fix",
+    scanner_method: "_check_artist_layout_fix",
+    fixer_method: "_fix_artist_layout",
+    support: "automatic",
+    risk: "caution",
+    scope: "hybrid",
+    requires_confirmation: true,
+    supports_batch: true,
+    supports_artist_scope: true,
+    supports_global_scope: false,
+    supports_bulk_fix: false,
+    auto_fixable: true,
+    ...overrides,
+  };
+}
+
+describe("fixAllMode", () => {
+  it("offers a confirmed bulk fix for artist-batched repairs", () => {
+    expect(fixAllMode(catalogEntry({ supports_bulk_fix: true }), 172)).toBe(
+      "bulk",
+    );
+  });
+
+  it("keeps global repairs as a direct fix", () => {
+    expect(fixAllMode(catalogEntry({ supports_global_scope: true }), 3)).toBe(
+      "global",
+    );
+  });
+
+  it("hides fix all for artist-only, manual or empty groups", () => {
+    expect(fixAllMode(catalogEntry({}), 5)).toBe("none");
+    expect(
+      fixAllMode(
+        catalogEntry({ supports_bulk_fix: true, auto_fixable: false }),
+        5,
+      ),
+    ).toBe("none");
+    expect(fixAllMode(catalogEntry({ supports_bulk_fix: true }), 0)).toBe(
+      "none",
+    );
+    expect(fixAllMode(undefined, 5)).toBe("none");
   });
 });
