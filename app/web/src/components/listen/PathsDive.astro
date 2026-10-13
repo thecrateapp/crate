@@ -1,0 +1,86 @@
+---
+import { t } from "../../i18n";
+import type { Step } from "../../lib/chapters";
+import DeepDive from "./DeepDive.astro";
+
+interface Props {
+  steps: Step[];
+  locale?: string;
+}
+
+const { steps, locale = "en" } = Astro.props;
+---
+
+<DeepDive name="paths" steps={steps}>
+  <p class="mono-panel paths-caption" data-fade>
+    <b>{t("paths.title", locale)}</b> · {t("paths.steps", locale, { steps: "6" })} · <span class="range"></span>
+  </p>
+  <p class="mono-panel paths-saved" data-fade>{t("paths.saved", locale)}</p>
+</DeepDive>
+
+<style>
+  .paths-caption {
+    left: 4%;
+    bottom: 12%;
+  }
+
+  .paths-saved {
+    top: 96px;
+    left: 4%;
+    color: var(--cyan-hi);
+  }
+
+  :global([data-dive="paths"] .route) {
+    fill: none;
+    stroke: var(--cyan-hi);
+    stroke-width: 1.25;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 0 6px rgba(103, 232, 249, 0.6));
+    opacity: 0;
+  }
+
+  :global([data-dive="paths"] .node) {
+    fill: var(--bg);
+    stroke: var(--cyan-hi);
+    stroke-width: 1.25;
+    opacity: 0;
+  }
+
+  :global([data-dive="paths"] .node.end) {
+    fill: var(--cyan-hi);
+  }
+
+  :global([data-dive="paths"] .node-label) {
+    position: absolute;
+    left: 0;
+    top: 0;
+    white-space: pre;
+    font-size: 10px;
+    line-height: 1.6;
+    letter-spacing: 0.08em;
+    color: var(--fg-2);
+    opacity: 0;
+    transition: opacity 0.4s var(--ease-out);
+    pointer-events: none;
+  }
+
+  :global([data-dive="paths"] .node-label.is-on) {
+    opacity: 1;
+  }
+
+  @media (max-width: 760px) {
+    .paths-caption {
+      left: 0;
+      bottom: 4%;
+      font-size: 9.5px;
+    }
+    .paths-saved {
+      top: 78px;
+      left: 0;
+      font-size: 9.5px;
+    }
+    :global([data-dive="paths"] .node-label) {
+      font-size: 9px;
+    }
+  }
+</style>

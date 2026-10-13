@@ -42,6 +42,22 @@ export const en = {
   "page.back": "Back to home",
   "why.eyebrow": "Manifesto",
   "status.comingSoon": "Coming soon",
+  "listen.chapters": "Chapters",
+  "radio.seed": "Seed",
+  "radio.seedReadout": "Target · 20-number bliss vector",
+  "radio.weights": "Score weights",
+  "radio.weight.sound": "Sound",
+  "radio.weight.artists": "Artists",
+  "radio.weight.genre": "Genre",
+  "radio.weight.bpm": "BPM",
+  "radio.weight.energy": "Energy",
+  "radio.weight.camelot": "Camelot",
+  "radio.weight.era": "Era",
+  "radio.queue": "Queue",
+  "radio.like": "Like · target +8% · cap 40%",
+  "paths.title": "Music Paths",
+  "paths.steps": "{steps} steps",
+  "paths.saved": "Saved · can be regenerated",
 } as const;
 
 export type MessageKey = keyof typeof en;

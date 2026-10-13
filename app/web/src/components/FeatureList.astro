@@ -1,11 +1,6 @@
 ---
+import type { Feature } from "../lib/chapters";
 import StatusBadge from "./StatusBadge.astro";
-
-export interface Feature {
-  title: string;
-  body: string;
-  status?: "coming-soon";
-}
 
 interface Props {
   items: Feature[];

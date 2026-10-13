@@ -5,3 +5,14 @@ export function chapterId(index: number, title: string): string {
     .replace(/^-+|-+$/g, "");
   return `${String(index).padStart(2, "0")}-${slug}`;
 }
+
+export interface Feature {
+  title: string;
+  body: string;
+  status?: "coming-soon";
+}
+
+export interface Step {
+  title: string;
+  body: string;
+}
