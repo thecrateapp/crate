@@ -645,10 +645,17 @@ class LibraryHealthCheck:
         year_prefix_re = re.compile(r"^(\d{4})\s*[-–]\s*(.+)$")
 
         albums = get_albums_with_year()
+        managed_artists = {
+            row["name"]
+            for row in get_artists_with_folder()
+            if looks_like_entity_uid(str(row.get("folder_name") or ""))
+        }
 
         for row in albums:
             folder_name = row["name"]
             artist = row["artist"]
+            if artist not in managed_artists:
+                continue
             year = row["year"][:4]
             album_path = row["path"]
 
