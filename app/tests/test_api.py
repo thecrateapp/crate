@@ -2282,6 +2282,8 @@ class TestHealthAPI:
         assert by_check["artist_layout_fix"]["support"] == "automatic"
         assert by_check["artist_layout_fix"]["risk"] == "caution"
         assert by_check["artist_layout_fix"]["scope"] == "hybrid"
+        assert by_check["artist_layout_fix"]["supports_bulk_fix"] is True
+        assert by_check["duplicate_tracks"]["supports_bulk_fix"] is False
         assert by_check["duplicate_albums"]["auto_fixable"] is True
         assert by_check["duplicate_albums"]["support"] == "automatic"
         assert by_check["duplicate_albums"]["risk"] == "caution"
@@ -2295,15 +2297,54 @@ class TestHealthAPI:
         assert by_check["duplicate_tracks"]["supports_global_scope"] is False
 
     def test_fix_type_rejects_non_global_repairs(self, test_app):
-        resp = test_app.post("/api/manage/health-issues/fix-type/artist_layout_fix")
+        resp = test_app.post("/api/manage/health-issues/fix-type/canonical_mismatch")
 
         assert resp.status_code == 200
         assert resp.json() == {
             "task_id": None,
+            "task_ids": [],
             "fixable": 0,
             "allowed": False,
             "reason": "global_scope_not_supported",
         }
+
+    def test_fix_type_splits_artist_layout_fixes_into_artist_batches(
+        self, test_app, monkeypatch
+    ):
+        from crate.api import management
+
+        issues = [
+            {
+                "id": index,
+                "check_type": "artist_layout_fix",
+                "auto_fixable": True,
+                "details_json": {"artist": f"Artist {index // 2}"},
+            }
+            for index in range(60)
+        ]
+        created: list[list[int]] = []
+        monkeypatch.setattr(
+            management, "get_open_issues", lambda check_type=None: issues
+        )
+        monkeypatch.setattr(
+            management,
+            "create_task",
+            lambda task_type, params: (
+                created.append([issue["id"] for issue in params["issues"]])
+                or f"task-{len(created)}"
+            ),
+        )
+        monkeypatch.setattr(management, "publish_health_surface_signal", lambda: None)
+
+        resp = test_app.post("/api/manage/health-issues/fix-type/artist_layout_fix")
+
+        body = resp.json()
+        assert body["allowed"] is True
+        assert body["fixable"] == 60
+        assert body["task_ids"] == ["task-1", "task-2"]
+        assert body["task_id"] == "task-1"
+        assert [len(batch) for batch in created] == [40, 20]
+        assert sorted(sum(created, [])) == list(range(60))
 
     def test_repair_preview_endpoint(self, test_app):
         preview = {
