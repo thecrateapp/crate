@@ -42,7 +42,7 @@ export const en = {
   "page.back": "Back to home",
   "why.eyebrow": "Manifesto",
   "status.comingSoon": "Coming soon",
-  "listen.chapters": "Chapters",
+  "page.chapters": "Chapters",
   "radio.seed": "Seed",
   "radio.seedReadout": "Target · 20-number bliss vector",
   "radio.weights": "Score weights",

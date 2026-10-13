@@ -1,11 +1,11 @@
 ---
 import Chapter from "../components/Chapter.astro";
+import ChapterToc from "../components/ChapterToc.astro";
 import FeatureList from "../components/FeatureList.astro";
 import PageHeader from "../components/PageHeader.astro";
 import PathsDive from "../components/listen/PathsDive.astro";
 import RadioDive from "../components/listen/RadioDive.astro";
 import { listen } from "../content/listen/en";
-import { t } from "../i18n";
 import Base from "../layouts/Base.astro";
 import { chapterId } from "../lib/chapters";
 
@@ -19,19 +19,7 @@ const chapters = listen.chapters.map((chapter, index) => ({
 <Base title={listen.meta.title} description={listen.meta.description}>
   <div class="listen">
     <PageHeader eyebrow={listen.eyebrow} title={listen.title} lede={listen.lede}>
-      <nav class="toc" aria-label={t("listen.chapters")} data-enter style="--d:520ms">
-        <ol>
-          {
-            chapters.map((chapter) => (
-              <li>
-                <a class="u-link" href={`#${chapter.id}`}>
-                  <b>{String(chapter.index).padStart(2, "0")}</b> {chapter.title}
-                </a>
-              </li>
-            ))
-          }
-        </ol>
-      </nav>
+      <ChapterToc items={chapters} />
     </PageHeader>
 
     {
@@ -65,27 +53,5 @@ const chapters = listen.chapters.map((chapter, index) => ({
 <style>
   .listen {
     padding-bottom: 12vh;
-  }
-
-  .toc ol {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 14px 28px;
-    margin: 4vh 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .toc a {
-    font-family: var(--mono);
-    font-size: 11.5px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-  }
-
-  .toc b {
-    margin-right: 6px;
-    font-weight: 400;
-    color: var(--cyan-hi);
   }
 </style>
