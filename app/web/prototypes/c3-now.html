@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crate · C3 · Now Playing</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      .hero-pin {
+        position: relative;
+        height: 220vh;
+      }
+
+      .hero-sticky {
+        position: sticky;
+        top: 0;
+        height: 100dvh;
+        min-height: 680px;
+        overflow: hidden;
+      }
+
+      .bg {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+      }
+
+      .bg div {
+        position: absolute;
+        inset: -6%;
+        background-size: cover;
+        background-position: center;
+        filter: grayscale(1) contrast(1.15) brightness(0.48) blur(2px);
+        opacity: 0;
+        transition: opacity 1.4s var(--ease-in-out);
+        animation: drift 18s var(--ease-in-out) infinite alternate;
+      }
+
+      .bg div.on {
+        opacity: 1;
+      }
+
+      @keyframes drift {
+        from {
+          transform: scale(1.04) translate3d(0, 0, 0);
+        }
+        to {
+          transform: scale(1.14) translate3d(-1.5%, -1%, 0);
+        }
+      }
+
+      .bg::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        background: rgba(6, 182, 212, 0.55);
+        mix-blend-mode: color;
+      }
+
+      .bg::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        background:
+          linear-gradient(0deg, rgba(10, 10, 15, 0.95) 0%, rgba(10, 10, 15, 0.25) 55%, rgba(10, 10, 15, 0.65) 100%),
+          linear-gradient(90deg, rgba(10, 10, 15, 0.85) 0%, rgba(10, 10, 15, 0) 60%);
+      }
+
+      .player {
+        --s: clamp(240px, min(46vh, 30vw), 440px);
+        position: absolute;
+        right: clamp(20px, 7vw, 120px);
+        top: 50%;
+        transform: translateY(-56%);
+        width: var(--s);
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        z-index: 3;
+      }
+
+      .sleeve {
+        position: relative;
+        width: var(--s);
+        height: var(--s);
+        border-radius: 8px;
+        overflow: hidden;
+        background: #10131a;
+        box-shadow:
+          0 50px 100px rgba(0, 0, 0, 0.6),
+          0 0 0 1px rgba(241, 245, 249, 0.08);
+        transition: transform 0.6s var(--ease-out);
+        will-change: transform;
+      }
+
+      .sleeve img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .sleeve img.incoming {
+        clip-path: inset(0 0 0 100%);
+      }
+
+      .sleeve img.incoming.go {
+        clip-path: inset(0 0 0 0);
+        transition: clip-path 0.9s var(--ease-dramatic);
+      }
+
+      .meta {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg-3);
+        display: grid;
+        gap: 10px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .meta .row {
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .meta .title {
+        color: var(--fg);
+      }
+
+      .meta .bar {
+        height: 2px;
+        background: rgba(241, 245, 249, 0.12);
+        overflow: hidden;
+        border-radius: 2px;
+      }
+
+      .meta .bar span {
+        display: block;
+        height: 100%;
+        background: var(--cyan-hi);
+        transform-origin: left;
+        transform: scaleX(0);
+      }
+
+      .queue {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+      }
+
+      .queue button {
+        position: relative;
+        aspect-ratio: 1;
+        padding: 0;
+        border: 0;
+        border-radius: 4px;
+        overflow: hidden;
+        cursor: pointer;
+        background: #10131a;
+        transition: transform 0.4s var(--ease-snap);
+      }
+
+      .queue button:hover {
+        transform: translateY(-3px);
+      }
+
+      .queue button img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        filter: grayscale(1) brightness(0.7);
+        transition: filter 0.4s var(--ease-snap);
+      }
+
+      .queue button:hover img {
+        filter: none;
+      }
+
+      .hero-copy {
+        position: absolute;
+        left: clamp(20px, 5vw, 72px);
+        bottom: 9vh;
+        z-index: 3;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 20px;
+        max-width: 58vw;
+        will-change: opacity, transform;
+      }
+
+      .hero-copy .display {
+        font-size: clamp(3.2rem, 7.2vw, 9.2rem);
+        max-width: 9.5ch;
+        text-wrap: wrap;
+      }
+
+      .hero-copy .sub {
+        font-size: clamp(1.25rem, 2vw, 2.2rem);
+      }
+
+      .pulled {
+        position: absolute;
+        z-index: 5;
+        border-radius: 18px;
+        overflow: hidden;
+        background-color: #0d0e14;
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: auto 100%;
+        visibility: hidden;
+        will-change: transform, clip-path;
+      }
+
+      .pulled::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: rgba(10, 10, 15, var(--dim, 0));
+        box-shadow: inset 0 0 0 1px rgba(241, 245, 249, calc(var(--ui, 0) * 0.12));
+      }
+
+      .pulled .eyebrow,
+      .pulled .play {
+        position: absolute;
+        z-index: 1;
+        opacity: var(--ui, 0);
+      }
+
+      .pulled .eyebrow {
+        top: 20px;
+        left: 24px;
+      }
+
+      .pulled .play {
+        left: 50%;
+        top: 50%;
+        width: 84px;
+        height: 84px;
+        margin: -42px 0 0 -42px;
+        border-radius: 50%;
+        border: 1px solid rgba(103, 232, 249, 0.45);
+        display: grid;
+        place-items: center;
+        color: var(--cyan-hi);
+        font-size: 22px;
+      }
+
+      @media (max-width: 760px) {
+        .player {
+          --s: 54vw;
+          right: auto;
+          left: 50%;
+          top: 96px;
+          transform: translateX(-50%);
+        }
+        .queue {
+          display: none;
+        }
+        .hero-copy {
+          max-width: none;
+          right: 20px;
+        }
+        .hero-copy .display {
+          font-size: 12vw;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero-pin">
+        <div class="hero-sticky">
+          <div class="bg" aria-hidden="true"><div></div><div></div></div>
+          <aside class="player" aria-hidden="true">
+            <div class="sleeve"></div>
+            <div class="meta">
+              <div class="row"><span>Now playing</span><span id="time">0:00</span></div>
+              <div class="title" id="title"></div>
+              <div class="bar"><span></span></div>
+              <div class="row"><span>Up next</span><span id="next-meta"></span></div>
+              <div class="queue"></div>
+            </div>
+          </aside>
+          <div class="hero-copy"></div>
+          <div class="pulled" aria-hidden="true">
+            <p class="eyebrow"><b>01</b> / Library</p>
+            <span class="play">&#9654;</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="proto-tag">C3 · Now Playing</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
+    <script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+    <script type="module">
+      import {
+        mountNav,
+        mountHero,
+        mountSections,
+        startEntry,
+        initReveals,
+        initSmoothScroll,
+        scrambleText,
+        reducedMotion,
+        finePointer,
+      } from "./hero.js";
+
+      mountNav();
+      const copy = document.querySelector(".hero-copy");
+      mountHero(copy);
+      const main = document.querySelector("main");
+      mountSections(main);
+      main.querySelector(".screencast").remove();
+      initSmoothScroll();
+      initReveals();
+      startEntry(copy, 160);
+
+      const { gsap, ScrollTrigger } = window;
+      let coverCount = 0;
+      try {
+        coverCount = (await fetch("covers/manifest.json").then((r) => r.json())).count;
+      } catch {
+        coverCount = 0;
+      }
+      const wrap = (n) => ((n % coverCount) + coverCount) % coverCount;
+      const src = (n) => `covers/${wrap(n) + 1}.jpg`;
+
+      const sleeve = document.querySelector(".sleeve");
+      const bgLayers = [...document.querySelectorAll(".bg div")];
+      const title = document.getElementById("title");
+      const time = document.getElementById("time");
+      const nextMeta = document.getElementById("next-meta");
+      const bar = document.querySelector(".meta .bar span");
+      const queue = document.querySelector(".queue");
+      const DURATION = 5200;
+      let current = 0;
+      let bgIndex = 0;
+      let elapsed = 0;
+      let lastTick = performance.now();
+
+      function describe(n) {
+        const year = 1968 + ((((n * 37) % 57) + 57) % 57);
+        const tracks = 6 + ((((n * 7) % 10) + 10) % 10);
+        return `Album ${String(wrap(n) + 1).padStart(4, "0")} · ${year} · ${tracks} tracks`;
+      }
+
+      function renderQueue() {
+        queue.innerHTML = "";
+        for (let i = 1; i <= 4; i++) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.setAttribute("aria-label", `Play album ${wrap(current + i) + 1}`);
+          button.innerHTML = `<img alt="" src="${src(current + i)}" />`;
+          button.addEventListener("click", () => show(current + i));
+          queue.appendChild(button);
+        }
+        nextMeta.textContent = String(wrap(current + 1) + 1).padStart(4, "0");
+      }
+
+      function show(n, instant = false) {
+        if (!coverCount) return;
+        current = n;
+        const incoming = document.createElement("img");
+        incoming.alt = "";
+        incoming.src = src(n);
+        if (instant || reducedMotion) {
+          sleeve.innerHTML = "";
+          sleeve.appendChild(incoming);
+        } else {
+          incoming.className = "incoming";
+          sleeve.appendChild(incoming);
+          incoming
+            .decode()
+            .catch(() => {})
+            .finally(() => {
+              requestAnimationFrame(() => incoming.classList.add("go"));
+              setTimeout(() => {
+                [...sleeve.querySelectorAll("img")].slice(0, -1).forEach((img) => img.remove());
+              }, 1000);
+            });
+        }
+        bgIndex = 1 - bgIndex;
+        bgLayers[bgIndex].style.backgroundImage = `url(${src(n)})`;
+        bgLayers[bgIndex].classList.add("on");
+        bgLayers[1 - bgIndex].classList.remove("on");
+        scrambleText(title, describe(n), 420);
+        renderQueue();
+        elapsed = 0;
+      }
+
+      show(0, true);
+
+      if (!reducedMotion && coverCount) {
+        let paused = false;
+        const player = document.querySelector(".player");
+        player.addEventListener("pointerenter", () => (paused = true));
+        player.addEventListener("pointerleave", () => (paused = false));
+
+        gsap.ticker.add(() => {
+          const now = performance.now();
+          const delta = now - lastTick;
+          lastTick = now;
+          if (!paused && window.scrollY < innerHeight * 0.2 && !document.hidden) elapsed += delta;
+          const progress = Math.min(1, elapsed / DURATION);
+          bar.style.transform = `scaleX(${progress})`;
+          const seconds = Math.floor(progress * 214);
+          time.textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+          if (progress >= 1) show(current + 1);
+        });
+
+        if (finePointer) {
+          sleeve.addEventListener("pointermove", (event) => {
+            const rect = sleeve.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / rect.width - 0.5;
+            const y = (event.clientY - rect.top) / rect.height - 0.5;
+            sleeve.style.transform = `perspective(900px) rotateY(${x * 12}deg) rotateX(${-y * 10}deg) scale(1.02)`;
+          });
+          sleeve.addEventListener("pointerleave", () => (sleeve.style.transform = ""));
+        }
+
+        gsap.from(".player", { opacity: 0, x: 60, duration: 0.9, ease: "power3.out", delay: 0.2 });
+        gsap.from(".bg", { opacity: 0, duration: 1.2, ease: "power2.out" });
+
+        const sticky = document.querySelector(".hero-sticky");
+        const pulled = document.querySelector(".pulled");
+        const geometry = {};
+        function measure() {
+          let w = Math.min(1180, sticky.clientWidth * 0.88);
+          let h = w / 1.6;
+          if (h > sticky.clientHeight * 0.78) {
+            h = sticky.clientHeight * 0.78;
+            w = h * 1.6;
+          }
+          Object.assign(pulled.style, {
+            width: `${w}px`,
+            height: `${h}px`,
+            left: `${(sticky.clientWidth - w) / 2}px`,
+            top: `${(sticky.clientHeight - h) / 2}px`,
+          });
+          const rect = sleeve.getBoundingClientRect();
+          const box = sticky.getBoundingClientRect();
+          Object.assign(geometry, {
+            w,
+            h,
+            s: rect.width,
+            dx: rect.left + rect.width / 2 - (box.left + box.width / 2),
+            dy: rect.top + rect.height / 2 - (box.top + box.height / 2),
+          });
+        }
+
+        let flying = false;
+        ScrollTrigger.create({
+          trigger: ".hero-pin",
+          start: "top top",
+          end: "bottom bottom",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            const fade = Math.min(1, progress / 0.25);
+            gsap.set(copy, { opacity: 1 - fade, y: fade * 40 });
+            gsap.set(".meta", { opacity: 1 - fade });
+            gsap.set(".bg", { opacity: 1 - Math.min(1, progress / 0.6) });
+
+            const raw = Math.min(1, Math.max(0, (progress - 0.15) / 0.6));
+            const f = raw < 0.5 ? 4 * raw ** 3 : 1 - (-2 * raw + 2) ** 3 / 2;
+            if (raw > 0 && !flying) {
+              flying = true;
+              measure();
+              pulled.style.backgroundImage = `url(${src(current)})`;
+            }
+            if (raw === 0) flying = false;
+            sleeve.style.visibility = raw > 0 ? "hidden" : "visible";
+            pulled.style.visibility = raw > 0 ? "visible" : "hidden";
+            if (raw === 0) return;
+            const k = geometry.s / geometry.h;
+            const scale = k + (1 - k) * f;
+            const side = ((geometry.w - geometry.h) / 2) * (1 - f);
+            pulled.style.transform = `translate3d(${geometry.dx * (1 - f)}px, ${geometry.dy * (1 - f)}px, 0) scale(${scale})`;
+            pulled.style.clipPath = `inset(0 ${side}px round ${8 / scale + 10 * f}px)`;
+            pulled.style.setProperty("--dim", (f * 0.82).toFixed(3));
+            pulled.style.setProperty("--ui", Math.max(0, (f - 0.6) / 0.4).toFixed(3));
+          },
+        });
+        addEventListener("resize", () => flying && measure());
+      }
+    </script>
+  </body>
+</html>

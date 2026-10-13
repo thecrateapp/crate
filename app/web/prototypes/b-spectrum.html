@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crate · B · Spectrum</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(ellipse 70% 50% at 30% 45%, rgba(6, 182, 212, 0.06), transparent 70%);
+      }
+
+      .hero-pin {
+        position: relative;
+        height: 160vh;
+      }
+
+      .hero-sticky {
+        position: sticky;
+        top: 0;
+        height: 100dvh;
+        min-height: 640px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 104px clamp(20px, 5vw, 72px) 6vh;
+      }
+
+      .poster {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        will-change: transform, opacity;
+      }
+
+      .poster h1 {
+        font-size: clamp(3.4rem, 11.8vw, 14rem);
+        line-height: 0.84;
+        text-wrap: wrap;
+        letter-spacing: -0.05em;
+        text-transform: uppercase;
+        max-width: none;
+        color: transparent;
+        -webkit-background-clip: text;
+        background-clip: text;
+        clip-path: inset(100% 0 0 0);
+      }
+
+      .poster h1.is-in {
+        clip-path: inset(0 0 0 0);
+        transition: clip-path 0.8s var(--ease-dramatic);
+      }
+
+      .bottom {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: end;
+        gap: 32px;
+      }
+
+      .bottom .left {
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+        align-items: flex-start;
+      }
+
+      .bottom .sub {
+        font-size: clamp(1.3rem, 2.4vw, 2.5rem);
+      }
+
+      .deck {
+        width: 340px;
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg-3);
+        font-variant-numeric: tabular-nums;
+        display: grid;
+        gap: 10px;
+      }
+
+      .deck .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .deck .now {
+        color: var(--fg-2);
+      }
+
+      .deck .beat {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        margin-right: 8px;
+        border-radius: 50%;
+        background: var(--cyan-hi);
+        box-shadow: 0 0 10px var(--cyan-hi);
+        vertical-align: 1px;
+        transition:
+          transform 0.12s var(--ease-snap),
+          opacity 0.12s var(--ease-snap);
+        opacity: 0.35;
+      }
+
+      .deck .beat.on {
+        opacity: 1;
+        transform: scale(1.4);
+      }
+
+      .deck .bar {
+        position: relative;
+        height: 1px;
+        background: var(--line);
+      }
+
+      .deck .bar span {
+        position: absolute;
+        inset: 0;
+        background: var(--cyan-hi);
+        transform-origin: left;
+        transform: scaleX(0);
+      }
+
+      @media (max-width: 760px) {
+        .poster h1 {
+          font-size: 14.5vw;
+        }
+        .bottom {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .deck {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero-pin">
+        <div class="hero-sticky">
+          <div class="poster"></div>
+          <div class="bottom">
+            <div class="left"></div>
+            <div class="deck" data-enter style="--d: 520ms" aria-hidden="true">
+              <div class="row">
+                <span class="now"><span class="beat"></span><span id="deck-name">Deck A · now</span></span>
+                <span id="deck-meta">124.0 BPM · 8A</span>
+              </div>
+              <div class="row"><span>Loudness</span><span id="deck-lufs">-8.4 LUFS</span></div>
+              <div class="bar"><span></span></div>
+              <div class="row"><span>Smart mix</span><span id="mix-label">Outro cue in 6.0 s</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="proto-tag">B · Spectrum · v2</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
+    <script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+    <script type="module">
+      import {
+        mountNav,
+        mountHero,
+        mountSections,
+        startEntry,
+        initReveals,
+        initSmoothScroll,
+        scrambleText,
+        reducedMotion,
+      } from "./hero.js";
+
+      mountNav();
+      const poster = document.querySelector(".poster");
+      const left = document.querySelector(".bottom .left");
+      mountHero(poster);
+      const h1 = poster.querySelector("h1");
+      h1.textContent = "Crate is not a streaming service.";
+      left.append(poster.querySelector(".sub"), poster.querySelector(".cta"));
+      mountSections(document.querySelector("main"));
+      initSmoothScroll();
+      initReveals();
+      const sticky = document.querySelector(".hero-sticky");
+      startEntry(sticky, 80);
+      setTimeout(() => h1.classList.add("is-in"), 120);
+
+      const BANDS = 24;
+      const levels = new Float32Array(BANDS);
+      const state = { amplitude: 0, bpm: 124 };
+
+      function paintLayers() {
+        const lineHeight = parseFloat(getComputedStyle(h1).lineHeight);
+        const layers = ["repeating-linear-gradient(to top, transparent 0 5px, rgba(10, 10, 15, 0.6) 5px 7px)"];
+        const sizes = [`100% ${lineHeight}px`];
+        const positions = ["0 0"];
+        for (let i = 0; i < BANDS; i++) {
+          const l = `var(--l${i}, 0)`;
+          layers.push(
+            `linear-gradient(to top, #06b6d4 0, #06b6d4 calc(${l} * 100% - 3px), #67e8f9 calc(${l} * 100% - 3px), #67e8f9 calc(${l} * 100%), rgba(241, 245, 249, 0.12) calc(${l} * 100%))`,
+          );
+          sizes.push(`calc(100% / ${BANDS} + 1px) ${lineHeight}px`);
+          positions.push(`${((i / (BANDS - 1)) * 100).toFixed(4)}% 0`);
+        }
+        h1.style.backgroundImage = layers.join(",");
+        h1.style.backgroundSize = sizes.join(",");
+        h1.style.backgroundPosition = positions.join(",");
+        h1.style.backgroundRepeat = "repeat-y";
+      }
+      paintLayers();
+      addEventListener("resize", paintLayers);
+      document.fonts.ready.then(paintLayers);
+
+      function bandTarget(band, beatPhase, barPhase, t) {
+        const low = 1 - band / BANDS;
+        const kick = Math.exp(-beatPhase * 7) * Math.max(0, 1 - band / 5);
+        const onSnare = (barPhase > 0.25 && barPhase < 0.3) || (barPhase > 0.75 && barPhase < 0.8);
+        const snare = onSnare ? 0.5 * Math.max(0, 1 - Math.abs(band - 10) / 8) : 0;
+        const hat = Math.exp(-((beatPhase + 0.5) % 1) * 12) * Math.max(0, (band - 15) / 9);
+        const body = 0.3 + 0.34 * low + 0.12 * Math.sin(t * 0.9 + band * 0.7) + 0.08 * Math.sin(t * 2.3 + band * 1.9);
+        return Math.min(1, body * 0.75 + kick * 0.85 + snare + hat * 0.7 + Math.random() * 0.04);
+      }
+
+      const beatDot = document.querySelector(".deck .beat");
+      const deckName = document.getElementById("deck-name");
+      const deckMeta = document.getElementById("deck-meta");
+      const deckLufs = document.getElementById("deck-lufs");
+      const mixLabel = document.getElementById("mix-label");
+      const mixBar = document.querySelector(".deck .bar span");
+      const KEYS = ["8A", "9A", "7A", "8B", "10A", "5A"];
+      let deck = "A";
+      let cycleStart = performance.now();
+      const CYCLE = 9000;
+      const FADE = 3000;
+      let lastBeat = -1;
+
+      function tick(time) {
+        const t = time / 1000;
+        const beatLength = 60 / state.bpm;
+        const beatIndex = Math.floor(t / beatLength);
+        const beatPhase = (t % beatLength) / beatLength;
+        const barPhase = ((t / beatLength) % 4) / 4;
+
+        if (beatIndex !== lastBeat) {
+          lastBeat = beatIndex;
+          beatDot.classList.add("on");
+          setTimeout(() => beatDot.classList.remove("on"), 110);
+        }
+
+        for (let band = 0; band < BANDS; band++) {
+          const target = bandTarget(band, beatPhase, barPhase, t) * state.amplitude;
+          levels[band] += (target - levels[band]) * (target > levels[band] ? 0.5 : 0.1);
+          h1.style.setProperty(`--l${band}`, levels[band].toFixed(3));
+        }
+
+        const elapsed = time - cycleStart;
+        const fadeStart = CYCLE - FADE;
+        if (elapsed < fadeStart) {
+          mixLabel.textContent = `Outro cue in ${((fadeStart - elapsed) / 1000).toFixed(1)} s`;
+          mixBar.style.transform = `scaleX(${elapsed / fadeStart})`;
+        } else if (elapsed < CYCLE) {
+          mixLabel.textContent = `Equal-power fade ${Math.round(((elapsed - fadeStart) / FADE) * 100)}%`;
+          mixBar.style.transform = "scaleX(1)";
+        } else {
+          deck = deck === "A" ? "B" : "A";
+          const bpm = (118 + Math.random() * 12).toFixed(1);
+          state.bpm = Number(bpm);
+          scrambleText(deckName, `Deck ${deck} · now`, 360);
+          scrambleText(deckMeta, `${bpm} BPM · ${KEYS[Math.floor(Math.random() * KEYS.length)]}`, 460);
+          scrambleText(deckLufs, `${(-6 - Math.random() * 5).toFixed(1)} LUFS`, 460);
+          cycleStart = time;
+        }
+      }
+
+      if (reducedMotion) {
+        for (let band = 0; band < BANDS; band++) {
+          h1.style.setProperty(`--l${band}`, (0.35 + 0.4 * (1 - band / BANDS)).toFixed(3));
+        }
+      } else {
+        const { gsap, ScrollTrigger } = window;
+        gsap.to(state, { amplitude: 1, duration: 1.4, delay: 0.5, ease: "power2.out" });
+        let visible = true;
+        new IntersectionObserver(([entry]) => (visible = entry.isIntersecting)).observe(sticky);
+        const loop = (time) => {
+          if (visible && !document.hidden) tick(time);
+          requestAnimationFrame(loop);
+        };
+        requestAnimationFrame(loop);
+
+        ScrollTrigger.create({
+          trigger: ".hero-pin",
+          start: "top top",
+          end: "bottom bottom",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            state.amplitude = Math.max(0, 1 - progress * 1.4);
+            const fade = Math.max(0, (progress - 0.45) / 0.55);
+            gsap.set(poster, { opacity: 1 - fade, scale: 1 - fade * 0.05, transformOrigin: "0% 50%" });
+            gsap.set(".bottom", { opacity: 1 - Math.min(1, progress / 0.4), y: progress * -40 });
+          },
+        });
+
+        gsap
+          .timeline({ scrollTrigger: { trigger: ".screencast", start: "top 90%", end: "top 20%", scrub: true } })
+          .fromTo(
+            "[data-frame]",
+            { scaleY: 0.004, scaleX: 0.4, opacity: 0 },
+            { scaleX: 1, opacity: 1, duration: 0.35, ease: "none" },
+          )
+          .to("[data-frame]", { scaleY: 1, duration: 0.65, ease: "power3.out" });
+      }
+    </script>
+  </body>
+</html>

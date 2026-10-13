@@ -1,0 +1,314 @@
+@font-face {
+  font-family: "Poppins";
+  src: url("../../../shared/fonts/poppins/poppins-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Poppins";
+  src: url("../../../shared/fonts/poppins/poppins-500.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Poppins";
+  src: url("../../../shared/fonts/poppins/poppins-800.woff2") format("woff2");
+  font-weight: 800;
+  font-display: swap;
+}
+
+:root {
+  --bg: #0a0a0f;
+  --fg: #f1f5f9;
+  --cyan: #06b6d4;
+  --cyan-hi: #67e8f9;
+  --cyan-lo: rgba(6, 182, 212, 0.18);
+  --amber: #f59e0b;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --sans: "Poppins", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0.06;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+.proto-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px clamp(16px, 4vw, 48px);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(241, 245, 249, 0.55);
+}
+
+.proto-nav a {
+  color: inherit;
+  text-decoration: none;
+  margin-left: 22px;
+}
+
+.proto-nav a:hover {
+  color: var(--cyan-hi);
+}
+
+.proto-nav .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--fg);
+  margin: 0;
+}
+
+.proto-nav .brand img {
+  width: 22px;
+  height: 22px;
+}
+
+.hero {
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.hero-copy {
+  position: relative;
+  z-index: 10;
+  max-width: 1120px;
+  padding: clamp(96px, 14vh, 150px) clamp(16px, 5vw, 72px) 64px;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cyan-hi);
+  margin: 0 0 20px;
+}
+
+.hero h1 {
+  margin: 0;
+  max-width: 12ch;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: clamp(44px, 8.4vw, 116px);
+  line-height: 0.88;
+  letter-spacing: -0.01em;
+  text-shadow: 0 0 34px rgba(103, 232, 249, 0.12);
+}
+
+.subline {
+  margin: 20px 0 0;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: clamp(22px, 3.6vw, 48px);
+  line-height: 1;
+  color: var(--cyan-hi);
+  text-shadow: 0 0 24px rgba(103, 232, 249, 0.22);
+}
+
+.body p {
+  max-width: 46rem;
+  margin: 22px 0 0;
+  font-size: clamp(16px, 1.45vw, 20px);
+  line-height: 1.7;
+  color: rgba(241, 245, 249, 0.68);
+}
+
+.installer {
+  margin-top: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 22px;
+  font-family: var(--mono);
+  font-size: clamp(12px, 1.1vw, 15px);
+}
+
+.installer code {
+  color: #cffafe;
+  padding: 10px 14px;
+  border: 1px solid var(--cyan-lo);
+  background: rgba(6, 182, 212, 0.05);
+  white-space: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  max-width: 100%;
+}
+
+.installer code::-webkit-scrollbar {
+  display: none;
+}
+
+.installer code .prompt {
+  color: rgba(103, 232, 249, 0.45);
+  user-select: none;
+}
+
+.installer button,
+.installer a,
+.links a {
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cyan-hi);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(103, 232, 249, 0.35);
+  text-underline-offset: 4px;
+}
+
+.links {
+  margin-top: 30px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 30px;
+  font-family: var(--mono);
+}
+
+.hud-frame {
+  position: absolute;
+  inset: clamp(10px, 2vw, 24px);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.hud-frame svg {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  overflow: visible;
+}
+
+.hud-frame path {
+  fill: none;
+  stroke: var(--cyan);
+  stroke-width: 1.25;
+  stroke-dasharray: 64;
+  stroke-dashoffset: 64;
+}
+
+.hud-frame .tl {
+  top: 0;
+  left: 0;
+}
+.hud-frame .tr {
+  top: 0;
+  right: 0;
+  transform: scaleX(-1);
+}
+.hud-frame .bl {
+  bottom: 0;
+  left: 0;
+  transform: scaleY(-1);
+}
+.hud-frame .br {
+  bottom: 0;
+  right: 0;
+  transform: scale(-1, -1);
+}
+
+.hud-label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(103, 232, 249, 0.7);
+  font-variant-numeric: tabular-nums;
+}
+
+.next-section {
+  position: relative;
+  min-height: 120vh;
+  display: grid;
+  place-items: center;
+  padding: 10vh 5vw;
+}
+
+.screen-frame {
+  position: relative;
+  width: min(1100px, 100%);
+  aspect-ratio: 16 / 10;
+  border: 1px solid rgba(6, 182, 212, 0.35);
+  background: linear-gradient(rgba(6, 182, 212, 0.04), rgba(6, 182, 212, 0.04)),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.025) 0 1px,
+      transparent 1px 4px
+    );
+  display: grid;
+  place-items: center;
+}
+
+.screen-frame .hud-label {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+}
+
+.proto-tag {
+  position: fixed;
+  right: 16px;
+  bottom: 14px;
+  z-index: 60;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(245, 158, 11, 0.85);
+}
+
+@media (max-width: 640px) {
+  .proto-nav .links-right {
+    display: none;
+  }
+  .hero h1 {
+    max-width: none;
+  }
+  .installer code {
+    font-size: 11.5px;
+  }
+  .proto-tag {
+    top: 22px;
+    bottom: auto;
+    right: 64px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-frame path {
+    stroke-dashoffset: 0;
+  }
+}

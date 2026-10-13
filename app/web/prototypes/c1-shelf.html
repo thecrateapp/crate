@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crate · C1 · Shelf</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(ellipse 55% 45% at 50% 32%, rgba(6, 182, 212, 0.09), transparent 70%);
+      }
+
+      .hero-pin {
+        position: relative;
+        height: 230vh;
+      }
+
+      .hero-sticky {
+        position: sticky;
+        top: 0;
+        height: 100dvh;
+        min-height: 680px;
+        overflow: hidden;
+        display: grid;
+        grid-template-rows: 1fr auto;
+        padding: 84px clamp(20px, 5vw, 72px) 7vh;
+      }
+
+      .shelf {
+        --s: clamp(200px, min(34vh, 24vw), 330px);
+        position: relative;
+        perspective: 1500px;
+        perspective-origin: 50% 40%;
+      }
+
+      .track {
+        position: absolute;
+        left: 50%;
+        top: 46%;
+        transform-style: preserve-3d;
+        will-change: transform;
+      }
+
+      .rec {
+        position: absolute;
+        left: calc(var(--s) / -2);
+        top: calc(var(--s) / -2);
+        width: var(--s);
+        height: var(--s);
+        transform-style: preserve-3d;
+        cursor: pointer;
+        transition:
+          transform 0.85s var(--spring-smooth),
+          opacity 0.5s var(--ease-out);
+        -webkit-box-reflect: below 2px linear-gradient(transparent 62%, rgba(255, 255, 255, 0.16));
+      }
+
+      .rec.no-anim {
+        transition: none;
+      }
+
+      .rec .card {
+        position: absolute;
+        inset: 0;
+        border-radius: 6px;
+        overflow: hidden;
+        background:
+          repeating-linear-gradient(45deg, rgba(6, 182, 212, 0.12) 0 2px, transparent 2px 10px),
+          #10131a;
+        transition:
+          transform 0.6s var(--ease-out),
+          box-shadow 0.6s var(--ease-out);
+      }
+
+      .rec .card img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        filter: grayscale(1) brightness(0.5) contrast(1.05);
+        transition: filter 0.7s var(--ease-out);
+      }
+
+      .rec .card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: rgba(6, 182, 212, 0.42);
+        mix-blend-mode: color;
+        transition: opacity 0.7s var(--ease-out);
+      }
+
+      .rec.focal {
+        cursor: grab;
+      }
+
+      .rec .vinyl {
+        position: absolute;
+        inset: 3%;
+        border-radius: 50%;
+        transform: translate3d(0, 0, -2px);
+        transition: transform 0.9s var(--spring-smooth);
+        background:
+          radial-gradient(circle, var(--cyan) 0 17%, #0b0c10 17.5% 19%, transparent 19.5%),
+          repeating-radial-gradient(circle, #0d0e12 0 1.6px, #16181f 1.8px 3.2px),
+          #0d0e12;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+      }
+
+      .rec .vinyl::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: conic-gradient(from 30deg, transparent 0 20%, rgba(255, 255, 255, 0.07) 25%, transparent 32% 70%, rgba(255, 255, 255, 0.05) 75%, transparent 82%);
+        animation: spin 1.8s linear infinite;
+      }
+
+      .rec .vinyl::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 3%;
+        height: 3%;
+        margin: -1.5% 0 0 -1.5%;
+        border-radius: 50%;
+        background: var(--bg);
+        z-index: 1;
+      }
+
+      .rec.focal .vinyl {
+        transform: translate3d(46%, 0, -2px);
+        transition-delay: 0.35s;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .rec.focal .card {
+        box-shadow:
+          0 40px 90px rgba(0, 0, 0, 0.65),
+          0 0 0 1px rgba(103, 232, 249, 0.22);
+      }
+
+      .rec.focal .card img {
+        filter: none;
+      }
+
+      .rec.focal .card::after {
+        opacity: 0;
+      }
+
+      .focal-label {
+        position: absolute;
+        left: 50%;
+        top: calc(46% + var(--s) / 2 + 22px);
+        transform: translateX(-50%);
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg-3);
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+        z-index: 200;
+      }
+
+      .hero-copy {
+        position: relative;
+        z-index: 300;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 16px;
+        will-change: transform, opacity;
+      }
+
+      .hero-copy .eyebrow {
+        display: none;
+      }
+
+      .hero-copy .display {
+        font-size: clamp(2.8rem, 6.3vw, 7.2rem);
+        max-width: 14ch;
+      }
+
+      .hero-copy .sub {
+        font-size: clamp(1.15rem, 1.9vw, 2rem);
+      }
+
+      .hero-copy .cta {
+        margin-top: 10px;
+      }
+
+      .pulled {
+        position: absolute;
+        z-index: 400;
+        border-radius: 18px;
+        overflow: hidden;
+        background-color: #0d0e14;
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: auto 100%;
+        visibility: hidden;
+        transform-origin: 50% 50%;
+        will-change: transform, clip-path;
+      }
+
+      .pulled::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: rgba(10, 10, 15, var(--dim, 0));
+        box-shadow: inset 0 0 0 1px rgba(241, 245, 249, calc(var(--ui, 0) * 0.12));
+      }
+
+      .pulled .eyebrow,
+      .pulled .play {
+        position: absolute;
+        z-index: 1;
+        opacity: var(--ui, 0);
+      }
+
+      .pulled .eyebrow {
+        top: 20px;
+        left: 24px;
+      }
+
+      .pulled .play {
+        left: 50%;
+        top: 50%;
+        width: 84px;
+        height: 84px;
+        margin: -42px 0 0 -42px;
+        border-radius: 50%;
+        border: 1px solid rgba(103, 232, 249, 0.45);
+        display: grid;
+        place-items: center;
+        color: var(--cyan-hi);
+        font-size: 22px;
+      }
+
+      @media (max-width: 760px) {
+        .hero-copy {
+          width: 100%;
+        }
+        .hero-copy .display {
+          font-size: 11.6vw;
+        }
+        .shelf {
+          --s: 58vw;
+        }
+        .rec:not(.focal) {
+          opacity: 0 !important;
+          pointer-events: none;
+        }
+        .rec {
+          -webkit-box-reflect: unset;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero-pin">
+        <div class="hero-sticky">
+          <div class="shelf" aria-hidden="true">
+            <div class="track"></div>
+            <div class="focal-label"></div>
+          </div>
+          <div class="hero-copy"></div>
+          <div class="pulled" aria-hidden="true">
+            <p class="eyebrow"><b>01</b> / Library</p>
+            <span class="play">&#9654;</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="proto-tag">C1 · Shelf</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
+    <script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+    <script type="module">
+      import {
+        mountNav,
+        mountHero,
+        mountSections,
+        startEntry,
+        initReveals,
+        initSmoothScroll,
+        scrambleText,
+        reducedMotion,
+        finePointer,
+      } from "./hero.js";
+
+      mountNav();
+      const copy = document.querySelector(".hero-copy");
+      mountHero(copy);
+      const main = document.querySelector("main");
+      mountSections(main);
+      main.querySelector(".screencast").remove();
+      initSmoothScroll();
+      initReveals();
+      startEntry(copy, 260);
+
+      const { gsap, ScrollTrigger } = window;
+
+      let coverCount = 0;
+      try {
+        coverCount = (await fetch("covers/manifest.json").then((r) => r.json())).count;
+      } catch {
+        coverCount = 0;
+      }
+
+      const SIDE = 5;
+      const shelf = document.querySelector(".shelf");
+      const track = document.querySelector(".track");
+      const label = document.querySelector(".focal-label");
+      const FORMATS = ["FLAC 16/44.1", "FLAC 24/96", "FLAC 24/48", "MP3 320"];
+      let head = 0;
+      const nodes = [];
+
+      function coverIndex(n) {
+        return coverCount ? ((n % coverCount) + coverCount) % coverCount : 0;
+      }
+
+      function setCover(node, n) {
+        node.dataset.album = n;
+        const img = node.querySelector("img");
+        if (img) img.src = `covers/${coverIndex(n) + 1}.jpg`;
+      }
+
+      for (let offset = -SIDE; offset <= SIDE; offset++) {
+        const node = document.createElement("div");
+        node.className = "rec";
+        node.innerHTML = `<div class="vinyl"></div><div class="card">${coverCount ? `<img alt="" decoding="async" draggable="false" />` : ""}</div>`;
+        node.dataset.o = offset;
+        setCover(node, offset);
+        node.addEventListener("click", () => step(Number(node.dataset.o)));
+        track.appendChild(node);
+        nodes.push(node);
+      }
+
+      const focalNode = () => nodes.find((node) => node.dataset.o === "0");
+
+      function place(node, settle = 1) {
+        const o = Number(node.dataset.o);
+        const s = node.offsetWidth;
+        const a = Math.abs(o);
+        const sign = Math.sign(o);
+        node.classList.toggle("focal", o === 0);
+        node.style.zIndex = String(100 - a);
+        if (o === 0) {
+          node.style.transform = `translate3d(0, 0, ${(1 - settle) * -900}px)`;
+        } else {
+          const x = sign * (s * 0.6 + (a - 1) * s * 0.23);
+          const z = -s * 0.5 - (a - 1) * s * 0.06 - (1 - settle) * 900;
+          node.style.transform = `translate3d(${x}px, 0, ${z}px) rotateY(${-sign * 64}deg)`;
+        }
+        node.style.opacity = a > SIDE - 1 || !settle ? "0" : "1";
+      }
+
+      function describe() {
+        const n = Number(focalNode().dataset.album);
+        const year = 1968 + (((n * 37) % 57) + 57) % 57;
+        const tracks = 6 + (((n * 7) % 10) + 10) % 10;
+        const format = FORMATS[((n % 4) + 4) % 4];
+        scrambleText(label, `Album ${String(coverIndex(n) + 1).padStart(4, "0")} · ${year} · ${tracks} tracks · ${format}`, 420);
+      }
+
+      function advance(direction) {
+        head += direction;
+        for (const node of nodes) {
+          let o = Number(node.dataset.o) - direction;
+          if (o < -SIDE || o > SIDE) {
+            o = o < -SIDE ? SIDE : -SIDE;
+            node.classList.add("no-anim");
+            node.dataset.o = o;
+            setCover(node, head + o);
+            place(node);
+            void node.offsetWidth;
+            node.classList.remove("no-anim");
+            continue;
+          }
+          node.dataset.o = o;
+          place(node);
+        }
+        describe();
+      }
+
+      let busy = false;
+      async function step(offset) {
+        if (!offset || busy) return;
+        busy = true;
+        const direction = Math.sign(offset);
+        for (let i = 0; i < Math.abs(offset); i++) {
+          advance(direction);
+          await new Promise((resolve) => setTimeout(resolve, 140));
+        }
+        busy = false;
+      }
+
+      nodes.forEach((node) => place(node, reducedMotion ? 1 : 0));
+      describe();
+
+      if (!reducedMotion) {
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            for (const node of nodes) {
+              node.style.transitionDelay = `${Math.abs(node.dataset.o) * 70}ms`;
+              place(node, 1);
+              setTimeout(() => (node.style.transitionDelay = ""), 1200);
+            }
+          }),
+        );
+
+        let paused = false;
+        let dragStart = null;
+        shelf.addEventListener("pointerdown", (event) => {
+          dragStart = event.clientX;
+        });
+        addEventListener("pointerup", (event) => {
+          if (dragStart === null) return;
+          const delta = event.clientX - dragStart;
+          dragStart = null;
+          if (Math.abs(delta) > 40) step(delta < 0 ? 1 : -1);
+        });
+        addEventListener("keydown", (event) => {
+          if (window.scrollY > innerHeight * 0.3) return;
+          if (event.key === "ArrowRight") step(1);
+          if (event.key === "ArrowLeft") step(-1);
+        });
+        shelf.addEventListener("pointerenter", () => (paused = true));
+        shelf.addEventListener("pointerleave", () => (paused = false));
+        setInterval(() => {
+          if (!paused && !busy && !document.hidden && window.scrollY < innerHeight * 0.2) advance(1);
+        }, 2600);
+
+        if (finePointer) {
+          shelf.addEventListener("pointermove", (event) => {
+            const card = focalNode().querySelector(".card");
+            const rect = card.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / rect.width - 0.5;
+            const y = (event.clientY - rect.top) / rect.height - 0.5;
+            const inside = Math.abs(x) < 0.7 && Math.abs(y) < 0.7;
+            card.style.transform = inside ? `rotateY(${x * 14}deg) rotateX(${-y * 10}deg) translateZ(30px)` : "";
+          });
+          shelf.addEventListener("pointerleave", () => {
+            nodes.forEach((node) => (node.querySelector(".card").style.transform = ""));
+          });
+        }
+
+        const pulled = document.querySelector(".pulled");
+        const sticky = document.querySelector(".hero-sticky");
+        const geometry = {};
+
+        function measure() {
+          let w = Math.min(1180, sticky.clientWidth * 0.88);
+          let h = w / 1.6;
+          if (h > sticky.clientHeight * 0.78) {
+            h = sticky.clientHeight * 0.78;
+            w = h * 1.6;
+          }
+          Object.assign(pulled.style, {
+            width: `${w}px`,
+            height: `${h}px`,
+            left: `${(sticky.clientWidth - w) / 2}px`,
+            top: `${(sticky.clientHeight - h) / 2}px`,
+          });
+          const rect = focalNode().getBoundingClientRect();
+          const box = sticky.getBoundingClientRect();
+          Object.assign(geometry, {
+            w,
+            h,
+            s: rect.width,
+            dx: rect.left + rect.width / 2 - (box.left + box.width / 2),
+            dy: rect.top + rect.height / 2 - (box.top + box.height / 2),
+          });
+        }
+
+        let flying = false;
+        ScrollTrigger.create({
+          trigger: ".hero-pin",
+          start: "top top",
+          end: "bottom bottom",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            const fade = Math.min(1, progress / 0.3);
+            gsap.set(copy, { opacity: 1 - fade, y: -fade * 60 });
+            gsap.set(label, { opacity: 1 - fade });
+            gsap.set(track, { z: -fade * 500, opacity: 1 - Math.min(1, Math.max(0, (progress - 0.2) / 0.2)) });
+
+            const raw = Math.min(1, Math.max(0, (progress - 0.22) / 0.55));
+            const f = raw < 0.5 ? 4 * raw ** 3 : 1 - (-2 * raw + 2) ** 3 / 2;
+
+            if (raw > 0 && !flying) {
+              flying = true;
+              measure();
+              const img = focalNode().querySelector("img");
+              pulled.style.backgroundImage = img ? `url(${img.src})` : "none";
+            }
+            if (raw === 0) flying = false;
+
+            pulled.style.visibility = raw > 0 ? "visible" : "hidden";
+            if (raw === 0) return;
+            const k = geometry.s / geometry.h;
+            const scale = k + (1 - k) * f;
+            const side = ((geometry.w - geometry.h) / 2) * (1 - f);
+            pulled.style.transform = `translate3d(${geometry.dx * (1 - f)}px, ${geometry.dy * (1 - f)}px, 0) scale(${scale})`;
+            pulled.style.clipPath = `inset(0 ${side}px round ${6 / scale + 12 * f}px)`;
+            pulled.style.setProperty("--dim", (f * 0.82).toFixed(3));
+            pulled.style.setProperty("--ui", Math.max(0, (f - 0.6) / 0.4).toFixed(3));
+          },
+        });
+
+        addEventListener("resize", () => flying && measure());
+      }
+    </script>
+  </body>
+</html>

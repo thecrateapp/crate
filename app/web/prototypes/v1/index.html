@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crate · Hero prototypes</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      main {
+        max-width: 900px;
+        padding: 12vh 6vw;
+      }
+      h1 {
+        font-weight: 800;
+        text-transform: uppercase;
+        font-size: clamp(36px, 6vw, 72px);
+        line-height: 0.9;
+        margin: 0 0 48px;
+      }
+      a.option {
+        display: block;
+        padding: 22px 0;
+        border-top: 1px solid rgba(6, 182, 212, 0.25);
+        color: var(--fg);
+        text-decoration: none;
+      }
+      a.option:hover strong {
+        color: var(--cyan-hi);
+      }
+      a.option strong {
+        display: block;
+        font-size: 28px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+      a.option span {
+        color: rgba(241, 245, 249, 0.6);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">// hero prototypes</p>
+      <h1>Pick a hero</h1>
+      <a class="option" href="a-signal-lock.html">
+        <span class="hud-label">A</span><strong>Signal Lock</strong>
+        <span>WebGL field of the library in bliss space. Locks onto tracks, draws the path between them.</span>
+      </a>
+      <a class="option" href="b-spectrum.html">
+        <span class="hud-label">B</span><strong>Spectrum</strong>
+        <span>24-band spectrum, two decks with Smart Mix readouts, title sliced on the downbeat.</span>
+      </a>
+      <a class="option" href="c-digging.html">
+        <span class="hud-label">C</span><strong>Digging</strong>
+        <span>Wall of album covers in perspective. Scroll pulls one record out into the screencast.</span>
+      </a>
+    </main>
+  </body>
+</html>

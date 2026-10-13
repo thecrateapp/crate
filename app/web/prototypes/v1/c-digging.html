@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crate · Hero C · Digging</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      .stage {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        perspective: 1500px;
+        perspective-origin: 70% 45%;
+        overflow: hidden;
+      }
+
+      .wall {
+        position: absolute;
+        top: -18%;
+        left: 34%;
+        width: 120vw;
+        display: grid;
+        gap: 18px;
+        transform-style: preserve-3d;
+        transform: rotateY(-28deg) rotateX(10deg) rotateZ(-4deg);
+      }
+
+      .row {
+        display: flex;
+        gap: 18px;
+        width: max-content;
+        transform-style: preserve-3d;
+      }
+
+      .record {
+        position: relative;
+        width: clamp(120px, 12vw, 190px);
+        aspect-ratio: 1;
+        flex: none;
+        background: #11131a;
+        transform-style: preserve-3d;
+        transition:
+          transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1),
+          outline-color 600ms ease;
+        outline: 1px solid transparent;
+        outline-offset: 6px;
+      }
+
+      .record img,
+      .record .placeholder {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: grayscale(1) contrast(1.1) brightness(0.55);
+        transition: filter 600ms ease;
+      }
+
+      .record .placeholder {
+        background:
+          repeating-linear-gradient(45deg, rgba(6, 182, 212, 0.12) 0 2px, transparent 2px 9px),
+          #10131a;
+      }
+
+      .record::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: rgba(6, 182, 212, 0.38);
+        mix-blend-mode: color;
+        transition: opacity 600ms ease;
+      }
+
+      .record.lifted {
+        transform: translateZ(90px);
+        outline-color: var(--cyan-hi);
+      }
+
+      .record.lifted img {
+        filter: none;
+      }
+
+      .record.lifted::after {
+        opacity: 0;
+      }
+
+      .hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        background:
+          linear-gradient(90deg, rgba(10, 10, 15, 0.97) 0%, rgba(10, 10, 15, 0.86) 38%, rgba(10, 10, 15, 0.2) 70%, rgba(10, 10, 15, 0.55) 100%),
+          linear-gradient(0deg, rgba(10, 10, 15, 1) 0%, rgba(10, 10, 15, 0) 22%),
+          linear-gradient(180deg, rgba(10, 10, 15, 0.92) 0%, rgba(10, 10, 15, 0) 16%);
+      }
+
+      .tag {
+        position: fixed;
+        z-index: 4;
+        left: 0;
+        top: 0;
+        padding: 6px 10px;
+        line-height: 1.7;
+        white-space: pre;
+        border-left: 1px solid rgba(103, 232, 249, 0.6);
+        background: rgba(10, 10, 15, 0.7);
+        pointer-events: none;
+        opacity: 0;
+      }
+
+      .pulled {
+        position: fixed;
+        z-index: 20;
+        left: 50%;
+        top: 50%;
+        width: 1px;
+        height: 1px;
+        pointer-events: none;
+        visibility: hidden;
+        border: 1px solid rgba(103, 232, 249, 0.5);
+        background-size: cover;
+        background-position: center;
+      }
+
+      .pulled .hud-label {
+        position: absolute;
+        z-index: 1;
+        top: 14px;
+        left: 16px;
+        opacity: 0;
+      }
+
+      .pulled::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: rgba(10, 10, 15, var(--dim, 0));
+      }
+
+      .screen-frame {
+        visibility: hidden;
+      }
+
+      @media (max-width: 760px) {
+        .stage {
+          perspective-origin: 50% 80%;
+          opacity: 0.6;
+        }
+        .wall {
+          top: 40%;
+          left: -10%;
+          transform: rotateX(48deg) rotateZ(-8deg);
+        }
+        .hero::before {
+          background: linear-gradient(180deg, rgba(10, 10, 15, 0.96) 0%, rgba(10, 10, 15, 0.85) 60%, rgba(10, 10, 15, 0.4) 100%);
+        }
+        .tag {
+          display: none;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .screen-frame {
+          visibility: visible;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="proto-nav">
+      <a class="brand" href="index.html"><img src="../../../site/public/icons/logo.svg" alt="" />Crate</a>
+      <div class="links-right">
+        <a href="#">Listen</a><a href="#">Admin</a><a href="#">Architecture</a><a href="#">Developers</a><a href="#">GitHub</a>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="stage" aria-hidden="true"><div class="wall"></div></div>
+      <div class="hud-frame"></div>
+      <div class="hero-copy"></div>
+    </section>
+
+    <div class="tag hud-label" aria-hidden="true"></div>
+    <div class="pulled" aria-hidden="true"><span class="hud-label">// 01 Library · screencast</span></div>
+
+    <section class="next-section">
+      <div class="screen-frame">
+        <span class="hud-label">// 01 Library · screencast</span>
+      </div>
+    </section>
+
+    <div class="proto-tag">Prototype C · Digging · local covers</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
+    <script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+    <script type="module">
+      import { mountHero, playIntro, reducedMotion, scrambleText } from "./hero.js";
+
+      mountHero(document.querySelector(".hero-copy"), document.querySelector(".hud-frame"));
+      playIntro({ delay: 300 });
+
+      const { gsap, ScrollTrigger } = window;
+      gsap.registerPlugin(ScrollTrigger);
+
+      let coverCount = 0;
+      try {
+        const manifest = await fetch("../covers/manifest.json").then((response) => response.json());
+        coverCount = manifest.count;
+      } catch {
+        coverCount = 0;
+      }
+
+      const ROWS = 5;
+      const PER_ROW = 12;
+      const wall = document.querySelector(".wall");
+      const records = [];
+      for (let row = 0; row < ROWS; row++) {
+        const rowElement = document.createElement("div");
+        rowElement.className = "row";
+        for (let copy = 0; copy < 2; copy++) {
+          for (let column = 0; column < PER_ROW; column++) {
+            const index = row * PER_ROW + column;
+            const record = document.createElement("div");
+            record.className = "record";
+            if (coverCount) {
+              const image = document.createElement("img");
+              image.src = `../covers/${(index % coverCount) + 1}.jpg`;
+              image.alt = "";
+              image.decoding = "async";
+              record.appendChild(image);
+            } else {
+              const placeholder = document.createElement("div");
+              placeholder.className = "placeholder";
+              record.appendChild(placeholder);
+            }
+            record.dataset.index = index;
+            rowElement.appendChild(record);
+            if (copy === 0) records.push(record);
+          }
+        }
+        wall.appendChild(rowElement);
+      }
+
+      if (!reducedMotion) startMotion();
+
+      function startMotion() {
+        const lenis = new window.Lenis({ lerp: 0.09 });
+        lenis.on("scroll", ScrollTrigger.update);
+        gsap.ticker.add((time) => lenis.raf(time * 1000));
+        gsap.ticker.lagSmoothing(0);
+
+        const rows = [...wall.querySelectorAll(".row")];
+        rows.forEach((row, index) => {
+          const half = row.scrollWidth / 2;
+          const forward = index % 2 === 1;
+          gsap.fromTo(
+            row,
+            { x: forward ? -half : 0 },
+            { x: forward ? 0 : -half, duration: 70 + index * 14, ease: "none", repeat: -1 },
+          );
+        });
+
+        const tilt = { x: 0, y: 0 };
+        const desktop = window.matchMedia("(min-width: 761px)").matches;
+        if (desktop) {
+          addEventListener("pointermove", (event) => {
+            gsap.to(tilt, {
+              x: (event.clientX / innerWidth - 0.5) * 8,
+              y: (event.clientY / innerHeight - 0.5) * -6,
+              duration: 1.2,
+              ease: "power3.out",
+              overwrite: true,
+              onUpdate: () => {
+                wall.style.transform = `rotateY(${-28 + tilt.x}deg) rotateX(${10 + tilt.y}deg) rotateZ(-4deg)`;
+              },
+            });
+          });
+        }
+
+        const tag = document.querySelector(".tag");
+        const FORMATS = ["FLAC 16/44.1", "FLAC 24/96", "FLAC 24/48", "MP3 320"];
+        let lifted = null;
+
+        function liftNext() {
+          lifted?.classList.remove("lifted");
+          const minX = desktop ? innerWidth * 0.64 : 20;
+          const minY = desktop ? 120 : innerHeight * 0.55;
+          const candidates = records.filter((record) => {
+            const rect = record.getBoundingClientRect();
+            return rect.left > minX && rect.right < innerWidth - 40 && rect.top > minY && rect.bottom < innerHeight - 80;
+          });
+          if (!candidates.length) return;
+          lifted = candidates[Math.floor(Math.random() * candidates.length)];
+          lifted.classList.add("lifted");
+          const year = 1968 + Math.floor(Math.random() * 57);
+          const tracks = 6 + Math.floor(Math.random() * 10);
+          const format = FORMATS[Math.floor(Math.random() * FORMATS.length)];
+          const bpm = 80 + Math.floor(Math.random() * 90);
+          scrambleText(
+            tag,
+            `ALBUM ${String(lifted.dataset.index).padStart(4, "0")} · ${year}\n${tracks} TRACKS · ${format}\nAVG ${bpm} BPM · ANALYSED`,
+            560,
+          );
+          gsap.fromTo(tag, { opacity: 0 }, { opacity: 1, duration: 0.3 });
+        }
+
+        gsap.ticker.add(() => {
+          if (!lifted) return;
+          const rect = lifted.getBoundingClientRect();
+          tag.style.transform = `translate(${Math.min(rect.right + 14, innerWidth - 260)}px, ${rect.top}px)`;
+        });
+
+        setTimeout(() => {
+          liftNext();
+          setInterval(liftNext, 2600);
+        }, 1600);
+
+        ScrollTrigger.create({
+          trigger: ".hero",
+          start: "top top",
+          end: "bottom top",
+          scrub: true,
+          onUpdate: (self) => {
+            gsap.set(".hero-copy", { opacity: 1 - self.progress * 1.6, y: -self.progress * 120 });
+            gsap.set(".stage", { opacity: 1 - self.progress * 0.8, scale: 1 + self.progress * 0.15 });
+            gsap.set(tag, { autoAlpha: self.progress > 0.05 ? 0 : 1 });
+          },
+        });
+
+        const pulled = document.querySelector(".pulled");
+        const frame = document.querySelector(".screen-frame");
+        let source = null;
+
+        ScrollTrigger.create({
+          trigger: ".next-section",
+          start: "top bottom",
+          end: "center center",
+          scrub: true,
+          onUpdate: (self) => {
+            if (!source) {
+              source = lifted ?? records[Math.floor(records.length / 2)];
+              const image = source.querySelector("img");
+              pulled.style.backgroundImage = image ? `url(${image.src})` : "none";
+            }
+            const from = source.getBoundingClientRect();
+            const to = frame.getBoundingClientRect();
+            const p = gsap.parseEase("power2.inOut")(self.progress);
+            const lerp = (a, b) => a + (b - a) * p;
+            pulled.style.visibility = self.progress > 0 && self.progress < 1 ? "visible" : "hidden";
+            frame.style.visibility = self.progress >= 1 ? "visible" : "hidden";
+            Object.assign(pulled.style, {
+              left: `${lerp(from.left, to.left)}px`,
+              top: `${lerp(from.top, to.top)}px`,
+              width: `${lerp(from.width, to.width)}px`,
+              height: `${lerp(from.height, to.height)}px`,
+              transform: `perspective(1200px) rotateY(${lerp(-28, 0)}deg)`,
+            });
+            pulled.style.setProperty("--dim", (p * 0.88).toFixed(2));
+            pulled.querySelector(".hud-label").style.opacity = p;
+          },
+          onLeaveBack: () => {
+            pulled.style.visibility = "hidden";
+            source = null;
+          },
+        });
+      }
+    </script>
+  </body>
+</html>

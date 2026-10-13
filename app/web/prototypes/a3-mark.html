@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crate · A3 · Mark</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      #field {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        opacity: 0;
+      }
+
+      .scrim {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(ellipse 120% 90% at 50% 45%, transparent 55%, rgba(10, 10, 15, 0.8) 100%);
+      }
+
+      .hero-pin {
+        position: relative;
+        height: 200vh;
+      }
+
+      .hero-sticky {
+        position: sticky;
+        top: 0;
+        height: 100dvh;
+        min-height: 700px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-items: center;
+        padding: 0 clamp(20px, 5vw, 72px) 7vh;
+      }
+
+      .hero-copy {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 18px;
+        will-change: transform, opacity;
+      }
+
+      .hero-copy .eyebrow {
+        display: none;
+      }
+
+      .hero-copy .display {
+        font-size: clamp(2.6rem, 5.4vw, 6.4rem);
+        max-width: 16ch;
+      }
+
+      .hero-copy .sub {
+        font-size: clamp(1.15rem, 1.8vw, 1.9rem);
+      }
+
+      .hero-copy .cta {
+        margin-top: 8px;
+      }
+
+      .hint {
+        position: fixed;
+        left: 50%;
+        top: 55vh;
+        transform: translateX(-50%);
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--fg-3);
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      @media (max-width: 760px) {
+        .hero-copy {
+          width: 100%;
+        }
+        .hero-copy .display {
+          font-size: 11vw;
+        }
+        .hint {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="field" aria-hidden="true"></canvas>
+    <div class="scrim" aria-hidden="true"></div>
+    <div class="hint" aria-hidden="true">48,213 tracks · one library</div>
+
+    <main>
+      <section class="hero-pin">
+        <div class="hero-sticky">
+          <div class="hero-copy"></div>
+        </div>
+      </section>
+    </main>
+
+    <div class="proto-tag">A3 · Mark</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
+    <script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+    <script type="module">
+      import {
+        mountNav,
+        mountHero,
+        mountSections,
+        startEntry,
+        initReveals,
+        initSmoothScroll,
+        reducedMotion,
+        finePointer,
+        isMobile,
+      } from "./hero.js";
+      import { createField, clusterCenters, cloudPositions, sampleImage } from "./field.js";
+
+      mountNav();
+      const copy = document.querySelector(".hero-copy");
+      mountHero(copy);
+      mountSections(document.querySelector("main"));
+      initSmoothScroll();
+      initReveals();
+      startEntry(copy, 650);
+
+      const { gsap, ScrollTrigger } = window;
+      const COUNT = isMobile ? 12000 : 40000;
+      const { positions: cloud } = cloudPositions(COUNT, clusterCenters(16, 1.1));
+      const mark = await sampleImage("../../site/public/icons/logo.svg", COUNT, {
+        width: isMobile ? 1.15 : 1.25,
+        depth: 0.03,
+      });
+      const lift = isMobile ? 0.55 : 0.62;
+      for (let i = 0; i < COUNT; i++) mark[i * 3 + 1] += lift;
+
+      const canvas = document.getElementById("field");
+      const field = createField(canvas, { positions: cloud, targets: mark, pointScale: 6.4, mobileScale: 5, isMobile });
+
+      const state = { morph: 0, dive: 0, repel: 0, mouse: [9, 9], yaw: 0, pitch: 0, targetYaw: 0, targetPitch: 0, visible: true };
+
+      if (finePointer && !reducedMotion) {
+        addEventListener("pointermove", (event) => {
+          const x = (event.clientX / innerWidth) * 2 - 1;
+          const y = 1 - (event.clientY / innerHeight) * 2;
+          state.mouse = [x, y];
+          state.targetYaw = x * 0.18;
+          state.targetPitch = -y * 0.1;
+        });
+        document.addEventListener("pointerleave", () => (state.mouse = [9, 9]));
+      }
+
+      function render(time) {
+        const t = time / 1000;
+        state.yaw += (state.targetYaw - state.yaw) * 0.05;
+        state.pitch += (state.targetPitch - state.pitch) * 0.05;
+        const orbit = state.yaw + state.dive * 1.1 + Math.sin(t * 0.25) * 0.04 * state.morph;
+        const distance = 3.3 - state.dive * 2.5;
+        const eye = [Math.sin(orbit) * distance, 0.15 + state.pitch, Math.cos(orbit) * distance];
+        field.render({ eye, time: t, morph: state.morph, mouse: state.mouse, repel: state.repel });
+      }
+
+      if (reducedMotion) {
+        state.morph = 1;
+        canvas.style.opacity = 1;
+        render(0);
+      } else {
+        gsap.to(canvas, { opacity: 1, duration: 0.8, ease: "power2.out" });
+        gsap.to(state, { morph: 1, duration: 2.6, delay: 0.15, ease: "power3.inOut" });
+        gsap.to(state, { repel: 1, duration: 0.6, delay: 2.4 });
+        gsap.to(".hint", { opacity: 1, duration: 0.6, delay: 2.6 });
+
+        const loop = (time) => {
+          if (state.visible && !document.hidden) render(time);
+          requestAnimationFrame(loop);
+        };
+        requestAnimationFrame(loop);
+
+        ScrollTrigger.create({
+          trigger: ".hero-pin",
+          start: "top top",
+          end: "bottom bottom",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            if (progress > 0) {
+              gsap.killTweensOf(state, "morph");
+              state.morph = 1 - Math.min(1, progress / 0.45);
+            }
+            state.repel = progress > 0.02 ? 0 : 1;
+            state.dive = Math.max(0, (progress - 0.3) / 0.7);
+            const fade = Math.min(1, progress / 0.35);
+            gsap.set(copy, { opacity: 1 - fade, y: fade * 40 });
+            gsap.set(".hint", { opacity: Math.max(0, 1 - progress * 8) });
+          },
+        });
+
+        const fieldFade = { statement: 0, screen: 0 };
+        const applyFieldFade = () => {
+          const opacity = (1 - 0.84 * fieldFade.statement) * (1 - fieldFade.screen);
+          gsap.set(canvas, { opacity });
+          state.visible = opacity > 0.001;
+        };
+        ScrollTrigger.create({
+          trigger: ".statement",
+          start: "top bottom",
+          end: "top 45%",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            fieldFade.statement = progress;
+            applyFieldFade();
+          },
+        });
+        ScrollTrigger.create({
+          trigger: ".screencast",
+          start: "top bottom",
+          end: "top 30%",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            fieldFade.screen = progress;
+            applyFieldFade();
+          },
+        });
+        gsap.fromTo(
+          "[data-frame]",
+          { scale: 0.86, opacity: 0, y: 60 },
+          {
+            scale: 1,
+            opacity: 1,
+            y: 0,
+            ease: "none",
+            scrollTrigger: { trigger: ".screencast", start: "top 85%", end: "top 20%", scrub: true },
+          },
+        );
+      }
+    </script>
+  </body>
+</html>

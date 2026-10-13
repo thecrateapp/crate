@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crate · A · Signal Lock</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      #field {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        opacity: 0;
+      }
+
+      .scrim {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(ellipse 46% 34% at 50% 50%, rgba(10, 10, 15, 0.7) 0%, rgba(10, 10, 15, 0.25) 60%, transparent 100%),
+          radial-gradient(ellipse 120% 90% at 50% 50%, transparent 55%, rgba(10, 10, 15, 0.85) 100%);
+      }
+
+      #overlay {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      #overlay line {
+        stroke: var(--cyan-hi);
+        stroke-width: 1;
+        stroke-dasharray: 2 6;
+        opacity: 0;
+      }
+
+      .lock {
+        position: fixed;
+        left: 0;
+        top: 0;
+        pointer-events: none;
+        opacity: 0;
+      }
+
+      .lock .ring {
+        position: absolute;
+        left: -16px;
+        top: -16px;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 1px solid rgba(103, 232, 249, 0.75);
+      }
+
+      .lock .ring::after {
+        content: "";
+        position: absolute;
+        inset: 13px;
+        border-radius: 50%;
+        background: var(--cyan-hi);
+        box-shadow: 0 0 16px var(--cyan-hi);
+      }
+
+      .lock .readout {
+        position: absolute;
+        left: 28px;
+        top: -9px;
+        white-space: pre;
+        font-family: var(--mono);
+        font-size: 10.5px;
+        line-height: 1.7;
+        letter-spacing: 0.08em;
+        color: var(--fg-2);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .hero-pin {
+        position: relative;
+        height: 190vh;
+      }
+
+      .hero-sticky {
+        position: sticky;
+        top: 0;
+        height: 100dvh;
+        min-height: 640px;
+        display: grid;
+        place-items: center;
+        padding: 0 clamp(20px, 5vw, 72px);
+      }
+
+      .hero-copy {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 22px;
+        will-change: transform, opacity;
+      }
+
+      .hero-copy .display {
+        font-size: clamp(3rem, 7.6vw, 8.6rem);
+        max-width: 12.5ch;
+      }
+
+      .hero-copy .sub {
+        font-size: clamp(1.3rem, 2.3vw, 2.4rem);
+      }
+
+      .hero-copy .cta {
+        margin-top: 18px;
+      }
+
+      @media (max-width: 760px) {
+        .hero-copy {
+          width: 100%;
+        }
+        .hero-copy .display {
+          font-size: 11.6vw;
+        }
+        .lock,
+        #overlay {
+          display: none;
+        }
+        .hero-pin {
+          height: 150vh;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="field" aria-hidden="true"></canvas>
+    <div class="scrim" aria-hidden="true"></div>
+    <svg id="overlay" aria-hidden="true"><line id="path-line" /></svg>
+    <div class="lock" aria-hidden="true"><span class="ring"></span><span class="readout"></span></div>
+
+    <main>
+      <section class="hero-pin">
+        <div class="hero-sticky">
+          <div class="hero-copy"></div>
+        </div>
+      </section>
+    </main>
+
+    <div class="proto-tag">A · Signal Lock · v2</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
+    <script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+    <script type="module">
+      import {
+        mountNav,
+        mountHero,
+        mountSections,
+        startEntry,
+        initReveals,
+        initSmoothScroll,
+        scrambleText,
+        spring,
+        reducedMotion,
+        finePointer,
+        isMobile,
+      } from "./hero.js";
+
+      mountNav();
+      const copy = document.querySelector(".hero-copy");
+      mountHero(copy);
+      mountSections(document.querySelector("main"));
+      initSmoothScroll();
+      initReveals();
+      startEntry(copy, 120);
+
+      const { gsap, ScrollTrigger } = window;
+      const POINTS = isMobile ? 14000 : 52000;
+      const CLUSTERS = 18;
+
+      function gaussian() {
+        let u = 0;
+        let v = 0;
+        while (u === 0) u = Math.random();
+        while (v === 0) v = Math.random();
+        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+      }
+
+      const centers = Array.from({ length: CLUSTERS }, () => {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const radius = 0.5 + Math.random() * 0.9;
+        return [
+          radius * Math.sin(phi) * Math.cos(theta),
+          radius * Math.sin(phi) * Math.sin(theta) * 0.55,
+          radius * Math.cos(phi),
+          0.09 + Math.random() * 0.22,
+        ];
+      });
+
+      const positions = new Float32Array(POINTS * 3);
+      const seeds = new Float32Array(POINTS);
+      for (let i = 0; i < POINTS; i++) {
+        let p;
+        if (i % 8 === 0) {
+          const a = centers[Math.floor(Math.random() * CLUSTERS)];
+          const b = centers[Math.floor(Math.random() * CLUSTERS)];
+          const t = Math.random();
+          p = [0, 1, 2].map((k) => a[k] + (b[k] - a[k]) * t + gaussian() * 0.03);
+        } else {
+          const c = centers[i % CLUSTERS];
+          p = [c[0] + gaussian() * c[3], c[1] + gaussian() * c[3] * 0.8, c[2] + gaussian() * c[3]];
+        }
+        positions.set(p, i * 3);
+        seeds[i] = Math.random();
+      }
+
+      const canvas = document.getElementById("field");
+      const gl = canvas.getContext("webgl2", { antialias: false, alpha: false, powerPreference: "high-performance" });
+
+      const vertexSource = `#version 300 es
+        in vec3 aPos;
+        in float aSeed;
+        uniform mat4 uMVP;
+        uniform float uTime;
+        uniform float uScale;
+        uniform vec3 uFocus;
+        out float vAlpha;
+        out float vHot;
+        void main() {
+          vec3 p = aPos + 0.007 * vec3(
+            sin(uTime * 0.7 + aSeed * 40.0),
+            cos(uTime * 0.6 + aSeed * 31.0),
+            sin(uTime * 0.5 + aSeed * 17.0));
+          gl_Position = uMVP * vec4(p, 1.0);
+          float depth = max(gl_Position.w, 0.04);
+          float near = smoothstep(0.32, 0.0, distance(aPos, uFocus));
+          vHot = near;
+          vAlpha = clamp(1.5 / depth, 0.06, 1.0) * (0.3 + aSeed * 0.7);
+          gl_PointSize = min(uScale * (0.6 + aSeed * 1.1 + near * 2.4) / depth, uScale * 2.2);
+        }`;
+
+      const fragmentSource = `#version 300 es
+        precision mediump float;
+        in float vAlpha;
+        in float vHot;
+        out vec4 outColor;
+        void main() {
+          float r = length(gl_PointCoord - 0.5);
+          if (r > 0.5) discard;
+          float soft = smoothstep(0.5, 0.0, r);
+          vec3 cyan = vec3(0.024, 0.714, 0.831);
+          vec3 hi = vec3(0.404, 0.91, 0.976);
+          vec3 color = mix(cyan, hi, vHot * 0.9 + soft * 0.2);
+          outColor = vec4(color * soft * vAlpha * (1.0 + vHot * 1.8), 1.0);
+        }`;
+
+      function compile(type, source) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader));
+        return shader;
+      }
+
+      const program = gl.createProgram();
+      gl.attachShader(program, compile(gl.VERTEX_SHADER, vertexSource));
+      gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragmentSource));
+      gl.linkProgram(program);
+      gl.useProgram(program);
+
+      for (const [name, data, size] of [["aPos", positions, 3], ["aSeed", seeds, 1]]) {
+        const buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+        const location = gl.getAttribLocation(program, name);
+        gl.enableVertexAttribArray(location);
+        gl.vertexAttribPointer(location, size, gl.FLOAT, false, 0, 0);
+      }
+
+      const uniform = (name) => gl.getUniformLocation(program, name);
+      const uMVP = uniform("uMVP");
+      const uTime = uniform("uTime");
+      const uScale = uniform("uScale");
+      const uFocus = uniform("uFocus");
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE);
+
+      function perspective(fov, aspect, near, far) {
+        const f = 1 / Math.tan(fov / 2);
+        const nf = 1 / (near - far);
+        return [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) * nf, -1, 0, 0, 2 * far * near * nf, 0];
+      }
+
+      function lookAt(eye, target) {
+        let z = eye.map((v, k) => v - target[k]);
+        const zl = Math.hypot(...z);
+        z = z.map((v) => v / zl);
+        let x = [z[2], 0, -z[0]];
+        const xl = Math.hypot(...x);
+        x = x.map((v) => v / xl);
+        const y = [z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2], z[0] * x[1] - z[1] * x[0]];
+        const dot = (a) => -(a[0] * eye[0] + a[1] * eye[1] + a[2] * eye[2]);
+        return [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, dot(x), dot(y), dot(z), 1];
+      }
+
+      function multiply(a, b) {
+        const out = new Array(16).fill(0);
+        for (let c = 0; c < 4; c++)
+          for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) out[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
+        return out;
+      }
+
+      function project(m, p) {
+        const x = m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12];
+        const y = m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13];
+        const w = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15];
+        return { x: ((x / w) * 0.5 + 0.5) * innerWidth, y: (1 - ((y / w) * 0.5 + 0.5)) * innerHeight, w };
+      }
+
+      const state = { dive: 0, intro: 0, yaw: 0, pitch: 0, targetYaw: 0, targetPitch: 0, visible: true };
+      let mvp = new Array(16).fill(0);
+      const pointAt = (index) => positions.subarray(index * 3, index * 3 + 3);
+
+      function resize() {
+        const dpr = Math.min(devicePixelRatio, 2);
+        canvas.width = innerWidth * dpr;
+        canvas.height = innerHeight * dpr;
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.uniform1f(uScale, (isMobile ? 6 : 8.4) * dpr);
+      }
+      resize();
+      addEventListener("resize", resize);
+
+      if (finePointer && !reducedMotion) {
+        addEventListener("pointermove", (event) => {
+          state.targetYaw = (event.clientX / innerWidth - 0.5) * 0.45;
+          state.targetPitch = (event.clientY / innerHeight - 0.5) * 0.28;
+        });
+      }
+
+      const lock = document.querySelector(".lock");
+      const readout = lock.querySelector(".readout");
+      const line = document.getElementById("path-line");
+      const KEYS = ["8A", "9A", "5B", "11A", "2A", "7B", "4A", "12B"];
+      let focus = 0;
+      let previous = null;
+
+      function lockNext() {
+        let candidate = 0;
+        for (let attempt = 0; attempt < 80; attempt++) {
+          candidate = Math.floor(Math.random() * POINTS);
+          const s = project(mvp, pointAt(candidate));
+          const outsideCopy =
+            Math.abs(s.x - innerWidth / 2) > innerWidth * 0.31 || s.y > innerHeight * 0.8 || s.y < innerHeight * 0.18;
+          if (s.w > 0 && outsideCopy && s.x > 60 && s.x < innerWidth - 220 && s.y > 110 && s.y < innerHeight - 90) break;
+        }
+        previous = focus;
+        focus = candidate;
+        const bpm = 84 + Math.floor(Math.random() * 90);
+        const key = KEYS[Math.floor(Math.random() * KEYS.length)];
+        scrambleText(
+          readout,
+          `TRK ${String(candidate).padStart(5, "0")}\n${bpm} BPM  ${key}\n${(-6 - Math.random() * 8).toFixed(1)} LUFS`,
+          480,
+        );
+        gsap.fromTo(lock, { opacity: 0, scale: 1.6 }, { opacity: 1, scale: 1, duration: 0.6, ease: spring });
+        gsap.fromTo(line, { opacity: 0.6 }, { opacity: 0, duration: 2.6, ease: "power1.in" });
+      }
+
+      function render(time) {
+        const t = time / 1000;
+        state.yaw += (state.targetYaw - state.yaw) * 0.045;
+        state.pitch += (state.targetPitch - state.pitch) * 0.045;
+        const orbit = t * 0.03 + state.yaw + state.dive * 0.9;
+        const distance = 6 - (6 - 3.05) * state.intro - state.dive * 2.3;
+        const eye = [Math.sin(orbit) * distance, 0.3 + state.pitch * 1.8, Math.cos(orbit) * distance];
+        mvp = multiply(perspective(0.85, innerWidth / innerHeight, 0.04, 50), lookAt(eye, [0, 0, 0]));
+
+        gl.clearColor(0.039, 0.039, 0.059, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.uniformMatrix4fv(uMVP, false, mvp);
+        gl.uniform1f(uTime, t);
+        gl.uniform3fv(uFocus, pointAt(focus));
+        gl.drawArrays(gl.POINTS, 0, POINTS);
+
+        const s = project(mvp, pointAt(focus));
+        lock.style.transform = `translate3d(${s.x}px, ${s.y}px, 0)`;
+        if (previous !== null) {
+          const from = project(mvp, pointAt(previous));
+          line.setAttribute("x1", from.x);
+          line.setAttribute("y1", from.y);
+          line.setAttribute("x2", s.x);
+          line.setAttribute("y2", s.y);
+        }
+      }
+
+      if (reducedMotion) {
+        state.intro = 1;
+        canvas.style.opacity = "1";
+        render(0);
+      } else {
+        gsap.to(canvas, { opacity: 1, duration: 1.1, ease: "power2.out" });
+        gsap.to(state, { intro: 1, duration: 1.8, ease: spring });
+        const loop = (time) => {
+          if (state.visible && !document.hidden) render(time);
+          requestAnimationFrame(loop);
+        };
+        requestAnimationFrame(loop);
+        if (!isMobile) {
+          setTimeout(() => {
+            lockNext();
+            setInterval(lockNext, 3000);
+          }, 1400);
+        }
+
+        ScrollTrigger.create({
+          trigger: ".hero-pin",
+          start: "top top",
+          end: "bottom bottom",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            state.dive = progress;
+            const fade = Math.min(1, progress / 0.55);
+            gsap.set(copy, { opacity: 1 - fade, scale: 1 - fade * 0.08, y: -fade * 40 });
+            gsap.set([lock, "#overlay"], { autoAlpha: 1 - Math.min(1, progress / 0.25) });
+          },
+        });
+
+        const fieldFade = { statement: 0, screen: 0 };
+        function applyFieldFade() {
+          const opacity = (1 - 0.84 * fieldFade.statement) * (1 - fieldFade.screen);
+          gsap.set("#field", { opacity });
+          state.visible = opacity > 0.001;
+        }
+
+        ScrollTrigger.create({
+          trigger: ".statement",
+          start: "top bottom",
+          end: "top 45%",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            fieldFade.statement = progress;
+            applyFieldFade();
+          },
+        });
+
+        ScrollTrigger.create({
+          trigger: ".screencast",
+          start: "top bottom",
+          end: "top 30%",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            fieldFade.screen = progress;
+            applyFieldFade();
+          },
+        });
+
+        gsap.fromTo(
+          "[data-frame]",
+          { scale: 0.86, opacity: 0, y: 60 },
+          {
+            scale: 1,
+            opacity: 1,
+            y: 0,
+            ease: "none",
+            scrollTrigger: { trigger: ".screencast", start: "top 85%", end: "top 20%", scrub: true },
+          },
+        );
+      }
+    </script>
+  </body>
+</html>
