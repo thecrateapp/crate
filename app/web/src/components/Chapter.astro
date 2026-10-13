@@ -1,0 +1,86 @@
+---
+import { chapterId } from "../lib/chapters";
+import StatusBadge from "./StatusBadge.astro";
+
+interface Props {
+  index: number;
+  title: string;
+  status?: "coming-soon";
+  locale?: string;
+}
+
+const { index, title, status, locale = "en" } = Astro.props;
+const id = chapterId(index, title);
+const number = String(index).padStart(2, "0");
+---
+
+<section class="chapter" id={id} aria-labelledby={`${id}-title`}>
+  <header class="chapter-head" data-reveal>
+    <div class="chapter-title">
+      <p class="eyebrow" data-enter><b>{number}</b> / {title}</p>
+      <h2 class="display" id={`${id}-title`} data-split style="--d:60ms;--step:50ms">{title}</h2>
+      {status === "coming-soon" && <div data-enter style="--d:240ms"><StatusBadge locale={locale} /></div>}
+    </div>
+    <div class="chapter-lede" data-enter style="--d:180ms">
+      <slot name="lede" />
+    </div>
+  </header>
+  <div class="chapter-body">
+    <slot />
+  </div>
+</section>
+
+<style>
+  .chapter {
+    position: relative;
+    z-index: 5;
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 14vh clamp(20px, 6vw, 96px) 4vh;
+    scroll-margin-top: 40px;
+  }
+
+  .chapter-head {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 32px clamp(24px, 5vw, 80px);
+    align-items: end;
+    margin-bottom: 8vh;
+  }
+
+  .chapter-title {
+    display: grid;
+    gap: 20px;
+    justify-items: start;
+  }
+
+  .chapter-title .display {
+    font-size: clamp(3rem, 7.5vw, 7.5rem);
+  }
+
+  .chapter-lede :global(p) {
+    margin: 0;
+    max-width: 30ch;
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(1.35rem, 2.3vw, 2.3rem);
+    line-height: 1.14;
+    letter-spacing: -0.025em;
+    color: var(--fg);
+  }
+
+  .chapter-lede :global(p + p) {
+    margin-top: 0.6em;
+    color: var(--fg-2);
+  }
+
+  @media (max-width: 760px) {
+    .chapter {
+      padding-top: 10vh;
+    }
+    .chapter-head {
+      grid-template-columns: 1fr;
+      margin-bottom: 5vh;
+    }
+  }
+</style>

@@ -41,6 +41,7 @@ export const en = {
   "footer.license": "AGPL-3.0",
   "page.back": "Back to home",
   "why.eyebrow": "Manifesto",
+  "status.comingSoon": "Coming soon",
 } as const;
 
 export type MessageKey = keyof typeof en;
