@@ -39,6 +39,8 @@ export const en = {
   "explore.developers": "APIs, tokens, contributing",
   "footer.manifesto": "Read the manifesto",
   "footer.license": "AGPL-3.0",
+  "page.back": "Back to home",
+  "why.eyebrow": "Manifesto",
 } as const;
 
 export type MessageKey = keyof typeof en;

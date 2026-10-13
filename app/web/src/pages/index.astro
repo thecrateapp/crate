@@ -19,25 +19,8 @@ import Base from "../layouts/Base.astro";
 </Base>
 
 <script>
-  import { initReveals } from "../scripts/motion/reveal";
-  import { initSmoothScroll } from "../scripts/motion/smooth-scroll";
-  import { splitWords } from "../scripts/motion/split-words";
+  import { mountOnPage } from "../scripts/motion/page";
+  import { initTextMotion } from "../scripts/motion/text-motion";
 
-  let cleanups: (() => void)[] = [];
-
-  function teardown() {
-    cleanups.forEach((cleanup) => cleanup());
-    cleanups = [];
-  }
-
-  document.addEventListener("astro:page-load", () => {
-    teardown();
-    if (!document.querySelector(".hero-pin")) return;
-    document.querySelectorAll<HTMLElement>(".statement [data-split]").forEach((element) => {
-      if (!element.querySelector(".w")) splitWords(element);
-    });
-    cleanups = [initSmoothScroll(), initReveals()];
-  });
-
-  document.addEventListener("astro:before-swap", teardown);
+  mountOnPage(".hero-pin", () => initTextMotion(".statement [data-split]"));
 </script>
