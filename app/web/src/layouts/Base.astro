@@ -1,0 +1,60 @@
+---
+import { ClientRouter } from "astro:transitions";
+import Footer from "../components/Footer.astro";
+import Nav from "../components/Nav.astro";
+import "../styles/tokens.css";
+import "../styles/base.css";
+
+interface Props {
+  title: string;
+  description: string;
+  locale?: string;
+}
+
+const { title, description, locale = "en" } = Astro.props;
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#0a0a0f" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={Astro.url.href} />
+    <link rel="icon" type="image/svg+xml" href="/icons/logo.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <ClientRouter />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <Nav locale={locale} />
+    <main id="main"><slot /></main>
+    <Footer locale={locale} />
+  </body>
+</html>
+
+<style>
+  .skip {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 100;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: var(--cyan);
+    color: var(--bg);
+    font-size: 13px;
+    text-decoration: none;
+    transform: translateY(-200%);
+  }
+
+  .skip:focus-visible {
+    transform: none;
+  }
+</style>

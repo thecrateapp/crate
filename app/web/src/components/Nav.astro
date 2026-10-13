@@ -1,0 +1,25 @@
+---
+import { t } from "../i18n";
+
+interface Props {
+  locale?: string;
+}
+
+const { locale = "en" } = Astro.props;
+
+const links = [
+  { href: "/listen", label: t("nav.listen", locale) },
+  { href: "/admin", label: t("nav.admin", locale) },
+  { href: "/architecture", label: t("nav.architecture", locale) },
+  { href: "/developers", label: t("nav.developers", locale) },
+  { href: "https://docs.cratemusic.app", label: t("nav.docs", locale) },
+  { href: "https://github.com/thecrateapp/crate", label: t("nav.github", locale) },
+];
+---
+
+<header class="nav">
+  <a class="brand" href="/"><img src="/icons/logo.svg" alt="" width="24" height="24" />Crate</a>
+  <nav class="links" aria-label="Primary">
+    {links.map((link, index) => <a href={link.href} style={`--i:${index}`}>{link.label}</a>)}
+  </nav>
+</header>
