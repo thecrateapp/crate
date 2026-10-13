@@ -1,7 +1,27 @@
 ---
+import Hero from "../components/Hero.astro";
 import Base from "../layouts/Base.astro";
 ---
 
-<Base title="Crate" description="Crate is free, open-source, self-hosted music software.">
-  <h1>Crate</h1>
+<Base
+  title="Crate — not a streaming service"
+  description="Crate is free, open-source, self-hosted music software. Own your music. Support your artists. Refuse the middleman."
+>
+  <Hero />
 </Base>
+
+<script>
+  import { initSmoothScroll } from "../scripts/motion/smooth-scroll";
+
+  let cleanup: (() => void) | undefined;
+
+  document.addEventListener("astro:page-load", () => {
+    cleanup?.();
+    cleanup = document.querySelector(".hero-pin") ? initSmoothScroll() : undefined;
+  });
+
+  document.addEventListener("astro:before-swap", () => {
+    cleanup?.();
+    cleanup = undefined;
+  });
+</script>

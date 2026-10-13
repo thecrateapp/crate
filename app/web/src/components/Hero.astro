@@ -1,0 +1,142 @@
+---
+import scale from "../data/scale.json";
+import { t } from "../i18n";
+import InstallCommand from "./InstallCommand.astro";
+
+interface Props {
+  locale?: string;
+}
+
+const { locale = "en" } = Astro.props;
+---
+
+<canvas id="field" aria-hidden="true"></canvas>
+<div class="scrim" aria-hidden="true"></div>
+<p class="caption" aria-hidden="true">{t("hero.caption", locale, scale)}</p>
+
+<section class="hero-pin">
+  <div class="hero-sticky">
+    <img class="mark-static" src="/icons/logo.svg" alt="" width="1052" height="1120" />
+    <div class="hero-copy">
+      <h1 class="display" data-split style="--d:90ms;--step:55ms">{t("hero.title", locale)}</h1>
+      <p class="sub" data-split style="--d:300ms;--step:40ms">{t("hero.subline", locale)}</p>
+      <InstallCommand locale={locale} delay="440ms" />
+    </div>
+  </div>
+</section>
+
+<script>
+  import { initHero } from "../scripts/hero/mark";
+
+  let cleanup: (() => void) | undefined;
+
+  document.addEventListener("astro:page-load", () => {
+    cleanup?.();
+    cleanup = document.querySelector(".hero-pin") ? initHero() : undefined;
+  });
+
+  document.addEventListener("astro:before-swap", () => {
+    cleanup?.();
+    cleanup = undefined;
+  });
+</script>
+
+<style>
+  #field {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    opacity: 0;
+  }
+
+  .scrim {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse 120% 90% at 50% 45%, transparent 55%, rgba(10, 10, 15, 0.8) 100%);
+  }
+
+  .caption {
+    position: fixed;
+    left: 50%;
+    top: 55vh;
+    margin: 0;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--fg-3);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .hero-pin {
+    position: relative;
+    height: 200vh;
+  }
+
+  .hero-sticky {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    min-height: 700px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 0 clamp(20px, 5vw, 72px) 7vh;
+  }
+
+  .mark-static {
+    position: absolute;
+    left: 50%;
+    top: 29.1vh;
+    width: 42.2vh;
+    height: auto;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+
+  .hero-copy {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 18px;
+    will-change: transform, opacity;
+  }
+
+  .hero-copy .display {
+    font-size: clamp(2.6rem, 5.4vw, 6.4rem);
+    max-width: 16ch;
+  }
+
+  .hero-copy .sub {
+    font-size: clamp(1.15rem, 1.8vw, 1.9rem);
+  }
+
+  .hero-copy :global(.cta) {
+    margin-top: 8px;
+  }
+
+  @media (max-width: 760px) {
+    .mark-static {
+      top: 31.5vh;
+      width: 38.8vh;
+    }
+    .hero-copy {
+      width: 100%;
+    }
+    .hero-copy .display {
+      font-size: 11vw;
+    }
+    .caption {
+      display: none;
+    }
+  }
+</style>

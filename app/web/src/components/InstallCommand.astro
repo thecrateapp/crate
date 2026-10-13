@@ -1,0 +1,40 @@
+---
+import { t } from "../i18n";
+
+interface Props {
+  locale?: string;
+  delay?: string;
+}
+
+const { locale = "en", delay = "0ms" } = Astro.props;
+const command = "curl -fsSL https://cratemusic.app/install.sh | bash";
+---
+
+<button
+  class="cta"
+  type="button"
+  data-enter
+  data-copy={command}
+  data-copied={t("cta.copied", locale)}
+  style={`--d:${delay}`}
+  aria-label={t("cta.copyLabel", locale)}
+>
+  <span class="cmd"><i>$</i> {command}</span>
+  <span class="pill">{t("cta.copy", locale)}</span>
+</button>
+
+<script>
+  import { scrambleText } from "../scripts/motion/scramble";
+
+  document.addEventListener("click", async (event) => {
+    const button = (event.target as Element | null)?.closest<HTMLButtonElement>("[data-copy]");
+    const pill = button?.querySelector<HTMLElement>(".pill");
+    if (!button || !pill) return;
+    const label = pill.dataset.label ?? pill.textContent ?? "";
+    pill.dataset.label = label;
+    await navigator.clipboard?.writeText(button.dataset.copy ?? "").catch(() => {});
+    scrambleText(pill, button.dataset.copied ?? label, { durationMs: 320 });
+    clearTimeout(Number(pill.dataset.timer));
+    pill.dataset.timer = String(setTimeout(() => scrambleText(pill, label, { durationMs: 320 }), 1700));
+  });
+</script>

@@ -1,0 +1,207 @@
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import type { Vec3 } from "../field/math";
+import { createField, type Field } from "../field/renderer";
+import {
+  cloudPositions,
+  clusterCenters,
+  loadLibraryCloud,
+  sampleImage,
+} from "../field/sources";
+import { finePointer, isMobile, reducedMotion } from "../motion/env";
+import { splitWords } from "../motion/split-words";
+
+gsap.registerPlugin(ScrollTrigger);
+
+export function initHero(): () => void {
+  const canvas = document.querySelector<HTMLCanvasElement>("#field");
+  const copy = document.querySelector<HTMLElement>(".hero-copy");
+  const caption = document.querySelector<HTMLElement>(".caption");
+  const staticMark = document.querySelector<HTMLElement>(".mark-static");
+  if (!canvas || !copy) return () => {};
+
+  copy.querySelectorAll<HTMLElement>("[data-split]").forEach((element) => {
+    if (!element.querySelector(".w")) splitWords(element);
+  });
+
+  const ctx = gsap.context(() => {});
+  const listeners = new AbortController();
+  const entry = setTimeout(
+    () => requestAnimationFrame(() => copy.classList.add("is-in")),
+    650,
+  );
+  let disposed = false;
+  let frame = 0;
+  let field: Field | null = null;
+
+  start().catch(() => {});
+
+  async function start() {
+    const mobile = isMobile();
+    const reduced = reducedMotion();
+    const count = mobile ? 12000 : 40000;
+    const { positions: cloud } = cloudPositions(count, clusterCenters(16, 1.1));
+    const mark = await sampleImage("/icons/logo.svg", count, {
+      width: mobile ? 1.15 : 1.25,
+      depth: 0.03,
+    });
+    if (disposed || !canvas || !copy) return;
+    const lift = mobile ? 0.55 : 0.62;
+    for (let i = 0; i < count; i++) mark[i * 3 + 1] += lift;
+
+    field = createField(canvas, {
+      positions: cloud,
+      targets: mark,
+      pointScale: 6.4,
+      mobileScale: 5,
+      isMobile: mobile,
+    });
+    if (!field) return;
+    const active = field;
+
+    loadLibraryCloud("/data/library-cloud.bin", count).then((real) => {
+      if (real && !disposed) active.setPositions(real);
+    });
+
+    const state = {
+      morph: 0,
+      dive: 0,
+      repel: 0,
+      mouse: [9, 9] as [number, number],
+      yaw: 0,
+      pitch: 0,
+      targetYaw: 0,
+      targetPitch: 0,
+      visible: true,
+    };
+
+    function render(time: number) {
+      const t = time / 1000;
+      state.yaw += (state.targetYaw - state.yaw) * 0.05;
+      state.pitch += (state.targetPitch - state.pitch) * 0.05;
+      const orbit =
+        state.yaw + state.dive * 1.1 + Math.sin(t * 0.25) * 0.04 * state.morph;
+      const distance = 3.3 - state.dive * 2.5;
+      const eye: Vec3 = [
+        Math.sin(orbit) * distance,
+        0.15 + state.pitch,
+        Math.cos(orbit) * distance,
+      ];
+      active.render({
+        eye,
+        time: t,
+        morph: state.morph,
+        mouse: state.mouse,
+        repel: state.repel,
+      });
+    }
+
+    if (reduced) {
+      state.morph = 1;
+      canvas.style.opacity = "1";
+      if (staticMark) staticMark.style.opacity = "0";
+      if (caption) caption.style.opacity = "1";
+      render(0);
+      addEventListener("resize", () => render(0), { signal: listeners.signal });
+      return;
+    }
+
+    if (finePointer()) {
+      addEventListener(
+        "pointermove",
+        (event) => {
+          const x = (event.clientX / innerWidth) * 2 - 1;
+          const y = 1 - (event.clientY / innerHeight) * 2;
+          state.mouse = [x, y];
+          state.targetYaw = x * 0.18;
+          state.targetPitch = -y * 0.1;
+        },
+        { signal: listeners.signal },
+      );
+      document.addEventListener("pointerleave", () => (state.mouse = [9, 9]), {
+        signal: listeners.signal,
+      });
+    }
+
+    const loop = (time: number) => {
+      if (state.visible && !document.hidden) render(time);
+      frame = requestAnimationFrame(loop);
+    };
+    frame = requestAnimationFrame(loop);
+
+    ctx.add(() => {
+      gsap.to(canvas, { opacity: 1, duration: 0.8, ease: "power2.out" });
+      if (staticMark)
+        gsap.to(staticMark, { opacity: 0, duration: 0.6, ease: "power2.out" });
+      gsap.to(state, {
+        morph: 1,
+        duration: 2.6,
+        delay: 0.15,
+        ease: "power3.inOut",
+      });
+      gsap.to(state, { repel: 1, duration: 0.6, delay: 2.4 });
+      if (caption) gsap.to(caption, { opacity: 1, duration: 0.6, delay: 2.6 });
+
+      ScrollTrigger.create({
+        trigger: ".hero-pin",
+        start: "top top",
+        end: "bottom bottom",
+        scrub: true,
+        onUpdate: ({ progress }) => {
+          if (progress > 0) {
+            gsap.killTweensOf(state, "morph");
+            state.morph = 1 - Math.min(1, progress / 0.45);
+          }
+          state.repel = progress > 0.02 ? 0 : 1;
+          state.dive = Math.max(0, (progress - 0.3) / 0.7);
+          const fade = Math.min(1, progress / 0.35);
+          gsap.set(copy, { opacity: 1 - fade, y: fade * 40 });
+          if (caption)
+            gsap.set(caption, { opacity: Math.max(0, 1 - progress * 8) });
+        },
+      });
+
+      const fieldFade = { statement: 0, screen: 0 };
+      const applyFieldFade = () => {
+        const opacity =
+          (1 - 0.84 * fieldFade.statement) * (1 - fieldFade.screen);
+        gsap.set(canvas, { opacity });
+        state.visible = opacity > 0.001;
+      };
+      if (document.querySelector(".statement")) {
+        ScrollTrigger.create({
+          trigger: ".statement",
+          start: "top bottom",
+          end: "top 45%",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            fieldFade.statement = progress;
+            applyFieldFade();
+          },
+        });
+      }
+      if (document.querySelector(".screencast")) {
+        ScrollTrigger.create({
+          trigger: ".screencast",
+          start: "top bottom",
+          end: "top 30%",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            fieldFade.screen = progress;
+            applyFieldFade();
+          },
+        });
+      }
+    });
+  }
+
+  return () => {
+    disposed = true;
+    clearTimeout(entry);
+    cancelAnimationFrame(frame);
+    listeners.abort();
+    ctx.revert();
+    field?.dispose();
+    field = null;
+  };
+}
