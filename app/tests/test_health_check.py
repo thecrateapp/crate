@@ -186,7 +186,7 @@ class TestStaleTracks:
 
 MANAGED_ARTISTS = [
     {"name": "Quicksand", "folder_name": "11111111-1111-4111-8111-111111111111"},
-    {"name": "Band", "folder_name": "22222222-2222-4222-8222-222222222222"},
+    {"name": "band", "folder_name": "22222222-2222-4222-8222-222222222222"},
 ]
 
 
