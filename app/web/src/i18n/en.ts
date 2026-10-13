@@ -18,6 +18,12 @@ export const en = {
     "Install it in your server. Bring your files. Tell your friends. Start a community and break with the system.",
   "statement.3":
     'Own your music. Support your artists. <span class="hl">Refuse the middleman.</span>',
+  "screencast.label": "Crate walkthrough",
+  "screencast.library": "Library",
+  "screencast.player": "Player",
+  "screencast.radio": "Radio",
+  "screencast.paths": "Paths",
+  "screencast.offline": "Offline",
   "get.title": "Get Crate",
   "get.server": "Server",
   "get.requirements":

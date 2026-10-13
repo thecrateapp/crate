@@ -1,0 +1,143 @@
+---
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { t } from "../i18n";
+
+interface Props {
+  locale?: string;
+}
+
+const { locale = "en" } = Astro.props;
+const chapters = (["library", "player", "radio", "paths", "offline"] as const).map((id, index) => {
+  const poster = `/screencast/${id}.jpg`;
+  return {
+    id,
+    number: `0${index + 1}`,
+    title: t(`screencast.${id}`, locale),
+    poster: existsSync(join(process.cwd(), "public", poster)) ? poster : undefined,
+  };
+});
+---
+
+<section class="screencast" aria-label={t("screencast.label", locale)}>
+  <div class="frame" data-frame>
+    {
+      chapters.map((chapter, index) => (
+        <figure class="slot" data-chapter={chapter.id} data-active={index === 0 ? "" : undefined}>
+          <video preload="none" muted playsinline poster={chapter.poster} aria-label={chapter.title} />
+          <p class="eyebrow">
+            <b>{chapter.number}</b> / {chapter.title}
+          </p>
+          {!chapter.poster && (
+            <span class="play" aria-hidden="true">
+              &#9654;
+            </span>
+          )}
+        </figure>
+      ))
+    }
+  </div>
+  <ol class="chapters">
+    {
+      chapters.map((chapter, index) => (
+        <li data-active={index === 0 ? "" : undefined}>
+          <b>{chapter.number}</b> {chapter.title}
+        </li>
+      ))
+    }
+  </ol>
+</section>
+
+<script>
+  import { gsap } from "gsap";
+  import { ScrollTrigger } from "gsap/ScrollTrigger";
+  import { reducedMotion } from "../scripts/motion/env";
+
+  gsap.registerPlugin(ScrollTrigger);
+
+  let ctx: gsap.Context | undefined;
+
+  document.addEventListener("astro:page-load", () => {
+    ctx?.revert();
+    ctx = undefined;
+    if (reducedMotion() || !document.querySelector("[data-frame]")) return;
+    ctx = gsap.context(() => {
+      gsap.fromTo(
+        "[data-frame]",
+        { scale: 0.86, opacity: 0, y: 60 },
+        {
+          scale: 1,
+          opacity: 1,
+          y: 0,
+          ease: "none",
+          scrollTrigger: { trigger: ".screencast", start: "top 85%", end: "top 20%", scrub: true },
+        },
+      );
+    });
+  });
+
+  document.addEventListener("astro:before-swap", () => {
+    ctx?.revert();
+    ctx = undefined;
+  });
+</script>
+
+<style>
+  .screencast {
+    grid-template-rows: auto auto;
+    align-content: center;
+    gap: 28px;
+  }
+
+  .slot {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    display: grid;
+    place-items: center;
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .slot[data-active] {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .slot video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: transparent;
+  }
+
+  .chapters {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px 28px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  .chapters b {
+    font-weight: 400;
+    margin-right: 6px;
+  }
+
+  .chapters [data-active] {
+    color: var(--fg);
+  }
+
+  .chapters [data-active] b {
+    color: var(--cyan-hi);
+  }
+</style>
