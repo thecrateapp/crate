@@ -1016,7 +1016,7 @@ class LibraryRepair:
         path = Path(str(track.get("path") or ""))
         tags = read_tags(path) if path.is_file() else {}
         return (
-            str(tags.get("artist") or "").strip().casefold(),
+            str(tags.get("albumartist") or tags.get("artist") or "").strip().casefold(),
             str(tags.get("album") or "").strip().casefold(),
             str(tags.get("title") or "").strip().casefold(),
             str(tags.get("tracknumber") or "").strip(),
