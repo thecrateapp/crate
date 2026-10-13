@@ -42,7 +42,7 @@ const number = String(index).padStart(2, "0");
 
   .chapter-head {
     display: grid;
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    grid-template-columns: minmax(min-content, 5fr) minmax(0, 7fr);
     gap: 32px clamp(24px, 5vw, 80px);
     align-items: end;
     margin-bottom: 8vh;
