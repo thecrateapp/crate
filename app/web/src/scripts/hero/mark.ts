@@ -129,8 +129,32 @@ export function initHero(): () => void {
     };
     frame = requestAnimationFrame(loop);
 
+    const mix = {
+      intro: 0,
+      caption: 0,
+      repel: 0,
+      hero: 0,
+      statement: 0,
+      screen: 0,
+    };
+    const apply = () => {
+      const opacity = mix.intro * (1 - 0.84 * mix.statement) * (1 - mix.screen);
+      gsap.set(canvas, { opacity });
+      state.visible = opacity > 0.001;
+      state.repel = mix.hero > 0.02 ? 0 : mix.repel;
+      if (caption)
+        gsap.set(caption, {
+          opacity: mix.caption * Math.max(0, 1 - mix.hero * 8),
+        });
+    };
+
     ctx.add(() => {
-      gsap.to(canvas, { opacity: 1, duration: 0.8, ease: "power2.out" });
+      gsap.to(mix, {
+        intro: 1,
+        duration: 0.8,
+        ease: "power2.out",
+        onUpdate: apply,
+      });
       if (staticMark)
         gsap.to(staticMark, { opacity: 0, duration: 0.6, ease: "power2.out" });
       gsap.to(state, {
@@ -139,8 +163,8 @@ export function initHero(): () => void {
         delay: 0.15,
         ease: "power3.inOut",
       });
-      gsap.to(state, { repel: 1, duration: 0.6, delay: 2.4 });
-      if (caption) gsap.to(caption, { opacity: 1, duration: 0.6, delay: 2.6 });
+      gsap.to(mix, { repel: 1, duration: 0.6, delay: 2.4, onUpdate: apply });
+      gsap.to(mix, { caption: 1, duration: 0.6, delay: 2.6, onUpdate: apply });
 
       ScrollTrigger.create({
         trigger: ".hero-pin",
@@ -152,43 +176,27 @@ export function initHero(): () => void {
             gsap.killTweensOf(state, "morph");
             state.morph = 1 - Math.min(1, progress / 0.45);
           }
-          state.repel = progress > 0.02 ? 0 : 1;
+          mix.hero = progress;
           state.dive = Math.max(0, (progress - 0.3) / 0.7);
           const fade = Math.min(1, progress / 0.35);
           gsap.set(copy, { opacity: 1 - fade, y: fade * 40 });
-          if (caption)
-            gsap.set(caption, { opacity: Math.max(0, 1 - progress * 8) });
+          apply();
         },
       });
 
-      const fieldFade = { statement: 0, screen: 0 };
-      const applyFieldFade = () => {
-        const opacity =
-          (1 - 0.84 * fieldFade.statement) * (1 - fieldFade.screen);
-        gsap.set(canvas, { opacity });
-        state.visible = opacity > 0.001;
-      };
-      if (document.querySelector(".statement")) {
+      for (const [trigger, key, end] of [
+        [".statement", "statement", "top 45%"],
+        [".screencast", "screen", "top 30%"],
+      ] as const) {
+        if (!document.querySelector(trigger)) continue;
         ScrollTrigger.create({
-          trigger: ".statement",
+          trigger,
           start: "top bottom",
-          end: "top 45%",
+          end,
           scrub: true,
           onUpdate: ({ progress }) => {
-            fieldFade.statement = progress;
-            applyFieldFade();
-          },
-        });
-      }
-      if (document.querySelector(".screencast")) {
-        ScrollTrigger.create({
-          trigger: ".screencast",
-          start: "top bottom",
-          end: "top 30%",
-          scrub: true,
-          onUpdate: ({ progress }) => {
-            fieldFade.screen = progress;
-            applyFieldFade();
+            mix[key] = progress;
+            apply();
           },
         });
       }
