@@ -1,0 +1,49 @@
+---
+import Chapter from "../components/Chapter.astro";
+import ChapterToc from "../components/ChapterToc.astro";
+import FeatureList from "../components/FeatureList.astro";
+import PageHeader from "../components/PageHeader.astro";
+import { admin } from "../content/admin/en";
+import Base from "../layouts/Base.astro";
+import { chapterId } from "../lib/chapters";
+
+const chapters = admin.chapters.map((chapter, index) => ({
+  ...chapter,
+  index: index + 1,
+  id: chapterId(index + 1, chapter.title),
+}));
+---
+
+<Base title={admin.meta.title} description={admin.meta.description}>
+  <div class="admin">
+    <PageHeader eyebrow={admin.eyebrow} title={admin.title} lede={admin.lede}>
+      <ChapterToc items={chapters} />
+    </PageHeader>
+
+    {
+      chapters.map((chapter) => (
+        <Chapter index={chapter.index} title={chapter.title} status={chapter.status}>
+          <Fragment slot="lede">
+            {chapter.lede.map((paragraph) => (
+              <p>{paragraph}</p>
+            ))}
+          </Fragment>
+          {chapter.features && <FeatureList items={chapter.features} />}
+        </Chapter>
+      ))
+    }
+  </div>
+</Base>
+
+<script>
+  import { mountOnPage } from "../scripts/motion/page";
+  import { initTextMotion } from "../scripts/motion/text-motion";
+
+  mountOnPage(".admin", initTextMotion);
+</script>
+
+<style>
+  .admin {
+    padding-bottom: 12vh;
+  }
+</style>

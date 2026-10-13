@@ -1,14 +1,17 @@
 ---
 import { t } from "../i18n";
+import type { Status } from "../lib/chapters";
 
 interface Props {
+  kind?: Status;
   locale?: string;
 }
 
-const { locale = "en" } = Astro.props;
+const { kind = "coming-soon", locale = "en" } = Astro.props;
+const label = kind === "optional-llm" ? t("status.optionalLlm", locale) : t("status.comingSoon", locale);
 ---
 
-<span class="status-badge">{t("status.comingSoon", locale)}</span>
+<span class:list={["status-badge", kind]}>{label}</span>
 
 <style>
   .status-badge {
@@ -34,5 +37,17 @@ const { locale = "en" } = Astro.props;
     height: 5px;
     border-radius: 50%;
     background: currentColor;
+  }
+
+  .optional-llm {
+    border-color: var(--line);
+    background: transparent;
+    color: var(--fg-2);
+    white-space: normal;
+  }
+
+  .optional-llm::before {
+    border-radius: 0;
+    background: var(--cyan-hi);
   }
 </style>

@@ -42,6 +42,7 @@ export const en = {
   "page.back": "Back to home",
   "why.eyebrow": "Manifesto",
   "status.comingSoon": "Coming soon",
+  "status.optionalLlm": "Optional — bring your own model",
   "page.chapters": "Chapters",
   "radio.seed": "Seed",
   "radio.seedReadout": "Target · 20-number bliss vector",

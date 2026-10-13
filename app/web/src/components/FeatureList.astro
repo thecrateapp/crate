@@ -16,7 +16,7 @@ const { items, locale = "en" } = Astro.props;
       <li style={`--i:${index}`}>
         <h3>
           {item.title}
-          {item.status === "coming-soon" && <StatusBadge locale={locale} />}
+          {item.status && <StatusBadge kind={item.status} locale={locale} />}
         </h3>
         <p>{item.body}</p>
       </li>
