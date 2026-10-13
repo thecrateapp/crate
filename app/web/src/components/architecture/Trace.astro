@@ -1,0 +1,157 @@
+---
+import type { TraceStep } from "../../content/architecture/en";
+import SystemMap from "./SystemMap.astro";
+
+interface Props {
+  steps: TraceStep[];
+}
+
+const { steps } = Astro.props;
+const total = String(steps.length).padStart(2, "0");
+---
+
+<div class="trace" data-trace style={`--steps:${steps.length}`}>
+  <div class="trace-stage">
+    <div class="trace-map">
+      <SystemMap id="trace-map" variant="trace" />
+    </div>
+    <ol class="trace-steps">
+      {
+        steps.map((step, index) => (
+          <li class="trace-step" data-route={step.route.join(" ")}>
+            <p class="eyebrow">
+              <b>{String(index + 1).padStart(2, "0")}</b> / {total}
+            </p>
+            <h3>{step.title}</h3>
+            <p class="body">{step.body}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</div>
+
+<style>
+  .trace-stage {
+    display: grid;
+    gap: 6vh;
+  }
+
+  .trace-steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+    gap: 32px clamp(24px, 4vw, 56px);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .trace-step {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+  }
+
+  h3 {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.6rem, 2.6vw, 2.4rem);
+    letter-spacing: -0.035em;
+    line-height: 1;
+  }
+
+  .body {
+    margin: 0;
+    max-width: 60ch;
+    font-size: clamp(0.98rem, 1.1vw, 1.08rem);
+    line-height: 1.7;
+    color: var(--fg-2);
+  }
+
+  .trace.is-live {
+    height: calc(var(--steps) * 70svh + 100svh);
+  }
+
+  .is-live .trace-stage {
+    position: sticky;
+    top: 0;
+    height: 100svh;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 96px 0 40px;
+  }
+
+  .is-live .trace-map {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .is-live .trace-map :global(svg) {
+    position: absolute;
+    inset: 0;
+    height: 100%;
+  }
+
+  .is-live .trace-steps {
+    position: relative;
+    display: block;
+    min-height: 150px;
+  }
+
+  .is-live .trace-step {
+    position: absolute;
+    inset: 0;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    grid-template-rows: auto 1fr;
+    gap: 12px clamp(24px, 5vw, 80px);
+    opacity: 0;
+    transform: translateY(14px);
+    transition:
+      opacity 0.45s var(--ease-snap),
+      transform 0.6s var(--spring-smooth);
+    pointer-events: none;
+  }
+
+  .is-live .trace-step .eyebrow {
+    grid-column: 1;
+  }
+
+  .is-live .trace-step h3 {
+    grid-column: 1;
+  }
+
+  .is-live .trace-step .body {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .is-live .trace-step.is-active {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+
+  @media (max-width: 760px) {
+    .is-live .trace-stage {
+      padding: 84px 0 24px;
+      gap: 16px;
+    }
+    .is-live .trace-steps {
+      min-height: 230px;
+    }
+    .is-live .trace-step {
+      grid-template-columns: 1fr;
+      grid-template-rows: none;
+      align-content: start;
+    }
+    .is-live .trace-step .body {
+      grid-column: 1;
+      grid-row: auto;
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+  }
+</style>

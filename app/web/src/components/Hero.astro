@@ -12,7 +12,7 @@ const { locale = "en" } = Astro.props;
 
 <canvas id="field" aria-hidden="true"></canvas>
 <div class="scrim" aria-hidden="true"></div>
-<p class="caption" aria-hidden="true">{t("hero.caption", locale, scale)}</p>
+<p class="caption" aria-hidden="true">{t("hero.caption", locale, { tracks: scale.tracks })}</p>
 
 <section class="hero-pin">
   <div class="hero-sticky">

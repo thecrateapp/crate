@@ -1,0 +1,105 @@
+---
+import Chapter from "../components/Chapter.astro";
+import ChapterToc from "../components/ChapterToc.astro";
+import FeatureList from "../components/FeatureList.astro";
+import PageHeader from "../components/PageHeader.astro";
+import ScaleFigures from "../components/architecture/ScaleFigures.astro";
+import Story from "../components/architecture/Story.astro";
+import SystemMap from "../components/architecture/SystemMap.astro";
+import Trace from "../components/architecture/Trace.astro";
+import { architecture as page } from "../content/architecture/en";
+import Base from "../layouts/Base.astro";
+import { chapterId } from "../lib/chapters";
+
+const order = ["map", "trace", "stories", "scale", "stack"] as const;
+const sections = Object.fromEntries(
+  order.map((key, index) => {
+    const section = page.sections[key];
+    return [key, { ...section, index: index + 1, id: chapterId(index + 1, section.title) }];
+  }),
+) as Record<(typeof order)[number], (typeof page.sections)["map"] & { index: number; id: string }>;
+---
+
+<Base title={page.meta.title} description={page.meta.description}>
+  <div class="architecture">
+    <PageHeader eyebrow={page.eyebrow} title={page.title} lede={page.lede}>
+      <ChapterToc items={order.map((key) => sections[key])} />
+    </PageHeader>
+
+    <Chapter index={sections.map.index} title={sections.map.title}>
+      <Fragment slot="lede">{sections.map.lede.map((paragraph) => <p>{paragraph}</p>)}</Fragment>
+      <figure class="system-map" data-reveal>
+        <SystemMap id="system-map" variant="full" title={page.map.title} description={page.map.description} />
+        <figcaption>
+          {page.map.legend.map((item) => <span>{item}</span>)}
+        </figcaption>
+      </figure>
+    </Chapter>
+
+    <Chapter index={sections.trace.index} title={sections.trace.title}>
+      <Fragment slot="lede">{sections.trace.lede.map((paragraph) => <p>{paragraph}</p>)}</Fragment>
+      <Trace steps={page.trace} />
+    </Chapter>
+
+    <Chapter index={sections.stories.index} title={sections.stories.title}>
+      <Fragment slot="lede">{sections.stories.lede.map((paragraph) => <p>{paragraph}</p>)}</Fragment>
+      <div class="stories">
+        {page.stories.map((story, index) => <Story index={index + 1} total={page.stories.length} story={story} />)}
+      </div>
+    </Chapter>
+
+    <Chapter index={sections.scale.index} title={sections.scale.title}>
+      <Fragment slot="lede">{sections.scale.lede.map((paragraph) => <p>{paragraph}</p>)}</Fragment>
+      <ScaleFigures figures={page.scale} note={page.scaleNote} />
+    </Chapter>
+
+    <Chapter index={sections.stack.index} title={sections.stack.title}>
+      <Fragment slot="lede">{sections.stack.lede.map((paragraph) => <p>{paragraph}</p>)}</Fragment>
+      <FeatureList items={page.stack} />
+    </Chapter>
+  </div>
+</Base>
+
+<script>
+  import { initCounters } from "../scripts/architecture/counters";
+  import { initTrace } from "../scripts/architecture/trace";
+  import { mountOnPage } from "../scripts/motion/page";
+  import { initTextMotion } from "../scripts/motion/text-motion";
+
+  mountOnPage(".architecture", () => {
+    const cleanups = [initTextMotion(), initTrace(), initCounters()];
+    return () => cleanups.forEach((cleanup) => cleanup());
+  });
+</script>
+
+<style>
+  .architecture {
+    padding-bottom: 12vh;
+  }
+
+  .system-map {
+    margin: 0;
+    opacity: 0;
+  }
+
+  .system-map.is-in {
+    animation: fade-in 0.9s var(--ease-out) both;
+  }
+
+  figcaption {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 28px;
+    margin-top: 28px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--fg-3);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .system-map.is-in {
+      animation-duration: 0.3s;
+    }
+  }
+</style>
