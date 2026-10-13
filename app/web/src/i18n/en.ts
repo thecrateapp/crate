@@ -23,6 +23,7 @@ export const en = {
   "get.requirements":
     "Linux x86_64 with Docker. 4 cores and 8 GB RAM recommended.",
   "get.clients": "Apps",
+  "get.docs": "Read the install guide",
   "get.ios":
     "On iPhone, open your server in Safari and add it to the Home Screen.",
   "explore.label": "Explore Crate",
