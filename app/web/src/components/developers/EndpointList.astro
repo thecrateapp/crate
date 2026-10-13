@@ -1,0 +1,79 @@
+---
+import type { Endpoint } from "../../content/developers/en";
+
+interface Props {
+  items: Endpoint[];
+}
+
+const { items } = Astro.props;
+---
+
+<ul class="endpoints" data-reveal>
+  {
+    items.map((item, index) => (
+      <li style={`--i:${index}`}>
+        <code>
+          <b>{item.method}</b> {item.path}
+        </code>
+        <p>{item.body}</p>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .endpoints {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 12px clamp(24px, 5vw, 80px);
+    padding: 26px 0 30px;
+    border-top: 1px solid var(--line);
+    opacity: 0;
+  }
+
+  .is-in li {
+    animation: enter-up 0.7s var(--spring-snappy) both;
+    animation-delay: calc(var(--i, 0) * 70ms);
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--fg);
+    overflow-wrap: anywhere;
+  }
+
+  b {
+    margin-right: 8px;
+    font-weight: 400;
+    color: var(--cyan-hi);
+  }
+
+  p {
+    margin: 0;
+    max-width: 60ch;
+    font-size: clamp(0.98rem, 1.1vw, 1.08rem);
+    line-height: 1.7;
+    color: var(--fg-2);
+  }
+
+  @media (max-width: 760px) {
+    li {
+      grid-template-columns: 1fr;
+      padding: 22px 0 24px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .is-in li {
+      animation: fade-in 0.3s linear both;
+    }
+  }
+</style>

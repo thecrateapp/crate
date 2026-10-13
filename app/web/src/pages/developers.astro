@@ -1,0 +1,83 @@
+---
+import Chapter from "../components/Chapter.astro";
+import ChapterToc from "../components/ChapterToc.astro";
+import FeatureList from "../components/FeatureList.astro";
+import InstallCommand from "../components/InstallCommand.astro";
+import PageHeader from "../components/PageHeader.astro";
+import CodeBlock from "../components/developers/CodeBlock.astro";
+import DocLinks from "../components/developers/DocLinks.astro";
+import EndpointList from "../components/developers/EndpointList.astro";
+import { developers } from "../content/developers/en";
+import { t } from "../i18n";
+import Base from "../layouts/Base.astro";
+import { chapterId } from "../lib/chapters";
+
+const chapters = developers.chapters.map((chapter, index) => ({
+  ...chapter,
+  index: index + 1,
+  id: chapterId(index + 1, chapter.title),
+}));
+---
+
+<Base title={developers.meta.title} description={developers.meta.description}>
+  <div class="developers">
+    <PageHeader eyebrow={developers.eyebrow} title={developers.title} lede={developers.lede}>
+      <ChapterToc items={chapters} />
+    </PageHeader>
+
+    {
+      chapters.map((chapter) => (
+        <Chapter index={chapter.index} title={chapter.title} status={chapter.status}>
+          <Fragment slot="lede">
+            {chapter.lede.map((paragraph) => (
+              <p>{paragraph}</p>
+            ))}
+          </Fragment>
+          {chapter.endpoints && <EndpointList items={chapter.endpoints} />}
+          {chapter.features && <FeatureList items={chapter.features} />}
+          {(chapter.install || chapter.snippets) && (
+            <div class="commands">
+              {chapter.install && (
+                <div class="install" data-reveal>
+                  <p class="eyebrow">{t("get.server")}</p>
+                  <InstallCommand />
+                </div>
+              )}
+              {chapter.snippets?.map((snippet) => (
+                <CodeBlock label={snippet.label} code={snippet.code} />
+              ))}
+            </div>
+          )}
+          {chapter.links && <DocLinks items={chapter.links} />}
+        </Chapter>
+      ))
+    }
+  </div>
+</Base>
+
+<script>
+  import { mountOnPage } from "../scripts/motion/page";
+  import { initTextMotion } from "../scripts/motion/text-motion";
+
+  mountOnPage(".developers", initTextMotion);
+</script>
+
+<style>
+  .developers {
+    padding-bottom: 12vh;
+  }
+
+  .commands {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+    gap: 24px;
+    margin-top: 4vh;
+  }
+
+  .install {
+    display: grid;
+    align-content: start;
+    gap: 16px;
+    padding: 0 0 8px;
+  }
+</style>
