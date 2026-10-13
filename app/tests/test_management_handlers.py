@@ -764,3 +764,98 @@ def test_system_playlist_generation_reports_rule_and_write_phases(monkeypatch):
         ("write_tracks", 1, 1, 2),
         ("write_tracks", 1, 2, 2),
     ]
+
+
+def _run_repair_with_actions(monkeypatch, actions):
+    scans: list[bool] = []
+    queued: list[str] = []
+
+    class FakeRepair:
+        def __init__(self, config):
+            self.config = config
+
+        def repair(self, report, **kwargs):
+            return {
+                "actions": actions,
+                "item_results": [
+                    {"check_type": "duplicate_tracks", "outcome": "applied"}
+                ],
+                "summary": {"applied": 1, "skipped": 0, "failed": 0, "unsupported": 0},
+                "fs_changed": True,
+                "db_changed": False,
+                "resolved_ids": [],
+                "unsupported_checks": [],
+            }
+
+    class FakeHealthCheck:
+        def __init__(self, config):
+            self.config = config
+
+        def run_selected_for_artists(self, check_types, artist_names, **kwargs):
+            return {"issues": [], "summary": {}, "duration_ms": 1}
+
+    monkeypatch.setattr("crate.repair.LibraryRepair", FakeRepair)
+    monkeypatch.setattr("crate.health_check.LibraryHealthCheck", FakeHealthCheck)
+    monkeypatch.setattr(
+        "crate.content.queue_process_new_content_if_needed",
+        lambda artist, **kwargs: queued.append(artist) or "task",
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.start_scan", lambda: scans.append(True)
+    )
+    for target in (
+        "crate.worker_handlers.management.emit_progress",
+        "crate.worker_handlers.management.emit_task_event",
+        "crate.worker_handlers.management.resolve_issue",
+        "crate.worker_handlers.management._mark_processing",
+        "crate.worker_handlers.management._unmark_processing",
+        "crate.db.domain_events.append_domain_event",
+        "crate.db.admin_health_surface.publish_health_surface_signal",
+    ):
+        monkeypatch.setattr(target, lambda *args, **kwargs: None)
+
+    _handle_repair(
+        "repair-scan",
+        {
+            "dry_run": False,
+            "auto_only": True,
+            "issues": [
+                {"check": "duplicate_tracks", "details": {"artist": "JPEGMAFIA"}}
+            ],
+        },
+        {"library_path": "/tmp/fake"},
+    )
+    return scans, queued
+
+
+def test_repair_leaves_resync_to_queued_artist_processing(monkeypatch):
+    scans, queued = _run_repair_with_actions(
+        monkeypatch,
+        [
+            {
+                "action": "quarantine_duplicate_tracks",
+                "applied": True,
+                "fs_write": True,
+                "details": {"enrich_artist": "JPEGMAFIA"},
+            }
+        ],
+    )
+
+    assert queued == ["JPEGMAFIA"]
+    assert scans == []
+
+
+def test_repair_scans_when_a_file_change_has_no_artist_to_resync(monkeypatch):
+    scans, _queued = _run_repair_with_actions(
+        monkeypatch,
+        [
+            {
+                "action": "delete_loose",
+                "applied": True,
+                "fs_write": True,
+                "details": {},
+            }
+        ],
+    )
+
+    assert scans == [True]

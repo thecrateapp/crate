@@ -287,6 +287,7 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
                     enrich_artists.add(artist)
 
         enqueued_enrich = 0
+        enrich_queue_failed = False
         if not dry_run and enrich_artists:
             from crate.content import queue_process_new_content_if_needed
 
@@ -300,6 +301,7 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
                     ):
                         enqueued_enrich += 1
                 except Exception:
+                    enrich_queue_failed = True
                     log.debug(
                         "Failed to queue enrichment for %s", artist, exc_info=True
                     )
@@ -487,7 +489,17 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
                 scope="ops",
                 subject_key=task_id,
             )
-        if not dry_run and result.get("fs_changed"):
+        fs_changes_without_artist_sync = any(
+            action.get("applied")
+            and action.get("fs_write")
+            and not (action.get("details") or {}).get("enrich_artist")
+            for action in result.get("actions", [])
+        )
+        if (
+            not dry_run
+            and result.get("fs_changed")
+            and (fs_changes_without_artist_sync or enrich_queue_failed)
+        ):
             start_scan()
 
         result["enrich_queued"] = enqueued_enrich
