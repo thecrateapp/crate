@@ -538,6 +538,87 @@ class TestDuplicateTrackRepair:
             assert result["details"]["keep_path"] == str(flac_file)
             assert result["details"]["remove_paths"] == [str(m4a_file)]
 
+    def _featured_duplicate_resolution(self, tags_by_name: dict):
+        from crate.repair import LibraryRepair
+
+        with tempfile.TemporaryDirectory() as lib:
+            album_dir = Path(lib) / "Cult of Luna" / "Mariner"
+            album_dir.mkdir(parents=True)
+            first = album_dir / "a.flac"
+            second = album_dir / "b.flac"
+            first.write_bytes(b"\x00" * 1000)
+            second.write_bytes(b"\x00" * 1000)
+            tracks = [
+                {
+                    "album_id": 62,
+                    "artist": "Cult of Luna",
+                    "album": "Mariner",
+                    "title": "A Greater Call",
+                    "path": str(path),
+                    "track_number": 1,
+                    "disc_number": 1,
+                    "format": "flac",
+                    "duration": 499.066,
+                    "size": 1000,
+                    "bitrate": 854000,
+                    "bit_depth": 16,
+                    "sample_rate": 44100,
+                    "audio_fingerprint": "fingerprint-1",
+                }
+                for path in (first, second)
+            ]
+            issue = {
+                "check": "duplicate_tracks",
+                "details": {
+                    "artist": "Cult of Luna",
+                    "album": "Mariner",
+                    "title": "A Greater Call",
+                    "paths": [str(first), str(second)],
+                },
+            }
+            with (
+                patch("crate.repair.get_tracks_by_paths", return_value=tracks),
+                patch(
+                    "crate.repair.read_tags",
+                    side_effect=lambda path: tags_by_name[Path(path).name],
+                ),
+            ):
+                return LibraryRepair({"library_path": lib}).duplicate_track_resolution(
+                    issue
+                )
+
+    def test_duplicate_track_with_featured_track_artist_is_cleanable(self):
+        base = {
+            "albumartist": "Cult of Luna",
+            "album": "Mariner",
+            "title": "A Greater Call",
+            "tracknumber": "1",
+        }
+        resolution = self._featured_duplicate_resolution(
+            {
+                "a.flac": {**base, "artist": "Cult of Luna, Julie Christmas"},
+                "b.flac": {**base, "artist": "Cult of Luna"},
+            }
+        )
+
+        assert not isinstance(resolution, str)
+
+    def test_duplicate_track_with_a_different_album_artist_stays_blocked(self):
+        base = {
+            "artist": "Cult of Luna",
+            "album": "Mariner",
+            "title": "A Greater Call",
+            "tracknumber": "1",
+        }
+        resolution = self._featured_duplicate_resolution(
+            {
+                "a.flac": {**base, "albumartist": "Cult of Luna"},
+                "b.flac": {**base, "albumartist": "Various Artists"},
+            }
+        )
+
+        assert resolution == "file tags disagree on artist, album or title"
+
     def test_duplicate_track_apply_quarantines_redundant_file(self):
         from crate.repair import LibraryRepair
 

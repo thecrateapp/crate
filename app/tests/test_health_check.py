@@ -184,6 +184,12 @@ class TestStaleTracks:
         assert issues[0]["details"]["track_path"] == missing_path
 
 
+MANAGED_ARTISTS = [
+    {"name": "Quicksand", "folder_name": "11111111-1111-4111-8111-111111111111"},
+    {"name": "band", "folder_name": "22222222-2222-4222-8222-222222222222"},
+]
+
+
 class TestFolderNaming:
     def test_detects_year_prefix(self):
         """'2020 - Album Name' should be flagged."""
@@ -206,8 +212,14 @@ class TestFolderNaming:
                 },
             ]
 
-            with patch(
-                "crate.health_check.get_albums_with_year", return_value=mock_rows
+            with (
+                patch(
+                    "crate.health_check.get_albums_with_year", return_value=mock_rows
+                ),
+                patch(
+                    "crate.health_check.get_artists_with_folder",
+                    return_value=MANAGED_ARTISTS,
+                ),
             ):
                 issues = hc._check_folder_naming()
 
@@ -237,8 +249,14 @@ class TestFolderNaming:
                 },
             ]
 
-            with patch(
-                "crate.health_check.get_albums_with_year", return_value=mock_rows
+            with (
+                patch(
+                    "crate.health_check.get_albums_with_year", return_value=mock_rows
+                ),
+                patch(
+                    "crate.health_check.get_artists_with_folder",
+                    return_value=MANAGED_ARTISTS,
+                ),
             ):
                 issues = hc._check_folder_naming()
 
@@ -264,13 +282,48 @@ class TestFolderNaming:
                 },
             ]
 
-            with patch(
-                "crate.health_check.get_albums_with_year", return_value=mock_rows
+            with (
+                patch(
+                    "crate.health_check.get_albums_with_year", return_value=mock_rows
+                ),
+                patch(
+                    "crate.health_check.get_artists_with_folder",
+                    return_value=MANAGED_ARTISTS,
+                ),
             ):
                 issues = hc._check_folder_naming()
 
         assert len(issues) == 1
         assert "subdirectory" in issues[0]["details"]["reason"]
+
+    def test_unmigrated_artist_is_left_to_the_layout_fix(self):
+        from crate.health_check import LibraryHealthCheck
+
+        with tempfile.TemporaryDirectory() as lib:
+            hc = LibraryHealthCheck({"library_path": lib})
+            flat_dir = Path(lib) / "Oh Sees" / "Warm Slime"
+            flat_dir.mkdir(parents=True)
+            mock_rows = [
+                {
+                    "name": "Warm Slime",
+                    "artist": "Oh Sees",
+                    "year": "2010",
+                    "path": str(flat_dir),
+                },
+            ]
+
+            with (
+                patch(
+                    "crate.health_check.get_albums_with_year", return_value=mock_rows
+                ),
+                patch(
+                    "crate.health_check.get_artists_with_folder",
+                    return_value=[{"name": "Oh Sees", "folder_name": "Oh Sees"}],
+                ),
+            ):
+                issues = hc._check_folder_naming()
+
+        assert issues == []
 
 
 class TestZombieArtists:
