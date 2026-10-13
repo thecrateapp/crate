@@ -77,49 +77,27 @@ export function useTaskEvents(taskId: string | null) {
     }
 
     reset();
-    const source = new EventSource(`/api/events/task/${taskId}`);
+    const source = new EventSource(`/api/events/task/${taskId}?generic=1`);
     sourceRef.current = source;
 
     source.onopen = () => setConnected(true);
     source.onerror = () => setConnected(false);
 
-    // Listen to all named events
-    const handleEvent = (e: MessageEvent) => {
+    source.addEventListener("task_event", (e: MessageEvent) => {
       try {
         const payload = JSON.parse(e.data);
+        const fallbackType =
+          isRecord(payload) && typeof payload.event_type === "string"
+            ? payload.event_type
+            : "info";
         setEvents((prev) => {
-          const next = [...prev, normalizeTaskEvent(payload, e.type)];
+          const next = [...prev, normalizeTaskEvent(payload, fallbackType)];
           return next.length > 200 ? next.slice(-200) : next;
         });
       } catch {
         // Ignore parse errors
       }
-    };
-
-    // All event types tasks can emit
-    const eventTypes = [
-      "info",
-      "progress",
-      "warning",
-      "warn",
-      "error",
-      "item",
-      "cover_found",
-      "cover_applied",
-      "artist_enriched",
-      "artist_skipped",
-      "artist_analyzed",
-      "track_analyzed",
-      "album_matched",
-      "lyrics_track",
-      "step_done",
-      "new_release_found",
-      "item_processed",
-      "match_found",
-    ];
-    for (const type of eventTypes) {
-      source.addEventListener(type, handleEvent);
-    }
+    });
 
     // Task completion
     source.addEventListener("task_done", (e: MessageEvent) => {

@@ -176,3 +176,61 @@ def test_worker_registry_uses_hardened_federation_import_handler():
     from crate.worker_handlers.federation import _handle_federation_import
 
     assert TASK_HANDLERS["federation_import_album"] is _handle_federation_import
+
+
+def test_federated_import_reports_the_manifest_phase_before_failing(
+    monkeypatch, tmp_path
+):
+    from crate.worker_handlers import federation as handlers
+
+    progress: list[dict] = []
+    updates: list[dict] = []
+    request = {
+        "status": "approved",
+        "node_uid": "remote",
+        "title": "Remote Album",
+        "remote_entity_uid": "album-1",
+    }
+
+    class _FailingClient:
+        def request(self, *args, **kwargs):
+            raise RuntimeError("peer unavailable")
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr(
+        "crate.federation.imports.get_import_request", lambda request_id: request
+    )
+    monkeypatch.setattr(
+        "crate.federation.imports.update_import_request",
+        lambda request_id, **kwargs: updates.append(kwargs),
+    )
+    monkeypatch.setattr(
+        handlers.repo,
+        "get_peer",
+        lambda node_uid: {"node_uid": node_uid, "trust_state": "approved"},
+    )
+    monkeypatch.setattr(handlers.repo, "get_local_node", lambda: {"node_uid": "local"})
+    monkeypatch.setattr(
+        handlers, "_build_import_user_assertion", lambda *args, **kwargs: "assertion"
+    )
+    monkeypatch.setattr(
+        handlers, "_build_import_client", lambda local, peer: _FailingClient()
+    )
+    monkeypatch.setattr("crate.worker_handlers.is_cancelled", lambda task_id: False)
+    monkeypatch.setattr(
+        handlers,
+        "emit_progress",
+        lambda task_id, value, force=False: progress.append(value.to_dict()),
+    )
+
+    result = handlers._handle_federation_import(
+        "task-1", {"request_id": "req-1"}, {"library_path": str(tmp_path)}
+    )
+
+    assert result["status"] == "failed"
+    assert [(p["phase"], p["phase_count"], p["item"]) for p in progress] == [
+        ("manifest", 3, "Remote Album")
+    ]
+    assert updates[-1]["status"] == "failed"

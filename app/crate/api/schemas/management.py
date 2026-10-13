@@ -146,6 +146,7 @@ class RepairCatalogEntryResponse(BaseModel):
     supports_batch: bool = True
     supports_artist_scope: bool = True
     supports_global_scope: bool = True
+    supports_bulk_fix: bool = False
     auto_fixable: bool
 
 
@@ -258,6 +259,15 @@ class HealthIssueResponse(BaseModel):
     status: str | None = None
     created_at: datetime | str | None = None
     resolved_at: datetime | str | None = None
+    artist_id: int | None = None
+    album_id: int | None = None
+    last_seen_at: datetime | str | None = None
+
+
+class HealthCheckRunResponse(BaseModel):
+    last_run_at: str | None = None
+    duration_ms: int = 0
+    issue_count: int = 0
 
 
 class HealthReportResponse(BaseModel):
@@ -278,6 +288,7 @@ class AdminHealthSnapshotResponse(BaseModel):
     counts: dict[str, int] = Field(default_factory=dict)
     total: int = 0
     filter: str | None = None
+    runs: dict[str, HealthCheckRunResponse] = Field(default_factory=dict)
 
 
 class CheckTypeMutationResponse(OkResponse):
@@ -286,6 +297,7 @@ class CheckTypeMutationResponse(OkResponse):
 
 class HealthFixTypeResponse(BaseModel):
     task_id: str | None = None
+    task_ids: list[str] = []
     fixable: int
     allowed: bool = True
     reason: str | None = None

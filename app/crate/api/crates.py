@@ -15,6 +15,8 @@ from crate.api.openapi_responses import (
 )
 from crate.api.schemas.common import OkResponse
 from crate.api.schemas.crates import (
+    AddCrateMemberRequest,
+    CrateCopyResponse,
     AddCrateAlbumRequest,
     CrateAlbumResponse,
     CrateCreateResponse,
@@ -41,30 +43,29 @@ from crate.crate_download import (
     is_crate_download_cache_key,
 )
 from crate.db.queries.crates import (
-    get_active_crate_invites,
     get_crate_access,
     get_crate_download_source_for_user,
     get_crate_detail_for_user,
-    get_crate_invite,
     get_crate_members,
     get_crate_playback_tracks_for_user,
     get_crates_for_user,
     get_followed_crates_for_user,
     resolve_crate_ref,
 )
+from crate.db.repositories.crates_collaboration import (
+    add_crate_collaborator,
+    copy_crate,
+)
+from crate.db.repositories.users import get_user_by_username
 from crate.db.repositories.crates import (
     CrateAlbumAlreadyExistsError,
     CrateAlbumNotFoundError,
     CrateAccessDeniedError,
-    CrateCollaborationDisabledError,
-    CrateInviteExhaustedError,
     CrateNotFoundError,
     CrateSelfFollowError,
     InvalidCrateAlbumOrderError,
-    accept_crate_invite,
     add_crate_album,
     create_crate,
-    create_crate_invite,
     delete_crate,
     follow_crate,
     remove_crate_album,
@@ -195,11 +196,11 @@ def create(request: Request, body: CreateCrateRequest):
     summary="Get a valid Crate invitation preview",
 )
 def get_invite(request: Request, token: str):
-    user = _require_auth(request)
-    invite = get_crate_invite(token, user["id"])
-    if invite is None:
-        raise HTTPException(status_code=404, detail="Invite not found or expired")
-    return invite
+    _require_auth(request)
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Invite links are disabled; ask the owner to add you",
+    )
 
 
 @router.post(
@@ -209,18 +210,11 @@ def get_invite(request: Request, token: str):
     summary="Accept a Crate invitation",
 )
 def accept_invite(request: Request, token: str):
-    user = _require_auth(request)
-    try:
-        accepted = accept_crate_invite(token, user["id"])
-    except CrateInviteExhaustedError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_410_GONE,
-            detail="Invite has reached its maximum uses",
-        ) from exc
-    if accepted is None:
-        raise HTTPException(status_code=404, detail="Invite not found or expired")
-    crate_id = accepted["crate_id"]
-    return {"ok": True, "crate_id": crate_id}
+    _require_auth(request)
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Invite links are disabled; ask the owner to add you",
+    )
 
 
 @router.get(
@@ -553,6 +547,43 @@ def members(request: Request, crate_id: UUID):
     return get_crate_members(str(crate_id))
 
 
+@router.post(
+    "/{crate_id}/members",
+    response_model=CrateMembersMutationResponse,
+    responses=_CRATE_RESPONSES,
+    summary="Add a collaborator to a Crate",
+)
+def add_member(request: Request, crate_id: UUID, body: AddCrateMemberRequest):
+    user = _require_auth(request)
+    _require_owner(
+        crate_id, user["id"], detail="Only the owner can manage Crate members"
+    )
+    target_id = body.user_id
+    if target_id is None and body.username:
+        target = get_user_by_username(body.username.strip().lstrip("@"))
+        target_id = int(target["id"]) if target else None
+    if target_id is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target_id == user["id"]:
+        raise HTTPException(status_code=400, detail="The owner is already a member")
+    add_crate_collaborator(str(crate_id), target_id, added_by=user["id"])
+    return {"ok": True, "members": get_crate_members(str(crate_id))}
+
+
+@router.post(
+    "/{crate_id}/copy",
+    response_model=CrateCopyResponse,
+    responses=_CRATE_RESPONSES,
+    summary="Copy a Crate into the current user's Crates",
+)
+def copy(request: Request, crate_id: UUID):
+    user = _require_auth(request)
+    crate, access, _genres = get_crate_detail_for_user(str(crate_id), user["id"])
+    if crate is None or access == "none":
+        raise HTTPException(status_code=404, detail="Crate not found")
+    return {"id": copy_crate(crate, user["id"])}
+
+
 @router.delete(
     "/{crate_id}/members/{user_id}",
     response_model=CrateMembersMutationResponse,
@@ -593,27 +624,11 @@ def delete_member(request: Request, crate_id: UUID, user_id: int):
     summary="List active Crate collaboration invites",
 )
 def list_invites(request: Request, crate_id: UUID):
-    user = _require_auth(request)
-    _require_owner(
-        crate_id,
-        user["id"],
-        detail="Only the owner can manage Crate invites",
+    _require_auth(request)
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Invite links are disabled; the owner adds collaborators directly",
     )
-    invites = get_active_crate_invites(str(crate_id))
-    if not invites:
-        return []
-    try:
-        listen_origin = _listen_public_origin()
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Listen public URL is not configured",
-        ) from exc
-    result = []
-    for invite_row in invites:
-        join_url = _invite_join_url(invite_row["token"], listen_origin=listen_origin)
-        result.append({**invite_row, "join_url": join_url, "qr_value": join_url})
-    return result
 
 
 @router.post(
@@ -624,41 +639,11 @@ def list_invites(request: Request, crate_id: UUID):
     summary="Create a Crate collaboration invite",
 )
 def invite(request: Request, crate_id: UUID, body: CreateCrateInviteRequest):
-    user = _require_auth(request)
-    _require_owner(
-        crate_id,
-        user["id"],
-        detail="Only the owner can manage Crate invites",
+    _require_auth(request)
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Invite links are disabled; the owner adds collaborators directly",
     )
-    try:
-        listen_origin = _listen_public_origin()
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Listen public URL is not configured",
-        ) from exc
-    try:
-        invite_row = create_crate_invite(
-            str(crate_id),
-            user["id"],
-            expires_in_hours=body.expires_in_hours,
-            max_uses=body.max_uses,
-        )
-    except CrateNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="Crate not found") from exc
-    except CrateCollaborationDisabledError as exc:
-        raise HTTPException(
-            status_code=409, detail="Enable collaboration before creating an invite"
-        ) from exc
-    except CrateAccessDeniedError as exc:
-        raise HTTPException(
-            status_code=403, detail="Only the owner can manage Crate invites"
-        ) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-    join_url = _invite_join_url(invite_row["token"], listen_origin=listen_origin)
-    return {**invite_row, "join_url": join_url, "qr_value": join_url}
 
 
 @router.delete(

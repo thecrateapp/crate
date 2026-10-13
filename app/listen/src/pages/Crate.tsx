@@ -69,6 +69,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOffline } from "@/contexts/OfflineContext";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
+import { canCopy, canEdit, canFollow } from "@/lib/collaboration-access";
 import { cacheSet } from "@/lib/cache";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { loginPathWithReturnTo } from "@/lib/auth-route-policy";
@@ -239,16 +240,15 @@ function AuthenticatedCrate() {
   const [editing, setEditing] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const downloadCrate = useCrateDownload();
-  const canEdit = data?.access === "owner" || data?.access === "collaborator";
-  const canManageMembers =
-    data?.access === "owner" || data?.access === "collaborator";
-  const canFollow = data?.visibility === "public" && data?.access === "public";
+  const canEditCrate = canEdit(data);
+  const canManageMembers = canEditCrate;
+  const canFollowCrate = canFollow(data);
   const offlineState = data ? getCrateState(data.id) : "idle";
   const crateFollow = useCrateFollow({
     crateId: data?.id ?? null,
     initialFollowed: data?.is_followed ?? false,
     initialFollowerCount: data?.follower_count ?? 0,
-    enabled: canFollow,
+    enabled: canFollowCrate,
   });
   const playerTracks = useMemo<Track[]>(
     () =>
@@ -335,6 +335,20 @@ function AuthenticatedCrate() {
     });
   }
 
+  async function copyCrate() {
+    if (!data) return;
+    try {
+      const copy = await api<{ id: string }>(
+        `/api/crates/${encodeURIComponent(data.id)}/copy`,
+        "POST",
+      );
+      notify.success(t("collaboration.copiedCrate", { name: data.name }));
+      navigate(cratePagePath({ id: copy.id }));
+    } catch {
+      notify.error(t("collaboration.copyFailed"));
+    }
+  }
+
   async function startCrateRadio() {
     if (!data) return;
     try {
@@ -396,9 +410,9 @@ function AuthenticatedCrate() {
             crate={data}
             albums={albums}
             canPlay={canPlay}
-            canEdit={Boolean(canEdit)}
+            canEdit={canEditCrate}
             canManageMembers={canManageMembers}
-            canFollow={canFollow}
+            canFollow={canFollowCrate}
             offlineSupported={offlineSupported && hasAlbums}
             offlineBusy={isOfflineBusy(offlineState)}
             offlineLabel={t(getOfflineActionLabelKey(offlineState))}
@@ -412,13 +426,14 @@ function AuthenticatedCrate() {
             onEdit={() => setEditing(true)}
             onMembers={() => setMembersOpen(true)}
             onFollow={() => void crateFollow.toggle()}
+            onCopy={canCopy(data) ? () => void copyCrate() : undefined}
             onShare={() => shareCrate(data, albums)}
             onDownload={hasAlbums ? () => void downloadCrate(data) : undefined}
           />
         }
       />
 
-      {editing && canEdit ? (
+      {editing && canEditCrate ? (
         <Suspense fallback={null}>
           <CrateEditor
             crateId={data.id}
@@ -452,7 +467,7 @@ function AuthenticatedCrate() {
         albums={albums}
         coverUrl={authenticatedCrateCoverUrl}
         linkAlbums
-        onRemoveAlbum={canEdit ? removeAlbum : undefined}
+        onRemoveAlbum={canEditCrate ? removeAlbum : undefined}
       />
     </div>
   );
@@ -630,6 +645,7 @@ function CratePageActions({
   onEdit,
   onMembers,
   onFollow,
+  onCopy,
   onShare,
   onDownload,
 }: {
@@ -652,6 +668,7 @@ function CratePageActions({
   onEdit: () => void;
   onMembers: () => void;
   onFollow: () => void;
+  onCopy?: () => void;
   onShare: () => void;
   onDownload?: () => void;
 }) {
@@ -668,6 +685,7 @@ function CratePageActions({
       onDownload,
       onShare,
       onToggleFollow: canFollow ? onFollow : undefined,
+      onCopy,
       followed,
       followPending,
       offlineActionLabel: offlineLabel,

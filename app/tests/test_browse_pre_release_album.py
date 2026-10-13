@@ -556,7 +556,9 @@ def test_artist_payload_marks_matching_local_album_as_pre_release(monkeypatch):
     monkeypatch.setattr(
         browse_artist, "build_genre_profile", lambda _items, limit=8: []
     )
-    monkeypatch.setattr(browse_artist, "get_artist_issue_count", lambda _artist: 0)
+    monkeypatch.setattr(
+        browse_artist, "get_open_issue_counts_for_artists", lambda _ids: {}
+    )
     monkeypatch.setattr(
         browse_artist,
         "get_upcoming_releases_for_artist",

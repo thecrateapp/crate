@@ -22,6 +22,8 @@ _USER_UPDATABLE_FIELDS = frozenset(
         "username",
         "bio",
         "instagram_handle",
+        "timezone",
+        "pulse_listed",
         "role",
         "status",
         "status_reason",

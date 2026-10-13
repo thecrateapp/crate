@@ -57,6 +57,81 @@ class TestRepairCatalog:
         assert result["item_results"][0]["check_type"] == "duplicate_tracks"
         assert result["item_results"][0]["outcome"] == "skipped"
 
+    def test_repair_resolves_duplicate_track_issue_when_copies_are_gone(self):
+        from crate.repair import LibraryRepair
+
+        repair = LibraryRepair({"library_path": "/tmp/fake_lib"})
+        report = {
+            "issues": [
+                {
+                    "id": 179813,
+                    "check": "duplicate_tracks",
+                    "details": {
+                        "artist": "Peace Test",
+                        "album": "Repercussion",
+                        "title": "Repercussion",
+                        "paths": ["/music/a.flac", "/music/b.flac"],
+                    },
+                }
+            ]
+        }
+
+        with patch(
+            "crate.repair.get_tracks_by_paths",
+            return_value=[{"id": 1, "path": "/music/a.flac", "album_id": 7}],
+        ):
+            result = repair.repair(report, dry_run=False, auto_only=False)
+
+        assert result["resolved_ids"] == [179813]
+        assert result["summary"]["applied"] == 0
+
+        with patch(
+            "crate.repair.get_tracks_by_paths",
+            return_value=[{"id": 1, "path": "/music/a.flac", "album_id": 7}],
+        ):
+            preview = repair.repair(report, dry_run=True, auto_only=False)
+
+        assert preview["resolved_ids"] == []
+        assert result["fs_changed"] is False
+        assert result["db_changed"] is False
+        assert result["actions"][0]["details"]["reason"] == (
+            "the copies are no longer in the library"
+        )
+
+    def test_repair_keeps_blocked_duplicate_track_issue_open(self):
+        from crate.repair import LibraryRepair
+
+        repair = LibraryRepair({"library_path": "/tmp/fake_lib"})
+        report = {
+            "issues": [
+                {
+                    "id": 42,
+                    "check": "duplicate_tracks",
+                    "details": {
+                        "artist": "Cult of Luna",
+                        "album": "Mariner",
+                        "title": "A Greater Call",
+                        "paths": ["/music/a.flac", "/music/b.flac"],
+                    },
+                }
+            ]
+        }
+
+        with patch(
+            "crate.repair.get_tracks_by_paths",
+            return_value=[
+                {"id": 1, "path": "/music/x/a.flac", "album_id": 7},
+                {"id": 2, "path": "/music/y/b.flac", "album_id": 8},
+            ],
+        ):
+            result = repair.repair(report, dry_run=False, auto_only=False)
+
+        assert result["resolved_ids"] == []
+        assert result["summary"]["skipped"] == 1
+        assert result["actions"][0]["details"]["reason"] == (
+            "the copies belong to different albums"
+        )
+
     def test_preview_returns_executable_duplicate_album_action(self):
         from crate.repair import LibraryRepair
 
@@ -97,8 +172,8 @@ class TestRepairCatalog:
         assert result["items"][0]["plan_item_id"].startswith("repair-plan:")
         assert result["items"][0]["item_key"] == "issue:9"
         assert result["items"][0]["executable"] is True
-        assert result["items"][0]["risk"] == "destructive"
-        assert result["items"][0]["scope"] == "hybrid"
+        assert result["items"][0]["risk"] == "caution"
+        assert result["items"][0]["scope"] == "db"
         assert result["items"][0]["requires_confirmation"] is True
         assert (
             result["items"][0]["message"]
@@ -463,6 +538,87 @@ class TestDuplicateTrackRepair:
             assert result["details"]["keep_path"] == str(flac_file)
             assert result["details"]["remove_paths"] == [str(m4a_file)]
 
+    def _featured_duplicate_resolution(self, tags_by_name: dict):
+        from crate.repair import LibraryRepair
+
+        with tempfile.TemporaryDirectory() as lib:
+            album_dir = Path(lib) / "Cult of Luna" / "Mariner"
+            album_dir.mkdir(parents=True)
+            first = album_dir / "a.flac"
+            second = album_dir / "b.flac"
+            first.write_bytes(b"\x00" * 1000)
+            second.write_bytes(b"\x00" * 1000)
+            tracks = [
+                {
+                    "album_id": 62,
+                    "artist": "Cult of Luna",
+                    "album": "Mariner",
+                    "title": "A Greater Call",
+                    "path": str(path),
+                    "track_number": 1,
+                    "disc_number": 1,
+                    "format": "flac",
+                    "duration": 499.066,
+                    "size": 1000,
+                    "bitrate": 854000,
+                    "bit_depth": 16,
+                    "sample_rate": 44100,
+                    "audio_fingerprint": "fingerprint-1",
+                }
+                for path in (first, second)
+            ]
+            issue = {
+                "check": "duplicate_tracks",
+                "details": {
+                    "artist": "Cult of Luna",
+                    "album": "Mariner",
+                    "title": "A Greater Call",
+                    "paths": [str(first), str(second)],
+                },
+            }
+            with (
+                patch("crate.repair.get_tracks_by_paths", return_value=tracks),
+                patch(
+                    "crate.repair.read_tags",
+                    side_effect=lambda path: tags_by_name[Path(path).name],
+                ),
+            ):
+                return LibraryRepair({"library_path": lib}).duplicate_track_resolution(
+                    issue
+                )
+
+    def test_duplicate_track_with_featured_track_artist_is_cleanable(self):
+        base = {
+            "albumartist": "Cult of Luna",
+            "album": "Mariner",
+            "title": "A Greater Call",
+            "tracknumber": "1",
+        }
+        resolution = self._featured_duplicate_resolution(
+            {
+                "a.flac": {**base, "artist": "Cult of Luna, Julie Christmas"},
+                "b.flac": {**base, "artist": "Cult of Luna"},
+            }
+        )
+
+        assert not isinstance(resolution, str)
+
+    def test_duplicate_track_with_a_different_album_artist_stays_blocked(self):
+        base = {
+            "artist": "Cult of Luna",
+            "album": "Mariner",
+            "title": "A Greater Call",
+            "tracknumber": "1",
+        }
+        resolution = self._featured_duplicate_resolution(
+            {
+                "a.flac": {**base, "albumartist": "Cult of Luna"},
+                "b.flac": {**base, "albumartist": "Various Artists"},
+            }
+        )
+
+        assert resolution == "file tags disagree on artist, album or title"
+
     def test_duplicate_track_apply_quarantines_redundant_file(self):
         from crate.repair import LibraryRepair
 
@@ -690,7 +846,11 @@ class TestDuplicateTrackRepair:
             ):
                 result = repair._fix_duplicate_tracks(issue, dry_run=True)
 
-            assert result is None
+            assert result["applied"] is False
+            assert (
+                result["details"]["reason"]
+                == "audio fingerprints differ and the tags are not conclusive"
+            )
 
     def test_duplicate_track_stays_manual_when_metadata_is_broken(self):
         from crate.repair import LibraryRepair
@@ -742,7 +902,11 @@ class TestDuplicateTrackRepair:
             with patch("crate.repair.get_tracks_by_paths", return_value=tracks):
                 result = repair._fix_duplicate_tracks(issue, dry_run=True)
 
-            assert result is None
+            assert result["applied"] is False
+            assert (
+                result["details"]["reason"]
+                == "missing artist, album, title or paths to compare"
+            )
 
     def test_shadow_quality_tracks_apply_removes_legacy_upgrade_residue(self):
         from crate.repair import LibraryRepair

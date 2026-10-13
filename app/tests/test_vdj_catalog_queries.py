@@ -392,15 +392,15 @@ def _has_seq_scan(plan: object, relation: str) -> bool:
 
 def test_mood_index_migration_builds_concurrently_and_matches_the_query() -> None:
     from crate.db.queries.vdj_catalog import VDJ_MOODS, mood_score_expression
-    from crate.db.schema_sections.vdj_catalog_v108 import vdj_mood_index_statements
+    from crate.db.schema_sections.vdj_catalog_v113 import vdj_mood_index_statements
 
     migration = (
         Path(__file__).resolve().parents[1]
-        / "crate/db/migrations/versions/108_vdj_mood_indexes.py"
+        / "crate/db/migrations/versions/113_vdj_mood_indexes.py"
     ).read_text()
     statements = vdj_mood_index_statements(concurrently=True)
 
-    assert 'down_revision = "107"' in migration
+    assert 'down_revision = "112"' in migration
     assert "autocommit_block()" in migration
     assert len(statements) == len(VDJ_MOODS)
     for mood, statement in zip(VDJ_MOODS, statements, strict=True):

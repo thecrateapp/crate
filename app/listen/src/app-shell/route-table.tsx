@@ -73,6 +73,9 @@ const HomeSection = React.lazy(() =>
 const Stats = React.lazy(() =>
   import("@/pages/Stats").then((m) => ({ default: m.Stats })),
 );
+const StatsDigging = React.lazy(() =>
+  import("@/pages/StatsDigging").then((m) => ({ default: m.StatsDigging })),
+);
 const Shows = React.lazy(() =>
   import("@/pages/Shows").then((m) => ({ default: m.Shows })),
 );
@@ -105,14 +108,8 @@ const JamSession = React.lazy(() =>
 const JamInvite = React.lazy(() =>
   import("@/pages/JamInvite").then((m) => ({ default: m.JamInvite })),
 );
-const PlaylistInvite = React.lazy(() =>
-  import("@/pages/PlaylistInvite").then((m) => ({ default: m.PlaylistInvite })),
-);
-const PublicCrate = React.lazy(() =>
-  import("@/pages/PublicCrate").then((m) => ({ default: m.PublicCrate })),
-);
-const CrateInvite = React.lazy(() =>
-  import("@/pages/CrateInvite").then((m) => ({ default: m.CrateInvite })),
+const Crate = React.lazy(() =>
+  import("@/pages/Crate").then((m) => ({ default: m.Crate })),
 );
 
 export interface AppRouteDefinition {
@@ -130,7 +127,6 @@ function heroRoute(element: ReactNode) {
 }
 
 export const publicAppRoutes: AppRouteDefinition[] = [
-  { path: "/crate/:crateRef", element: deferred(<PublicCrate />) },
   { path: "/server-setup", element: deferred(<ServerSetup />) },
   { path: "/offline", element: deferred(<OfflineAccessRoute />) },
   { path: "/auth/callback", element: deferred(<AuthCallback />) },
@@ -147,6 +143,7 @@ export const protectedAppRoutes: AppRouteDefinition[] = [
   { path: "collection/:section", element: deferred(<Library />) },
   { path: "stats", element: deferred(<Stats />) },
   { path: "stats/global", element: deferred(<Stats />) },
+  { path: "stats/digging", element: deferred(<StatsDigging />) },
   { path: "upload", element: deferred(<Upload />) },
   { path: "settings", element: deferred(<Settings />) },
   { path: "bandcamp", element: deferred(<Bandcamp />) },
@@ -162,8 +159,7 @@ export const protectedAppRoutes: AppRouteDefinition[] = [
         { path: "jam/invite/:token", element: deferred(<JamInvite />) },
       ]
     : [{ path: "jam/*", element: <Navigate to="/" replace /> }]),
-  { path: "playlist/invite/:token", element: deferred(<PlaylistInvite />) },
-  { path: "crate/invite/:token", element: deferred(<CrateInvite />) },
+  { path: "crate/:crateRef", element: deferred(<Crate />) },
   { path: "shows", element: <Navigate to="/upcoming" replace /> },
   { path: "upcoming", element: deferred(<Shows />) },
   { path: "paths", element: deferred(<PathsPage />) },

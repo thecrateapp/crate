@@ -83,31 +83,48 @@ def can_view_playlist(
     )
 
 
+def get_playlist_access(
+    playlist: dict | None, user_id: int | None, *, session: Session | None = None
+) -> str:
+    """Viewer access: owner, collaborator, public or none."""
+    if not playlist:
+        return "none"
+    if playlist.get("scope") == "system":
+        return "public"
+    if user_id is not None and playlist.get("user_id") == user_id:
+        return "owner"
+    if user_id is not None and playlist.get("is_collaborative"):
+        member = get_playlist_member(int(playlist["id"]), user_id, session=session)
+        if member and member.get("role") in {"owner", "collab"}:
+            return "collaborator"
+    if playlist.get("visibility") == "public":
+        return "public"
+    if user_id is not None and get_playlist_member(
+        int(playlist["id"]), user_id, session=session
+    ):
+        return "public"
+    return "none"
+
+
 def can_edit_playlist(
     playlist: dict | None, user_id: int | None, *, session: Session | None = None
 ) -> bool:
-    if not playlist or user_id is None:
-        return False
-    if playlist.get("scope") == "system":
-        return False
-    if playlist.get("user_id") == user_id:
-        return True
-    member = get_playlist_member(int(playlist["id"]), user_id, session=session)
-    return bool(member and member.get("role") in {"owner", "collab"})
+    return get_playlist_access(playlist, user_id, session=session) in {
+        "owner",
+        "collaborator",
+    }
 
 
 def is_playlist_owner(
     playlist: dict | None, user_id: int | None, *, session: Session | None = None
 ) -> bool:
-    if not playlist or user_id is None:
+    if not playlist or user_id is None or playlist.get("scope") == "system":
         return False
-    if playlist.get("user_id") == user_id:
-        return True
-    member = get_playlist_member(int(playlist["id"]), user_id, session=session)
-    return bool(member and member.get("role") == "owner")
+    return playlist.get("user_id") == user_id
 
 
 __all__ = [
+    "get_playlist_access",
     "can_edit_playlist",
     "can_view_playlist",
     "get_playlist_member",

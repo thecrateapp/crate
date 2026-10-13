@@ -15,6 +15,7 @@ from crate.db.events import emit_task_event
 from crate.db.genres import set_album_genres
 from crate.db.repositories.bandcamp import set_library_entity_bandcamp_url
 from crate.db.jobs.enrichment import (
+    get_albums_missing_release_group,
     get_albums_needing_release_metadata,
     get_album_names_for_artists,
     get_artists_with_mbid,
@@ -679,7 +680,6 @@ def _handle_sync_lyrics(task_id: str, params: dict, config: dict) -> dict:
 
 def _handle_enrich_mbids(task_id: str, params: dict, config: dict) -> dict:
     """Enrich albums and tracks with MusicBrainz IDs."""
-    exts = DEFAULT_AUDIO_EXTENSIONS
     artist_filter = params.get("artist")
     min_score = params.get("min_score", 70)
     release_types_only = bool(params.get("release_types_only"))
@@ -703,6 +703,26 @@ def _handle_enrich_mbids(task_id: str, params: dict, config: dict) -> dict:
             if not normalize_release_date(album.get("release_date"))
         ]
 
+    return _match_album_mbids(
+        task_id,
+        albums,
+        config,
+        min_score=min_score,
+        release_types_only=release_types_only,
+        release_dates_only=release_dates_only,
+    )
+
+
+def _match_album_mbids(
+    task_id: str,
+    albums: Sequence[Mapping[str, Any]],
+    config: dict,
+    *,
+    min_score: int = 70,
+    release_types_only: bool = False,
+    release_dates_only: bool = False,
+) -> dict:
+    exts = DEFAULT_AUDIO_EXTENSIONS
     total = len(albums)
     enriched = 0
     skipped = 0
@@ -845,6 +865,29 @@ def _handle_enrich_mbids(task_id: str, params: dict, config: dict) -> dict:
         result["matched"] = enriched
         result["unresolved"] = failed
     if release_dates_only or release_types_only:
+        _broadcast_release_metadata_invalidation()
+    return result
+
+
+ALBUM_MBID_REMATCH_BATCH = 50
+ALBUM_MBID_REMATCH_COOLDOWN_SECONDS = 7 * 86400
+
+
+def _handle_rematch_album_mbids(task_id: str, params: dict, config: dict) -> dict:
+    batch = [
+        album
+        for album in get_albums_missing_release_group()
+        if not get_cache(f"album-mbid-rematch:{album['id']}")
+    ][:ALBUM_MBID_REMATCH_BATCH]
+
+    result = _match_album_mbids(task_id, batch, config)
+    for album in batch:
+        set_cache(
+            f"album-mbid-rematch:{album['id']}",
+            True,
+            ttl=ALBUM_MBID_REMATCH_COOLDOWN_SECONDS,
+        )
+    if result["enriched"]:
         _broadcast_release_metadata_invalidation()
     return result
 
@@ -1918,6 +1961,7 @@ ENRICHMENT_TASK_HANDLERS: dict[str, TaskHandler] = {
     "normalize_artist_bios": _handle_normalize_artist_bios,
     "research_artist_bio": _handle_research_artist_bio,
     "enrich_mbids": _handle_enrich_mbids,
+    "rematch_album_mbids": _handle_rematch_album_mbids,
     "process_new_content": _handle_process_new_content,
     "compute_completeness": _handle_compute_completeness,
     "refresh_probable_setlist": _handle_refresh_probable_setlist,

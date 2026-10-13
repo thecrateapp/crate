@@ -12,6 +12,8 @@ export interface AuthUser {
   username?: string | null;
   bio?: string | null;
   instagram_handle?: string | null;
+  timezone?: string | null;
+  pulse_listed?: boolean;
   session_id?: string | null;
   connected_accounts?: Array<{ provider: string; status: string }>;
 }

@@ -1,0 +1,160 @@
+{
+  "snapshot": {
+    "scope": "ops:tasks",
+    "subject_key": "surface:100",
+    "version": 9,
+    "built_at": "2026-10-10T21:01:12.759752Z",
+    "stale_after": "2026-10-10T21:01:42.759752Z",
+    "stale": false,
+    "generation_ms": 11
+  },
+  "live": {
+    "engine": "dramatiq",
+    "running_tasks": [
+      {
+        "id": "2d12449111d8",
+        "type": "enrich_artists",
+        "status": "delegated",
+        "pool": "maintenance",
+        "progress": "{\"phase\": \"processing\", \"phase_index\": 0, \"phase_count\": 1, \"item\": \"1/2 chunks\", \"done\": 1, \"total\": 2, \"percent\": 50.0, \"rate\": 0.0, \"eta_sec\": 0, \"errors\": 0, \"warnings\": 0}",
+        "created_at": "2026-10-01T15:19:09.401996+00:00",
+        "started_at": "2026-10-01T15:20:37.639047+00:00",
+        "updated_at": "2026-10-01T15:27:03.642952+00:00"
+      }
+    ],
+    "pending_tasks": [],
+    "recent_tasks": [
+      {
+        "id": "862ae64c807c",
+        "type": "global_catalog_reconcile_incremental",
+        "status": "completed",
+        "updated_at": "2026-10-10T20:55:11.698969+00:00"
+      },
+      {
+        "id": "f99b413f5d56",
+        "type": "cleanup_stream_variants",
+        "status": "completed",
+        "updated_at": "2026-10-10T20:49:07.690543+00:00"
+      },
+      {
+        "id": "2a10a0076c09",
+        "type": "global_catalog_reconcile_incremental",
+        "status": "completed",
+        "updated_at": "2026-10-10T20:49:07.563765+00:00"
+      }
+    ],
+    "worker_slots": {
+      "max": 6,
+      "active": 1
+    },
+    "queue_breakdown": {
+      "running": {
+        "fast": 0,
+        "default": 0,
+        "heavy": 0,
+        "maintenance": 1,
+        "playback": 0
+      },
+      "pending": {
+        "fast": 0,
+        "default": 0,
+        "heavy": 0,
+        "maintenance": 0,
+        "playback": 0
+      }
+    },
+    "db_heavy_gate": {
+      "active": 0,
+      "pending": 0,
+      "blocking": false
+    },
+    "systems": {
+      "postgres": true,
+      "watcher": true
+    }
+  },
+  "history": [
+    {
+      "id": "2d12449111d8",
+      "type": "enrich_artists",
+      "status": "delegated",
+      "progress": {
+        "done": 1,
+        "item": "1/2 chunks",
+        "rate": 0.0,
+        "phase": "processing",
+        "total": 2,
+        "errors": 0,
+        "eta_sec": 0,
+        "percent": 50.0,
+        "warnings": 0,
+        "phase_count": 1,
+        "phase_index": 0
+      },
+      "error": null,
+      "result": {
+        "chunks": 2,
+        "artists": 29
+      },
+      "params": {},
+      "priority": 3,
+      "pool": "maintenance",
+      "created_at": "2026-10-01 15:19:09.401996+00:00",
+      "started_at": "2026-10-01 15:20:37.639047+00:00",
+      "updated_at": "2026-10-01 15:27:03.642952+00:00",
+      "label": "Artist Enrichment"
+    },
+    {
+      "id": "862ae64c807c",
+      "type": "global_catalog_reconcile_incremental",
+      "status": "completed",
+      "progress": "",
+      "error": null,
+      "result": {
+        "mode": "incremental",
+        "failed": 0,
+        "status": "completed",
+        "claimed": 0,
+        "completed": 0,
+        "remaining": 0
+      },
+      "params": {},
+      "priority": 2,
+      "pool": "maintenance",
+      "created_at": "2026-10-10 20:55:11.136084+00:00",
+      "started_at": "2026-10-10 20:55:11.666487+00:00",
+      "updated_at": "2026-10-10 20:55:11.698969+00:00",
+      "label": "Global Catalog Reconciliation"
+    },
+    {
+      "id": "f99b413f5d56",
+      "type": "cleanup_stream_variants",
+      "status": "completed",
+      "progress": "",
+      "error": null,
+      "result": {
+        "bytes_after": 277260566,
+        "files_after": 67,
+        "bytes_before": 277260566,
+        "files_before": 67,
+        "bytes_removed": 0,
+        "files_removed": 0,
+        "rows_truncated": 0,
+        "files_truncated": 0,
+        "remove_failures": 0,
+        "orphan_files_seen": 0,
+        "idle_files_removed": 0,
+        "quota_files_removed": 0,
+        "orphan_files_removed": 0,
+        "missing_rows_reconciled": 0
+      },
+      "params": {},
+      "priority": 3,
+      "pool": "maintenance",
+      "created_at": "2026-10-10 20:49:07.073797+00:00",
+      "started_at": "2026-10-10 20:49:07.573849+00:00",
+      "updated_at": "2026-10-10 20:49:07.690543+00:00",
+      "label": "Clean Playback Cache"
+    }
+  ]
+}

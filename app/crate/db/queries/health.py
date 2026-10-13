@@ -130,15 +130,43 @@ def get_artists_with_photo() -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def get_duplicate_albums() -> list[dict]:
+def get_duplicate_albums(artist_name: str | None = None) -> list[dict]:
+    """Albums that look like the same release stored twice.
+
+    Copies must share the normalized name, the year (or have none) and roughly
+    the same track count, so remasters and deluxe editions are not flagged."""
+    artist_filter = "AND artist = :artist" if artist_name else ""
     with read_scope() as session:
         rows = (
             session.execute(
                 text(
-                    "SELECT artist, LOWER(name) AS album_key, MIN(name) AS album_name, COUNT(*) AS cnt, "
-                    "array_agg(path ORDER BY path) AS paths "
-                    "FROM library_albums GROUP BY artist, LOWER(name) HAVING COUNT(*) > 1"
-                )
+                    f"""
+                    WITH albums AS (
+                        SELECT id, artist, name, LOWER(BTRIM(name)) AS album_key,
+                               SUBSTRING(year FROM '^[0-9]{{4}}') AS year,
+                               COALESCE(track_count, 0) AS track_count,
+                               total_duration, total_size, formats_json, path
+                        FROM library_albums
+                        WHERE quarantined_at IS NULL {artist_filter}
+                    )
+                    SELECT artist, album_key, (array_agg(name ORDER BY id))[1] AS album_name, COUNT(*) AS cnt,
+                           array_agg(path ORDER BY path) AS paths,
+                           jsonb_agg(
+                               jsonb_build_object(
+                                   'album_id', id, 'path', path, 'year', year,
+                                   'track_count', track_count,
+                                   'total_duration', total_duration,
+                                   'total_size', total_size, 'formats', formats_json
+                               ) ORDER BY id
+                           ) AS copies
+                    FROM albums
+                    GROUP BY artist, album_key
+                    HAVING COUNT(*) > 1
+                       AND COUNT(DISTINCT year) <= 1
+                       AND MAX(track_count) - MIN(track_count) <= 1
+                    """
+                ),
+                {"artist": artist_name} if artist_name else {},
             )
             .mappings()
             .all()

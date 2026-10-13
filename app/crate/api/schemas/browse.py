@@ -78,6 +78,7 @@ class ArtistBrowseItemResponse(IdentityFieldsMixin):
     primary_format: str | None = None
     has_photo: bool | int
     has_issues: bool
+    issue_count: int = 0
     popularity: int | None = None
     popularity_score: float | None = None
     popularity_confidence: float | None = None

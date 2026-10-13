@@ -1,311 +1,202 @@
+"""Narrative stats (movers, discoveries, rhythm, monthly recaps).
+
+Everything reads the per-day listening projections
+(``user_track_daily``, ``user_hourly_listening``, ``user_daily_listening``,
+``user_entity_firsts``) so building a story never rescans the raw play log.
+"""
+
 from __future__ import annotations
 
 import json
 from calendar import month_name
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import text
 
-from crate.db.queries.user_library_stats_month import month_bounds, month_period_key
-from crate.db.queries.user_library_shared import _STATS_WINDOWS, normalize_stats_window
+from crate.db.queries.user_stats_periods import (
+    StatsPeriod,
+    period_day_filter,
+    period_params,
+    resolve_stats_period,
+    user_stats_timezone,
+)
 from crate.db.tx import read_scope
 
-
-def _period_bounds(window: str) -> tuple[datetime | None, datetime | None]:
-    normalized = normalize_stats_window(window)
-    days = _STATS_WINDOWS[normalized]
-    if days is None:
-        return None, None
-    now = datetime.now(timezone.utc)
-    current_start = now - timedelta(days=days)
-    previous_start = current_start - timedelta(days=days)
-    return current_start, previous_start
+_ARTIST_JOIN = "LEFT JOIN library_artists la ON lower(la.name) = lower({column})"
 
 
-def _artist_delta_rows(
-    user_id: int,
-    *,
-    current_start: datetime | None,
-    previous_start: datetime | None,
-    current_end: datetime | None = None,
-    limit: int,
-) -> list[dict]:
-    with read_scope() as session:
-        rows = (
-            session.execute(
-                text(
-                    """
-                    WITH current_artists AS (
-                        SELECT
-                            COALESCE(NULLIF(TRIM(artist), ''), 'Unknown artist') AS artist_name,
-                            COUNT(*)::integer AS play_count,
-                            COALESCE(SUM(played_seconds), 0) / 60.0 AS minutes_listened
-                        FROM user_play_events
-                        WHERE user_id = :user_id
-                          AND (
-                            CAST(:current_start AS TIMESTAMPTZ) IS NULL
-                            OR ended_at >= CAST(:current_start AS TIMESTAMPTZ)
-                          )
-                          AND (
-                            CAST(:current_end AS TIMESTAMPTZ) IS NULL
-                            OR ended_at < CAST(:current_end AS TIMESTAMPTZ)
-                          )
-                        GROUP BY 1
-                    ),
-                    previous_artists AS (
-                        SELECT
-                            COALESCE(NULLIF(TRIM(artist), ''), 'Unknown artist') AS artist_name,
-                            COUNT(*)::integer AS play_count
-                        FROM user_play_events
-                        WHERE user_id = :user_id
-                          AND CAST(:previous_start AS TIMESTAMPTZ) IS NOT NULL
-                          AND ended_at >= CAST(:previous_start AS TIMESTAMPTZ)
-                          AND ended_at < CAST(:current_start AS TIMESTAMPTZ)
-                        GROUP BY 1
-                    )
-                    SELECT
-                        c.artist_name,
-                        la.id AS artist_id,
-                        la.slug AS artist_slug,
-                        c.play_count,
-                        COALESCE(p.play_count, 0)::integer AS previous_play_count,
-                        (c.play_count - COALESCE(p.play_count, 0))::integer AS delta_play_count,
-                        c.minutes_listened
-                    FROM current_artists c
-                    LEFT JOIN previous_artists p
-                      ON lower(p.artist_name) = lower(c.artist_name)
-                    LEFT JOIN library_artists la
-                      ON lower(la.name) = lower(c.artist_name)
-                    WHERE c.artist_name <> 'Unknown artist'
-                    ORDER BY
-                        (c.play_count - COALESCE(p.play_count, 0)) DESC,
-                        c.play_count DESC,
-                        c.minutes_listened DESC
-                    LIMIT :limit
-                    """
-                ),
-                {
-                    "user_id": user_id,
-                    "current_start": current_start,
-                    "current_end": current_end,
-                    "previous_start": previous_start,
-                    "limit": limit,
-                },
+def _artist_delta_rows(session, user_id: int, period: StatsPeriod, limit: int):
+    previous = (
+        "FALSE"
+        if period.previous_start is None
+        else "day >= :previous_start AND day < :period_start"
+    )
+    rows = session.execute(
+        text(
+            f"""
+            WITH current_artists AS (
+                SELECT artist AS artist_name,
+                       SUM(play_count)::integer AS play_count,
+                       SUM(minutes_listened) AS minutes_listened
+                FROM user_track_daily
+                WHERE user_id = :user_id AND artist != ''
+                  AND {period_day_filter(period)}
+                GROUP BY artist
+            ),
+            previous_artists AS (
+                SELECT artist AS artist_name,
+                       SUM(play_count)::integer AS play_count
+                FROM user_track_daily
+                WHERE user_id = :user_id AND artist != '' AND {previous}
+                GROUP BY artist
             )
-            .mappings()
-            .all()
-        )
-    return [dict(row) for row in rows]
+            SELECT
+                c.artist_name,
+                la.id AS artist_id,
+                la.slug AS artist_slug,
+                c.play_count,
+                COALESCE(p.play_count, 0)::integer AS previous_play_count,
+                (c.play_count - COALESCE(p.play_count, 0))::integer AS delta_play_count,
+                c.minutes_listened
+            FROM current_artists c
+            LEFT JOIN previous_artists p ON lower(p.artist_name) = lower(c.artist_name)
+            {_ARTIST_JOIN.format(column="c.artist_name")}
+            ORDER BY
+                (c.play_count - COALESCE(p.play_count, 0)) DESC,
+                c.play_count DESC,
+                c.minutes_listened DESC
+            LIMIT :limit
+            """
+        ),
+        {"user_id": user_id, "limit": limit, **period_params(period)},
+    )
+    return [dict(row) for row in rows.mappings()]
 
 
-def _discovery_rows(
-    user_id: int,
-    *,
-    current_start: datetime | None,
-    current_end: datetime | None = None,
-    limit: int,
-) -> list[dict]:
-    if current_start is None:
+def _discovery_rows(session, user_id: int, period: StatsPeriod, limit: int):
+    if period.start is None:
         return []
-    with read_scope() as session:
-        rows = (
-            session.execute(
-                text(
-                    """
-                    WITH current_artists AS (
-                        SELECT
-                            COALESCE(NULLIF(TRIM(artist), ''), 'Unknown artist') AS artist_name,
-                            COUNT(*)::integer AS play_count,
-                            COALESCE(SUM(played_seconds), 0) / 60.0 AS minutes_listened,
-                            MIN(ended_at) AS first_played_at
-                        FROM user_play_events
-                        WHERE user_id = :user_id
-                          AND ended_at >= CAST(:current_start AS TIMESTAMPTZ)
-                          AND (
-                            CAST(:current_end AS TIMESTAMPTZ) IS NULL
-                            OR ended_at < CAST(:current_end AS TIMESTAMPTZ)
-                          )
-                        GROUP BY 1
-                    )
-                    SELECT
-                        c.artist_name,
-                        la.id AS artist_id,
-                        la.slug AS artist_slug,
-                        c.play_count,
-                        c.minutes_listened,
-                        c.first_played_at
-                    FROM current_artists c
-                    LEFT JOIN library_artists la
-                      ON lower(la.name) = lower(c.artist_name)
-                    WHERE c.artist_name <> 'Unknown artist'
-                      AND NOT EXISTS (
-                        SELECT 1
-                        FROM user_play_events prior
-                        WHERE prior.user_id = :user_id
-                          AND lower(prior.artist) = lower(c.artist_name)
-                          AND prior.ended_at < CAST(:current_start AS TIMESTAMPTZ)
-                        LIMIT 1
-                      )
-                    ORDER BY c.play_count DESC, c.minutes_listened DESC
-                    LIMIT :limit
-                    """
-                ),
-                {
-                    "user_id": user_id,
-                    "current_start": current_start,
-                    "current_end": current_end,
-                    "limit": limit,
-                },
+    rows = session.execute(
+        text(
+            f"""
+            WITH discovered AS (
+                SELECT entity_key AS artist_name, first_played_at
+                FROM user_entity_firsts
+                WHERE user_id = :user_id
+                  AND entity_type = 'artist'
+                  AND {period_day_filter(period, "first_day")}
             )
-            .mappings()
-            .all()
-        )
-    return [dict(row) for row in rows]
+            SELECT
+                d.artist_name,
+                la.id AS artist_id,
+                la.slug AS artist_slug,
+                SUM(td.play_count)::integer AS play_count,
+                SUM(td.minutes_listened) AS minutes_listened,
+                d.first_played_at
+            FROM discovered d
+            JOIN user_track_daily td
+              ON td.user_id = :user_id AND td.artist = d.artist_name
+             AND {period_day_filter(period, "td.day")}
+            {_ARTIST_JOIN.format(column="d.artist_name")}
+            GROUP BY d.artist_name, la.id, la.slug, d.first_played_at
+            ORDER BY play_count DESC, minutes_listened DESC
+            LIMIT :limit
+            """
+        ),
+        {"user_id": user_id, "limit": limit, **period_params(period)},
+    )
+    return [dict(row) for row in rows.mappings()]
 
 
-def _comeback_rows(
-    user_id: int,
-    *,
-    current_start: datetime | None,
-    comeback_before: datetime | None,
-    current_end: datetime | None = None,
-    limit: int,
-) -> list[dict]:
-    if current_start is None or comeback_before is None:
+def _comeback_rows(session, user_id: int, period: StatsPeriod, limit: int):
+    if period.start is None:
         return []
-    with read_scope() as session:
-        rows = (
-            session.execute(
-                text(
-                    """
-                    WITH current_artists AS (
-                        SELECT
-                            COALESCE(NULLIF(TRIM(artist), ''), 'Unknown artist') AS artist_name,
-                            COUNT(*)::integer AS play_count,
-                            COALESCE(SUM(played_seconds), 0) / 60.0 AS minutes_listened
-                        FROM user_play_events
-                        WHERE user_id = :user_id
-                          AND ended_at >= CAST(:current_start AS TIMESTAMPTZ)
-                          AND (
-                            CAST(:current_end AS TIMESTAMPTZ) IS NULL
-                            OR ended_at < CAST(:current_end AS TIMESTAMPTZ)
-                          )
-                        GROUP BY 1
-                    ),
-                    prior_artists AS (
-                        SELECT
-                            COALESCE(NULLIF(TRIM(artist), ''), 'Unknown artist') AS artist_name,
-                            MAX(ended_at) AS last_seen_at
-                        FROM user_play_events
-                        WHERE user_id = :user_id
-                          AND ended_at < CAST(:current_start AS TIMESTAMPTZ)
-                        GROUP BY 1
-                    )
-                    SELECT
-                        c.artist_name,
-                        la.id AS artist_id,
-                        la.slug AS artist_slug,
-                        c.play_count,
-                        c.minutes_listened,
-                        p.last_seen_at
-                    FROM current_artists c
-                    JOIN prior_artists p
-                      ON lower(p.artist_name) = lower(c.artist_name)
-                    LEFT JOIN library_artists la
-                      ON lower(la.name) = lower(c.artist_name)
-                    WHERE c.artist_name <> 'Unknown artist'
-                      AND p.last_seen_at < CAST(:comeback_before AS TIMESTAMPTZ)
-                    ORDER BY c.play_count DESC, c.minutes_listened DESC, p.last_seen_at ASC
-                    LIMIT :limit
-                    """
-                ),
-                {
-                    "user_id": user_id,
-                    "current_start": current_start,
-                    "current_end": current_end,
-                    "comeback_before": comeback_before,
-                    "limit": limit,
-                },
+    comeback_before = period.start - timedelta(days=max(30, period.days or 30))
+    rows = session.execute(
+        text(
+            f"""
+            WITH current_artists AS (
+                SELECT artist AS artist_name,
+                       SUM(play_count)::integer AS play_count,
+                       SUM(minutes_listened) AS minutes_listened
+                FROM user_track_daily
+                WHERE user_id = :user_id AND artist != ''
+                  AND {period_day_filter(period)}
+                GROUP BY artist
+            ),
+            prior_artists AS (
+                SELECT artist AS artist_name, MAX(last_played_at) AS last_seen_at,
+                       MAX(day) AS last_seen_day
+                FROM user_track_daily
+                WHERE user_id = :user_id AND artist != '' AND day < :period_start
+                GROUP BY artist
             )
-            .mappings()
-            .all()
-        )
-    return [dict(row) for row in rows]
+            SELECT
+                c.artist_name,
+                la.id AS artist_id,
+                la.slug AS artist_slug,
+                c.play_count,
+                c.minutes_listened,
+                p.last_seen_at
+            FROM current_artists c
+            JOIN prior_artists p ON lower(p.artist_name) = lower(c.artist_name)
+            {_ARTIST_JOIN.format(column="c.artist_name")}
+            WHERE p.last_seen_day < :comeback_before
+            ORDER BY c.play_count DESC, c.minutes_listened DESC, p.last_seen_at ASC
+            LIMIT :limit
+            """
+        ),
+        {
+            "user_id": user_id,
+            "limit": limit,
+            "comeback_before": comeback_before,
+            **period_params(period),
+        },
+    )
+    return [dict(row) for row in rows.mappings()]
 
 
-def _rhythm_payload(
-    user_id: int,
-    *,
-    current_start: datetime | None,
-    current_end: datetime | None = None,
-) -> dict:
-    with read_scope() as session:
-        hour_row = (
-            session.execute(
-                text(
-                    """
-                    SELECT
-                        EXTRACT(HOUR FROM ended_at)::integer AS peak_hour,
-                        COUNT(*)::integer AS play_count,
-                        COALESCE(SUM(played_seconds), 0) / 60.0 AS minutes_listened
-                    FROM user_play_events
-                    WHERE user_id = :user_id
-                      AND (
-                        CAST(:current_start AS TIMESTAMPTZ) IS NULL
-                        OR ended_at >= CAST(:current_start AS TIMESTAMPTZ)
-                      )
-                      AND (
-                        CAST(:current_end AS TIMESTAMPTZ) IS NULL
-                        OR ended_at < CAST(:current_end AS TIMESTAMPTZ)
-                      )
-                    GROUP BY 1
-                    ORDER BY play_count DESC, minutes_listened DESC
-                    LIMIT 1
-                    """
-                ),
-                {
-                    "user_id": user_id,
-                    "current_start": current_start,
-                    "current_end": current_end,
-                },
-            )
-            .mappings()
-            .first()
+def _rhythm_payload(session, user_id: int, period: StatsPeriod) -> dict:
+    params = {"user_id": user_id, **period_params(period)}
+    hour_row = (
+        session.execute(
+            text(
+                f"""
+                SELECT hour::integer AS peak_hour,
+                       SUM(play_count)::integer AS play_count,
+                       SUM(minutes_listened) AS minutes_listened
+                FROM user_hourly_listening
+                WHERE user_id = :user_id AND {period_day_filter(period)}
+                GROUP BY hour
+                ORDER BY play_count DESC, minutes_listened DESC, hour
+                LIMIT 1
+                """
+            ),
+            params,
         )
-        weekday_row = (
-            session.execute(
-                text(
-                    """
-                    SELECT
-                        TRIM(TO_CHAR(ended_at, 'Day')) AS peak_weekday,
-                        COUNT(*)::integer AS play_count,
-                        COALESCE(SUM(played_seconds), 0) / 60.0 AS minutes_listened
-                    FROM user_play_events
-                    WHERE user_id = :user_id
-                      AND (
-                        CAST(:current_start AS TIMESTAMPTZ) IS NULL
-                        OR ended_at >= CAST(:current_start AS TIMESTAMPTZ)
-                      )
-                      AND (
-                        CAST(:current_end AS TIMESTAMPTZ) IS NULL
-                        OR ended_at < CAST(:current_end AS TIMESTAMPTZ)
-                      )
-                    GROUP BY 1
-                    ORDER BY play_count DESC, minutes_listened DESC
-                    LIMIT 1
-                    """
-                ),
-                {
-                    "user_id": user_id,
-                    "current_start": current_start,
-                    "current_end": current_end,
-                },
-            )
-            .mappings()
-            .first()
+        .mappings()
+        .first()
+    )
+    weekday_row = (
+        session.execute(
+            text(
+                f"""
+                SELECT TRIM(TO_CHAR(day, 'Day')) AS peak_weekday,
+                       SUM(play_count)::integer AS play_count,
+                       SUM(minutes_listened) AS minutes_listened
+                FROM user_daily_listening
+                WHERE user_id = :user_id AND {period_day_filter(period)}
+                GROUP BY 1
+                ORDER BY play_count DESC, minutes_listened DESC, 1
+                LIMIT 1
+                """
+            ),
+            params,
         )
-
+        .mappings()
+        .first()
+    )
     peak_hour = int(hour_row["peak_hour"]) if hour_row else None
     return {
         "peak_hour": peak_hour,
@@ -316,66 +207,35 @@ def _rhythm_payload(
     }
 
 
-def _audio_profile_payload(
-    user_id: int,
-    *,
-    current_start: datetime | None,
-    current_end: datetime | None = None,
-) -> dict:
-    with read_scope() as session:
-        row = (
-            session.execute(
-                text(
-                    """
-                    SELECT
-                        AVG(lt.energy) AS energy,
-                        AVG(lt.danceability) AS danceability,
-                        AVG(lt.valence) AS valence,
-                        AVG(lt.bpm) AS bpm
-                    FROM user_play_events upe
-                    LEFT JOIN library_tracks lt
-                      ON lt.id = upe.track_id
-                      OR (
-                        upe.track_id IS NULL
-                        AND upe.track_entity_uid IS NOT NULL
-                        AND lt.entity_uid = upe.track_entity_uid
-                      )
-                    WHERE upe.user_id = :user_id
-                      AND (
-                        CAST(:current_start AS TIMESTAMPTZ) IS NULL
-                        OR upe.ended_at >= CAST(:current_start AS TIMESTAMPTZ)
-                      )
-                      AND (
-                        CAST(:current_end AS TIMESTAMPTZ) IS NULL
-                        OR upe.ended_at < CAST(:current_end AS TIMESTAMPTZ)
-                      )
-                    """
-                ),
-                {
-                    "user_id": user_id,
-                    "current_start": current_start,
-                    "current_end": current_end,
-                },
-            )
-            .mappings()
-            .first()
+def _audio_profile_payload(session, user_id: int, period: StatsPeriod) -> dict:
+    row = (
+        session.execute(
+            text(
+                f"""
+                SELECT
+                    SUM(lt.energy * td.play_count) / NULLIF(SUM(td.play_count) FILTER (WHERE lt.energy IS NOT NULL), 0) AS energy,
+                    SUM(lt.danceability * td.play_count) / NULLIF(SUM(td.play_count) FILTER (WHERE lt.danceability IS NOT NULL), 0) AS danceability,
+                    SUM(lt.valence * td.play_count) / NULLIF(SUM(td.play_count) FILTER (WHERE lt.valence IS NOT NULL), 0) AS valence,
+                    SUM(lt.bpm * td.play_count) / NULLIF(SUM(td.play_count) FILTER (WHERE lt.bpm IS NOT NULL), 0) AS bpm
+                FROM user_track_daily td
+                JOIN library_tracks lt
+                  ON lt.id = td.track_id
+                  OR (td.track_id IS NULL AND td.track_entity_uid IS NOT NULL
+                      AND lt.entity_uid = td.track_entity_uid)
+                WHERE td.user_id = :user_id AND {period_day_filter(period, "td.day")}
+                """
+            ),
+            {"user_id": user_id, **period_params(period)},
         )
+        .mappings()
+        .first()
+    )
     return {
         "energy": float(row["energy"] or 0) if row else 0,
         "danceability": float(row["danceability"] or 0) if row else 0,
         "valence": float(row["valence"] or 0) if row else 0,
         "bpm": round(float(row["bpm"]), 1) if row and row["bpm"] is not None else None,
     }
-
-
-def _month_start(months_back: int) -> datetime:
-    now = datetime.now(timezone.utc)
-    month = now.month - months_back
-    year = now.year
-    while month <= 0:
-        month += 12
-        year -= 1
-    return datetime(year, month, 1, tzinfo=timezone.utc)
 
 
 def _json_payload(value: Any) -> list[dict]:
@@ -405,107 +265,95 @@ def _month_subtitle(top_artists: list[dict]) -> str:
     return f"{', '.join(names)} and more"
 
 
-def _all_time_snapshot(user_id: int) -> dict | None:
-    with read_scope() as session:
-        totals = (
-            session.execute(
-                text(
-                    """
-                    SELECT
-                        COUNT(*)::integer AS play_count,
-                        COALESCE(SUM(played_seconds), 0) / 60.0 AS minutes_listened,
-                        COUNT(DISTINCT ended_at::date)::integer AS active_days
-                    FROM user_play_events
-                    WHERE user_id = :user_id
-                    """
-                ),
-                {"user_id": user_id},
-            )
-            .mappings()
-            .first()
-        )
-        if not totals or int(totals["play_count"] or 0) <= 0:
-            return None
+_COVER_COLUMNS_SQL = """
+    COALESCE(lt.id, td.track_id) AS track_id,
+    COALESCE(lt.entity_uid::text, td.track_entity_uid::text) AS track_entity_uid,
+    COALESCE(lt.path, td.track_path) AS track_path,
+    COALESCE(lt.title, td.title) AS title,
+    COALESCE(lt.artist, NULLIF(td.artist, '')) AS artist,
+    COALESCE(lt.album, NULLIF(td.album, '')) AS album,
+    art.id AS artist_id,
+    art.slug AS artist_slug,
+    COALESCE(alb_by_id.id, alb_by_name.id) AS album_id,
+    COALESCE(alb_by_id.slug, alb_by_name.slug) AS album_slug
+"""
+_COVER_JOINS_SQL = """
+    LEFT JOIN library_tracks lt
+      ON lt.id = td.track_id
+      OR (td.track_id IS NULL AND td.track_entity_uid IS NOT NULL
+          AND lt.entity_uid = td.track_entity_uid)
+    LEFT JOIN library_artists art ON art.name = COALESCE(lt.artist, td.artist)
+    LEFT JOIN library_albums alb_by_id ON alb_by_id.id = lt.album_id
+    LEFT JOIN library_albums alb_by_name
+      ON alb_by_id.id IS NULL
+     AND alb_by_name.artist = COALESCE(lt.artist, td.artist)
+     AND alb_by_name.name = COALESCE(lt.album, td.album)
+"""
 
-        top_artists_rows = (
-            session.execute(
-                text(
-                    """
-                    SELECT
-                        COALESCE(NULLIF(TRIM(artist), ''), 'Unknown artist') AS artist_name,
-                        COUNT(*)::integer AS play_count,
-                        COALESCE(SUM(played_seconds), 0) / 60.0 AS minutes_listened
-                    FROM user_play_events
-                    WHERE user_id = :user_id
-                      AND COALESCE(NULLIF(TRIM(artist), ''), '') <> ''
-                    GROUP BY 1
-                    ORDER BY play_count DESC, minutes_listened DESC, artist_name
-                    LIMIT 4
-                    """
-                ),
-                {"user_id": user_id},
-            )
-            .mappings()
-            .all()
+
+def _all_time_snapshot(session, user_id: int) -> dict | None:
+    totals = (
+        session.execute(
+            text(
+                """
+                SELECT SUM(play_count)::integer AS play_count,
+                       COALESCE(SUM(minutes_listened), 0) AS minutes_listened,
+                       COUNT(*)::integer AS active_days
+                FROM user_daily_listening
+                WHERE user_id = :user_id
+                """
+            ),
+            {"user_id": user_id},
         )
-        cover_rows = (
-            session.execute(
-                text(
-                    """
-                    WITH ranked AS (
-                        SELECT
-                            COALESCE(lt.id, upe.track_id) AS track_id,
-                            COALESCE(lt.entity_uid::text, upe.track_entity_uid::text) AS track_entity_uid,
-                            COALESCE(lt.path, upe.track_path) AS track_path,
-                            COALESCE(lt.title, upe.title) AS title,
-                            COALESCE(lt.artist, upe.artist) AS artist,
-                            COALESCE(lt.album, upe.album) AS album,
-                            art.id AS artist_id,
-                            art.slug AS artist_slug,
-                            COALESCE(alb_by_id.id, alb_by_name.id) AS album_id,
-                            COALESCE(alb_by_id.slug, alb_by_name.slug) AS album_slug,
-                            COUNT(*)::integer AS play_count
-                        FROM user_play_events upe
-                        LEFT JOIN library_tracks lt
-                          ON lt.id = upe.track_id
-                          OR (
-                            upe.track_id IS NULL
-                            AND upe.track_entity_uid IS NOT NULL
-                            AND lt.entity_uid = upe.track_entity_uid
-                          )
-                        LEFT JOIN library_artists art
-                          ON art.name = COALESCE(lt.artist, upe.artist)
-                        LEFT JOIN library_albums alb_by_id ON alb_by_id.id = lt.album_id
-                        LEFT JOIN library_albums alb_by_name
-                          ON alb_by_id.id IS NULL
-                         AND alb_by_name.artist = COALESCE(lt.artist, upe.artist)
-                         AND alb_by_name.name = COALESCE(lt.album, upe.album)
-                        WHERE upe.user_id = :user_id
-                        GROUP BY
-                            COALESCE(lt.id, upe.track_id),
-                            COALESCE(lt.entity_uid::text, upe.track_entity_uid::text),
-                            COALESCE(lt.path, upe.track_path),
-                            COALESCE(lt.title, upe.title),
-                            COALESCE(lt.artist, upe.artist),
-                            COALESCE(lt.album, upe.album),
-                            art.id,
-                            art.slug,
-                            COALESCE(alb_by_id.id, alb_by_name.id),
-                            COALESCE(alb_by_id.slug, alb_by_name.slug)
-                    )
-                    SELECT *
-                    FROM ranked
+        .mappings()
+        .first()
+    )
+    if not totals or int(totals["play_count"] or 0) <= 0:
+        return None
+    top_artists = [
+        dict(row)
+        for row in session.execute(
+            text(
+                """
+                SELECT artist_name, play_count, minutes_listened
+                FROM user_artist_stats
+                WHERE user_id = :user_id AND stat_window = 'all_time'
+                ORDER BY play_count DESC, minutes_listened DESC, artist_name
+                LIMIT 4
+                """
+            ),
+            {"user_id": user_id},
+        ).mappings()
+    ]
+    covers = [
+        dict(row)
+        for row in session.execute(
+            text(
+                f"""
+                WITH ranked AS (
+                    SELECT entity_key, SUM(play_count)::integer AS play_count
+                    FROM user_track_daily
+                    WHERE user_id = :user_id AND entity_key != 'unknown-track'
+                    GROUP BY entity_key
                     ORDER BY play_count DESC
                     LIMIT 4
-                    """
                 ),
-                {"user_id": user_id},
-            )
-            .mappings()
-            .all()
-        )
-
-    top_artists = [dict(row) for row in top_artists_rows]
+                picked AS (
+                    SELECT DISTINCT ON (r.entity_key) r.play_count AS total_plays, td.*
+                    FROM ranked r
+                    JOIN user_track_daily td
+                      ON td.user_id = :user_id AND td.entity_key = r.entity_key
+                    ORDER BY r.entity_key, td.day DESC
+                )
+                SELECT {_COVER_COLUMNS_SQL}, td.total_plays AS play_count
+                FROM picked td
+                {_COVER_JOINS_SQL}
+                ORDER BY td.total_plays DESC
+                """
+            ),
+            {"user_id": user_id},
+        ).mappings()
+    ]
     return {
         "period_kind": "all_time",
         "month_key": "all_time",
@@ -516,177 +364,122 @@ def _all_time_snapshot(user_id: int) -> dict | None:
         "minutes_listened": float(totals["minutes_listened"] or 0),
         "active_days": int(totals["active_days"] or 0),
         "top_artists": top_artists,
-        "covers": [dict(row) for row in cover_rows],
+        "covers": covers,
     }
 
 
-def _monthly_snapshots(user_id: int, *, months: int = 8) -> list[dict]:
-    start_month = _month_start(max(0, months - 1))
-    with read_scope() as session:
-        rows = (
-            session.execute(
-                text(
-                    """
-                    WITH filtered AS (
-                        SELECT
-                            date_trunc('month', upe.ended_at)::date AS month_start,
-                            upe.ended_at,
-                            upe.track_id,
-                            upe.track_entity_uid,
-                            upe.track_path,
-                            COALESCE(NULLIF(TRIM(upe.title), ''), 'Unknown track') AS title,
-                            COALESCE(NULLIF(TRIM(upe.artist), ''), 'Unknown artist') AS artist_name,
-                            COALESCE(NULLIF(TRIM(upe.album), ''), 'Unknown album') AS album_name,
-                            upe.played_seconds
-                        FROM user_play_events upe
-                        WHERE upe.user_id = :user_id
-                          AND upe.ended_at >= CAST(:start_month AS TIMESTAMPTZ)
-                    ),
-                    month_totals AS (
-                        SELECT
-                            month_start,
-                            COUNT(*)::integer AS play_count,
-                            COALESCE(SUM(played_seconds), 0) / 60.0 AS minutes_listened,
-                            COUNT(DISTINCT ended_at::date)::integer AS active_days
-                        FROM filtered
-                        GROUP BY 1
-                    ),
-                    artist_ranked AS (
-                        SELECT
-                            month_start,
-                            artist_name,
-                            COUNT(*)::integer AS play_count,
-                            COALESCE(SUM(played_seconds), 0) / 60.0 AS minutes_listened,
-                            ROW_NUMBER() OVER (
-                                PARTITION BY month_start
-                                ORDER BY COUNT(*) DESC, COALESCE(SUM(played_seconds), 0) DESC, artist_name
-                            ) AS rank
-                        FROM filtered
-                        WHERE artist_name <> 'Unknown artist'
-                        GROUP BY 1, 2
-                    ),
-                    artist_payload AS (
-                        SELECT
-                            month_start,
-                            jsonb_agg(
-                                jsonb_build_object(
-                                    'artist_name', artist_name,
-                                    'play_count', play_count,
-                                    'minutes_listened', minutes_listened
-                                )
-                                ORDER BY rank
-                            ) FILTER (WHERE rank <= 4) AS top_artists
-                        FROM artist_ranked
-                        GROUP BY 1
-                    ),
-                    cover_ranked AS (
-                        SELECT
-                            f.month_start,
-                            COALESCE(lt.id, f.track_id) AS track_id,
-                            COALESCE(lt.entity_uid::text, f.track_entity_uid::text) AS track_entity_uid,
-                            COALESCE(lt.path, f.track_path) AS track_path,
-                            COALESCE(lt.title, f.title) AS title,
-                            COALESCE(lt.artist, f.artist_name) AS artist,
-                            COALESCE(lt.album, f.album_name) AS album,
-                            art.id AS artist_id,
-                            art.slug AS artist_slug,
-                            COALESCE(alb_by_id.id, alb_by_name.id) AS album_id,
-                            COALESCE(alb_by_id.slug, alb_by_name.slug) AS album_slug,
-                            COUNT(*)::integer AS play_count,
-                            ROW_NUMBER() OVER (
-                                PARTITION BY f.month_start
-                                ORDER BY COUNT(*) DESC, COALESCE(SUM(f.played_seconds), 0) DESC, MAX(f.ended_at) DESC
-                            ) AS rank
-                        FROM filtered f
-                        LEFT JOIN library_tracks lt
-                          ON lt.id = f.track_id
-                          OR (
-                            f.track_id IS NULL
-                            AND f.track_entity_uid IS NOT NULL
-                            AND lt.entity_uid = f.track_entity_uid
-                          )
-                        LEFT JOIN library_artists art
-                          ON art.name = COALESCE(lt.artist, f.artist_name)
-                        LEFT JOIN library_albums alb_by_id
-                          ON alb_by_id.id = lt.album_id
-                        LEFT JOIN library_albums alb_by_name
-                          ON alb_by_id.id IS NULL
-                         AND alb_by_name.artist = COALESCE(lt.artist, f.artist_name)
-                         AND alb_by_name.name = COALESCE(lt.album, f.album_name)
-                        GROUP BY
-                            f.month_start,
-                            COALESCE(lt.id, f.track_id),
-                            COALESCE(lt.entity_uid::text, f.track_entity_uid::text),
-                            COALESCE(lt.path, f.track_path),
-                            COALESCE(lt.title, f.title),
-                            COALESCE(lt.artist, f.artist_name),
-                            COALESCE(lt.album, f.album_name),
-                            art.id,
-                            art.slug,
-                            COALESCE(alb_by_id.id, alb_by_name.id),
-                            COALESCE(alb_by_id.slug, alb_by_name.slug)
-                    ),
-                    cover_payload AS (
-                        SELECT
-                            month_start,
-                            jsonb_agg(
-                                jsonb_build_object(
-                                    'track_id', track_id,
-                                    'track_entity_uid', track_entity_uid,
-                                    'track_path', track_path,
-                                    'title', title,
-                                    'artist', artist,
-                                    'artist_id', artist_id,
-                                    'artist_slug', artist_slug,
-                                    'album', album,
-                                    'album_id', album_id,
-                                    'album_slug', album_slug
-                                )
-                                ORDER BY rank
-                            ) FILTER (WHERE rank <= 4) AS covers
-                        FROM cover_ranked
-                        GROUP BY 1
-                    )
-                    SELECT
-                        mt.month_start,
-                        to_char(mt.month_start, 'YYYY-MM') AS month_key,
-                        mt.play_count,
-                        mt.minutes_listened,
-                        mt.active_days,
-                        COALESCE(ap.top_artists, '[]'::jsonb) AS top_artists,
-                        COALESCE(cp.covers, '[]'::jsonb) AS covers
-                    FROM month_totals mt
-                    LEFT JOIN artist_payload ap ON ap.month_start = mt.month_start
-                    LEFT JOIN cover_payload cp ON cp.month_start = mt.month_start
-                    ORDER BY mt.month_start DESC
-                    LIMIT :months
-                    """
-                ),
-                {"user_id": user_id, "start_month": start_month, "months": months},
+def _monthly_snapshots(
+    session, user_id: int, today: date, *, months: int = 8
+) -> list[dict]:
+    month_index = today.year * 12 + today.month - 1 - max(0, months - 1)
+    start_month = date(month_index // 12, month_index % 12 + 1, 1)
+    rows = session.execute(
+        text(
+            f"""
+            WITH month_totals AS (
+                SELECT date_trunc('month', day)::date AS month_start,
+                       SUM(play_count)::integer AS play_count,
+                       SUM(minutes_listened) AS minutes_listened,
+                       COUNT(*)::integer AS active_days
+                FROM user_daily_listening
+                WHERE user_id = :user_id AND day >= :start_month
+                GROUP BY 1
+            ),
+            artist_ranked AS (
+                SELECT date_trunc('month', day)::date AS month_start,
+                       artist AS artist_name,
+                       SUM(play_count)::integer AS play_count,
+                       SUM(minutes_listened) AS minutes_listened,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY date_trunc('month', day)::date
+                           ORDER BY SUM(play_count) DESC, SUM(minutes_listened) DESC, artist
+                       ) AS rank
+                FROM user_track_daily
+                WHERE user_id = :user_id AND day >= :start_month AND artist != ''
+                GROUP BY 1, 2
+            ),
+            artist_payload AS (
+                SELECT month_start,
+                       jsonb_agg(
+                           jsonb_build_object(
+                               'artist_name', artist_name,
+                               'play_count', play_count,
+                               'minutes_listened', minutes_listened
+                           ) ORDER BY rank
+                       ) FILTER (WHERE rank <= 4) AS top_artists
+                FROM artist_ranked
+                GROUP BY 1
+            ),
+            track_ranked AS (
+                SELECT date_trunc('month', day)::date AS month_start,
+                       entity_key,
+                       MAX(track_id) AS track_id,
+                       MAX(track_entity_uid::text)::uuid AS track_entity_uid,
+                       MAX(track_path) AS track_path,
+                       MAX(title) AS title,
+                       MAX(artist) AS artist,
+                       MAX(album) AS album,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY date_trunc('month', day)::date
+                           ORDER BY SUM(play_count) DESC, SUM(minutes_listened) DESC, MAX(last_played_at) DESC
+                       ) AS rank
+                FROM user_track_daily
+                WHERE user_id = :user_id AND day >= :start_month
+                GROUP BY 1, 2
+            ),
+            cover_payload AS (
+                SELECT td.month_start,
+                       jsonb_agg(
+                           jsonb_build_object(
+                               'track_id', COALESCE(lt.id, td.track_id),
+                               'track_entity_uid', COALESCE(lt.entity_uid::text, td.track_entity_uid::text),
+                               'track_path', COALESCE(lt.path, td.track_path),
+                               'title', COALESCE(lt.title, td.title),
+                               'artist', COALESCE(lt.artist, NULLIF(td.artist, '')),
+                               'artist_id', art.id,
+                               'artist_slug', art.slug,
+                               'album', COALESCE(lt.album, NULLIF(td.album, '')),
+                               'album_id', COALESCE(alb_by_id.id, alb_by_name.id),
+                               'album_slug', COALESCE(alb_by_id.slug, alb_by_name.slug)
+                           ) ORDER BY td.rank
+                       ) AS covers
+                FROM track_ranked td
+                {_COVER_JOINS_SQL}
+                WHERE td.rank <= 4
+                GROUP BY td.month_start
             )
-            .mappings()
-            .all()
-        )
+            SELECT mt.month_start,
+                   to_char(mt.month_start, 'YYYY-MM') AS month_key,
+                   mt.play_count,
+                   mt.minutes_listened,
+                   mt.active_days,
+                   COALESCE(ap.top_artists, '[]'::jsonb) AS top_artists,
+                   COALESCE(cp.covers, '[]'::jsonb) AS covers
+            FROM month_totals mt
+            LEFT JOIN artist_payload ap ON ap.month_start = mt.month_start
+            LEFT JOIN cover_payload cp ON cp.month_start = mt.month_start
+            ORDER BY mt.month_start DESC
+            LIMIT :months
+            """
+        ),
+        {"user_id": user_id, "start_month": start_month, "months": months},
+    ).mappings()
 
     snapshots: list[dict] = []
-    all_time = _all_time_snapshot(user_id)
+    all_time = _all_time_snapshot(session, user_id)
     if all_time:
         snapshots.append(all_time)
     for row in rows:
         month_start = row["month_start"]
         if isinstance(month_start, datetime):
-            month_start_date = month_start.date()
-        elif isinstance(month_start, date):
-            month_start_date = month_start
-        else:
-            month_start_date = datetime.fromisoformat(str(month_start)).date()
+            month_start = month_start.date()
         top_artists = _json_payload(row["top_artists"])
         snapshots.append(
             {
                 "period_kind": "month",
                 "month_key": row["month_key"],
-                "month_start": month_start_date.isoformat(),
-                "title": _month_title(month_start_date),
+                "month_start": month_start.isoformat(),
+                "title": _month_title(month_start),
                 "subtitle": _month_subtitle(top_artists),
                 "play_count": int(row["play_count"] or 0),
                 "minutes_listened": float(row["minutes_listened"] or 0),
@@ -699,56 +492,27 @@ def _monthly_snapshots(user_id: int, *, months: int = 8) -> list[dict]:
 
 
 def get_stats_story(
-    user_id: int, window: str = "30d", month: str | None = None
+    user_id: int,
+    window: str = "30d",
+    month: str | None = None,
+    year: int | None = None,
 ) -> dict:
-    if month:
-        current_start, current_end = month_bounds(month)
-        previous_month = current_start.month - 1
-        previous_year = current_start.year
-        if previous_month <= 0:
-            previous_month = 12
-            previous_year -= 1
-        previous_start = datetime(previous_year, previous_month, 1, tzinfo=timezone.utc)
-        normalized = month_period_key(month)
-        days = (current_end - current_start).days
-    else:
-        normalized = normalize_stats_window(window)
-        current_start, previous_start = _period_bounds(normalized)
-        current_end = None
-        days = _STATS_WINDOWS[normalized]
-    comeback_before = (
-        current_start - timedelta(days=max(30, days or 30)) if current_start else None
-    )
-    return {
-        "window": normalized,
-        "movers": _artist_delta_rows(
-            user_id,
-            current_start=current_start,
-            previous_start=previous_start,
-            current_end=current_end,
-            limit=5,
-        ),
-        "discoveries": _discovery_rows(
-            user_id,
-            current_start=current_start,
-            current_end=current_end,
-            limit=5,
-        ),
-        "comebacks": _comeback_rows(
-            user_id,
-            current_start=current_start,
-            comeback_before=comeback_before,
-            current_end=current_end,
-            limit=5,
-        ),
-        "rhythm": _rhythm_payload(
-            user_id, current_start=current_start, current_end=current_end
-        ),
-        "audio_profile": _audio_profile_payload(
-            user_id, current_start=current_start, current_end=current_end
-        ),
-        "monthly_snapshots": _monthly_snapshots(user_id),
-    }
+    with read_scope() as session:
+        period = resolve_stats_period(
+            user_stats_timezone(user_id, session=session),
+            window=window,
+            month=month,
+            year=year,
+        )
+        return {
+            "window": period.key,
+            "movers": _artist_delta_rows(session, user_id, period, limit=5),
+            "discoveries": _discovery_rows(session, user_id, period, limit=5),
+            "comebacks": _comeback_rows(session, user_id, period, limit=5),
+            "rhythm": _rhythm_payload(session, user_id, period),
+            "audio_profile": _audio_profile_payload(session, user_id, period),
+            "monthly_snapshots": _monthly_snapshots(session, user_id, period.today),
+        }
 
 
 __all__ = ["get_stats_story"]

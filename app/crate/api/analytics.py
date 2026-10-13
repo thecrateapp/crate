@@ -29,7 +29,7 @@ from crate.api._deps import (
     extensions,
 )
 from crate.db.import_queue_read_models import count_import_queue_items
-from crate.db.cache_store import get_cache, set_cache
+from crate.db.instance_stats_dashboard_surface import get_instance_stats_dashboard
 from crate.db.repositories.library import get_library_artist, get_library_track_count
 from crate.db.ops_snapshot import get_cached_ops_snapshot
 from crate.storage_layout import resolve_artist_dir
@@ -51,21 +51,9 @@ from crate.db.queries.analytics import (
     get_insights_acoustic_instrumental,
     get_insights_artist_depth,
 )
-from crate.db.queries.user_library_stats_global import (
-    get_global_replay_mix,
-    get_global_stats_overview,
-    get_global_stats_story,
-    get_global_stats_trends,
-    get_global_top_albums,
-    get_global_top_artists,
-    get_global_top_genres,
-    get_global_top_tracks,
-)
 from crate.db.queries.tasks import list_tasks
 
 router = APIRouter(tags=["analytics"])
-
-_LISTENING_STATS_CACHE_TTL_SECONDS = 90
 
 _ANALYTICS_RESPONSES = merge_responses(
     AUTH_ERROR_RESPONSES,
@@ -125,57 +113,18 @@ def api_instance_listening_stats_dashboard(
     replay_limit: int = Query(36, ge=1, le=100),
 ):
     _require_auth(request)
-    period_key = f"month:{month}" if month else window
-    cache_key = (
-        f"listen:stats_dashboard:v4:instance:{period_key}:"
-        f"{tracks_limit}:{artists_limit}:{albums_limit}:{genres_limit}:{replay_limit}"
-    )
-    cached = get_cache(cache_key, max_age_seconds=_LISTENING_STATS_CACHE_TTL_SECONDS)
-    if cached is not None:
-        return cached
-
     try:
-        payload = {
-            "window": period_key,
-            "subject": {
-                "kind": "instance",
-                "display_name": "Crate",
-            },
-            "overview": get_global_stats_overview(window=window, month=month),
-            "trends": get_global_stats_trends(window=window, month=month),
-            "top_tracks": {
-                "window": period_key,
-                "items": get_global_top_tracks(
-                    window=window, month=month, limit=tracks_limit
-                ),
-            },
-            "top_artists": {
-                "window": period_key,
-                "items": get_global_top_artists(
-                    window=window, month=month, limit=artists_limit
-                ),
-            },
-            "top_albums": {
-                "window": period_key,
-                "items": get_global_top_albums(
-                    window=window, month=month, limit=albums_limit
-                ),
-            },
-            "top_genres": {
-                "window": period_key,
-                "items": get_global_top_genres(
-                    window=window, month=month, limit=genres_limit
-                ),
-            },
-            "replay": get_global_replay_mix(
-                window=window, month=month, limit=replay_limit
-            ),
-            "story": get_global_stats_story(window=window, month=month),
-        }
+        return get_instance_stats_dashboard(
+            window=window,
+            month=month,
+            tracks_limit=tracks_limit,
+            artists_limit=artists_limit,
+            albums_limit=albums_limit,
+            genres_limit=genres_limit,
+            replay_limit=replay_limit,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    set_cache(cache_key, payload, ttl=_LISTENING_STATS_CACHE_TTL_SECONDS)
-    return payload
 
 
 @router.get(

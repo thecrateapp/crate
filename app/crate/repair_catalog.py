@@ -21,6 +21,7 @@ class RepairCatalogEntry:
     supports_batch: bool = True
     supports_artist_scope: bool = True
     supports_global_scope: bool = True
+    supports_bulk_fix: bool = False
 
     @property
     def auto_fixable(self) -> bool:
@@ -61,6 +62,7 @@ REPAIR_CATALOG: tuple[RepairCatalogEntry, ...] = (
         "hybrid",
         requires_confirmation=True,
         supports_global_scope=False,
+        supports_bulk_fix=True,
     ),
     RepairCatalogEntry(
         "fk_orphan_albums",
@@ -133,8 +135,8 @@ REPAIR_CATALOG: tuple[RepairCatalogEntry, ...] = (
         "_check_duplicate_albums",
         "_fix_duplicate_albums",
         "automatic",
-        "destructive",
-        "hybrid",
+        "caution",
+        "db",
         requires_confirmation=True,
         supports_global_scope=False,
     ),

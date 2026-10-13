@@ -14,12 +14,20 @@ vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
     error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
   },
 }));
 
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
-import { CommandPalette } from "./CommandPalette";
+import { resetTaskCatalogForTests } from "@/lib/task-catalog";
+import { toast } from "sonner";
+import {
+  CommandPalette,
+  describeActionResult,
+  matchesCommandQuery,
+} from "./CommandPalette";
 
 beforeAll(() => {
   class TestResizeObserver {
@@ -57,12 +65,111 @@ function mockAuth(capabilities: string[]) {
   });
 }
 
+function catalogAction(
+  id: string,
+  label: string,
+  path: string,
+  capability: string,
+  body: Record<string, unknown> | null = null,
+) {
+  return {
+    id,
+    label,
+    task_type: id,
+    task_label: label,
+    category: "library",
+    path,
+    capability,
+    icon: "sparkles",
+    body,
+  };
+}
+
+const TASK_CATALOG = {
+  categories: { library: "Library" },
+  types: [],
+  actions: [
+    catalogAction(
+      "sync-library",
+      "Sync Library",
+      "/api/tasks/sync-library",
+      "library.import.manage",
+    ),
+    catalogAction(
+      "sync-federated-catalogs",
+      "Sync Federated Catalogs",
+      "/api/admin/federation/sync-catalog",
+      "federation.catalog.sync.manage",
+    ),
+    catalogAction(
+      "reconcile-global-catalog",
+      "Reconcile Global Catalog",
+      "/api/admin/global-catalog/reconcile",
+      "federation.policy.manage",
+      { mode: "incremental" },
+    ),
+    catalogAction(
+      "reconcile-global-catalog-full",
+      "Full Global Catalog Reconciliation",
+      "/api/admin/global-catalog/reconcile",
+      "federation.policy.manage",
+      { mode: "full" },
+    ),
+    catalogAction(
+      "health-check",
+      "Run Health Check",
+      "/api/manage/health-check",
+      "library.repair.run",
+    ),
+    catalogAction(
+      "remove-duplicate-tracks",
+      "Remove Duplicate Tracks",
+      "/api/manage/repair-duplicate-tracks",
+      "library.repair.run",
+    ),
+    catalogAction(
+      "analyze-all",
+      "Analyze All Tracks (BPM, Key, Energy)",
+      "/api/manage/analyze-all",
+      "library.analysis.manage",
+    ),
+    catalogAction(
+      "enrich-mbids",
+      "Enrich MusicBrainz IDs",
+      "/api/manage/enrich-mbids",
+      "library.metadata.write",
+    ),
+    catalogAction(
+      "backfill-release-dates",
+      "Backfill Album Release Dates",
+      "/api/manage/enrich-mbids",
+      "library.metadata.write",
+      { release_dates_only: true },
+    ),
+    catalogAction(
+      "sync-lyrics",
+      "Sync Missing Lyrics",
+      "/api/manage/sync-lyrics",
+      "library.metadata.write",
+      { limit: 1000 },
+    ),
+  ],
+};
+
+function mockApi(result: unknown = {}) {
+  vi.mocked(api).mockImplementation(async (path: string) =>
+    path === "/api/admin/task-catalog" ? TASK_CATALOG : result,
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  resetTaskCatalogForTests();
+  mockApi();
 });
 
 describe("CommandPalette", () => {
-  it("filters navigation commands by current capabilities", () => {
+  it("filters navigation commands by current capabilities", async () => {
     vi.mocked(useAuth).mockReturnValue({
       user: {
         id: 2,
@@ -100,14 +207,16 @@ describe("CommandPalette", () => {
     expect(screen.queryByText("Bandcamp")).not.toBeInTheDocument();
     expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
-    expect(screen.getByText("Enrich MusicBrainz IDs")).toBeInTheDocument();
-    expect(screen.getByText("Sync Missing Lyrics")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Enrich MusicBrainz IDs"),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("Sync Missing Lyrics")).toBeInTheDocument();
     expect(
       screen.queryByText("Analyze All Tracks (BPM, Key, Energy)"),
     ).not.toBeInTheDocument();
   });
 
-  it("shows acquisition and Bandcamp surfaces to librarians without admin access", () => {
+  it("shows acquisition and Bandcamp surfaces to librarians without admin access", async () => {
     vi.mocked(useAuth).mockReturnValue({
       user: {
         id: 6,
@@ -161,8 +270,8 @@ describe("CommandPalette", () => {
     expect(screen.getByText("Acquisition")).toBeInTheDocument();
     expect(screen.getByText("Bandcamp")).toBeInTheDocument();
     expect(screen.getByText("New Releases")).toBeInTheDocument();
-    expect(screen.getByText("Sync Library")).toBeInTheDocument();
-    expect(screen.getByText("Run Health Check")).toBeInTheDocument();
+    expect(await screen.findByText("Sync Library")).toBeInTheDocument();
+    expect(await screen.findByText("Run Health Check")).toBeInTheDocument();
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
   });
 
@@ -330,7 +439,7 @@ describe("CommandPalette", () => {
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
   });
 
-  it("shows federation surfaces and reconciliation tasks to federation admins", () => {
+  it("shows federation surfaces and reconciliation tasks to federation admins", async () => {
     mockAuth([
       "federation.nodes.view",
       "federation.catalog.sync.manage",
@@ -347,16 +456,20 @@ describe("CommandPalette", () => {
 
     expect(screen.getByText("Federation")).toBeInTheDocument();
     expect(screen.getByText("Global Catalog")).toBeInTheDocument();
-    expect(screen.getByText("Sync Federated Catalogs")).toBeInTheDocument();
-    expect(screen.getByText("Reconcile Global Catalog")).toBeInTheDocument();
     expect(
-      screen.getByText("Full Global Catalog Reconciliation"),
+      await screen.findByText("Sync Federated Catalogs"),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("Reconcile Global Catalog"),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("Full Global Catalog Reconciliation"),
     ).toBeInTheDocument();
   });
 
   it("queues all-peer federation catalog sync from the palette", async () => {
     mockAuth(["federation.catalog.sync.manage"]);
-    vi.mocked(api).mockResolvedValue({});
+    mockApi();
 
     render(
       <MemoryRouter>
@@ -365,7 +478,7 @@ describe("CommandPalette", () => {
     );
 
     fireEvent.keyDown(document, { key: "k", ctrlKey: true });
-    fireEvent.click(screen.getByText("Sync Federated Catalogs"));
+    fireEvent.click(await screen.findByText("Sync Federated Catalogs"));
 
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith(
@@ -377,7 +490,7 @@ describe("CommandPalette", () => {
 
   it("queues global catalog reconciliation from the palette", async () => {
     mockAuth(["federation.policy.manage"]);
-    vi.mocked(api).mockResolvedValue({});
+    mockApi();
 
     render(
       <MemoryRouter>
@@ -386,7 +499,7 @@ describe("CommandPalette", () => {
     );
 
     fireEvent.keyDown(document, { key: "k", ctrlKey: true });
-    fireEvent.click(screen.getByText("Reconcile Global Catalog"));
+    fireEvent.click(await screen.findByText("Reconcile Global Catalog"));
 
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith(
@@ -399,7 +512,7 @@ describe("CommandPalette", () => {
 
   it("queues the album release date backfill from the palette", async () => {
     mockAuth(["library.metadata.write"]);
-    vi.mocked(api).mockResolvedValue({});
+    mockApi();
 
     render(
       <MemoryRouter>
@@ -408,12 +521,116 @@ describe("CommandPalette", () => {
     );
 
     fireEvent.keyDown(document, { key: "k", ctrlKey: true });
-    fireEvent.click(screen.getByText("Backfill Album Release Dates"));
+    fireEvent.click(await screen.findByText("Backfill Album Release Dates"));
 
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith("/api/manage/enrich-mbids", "POST", {
         release_dates_only: true,
       }),
     );
+  });
+
+  it("opens as an accessible modal dialog", () => {
+    mockAuth(["admin.access", "library.repair.run"]);
+    render(
+      <MemoryRouter>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+
+    expect(
+      screen.getByRole("dialog", { name: "Command palette" }),
+    ).toBeInTheDocument();
+  });
+
+  it("finds actions and pages by typing their name", async () => {
+    mockAuth(["admin.access", "library.repair.run", "library.import.manage"]);
+    render(
+      <MemoryRouter>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+
+    fireEvent.change(
+      screen.getByPlaceholderText("Type a command or search..."),
+      {
+        target: { value: "sync lib" },
+      },
+    );
+
+    expect(await screen.findByText("Sync Library")).toBeInTheDocument();
+    expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
+  });
+
+  it("loads the task catalog once across palette mounts", async () => {
+    mockAuth(["library.import.manage"]);
+    const first = render(
+      <MemoryRouter>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+    expect(await screen.findByText("Sync Library")).toBeInTheDocument();
+    first.unmount();
+
+    render(
+      <MemoryRouter>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+    expect(screen.getByText("Sync Library")).toBeInTheDocument();
+    expect(
+      vi
+        .mocked(api)
+        .mock.calls.filter(([path]) => path === "/api/admin/task-catalog"),
+    ).toHaveLength(1);
+  });
+
+  it("tells the user when the backend did not start the task", async () => {
+    mockAuth(["library.import.manage"]);
+    mockApi({
+      task_id: null,
+      reason: "global_scope_not_supported",
+    });
+    render(
+      <MemoryRouter>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+
+    fireEvent.click(await screen.findByText("Sync Library"));
+
+    await waitFor(() =>
+      expect(toast.warning).toHaveBeenCalledWith(
+        "Sync Library not started: global scope not supported",
+      ),
+    );
+  });
+});
+
+describe("command palette helpers", () => {
+  it.each([
+    [{ task_id: "abc" }, { kind: "queued" }],
+    [{ status: "already_running" }, { kind: "already" }],
+    [{ task_id: null }, { kind: "already" }],
+    [
+      { task_id: null, reason: "not_fixable" },
+      { kind: "skipped", reason: "not fixable" },
+    ],
+    [undefined, { kind: "queued" }],
+  ])("describes %j as %j", (result, expected) => {
+    expect(describeActionResult(result)).toEqual(expected);
+  });
+
+  it("matches every word of the query in any order", () => {
+    expect(matchesCommandQuery("Remove duplicate tracks", "dup rem")).toBe(
+      true,
+    );
+    expect(matchesCommandQuery("Sync Library", "health")).toBe(false);
   });
 });

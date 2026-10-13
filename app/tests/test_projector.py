@@ -200,6 +200,11 @@ def test_process_domain_events_refreshes_home_for_play_event_and_aggregate_updat
     )
     monkeypatch.setattr(
         projector,
+        "schedule_instance_stats_dashboard_refresh",
+        lambda: calls["stats"].append("instance") or 4,
+    )
+    monkeypatch.setattr(
+        projector,
         "mark_domain_events_processed",
         lambda event_ids: calls["processed"].append(event_ids),
     )
@@ -210,7 +215,7 @@ def test_process_domain_events_refreshes_home_for_play_event_and_aggregate_updat
     assert calls["ops"] == []
     assert calls["home"] == [(3, True)]
     assert calls["recent"] == [3]
-    assert calls["stats"] == [3]
+    assert sorted(calls["stats"], key=str) == [3, "instance"]
     assert calls["processed"] == [["1682349000011-0", "1682349000012-0"]]
 
 

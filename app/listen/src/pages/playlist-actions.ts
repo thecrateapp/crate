@@ -18,7 +18,13 @@ import {
   toTrackReferencePayload,
 } from "@/lib/track-reference";
 import { fetchPlaylistRadio } from "@/lib/radio";
-import { inviteShareUrl, publicShareUrl } from "@/lib/share-url";
+import {
+  canCopy,
+  canEdit,
+  canFollow,
+  canManage,
+} from "@/lib/collaboration-access";
+import { publicShareUrl } from "@/lib/share-url";
 import { openShareSheet } from "@/lib/social-share";
 import { shuffleArray } from "@/lib/utils";
 import {
@@ -27,11 +33,8 @@ import {
   type PlaylistPageActions,
 } from "@/pages/playlist-action-menus";
 import type { PlaylistOfflinePresentation } from "@/pages/playlist-page-model";
-import type {
-  PlaylistData,
-  PlaylistInvite,
-  PlaylistSavePayload,
-} from "@/pages/playlist-types";
+import type { UserSearchResult } from "@/pages/people-types";
+import type { PlaylistData, PlaylistSavePayload } from "@/pages/playlist-types";
 
 const EMPTY_PAGE_ACTIONS: PlaylistPageActions = {
   offlineIcon: getPlaylistOfflineIcon("idle", { busy: false }),
@@ -52,20 +55,21 @@ interface PlaylistActionInput {
   offlineSupported: boolean;
   openCreatePlaylist: OpenCreatePlaylist;
   navigate: (to: string) => void;
-  onInviteCreated: (invite: PlaylistInvite) => void;
   playerTracks: Track[];
   playAll: PlayerActionsValue["playAll"];
   refetch: () => void;
-  setCreatingInvite: (value: boolean) => void;
+  setCopying: (value: boolean) => void;
   setDeleteOpen: (value: boolean) => void;
   setDeleting: (value: boolean) => void;
   setEditorOpen: (value: boolean) => void;
+  setLeaving: (value: boolean) => void;
   setMembersOpen: (value: boolean) => void;
   setRemovingMemberId: (value: number | null) => void;
   setSaving: (value: boolean) => void;
+  setTogglingFollow: (value: boolean) => void;
   t: TFunction;
   togglePlaylistOffline: ReturnType<typeof useOffline>["togglePlaylistOffline"];
-  inviteData: PlaylistInvite | null;
+  togglingFollow: boolean;
 }
 
 export interface PlaylistActions {
@@ -73,10 +77,11 @@ export interface PlaylistActions {
     playlistId: number,
     track: TrackRowData,
   ) => Promise<void>;
-  handleCopyInviteLink: () => Promise<void>;
-  handleCreateCollaboratorInvite: () => Promise<void>;
+  handleAddMember: (candidate: UserSearchResult) => Promise<void>;
+  handleCopyToMyPlaylists: () => Promise<void>;
   handleCreatePlaylistFromTrack: (track: TrackRowData) => void;
   handleDeletePlaylist: () => Promise<void>;
+  handleLeave: () => Promise<void>;
   handlePlay: () => void;
   handlePlayTrack: (trackEntryId: number) => void;
   handlePlaylistRadio: () => Promise<void>;
@@ -85,6 +90,7 @@ export interface PlaylistActions {
   handleSavePlaylist: (payload: PlaylistSavePayload) => Promise<void>;
   handleShare: () => void;
   handleShuffle: () => void;
+  handleToggleFollow: () => Promise<void>;
   handleToggleOffline: () => Promise<void>;
   offlineIcon: CrateIcon;
   playlistMenuItems: ContextMenuEntry[];
@@ -100,20 +106,21 @@ export function buildPlaylistActions({
   offlineSupported,
   openCreatePlaylist,
   navigate,
-  onInviteCreated,
   playerTracks,
   playAll,
   refetch,
-  setCreatingInvite,
+  setCopying,
   setDeleteOpen,
   setDeleting,
   setEditorOpen,
+  setLeaving,
   setMembersOpen,
   setRemovingMemberId,
   setSaving,
+  setTogglingFollow,
   t,
   togglePlaylistOffline,
-  inviteData,
+  togglingFollow,
 }: PlaylistActionInput): PlaylistActions {
   function handlePlay() {
     if (!playerTracks.length) return;
@@ -246,8 +253,12 @@ export function buildPlaylistActions({
         name: payload.name,
         description: payload.description,
         cover_data_url: payload.coverDataUrl,
-        visibility: payload.visibility,
-        is_collaborative: payload.isCollaborative,
+        ...(canManage(data)
+          ? {
+              visibility: payload.visibility,
+              is_collaborative: payload.isCollaborative,
+            }
+          : {}),
       });
 
       const originalByEntryId = new Map(
@@ -313,32 +324,72 @@ export function buildPlaylistActions({
     }
   }
 
-  async function handleCreateCollaboratorInvite() {
+  async function handleAddMember(candidate: UserSearchResult) {
     if (!data) return;
-    setCreatingInvite(true);
     try {
-      const invite = await api<PlaylistInvite>(
-        `/api/playlists/${data.id}/invites`,
-        "POST",
-        {},
+      await api(`/api/playlists/${data.id}/members`, "POST", {
+        user_id: candidate.id,
+      });
+      notify.success(
+        t("collaboration.added", {
+          name: candidate.display_name || candidate.username,
+        }),
       );
-      onInviteCreated(invite);
-      notify.success(t("playlist.toasts.inviteCreated"));
+      refetch();
     } catch {
-      notify.error(t("playlist.toasts.inviteCreateFailed"));
-    } finally {
-      setCreatingInvite(false);
+      notify.error(t("collaboration.addFailed"));
     }
   }
 
-  async function handleCopyInviteLink() {
-    if (!inviteData || typeof window === "undefined") return;
-    const inviteLink = inviteShareUrl(inviteData);
+  async function handleLeave() {
+    if (!data) return;
+    setLeaving(true);
     try {
-      await navigator.clipboard.writeText(inviteLink);
-      notify.success(t("playlist.toasts.inviteCopied"));
+      await api(`/api/playlists/${data.id}/leave`, "POST");
+      notify.success(t("collaboration.left", { name: data.name }));
+      navigate("/library?tab=playlists");
     } catch {
-      notify.error(t("playlist.toasts.inviteCopyFailed"));
+      notify.error(t("collaboration.leaveFailed"));
+    } finally {
+      setLeaving(false);
+    }
+  }
+
+  async function handleToggleFollow() {
+    if (!data) return;
+    setTogglingFollow(true);
+    try {
+      await api(
+        `/api/playlists/${data.id}/follow`,
+        data.is_followed ? "DELETE" : "POST",
+      );
+      notify.success(
+        data.is_followed
+          ? t("playlist.toasts.unfollowed", { name: data.name })
+          : t("playlist.toasts.followed", { name: data.name }),
+      );
+      refetch();
+    } catch {
+      notify.error(t("playlist.toasts.updateFailed"));
+    } finally {
+      setTogglingFollow(false);
+    }
+  }
+
+  async function handleCopyToMyPlaylists() {
+    if (!data) return;
+    setCopying(true);
+    try {
+      const copy = await api<{ id: number }>(
+        `/api/playlists/${data.id}/copy`,
+        "POST",
+      );
+      notify.success(t("collaboration.copiedPlaylist", { name: data.name }));
+      navigate(`/playlist/${copy.id}`);
+    } catch {
+      notify.error(t("collaboration.copyFailed"));
+    } finally {
+      setCopying(false);
     }
   }
 
@@ -371,21 +422,32 @@ export function buildPlaylistActions({
           isSmart: data.is_smart,
           onToggle: handleToggleOffline,
         },
-        onCollaborators: data.is_collaborative
-          ? () => setMembersOpen(true)
+        follow: canFollow(data)
+          ? {
+              followed: Boolean(data.is_followed),
+              pending: togglingFollow,
+              onToggle: handleToggleFollow,
+            }
           : undefined,
-        onEdit: () => setEditorOpen(true),
-        onRegenerate: data.is_smart ? handleRegenerate : undefined,
-        onDelete: () => setDeleteOpen(true),
+        onCopy: canCopy(data) ? handleCopyToMyPlaylists : undefined,
+        onCollaborators:
+          canManage(data) || (canEdit(data) && data.is_collaborative)
+            ? () => setMembersOpen(true)
+            : undefined,
+        onEdit: canEdit(data) ? () => setEditorOpen(true) : undefined,
+        onRegenerate:
+          canEdit(data) && data.is_smart ? handleRegenerate : undefined,
+        onDelete: canManage(data) ? () => setDeleteOpen(true) : undefined,
       })
     : EMPTY_PAGE_ACTIONS;
 
   return {
+    handleAddMember,
     handleAddTrackToPlaylist,
-    handleCopyInviteLink,
-    handleCreateCollaboratorInvite,
+    handleCopyToMyPlaylists,
     handleCreatePlaylistFromTrack,
     handleDeletePlaylist,
+    handleLeave,
     handlePlay,
     handlePlayTrack,
     handlePlaylistRadio,
@@ -394,6 +456,7 @@ export function buildPlaylistActions({
     handleSavePlaylist,
     handleShare,
     handleShuffle,
+    handleToggleFollow,
     handleToggleOffline,
     offlineIcon,
     playlistMenuItems,

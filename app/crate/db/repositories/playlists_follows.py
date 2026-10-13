@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 
 from crate.db.orm.playlist import Playlist, PlaylistMember, UserFollowedPlaylist
@@ -16,16 +15,13 @@ def follow_playlist(
     user_id: int, playlist_id: int, *, session: Session | None = None
 ) -> bool:
     def _impl(s: Session) -> bool:
-        playlist_exists = s.execute(
-            select(
-                exists().where(
-                    Playlist.id == playlist_id,
-                    Playlist.scope == "system",
-                    Playlist.is_active.is_(True),
-                )
-            )
-        ).scalar_one()
-        if not playlist_exists:
+        playlist = s.get(Playlist, playlist_id)
+        if playlist is None:
+            return False
+        if playlist.scope == "system":
+            if not playlist.is_active:
+                return False
+        elif playlist.visibility != "public" or playlist.user_id == user_id:
             return False
         existing = s.get(
             UserFollowedPlaylist, {"user_id": user_id, "playlist_id": playlist_id}

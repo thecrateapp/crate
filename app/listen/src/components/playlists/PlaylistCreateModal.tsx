@@ -40,6 +40,7 @@ interface PlaylistCreateModalProps {
   initialCoverDataUrl?: string | null;
   initialVisibility?: "public" | "private";
   initialCollaborative?: boolean;
+  canManageSettings?: boolean;
   initialTracks: PlaylistComposerTrack[];
   submitting: boolean;
   onClose: () => void;
@@ -61,6 +62,7 @@ export function PlaylistCreateModal({
   initialCoverDataUrl = null,
   initialVisibility = "private",
   initialCollaborative = false,
+  canManageSettings = true,
   initialTracks,
   submitting,
   onClose,
@@ -254,6 +256,7 @@ export function PlaylistCreateModal({
             }}
             dispatch={dispatch}
             handleFileChange={handleFileChange}
+            canManageSettings={canManageSettings}
             t={t}
           />
 

@@ -564,22 +564,20 @@ class TestStatsApiContracts:
             "monthly_snapshots": [],
         }
 
-        with (
-            patch("crate.api.analytics.get_cache", return_value=None),
-            patch("crate.api.analytics.set_cache"),
-            patch(
-                "crate.api.analytics.get_global_stats_overview", return_value=overview
-            ),
-            patch(
-                "crate.api.analytics.get_global_stats_trends",
-                return_value={"window": "30d", "points": []},
-            ),
-            patch("crate.api.analytics.get_global_top_tracks", return_value=[]),
-            patch("crate.api.analytics.get_global_top_artists", return_value=[]),
-            patch("crate.api.analytics.get_global_top_albums", return_value=[]),
-            patch("crate.api.analytics.get_global_top_genres", return_value=[]),
-            patch("crate.api.analytics.get_global_replay_mix", return_value=replay),
-            patch("crate.api.analytics.get_global_stats_story", return_value=story),
+        built = {
+            "window": "30d",
+            "subject": {"kind": "instance", "display_name": "Crate"},
+            "overview": overview,
+            "trends": {"window": "30d", "points": []},
+            "top_tracks": {"window": "30d", "items": []},
+            "top_artists": {"window": "30d", "items": []},
+            "top_albums": {"window": "30d", "items": []},
+            "top_genres": {"window": "30d", "items": []},
+            "replay": replay,
+            "story": story,
+        }
+        with patch(
+            "crate.api.analytics.get_instance_stats_dashboard", return_value=built
         ):
             resp = test_app.get("/api/stats/dashboard?window=30d")
 

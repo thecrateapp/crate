@@ -113,7 +113,13 @@ async def _global_stream_pubsub() -> AsyncIterator[str]:
             await asyncio.sleep(3)
 
 
-async def _task_stream_pubsub(task_id: str) -> AsyncIterator[str]:
+def _event_name(event_type: str, generic: bool) -> str:
+    return "task_event" if generic and event_type != "task_done" else event_type
+
+
+async def _task_stream_pubsub(
+    task_id: str, *, generic: bool = False
+) -> AsyncIterator[str]:
     """Subscribe to Redis channel for a specific task. Falls back to polling."""
     last_event_id = 0
     pubsub = None
@@ -123,7 +129,7 @@ async def _task_stream_pubsub(task_id: str) -> AsyncIterator[str]:
         pubsub = await open_pubsub(channel)
 
         # Send any existing events first
-        events = get_task_events(task_id, after_id=0, limit=50)
+        events = get_task_events(task_id, after_id=0, limit=50, tail=True)
         for event in events:
             payload = {
                 "id": event["id"],
@@ -136,7 +142,7 @@ async def _task_stream_pubsub(task_id: str) -> AsyncIterator[str]:
                 if event["event_type"] == "task_done"
                 else payload
             )
-            yield f"event: {event['event_type']}\ndata: {json_dumps(event_payload)}\n\n"
+            yield f"event: {_event_name(event['event_type'], generic)}\ndata: {json_dumps(event_payload)}\n\n"
             last_event_id = event["id"]
 
         # Check if already done
@@ -162,7 +168,8 @@ async def _task_stream_pubsub(task_id: str) -> AsyncIterator[str]:
                     yield f"event: task_done\ndata: {json_dumps(_task_done_payload(data))}\n\n"
                     break
                 else:
-                    yield f"event: {data.get('event_type', 'info')}\ndata: {json_dumps(data)}\n\n"
+                    event_type = data.get("event_type", "info")
+                    yield f"event: {_event_name(event_type, generic)}\ndata: {json_dumps(data)}\n\n"
         finally:
             if pubsub is not None:
                 await close_pubsub(pubsub, channel)
@@ -183,7 +190,7 @@ async def _task_stream_pubsub(task_id: str) -> AsyncIterator[str]:
                     if event["event_type"] == "task_done"
                     else payload
                 )
-                yield f"event: {event['event_type']}\ndata: {json_dumps(event_payload)}\n\n"
+                yield f"event: {_event_name(event['event_type'], generic)}\ndata: {json_dumps(event_payload)}\n\n"
                 last_event_id = event["id"]
 
             task = get_task(task_id)
@@ -215,10 +222,10 @@ async def api_events(request: Request):
     responses=_EVENT_SSE_RESPONSES,
     summary="Stream events for one task",
 )
-async def api_task_events(request: Request, task_id: str):
+async def api_task_events(request: Request, task_id: str, generic: bool = False):
     _require_auth(request)
     return StreamingResponse(
-        _task_stream_pubsub(task_id),
+        _task_stream_pubsub(task_id, generic=generic),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

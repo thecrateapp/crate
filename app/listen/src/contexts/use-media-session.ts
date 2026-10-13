@@ -3,7 +3,7 @@ import type { PlayerPauseOptions } from "./player-context";
 import type { Track } from "./player-types";
 import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
-import { isNative } from "@/lib/capacitor-runtime";
+import { isIosBrowser, isNative } from "@/lib/capacitor-runtime";
 import { useMediaAccessVersion } from "@/hooks/use-media-access-version";
 import { syncDesktopMediaSession } from "@/lib/desktop-tray";
 import {
@@ -246,6 +246,8 @@ export function useMediaSession({
     nativePositionSeconds,
   ]);
 
+  const registerActionsRef = useRef<() => void>(() => {});
+
   // Register action handlers
   useEffect(() => {
     if (isNative || !("mediaSession" in navigator)) return;
@@ -268,38 +270,61 @@ export function useMediaSession({
             actionsRef.current.seek(details.seekTime);
         },
       ],
-      [
-        "seekbackward",
-        (details) => {
-          const { currentTime, seek } = actionsRef.current;
-          seek(Math.max(0, currentTime - (details.seekOffset || 10)));
-        },
-      ],
-      [
-        "seekforward",
-        (details) => {
-          const { currentTime, duration, seek } = actionsRef.current;
-          seek(Math.min(duration, currentTime + (details.seekOffset || 10)));
-        },
-      ],
     ];
+    if (!isIosBrowser) {
+      actions.push(
+        [
+          "seekbackward",
+          (details) => {
+            const { currentTime, seek } = actionsRef.current;
+            seek(Math.max(0, currentTime - (details.seekOffset || 10)));
+          },
+        ],
+        [
+          "seekforward",
+          (details) => {
+            const { currentTime, duration, seek } = actionsRef.current;
+            seek(Math.min(duration, currentTime + (details.seekOffset || 10)));
+          },
+        ],
+      );
+    }
+    const clearedActions: MediaSessionAction[] = isIosBrowser
+      ? ["seekbackward", "seekforward"]
+      : [];
 
-    for (const [action, handler] of actions) {
+    const setHandler = (
+      action: MediaSessionAction,
+      handler: MediaSessionActionHandler | null,
+    ) => {
       try {
         navigator.mediaSession.setActionHandler(action, handler);
       } catch {
         // Action not supported in this browser
       }
-    }
+    };
+    const register = () => {
+      for (const [action, handler] of actions) setHandler(action, handler);
+      for (const action of clearedActions) setHandler(action, null);
+    };
+    const registerWhenVisible = () => {
+      if (document.visibilityState === "visible") register();
+    };
+
+    registerActionsRef.current = register;
+    register();
+    document.addEventListener("visibilitychange", registerWhenVisible);
+    window.addEventListener("pageshow", register);
 
     return () => {
-      for (const [action] of actions) {
-        try {
-          navigator.mediaSession.setActionHandler(action, null);
-        } catch {
-          /* ignore */
-        }
-      }
+      registerActionsRef.current = () => {};
+      document.removeEventListener("visibilitychange", registerWhenVisible);
+      window.removeEventListener("pageshow", register);
+      for (const [action] of actions) setHandler(action, null);
     };
   }, []);
+
+  useEffect(() => {
+    if (isPlaying) registerActionsRef.current();
+  }, [currentTrack?.id, isPlaying]);
 }

@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy import TextClause, text
 
-from crate.db.schema_sections.vdj_catalog_v108 import VDJ_MOOD_INDEX_MOODS
+from crate.db.schema_sections.vdj_catalog_v113 import VDJ_MOOD_INDEX_MOODS
 from crate.db.tx import read_scope
 
 VDJ_FOLDER_TRACK_LIMIT = 500
@@ -223,7 +223,7 @@ def list_vdj_folders(user_id: int | None) -> list[dict[str, str]]:
             .all()
         )
     for playlist in playlists:
-        folders.extend(_playlist_folders(playlist))
+        folders.extend(_playlist_folders(dict(playlist)))
     folders.extend(
         {"id": f"crate:genre:{genre['id']}", "name": str(genre["name"])}
         for genre in genres

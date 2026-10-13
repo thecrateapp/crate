@@ -113,6 +113,17 @@ test("renders Radar release and show rows", async ({
   await expectStablePage(page, "radar-default-dark");
 });
 
+test("renders the Stats signal page", async ({ openListenPage, page }) => {
+  await openListenPage("/stats");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "30 days of signal",
+  );
+  await expect(
+    page.getByRole("group", { name: /of listening across 30 bars/ }),
+  ).toBeVisible();
+  await expectStablePage(page, "stats-default-dark");
+});
+
 test("renders the appearance editor without native selects", async ({
   openListenPage,
   page,

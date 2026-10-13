@@ -33,12 +33,24 @@ from crate.federation.global_reconciliation import (
     reconcile_remote_catalog_batch,
 )
 from crate.task_dedup_keys import GLOBAL_CATALOG_FULL_DEDUP_KEY
+from crate.task_progress import TaskProgress, emit_progress
 from crate.worker_handlers import TaskHandler
 
 log = logging.getLogger(__name__)
 
 DEFAULT_BATCH_SIZE = 500
 MAX_BATCH_SIZE = 5000
+_FULL_PHASES = (
+    "local",
+    "local_prune",
+    "remote",
+    "remote_prune",
+    "local_refresh",
+    "remote_refresh",
+    "user_refs",
+    "search_documents",
+    "snapshots",
+)
 _USER_REF_COUNTERS = (
     "artist_follows",
     "album_saves",
@@ -52,8 +64,13 @@ _USER_REF_COUNTERS = (
 
 def _handle_reconcile_incremental(task_id: str, params: dict, config: dict) -> dict:
     batch_size = _batch_size(params)
+    progress = TaskProgress(phase="reconcile_dirty_sources", phase_count=2)
+    emit_progress(task_id, progress, force=True)
     result = reconcile_dirty_catalog_sources(limit=batch_size)
     if result["completed"]:
+        progress.phase = "refresh_genre_snapshots"
+        progress.phase_index = 1
+        emit_progress(task_id, progress, force=True)
         refresh_global_catalog_genre_snapshots()
         from crate.api.cache_events import broadcast_invalidation
 
@@ -73,6 +90,17 @@ def _handle_reconcile_full(task_id: str, params: dict, config: dict) -> dict:
     run_id = str(bootstrap.get("run_id") or "")
     phase = str(bootstrap.get("phase") or "local")
     cursor = bootstrap.get("cursor")
+    emit_progress(
+        task_id,
+        TaskProgress(
+            phase=phase,
+            phase_index=_FULL_PHASES.index(phase) if phase in _FULL_PHASES else 0,
+            phase_count=len(_FULL_PHASES),
+            done=_FULL_PHASES.index(phase) if phase in _FULL_PHASES else 0,
+            total=len(_FULL_PHASES),
+        ),
+        force=True,
+    )
     try:
         if state["status"] == "failed":
             run_id = begin_global_catalog_reconciliation_run(mode="full")

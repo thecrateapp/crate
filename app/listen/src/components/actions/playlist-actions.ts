@@ -6,6 +6,7 @@ import {
   ArrowDownToLineBold,
   Heart,
   HeartBold,
+  ListPlus,
   Loader2,
   Pencil,
   Play,
@@ -60,6 +61,7 @@ export interface PlaylistMenuItemsInput {
     disabled: boolean;
     onToggle: MenuHandler;
   };
+  onCopy?: MenuHandler;
   onCollaborators?: MenuHandler;
   onEdit?: MenuHandler;
   onRegenerate?: MenuHandler;
@@ -88,6 +90,7 @@ export function buildPlaylistMenuItems({
   onStartRadio,
   follow,
   offline,
+  onCopy,
   onCollaborators,
   onEdit,
   onRegenerate,
@@ -136,12 +139,22 @@ export function buildPlaylistMenuItems({
       action({
         key: "follow",
         label: follow.followed
-          ? t("actions.playlist.removeFromLibrary")
-          : t("actions.playlist.addToLibrary"),
+          ? t("actions.playlist.unfollow")
+          : t("actions.playlist.follow"),
         icon: follow.followed ? HeartBold : Heart,
         active: follow.followed,
         disabled: follow.disabled,
         onSelect: follow.onToggle,
+      }),
+    );
+  }
+  if (onCopy) {
+    library.push(
+      action({
+        key: "copy",
+        label: t("collaboration.addToMyPlaylists"),
+        icon: ListPlus,
+        onSelect: onCopy,
       }),
     );
   }

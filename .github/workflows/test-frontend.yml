@@ -17,8 +17,10 @@ on:
       - "scripts/design-system/**"
       - "playwright.appearance.config.ts"
       - "playwright.listen-visual.config.ts"
+      - "playwright.admin.config.ts"
       - "tests/appearance/**"
       - "tests/listen-visual/**"
+      - "tests/admin-e2e/**"
       - ".github/workflows/test-frontend.yml"
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
@@ -35,8 +37,10 @@ on:
       - "scripts/design-system/**"
       - "playwright.appearance.config.ts"
       - "playwright.listen-visual.config.ts"
+      - "playwright.admin.config.ts"
       - "tests/appearance/**"
       - "tests/listen-visual/**"
+      - "tests/admin-e2e/**"
       - ".github/workflows/test-frontend.yml"
 
 jobs:
@@ -204,6 +208,9 @@ jobs:
       - name: Run real Listen visual regression
         run: npm run test:listen-visual
 
+      - name: Run admin end-to-end flows
+        run: npm run test:admin-e2e
+
       - name: Upload appearance report
         if: failure()
         uses: actions/upload-artifact@v4
@@ -212,5 +219,7 @@ jobs:
           path: |
             playwright-report/appearance/
             playwright-report/listen-visual/
+            playwright-report/admin-e2e/
             test-results/appearance/
             test-results/listen-visual/
+            test-results/admin-e2e/

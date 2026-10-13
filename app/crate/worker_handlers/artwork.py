@@ -755,13 +755,15 @@ def _handle_backfill_artwork_variants(task_id: str, params: dict, config: dict) 
 
 
 def _handle_cleanup_artwork_variants(task_id: str, params: dict, config: dict) -> dict:
-    del task_id
     max_assets = max(1, min(int(params.get("max_assets") or 10_000), 100_000))
     library_path = config.get("library_path")
-    return cleanup_artwork_variants(
+    emit_progress(task_id, TaskProgress(phase="cleanup", total=1), force=True)
+    result = cleanup_artwork_variants(
         max_assets=max_assets,
         library_root=Path(str(library_path)) if library_path else None,
     )
+    emit_progress(task_id, TaskProgress(phase="cleanup", done=1, total=1), force=True)
+    return result
 
 
 def _handle_repair_artwork_variants(task_id: str, params: dict, config: dict) -> dict:
@@ -2550,13 +2552,18 @@ def _handle_derive_artist_hero(task_id: str, params: dict, config: dict) -> dict
 
 
 def _handle_backfill_artist_heroes(task_id: str, params: dict, config: dict) -> dict:
-    del task_id, config
+    del config
     after_id = max(0, int(params.get("after_artist_id") or 0))
     batch_size = max(1, min(int(params.get("batch_size") or 25), 100))
     candidates = list_artist_hero_backfill_candidates(
         after_id=after_id, limit=batch_size
     )
+    progress = TaskProgress(phase="queue_heroes", total=len(candidates))
+    emit_progress(task_id, progress, force=True)
     for candidate in candidates:
+        progress.done += 1
+        progress.item = str(candidate.get("name") or "")
+        emit_progress(task_id, progress)
         create_task_dedup(
             "derive_artist_hero",
             {"artist": candidate["name"]},
@@ -2581,7 +2588,6 @@ def _handle_backfill_artist_heroes(task_id: str, params: dict, config: dict) -> 
 def _handle_migrate_artist_heroes(task_id: str, params: dict, config: dict) -> dict:
     """Plan or queue a resumable canary over approved manual hero profiles."""
 
-    del task_id
     dry_run = params.get("dry_run", True) is not False
 
     after_id = max(0, int(params.get("after_artist_id") or 0))
@@ -2592,7 +2598,15 @@ def _handle_migrate_artist_heroes(task_id: str, params: dict, config: dict) -> d
     planned = 0
     skipped: dict[str, int] = {}
     targets: list[dict[str, object]] = []
+    progress = TaskProgress(
+        phase="plan_migration" if dry_run else "queue_migration",
+        total=len(candidates),
+    )
+    emit_progress(task_id, progress, force=True)
     for candidate in candidates:
+        progress.done += 1
+        progress.item = str(candidate.get("name") or "")
+        emit_progress(task_id, progress)
         artist_id = int(candidate["id"])
         profile = get_artist_hero_artwork(artist_id)
         if profile is None:

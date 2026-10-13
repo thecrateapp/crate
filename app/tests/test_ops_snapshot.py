@@ -56,6 +56,7 @@ def test_build_live_activity_payload_prefers_worker_runtime_state(monkeypatch):
         ),
     )
     monkeypatch.setattr(ops_snapshot_activity, "get_latest_scan", lambda: None)
+    monkeypatch.setattr(ops_snapshot_activity, "get_open_issue_total", lambda: 0)
     monkeypatch.setattr(
         ops_snapshot_activity, "count_import_queue_items", lambda status="pending": 0
     )

@@ -1,13 +1,13 @@
 """Catalog tables and indexes for the library schema bootstrap."""
 
-from crate.db.schema_sections.smart_mix_v106 import (
-    create_smart_mix_measurement_v106_schema,
+from crate.db.schema_sections.smart_mix_v111 import (
+    create_smart_mix_measurement_v111_schema,
 )
-from crate.db.schema_sections.smart_mix_v109 import (
-    create_smart_mix_source_stale_v109_schema,
+from crate.db.schema_sections.smart_mix_v114 import (
+    create_smart_mix_source_stale_v114_schema,
 )
-from crate.db.schema_sections.vdj_catalog_v108 import (
-    create_vdj_mood_indexes_v108_schema,
+from crate.db.schema_sections.vdj_catalog_v113 import (
+    create_vdj_mood_indexes_v113_schema,
 )
 
 
@@ -382,9 +382,9 @@ def create_library_catalog_schema(cur) -> None:
         CREATE INDEX IF NOT EXISTS idx_track_mix_profiles_updated_at
         ON track_mix_profiles(updated_at DESC)
     """)
-    create_smart_mix_measurement_v106_schema(cur)
-    create_smart_mix_source_stale_v109_schema(cur)
-    create_vdj_mood_indexes_v108_schema(cur)
+    create_smart_mix_measurement_v111_schema(cur)
+    create_smart_mix_source_stale_v114_schema(cur)
+    create_vdj_mood_indexes_v113_schema(cur)
     cur.execute("""
         CREATE INDEX IF NOT EXISTS idx_track_mix_profiles_source_revision
         ON track_mix_profiles(source_revision)

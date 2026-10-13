@@ -37,6 +37,7 @@ export interface PlaylistPageActionInput {
   onShare: Handler;
   offline?: PlaylistPageOffline;
   follow?: { followed: boolean; pending: boolean; onToggle: Handler };
+  onCopy?: Handler;
   onCollaborators?: Handler;
   onEdit?: Handler;
   onRegenerate?: Handler;
@@ -75,6 +76,7 @@ export function buildPlaylistPageActions({
   onShare,
   offline,
   follow,
+  onCopy,
   onCollaborators,
   onEdit,
   onRegenerate,
@@ -106,6 +108,7 @@ export function buildPlaylistPageActions({
           onToggle: offline.onToggle,
         }
       : undefined,
+    onCopy,
     onCollaborators,
     onEdit,
     onRegenerate,
@@ -151,7 +154,7 @@ export function buildPlaylistPageActions({
       key: "follow",
       label: follow.followed ? t("common.following") : t("common.follow"),
       ariaLabel: follow.followed
-        ? t("playlist.actions.removeFromLibrary")
+        ? t("actions.playlist.unfollow")
         : t("common.follow"),
       icon: follow.pending ? Loader2 : follow.followed ? HeartBold : Heart,
       iconClassName: follow.pending ? "animate-spin" : undefined,

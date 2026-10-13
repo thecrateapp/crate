@@ -6,6 +6,7 @@ import type { SocialShareColors } from "./social-share-colors";
 import {
   CRATE_STORY_STYLES,
   drawCrateStoryCard,
+  drawDiggingStoryCard,
   resolveCrateStoryStyle,
   STORY_HEIGHT,
   STORY_SAFE_BOTTOM,
@@ -156,5 +157,70 @@ describe("crate story styles", () => {
         crateStoryStyle: "spiral" as CrateStoryStyle,
       }),
     ).toBe("bento");
+  });
+});
+
+describe("digging story card", () => {
+  const data = {
+    kicker: "2026 on Crate",
+    headline: "Converge, no doubt about it.",
+    coverUrls: ["a", "b", "c", "d", "e"],
+    topArtistsLabel: "Top artists",
+    topArtists: [
+      "Converge",
+      "Birds In Row",
+      "Black Curse",
+      "Dredg",
+      "High Vis",
+    ],
+    topTracksLabel: "Top tracks",
+    topTracks: [
+      "Love Is Not Enough",
+      "Water Wings",
+      "Spectral Wound",
+      "Bug Eyes",
+      "Fever",
+    ],
+    stats: [
+      { value: "41,382", label: "minutes" },
+      { value: "metalcore", label: "top genre" },
+      { value: "47", label: "Longest streak" },
+      { value: "61", label: "New artists" },
+      { value: "2009", label: "Music age" },
+    ],
+    credit: "A selected year by diego.trecedoce",
+  };
+
+  it("draws every section inside the story safe area", () => {
+    const [ctx, recorded] = fakeContext();
+    const image = { naturalWidth: 600, naturalHeight: 600 } as HTMLImageElement;
+
+    drawDiggingStoryCard(
+      ctx,
+      data,
+      [image, image, null, image, image],
+      null,
+      colors,
+    );
+
+    const texts = recorded.texts.map((entry) => entry.text);
+    expect(texts).toEqual(
+      expect.arrayContaining([
+        "2026 on Crate",
+        "Converge",
+        "Love Is Not Enough",
+        "41,382",
+        "metalcore",
+        "47",
+        "A selected year by diego.trecedoce",
+      ]),
+    );
+    expect(recorded.images).toBe(4);
+    const body = recorded.texts.filter(
+      (entry) => !entry.text.startsWith("A selected"),
+    );
+    expect(Math.max(...body.map((entry) => entry.y))).toBeLessThanOrEqual(
+      STORY_HEIGHT - STORY_SAFE_BOTTOM,
+    );
   });
 });

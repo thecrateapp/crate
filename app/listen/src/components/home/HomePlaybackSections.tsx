@@ -1,1 +1,4 @@
-export { HomeReplaySection } from "./HomeReplaySection";
+export {
+  HomeReplaySection,
+  type HomeListeningSignal,
+} from "./HomeReplaySection";

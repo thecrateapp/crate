@@ -53,6 +53,34 @@ def get_albums_needing_release_metadata() -> list[dict]:
         return [dict(row) for row in rows]
 
 
+def get_albums_missing_release_group() -> list[dict]:
+    with transaction_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT
+                        album.*,
+                        (
+                            SELECT artist.mbid
+                            FROM library_artists artist
+                            WHERE LOWER(artist.name) = LOWER(album.artist)
+                            ORDER BY artist.mbid IS NULL, artist.id
+                            LIMIT 1
+                        ) AS artist_mbid
+                    FROM library_albums album
+                    WHERE COALESCE(album.release_group_primary_type, '') = ''
+                      AND album.quarantined_at IS NULL
+                    ORDER BY album.id DESC
+                    """
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(row) for row in rows]
+
+
 def update_album_mbid(album_id: int, mbid: str) -> None:
     with transaction_scope() as session:
         session.execute(

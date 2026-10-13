@@ -34,8 +34,10 @@ export function PlaylistIdentitySection({
   refs,
   dispatch,
   handleFileChange,
+  canManageSettings = true,
   t,
 }: {
+  canManageSettings?: boolean;
   state: PlaylistIdentityState;
   refs: {
     fileInputRef: { current: HTMLInputElement | null };
@@ -176,34 +178,36 @@ export function PlaylistIdentitySection({
           </Button>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <SegmentedControl
-            as="radio"
-            size="sm"
-            label={t("library.crates.visibility")}
-            value={visibility}
-            onValueChange={(value) =>
-              dispatch({ type: "set-visibility", value })
-            }
-            items={[
-              { value: "private", label: t("playlist.visibility.private") },
-              { value: "public", label: t("playlist.visibility.public") },
-            ]}
-          />
-          <button
-            type="button"
-            aria-pressed={isCollaborative}
-            className={cn(
-              "rounded-full px-3 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
-              isCollaborative
-                ? "bg-accent-action text-accent-action-foreground"
-                : "bg-text-primary/5 text-text-muted",
-            )}
-            onClick={() => dispatch({ type: "toggle-collaborative" })}
-          >
-            {t("playlist.badges.collaborative")}
-          </button>
-        </div>
+        {canManageSettings ? (
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <SegmentedControl
+              as="radio"
+              size="sm"
+              label={t("library.crates.visibility")}
+              value={visibility}
+              onValueChange={(value) =>
+                dispatch({ type: "set-visibility", value })
+              }
+              items={[
+                { value: "private", label: t("playlist.visibility.private") },
+                { value: "public", label: t("playlist.visibility.public") },
+              ]}
+            />
+            <button
+              type="button"
+              aria-pressed={isCollaborative}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
+                isCollaborative
+                  ? "bg-accent-action text-accent-action-foreground"
+                  : "bg-text-primary/5 text-text-muted",
+              )}
+              onClick={() => dispatch({ type: "toggle-collaborative" })}
+            >
+              {t("playlist.badges.collaborative")}
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

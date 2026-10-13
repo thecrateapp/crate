@@ -19,6 +19,9 @@ from crate.db.queries.tasks import has_inflight_acquisition_for_artist
 from crate.db.user_stats_dashboard_surface import (
     refresh_user_stats_dashboard_snapshots,
 )
+from crate.db.instance_stats_dashboard_surface import (
+    schedule_instance_stats_dashboard_refresh,
+)
 
 log = logging.getLogger(__name__)
 
@@ -256,6 +259,7 @@ def _projection_actions(
             actions.add(("home-user", user_id))
             if event_type == "user.listening_aggregates.updated":
                 actions.add(("stats-user", user_id))
+                actions.add(("stats-instance", None))
     elif scope == "ui.invalidate":
         invalidation_scope = str(payload.get("scope") or event.get("subject_key") or "")
         if _refreshes_ops_from_invalidation(invalidation_scope):
@@ -276,6 +280,9 @@ def _execute_projection_action(action: tuple[str, int | None]) -> tuple[int, int
         return 1, 0
     if name == "recent-global":
         return 0, _warm_recent_home_discovery_snapshots()
+    if name == "stats-instance":
+        schedule_instance_stats_dashboard_refresh()
+        return 0, 0
     if subject is None:
         raise ValueError(f"Projection {name} requires a user ID")
     if name == "home-user":

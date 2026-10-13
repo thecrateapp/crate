@@ -198,7 +198,7 @@ describe("action hooks i18n", () => {
         "Reproducir playlist",
         "Reproducir playlist aleatoriamente",
         "Iniciar radio de playlist",
-        "Añadir a tu biblioteca",
+        "Seguir playlist",
         "Disponible offline",
         "Compartir playlist",
       ]),

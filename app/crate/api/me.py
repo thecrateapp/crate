@@ -46,6 +46,7 @@ from crate.api.schemas.acquisition import (
 )
 from crate.api.schemas.common import OkResponse, TaskEnqueueResponse
 from crate.api.schemas.me import (
+    StatsTodayResponse,
     ChangePasswordRequest,
     CitySearchResultResponse,
     FeedItemResponse,
@@ -159,7 +160,9 @@ from crate.db.repositories.library_contributions import (
     list_user_album_contributions,
 )
 from crate.db.repositories.global_user_library import get_user_global_library_counts
-from crate.db.repositories.playlists import get_followed_system_playlists, get_playlists
+from crate.db.repositories.user_listening_today import get_listening_today
+from crate.db.repositories.playlists import get_followed_system_playlists
+from crate.db.repositories.playlists_library_reads import get_library_playlists_page
 from crate.db.repositories.recommendations import (
     record_recommendation_exposure,
     record_recommendation_feedback,
@@ -608,10 +611,7 @@ def my_followed_playlists(request: Request):
 )
 def my_playlists_page(request: Request):
     user = _require_auth(request)
-    return {
-        "playlists": get_playlists(user_id=user["id"]),
-        "followed_curated_playlists": my_followed_playlists(request),
-    }
+    return get_library_playlists_page(int(user["id"]))
 
 
 # ── Contributions ────────────────────────────────────────────
@@ -953,6 +953,17 @@ def stats(request: Request):
 
 
 @router.get(
+    "/stats/today",
+    response_model=StatsTodayResponse,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Get minutes and plays listened today, updated on every play",
+)
+def stats_today(request: Request):
+    user = _require_auth(request)
+    return get_listening_today(user["id"])
+
+
+@router.get(
     "/stats/overview",
     response_model=StatsOverviewResponse,
     responses=_ME_RESPONSES,
@@ -1084,7 +1095,7 @@ def stats_dashboard(
     month: str | None = Query(None, pattern=r"^\d{4}-\d{2}$"),
     tracks_limit: int = Query(12, ge=1, le=100),
     artists_limit: int = Query(10, ge=1, le=100),
-    albums_limit: int = Query(12, ge=1, le=100),
+    albums_limit: int = Query(14, ge=1, le=100),
     genres_limit: int = Query(10, ge=1, le=100),
     replay_limit: int = Query(36, ge=1, le=100),
 ):

@@ -271,6 +271,10 @@ from crate.api.schemas.settings import (
     WorkerSettingsResponse,
 )
 from crate.api.schemas.tasks import (
+    ScheduleRunResponse,
+    TaskActionCatalogEntry,
+    TaskCatalogResponse,
+    TaskTypeCatalogEntry,
     TaskCancelResponse,
     TaskCleanupResponse,
     TaskCleanByStatusResponse,
@@ -733,6 +737,10 @@ __all__ = [
     "WorkerRestartResponse",
     "WorkerSchedulesResponse",
     "WorkerSchedulesUpdateResponse",
+    "ScheduleRunResponse",
+    "TaskActionCatalogEntry",
+    "TaskCatalogResponse",
+    "TaskTypeCatalogEntry",
     "WorkerSettingsResponse",
     "WorkerSlotsResponse",
     "WorkerStatusResponse",

@@ -1,9 +1,14 @@
-import { act, screen } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useApi } from "@/hooks/use-api";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
-import type { StatsDashboard } from "@/components/stats/stats-model";
+import type {
+  StatsDashboard,
+  StatsToday,
+} from "@/components/stats/stats-model";
+import { baseDashboard, signalDashboard } from "@/test/stats-dashboard-fixture";
 
 import { Stats } from "./Stats";
 
@@ -19,17 +24,11 @@ vi.mock("@/hooks/use-lazy-crate-options", () => ({
 }));
 
 vi.mock("@/contexts/LikedTracksContext", () => ({
-  useLikedTracks: () => ({
-    isLiked: () => false,
-    toggleTrackLike: vi.fn(),
-  }),
+  useLikedTracks: () => ({ isLiked: () => false, toggleTrackLike: vi.fn() }),
 }));
 
 vi.mock("@/contexts/SavedAlbumsContext", () => ({
-  useSavedAlbums: () => ({
-    isSaved: () => false,
-    toggleAlbumSaved: vi.fn(),
-  }),
+  useSavedAlbums: () => ({ isSaved: () => false, toggleAlbumSaved: vi.fn() }),
 }));
 
 vi.mock("@/contexts/ArtistFollowsContext", () => ({
@@ -40,56 +39,35 @@ vi.mock("@/contexts/ArtistFollowsContext", () => ({
 }));
 
 const mockUseApi = vi.mocked(useApi);
+const CURRENT_YEAR = new Date().getFullYear();
+
+function mockApis(dashboard: StatsDashboard | null, today?: StatsToday) {
+  mockUseApi.mockImplementation((url: string | null) => ({
+    data: url === "/api/me/stats/today" ? today ?? null : dashboard,
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  }));
+}
 
 describe("Stats page", () => {
   beforeEach(() => {
-    mockUseApi.mockReturnValue({
-      data: null,
-      loading: false,
-      error: null,
-      refetch: vi.fn(),
-    });
+    mockApis(null);
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("refreshes the extracted stats controller while a snapshot is pending", () => {
+  it("refreshes the dashboard while a snapshot is pending", () => {
     vi.useFakeTimers();
     const refetch = vi.fn();
-    mockUseApi.mockReturnValue({
-      data: {
-        window: "30d",
-        overview: {
-          window: "30d",
-          play_count: 0,
-          complete_play_count: 0,
-          skip_count: 0,
-          minutes_listened: 0,
-          active_days: 0,
-          skip_rate: 0,
-          top_artist: null,
-        },
-        trends: { window: "30d", points: [] },
-        top_tracks: { window: "30d", items: [] },
-        top_artists: { window: "30d", items: [] },
-        top_albums: { window: "30d", items: [] },
-        top_genres: { window: "30d", items: [] },
-        replay: {
-          window: "30d",
-          title: "Replay",
-          subtitle: "Pending",
-          track_count: 0,
-          minutes_listened: 0,
-          items: [],
-        },
-        snapshot: { pending: true },
-      },
+    mockUseApi.mockImplementation(() => ({
+      data: { ...baseDashboard(), snapshot: { pending: true } },
       loading: false,
       error: null,
       refetch,
-    });
+    }));
 
     renderWithListenProviders(<Stats />, {
       route: "/stats",
@@ -104,301 +82,129 @@ describe("Stats page", () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it("localizes the main stats chrome", () => {
+  it("localizes the header and shows a single empty state", () => {
     renderWithListenProviders(<Stats />, {
       route: "/stats",
       path: "/stats",
       locale: "es",
     });
 
-    expect(screen.getByText("Crate DNA")).toBeInTheDocument();
-    expect(screen.getByText("Tu sonido")).toBeInTheDocument();
-    expect(screen.getByText("descifrado")).toBeInTheDocument();
-    expect(screen.getByText("Tu Crate DNA")).toBeInTheDocument();
-    expect(screen.getByText("Crate Pulse")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "30 días de señal",
+    );
+    expect(screen.getByRole("link", { name: "Crate DNA" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      screen.getByRole("link", { name: "Crate Pulse" }),
+    ).not.toHaveAttribute("aria-current");
+    expect(
+      screen.queryByRole("heading", { name: "Crate Digging" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByText("Tus estadísticas esperan una señal"),
     ).toBeInTheDocument();
-  });
-
-  it("shows a single global empty state without per-section empties", () => {
-    renderWithListenProviders(<Stats />, {
-      route: "/stats",
-      path: "/stats",
-      locale: "es",
-    });
-
     expect(screen.getAllByTestId("empty-state")).toHaveLength(1);
-    expect(
-      screen.queryByText(
-        "Sigue escuchando y esta página empezará a escribir tu recap.",
-      ),
-    ).not.toBeInTheDocument();
   });
 
-  it("uses semantic tokens for the stats shell and hero", () => {
-    const period = "30d";
-    const dashboard: StatsDashboard = {
-      window: period,
-      overview: {
-        window: period,
-        play_count: 1,
-        complete_play_count: 1,
-        skip_count: 0,
-        minutes_listened: 3,
-        active_days: 1,
-        skip_rate: 0,
-        top_artist: null,
-      },
-      trends: { window: period, points: [] },
-      top_tracks: { window: period, items: [] },
-      top_artists: { window: period, items: [] },
-      top_albums: { window: period, items: [] },
-      top_genres: { window: period, items: [] },
-      replay: {
-        window: period,
-        title: "Replay",
-        subtitle: "Snapshot",
-        track_count: 0,
-        minutes_listened: 0,
-        items: [],
-      },
-    };
-    mockUseApi.mockReturnValue({
-      data: dashboard,
-      loading: false,
-      error: null,
-      refetch: vi.fn(),
-    });
-
-    const { container } = renderWithListenProviders(<Stats />, {
-      route: "/stats",
-      path: "/stats",
-      locale: "es",
-    });
-
-    expect(
-      container.querySelector(".stats-page-atmosphere"),
-    ).toBeInTheDocument();
-    expect(container.querySelector(".stats-page-grid")).toBeInTheDocument();
-
-    const hero = container.querySelector(".stats-hero-surface");
-    expect(hero).toBeInTheDocument();
-    expect(hero).not.toHaveClass("bg-[#101116]");
-    expect(hero).not.toHaveClass("shadow-black/35");
-    expect(hero?.querySelector(".stats-hero-overlay")).toBeInTheDocument();
-
-    const heroTitle = container.querySelector(".stats-hero-title");
-    expect(heroTitle).toBeInTheDocument();
-    expect(heroTitle).not.toHaveClass("text-white");
-    expect(container.querySelectorAll(".stats-hero-metric")).toHaveLength(3);
-  });
-
-  it("localizes data-backed stats panels", () => {
-    const dashboard: StatsDashboard = {
-      window: "30d",
-      subject: {
-        kind: "user",
-        username: "listener",
-        display_name: "Listener",
-      },
-      overview: {
-        window: "30d",
-        play_count: 12,
-        complete_play_count: 10,
-        skip_count: 2,
-        minutes_listened: 64,
-        active_days: 4,
-        skip_rate: 0.16,
-        top_artist: {
-          artist_name: "Fugazi",
-          play_count: 8,
-          minutes_listened: 42,
-        },
-      },
-      trends: {
-        window: "30d",
-        points: [
-          {
-            day: "2026-07-01",
-            play_count: 6,
-            complete_play_count: 5,
-            skip_count: 1,
-            minutes_listened: 32,
-          },
-        ],
-      },
-      top_tracks: {
-        window: "30d",
-        items: [
-          {
-            track_id: 1,
-            track_path: "/music/fugazi/waiting-room.flac",
-            title: "Waiting Room",
-            artist: "Fugazi",
-            album: "13 Songs",
-            energy: 0.72,
-            danceability: 0.42,
-            valence: 0.34,
-            play_count: 6,
-            complete_play_count: 5,
-            minutes_listened: 18,
-          },
-        ],
-      },
-      top_artists: {
-        window: "30d",
-        items: [
-          {
-            artist_name: "Fugazi",
-            play_count: 8,
-            complete_play_count: 7,
-            minutes_listened: 42,
-          },
-        ],
-      },
-      top_albums: {
-        window: "30d",
-        items: [
-          {
-            artist: "Fugazi",
-            album: "13 Songs",
-            play_count: 6,
-            complete_play_count: 5,
-            minutes_listened: 18,
-          },
-        ],
-      },
-      top_genres: {
-        window: "30d",
-        items: [],
-      },
-      replay: {
-        window: "30d",
-        title: "Replay this month",
-        subtitle: "The tracks that defined your last 30 days.",
-        title_key: "stats.replay.thisMonth.title",
-        subtitle_key: "stats.replay.thisMonth.subtitle",
-        track_count: 0,
-        minutes_listened: 0,
-        items: [],
-      },
-      viewer_affinity: {
-        affinity_score: 82,
-        affinity_band: "very_high",
-        affinity_reasons: ["Fugazi"],
-      },
-    };
-
-    mockUseApi.mockReturnValue({
-      data: dashboard,
-      loading: false,
-      error: null,
-      refetch: vi.fn(),
+  it("renders the signal tape and every section of the redesigned page", () => {
+    mockApis(signalDashboard(), {
+      day: "2026-10-08",
+      timezone: "Europe/Madrid",
+      minutes: 38,
+      plays: 9,
     });
 
     renderWithListenProviders(<Stats />, {
-      route: "/users/listener/stats",
-      path: "/users/:username/stats",
-      locale: "es",
-    });
-
-    expect(screen.getByText("Coincidencia de oyente")).toBeInTheDocument();
-    expect(screen.getByText("82% de afinidad")).toBeInTheDocument();
-    expect(screen.getByText("Fugazi lideró este periodo")).toBeInTheDocument();
-    expect(screen.getAllByText(/1 jul/i).length).toBeGreaterThan(0);
-    expect(screen.getByText("Señal 01")).toBeInTheDocument();
-    expect(screen.getByText("Tu perfil sonoro")).toBeInTheDocument();
-    expect(screen.getByText("Energía")).toBeInTheDocument();
-    expect(screen.getByText("Movimiento")).toBeInTheDocument();
-    expect(screen.getByText("Luminosidad")).toBeInTheDocument();
-    expect(screen.getByText("BPM medio")).toBeInTheDocument();
-    expect(screen.getByText("Tasa de saltos")).toBeInTheDocument();
-    expect(
-      screen.getByText("La señal de géneros aparecerá aquí."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("Tu replay aparecerá cuando escuches un poco más."),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Replay de este mes")).toBeInTheDocument();
-    expect(
-      screen.getByText("Las canciones que definieron tus últimos 30 días."),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("Replay this month")).not.toBeInTheDocument();
-  });
-
-  it("uses global album artwork for remote replay tracks", () => {
-    const dashboard: StatsDashboard = {
-      window: "30d",
-      overview: {
-        window: "30d",
-        play_count: 1,
-        complete_play_count: 1,
-        skip_count: 0,
-        minutes_listened: 3,
-        active_days: 1,
-        skip_rate: 0,
-        top_artist: null,
-      },
-      trends: {
-        window: "30d",
-        points: [],
-      },
-      top_tracks: {
-        window: "30d",
-        items: [],
-      },
-      top_artists: {
-        window: "30d",
-        items: [],
-      },
-      top_albums: {
-        window: "30d",
-        items: [],
-      },
-      top_genres: {
-        window: "30d",
-        items: [],
-      },
-      replay: {
-        window: "30d",
-        title: "Replay",
-        subtitle: "Snapshot",
-        track_count: 1,
-        minutes_listened: 3,
-        items: [
-          {
-            track_id: null,
-            global_track_uid: "track-global-1",
-            global_artist_uid: "artist-global-1",
-            global_album_uid: "album-global-1",
-            track_path: null,
-            title: "0151",
-            artist: "High Vis",
-            album: "Blending",
-            play_count: 1,
-            complete_play_count: 1,
-            minutes_listened: 3,
-          },
-        ],
-      },
-    };
-
-    mockUseApi.mockReturnValue({
-      data: dashboard,
-      loading: false,
-      error: null,
-      refetch: vi.fn(),
-    });
-
-    const { container } = renderWithListenProviders(<Stats />, {
       route: "/stats",
       path: "/stats",
       locale: "es",
     });
 
-    expect(container.innerHTML).toContain(
-      "/api/catalog/albums/album-global-1/cover",
+    expect(
+      screen.getByRole("group", { name: /de escucha en 30 barras/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("minutos hoy")).toBeInTheDocument();
+    expect(screen.getByText("artistas")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Crate Digging" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Ver la historia" }),
+    ).toHaveAttribute("href", "/stats/digging?window=30d");
+    expect(screen.getByRole("link", { name: "Converge" })).toBeInTheDocument();
+    expect(screen.getByText("Tu artista del periodo")).toBeInTheDocument();
+    expect(screen.getByText("top 3%")).toBeInTheDocument();
+    expect(screen.getByText("de sus oyentes en Crate")).toBeInTheDocument();
+    expect(screen.getByText("Racha más larga")).toBeInTheDocument();
+    expect(screen.getAllByText("Spectral Wound").length).toBeGreaterThan(0);
+    expect(screen.getByText("31×")).toBeInTheDocument();
+    expect(screen.getByText("Cómo escuchas")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /22:00/ })).toBeInTheDocument();
+    expect(screen.getByText(/ha crecido 9 puntos/)).toBeInTheDocument();
+    expect(screen.getByText("2009")).toBeInTheDocument();
+    expect(screen.getByText(/When Forever Comes Crashing/)).toBeInTheDocument();
+    expect(screen.getByText("Angine de Poitrine")).toBeInTheDocument();
+  });
+
+  it("switches periods through the URL, including the calendar year", async () => {
+    const user = userEvent.setup();
+    mockApis(signalDashboard());
+
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "es",
+    });
+
+    expect(screen.getByRole("radio", { name: "30 días" })).toBeChecked();
+    await user.click(screen.getByRole("radio", { name: String(CURRENT_YEAR) }));
+
+    await waitFor(() =>
+      expect(mockUseApi).toHaveBeenCalledWith(
+        expect.stringContaining(`window=year%3A${CURRENT_YEAR}`),
+      ),
     );
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      `Tu ${CURRENT_YEAR} en señal`,
+    );
+  });
+
+  it("keeps rendering legacy dashboards without the signal sections", () => {
+    const legacy = baseDashboard();
+    legacy.overview = {
+      ...legacy.overview,
+      play_count: 3,
+      minutes_listened: 9,
+    };
+    mockApis(legacy);
+
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "en",
+    });
+
+    expect(screen.queryByRole("group")).not.toBeInTheDocument();
+    expect(screen.getByText("Top tracks")).toBeInTheDocument();
+  });
+
+  it("offers the rolling year instead of the calendar year for Crate Pulse", () => {
+    mockApis(signalDashboard());
+
+    renderWithListenProviders(<Stats />, {
+      route: "/stats/global",
+      path: "/stats/global",
+      locale: "en",
+    });
+
+    expect(
+      screen.getByRole("radio", { name: "Last year" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("radio", { name: String(CURRENT_YEAR) }),
+    ).toBeNull();
+    expect(mockUseApi).toHaveBeenCalledWith(null);
   });
 });

@@ -178,10 +178,10 @@ export function buildCuratedPlaylistActions({
     try {
       if (data.is_followed) {
         await api(`/api/curation/playlists/${id}/follow`, "DELETE");
-        notify.success(t("playlist.toasts.removedLibrary"));
+        notify.success(t("playlist.toasts.unfollowed", { name: data.name }));
       } else {
         await api(`/api/curation/playlists/${id}/follow`, "POST");
-        notify.success(t("playlist.toasts.addedLibrary"));
+        notify.success(t("playlist.toasts.followed", { name: data.name }));
       }
       refetch();
     } catch {

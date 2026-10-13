@@ -10,7 +10,8 @@ from crate.artist_lifecycle import (
     delete_artist,
     run_artist_merge,
 )
-from crate.audio import read_tags
+from crate.audio import audio_format_rank, read_tags
+from crate.db.repositories.library_quarantine import quarantine_album
 from crate.db.audit import log_audit
 from crate.db.jobs.repair import (
     count_valid_album_tracks,
@@ -36,7 +37,9 @@ from crate.worker_handlers.migration import _fix_artist, preview_fix_artist
 log = logging.getLogger(__name__)
 
 DUPLICATE_TRACK_MAX_DURATION_DELTA_SEC = 1.0
+LOSSLESS_FORMATS = frozenset({"flac", "alac", "wav", "aiff", "ape", "wv", "dsf"})
 DUPLICATE_TRACK_CONFLICTING_FINGERPRINT_MAX_DURATION_DELTA_SEC = 0.25
+DUPLICATE_TRACK_ALREADY_RESOLVED_REASON = "the copies are no longer in the library"
 
 
 class LibraryRepair:
@@ -236,7 +239,8 @@ class LibraryRepair:
             "action": str(action or check),
         }
         digest = hashlib.sha1(
-            json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
+            json.dumps(payload, sort_keys=True, default=str).encode("utf-8"),
+            usedforsecurity=False,
         ).hexdigest()
         return f"repair-plan:{digest[:16]}"
 
@@ -431,6 +435,9 @@ class LibraryRepair:
                                 fs_changed = True
                             else:
                                 db_changed = True
+                        if result.get("applied") or (
+                            result.get("resolved") and not dry_run
+                        ):
                             issue_id = issue.get("id")
                             if isinstance(issue_id, int):
                                 resolved_ids.append(issue_id)
@@ -845,6 +852,67 @@ class LibraryRepair:
 
         return result
 
+    @staticmethod
+    def _duplicate_album_keep_key(copy: dict) -> tuple:
+        formats = {str(fmt).lower() for fmt in copy.get("formats") or []}
+        return (
+            bool(formats & LOSSLESS_FORMATS),
+            int(copy.get("track_count") or 0),
+            float(copy.get("total_duration") or 0),
+            int(copy.get("total_size") or 0),
+            -int(copy.get("album_id") or 0),
+        )
+
+    def _quarantine_duplicate_album_copies(
+        self,
+        artist: str,
+        album_name: str,
+        copies: list[dict],
+        *,
+        dry_run: bool,
+        task_id: str | None,
+    ) -> dict:
+        keep = max(copies, key=self._duplicate_album_keep_key)
+        drop = [copy for copy in copies if copy is not keep]
+        result = {
+            "action": "quarantine_duplicate_albums",
+            "target": f"{artist}/{album_name}",
+            "details": {
+                "keep": keep,
+                "quarantine": drop,
+                "reason": "keeps the lossless, most complete copy",
+            },
+            "applied": False,
+            "fs_write": False,
+        }
+        if dry_run:
+            result["message"] = (
+                f"Would keep {keep.get('path')} and quarantine {len(drop)} "
+                f"duplicate cop{'y' if len(drop) == 1 else 'ies'} of {artist}/{album_name}"
+            )
+            return result
+        quarantined = [
+            copy
+            for copy in drop
+            if quarantine_album(int(copy["album_id"]), task_id or "repair")
+        ]
+        result["applied"] = bool(quarantined)
+        result["details"]["quarantined_album_ids"] = [
+            copy["album_id"] for copy in quarantined
+        ]
+        log_audit(
+            "quarantine_duplicate_album",
+            "album",
+            f"{artist}/{album_name}",
+            details=result["details"],
+            task_id=task_id,
+        )
+        result["message"] = (
+            f"Quarantined {len(quarantined)} duplicate cop"
+            f"{'y' if len(quarantined) == 1 else 'ies'} of {artist}/{album_name}"
+        )
+        return result
+
     def _fix_duplicate_albums(
         self, issue: dict, dry_run: bool, task_id: str | None = None
     ) -> dict | None:
@@ -856,6 +924,11 @@ class LibraryRepair:
         details = issue.get("details", {})
         artist = details.get("artist", "")
         album_name = details.get("album", "")
+        copies = [copy for copy in details.get("copies") or [] if copy.get("album_id")]
+        if len(copies) >= 2:
+            return self._quarantine_duplicate_album_copies(
+                artist, album_name, copies, dry_run=dry_run, task_id=task_id
+            )
         paths = [Path(path) for path in details.get("paths", []) if path]
         if len(paths) < 2:
             return {
@@ -943,7 +1016,7 @@ class LibraryRepair:
         path = Path(str(track.get("path") or ""))
         tags = read_tags(path) if path.is_file() else {}
         return (
-            str(tags.get("artist") or "").strip().casefold(),
+            str(tags.get("albumartist") or tags.get("artist") or "").strip().casefold(),
             str(tags.get("album") or "").strip().casefold(),
             str(tags.get("title") or "").strip().casefold(),
             str(tags.get("tracknumber") or "").strip(),
@@ -963,17 +1036,8 @@ class LibraryRepair:
     def _duplicate_track_format_rank(track: dict) -> int:
         format_value = str(track.get("format") or "").strip().casefold()
         if not format_value:
-            path = Path(str(track.get("path") or ""))
-            format_value = path.suffix.lstrip(".").casefold()
-        if format_value in {"flac", "alac", "wav", "aiff", "aif"}:
-            return 100
-        if format_value in {"m4a", "aac"}:
-            return 60
-        if format_value in {"opus", "ogg"}:
-            return 50
-        if format_value == "mp3":
-            return 40
-        return 0
+            format_value = Path(str(track.get("path") or "")).suffix
+        return audio_format_rank(format_value)
 
     @staticmethod
     def _duplicate_track_keep_key(
@@ -1001,17 +1065,24 @@ class LibraryRepair:
     def _safe_duplicate_track_resolution(
         self, issue: dict
     ) -> tuple[dict, list[dict], str] | None:
+        resolution = self.duplicate_track_resolution(issue)
+        return None if isinstance(resolution, str) else resolution
+
+    def duplicate_track_resolution(
+        self, issue: dict
+    ) -> tuple[dict, list[dict], str] | str:
+        """Pick the copy to keep, or explain why the duplicate is not safe to clean."""
         details = issue.get("details", {})
         artist = str(details.get("artist") or "").strip()
         album = str(details.get("album") or "").strip()
         title = str(details.get("title") or "").strip()
         paths = [str(path) for path in details.get("paths", []) if path]
         if not artist or not album or not title or len(paths) < 2:
-            return None
+            return "missing artist, album, title or paths to compare"
 
         tracks = get_tracks_by_paths(paths)
         if len(tracks) < 2:
-            return None
+            return DUPLICATE_TRACK_ALREADY_RESOLVED_REASON
 
         album_ids = {
             track.get("album_id")
@@ -1019,11 +1090,11 @@ class LibraryRepair:
             if track.get("album_id") is not None
         }
         if len(album_ids) != 1:
-            return None
+            return "the copies belong to different albums"
 
         parents = {str(Path(str(track.get("path") or "")).parent) for track in tracks}
         if len(parents) != 1:
-            return None
+            return "the copies live in different folders"
 
         durations = [
             float(track["duration"])
@@ -1032,14 +1103,14 @@ class LibraryRepair:
         ]
         duration_delta = max(durations) - min(durations) if durations else 0.0
         if durations and duration_delta > DUPLICATE_TRACK_MAX_DURATION_DELTA_SEC:
-            return None
+            return f"durations differ by {duration_delta:.1f}s"
         if any(
             not str(track.get("title") or "").strip()
             or int(track.get("track_number") or 0) <= 0
             or float(track.get("duration") or 0) <= 1.0
             for track in tracks
         ):
-            return None
+            return "a copy has no title, track number or duration"
 
         track_numbers = {
             int(track["track_number"])
@@ -1047,7 +1118,7 @@ class LibraryRepair:
             if track.get("track_number") is not None
         }
         if len(track_numbers) > 1:
-            return None
+            return "the copies have different track numbers"
 
         disc_numbers = {
             int(track["disc_number"])
@@ -1055,7 +1126,7 @@ class LibraryRepair:
             if track.get("disc_number") is not None
         }
         if len(disc_numbers) > 1:
-            return None
+            return "the copies are on different discs"
 
         expected_artist = artist.casefold()
         expected_album = album.casefold()
@@ -1075,7 +1146,7 @@ class LibraryRepair:
             )
         ]
         if mismatched_tags:
-            return None
+            return "file tags disagree on artist, album or title"
 
         expected_track_number = next(iter(track_numbers)) if track_numbers else None
         tag_track_numbers = [
@@ -1086,7 +1157,7 @@ class LibraryRepair:
             tag_track_number is not None and tag_track_number != expected_track_number
             for tag_track_number in tag_track_numbers
         ):
-            return None
+            return "file tags disagree on the track number"
 
         fingerprints = {
             str(track["audio_fingerprint"])
@@ -1099,7 +1170,7 @@ class LibraryRepair:
                 duration_delta
                 > DUPLICATE_TRACK_CONFLICTING_FINGERPRINT_MAX_DURATION_DELTA_SEC
             ):
-                return None
+                return "audio fingerprints differ"
             strong_tag_matches = all(
                 tag_artist == expected_artist
                 and tag_album == expected_album
@@ -1118,7 +1189,7 @@ class LibraryRepair:
                 )
             )
             if not strong_tag_matches:
-                return None
+                return "audio fingerprints differ and the tags are not conclusive"
             reason = (
                 "same album/title/track number, near-identical duration, "
                 "and matching readable tags"
@@ -1127,7 +1198,7 @@ class LibraryRepair:
         keep = max(tracks, key=self._duplicate_track_keep_key)
         remove = [track for track in tracks if track is not keep]
         if not remove:
-            return None
+            return "nothing to remove"
         return keep, remove, reason
 
     def _fix_duplicate_tracks(
@@ -1138,9 +1209,26 @@ class LibraryRepair:
         album = str(details.get("album") or "").strip()
         title = str(details.get("title") or "").strip()
 
-        resolution = self._safe_duplicate_track_resolution(issue)
-        if resolution is None:
-            return None
+        resolution = self.duplicate_track_resolution(issue)
+        if resolution == DUPLICATE_TRACK_ALREADY_RESOLVED_REASON:
+            return {
+                "action": "fix_duplicate_tracks",
+                "target": f"{artist}/{album}/{title}",
+                "details": {"reason": resolution},
+                "applied": False,
+                "resolved": True,
+                "fs_write": False,
+                "message": f"Already resolved {artist}/{album}/{title}: {resolution}",
+            }
+        if isinstance(resolution, str):
+            return {
+                "action": "fix_duplicate_tracks",
+                "target": f"{artist}/{album}/{title}",
+                "details": {"reason": resolution},
+                "applied": False,
+                "fs_write": False,
+                "message": f"Skipped duplicate track {artist}/{album}/{title}: {resolution}",
+            }
 
         keep, remove, reason = resolution
         keep_path = str(keep.get("path") or "")

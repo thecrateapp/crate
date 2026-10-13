@@ -94,7 +94,12 @@ describe("TranslationOverlay", () => {
     expect(await screen.findByRole("dialog")).toHaveAccessibleName(
       "Edit translation",
     );
-    expect(screen.getByRole("dialog")).toHaveClass("shadow-translation-editor");
+    expect(screen.getByRole("dialog")).toHaveClass(
+      "shadow-translation-editor",
+      "right-4",
+      "left-auto",
+      "m-0",
+    );
     expect(screen.getAllByText("player.play").length).toBeGreaterThan(0);
     expect(screen.getByText("Play")).toBeInTheDocument();
     expect(screen.getByText("Not checked locally")).toBeInTheDocument();

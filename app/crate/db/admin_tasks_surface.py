@@ -91,13 +91,16 @@ def build_tasks_surface_payload(limit: int = 100) -> dict[str, Any]:
 
 
 def get_cached_tasks_surface(
-    *, limit: int = 100, fresh: bool = False
+    *,
+    limit: int = 100,
+    fresh: bool = False,
+    max_age_seconds: int = TASKS_SNAPSHOT_MAX_AGE,
 ) -> dict[str, Any]:
     safe_limit = min(max(int(limit or 100), 1), 200)
     return get_or_build_ui_snapshot(
         scope=TASKS_SNAPSHOT_SCOPE,
         subject_key=f"surface:{safe_limit}",
-        max_age_seconds=TASKS_SNAPSHOT_MAX_AGE,
+        max_age_seconds=max_age_seconds,
         stale_max_age_seconds=TASKS_SNAPSHOT_STALE_MAX_AGE,
         fresh=fresh,
         allow_stale_on_error=True,

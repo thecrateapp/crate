@@ -1,7 +1,7 @@
 def _stats_snapshot(payload: dict) -> dict:
     return {
         "scope": "stats:dashboard",
-        "subject_key": "user:7:30d:default:12:10:12:10:36",
+        "subject_key": "v2:user:7:30d:default:12:10:14:10:36",
         "payload_json": payload,
         "version": 2,
         "built_at": "2026-07-18T10:00:00+00:00",
@@ -63,7 +63,7 @@ def test_cold_stats_dashboard_returns_minimal_payload_and_queues_projection(
             "month": None,
             "tracks_limit": 12,
             "artists_limit": 10,
-            "albums_limit": 12,
+            "albums_limit": 14,
             "genres_limit": 10,
             "replay_limit": 36,
         }
@@ -74,6 +74,12 @@ def test_stats_projection_refresh_persists_built_payload(monkeypatch):
     from crate.db import user_stats_dashboard_surface as surface
 
     saved: list[tuple[str, str, dict]] = []
+    ensured: list[int] = []
+    monkeypatch.setattr(
+        surface,
+        "ensure_user_listening_aggregates",
+        lambda user_id: ensured.append(user_id),
+    )
     monkeypatch.setattr(
         surface,
         "build_user_stats_dashboard",
@@ -91,7 +97,8 @@ def test_stats_projection_refresh_persists_built_payload(monkeypatch):
 
     assert payload["overview"]["play_count"] == 9
     assert saved[0][0] == "stats:dashboard"
-    assert saved[0][1].startswith("user:7:30d:")
+    assert saved[0][1].startswith("v2:user:7:30d:")
+    assert ensured == [7]
 
 
 def test_stats_refresh_worker_builds_default_dashboard(monkeypatch):
@@ -124,9 +131,16 @@ def test_stats_bootstrap_queues_only_missing_canonical_snapshots(monkeypatch):
     monkeypatch.setattr(surface, "_list_stats_dashboard_user_ids", lambda: [7, 8])
     monkeypatch.setattr(
         surface,
+        "prewarmed_stats_windows",
+        lambda _user_id: ["30d", "90d", "year:2026", "all_time"],
+    )
+    monkeypatch.setattr(
+        surface,
         "get_ui_snapshot",
         lambda _scope, subject_key, **_kwargs: (
-            {"subject_key": subject_key} if subject_key.startswith("user:8:") else None
+            {"subject_key": subject_key}
+            if subject_key.startswith("v2:user:8:")
+            else None
         ),
     )
     monkeypatch.setattr(
@@ -137,8 +151,13 @@ def test_stats_bootstrap_queues_only_missing_canonical_snapshots(monkeypatch):
 
     count = surface.queue_missing_stats_dashboard_snapshots()
 
-    assert count == 1
-    assert queued == [(7, "user:7:30d:default:12:10:12:10:36")]
+    assert count == 4
+    assert queued == [
+        (7, "v2:user:7:30d:default:12:10:14:10:36"),
+        (7, "v2:user:7:90d:default:12:10:14:10:36"),
+        (7, "v2:user:7:year:2026:default:12:10:14:10:36"),
+        (7, "v2:user:7:all_time:default:12:10:14:10:36"),
+    ]
 
 
 def test_api_startup_queues_stats_snapshot_bootstrap(monkeypatch):

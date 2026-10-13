@@ -535,6 +535,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         (
             "tidal_download",
             "check_new_releases",
+            "promote_due_releases",
             "soulseek_download",
             "cleanup_incomplete_downloads",
             "library_upload",
@@ -570,6 +571,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "refresh_user_listening_stats",
             "refresh_home_discovery_snapshot",
             "refresh_user_stats_dashboard_snapshot",
+            "refresh_instance_stats_dashboard_snapshot",
             "index_genres",
             "infer_genre_taxonomy",
             "rebuild_genre_taxonomy_proposals",
@@ -627,6 +629,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "sync_lyrics",
             "reset_enrichment",
             "enrich_mbids",
+            "rematch_album_mbids",
             "process_new_content",
             "compute_completeness",
             "refresh_probable_setlist",

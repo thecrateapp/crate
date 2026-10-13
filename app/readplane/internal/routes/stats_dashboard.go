@@ -19,9 +19,20 @@ var statsDashboardLimits = []struct {
 }{
 	{name: "tracks_limit", defaultValue: 12},
 	{name: "artists_limit", defaultValue: 10},
-	{name: "albums_limit", defaultValue: 12},
+	{name: "albums_limit", defaultValue: 14},
 	{name: "genres_limit", defaultValue: 10},
 	{name: "replay_limit", defaultValue: 36},
+}
+
+// validStatsYearWindow mirrors normalize_user_stats_window: "year:YYYY"
+// from 1970 through next year.
+func validStatsYearWindow(window string, currentYear int) bool {
+	raw, ok := strings.CutPrefix(window, "year:")
+	if !ok || len(raw) != 4 {
+		return false
+	}
+	year, err := strconv.Atoi(raw)
+	return err == nil && year >= 1970 && year <= currentYear+1
 }
 
 func statsDashboardSubjectKey(userID int64, query url.Values) (string, error) {
@@ -32,7 +43,9 @@ func statsDashboardSubjectKey(userID int64, query url.Values) (string, error) {
 	switch window {
 	case "7d", "30d", "90d", "365d", "all_time":
 	default:
-		return "", fmt.Errorf("unsupported stats window: %s", window)
+		if !validStatsYearWindow(window, time.Now().UTC().Year()) {
+			return "", fmt.Errorf("unsupported stats window: %s", window)
+		}
 	}
 
 	month := strings.TrimSpace(query.Get("month"))
@@ -61,7 +74,7 @@ func statsDashboardSubjectKey(userID int64, query url.Values) (string, error) {
 	}
 
 	return fmt.Sprintf(
-		"user:%d:%s:%s:%d:%d:%d:%d:%d",
+		"v2:user:%d:%s:%s:%d:%d:%d:%d:%d",
 		userID,
 		period,
 		monthKey,

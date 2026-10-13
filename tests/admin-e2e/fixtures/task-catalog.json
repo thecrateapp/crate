@@ -1,0 +1,865 @@
+{
+  "categories": {
+    "library": "Library",
+    "acquisition": "Acquisition",
+    "federation": "Federation",
+    "enrichment": "Enrichment",
+    "analysis": "Analysis",
+    "artwork": "Artwork",
+    "playback": "Playback",
+    "playlists": "Playlists"
+  },
+  "types": [
+    {
+      "type": "library_sync",
+      "label": "Library Scan",
+      "category": "library"
+    },
+    {
+      "type": "library_pipeline",
+      "label": "Library Pipeline",
+      "category": "library"
+    },
+    {
+      "type": "scan",
+      "label": "Health Check",
+      "category": "library"
+    },
+    {
+      "type": "health_check",
+      "label": "Health Check",
+      "category": "library"
+    },
+    {
+      "type": "fix_issues",
+      "label": "Fix Health Issues",
+      "category": "library"
+    },
+    {
+      "type": "repair",
+      "label": "Library Repair",
+      "category": "library"
+    },
+    {
+      "type": "repair_duplicate_tracks",
+      "label": "Duplicate Track Cleanup",
+      "category": "library"
+    },
+    {
+      "type": "resolve_duplicates",
+      "label": "Resolve Duplicates",
+      "category": "library"
+    },
+    {
+      "type": "process_new_content",
+      "label": "Process New Content",
+      "category": "library"
+    },
+    {
+      "type": "batch_retag",
+      "label": "Batch Retag",
+      "category": "library"
+    },
+    {
+      "type": "delete_artist",
+      "label": "Artist Deletion",
+      "category": "library"
+    },
+    {
+      "type": "delete_album",
+      "label": "Album Deletion",
+      "category": "library"
+    },
+    {
+      "type": "library_track_quarantine",
+      "label": "Quarantine Track",
+      "category": "library"
+    },
+    {
+      "type": "library_track_restore",
+      "label": "Restore Track",
+      "category": "library"
+    },
+    {
+      "type": "library_track_hard_delete",
+      "label": "Delete Track",
+      "category": "library"
+    },
+    {
+      "type": "library_quarantined_track_hard_delete",
+      "label": "Delete Quarantined Track",
+      "category": "library"
+    },
+    {
+      "type": "library_quarantined_tracks_hard_delete_all",
+      "label": "Empty Track Quarantine",
+      "category": "library"
+    },
+    {
+      "type": "library_track_move",
+      "label": "Move Track",
+      "category": "library"
+    },
+    {
+      "type": "library_album_move_to_artist",
+      "label": "Move Album to Artist",
+      "category": "library"
+    },
+    {
+      "type": "library_album_merge",
+      "label": "Merge Albums",
+      "category": "library"
+    },
+    {
+      "type": "library_album_split",
+      "label": "Split Album",
+      "category": "library"
+    },
+    {
+      "type": "library_artist_merge",
+      "label": "Merge Artists",
+      "category": "library"
+    },
+    {
+      "type": "move_artist",
+      "label": "Move Artist",
+      "category": "library"
+    },
+    {
+      "type": "wipe_library",
+      "label": "Wipe Library",
+      "category": "library"
+    },
+    {
+      "type": "rebuild_library",
+      "label": "Rebuild Library",
+      "category": "library"
+    },
+    {
+      "type": "match_apply",
+      "label": "Apply Metadata Match",
+      "category": "library"
+    },
+    {
+      "type": "update_artist_metadata",
+      "label": "Update Artist Metadata",
+      "category": "library"
+    },
+    {
+      "type": "update_album_tags",
+      "label": "Update Album Tags",
+      "category": "library"
+    },
+    {
+      "type": "update_track_tags",
+      "label": "Update Track Tags",
+      "category": "library"
+    },
+    {
+      "type": "write_portable_metadata",
+      "label": "Portable Metadata",
+      "category": "library"
+    },
+    {
+      "type": "rehydrate_portable_metadata",
+      "label": "Portable Metadata Rehydrate",
+      "category": "library"
+    },
+    {
+      "type": "export_rich_metadata",
+      "label": "Rich Metadata Export",
+      "category": "library"
+    },
+    {
+      "type": "migrate_storage_v2",
+      "label": "Legacy Storage Migration v2",
+      "category": "library"
+    },
+    {
+      "type": "fix_artist",
+      "label": "Artist Fix",
+      "category": "library"
+    },
+    {
+      "type": "verify_storage_v2",
+      "label": "Verify Storage v2",
+      "category": "library"
+    },
+    {
+      "type": "tidal_download",
+      "label": "Tidal Download",
+      "category": "acquisition"
+    },
+    {
+      "type": "soulseek_download",
+      "label": "Soulseek Download",
+      "category": "acquisition"
+    },
+    {
+      "type": "check_new_releases",
+      "label": "Check New Releases",
+      "category": "acquisition"
+    },
+    {
+      "type": "cleanup_incomplete_downloads",
+      "label": "Clean Incomplete Downloads",
+      "category": "acquisition"
+    },
+    {
+      "type": "library_upload",
+      "label": "Library Upload",
+      "category": "acquisition"
+    },
+    {
+      "type": "import_queue_item",
+      "label": "Import Staged Album",
+      "category": "acquisition"
+    },
+    {
+      "type": "import_queue_all",
+      "label": "Import Staged Albums",
+      "category": "acquisition"
+    },
+    {
+      "type": "import_queue_remove",
+      "label": "Remove Staged Import",
+      "category": "acquisition"
+    },
+    {
+      "type": "remux_m4a_dash",
+      "label": "Remux DASH Audio",
+      "category": "acquisition"
+    },
+    {
+      "type": "bandcamp_connect_credentials",
+      "label": "Connect Bandcamp",
+      "category": "acquisition"
+    },
+    {
+      "type": "bandcamp_sync_collection",
+      "label": "Bandcamp Collection Sync",
+      "category": "acquisition"
+    },
+    {
+      "type": "bandcamp_discover_refresh",
+      "label": "Bandcamp Discover Refresh",
+      "category": "acquisition"
+    },
+    {
+      "type": "bandcamp_import_purchase",
+      "label": "Import Bandcamp Purchase",
+      "category": "acquisition"
+    },
+    {
+      "type": "bandcamp_radar_refresh",
+      "label": "Bandcamp Radar Refresh",
+      "category": "acquisition"
+    },
+    {
+      "type": "bandcamp_backfill_entity_urls",
+      "label": "Bandcamp URL Backfill",
+      "category": "acquisition"
+    },
+    {
+      "type": "bandcamp_withdraw_contribution",
+      "label": "Withdraw Bandcamp Contribution",
+      "category": "acquisition"
+    },
+    {
+      "type": "bandcamp_cleanup_user_contributions",
+      "label": "Clean Bandcamp Contributions",
+      "category": "acquisition"
+    },
+    {
+      "type": "library_withdraw_contribution",
+      "label": "Withdraw Contribution",
+      "category": "acquisition"
+    },
+    {
+      "type": "library_cleanup_user_contributions",
+      "label": "Clean User Contributions",
+      "category": "acquisition"
+    },
+    {
+      "type": "federation_sync_catalog",
+      "label": "Sync Federated Catalog",
+      "category": "federation"
+    },
+    {
+      "type": "federation_health_poll",
+      "label": "Federation Health Poll",
+      "category": "federation"
+    },
+    {
+      "type": "federation_import_album",
+      "label": "Import Federated Album",
+      "category": "federation"
+    },
+    {
+      "type": "federation_directory_refresh",
+      "label": "Federation Directory Refresh",
+      "category": "federation"
+    },
+    {
+      "type": "global_catalog_reconcile_incremental",
+      "label": "Global Catalog Reconciliation",
+      "category": "federation"
+    },
+    {
+      "type": "global_catalog_reconcile_full",
+      "label": "Full Global Catalog Reconciliation",
+      "category": "federation"
+    },
+    {
+      "type": "enrich_artist",
+      "label": "Artist Enrichment",
+      "category": "enrichment"
+    },
+    {
+      "type": "enrich_artists",
+      "label": "Artist Enrichment",
+      "category": "enrichment"
+    },
+    {
+      "type": "sync_lyrics",
+      "label": "Lyrics Sync",
+      "category": "enrichment"
+    },
+    {
+      "type": "reset_enrichment",
+      "label": "Reset Enrichment",
+      "category": "enrichment"
+    },
+    {
+      "type": "enrich_mbids",
+      "label": "MusicBrainz ID Enrichment",
+      "category": "enrichment"
+    },
+    {
+      "type": "compute_completeness",
+      "label": "Discography Completeness",
+      "category": "enrichment"
+    },
+    {
+      "type": "refresh_probable_setlist",
+      "label": "Probable Setlist Refresh",
+      "category": "enrichment"
+    },
+    {
+      "type": "normalize_artist_bios",
+      "label": "Normalize Artist Bios",
+      "category": "enrichment"
+    },
+    {
+      "type": "research_artist_bio",
+      "label": "Research Artist Bio",
+      "category": "enrichment"
+    },
+    {
+      "type": "sync_shows",
+      "label": "Shows Sync",
+      "category": "enrichment"
+    },
+    {
+      "type": "backfill_similarities",
+      "label": "Artist Similarity Backfill",
+      "category": "enrichment"
+    },
+    {
+      "type": "index_genres",
+      "label": "Genre Indexing",
+      "category": "enrichment"
+    },
+    {
+      "type": "infer_genre_taxonomy",
+      "label": "Taxonomy Inference",
+      "category": "enrichment"
+    },
+    {
+      "type": "rebuild_genre_taxonomy_proposals",
+      "label": "Taxonomy Proposals Rebuild",
+      "category": "enrichment"
+    },
+    {
+      "type": "enrich_genre_descriptions",
+      "label": "Genre Description Enrichment",
+      "category": "enrichment"
+    },
+    {
+      "type": "sync_musicbrainz_genre_graph",
+      "label": "MusicBrainz Genre Graph Sync",
+      "category": "enrichment"
+    },
+    {
+      "type": "cleanup_invalid_genre_taxonomy",
+      "label": "Taxonomy Cleanup",
+      "category": "enrichment"
+    },
+    {
+      "type": "compute_analytics",
+      "label": "Library Analytics",
+      "category": "analysis"
+    },
+    {
+      "type": "refresh_user_listening_stats",
+      "label": "Listening Stats Refresh",
+      "category": "analysis"
+    },
+    {
+      "type": "refresh_home_discovery_snapshot",
+      "label": "Home Discovery Refresh",
+      "category": "analysis"
+    },
+    {
+      "type": "refresh_user_stats_dashboard_snapshot",
+      "label": "User Stats Refresh",
+      "category": "analysis"
+    },
+    {
+      "type": "refresh_instance_stats_dashboard_snapshot",
+      "label": "Instance Stats Refresh",
+      "category": "analysis"
+    },
+    {
+      "type": "compute_popularity",
+      "label": "Popularity Update",
+      "category": "analysis"
+    },
+    {
+      "type": "backfill_track_audio_fingerprints",
+      "label": "Track Fingerprint Backfill",
+      "category": "analysis"
+    },
+    {
+      "type": "analyze_tracks",
+      "label": "Track Analysis",
+      "category": "analysis"
+    },
+    {
+      "type": "analyze_all",
+      "label": "Full Audio Analysis",
+      "category": "analysis"
+    },
+    {
+      "type": "analyze_album_full",
+      "label": "Album Analysis",
+      "category": "analysis"
+    },
+    {
+      "type": "compute_bliss",
+      "label": "Bliss Similarity",
+      "category": "analysis"
+    },
+    {
+      "type": "materialize_artwork_variants",
+      "label": "Artwork Variants",
+      "category": "artwork"
+    },
+    {
+      "type": "backfill_artwork_variants",
+      "label": "Artwork Variant Backfill",
+      "category": "artwork"
+    },
+    {
+      "type": "cleanup_artwork_variants",
+      "label": "Artwork Variant Cleanup",
+      "category": "artwork"
+    },
+    {
+      "type": "repair_artwork_variants",
+      "label": "Artwork Variant Repair",
+      "category": "artwork"
+    },
+    {
+      "type": "resolve_external_artist_artwork",
+      "label": "External Artist Artwork",
+      "category": "artwork"
+    },
+    {
+      "type": "fetch_cover",
+      "label": "Fetch Cover",
+      "category": "artwork"
+    },
+    {
+      "type": "fetch_album_cover",
+      "label": "Fetch Album Cover",
+      "category": "artwork"
+    },
+    {
+      "type": "fetch_artist_covers",
+      "label": "Fetch Artist Covers",
+      "category": "artwork"
+    },
+    {
+      "type": "fetch_artwork_all",
+      "label": "Fetch All Artwork",
+      "category": "artwork"
+    },
+    {
+      "type": "batch_covers",
+      "label": "Batch Covers",
+      "category": "artwork"
+    },
+    {
+      "type": "scan_missing_covers",
+      "label": "Missing Cover Scan",
+      "category": "artwork"
+    },
+    {
+      "type": "apply_cover",
+      "label": "Apply Cover",
+      "category": "artwork"
+    },
+    {
+      "type": "upload_image",
+      "label": "Image Upload",
+      "category": "artwork"
+    },
+    {
+      "type": "compose_artist_hero",
+      "label": "Artist Hero Composition",
+      "category": "artwork"
+    },
+    {
+      "type": "preview_artist_hero",
+      "label": "Artist Hero Preview",
+      "category": "artwork"
+    },
+    {
+      "type": "recompose_artist_hero",
+      "label": "Artist Hero Renderer Migration",
+      "category": "artwork"
+    },
+    {
+      "type": "derive_artist_hero",
+      "label": "Artist Hero Derivation",
+      "category": "artwork"
+    },
+    {
+      "type": "backfill_artist_heroes",
+      "label": "Artist Hero Backfill",
+      "category": "artwork"
+    },
+    {
+      "type": "migrate_artist_heroes",
+      "label": "Artist Hero Migration Canary",
+      "category": "artwork"
+    },
+    {
+      "type": "migrate_artist_hero",
+      "label": "Artist Hero Migration",
+      "category": "artwork"
+    },
+    {
+      "type": "rollback_artist_hero",
+      "label": "Artist Hero Rollback",
+      "category": "artwork"
+    },
+    {
+      "type": "delete_artist_hero_composition",
+      "label": "Delete Artist Hero",
+      "category": "artwork"
+    },
+    {
+      "type": "import_artist_artwork_asset",
+      "label": "Artist Artwork Gallery",
+      "category": "artwork"
+    },
+    {
+      "type": "assign_artist_artwork_slot",
+      "label": "Artist Artwork Assignment",
+      "category": "artwork"
+    },
+    {
+      "type": "delete_artist_artwork_asset",
+      "label": "Artist Artwork Deletion",
+      "category": "artwork"
+    },
+    {
+      "type": "prepare_stream_variant",
+      "label": "Prepare Playback Stream",
+      "category": "playback"
+    },
+    {
+      "type": "warmup_stream_variants",
+      "label": "Warm Playback Cache",
+      "category": "playback"
+    },
+    {
+      "type": "cleanup_stream_variants",
+      "label": "Clean Playback Cache",
+      "category": "playback"
+    },
+    {
+      "type": "crate_download",
+      "label": "Crate Download",
+      "category": "playback"
+    },
+    {
+      "type": "generate_cast_spectrum",
+      "label": "Cast Spectrum",
+      "category": "playback"
+    },
+    {
+      "type": "prime_jam_auto_dj",
+      "label": "Jam Room Auto DJ",
+      "category": "playback"
+    },
+    {
+      "type": "generate_system_playlist",
+      "label": "Playlist Generation",
+      "category": "playlists"
+    },
+    {
+      "type": "refresh_system_smart_playlists",
+      "label": "Refresh Smart Playlists",
+      "category": "playlists"
+    },
+    {
+      "type": "persist_playlist_cover",
+      "label": "Save Playlist Cover",
+      "category": "playlists"
+    },
+    {
+      "type": "draft_i18n_translation",
+      "label": "Listen Translation Draft",
+      "category": "playlists"
+    }
+  ],
+  "actions": [
+    {
+      "id": "sync-library",
+      "label": "Sync Library",
+      "task_type": "library_sync",
+      "task_label": "Library Scan",
+      "category": "library",
+      "path": "/api/tasks/sync-library",
+      "capability": "library.import.manage",
+      "icon": "refresh",
+      "body": null
+    },
+    {
+      "id": "sync-federated-catalogs",
+      "label": "Sync Federated Catalogs",
+      "task_type": "federation_sync_catalog",
+      "task_label": "Sync Federated Catalog",
+      "category": "federation",
+      "path": "/api/admin/federation/sync-catalog",
+      "capability": "federation.catalog.sync.manage",
+      "icon": "refresh",
+      "body": null
+    },
+    {
+      "id": "reconcile-global-catalog",
+      "label": "Reconcile Global Catalog",
+      "task_type": "global_catalog_reconcile_incremental",
+      "task_label": "Global Catalog Reconciliation",
+      "category": "federation",
+      "path": "/api/admin/global-catalog/reconcile",
+      "capability": "federation.policy.manage",
+      "icon": "refresh",
+      "body": {
+        "mode": "incremental"
+      }
+    },
+    {
+      "id": "reconcile-global-catalog-full",
+      "label": "Full Global Catalog Reconciliation",
+      "task_type": "global_catalog_reconcile_full",
+      "task_label": "Full Global Catalog Reconciliation",
+      "category": "federation",
+      "path": "/api/admin/global-catalog/reconcile",
+      "capability": "federation.policy.manage",
+      "icon": "refresh",
+      "body": {
+        "mode": "full"
+      }
+    },
+    {
+      "id": "health-check",
+      "label": "Run Health Check",
+      "task_type": "health_check",
+      "task_label": "Health Check",
+      "category": "library",
+      "path": "/api/manage/health-check",
+      "capability": "library.repair.run",
+      "icon": "stethoscope",
+      "body": null
+    },
+    {
+      "id": "remove-duplicate-tracks",
+      "label": "Remove Duplicate Tracks",
+      "task_type": "repair_duplicate_tracks",
+      "task_label": "Duplicate Track Cleanup",
+      "category": "library",
+      "path": "/api/manage/repair-duplicate-tracks",
+      "capability": "library.repair.run",
+      "icon": "trash",
+      "body": null
+    },
+    {
+      "id": "analyze-all",
+      "label": "Analyze All Tracks (BPM, Key, Energy)",
+      "task_type": "analyze_all",
+      "task_label": "Full Audio Analysis",
+      "category": "analysis",
+      "path": "/api/manage/analyze-all",
+      "capability": "library.analysis.manage",
+      "icon": "brain",
+      "body": null
+    },
+    {
+      "id": "compute-bliss",
+      "label": "Compute Bliss Vectors",
+      "task_type": "compute_bliss",
+      "task_label": "Bliss Similarity",
+      "category": "analysis",
+      "path": "/api/manage/compute-bliss",
+      "capability": "library.analysis.manage",
+      "icon": "radio",
+      "body": null
+    },
+    {
+      "id": "compute-popularity",
+      "label": "Compute Popularity (Last.fm)",
+      "task_type": "compute_popularity",
+      "task_label": "Popularity Update",
+      "category": "analysis",
+      "path": "/api/manage/compute-popularity",
+      "capability": "library.analysis.manage",
+      "icon": "chart",
+      "body": null
+    },
+    {
+      "id": "backfill-fingerprints",
+      "label": "Backfill Audio Fingerprints (Chromaprint)",
+      "task_type": "backfill_track_audio_fingerprints",
+      "task_label": "Track Fingerprint Backfill",
+      "category": "analysis",
+      "path": "/api/tasks/backfill-track-fingerprints",
+      "capability": "library.analysis.manage",
+      "icon": "brain",
+      "body": null
+    },
+    {
+      "id": "enrich-mbids",
+      "label": "Enrich MusicBrainz IDs",
+      "task_type": "enrich_mbids",
+      "task_label": "MusicBrainz ID Enrichment",
+      "category": "enrichment",
+      "path": "/api/manage/enrich-mbids",
+      "capability": "library.metadata.write",
+      "icon": "sparkles",
+      "body": null
+    },
+    {
+      "id": "backfill-release-dates",
+      "label": "Backfill Album Release Dates",
+      "task_type": "enrich_mbids",
+      "task_label": "MusicBrainz ID Enrichment",
+      "category": "enrichment",
+      "path": "/api/manage/enrich-mbids",
+      "capability": "library.metadata.write",
+      "icon": "calendar",
+      "body": {
+        "release_dates_only": true
+      }
+    },
+    {
+      "id": "sync-lyrics",
+      "label": "Sync Missing Lyrics",
+      "task_type": "sync_lyrics",
+      "task_label": "Lyrics Sync",
+      "category": "enrichment",
+      "path": "/api/manage/sync-lyrics",
+      "capability": "library.metadata.write",
+      "icon": "file-json",
+      "body": {
+        "limit": 1000
+      }
+    },
+    {
+      "id": "write-portable-metadata",
+      "label": "Write Portable Metadata",
+      "task_type": "write_portable_metadata",
+      "task_label": "Portable Metadata",
+      "category": "library",
+      "path": "/api/manage/portable-metadata",
+      "capability": "library.metadata.write",
+      "icon": "tags",
+      "body": {
+        "write_audio_tags": true,
+        "write_sidecars": true
+      }
+    },
+    {
+      "id": "rehydrate-portable-metadata",
+      "label": "Rehydrate From Portable Metadata",
+      "task_type": "rehydrate_portable_metadata",
+      "task_label": "Portable Metadata Rehydrate",
+      "category": "library",
+      "path": "/api/manage/portable-metadata/rehydrate",
+      "capability": "library.metadata.write",
+      "icon": "file-input",
+      "body": null
+    },
+    {
+      "id": "export-rich-metadata",
+      "label": "Export Rich Metadata Index",
+      "task_type": "export_rich_metadata",
+      "task_label": "Rich Metadata Export",
+      "category": "library",
+      "path": "/api/manage/portable-metadata/export-rich",
+      "capability": "library.metadata.write",
+      "icon": "archive",
+      "body": {
+        "include_audio": false,
+        "write_rich_tags": false
+      }
+    },
+    {
+      "id": "backfill-similarities",
+      "label": "Backfill Artist Similarities",
+      "task_type": "backfill_similarities",
+      "task_label": "Artist Similarity Backfill",
+      "category": "enrichment",
+      "path": "/api/tasks/backfill-similarities",
+      "capability": "library.metadata.write",
+      "icon": "sparkles",
+      "body": null
+    },
+    {
+      "id": "sync-shows",
+      "label": "Sync Shows (Ticketmaster)",
+      "task_type": "sync_shows",
+      "task_label": "Shows Sync",
+      "category": "enrichment",
+      "path": "/api/tasks/sync-shows",
+      "capability": "curation.shows.write",
+      "icon": "sparkles",
+      "body": null
+    },
+    {
+      "id": "cleanup-genre-taxonomy",
+      "label": "Clean Invalid Genre Taxonomy Nodes",
+      "task_type": "cleanup_invalid_genre_taxonomy",
+      "task_label": "Taxonomy Cleanup",
+      "category": "enrichment",
+      "path": "/api/genres/taxonomy/cleanup-invalid",
+      "capability": "curation.genres.write",
+      "icon": "sparkles",
+      "body": null
+    },
+    {
+      "id": "check-new-releases",
+      "label": "Check New Releases (MusicBrainz)",
+      "task_type": "check_new_releases",
+      "task_label": "Check New Releases",
+      "category": "acquisition",
+      "path": "/api/acquisition/new-releases/check",
+      "capability": "curation.releases.write",
+      "icon": "sparkles",
+      "body": null
+    }
+  ]
+}

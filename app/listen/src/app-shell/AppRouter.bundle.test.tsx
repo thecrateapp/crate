@@ -9,15 +9,26 @@ describe("AppRouter mobile bundle boundary", () => {
       "utf8",
     );
 
-    expect(source).toMatch(
+    const layoutSource = readFileSync(
+      path.join(process.cwd(), "src/app-shell/AppLayoutRoute.tsx"),
+      "utf8",
+    );
+    expect(layoutSource).toMatch(
       /lazy\(\(\)\s*=>\s*import\("@\/app-shell\/AuthenticatedApp"\)/,
     );
-    expect(source).not.toContain(
-      'import { AppProviders } from "@/app-shell/AppProviders"',
+    expect(layoutSource).toMatch(
+      /lazy\(\(\)\s*=>\s*import\("@\/app-shell\/PublicAppLayout"\)/,
     );
-    expect(source).not.toContain(
-      'import { Shell } from "@/components/layout/Shell"',
-    );
+    for (const eagerSource of [source, layoutSource]) {
+      expect(eagerSource).not.toContain(
+        'import { AppProviders } from "@/app-shell/AppProviders"',
+      );
+      expect(eagerSource).not.toContain(
+        'import { Shell } from "@/components/layout/Shell"',
+      );
+      expect(eagerSource).not.toContain("@/app-shell/PublicAppProviders");
+      expect(eagerSource).not.toContain("@/components/share/ShareSheet");
+    }
 
     const routeTableSource = readFileSync(
       path.join(process.cwd(), "src/app-shell/route-table.tsx"),

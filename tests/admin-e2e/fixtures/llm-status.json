@@ -1,0 +1,12 @@
+{
+  "available": true,
+  "model": "gemini/gemini-2.5-flash",
+  "provider": "gemini",
+  "models": [],
+  "error": null,
+  "web_research": {
+    "available": true,
+    "provider": "curated public sources",
+    "providers": []
+  }
+}

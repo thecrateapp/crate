@@ -666,7 +666,9 @@ def test_api_artists_decade_filter_accepts_album_year_fallback(monkeypatch):
 
     monkeypatch.setattr(browse_artist, "_require_auth", lambda _request: {"id": 1})
     monkeypatch.setattr(browse_artist, "has_library_data", lambda: True)
-    monkeypatch.setattr(browse_artist, "get_all_artist_issue_counts", lambda: {})
+    monkeypatch.setattr(
+        browse_artist, "get_open_issue_counts_for_artists", lambda ids: {}
+    )
     monkeypatch.setattr(
         browse_artist,
         "get_artists_count",

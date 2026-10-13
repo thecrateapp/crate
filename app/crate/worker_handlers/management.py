@@ -96,7 +96,7 @@ def _unmark_processing(artist_name: str):
 
 
 def _handle_health_check(task_id: str, params: dict, config: dict) -> dict:
-    from crate.health_check import LibraryHealthCheck
+    from crate.health_check import ARTIST_SCOPED_CHECKS, LibraryHealthCheck
 
     p_hc = TaskProgress(phase="health_check", phase_count=1)
 
@@ -107,8 +107,19 @@ def _handle_health_check(task_id: str, params: dict, config: dict) -> dict:
         emit_progress(task_id, p_hc)
 
     checker = LibraryHealthCheck(config)
-    report = checker.run(progress_callback=_hc_progress)
-    set_cache("health_report", report, ttl=3600)
+    artists = [str(name) for name in params.get("artists") or [] if str(name).strip()]
+    check_types = [str(check) for check in params.get("check_types") or []]
+    if artists:
+        report = checker.run_selected_for_artists(
+            check_types or list(ARTIST_SCOPED_CHECKS),
+            artists,
+            progress_callback=_hc_progress,
+        )
+    elif check_types:
+        report = checker.run_selected(check_types, progress_callback=_hc_progress)
+    else:
+        report = checker.run(progress_callback=_hc_progress)
+        set_cache("health_report", report, ttl=3600)
     issue_count = len(report.get("issues", []))
     emit_task_event(
         task_id,
@@ -122,7 +133,7 @@ def _handle_health_check(task_id: str, params: dict, config: dict) -> dict:
 
 
 def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
-    from crate.health_check import LibraryHealthCheck
+    from crate.health_check import ARTIST_SCOPED_CHECKS, LibraryHealthCheck
     from crate.repair import LibraryRepair
     from crate.db.admin_health_surface import publish_health_surface_signal
     from crate.db.domain_events import append_domain_event
@@ -243,7 +254,7 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
                     catalog_entry is not None
                     and not catalog_entry.supports_global_scope
                 ):
-                    if check_type == "artist_layout_fix":
+                    if check_type in ARTIST_SCOPED_CHECKS:
                         artist_revalidation_check_types.append(check_type)
                     else:
                         skipped_revalidation_check_types.append(check_type)
@@ -276,6 +287,7 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
                     enrich_artists.add(artist)
 
         enqueued_enrich = 0
+        enrich_queue_failed = False
         if not dry_run and enrich_artists:
             from crate.content import queue_process_new_content_if_needed
 
@@ -289,6 +301,7 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
                     ):
                         enqueued_enrich += 1
                 except Exception:
+                    enrich_queue_failed = True
                     log.debug(
                         "Failed to queue enrichment for %s", artist, exc_info=True
                     )
@@ -476,7 +489,17 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
                 scope="ops",
                 subject_key=task_id,
             )
-        if not dry_run and result.get("fs_changed"):
+        fs_changes_without_artist_sync = any(
+            action.get("applied")
+            and action.get("fs_write")
+            and not (action.get("details") or {}).get("enrich_artist")
+            for action in result.get("actions", [])
+        )
+        if (
+            not dry_run
+            and result.get("fs_changed")
+            and (fs_changes_without_artist_sync or enrich_queue_failed)
+        ):
             start_scan()
 
         result["enrich_queued"] = enqueued_enrich
@@ -2193,6 +2216,8 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
 
     set_generation_status(playlist_id, "running")
     log_id = log_generation_start(playlist_id, rules, triggered_by)
+    progress = TaskProgress(phase="evaluate_rules", phase_count=2, total=2, item=name)
+    emit_progress(task_id, progress, force=True)
 
     try:
         tracks = execute_smart_rules(rules)
@@ -2212,6 +2237,10 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
             for t in tracks
         ]
         target_count = int(rules.get("limit") or len(track_dicts) or 50)
+        progress.phase = "write_tracks"
+        progress.phase_index = 1
+        progress.done = 1
+        emit_progress(task_id, progress, force=True)
         track_count = regenerate_playlist_tracks(
             playlist_id,
             track_dicts,
@@ -2222,6 +2251,8 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
 
         set_generation_status(playlist_id, "idle")
         log_generation_complete(log_id, track_count, total_duration)
+        progress.done = 2
+        emit_progress(task_id, progress, force=True)
         emit_task_event(
             task_id,
             "info",
@@ -2266,7 +2297,12 @@ def _handle_refresh_system_smart_playlists(
     )
 
     enqueued = 0
+    progress = TaskProgress(phase="enqueue_playlists", total=len(playlists))
+    emit_progress(task_id, progress, force=True)
     for pl in playlists:
+        progress.done += 1
+        progress.item = str(pl.get("name") or pl["id"])
+        emit_progress(task_id, progress)
         create_task(
             "generate_system_playlist",
             {

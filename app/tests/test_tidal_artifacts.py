@@ -14,9 +14,12 @@ def _write_mp4_header(path: Path) -> None:
 def test_tidal_download_uses_collision_safe_output_template(tmp_path, monkeypatch):
     captured: list[list[str]] = []
 
+    popen_kwargs: list[dict] = []
+
     class FakeProc:
-        def __init__(self, cmd, **_kwargs):
+        def __init__(self, cmd, **kwargs):
             captured.append(cmd)
+            popen_kwargs.append(kwargs)
             processing_dir = Path(cmd[cmd.index("--path") + 1])
             album_dir = processing_dir / "KNEECAP" / "H.O.O.D 2025"
             album_dir.mkdir(parents=True)
@@ -48,6 +51,9 @@ def test_tidal_download_uses_collision_safe_output_template(tmp_path, monkeypatc
     assert result["success"] is True
     assert result["audio_file_count"] == 1
     cmd = captured[0]
+    assert cmd[:4] == [tidal.sys.executable, "-m", "crate.tiddl_stereo", "download"]
+    assert popen_kwargs[0]["cwd"] == tidal.APP_ROOT
+    assert (Path(tidal.APP_ROOT) / "crate" / "tiddl_stereo.py").is_file()
     assert cmd[cmd.index("--output") + 1] == tidal.TIDDL_OUTPUT_TEMPLATE
     assert "{item.number:02d}" in tidal.TIDDL_OUTPUT_TEMPLATE
     assert "{item.title_version}" in tidal.TIDDL_OUTPUT_TEMPLATE
@@ -250,6 +256,36 @@ def test_move_to_library_detailed_imports_loose_tiddl_audio_root(tmp_path, monke
     assert (
         library / "Quicksand" / "Get to It & Regenerate" / loose_track.name
     ).exists()
+
+
+def test_move_to_library_detailed_drops_redownloaded_track_already_in_library(
+    tmp_path, monkeypatch
+):
+    processing = tmp_path / "processing"
+    library = tmp_path / "library"
+    target = library / "artist-uid" / "album-uid"
+    target.mkdir(parents=True)
+    processing.mkdir()
+    loose_track = processing / "02 - Terminate.flac"
+    loose_track.write_bytes(b"fLaC")
+
+    monkeypatch.setattr(
+        tidal, "infer_album_identity", lambda _path: ("Peace Test", "Repercussion")
+    )
+    monkeypatch.setattr(
+        tidal,
+        "resolve_import_album_target",
+        lambda root, artist, album: ({}, target, True),
+    )
+    monkeypatch.setattr(
+        tidal, "resolve_managed_track_destination", lambda *_args, **_kwargs: None
+    )
+
+    moved = tidal.move_to_library_detailed(str(processing), str(library))
+
+    assert moved[0]["moved"] == 0
+    assert not loose_track.exists()
+    assert list(target.iterdir()) == []
 
 
 def test_refresh_token_keeps_tiddl_cli_success_path(tmp_path, monkeypatch):

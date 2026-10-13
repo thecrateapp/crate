@@ -17,6 +17,8 @@ DEFAULT_SCHEDULES = {
     "library_pipeline": 86400,  # 24h — gated maintenance path (watcher handles real-time)
     "compute_analytics": 14400,  # 4h — recompute analytics from DB
     "check_new_releases": 43200,  # 12h — check MusicBrainz for new releases
+    "promote_due_releases": 3600,  # 1h — download pre-releases once they are out
+    "rematch_album_mbids": 21600,  # 6h — retry MusicBrainz for albums without one
     "repair_duplicate_tracks": 43200,  # 12h — clean high-confidence duplicate tracks
     "cleanup_incomplete_downloads": 172800,  # 48h — remove incomplete soulseek downloads
     "cleanup_artwork_variants": 172800,  # 48h — retain current + previous revisions
@@ -183,6 +185,21 @@ def mark_run(task_type: str):
     set_setting(last_key, datetime.now(timezone.utc).isoformat())
 
 
+def enqueue_scheduled_task(task_type: str) -> str | None:
+    """Create the task a schedule runs, deduplicated against a queued run."""
+    task_id = create_task_dedup(
+        task_type,
+        dedup_key=(
+            GLOBAL_CATALOG_FULL_DEDUP_KEY
+            if task_type == "global_catalog_reconcile_full"
+            else f"schedule:{task_type}"
+        ),
+    )
+    if task_id:
+        mark_run(task_type)
+    return task_id
+
+
 def check_and_create_scheduled_tasks():
     """Check all scheduled tasks and create any that are due."""
     schedules = get_schedules()
@@ -210,13 +227,4 @@ def check_and_create_scheduled_tasks():
                     exc_info=True,
                 )
             log.info("Scheduling task: %s (interval=%ds)", task_type, interval)
-            task_id = create_task_dedup(
-                task_type,
-                dedup_key=(
-                    GLOBAL_CATALOG_FULL_DEDUP_KEY
-                    if task_type == "global_catalog_reconcile_full"
-                    else f"schedule:{task_type}"
-                ),
-            )
-            if task_id:
-                mark_run(task_type)
+            enqueue_scheduled_task(task_type)

@@ -425,6 +425,34 @@ describe("Crate page", () => {
     ]);
   });
 
+  it("lets visitors copy a public Crate into their own Crates", async () => {
+    const user = userEvent.setup();
+    mocks.api.mockResolvedValue({ id: "88888888-8888-4888-8888-888888888888" });
+    renderCrate();
+
+    await user.click(screen.getByRole("button", { name: "More" }));
+    await user.click(
+      screen.getByRole("menuitem", { name: "Add to my Crates" }),
+    );
+
+    expect(mocks.api).toHaveBeenCalledWith(
+      `/api/crates/${crateId}/copy`,
+      "POST",
+    );
+  });
+
+  it("does not offer copying to owners", async () => {
+    const user = userEvent.setup();
+    mocks.detail = crate("owner");
+    renderCrate();
+
+    await user.click(screen.getByRole("button", { name: "More" }));
+
+    expect(
+      screen.queryByRole("menuitem", { name: "Add to my Crates" }),
+    ).toBeNull();
+  });
+
   it("opens the members modal from the collaborators action", async () => {
     const user = userEvent.setup();
     mocks.detail = crate("owner");

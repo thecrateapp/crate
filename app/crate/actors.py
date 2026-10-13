@@ -122,6 +122,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "refresh_user_listening_stats": TaskPoolConfig("fast", 1, 300, 0),
     "refresh_home_discovery_snapshot": TaskPoolConfig("fast", 1, 120, 1),
     "refresh_user_stats_dashboard_snapshot": TaskPoolConfig("fast", 1, 300, 1),
+    "refresh_instance_stats_dashboard_snapshot": TaskPoolConfig("fast", 1, 600, 1),
     "refresh_probable_setlist": TaskPoolConfig("fast", 1, 180, 3),
     "generate_cast_spectrum": TaskPoolConfig("heavy", 1, 1200, 2),
     # New content processing (priority 1)
@@ -139,6 +140,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "repair_duplicate_tracks": TaskPoolConfig("maintenance", 2, 3600, 0),
     "compute_analytics": TaskPoolConfig("maintenance", 2, 600, 0),
     "check_new_releases": TaskPoolConfig("maintenance", 2, 7200, 1),
+    "promote_due_releases": TaskPoolConfig("maintenance", 2, 900, 0),
     "scan": TaskPoolConfig("maintenance", 2, 1800, 0),
     "fix_issues": TaskPoolConfig("maintenance", 2, 3600, 0),
     "fetch_artist_covers": TaskPoolConfig("maintenance", 2, 300, 1),
@@ -153,6 +155,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     # Background batch (priority 3)
     "enrich_artists": TaskPoolConfig("maintenance", 3, 86400, 0),
     "enrich_mbids": TaskPoolConfig("maintenance", 3, 86400, 0),
+    "rematch_album_mbids": TaskPoolConfig("maintenance", 3, 1800, 0),
     "compute_popularity": TaskPoolConfig("maintenance", 3, 3600, 0),
     "compute_bliss": TaskPoolConfig(
         "fast", 3, 60, 0

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { AppProviders } from "@/app-shell/AppProviders";
+import { TimezoneAutodetect } from "@/app-shell/TimezoneAutodetect";
 import { TauriDevLogPanel } from "@/components/dev/TauriDevLogPanel";
 import { Shell } from "@/components/layout/Shell";
 import { ShareSheetHost } from "@/components/share/ShareSheet";
@@ -53,6 +54,7 @@ export function AuthenticatedApp() {
     <AppProviders>
       <Shell />
       <ShareSheetHost />
+      <TimezoneAutodetect />
       <TauriDevLogPanel />
     </AppProviders>
   );

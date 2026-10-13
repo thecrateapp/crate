@@ -23,10 +23,14 @@ vi.mock("@/lib/api", () => ({
 vi.mock("sonner", () => ({
   toast: {
     error: vi.fn(),
+    info: vi.fn(),
     success: vi.fn(),
   },
 }));
 
+import { toast } from "sonner";
+
+import { resetTaskCatalogForTests } from "@/lib/task-catalog";
 import { Settings } from "./Settings";
 
 const settingsData = {
@@ -81,6 +85,7 @@ describe("Settings", () => {
   beforeEach(() => {
     apiMock.mockReset();
     refetchMock.mockReset();
+    resetTaskCatalogForTests();
     useApiMock.mockReturnValue({
       data: settingsData,
       loading: false,
@@ -125,5 +130,43 @@ describe("Settings", () => {
         },
       );
     });
+  });
+
+  it("runs a schedule now with its catalog label", async () => {
+    const user = userEvent.setup();
+    apiMock.mockImplementation(async (path: string) => {
+      if (path === "/api/admin/task-catalog") {
+        return {
+          categories: {},
+          types: [
+            {
+              type: "library_sync",
+              label: "Library Scan",
+              category: "library",
+            },
+          ],
+          actions: [],
+        };
+      }
+      if (path.startsWith("/api/worker/schedules/")) {
+        return { status: "already_queued" };
+      }
+      return { ok: true };
+    });
+
+    render(<Settings />);
+
+    await user.click(screen.getAllByRole("button", { name: /schedules/i })[0]!);
+    await user.click(
+      await screen.findByRole("button", { name: "Run Library Scan now" }),
+    );
+
+    await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledWith(
+        "/api/worker/schedules/library_sync/run",
+        "POST",
+      );
+    });
+    expect(toast.info).toHaveBeenCalledWith("Library Scan is already queued");
   });
 });

@@ -1,0 +1,74 @@
+{
+  "top_level": [
+    "window",
+    "overview",
+    "trends",
+    "top_tracks",
+    "top_artists",
+    "top_albums",
+    "top_genres",
+    "replay",
+    "story",
+    "timezone",
+    "provisional",
+    "computed_until",
+    "metrics_version",
+    "tape",
+    "highlights",
+    "artist_of_period",
+    "heatmap",
+    "music_age",
+    "genre_trend"
+  ],
+  "overview": [
+    "window",
+    "play_count",
+    "complete_play_count",
+    "skip_count",
+    "minutes_listened",
+    "active_days",
+    "skip_rate",
+    "top_artist"
+  ],
+  "trends": ["window", "points"],
+  "top_tracks": ["window", "items"],
+  "top_artists": ["window", "items"],
+  "top_albums": ["window", "items"],
+  "top_genres": ["window", "items"],
+  "replay": [
+    "window",
+    "title",
+    "subtitle",
+    "title_key",
+    "subtitle_key",
+    "track_count",
+    "minutes_listened",
+    "items"
+  ],
+  "story": [
+    "window",
+    "movers",
+    "discoveries",
+    "comebacks",
+    "rhythm",
+    "audio_profile",
+    "monthly_snapshots"
+  ],
+  "nullable": [
+    "tape",
+    "highlights",
+    "artist_of_period",
+    "heatmap",
+    "music_age"
+  ],
+  "tape": ["granularity", "start", "end", "points", "mood", "peaks", "months"],
+  "highlights": [
+    "longest_streak",
+    "current_streak",
+    "new_artists",
+    "longest_session",
+    "obsession"
+  ],
+  "heatmap": ["cells", "peak", "night_share"],
+  "music_age": ["median_year", "decades", "oldest_album"]
+}

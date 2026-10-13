@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
-from crate.db.queries.user_library_shared import (
-    normalize_stats_window,
-    window_day_cutoff,
+from crate.db.queries.user_library_shared import normalize_user_stats_window
+from crate.db.queries.user_stats_periods import (
+    StatsPeriod,
+    period_day_filter,
+    period_params,
+    resolve_stats_period,
+    user_stats_timezone,
 )
 from crate.db.tx import read_scope
 
@@ -48,50 +52,29 @@ def get_play_stats(user_id: int) -> dict:
 
 
 def _get_stats_overview_payload(
-    user_id: int, *, window: str, day_cutoff: str | None
+    user_id: int, *, window: str, period: StatsPeriod
 ) -> dict:
     allow_global_catalog = _global_stats_refs_enabled()
     with read_scope() as session:
-        if day_cutoff is None:
-            overview_row = (
-                session.execute(
-                    text(
-                        """
-                    SELECT
-                        COALESCE(SUM(play_count), 0) AS play_count,
-                        COALESCE(SUM(complete_play_count), 0) AS complete_play_count,
-                        COALESCE(SUM(skip_count), 0) AS skip_count,
-                        COALESCE(SUM(minutes_listened), 0) AS minutes_listened,
-                        COUNT(*)::INTEGER AS active_days
-                    FROM user_daily_listening
-                    WHERE user_id = :user_id
-                    """
-                    ),
-                    {"user_id": user_id},
-                )
-                .mappings()
-                .first()
+        overview_row = (
+            session.execute(
+                text(
+                    f"""
+                SELECT
+                    COALESCE(SUM(play_count), 0) AS play_count,
+                    COALESCE(SUM(complete_play_count), 0) AS complete_play_count,
+                    COALESCE(SUM(skip_count), 0) AS skip_count,
+                    COALESCE(SUM(minutes_listened), 0) AS minutes_listened,
+                    COUNT(*)::INTEGER AS active_days
+                FROM user_daily_listening
+                WHERE user_id = :user_id AND {period_day_filter(period)}
+                """
+                ),
+                {"user_id": user_id, **period_params(period)},
             )
-        else:
-            overview_row = (
-                session.execute(
-                    text(
-                        """
-                    SELECT
-                        COALESCE(SUM(play_count), 0) AS play_count,
-                        COALESCE(SUM(complete_play_count), 0) AS complete_play_count,
-                        COALESCE(SUM(skip_count), 0) AS skip_count,
-                        COALESCE(SUM(minutes_listened), 0) AS minutes_listened,
-                        COUNT(*)::INTEGER AS active_days
-                    FROM user_daily_listening
-                    WHERE user_id = :user_id AND day >= :day_cutoff
-                    """
-                    ),
-                    {"user_id": user_id, "day_cutoff": day_cutoff},
-                )
-                .mappings()
-                .first()
-            )
+            .mappings()
+            .first()
+        )
         overview = dict(overview_row or {})
 
         top_artist_row = (
@@ -144,11 +127,9 @@ def _get_stats_overview_payload(
 
 
 def get_stats_overview(user_id: int, window: str = "30d") -> dict:
-    normalized = normalize_stats_window(window)
-    day_cutoff = window_day_cutoff(normalized)
-    payload = _get_stats_overview_payload(
-        user_id, window=normalized, day_cutoff=day_cutoff
-    )
+    normalized = normalize_user_stats_window(window)
+    period = resolve_stats_period(user_stats_timezone(user_id), window=normalized)
+    payload = _get_stats_overview_payload(user_id, window=normalized, period=period)
     overview = payload["overview"]
     top_artist = payload["top_artist"]
     play_count = overview.get("play_count", 0) or 0

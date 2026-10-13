@@ -162,3 +162,24 @@ class TestMarkRun:
             assert args[0] == "schedule:last_run:library_sync"
             # Should be a valid ISO datetime
             datetime.fromisoformat(args[1])
+
+
+def test_enqueue_scheduled_task_marks_the_run_only_when_created():
+    from crate import scheduler
+
+    with (
+        patch.object(scheduler, "create_task_dedup", return_value="t1") as create,
+        patch.object(scheduler, "mark_run") as mark,
+    ):
+        assert scheduler.enqueue_scheduled_task("repair_duplicate_tracks") == "t1"
+    create.assert_called_once_with(
+        "repair_duplicate_tracks", dedup_key="schedule:repair_duplicate_tracks"
+    )
+    mark.assert_called_once_with("repair_duplicate_tracks")
+
+    with (
+        patch.object(scheduler, "create_task_dedup", return_value=None),
+        patch.object(scheduler, "mark_run") as mark,
+    ):
+        assert scheduler.enqueue_scheduled_task("repair_duplicate_tracks") is None
+    mark.assert_not_called()

@@ -63,6 +63,7 @@ class CancelAllTasksResponse(BaseModel):
 
 
 class WorkerScheduleEntryResponse(BaseModel):
+    label: str | None = None
     interval_seconds: int
     interval_human: str
     last_run: datetime | str | None = None
@@ -128,3 +129,33 @@ class AdminTasksSnapshotResponse(BaseModel):
     snapshot: SnapshotMetadataResponse
     live: ActivityLiveResponse
     history: list[TaskResponse]
+
+
+class ScheduleRunResponse(BaseModel):
+    task_type: str
+    task_id: str | None = None
+    status: str
+
+
+class TaskTypeCatalogEntry(BaseModel):
+    type: str
+    label: str
+    category: str
+
+
+class TaskActionCatalogEntry(BaseModel):
+    id: str
+    label: str
+    task_type: str
+    task_label: str
+    category: str
+    path: str
+    capability: str
+    icon: str
+    body: dict | None = None
+
+
+class TaskCatalogResponse(BaseModel):
+    categories: dict[str, str]
+    types: list[TaskTypeCatalogEntry]
+    actions: list[TaskActionCatalogEntry]

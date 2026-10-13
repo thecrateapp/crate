@@ -24,6 +24,10 @@ class User(Base):
     name: Mapped[str | None] = mapped_column(Text)
     bio: Mapped[str | None] = mapped_column(Text)
     instagram_handle: Mapped[str | None] = mapped_column(Text)
+    timezone: Mapped[str | None] = mapped_column(Text)
+    pulse_listed: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true"
+    )
     password_hash: Mapped[str | None] = mapped_column(Text)
     avatar: Mapped[str | None] = mapped_column(Text)
     role: Mapped[str] = mapped_column(Text, nullable=False, server_default="user")

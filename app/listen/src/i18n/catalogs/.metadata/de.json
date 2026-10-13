@@ -223,9 +223,9 @@
     "sourceHash": "sha256:4920b37878cff5cb18b2dee1f762a825b2a4aa0b5d673eac62eea1c3b3014eef",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
-  "actions.playlist.addToLibrary": {
-    "sourceHash": "sha256:6d3548af8ba72794e0e95a0a6965de89da4dea462b3024d428fc3f5f79285b47",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
+  "actions.playlist.follow": {
+    "sourceHash": "sha256:927cfa55b56ed366c65f57d50bfd20d6a77b8f7a1dc61179dfe2904e2d86e296",
+    "reviewedAt": "2026-10-10T19:24:58.346Z"
   },
   "actions.playlist.offlineStaticOnly": {
     "sourceHash": "sha256:85024185133f09756ba4006fdc53bc83255b6183b683c93358115c07218ea3b8",
@@ -237,10 +237,6 @@
   },
   "actions.playlist.radio": {
     "sourceHash": "sha256:c9e32f1b1706b58705b01a003a92bbe3052821885b1f33d9c2189a093187c2f4",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "actions.playlist.removeFromLibrary": {
-    "sourceHash": "sha256:4ab325bdd751da0dcca305acd073dcb0c8114082f43d53cc72d65ee76ca27e61",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
   "actions.playlist.share": {
@@ -270,6 +266,10 @@
   "actions.playlist.toasts.removedFromLibrary": {
     "sourceHash": "sha256:408fd3ca135bc6edc14f7e06c260e21fa2915b10e801f5ffdc646376d68d03ae",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "actions.playlist.unfollow": {
+    "sourceHash": "sha256:2d935866f68f219dad20c6d91da9134dd8288f5c07f7621e1469ce47909a81df",
+    "reviewedAt": "2026-10-10T19:24:58.346Z"
   },
   "actions.radio.start": {
     "sourceHash": "sha256:693e7f99cfd40071f80501237a5754feca19316414387b70444c7d95aaec8894",
@@ -1143,6 +1143,78 @@
     "sourceHash": "sha256:b6b1f0a9f7df8faccce0497f7442304c4444da1ccd37f777aa05eb8eab7071a4",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "collaboration.add": {
+    "sourceHash": "sha256:6473b4c03c213caccbca08f58d85188d6f32a5d6ae489c1b0b0baa9a057ccd28",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "collaboration.added": {
+    "sourceHash": "sha256:31a514b48c99cfc969daccca6e9da9f4c40ea5bca94ba0c1476682356fc860e6",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "collaboration.addFailed": {
+    "sourceHash": "sha256:f9b01470249aa0b8f9f2c5ea293500c7f47c31be0ecf6aed1bdfc72a85041e4a",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "collaboration.addTitle": {
+    "sourceHash": "sha256:9c5f2cbab2fe7183725dee65cc2f36e6d0b11772c52c6d0d2318c84c1deaa8f4",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "collaboration.addToMyCrates": {
+    "sourceHash": "sha256:388c66989d6f2800eea26fa2939f1d9d54824cec0296485bceed81b19c9fe7dc",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "collaboration.addToMyPlaylists": {
+    "sourceHash": "sha256:9bffe7b0d3e99aea39ec5b5585b93b2bf614194809c94a4158ace40cb225cf3e",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "collaboration.addUser": {
+    "sourceHash": "sha256:81dbc399ce76a45d7fb5a6bcc4d7bd82b2781c2c0e07f9945a84abc6513368b0",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "collaboration.copiedCrate": {
+    "sourceHash": "sha256:0a865536d3b5871b720f157224b36fc96d9ff77fc87821c22a362d94350978f9",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "collaboration.copiedPlaylist": {
+    "sourceHash": "sha256:cf46c6e3e90b4ab1feefe41ff1a34d5952ef582ebc116dc0bf5cf02314550ca3",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "collaboration.copyFailed": {
+    "sourceHash": "sha256:775e0e2d1e818ec5f81af0d11c9815f25c3cbb52baeda5fb82d1ea9e539e4902",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "collaboration.leave": {
+    "sourceHash": "sha256:8eb3efd312ba322842b6470a046b524038176f91463cad22067cbb685025b1f1",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "collaboration.leaveFailed": {
+    "sourceHash": "sha256:60d1c0a09de7839e4c5d2ad891956df196b3477f168033071c83e441af3a695c",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "collaboration.leavePlaylist": {
+    "sourceHash": "sha256:973728a7ed541eb683ab2313048595046450088c0ef10f605eb97daa064e8ed8",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "collaboration.leavePlaylistConfirmation": {
+    "sourceHash": "sha256:bf3b56d122c25da4fb8dc1abc8bedb6a914ef645d94218c897184355f72d7508",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "collaboration.left": {
+    "sourceHash": "sha256:564aac7f81f45d296ec1416455dc0c7c83a773af5f376dd89f1991cd243e0214",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "collaboration.noResults": {
+    "sourceHash": "sha256:7a1c37bc9365030f396923bb089502f6d75bc9f5da9559ce900e28c8073ce41a",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "collaboration.ownerDescription": {
+    "sourceHash": "sha256:48ba38f39bef3047ab204bddf91120495fa6a4933b58227fa6b6824ee4989844",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "collaboration.searchPlaceholder": {
+    "sourceHash": "sha256:f555885bbe87c696fed5360e52f2160417ddc866cec2985ba7c884e748889182",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
   "common.about": {
     "sourceHash": "sha256:947d5800fe2f1da52438addac88e44d949f084a65ae12cb770f573b6113cb3ae",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -1455,10 +1527,6 @@
     "sourceHash": "sha256:eb8ad292b9c9569582e008e3630d0e987498f9c80a1de8f67c3d35e674d66d66",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
-  "crate.members.activeInvites": {
-    "sourceHash": "sha256:1f64550d9405cb8e50ef66432f32b40cde054ee49af17f60cfdd93c689e2fda5",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
   "crate.members.collaborationEnabled": {
     "sourceHash": "sha256:843d425ac7dd053e41e8ac2d7e9592396d7b9e2fb60223555327c47c075162ca",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
@@ -1491,30 +1559,6 @@
     "sourceHash": "sha256:7cf222ef225814ef17e06de3f235bfa05c67ac3a6dc74f03ad6d0fce297ddeea",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
-  "crate.members.expiry": {
-    "sourceHash": "sha256:5f504e1620ecf4089b54d6eb3b11d12b63e96360d74c76b433010c0d15f596dc",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "crate.members.expiry24h": {
-    "sourceHash": "sha256:7ed11c67bc68335ad1d3d4d29f3f1212aac1286de1489032d85778aca8b4c09c",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "crate.members.expiry30d": {
-    "sourceHash": "sha256:d2e19e87ab66d817a50b82c40c37560bd58695c271ec3eafe19b0b744ac46893",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "crate.members.expiry7d": {
-    "sourceHash": "sha256:3f714fb54bf72da3d0041532d464e4ac1e9a3943f0c0eae437c440389554e5b6",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "crate.members.expiryNever": {
-    "sourceHash": "sha256:6447d72892612b56e681a7b4e40bd60087aab08eefd532b794b06729752c1799",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "crate.members.invitesFailed": {
-    "sourceHash": "sha256:9f89b8d6b1fc9b3a08e603e771382f1eb6e46046f785c56ead486f74d20879de",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
   "crate.members.leave": {
     "sourceHash": "sha256:fc4a33ea11415987396c286e027c4223957bc8da00c52979508d1348f0745d65",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
@@ -1531,24 +1575,12 @@
     "sourceHash": "sha256:218ac2bc1bc3946a135e9b39d248cc76c672079f4af7c9e376dde8c5f7806535",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
-  "crate.members.maxUses": {
-    "sourceHash": "sha256:a8c109bd0da499c4bb3895c7086b83c3ccc2f1d78cf435259a46691d6fb37699",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
   "crate.members.membersFailed": {
     "sourceHash": "sha256:b33f509910694ff532aad4d4506a27af790d4666c439411dc24923ab64673ace",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
-  "crate.members.newInvite": {
-    "sourceHash": "sha256:2508ee54d165437cff612e4d292d5598e84b2d9fc0ee306cc6fdde14915906b9",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
   "crate.members.noCollaborators": {
     "sourceHash": "sha256:f236f7f93b597926f9b556804dbb3f6bf50431eaf569f48bc066e4f09c7f1f95",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "crate.members.noInvites": {
-    "sourceHash": "sha256:a3b50cdaf29a76b8f42ee2e2acc3e78088c4f262b4c7da668fc6a431801adf0f",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
   "crate.members.owner": {
@@ -1557,26 +1589,6 @@
   },
   "crate.members.readOnlySubtitle": {
     "sourceHash": "sha256:63c70de23e2c3d676cd1f62d8e3916e9114b431e7b72bdf2e9815b5d278d3f8a",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "crate.members.revoke": {
-    "sourceHash": "sha256:09e91326ff76a5c2a019b877065531346abdf24f8210b3b56279d3da2bb1a257",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "crate.members.revokeFailed": {
-    "sourceHash": "sha256:1b03331936787d07d5c7a559ec934e1b599716c03fa46ce5c4f640c811e5ae80",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "crate.members.unlimited": {
-    "sourceHash": "sha256:4400c31a19071472678067457c04bee910eb3527bb704543a4b2bf988c3883fd",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "crate.members.usesLimited": {
-    "sourceHash": "sha256:45436ea8996eae2728bd432b4eb69eadb452be6ce663a7106674b7925d70e6f7",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "crate.members.usesUnlimited": {
-    "sourceHash": "sha256:89994207719487531af122b0a9cf05510c3562408d9221d8fb0166e7dbae7f6d",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
   "crate.members.you": {
@@ -1653,22 +1665,6 @@
   },
   "crate.page.signInToListen": {
     "sourceHash": "sha256:5136f23a98e3b61d80328b3c3c3a18e1443f3eac61778cb47c45c63ebeb464cb",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "crateInvite.subtitle": {
-    "sourceHash": "sha256:a98e581af0d9835a452a6f9a5870fb0be5964edb93e4c024ff53b14620b39245",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "crateInvite.title": {
-    "sourceHash": "sha256:490ebf0b1bdc3e0f1b78e3e2ec6c8d2c57513bf0b43f2d501815579bd26997b9",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "crateInvite.toasts.invalid": {
-    "sourceHash": "sha256:f3824f7276161501a008fbba8af49ba57a6e07c9697dca10460a134d19d17e1e",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "crateInvite.toasts.joined": {
-    "sourceHash": "sha256:a1383adbfc40c25cd51ea9b38b4c9af4ed5161c250c02c7042bc2ccd9931ab73",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
   "explore.decade.empty": {
@@ -3143,10 +3139,6 @@
     "sourceHash": "sha256:ec34615a40cfa0aac4e14e4f1ba0c062cca196bcf1a08faca5db2d57ee7715e3",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
-  "library.crates.createInvite": {
-    "sourceHash": "sha256:49158aa6ed9c95250829f8700adc299ad20dbba95c7a7aad07d22740e08a7026",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
   "library.crates.createTitle": {
     "sourceHash": "sha256:d484b186f6438811f1d5a708885f11107fd6921fa11831f9f4d88254e1d5c7da",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
@@ -3193,18 +3185,6 @@
   },
   "library.crates.followedTitle": {
     "sourceHash": "sha256:0cc01944946fea72e9b6d202c2840ab91cf11c362d3515c062382d8ae28994fc",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "library.crates.inviteDescription": {
-    "sourceHash": "sha256:dc88a0fb62051ca541a03be93b65ad8a35f970eff201f051076dcb53a10994ed",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "library.crates.inviteFailed": {
-    "sourceHash": "sha256:143f4a3d72d252500284c6b40b8e71060ece7ad4a6fbb1402e96a4299aef8dbd",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "library.crates.inviteLink": {
-    "sourceHash": "sha256:9d7a1231b053af03d8f3156528227322aa8a7983cde41b7d281475611b98ba5a",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
   "library.crates.loadFailed": {
@@ -3287,10 +3267,6 @@
     "sourceHash": "sha256:19f43503c7f1dc99cb467976116bdd596f25a585fc773345af3c9a2b509c8308",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
-  "library.crates.saveBeforeInvite": {
-    "sourceHash": "sha256:fbcc797d263f171213b3c0857953b4ad0385c6c8ef4e01709ddbf940df76e3fa",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
   "library.crates.saved": {
     "sourceHash": "sha256:cadfe97501b5399151e949f9100c73587ce1b81d6965c41854d421bfc5cd4704",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
@@ -3306,6 +3282,10 @@
   "library.crates.searchFailed": {
     "sourceHash": "sha256:96e4a9c0fa6d1d4152b6bc1633470294695065fa76cd62279fd370e30839f345",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
+  },
+  "library.crates.sharedTitle": {
+    "sourceHash": "sha256:ab17ad0725047fe01fc5f342205c2a5269e4f077707d9f7a412c03c5b1f6509f",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
   },
   "library.crates.sharedWithYou": {
     "sourceHash": "sha256:38bc8c7c8d6aea56330cfb6dae9bf104d8a1a92ef2e3125c2d998b9cc0ffc314",
@@ -3355,9 +3335,17 @@
     "sourceHash": "sha256:5adff5228a72c8cbd6ffa99bf6f754885d5cd7af429ac4725048628973b6c35f",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
+  "library.playlists.followed": {
+    "sourceHash": "sha256:72a3a721b3c6f3cbcc15f35c06d346f9df87879a22292b28742f2157e2b56e46",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
   "library.playlists.new": {
     "sourceHash": "sha256:d1e16ec94c207299338e7b2d2f70e08324e3903574cd7c3994e96c0dcd3f6c30",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "library.playlists.shared": {
+    "sourceHash": "sha256:6cabf17cf1efc7635e31c4dc60713eb806130e79e00808f3628c7ba3f5f438c2",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
   },
   "library.playlists.yours": {
     "sourceHash": "sha256:b0695566bee8f72da3ae8d0c7e032b94cb4f82a32691b0e6627d7055fe676dc9",
@@ -4435,10 +4423,6 @@
     "sourceHash": "sha256:aa31ebfeed73d01e4444662ef8f9d53e6d76d71ae39ef3d5c9d59301af9e24d8",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
-  "playlist.actions.removeFromLibrary": {
-    "sourceHash": "sha256:e0f70d2201dfcbf5e4c3cdec6ca34c0af9eedda46ad6fe3bd6b2ea05aaa68597",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
   "playlist.actions.secondaryGroup": {
     "sourceHash": "sha256:40f432f021076c4d8546b9f02a3cefb48cd459a2cd28fa5509af3c9fe83fab3b",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -4455,22 +4439,6 @@
     "sourceHash": "sha256:c2f5ba6acf8c48836e5d3218a8b0959dd5474f642da16865193329e5885b6e58",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
-  "playlist.collaborators.copyInvite": {
-    "sourceHash": "sha256:cfd14660033df30289883702ec600cba9449f7d5b0a66e5b0acb6ae5c1b6c96c",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "playlist.collaborators.createInvite": {
-    "sourceHash": "sha256:d9ae4f5387774ab1d1c5d2f49b58819c41c0c97d70fbe6100baee0cdd316565c",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "playlist.collaborators.inviteSubtitle": {
-    "sourceHash": "sha256:2eb2ae5289c130bffa8dc33411402166a04fba791e0c564f57c0623bc4ed41ed",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "playlist.collaborators.inviteTitle": {
-    "sourceHash": "sha256:2c74aece5ceadfb883c8f0f7bfa5d61d469b8878b7e13a4e3a95c2983ab0dd44",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
   "playlist.collaborators.notCollaborative": {
     "sourceHash": "sha256:31cb73626e610261c272146491302b5b1e0ca2eabb4567b7f1f35849b40ac9f6",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -4484,8 +4452,8 @@
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
   "playlist.collaborators.subtitle": {
-    "sourceHash": "sha256:a899f7e7f3f6c9544f8e5037429128bd7252f35397d092208bf48807e0897458",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
+    "sourceHash": "sha256:03a53d6cd39834849a6c1f7f5e66889ead8ac343136cce7c7b1a37bec1990a74",
+    "reviewedAt": "2026-10-10T19:20:32.000Z"
   },
   "playlist.collaborators.title": {
     "sourceHash": "sha256:f1af6f9d6a19f334bcc34dcd660a709664bb2747611ae1642486edd31ce4bf9c",
@@ -4611,10 +4579,6 @@
     "sourceHash": "sha256:67aa917f6491db85a574fdf8238edeaa787f12c3e014fc03105d5056dd6486b3",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
-  "playlist.toasts.addedLibrary": {
-    "sourceHash": "sha256:84f3e65b10b5be337a234356d768a4ec49fd29c15a0c6a7c6e83d1b26c4f52e4",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
   "playlist.toasts.availableOffline": {
     "sourceHash": "sha256:2223bdcf21b02b93a2cdbec61bbbf05e7770ac68db26ea9903071859f34c0f2f",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -4635,21 +4599,9 @@
     "sourceHash": "sha256:95d84f31705a8a34cf6a8fd7976de9e2a53b3fca5a71495325e780514bb27620",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
-  "playlist.toasts.inviteCopied": {
-    "sourceHash": "sha256:0b239395d286aef1552387f9fd7bf5591ff25efd80117c9195c4a085d553f4fe",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "playlist.toasts.inviteCopyFailed": {
-    "sourceHash": "sha256:c9f65fe85542ebc735d7287d5157085ce62219f3b2e7893f6451e55697a5b0f9",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "playlist.toasts.inviteCreated": {
-    "sourceHash": "sha256:71bf674617f5032e9b2a4a553f2e19e0683624544234b08c4d566e1de8dbfcfa",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "playlist.toasts.inviteCreateFailed": {
-    "sourceHash": "sha256:5438e10614b0c137d60e74371ad33cfb876c846f6dffbe5d083b3b964c0ebedb",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
+  "playlist.toasts.followed": {
+    "sourceHash": "sha256:192df70d340d41b9741869012ea1ca7f3d36e2c13efc87568c72ae2b7691aa1a",
+    "reviewedAt": "2026-10-10T19:24:58.346Z"
   },
   "playlist.toasts.loadFailed": {
     "sourceHash": "sha256:70bf7617a554d03e11447b21cea09947f3ba29185a87deb6e41fa4e12a2653ed",
@@ -4687,14 +4639,6 @@
     "sourceHash": "sha256:b97ca7426da2fc31595c409b324d711558af44ed9b780a503d47368d207db545",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
-  "playlist.toasts.removedLibrary": {
-    "sourceHash": "sha256:87ad5e778ecfbc8d3df2c356f5992225827d1ece43b6aeb66f69e1b711c63baf",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "playlist.toasts.removedNamedLibrary": {
-    "sourceHash": "sha256:bd15e4500619543ff980ca17096b783d46281ce0c1aa81914dfa105bf4cbf389",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
   "playlist.toasts.trackAdded": {
     "sourceHash": "sha256:b960bcdf39a22962add45348a6ff373591e271f238d558c816c7c5015109b0ed",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -4702,6 +4646,10 @@
   "playlist.toasts.trackAddFailed": {
     "sourceHash": "sha256:148fb5e3b0187cfd2379ba19cb042a404b59dba3831ab8062315870ee6bce370",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "playlist.toasts.unfollowed": {
+    "sourceHash": "sha256:a595edf5c4a0e30adb406a5eeb6848178d23de3ca52984639fec371944b88c7c",
+    "reviewedAt": "2026-10-10T19:24:58.346Z"
   },
   "playlist.toasts.updated": {
     "sourceHash": "sha256:b66b96c840ecd00547be9cd7f0d18a8a364c5218712656fb66c6eaea5d9d237f",
@@ -4814,22 +4762,6 @@
   "playlistComposer.useCollage": {
     "sourceHash": "sha256:5f9ae73be8c3b94a24dfc375cb378675422450867b7975e254963c0cd5a81e73",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "playlistInvite.subtitle": {
-    "sourceHash": "sha256:4dedb6099b4b757661b220121ef467ca5a1856784eebeb3de0813d44591a231a",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "playlistInvite.title": {
-    "sourceHash": "sha256:98475749a9a40768a5159efed753f5dca4b349ce5b5471d3dde4aeb3eb666177",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "playlistInvite.toasts.invalid": {
-    "sourceHash": "sha256:6fe291a28ca4e2799a657507b785181391f748022959bca1ef68b3101fc14ab5",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "playlistInvite.toasts.joined": {
-    "sourceHash": "sha256:eb86b1b6295a3160747c83dbd4301c3df40d64e4e3c17020f2ee13680f91baaf",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
   "profileHover.defaultBadge": {
     "sourceHash": "sha256:5f97f012869a752baa92f563a0e05b4965791e5068aebf75a65f7d655b459b43",
@@ -5583,9 +5515,33 @@
     "sourceHash": "sha256:0b3f3c623cad834e92efc16e8d6341598b329a004db263282921e2a80d444763",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "settings.account.pulseListed": {
+    "sourceHash": "sha256:8ab224d44cacf9d5f005fb80fd174903852404b1b3116f076221ad8d2b99078c",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "settings.account.pulseListedDescription": {
+    "sourceHash": "sha256:4c57b6786ee770de12c8d14757d629aa34de0c6dd74b3d71136b6dc552f9efce",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
   "settings.account.saveProfile": {
     "sourceHash": "sha256:13e9b87f59fa72cb70f553567b40b5ad755698935b6aba4cadb4251c1dcdab75",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "settings.account.timezone": {
+    "sourceHash": "sha256:bb0a38239f448a3416c29712e9e5b8da96277496002f22cdd7961c0d5d2bd6bc",
+    "reviewedAt": "2026-10-07T21:53:27.338Z"
+  },
+  "settings.account.timezoneDescription": {
+    "sourceHash": "sha256:141ac69a6074199a28137ad184dec5255251b439479cd97883e950db4559668c",
+    "reviewedAt": "2026-10-07T21:53:27.338Z"
+  },
+  "settings.account.timezoneUnset": {
+    "sourceHash": "sha256:e1e678a11cfb1caa5da25a9a0223f285697d090342e26039d46c2a9a0ea97f64",
+    "reviewedAt": "2026-10-07T21:53:27.338Z"
+  },
+  "settings.account.timezoneUseDevice": {
+    "sourceHash": "sha256:41805bea2f880c9c03051ebf90518810197970369354bee4179e51c58313d258",
+    "reviewedAt": "2026-10-07T21:53:27.338Z"
   },
   "settings.account.title": {
     "sourceHash": "sha256:d7e15130a624a3190a1697b83c9d8fb292b70abf66a39edd4dd7823096fbd2f8",
@@ -5630,6 +5586,18 @@
   "settings.account.toasts.profileUpdateFailed": {
     "sourceHash": "sha256:7af4fa7aec8d1a6bf3fb1551ebe1296b3e30ed2444d7c576039d0ca349173470",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "settings.account.toasts.pulseListedFailed": {
+    "sourceHash": "sha256:05617a8ae4e2d875dc26dc6421b37839ae006b0b70c5bea88b34b9f70526efb0",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "settings.account.toasts.timezoneUpdated": {
+    "sourceHash": "sha256:710cea79b50850ccaac271b9a1fb12f45411b616c8a93e05d33fe16fea725e42",
+    "reviewedAt": "2026-10-07T21:53:27.338Z"
+  },
+  "settings.account.toasts.timezoneUpdateFailed": {
+    "sourceHash": "sha256:f9272ae0b71a4562a860a94f8f87a8650475943364cbfb258931e7b47b0c84ea",
+    "reviewedAt": "2026-10-07T21:53:27.338Z"
   },
   "settings.account.toasts.unlinked": {
     "sourceHash": "sha256:4aa12aba6cb391db6ca42c13521699d6a11d33d67637809e6fa77c1e820557d8",
@@ -6663,6 +6631,10 @@
     "sourceHash": "sha256:96513b02ba3ecee367ebae785c5cab2cfec8a8ed19a02a6325ed17279e80ef9d",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
+  "share.kind.digging": {
+    "sourceHash": "sha256:70df141cad1521aa09346a1b039a11d858a57777debe59f942f72124a36ce5c9",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
   "share.kind.genre": {
     "sourceHash": "sha256:8d0d27ca23aafd121088b615696d34ef53a25c7b92b30c6fbad4d2cce11ab79a",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -6791,6 +6763,146 @@
     "sourceHash": "sha256:981f47318e326ceb118d8a61a23bc2d80c2f0dd36e8186df6aa97986fb20121e",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "stats.artistOfPeriod.activeDays": {
+    "sourceHash": "sha256:9226634db3bbd3c938e6ea319c6f1e2aea5e5dfb76e70f87e4610402178b8455",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.artistOfPeriod.body": {
+    "sourceHash": "sha256:e28dbc98f6b99e5870e033912796a8fa6f0b2b20f1a8efb1aabe3d82f2ceadc6",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.artistOfPeriod.kicker": {
+    "sourceHash": "sha256:c5404c1aa74d5203534e2d2a04d802ad96fbd9e8dd8d6bfb787d52067ea0d29c",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.artistOfPeriod.listened": {
+    "sourceHash": "sha256:837c0178898878ed299cfcc3e7bd4546750d8ad7200a2bcd2fb54306ff848a66",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.artistOfPeriod.plays": {
+    "sourceHash": "sha256:c93719d33dcae975b68c1f8eb88e1e75295855f40f84ce5fd20ba0d83f6334e4",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.artistOfPeriod.topAlbum": {
+    "sourceHash": "sha256:240fb9a9bd936caabcb180f8b54b49407f82d43e689d97073c720272b9f107c6",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.artistOfPeriod.topPercent": {
+    "sourceHash": "sha256:91b42c354bb3b709bdd8681c922ffa09b930b70dd53ac2b90fb1338087ffd7ea",
+    "reviewedAt": "2026-10-08T00:47:13.880Z"
+  },
+  "stats.artistOfPeriod.topPercentLabel": {
+    "sourceHash": "sha256:ef4849168114e27f19cd4c66c3420ef97136025de538475f5a51f2aaf2c83b12",
+    "reviewedAt": "2026-10-08T00:47:13.880Z"
+  },
+  "stats.digging.age.body": {
+    "sourceHash": "sha256:6d6bfebabbaa48d70df0f8eed987e83cf21bcc5313810f7f892468b305c30979",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.artist.body": {
+    "sourceHash": "sha256:0b7a4720818983f3a589ff648330ec02c6d91428d6f5e14378400e955e15f81f",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.band.body": {
+    "sourceHash": "sha256:61d180ecae60ac9bb6a8bc77dea45de620a7b9c1b137ae32db21ed069a9108cf",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.band.title": {
+    "sourceHash": "sha256:c0e19ebe17e8c0d0b04139ad8db9fc3e414115e710de5e276852d153061d8e92",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.chapter": {
+    "sourceHash": "sha256:a8126572dc052d5fefa92438d2aae475d50332a372e4da6075d8baa16a1bfb33",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.close": {
+    "sourceHash": "sha256:446ba6998aaffa06eb3a9ed9b453b7e6bf684a7ae781a999e6a4fbd87c516db7",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.credit": {
+    "sourceHash": "sha256:5d6216568fd14373e8a0f5acf064d6b8255be092c17028bfeb835e929e9b478c",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.habits.label": {
+    "sourceHash": "sha256:d3a3f6d7f3b8288a6eefe11dd00da471ec3e0458094abb8597d0e1ab5cf2b43e",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.habits.obsession": {
+    "sourceHash": "sha256:372affe668565467510a96591622bc59ac1d23452c11a081195ca9343415cea8",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.habits.streak": {
+    "sourceHash": "sha256:31275bb7ce8bae02258033d4934733707568eec6fbccd2d2014943d014ecea73",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.kicker": {
+    "sourceHash": "sha256:b44fff8800176eb4d1c8c8c11685a7a2f3e885d414d64893da143f0640ba9d42",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.label": {
+    "sourceHash": "sha256:abf73509d632642143cbf5f9075aba51c48448369cebc2fa175470d54ea0de41",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.lastDays": {
+    "sourceHash": "sha256:93a8c40d4b0e8840f4256ff863ce14f0b1087a6e81e658fb0540c4cd0210a6b6",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.minutes.body": {
+    "sourceHash": "sha256:1d4a11bfa20b650719329a6449c44e877396683b0bd4afbdaa6cde13e4cc9d5a",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.minutes.label": {
+    "sourceHash": "sha256:4b99478cf84417e3630c7972636327ba059b4ad00a5e94cbeef5cc50b1b0c1e7",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.minutes.unit": {
+    "sourceHash": "sha256:4f96dff38eeb66dac530b928247c41976d687012686e14e9f54ff5ad5e6310ec",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.open": {
+    "sourceHash": "sha256:ede94939466ae6b4c09b942c6394ed683cf60d20e3c9ff36e9f20b6aeb5b2588",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.progress": {
+    "sourceHash": "sha256:30ed9e877671de00a6ce403aa5f006608d763b6c3f63ac99c0ad28d605912fa9",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.share": {
+    "sourceHash": "sha256:dd8178d598d88aee5e2d87a4828b8ee3f116c4a14a16fb3eceda9015c34356c3",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.summary.fallback": {
+    "sourceHash": "sha256:eae5ce08936c6bf1419050fafab7c00379dbb5a9a9f509d3db5abea74bbf1966",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.summary.headline": {
+    "sourceHash": "sha256:b00629c93f0a948d71df05f2e4462eb0ca14180082108976fa9c7464420d45b9",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.summary.label": {
+    "sourceHash": "sha256:42fa8c40b8a401061fabe000206f821adf0464e8515bd984a72d8907da61658c",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.topGenre": {
+    "sourceHash": "sha256:2bac9c31899612817f03df27d1efed7a6fa40d7c32a4d0f6f86fa7edb14d89da",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.digging.tracks.kicker": {
+    "sourceHash": "sha256:df3e72efb3071fc4b6c6373e868a0713605f296b1fb210f94d6045ebf7ae5cce",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.discoveries.empty": {
+    "sourceHash": "sha256:abc05770067adcd5559b5f476f338232c87694eedc76f2446d560bf755538019",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.discoveries.since": {
+    "sourceHash": "sha256:baccaa6b0a8e6c79c73b4a907d08090ca423880fba8d9fccf6d385cc3270c4e0",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.discoveries.title": {
+    "sourceHash": "sha256:57e57117a93640ed5822729127c90b46907aca951bb9f65c0c7a3def694b07cf",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
   "stats.empty.body": {
     "sourceHash": "sha256:225d7a581b76e9463429d0f30d2f320292e3dcdce315a13a36fd6771b080aa1d",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -6802,6 +6914,46 @@
   "stats.empty.title": {
     "sourceHash": "sha256:d8612567999480c24fd9e00db3a887765b24443bbf80a4e887994bb3f19bb9a3",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "stats.genreTrend.rising": {
+    "sourceHash": "sha256:9c71132813055b5aeff946398ad7771cdd97337bf13a5877dcdc96c07e215eb1",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.genreTrend.title": {
+    "sourceHash": "sha256:fbc5ba1e872160e3dc6ff58308342060572f8977fe95df6e23b9700a33028b9f",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.headline.activeDays": {
+    "sourceHash": "sha256:562adb12d1532206ef0124722cadc81b7400814f0c036601ea167a7114a77a1f",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.headline.artists": {
+    "sourceHash": "sha256:946d0919a9729b9ab02bbeec09a95e79dd07d5780cf123ab7cc96ce358f69687",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.headline.minutes": {
+    "sourceHash": "sha256:55d1e150e0b126aa5491559016f668c665cbe534e2f06528a624d26873c72e2c",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.headline.plays": {
+    "sourceHash": "sha256:ac2623e3dfe36f8a6721858f5015d06c837b2a8664d8aec7153c051fb665852b",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.headline.today": {
+    "sourceHash": "sha256:05f9e67b0ab9dc290de2fdfd4e2bbff6817d859e480bf8baadc1c685e08a35b4",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.heatmap.detail": {
+    "sourceHash": "sha256:37e6efa18c9b9f83f30c1321e4d7c718880a637636712267960f4d9e38578622",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.heatmap.summary": {
+    "sourceHash": "sha256:0fa67330d599975b7137e3fc08544490a31ce62cb0fdd39a1e5c538f1713a07a",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.heatmap.title": {
+    "sourceHash": "sha256:ff50bdb4e4a5a7a843a7e083e6417a66b7d16b18dda837211070a5862319a4a7",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
   },
   "stats.hero.badge": {
     "sourceHash": "sha256:cd6c1eca5faa430338ca63539e24458e9bc83dd68b7233369e27cc23779116b7",
@@ -6835,6 +6987,42 @@
     "sourceHash": "sha256:30e7d82f63d10dbbdacf31430257c2d16b3213e1b4a9e453befeb263d6de4a78",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "stats.highlights.longestSession": {
+    "sourceHash": "sha256:51945fda0a5eb74521c2e3cfb4c920ebfc9cd23cb1b6d421030304b825b0017a",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.highlights.longestStreak": {
+    "sourceHash": "sha256:939e8921c045cedfdc575dbf9b8f07c7c009ff0a3c0d0e294f5ba2efba36a9da",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.highlights.newArtists": {
+    "sourceHash": "sha256:d2a41b2254ad54ed8d3bf4a5d256e6bd695c8b5cfa3f0bee7fa21921c44fbf99",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.highlights.newArtistsDetail": {
+    "sourceHash": "sha256:4f66b6c3705c5fdebdde158257e9d6dcfeec256256f2f2c65f382c18f64dbb05",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.highlights.obsession": {
+    "sourceHash": "sha256:ea0a2e76e79f5e98ab4a650c6e6bcaa075450cea5abc38dcc48fbf8417930b37",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.highlights.obsessionDetail": {
+    "sourceHash": "sha256:d7995a82925c21b5571c82c7e7550969634713f3dbe968a14047393bdb6d1bf1",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.highlights.sessionDetail": {
+    "sourceHash": "sha256:6f90329f7c1d0e014a87167ad219f4f851de86cca6437698cce1559de060dfc7",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.highlights.streakDetail": {
+    "sourceHash": "sha256:60aedc3a1546bb3cff59c5eb4766280fd69352a5df4fa86b586a72d49ab89f21",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.listening.title": {
+    "sourceHash": "sha256:b001f0fcca6be99ad95882c24ceff443b56b7ae7eed8d96f05e2e8dadf2f3013",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
   "stats.metrics.activeDays": {
     "sourceHash": "sha256:818d906fc4a3dfa8a9cd76a42e123b708bc1ec313a04a9e7486255ff79d898ac",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -6847,9 +7035,37 @@
     "sourceHash": "sha256:e3490e4a0184030e450421887d6c4fb0b37154aca95cb639ae434c2551f8c206",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "stats.musicAge.decadeTop": {
+    "sourceHash": "sha256:9c43275fc503e020daaaa67a9d5910c436ebacc7c45d527ff02fdb8a031ae05a",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "stats.musicAge.oldest": {
+    "sourceHash": "sha256:7a8cb52f5e475fd9bc243dede4f850b2e2c319f88b7d81a9ff8e31b6151878bc",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.musicAge.title": {
+    "sourceHash": "sha256:2af49321bc45fb9c78dc75c3ef18cf845ef2f7def6b6e71df66a37a9a29fd0cf",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
   "stats.narrative.signal": {
     "sourceHash": "sha256:28289b351d6fadf177886ac065d7db1738a88167a2dca7ccd9244baf605f9fb1",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "stats.period.30d": {
+    "sourceHash": "sha256:5359607cc4275704dabedc73fa3973597c0676b4f2ad0f4949484cf470f11980",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.period.365d": {
+    "sourceHash": "sha256:900fedf0e2427df24193b764f7879f8b8c541645cbec3b43c3929c6444100e74",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.period.90d": {
+    "sourceHash": "sha256:81a2597e3684b215af9379f3e262208bafad100f7a08ccec039a96e454e470db",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.period.allTime": {
+    "sourceHash": "sha256:9b2b53d5ce8d35d002bd4f0f0960e815c090674b65ffe0f88ad23d0799ec3425",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
   },
   "stats.rank": {
     "sourceHash": "sha256:1d9f66ac38e0b91942ff7d40c9f7d5fd036b78515848ffe1872ad710ba6fa5b1",
@@ -6910,6 +7126,14 @@
   "stats.replay.allTime.title": {
     "sourceHash": "sha256:56d355e377f4cff0ec7b941e379812f5ad5a74f09a233e3c370de7f892707036",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
+  },
+  "stats.replay.calendarYear.subtitle": {
+    "sourceHash": "sha256:8d0bf8e4d11fa5c556ab047a24a33f158e3fe0b2dbf5b630fd1273c207e83dc6",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.replay.calendarYear.title": {
+    "sourceHash": "sha256:c0f8133fdc33fe83ea59abb098759093eba2555f4be4cebbe460f6261f1af206",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
   },
   "stats.replay.defaultSubtitle": {
     "sourceHash": "sha256:8c64098a5c61c921bb4643210ca38582a2f17466a95a82c1a2c740b2d1281ac4",
@@ -7044,8 +7268,64 @@
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
   "stats.scope.yourDna": {
-    "sourceHash": "sha256:4bcd8c482ce9b0cb7081ce1e006131d5598893ceb3fcfcfcd5fae9429da56f3c",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
+    "sourceHash": "sha256:106127a7d843ebdc1ace76265543d655992b0707e3432c2f2731b4d1ac118a38",
+    "reviewedAt": "2026-10-08T14:46:50.978Z"
+  },
+  "stats.signal.legend.dayMinutes": {
+    "sourceHash": "sha256:32f72ed91a17856b260f59563317ff31e89eb6b1aa69af30d526fe5fd530a128",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.signal.legend.energy": {
+    "sourceHash": "sha256:ae5ed05a78a5cb5a414c6002aa432ef000a749ab9e29facabcba1215243ffc32",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.signal.legend.peaks": {
+    "sourceHash": "sha256:63e139b515fb99262534dcf6662b3208ba748d1f6e083bde82956755c42e73dd",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.signal.legend.weekMinutes": {
+    "sourceHash": "sha256:a9b1d317c89ba670838c2d6ebc6ce488de4b9c1d3f7b7ba5643d2091e662311e",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.signal.playReplay": {
+    "sourceHash": "sha256:babd3d46d6272adadb9db6272dd6a5d05df80e84ce588e32aee761bfafe19c01",
+    "reviewedAt": "2026-10-08T10:47:07.617Z"
+  },
+  "stats.signal.tapeLabel": {
+    "sourceHash": "sha256:7341d95837cbc06cb88bd284c5ed3506b49d6635c12a9196588c85f544d0d546",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.signal.tip.minutes": {
+    "sourceHash": "sha256:491a3e4a24961905040266b89de7e25f3161836a5e73c2003052d85f029d4f8b",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.signal.tip.obsession": {
+    "sourceHash": "sha256:4fe7d4105cc011dd548c34da39563c75654d9add3ad1f371151344d85e165f06",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.signal.tip.weekOf": {
+    "sourceHash": "sha256:02a7508772ed1c71e4781aedce764eb846337351ca994da9b3eae865f35ed7de",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.signal.title.accent": {
+    "sourceHash": "sha256:4e2a57bf995bb93f04d8568f4eebd46e6fd83ceb51afdfd7f817ae0829c720c1",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.signal.title.allTime": {
+    "sourceHash": "sha256:16c5dd5ef83e8dc23b9d78a3ccddb84fec48579b257171e1b5522b43b1c3521f",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.signal.title.days": {
+    "sourceHash": "sha256:1e64feeb3db7592cf5f74cbc0b41ace19b5bdd86556bed1fcefa687cbe25ca73",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.signal.title.month": {
+    "sourceHash": "sha256:d381b5c3a64b3fb0eabf858279492a2de36e879337798d53cabd0cdd03420919",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.signal.title.year": {
+    "sourceHash": "sha256:a754d05bfb9b21df8142ce6f55192518d58343dc3b30a0feaf83b1310ffff818",
+    "reviewedAt": "2026-10-08T00:23:45.012Z"
   },
   "stats.signals.discovery": {
     "sourceHash": "sha256:4a5f877e5019c9412d77b3bda44886ddc446d8b4214334ac2e71c227d36668cb",
@@ -7210,6 +7490,18 @@
   "stats.topArtists.title": {
     "sourceHash": "sha256:421d9f5968317dfd1606e0f82ab8966c790382660110651087d7efd25a74b4a1",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "stats.topListeners.meta": {
+    "sourceHash": "sha256:5bda4c33a9f0b9b8118c3b82092b07fbb06521aeabfc8fbb0ab68af5ce103298",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "stats.topListeners.subtitle": {
+    "sourceHash": "sha256:fa18a3083f665f14ed05204c79afa02b00cce0493b44d8db6237f9891c306c49",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
+  },
+  "stats.topListeners.title": {
+    "sourceHash": "sha256:8a23c4bd1eccf4b96166e79028f7cc0c9be5d3031dfcb5a24f1208123ddc041f",
+    "reviewedAt": "2026-10-10T18:23:08.711Z"
   },
   "stats.topTracks.empty": {
     "sourceHash": "sha256:f16d49bdce4aa7863caee40fa29de2da72e8e13f94815dd8ca93ace000477fe0",

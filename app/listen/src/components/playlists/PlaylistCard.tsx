@@ -193,7 +193,7 @@ function usePlaylistCardBase(props: PlaylistCardProps) {
   const [togglingFollow, runToggleFollow] = usePendingHandler(
     () => latest.current.onToggleFollow,
   );
-  const canFollow = Boolean(props.systemPlaylist && props.onToggleFollow);
+  const canFollow = Boolean(props.onToggleFollow);
 
   return {
     t,
@@ -218,8 +218,8 @@ function useCardOverlay(
   const hasPlay = Boolean(props.onPlay);
   const isFollowed = Boolean(props.isFollowed);
   const playLabel = t("common.playItem", { name: props.name });
-  const followLabel = t("actions.playlist.addToLibrary");
-  const unfollowLabel = t("actions.playlist.removeFromLibrary");
+  const followLabel = t("actions.playlist.follow");
+  const unfollowLabel = t("actions.playlist.unfollow");
 
   return useMemo(() => {
     if (!hasPlay && !canFollow) return undefined;

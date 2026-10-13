@@ -125,14 +125,12 @@ describe("PlaylistCard tile", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Add to your library" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Follow playlist" }));
     await waitFor(() => expect(onToggleFollow).toHaveBeenCalledOnce());
 
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
     fireEvent.click(
-      await screen.findByRole("menuitem", { name: "Add to your library" }),
+      await screen.findByRole("menuitem", { name: "Follow playlist" }),
     );
     await waitFor(() => expect(onToggleFollow).toHaveBeenCalledTimes(2));
   });

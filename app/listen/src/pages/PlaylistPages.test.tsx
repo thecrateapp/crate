@@ -317,3 +317,60 @@ describe("playlist pages", () => {
     );
   });
 });
+
+describe("playlist page access", () => {
+  function renderAs(overrides: Record<string, unknown>) {
+    mockUseApi.mockImplementation((url: string | null) => ({
+      data:
+        url === "/api/playlists/42"
+          ? {
+              ...basePlaylist,
+              visibility: "public",
+              user_id: 1,
+              is_collaborative: true,
+              created_at: "2026-06-01T00:00:00Z",
+              updated_at: "2026-06-01T00:00:00Z",
+              ...overrides,
+            }
+          : null,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    }));
+    renderWithListenProviders(<Playlist />, {
+      route: "/playlists/42",
+      path: "/playlists/:id",
+    });
+    return screen.getByTestId("playlist-hero");
+  }
+
+  it("shows another user's public playlist read-only with follow and copy", () => {
+    const hero = renderAs({ access: "public", is_followed: false });
+
+    expect(screen.getByRole("button", { name: "Follow" })).toBeVisible();
+    expect(hero).toHaveTextContent("Add to my playlists");
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Collaborators" })).toBeNull();
+    expect(hero).not.toHaveTextContent("Edit playlist");
+    expect(hero).not.toHaveTextContent("Delete playlist");
+  });
+
+  it("lets collaborators edit content without owner-only actions", () => {
+    const hero = renderAs({ access: "collaborator" });
+
+    expect(screen.getByRole("button", { name: "Edit" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Collaborators" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Follow" })).toBeNull();
+    expect(hero).not.toHaveTextContent("Delete playlist");
+    expect(hero).not.toHaveTextContent("Add to my playlists");
+  });
+
+  it("gives the owner every management action", () => {
+    const hero = renderAs({ access: "owner", is_collaborative: false });
+
+    expect(screen.getByRole("button", { name: "Edit" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Collaborators" })).toBeVisible();
+    expect(hero).toHaveTextContent("Delete playlist");
+    expect(screen.queryByRole("button", { name: "Follow" })).toBeNull();
+  });
+});

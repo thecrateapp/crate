@@ -886,3 +886,66 @@ class TestWorkerStatus:
         ):
             with pytest.raises(Exception, match="unauthorized"):
                 test_app.get("/api/worker/status")
+
+
+class TestTaskCatalogAndScheduleRun:
+    def test_catalog_lists_every_type_and_manual_action(self, test_app):
+        resp = test_app.get("/api/admin/task-catalog")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        types = {item["type"]: item for item in data["types"]}
+        assert types["repair_duplicate_tracks"]["label"] == "Duplicate Track Cleanup"
+        assert types["repair_duplicate_tracks"]["category"] == "library"
+        assert data["categories"]["library"] == "Library"
+        action = next(a for a in data["actions"] if a["id"] == "sync-lyrics")
+        assert action["path"] == "/api/manage/sync-lyrics"
+        assert action["body"] == {"limit": 1000}
+        assert action["task_label"] == "Lyrics Sync"
+
+    def test_schedules_include_catalog_labels(self, test_app):
+        with (
+            patch(
+                "crate.api.tasks.get_schedules",
+                return_value={"repair_duplicate_tracks": 43200},
+            ),
+            patch("crate.api.tasks.get_setting", return_value=None),
+        ):
+            resp = test_app.get("/api/worker/schedules")
+
+        assert resp.json()["repair_duplicate_tracks"]["label"] == (
+            "Duplicate Track Cleanup"
+        )
+
+    @pytest.mark.parametrize(
+        ("task_id", "status"), [("task-1", "queued"), (None, "already_queued")]
+    )
+    def test_run_schedule_now(self, test_app, task_id, status):
+        with (
+            patch(
+                "crate.api.tasks.get_schedules",
+                return_value={"repair_duplicate_tracks": 43200},
+            ),
+            patch(
+                "crate.api.tasks.enqueue_scheduled_task", return_value=task_id
+            ) as enqueue,
+        ):
+            resp = test_app.post("/api/worker/schedules/repair_duplicate_tracks/run")
+
+        assert resp.status_code == 200
+        assert resp.json() == {
+            "task_type": "repair_duplicate_tracks",
+            "task_id": task_id,
+            "status": status,
+        }
+        enqueue.assert_called_once_with("repair_duplicate_tracks")
+
+    def test_run_schedule_now_rejects_unknown_schedules(self, test_app):
+        with (
+            patch("crate.api.tasks.get_schedules", return_value={}),
+            patch("crate.api.tasks.enqueue_scheduled_task") as enqueue,
+        ):
+            resp = test_app.post("/api/worker/schedules/wipe_library/run")
+
+        assert resp.status_code == 404
+        enqueue.assert_not_called()

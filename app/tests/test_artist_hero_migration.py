@@ -193,12 +193,24 @@ def test_canary_cursor_reports_skips_and_queues_only_the_next_cursor(
         ),
     )
 
+    progress: list[dict] = []
+    monkeypatch.setattr(
+        artwork_handlers,
+        "emit_progress",
+        lambda task_id, value, force=False: progress.append(value.to_dict()),
+    )
+
     result = artwork_handlers._handle_migrate_artist_heroes(
         "task-1",
         {"after_artist_id": 0, "batch_size": 2, "dry_run": True},
         {"library_path": str(tmp_path)},
     )
 
+    assert [(p["phase"], p["done"], p["total"], p["item"]) for p in progress] == [
+        ("plan_migration", 0, 2, ""),
+        ("plan_migration", 1, 2, "Example Artist"),
+        ("plan_migration", 2, 2, "Missing Recipe"),
+    ]
     assert result == {
         "status": "continued",
         "dry_run": True,

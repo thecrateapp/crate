@@ -1,14 +1,22 @@
 import { useTranslation } from "react-i18next";
-import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
-import { Clock3, CRATE_ICON_SIZE, Play, Sparkles } from "@crate/ui/icons";
+import { Clock3, CRATE_ICON_SIZE, Play } from "@crate/ui/icons";
 import { SectionHeader } from "@crate/ui/domain/lists";
 import { Button } from "@crate/ui/shadcn/button";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
+import { StatsMiniTape } from "@/components/stats/StatsMiniTape";
+import type { StatsTape } from "@/components/stats/stats-model";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 
 import type { ReplayMix, ReplayTrack } from "./home-model";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
+
+export interface HomeListeningSignal {
+  days: number;
+  minutes: number;
+  plays: number;
+  artists: number | null;
+  tape: StatsTape | null;
+}
 
 function replayCoverUrl(item: ReplayTrack): string | undefined {
   if (item.album_id == null && !item.global_album_uid) return undefined;
@@ -50,68 +58,93 @@ function replayTrackRowData(item: ReplayTrack): TrackRowData {
 export function HomeReplaySection({
   replay,
   replayPreview,
+  signal,
   onOpenStats,
   onPlayReplay,
   onPlayTrack,
 }: {
   replay?: ReplayMix;
   replayPreview: ReplayTrack[];
+  signal?: HomeListeningSignal | null;
   onOpenStats: () => void;
   onPlayReplay: () => void;
   onPlayTrack: (track: ReplayTrack) => void;
 }) {
-  const { t } = useTranslation();
-  const isDesktop = useIsDesktop();
+  const { t, i18n } = useTranslation();
   if (!replayPreview.length) return null;
+
+  const formatInteger = (value: number) =>
+    new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 0 }).format(
+      Math.round(value),
+    );
+  const metrics = signal
+    ? [
+        {
+          key: "minutes",
+          value: signal.minutes,
+          label: t("stats.headline.minutes"),
+        },
+        { key: "plays", value: signal.plays, label: t("stats.headline.plays") },
+        ...(signal.artists === null
+          ? []
+          : [
+              {
+                key: "artists",
+                value: signal.artists,
+                label: t("stats.headline.artists"),
+              },
+            ]),
+      ]
+    : [
+        {
+          key: "tracks",
+          value: replay?.track_count ?? 0,
+          label: t("home.replay.tracks"),
+        },
+        {
+          key: "minutes",
+          value: replay?.minutes_listened ?? 0,
+          label: t("stats.headline.minutes"),
+        },
+      ];
 
   return (
     <section className="space-y-4">
       <SectionHeader
         title={t("home.sections.listeningDna.title")}
-        subtitle={
-          replay?.title && replay?.subtitle
-            ? `${replay.title} · ${replay.subtitle}`
-            : t("home.replay.sectionSubtitle")
-        }
-        actionLabel={isDesktop ? t("home.replay.openPulse") : undefined}
-        onAction={isDesktop ? onOpenStats : undefined}
+        actionLabel={t("home.sections.listeningDna.action")}
+        onAction={onOpenStats}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
-        <div className="home-replay-card overflow-hidden rounded-panel p-5">
-          <CrateBadge size="md" icon={Sparkles}>
-            {t("home.sections.listeningDna.title")}
-          </CrateBadge>
-          <h2 className="mt-4 text-2xl font-bold text-text-primary">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,1fr)]">
+        <div className="home-replay-card flex flex-col overflow-hidden rounded-panel p-6">
+          <div className="text-sm font-semibold text-accent-action">
             {replay?.title || t("home.replay.thisMonth")}
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-text-muted">
-            {replay?.subtitle || t("home.replay.recap")}
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <div className="home-replay-metric-card rounded-lg px-3 py-2">
-              <div className="home-replay-metric-label text-xs uppercase tracking-kicker">
-                {t("home.replay.tracks")}
-              </div>
-              <div className="mt-1 text-sm font-semibold text-text-primary">
-                {replay?.track_count ?? 0}
-              </div>
-            </div>
-            <div className="home-replay-metric-card rounded-lg px-3 py-2">
-              <div className="home-replay-metric-label text-xs uppercase tracking-kicker">
-                {t("home.replay.timeListened")}
-              </div>
-              <div className="mt-1 text-sm font-semibold text-text-primary">
-                {Math.round(replay?.minutes_listened ?? 0)}m
-              </div>
-            </div>
           </div>
-          <Button
-            size="sm"
-            shape="pill"
-            onClick={onPlayReplay}
-            className="mt-5 h-9 gap-2 px-4 shadow-none has-[>svg]:px-4"
-          >
+          <h2 className="mt-1 text-3xl font-extrabold tracking-tight text-text-primary">
+            {signal
+              ? t("stats.signal.title.days", { count: signal.days })
+              : t("home.replay.recap")}{" "}
+            {signal ? (
+              <span className="text-accent-action">
+                {t("stats.signal.title.accent")}
+              </span>
+            ) : null}
+          </h2>
+          <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-3">
+            {metrics.map((metric) => (
+              <div key={metric.key}>
+                <dd className="text-2xl font-extrabold tabular-nums text-text-primary">
+                  {formatInteger(metric.value)}
+                </dd>
+                <dt className="text-xs text-text-muted">{metric.label}</dt>
+              </div>
+            ))}
+          </dl>
+          {signal?.tape?.points.length ? (
+            <StatsMiniTape tape={signal.tape} />
+          ) : null}
+          <Button onClick={onPlayReplay} className="mt-auto self-start">
             <Play size={CRATE_ICON_SIZE.sm} fill="currentColor" />
             {t("home.replay.play")}
           </Button>

@@ -294,3 +294,104 @@ def test_admin_logs_stream_cleans_up_redis_on_pubsub_error(monkeypatch):
     assert fake_pubsub.subscribed == [admin_metrics.LOGS_SURFACE_STREAM_CHANNEL]
     assert fake_pubsub.unsubscribed == [admin_metrics.LOGS_SURFACE_STREAM_CHANNEL]
     assert fake_redis.closed is False
+
+
+def test_tasks_stream_coalesces_signals_into_one_shared_refresh(monkeypatch):
+    from crate.api import tasks
+
+    fake_pubsub = _FakePubSub([{"type": "message", "data": "tick"} for _ in range(5)])
+    _install_fake_async_redis(monkeypatch, fake_pubsub)
+    calls = []
+
+    def _surface(limit=100, fresh=False, max_age_seconds=30):
+        calls.append({"fresh": fresh, "max_age_seconds": max_age_seconds})
+        return {"n": len(calls)}
+
+    monkeypatch.setattr(tasks, "get_cached_tasks_surface", _surface)
+
+    async def _collect():
+        stream = tasks._tasks_stream(25)
+        first = await anext(stream)
+        second = await anext(stream)
+        await stream.aclose()
+        return first, second
+
+    first, second = asyncio.run(_collect())
+
+    assert first == 'data: {"n": 1}\n\n'
+    assert second == 'data: {"n": 2}\n\n'
+    assert calls[1] == {
+        "fresh": False,
+        "max_age_seconds": tasks.TASKS_STREAM_REFRESH_SECONDS,
+    }
+    assert len(calls) == 2
+
+
+def _task_stream_items(monkeypatch, *, generic: bool):
+    from crate.api import events
+
+    fake_pubsub = _FakePubSub(
+        [
+            {
+                "type": "message",
+                "data": json.dumps(
+                    {"event_type": "cover_variant_pruned", "data": {"n": 1}}
+                ),
+            },
+            {
+                "type": "message",
+                "data": json.dumps(
+                    {"event_type": "task_done", "data": {"status": "completed"}}
+                ),
+            },
+        ]
+    )
+
+    async def _open_pubsub(_channel):
+        return fake_pubsub
+
+    async def _close_pubsub(_pubsub, _channel):
+        return None
+
+    replay_calls = []
+
+    def _events(*args, **kwargs):
+        replay_calls.append(kwargs)
+        return [
+            {
+                "id": 7,
+                "event_type": "artist_enriched",
+                "data": {"artist": "Adrift"},
+                "created_at": "2026-10-10T00:00:00Z",
+            }
+        ]
+
+    monkeypatch.setattr(events, "open_pubsub", _open_pubsub)
+    monkeypatch.setattr(events, "close_pubsub", _close_pubsub)
+    monkeypatch.setattr(events, "get_task_events", _events)
+    monkeypatch.setattr(events, "get_task", lambda _task_id: None)
+
+    async def _collect():
+        items = []
+        async for item in events._task_stream_pubsub("t1", generic=generic):
+            items.append(item.split("\n", 1)[0])
+        return items
+
+    return asyncio.run(_collect()), replay_calls
+
+
+def test_generic_task_stream_names_every_event_task_event(monkeypatch):
+    names, replay_calls = _task_stream_items(monkeypatch, generic=True)
+
+    assert names == ["event: task_event", "event: task_event", "event: task_done"]
+    assert replay_calls[0]["tail"] is True
+
+
+def test_task_stream_keeps_event_names_without_generic(monkeypatch):
+    names, _ = _task_stream_items(monkeypatch, generic=False)
+
+    assert names == [
+        "event: artist_enriched",
+        "event: cover_variant_pruned",
+        "event: task_done",
+    ]

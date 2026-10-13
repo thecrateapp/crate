@@ -1,7 +1,6 @@
-from crate.api import jam, playlists
+from crate.api import jam
 from crate.api.public_urls import public_share_url
 from crate.api.schemas.jam import JamInviteCreateRequest, JamInviteResponse
-from crate.api.schemas.playlists import PlaylistInviteRequest, PlaylistInviteResponse
 from starlette.requests import Request
 
 
@@ -34,37 +33,6 @@ def test_public_share_url_ignores_invalid_configured_origins(monkeypatch):
     )
 
     assert public_share_url("/jam/invite/token") is None
-
-
-def test_playlist_invite_preserves_relative_urls_and_exposes_public_url(monkeypatch):
-    monkeypatch.setenv(
-        "CRATE_PUBLIC_LISTEN_BASE_URL", "https://listen.custom.test/library/"
-    )
-    monkeypatch.setattr(playlists, "_require_auth", lambda _request: {"id": 7})
-    monkeypatch.setattr(
-        playlists, "get_playlist", lambda _playlist_id: {"id": 12, "user_id": 7}
-    )
-    monkeypatch.setattr(playlists, "is_playlist_owner", lambda *_args: True)
-    monkeypatch.setattr(
-        playlists,
-        "create_playlist_invite",
-        lambda *_args, **_kwargs: {"token": "playlist-token", "playlist_id": 12},
-    )
-
-    response = playlists.invite(
-        _request(), playlist_id=12, body=PlaylistInviteRequest()
-    )
-
-    expected = "/playlist/invite/playlist-token"
-    assert response["join_url"] == expected
-    assert response["qr_value"] == expected
-    assert response["public_url"] == (
-        "https://listen.custom.test/library/playlist/invite/playlist-token"
-    )
-    assert (
-        PlaylistInviteResponse.model_validate(response).public_url
-        == response["public_url"]
-    )
 
 
 def test_jam_invite_preserves_relative_urls_and_exposes_public_url(monkeypatch):
