@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev --port 5176 --host",
+    "prebuild": "node scripts/scale-numbers.mjs",
     "build": "astro check && astro build",
     "preview": "astro preview --port 5176",
     "test": "vitest run",
@@ -20,6 +21,7 @@
     "@astrojs/check": "^0.9.0",
     "@fontsource/jetbrains-mono": "^5.0.0",
     "@playwright/test": "^1.48.0",
+    "@types/node": "^22.20.5",
     "jsdom": "^25.0.0",
     "typescript": "^5.9.0",
     "vitest": "^3.0.0"

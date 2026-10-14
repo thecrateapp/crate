@@ -1,10 +1,10 @@
 {
   "tracks": "48,213",
   "albums": "4,400",
-  "pytest": 4400,
-  "vitest": 3700,
+  "pytest": 4423,
+  "vitest": 3729,
   "goTests": 255,
-  "rustTests": 234,
-  "taskTypes": 121,
+  "rustTests": 250,
+  "taskTypes": 125,
   "migrations": 108
 }
