@@ -85,6 +85,8 @@ jobs:
           npm test --prefix app/web
           npm run build --prefix app/web
           npm run budget --prefix app/web
+          (cd app/web && npx playwright install --with-deps chromium)
+          npm run test:e2e --prefix app/web
 
       - name: Test and build docs site
         env:

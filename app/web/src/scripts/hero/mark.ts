@@ -37,8 +37,8 @@ export function initHero(): () => void {
   start().catch(() => {});
 
   async function start() {
+    if (reducedMotion()) return;
     const mobile = isMobile();
-    const reduced = reducedMotion();
     const count = mobile ? 12000 : 40000;
     const { positions: cloud } = cloudPositions(count, clusterCenters(16, 1.1));
     const mark = await sampleImage("/icons/logo.svg", count, {
@@ -94,16 +94,6 @@ export function initHero(): () => void {
         mouse: state.mouse,
         repel: state.repel,
       });
-    }
-
-    if (reduced) {
-      state.morph = 1;
-      canvas.style.opacity = "1";
-      if (staticMark) staticMark.style.opacity = "0";
-      if (caption) caption.style.opacity = "1";
-      render(0);
-      addEventListener("resize", () => render(0), { signal: listeners.signal });
-      return;
     }
 
     if (finePointer()) {
