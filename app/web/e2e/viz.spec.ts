@@ -76,6 +76,19 @@ test("every live visual on /developers mounts and the terminal streams the respo
   });
 });
 
+test("architecture stories mount their visuals and derive the same id for both spellings", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(await mountAll(page, "/architecture")).toBe(4);
+  const ids = await page.locator(".uuid .rows .out").allTextContents();
+  expect(ids).toHaveLength(2);
+  expect(new Set(ids).size).toBe(1);
+  expect(ids[0]).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+  );
+});
+
 test("the Smart Mix strip never implies beat matching", async ({ page }) => {
   await page.goto("/listen");
   const text = (await page.locator(".mix").textContent()) ?? "";

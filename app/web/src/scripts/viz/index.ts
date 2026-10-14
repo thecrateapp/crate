@@ -23,6 +23,8 @@ const views: Record<string, () => Promise<View>> = {
     import("./terminal-view").then((module) => module.initTerminal),
   allowlist: () =>
     import("./allowlist-view").then((module) => module.initAllowlist),
+  redis: () => import("./redis-view").then((module) => module.initRedis),
+  steps: () => import("./steps-view").then((module) => module.initSteps),
   governor: () =>
     import("./governor-view").then((module) => module.initGovernor),
 };

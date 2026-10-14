@@ -7,6 +7,10 @@ import ScaleFigures from "../components/architecture/ScaleFigures.astro";
 import Story from "../components/architecture/Story.astro";
 import SystemMap from "../components/architecture/SystemMap.astro";
 import Trace from "../components/architecture/Trace.astro";
+import GovernorGauges from "../components/viz/GovernorGauges.astro";
+import OutboxSequence from "../components/viz/OutboxSequence.astro";
+import RedisPair from "../components/viz/RedisPair.astro";
+import UuidDerivation from "../components/viz/UuidDerivation.astro";
 import { architecture as page } from "../content/architecture/en";
 import Base from "../layouts/Base.astro";
 import { chapterId } from "../lib/chapters";
@@ -44,7 +48,16 @@ const sections = Object.fromEntries(
     <Chapter index={sections.stories.index} title={sections.stories.title}>
       <Fragment slot="lede">{sections.stories.lede.map((paragraph) => <p>{paragraph}</p>)}</Fragment>
       <div class="stories">
-        {page.stories.map((story, index) => <Story index={index + 1} total={page.stories.length} story={story} />)}
+        {
+          page.stories.map((story, index) => (
+            <Story index={index + 1} total={page.stories.length} story={story}>
+              {story.visual === "outbox" && <OutboxSequence slot="visual" />}
+              {story.visual === "redis" && <RedisPair slot="visual" />}
+              {story.visual === "uuid" && <UuidDerivation slot="visual" />}
+              {story.visual === "governor" && <GovernorGauges slot="visual" standalone />}
+            </Story>
+          ))
+        }
       </div>
     </Chapter>
 
@@ -65,9 +78,10 @@ const sections = Object.fromEntries(
   import { initTrace } from "../scripts/architecture/trace";
   import { mountOnPage } from "../scripts/motion/page";
   import { initTextMotion } from "../scripts/motion/text-motion";
+  import { initViz } from "../scripts/viz";
 
   mountOnPage(".architecture", () => {
-    const cleanups = [initTextMotion(), initTrace(), initCounters()];
+    const cleanups = [initTextMotion(), initTrace(), initCounters(), initViz()];
     return () => cleanups.forEach((cleanup) => cleanup());
   });
 </script>

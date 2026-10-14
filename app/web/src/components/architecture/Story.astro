@@ -23,6 +23,13 @@ const id = `story-${chapterId(index, story.title)}`;
       {story.facts.map((fact) => <li>{fact}</li>)}
     </ul>
   </div>
+  {
+    Astro.slots.has("visual") && (
+      <div class="story-visual">
+        <slot name="visual" />
+      </div>
+    )
+  }
 </article>
 
 <style>
@@ -67,6 +74,11 @@ const id = `story-${chapterId(index, story.title)}`;
 
   .story-body p:first-child {
     color: var(--fg);
+  }
+
+  .story-visual {
+    grid-column: 1 / -1;
+    margin-top: 4vh;
   }
 
   .facts {

@@ -16,6 +16,7 @@ export interface Story {
   title: string;
   body: string[];
   facts: string[];
+  visual?: "outbox" | "redis" | "uuid" | "governor";
 }
 
 export interface ScaleFigure {
@@ -132,6 +133,7 @@ export const architecture: ArchitecturePage = {
         "A relay leases rows with SKIP LOCKED and appends them to a Redis stream through a Lua script that deduplicates by event uid and stamps a global sequence. Consumers acknowledge only after the projection is warm. A Redis outage may delay projections but never loses committed events.",
       ],
       facts: ["domain_event_outbox", "crate:domain_events", "SKIP LOCKED"],
+      visual: "outbox",
     },
     {
       title: "Your API can't corrupt your library",
@@ -148,6 +150,7 @@ export const architecture: ArchitecturePage = {
         "One instance would need to be a cache that never evicts or a queue that can. Two instances mean a cache under pressure never touches work in flight.",
       ],
       facts: ["volatile-lru", "AOF everysec", "noeviction"],
+      visual: "redis",
     },
     {
       title: "Gapless in the browser: HTML5 first, WebAudio second",
@@ -164,6 +167,7 @@ export const architecture: ArchitecturePage = {
         "The same music gets the same ID after every rebuild and on every server, so catalogs, caches and clients agree on what a track is without a lookup table.",
       ],
       facts: ["UUIDv5", "MBID-first", "crate:entity-uids:v1"],
+      visual: "uuid",
     },
     {
       title: "A media worker with five dependencies",
@@ -177,16 +181,15 @@ export const architecture: ArchitecturePage = {
       title: "Background work that yields to listeners",
       body: [
         "Each task is a PostgreSQL row, the source of truth, plus a Dramatiq message sent after the transaction commits. An advisory lock and a dedup key stop the same work from being queued twice.",
-        "A resource governor defers heavy work when the load ratio passes 0.85, iowait 25% or swap 30%, when free memory falls under 15%, or while people are listening. The heaviest maintenance runs only between 02:00 and 07:00. Daemons claim work with FOR UPDATE SKIP LOCKED, so several run side by side without stepping on each other.",
+        "A resource governor defers heavy work when the load ratio passes 0.85 or iowait 25%, when swap passes 30% while memory is short, or while more than ten people are listening. The heaviest maintenance runs only between 02:00 and 07:00. Daemons claim work with FOR UPDATE SKIP LOCKED, so several run side by side without stepping on each other.",
       ],
       facts: [
-        "121 task types",
-        "maintenance 56",
-        "default 37",
-        "fast 26",
-        "heavy 2",
-        "playback 1",
+        `${scale.taskTypes} task types`,
+        ...Object.entries(scale.taskQueues)
+          .sort(([, a], [, b]) => b.length - a.length)
+          .map(([queue, tasks]) => `${queue} ${tasks.length}`),
       ],
+      visual: "governor",
     },
     {
       title: "One planner, two players that don't trust it",
