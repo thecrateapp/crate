@@ -1982,7 +1982,7 @@ def _move_soulseek_completed_files(
     import re
 
     lib = Path(config["library_path"])
-    slsk_download_dir = Path("/downloads/soulseek")
+    slsk_download_dir = Path(config.get("downloads_path", "/downloads/soulseek"))
     moved = 0
 
     clean_album = re.sub(r"^\d{4}\s*[-–]\s*", "", album).strip()
@@ -1992,44 +1992,47 @@ def _move_soulseek_completed_files(
     if not clean_album:
         clean_album = album
     clean_album = _sanitize_import_name(clean_album)
+
+    found_files: list[Path] = []
+    if slsk_download_dir.is_dir():
+        for download in completed_files:
+            found = _locate_soulseek_download_file(slsk_download_dir, download)
+            if found:
+                found_files.append(found)
+
+    if found_files:
+        tags = read_tags(found_files[0])
+        tag_artist = (tags.get("albumartist") or tags.get("artist") or "").strip()
+        if tag_artist:
+            artist = tag_artist
+
     _, target_dir, managed_track_names = resolve_import_album_target(
         lib, artist, clean_album
     )
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    if not slsk_download_dir.is_dir():
-        return {
-            "artist": artist,
-            "album": clean_album,
-            "path": str(target_dir),
-            "moved": 0,
-        }
-
-    for download in completed_files:
-        found = _locate_soulseek_download_file(slsk_download_dir, download)
-
-        if found:
-            placement = (
-                resolve_managed_track_destination(
-                    found,
-                    target_dir,
-                    artist_name=artist,
-                    album_name=clean_album,
-                    album_entity_uid=target_dir.name,
-                    replace_existing_audio=replace_existing_audio,
-                )
-                if managed_track_names
-                else ManagedTrackPlacement(target_dir / found.name)
+    for found in found_files:
+        placement = (
+            resolve_managed_track_destination(
+                found,
+                target_dir,
+                artist_name=artist,
+                album_name=clean_album,
+                album_entity_uid=target_dir.name,
+                replace_existing_audio=replace_existing_audio,
             )
-            if placement is None:
-                found.unlink(missing_ok=True)
-                continue
-            try:
-                install_managed_track(found, placement, library_root=lib)
-                moved += 1
-                log.info("Moved %s -> %s", found.name, placement.dest)
-            except Exception as exc:
-                log.warning("Failed to move %s: %s", found.name, exc)
+            if managed_track_names
+            else ManagedTrackPlacement(target_dir / found.name)
+        )
+        if placement is None:
+            found.unlink(missing_ok=True)
+            continue
+        try:
+            install_managed_track(found, placement, library_root=lib)
+            moved += 1
+            log.info("Moved %s -> %s", found.name, placement.dest)
+        except Exception as exc:
+            log.warning("Failed to move %s: %s", found.name, exc)
 
     return {
         "artist": artist,
@@ -2156,6 +2159,7 @@ def _handle_soulseek_download(task_id: str, params: dict, config: dict) -> dict:
             replace_existing_audio=bool(upgrade_album_id),
         )
         moved = int(str(moved_info.get("moved") or 0))
+        artist = str(moved_info.get("artist") or artist)
 
         import re
 

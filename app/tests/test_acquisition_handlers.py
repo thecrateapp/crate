@@ -11,6 +11,7 @@ from crate.worker_handlers.acquisition import (
     _handle_library_upload,
     _handle_promote_due_releases,
     _locate_soulseek_download_file,
+    _move_soulseek_completed_files,
     _queue_release_preview_download,
     _register_new_release,
     _select_soulseek_task_downloads,
@@ -739,6 +740,72 @@ def test_locate_soulseek_download_file_prefers_exact_path_suffix(tmp_path):
 
     assert isinstance(match, Path)
     assert match == wanted_file
+
+
+def _stub_soulseek_import(monkeypatch, tmp_path, tags):
+    from crate.worker_handlers import acquisition
+
+    downloads = tmp_path / "downloads"
+    album_dir = (
+        downloads / "audio" / "Lisabö - Izkiriaturik Aurkitu Ditudan Gurak (2005)"
+    )
+    album_dir.mkdir(parents=True)
+    (album_dir / "01 - Ardoa Eta Odola I.flac").write_bytes(b"a")
+    resolved: list[str] = []
+    installed: list[Path] = []
+
+    def fake_resolve_target(lib, artist, album):
+        resolved.append(artist)
+        return None, tmp_path / "music" / artist / album, False
+
+    monkeypatch.setattr(acquisition, "read_tags", lambda path: tags)
+    monkeypatch.setattr(acquisition, "resolve_import_album_target", fake_resolve_target)
+    monkeypatch.setattr(
+        acquisition,
+        "install_managed_track",
+        lambda found, placement, library_root: installed.append(placement.dest),
+    )
+    config = {"library_path": str(tmp_path / "music"), "downloads_path": str(downloads)}
+    completed = [
+        {
+            "directory": "audio/Lisabö - Izkiriaturik Aurkitu Ditudan Gurak (2005)",
+            "fullPath": "audio/Lisabö - Izkiriaturik Aurkitu Ditudan Gurak (2005)/01 - Ardoa Eta Odola I.flac",
+            "filename": "01 - Ardoa Eta Odola I.flac",
+        }
+    ]
+    return config, completed, resolved, installed
+
+
+def test_move_soulseek_files_places_album_under_tagged_album_artist(
+    monkeypatch, tmp_path
+):
+    config, completed, resolved, installed = _stub_soulseek_import(
+        monkeypatch, tmp_path, {"albumartist": "Lisabö", "artist": "Lisabö"}
+    )
+
+    result = _move_soulseek_completed_files(
+        config, "audio", "Lisabö - Izkiriaturik Aurkitu Ditudan Gurak (2005)", completed
+    )
+
+    assert resolved == ["Lisabö"]
+    assert result["artist"] == "Lisabö"
+    assert result["moved"] == 1
+    assert len(installed) == 1
+
+
+def test_move_soulseek_files_keeps_requested_artist_without_artist_tags(
+    monkeypatch, tmp_path
+):
+    config, completed, resolved, _ = _stub_soulseek_import(
+        monkeypatch, tmp_path, {"title": "Ardoa Eta Odola I"}
+    )
+
+    result = _move_soulseek_completed_files(
+        config, "Lisabö", "Izkiriaturik Aurkitu Ditudan Gurak (2005)", completed
+    )
+
+    assert resolved == ["Lisabö"]
+    assert result["artist"] == "Lisabö"
 
 
 def test_library_upload_syncs_each_album_and_emits_grouped_completion(
