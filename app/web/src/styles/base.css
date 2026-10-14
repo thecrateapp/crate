@@ -184,6 +184,9 @@ body::after {
 
 .w {
   display: inline-block;
+}
+
+:where(html.js) .w {
   transform: translateY(112%);
 }
 
@@ -193,7 +196,7 @@ body::after {
   transition-delay: calc(var(--d, 0ms) + var(--i, 0) * var(--step, 45ms));
 }
 
-[data-enter] {
+:where(html.js) [data-enter] {
   opacity: 0;
 }
 
@@ -353,10 +356,13 @@ body::after {
   top: 0;
   height: 1px;
   background: var(--line);
-  transform: scaleX(0);
   transform-origin: left;
   transition: transform 0.9s var(--ease-out);
   transition-delay: calc(var(--i, 0) * 90ms);
+}
+
+:where(html.js) .explore a::before {
+  transform: scaleX(0);
 }
 
 .explore.is-in a::before {

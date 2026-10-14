@@ -94,8 +94,11 @@ const { name, steps, seedLabel } = Astro.props;
   .dive-card {
     display: grid;
     gap: 14px;
-    opacity: 0.32;
     transition: opacity 0.5s var(--ease-snap);
+  }
+
+  :global(:where(html.js)) .dive-card {
+    opacity: 0.32;
   }
 
   .is-active .dive-card {
@@ -176,8 +179,10 @@ const { name, steps, seedLabel } = Astro.props;
       min-height: 80svh;
       align-items: flex-end;
     }
-    .dive-card {
+    :global(:where(html.js)) .dive-card {
       opacity: 0;
+    }
+    .dive-card {
       width: 100%;
       padding: 20px;
       border: 1px solid var(--line);

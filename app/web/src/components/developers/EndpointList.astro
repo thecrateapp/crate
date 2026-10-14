@@ -34,6 +34,9 @@ const { items } = Astro.props;
     gap: 12px clamp(24px, 5vw, 80px);
     padding: 26px 0 30px;
     border-top: 1px solid var(--line);
+  }
+
+  :global(:where(html.js)) li {
     opacity: 0;
   }
 

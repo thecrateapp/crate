@@ -37,6 +37,9 @@ const { items, locale = "en" } = Astro.props;
     grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
     gap: 12px clamp(24px, 5vw, 80px);
     padding: 26px 0 30px;
+  }
+
+  :global(:where(html.js)) li {
     opacity: 0;
   }
 
@@ -46,8 +49,11 @@ const { items, locale = "en" } = Astro.props;
     inset: 0 0 auto;
     height: 1px;
     background: var(--line);
-    transform: scaleX(0);
     transform-origin: left;
+  }
+
+  :global(:where(html.js)) li::before {
+    transform: scaleX(0);
   }
 
   .is-in li {
