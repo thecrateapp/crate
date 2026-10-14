@@ -55,6 +55,17 @@ export function initHero(): () => void {
       pointScale: 6.4,
       mobileScale: 5,
       isMobile: mobile,
+      onContextLost() {
+        canvas.style.visibility = "hidden";
+        if (staticMark) {
+          gsap.killTweensOf(staticMark);
+          gsap.set(staticMark, { opacity: 1 });
+        }
+      },
+      onContextRestored() {
+        canvas.style.visibility = "";
+        if (staticMark) gsap.to(staticMark, { opacity: 0, duration: 0.6 });
+      },
     });
     if (!field) return;
     const active = field;

@@ -9,6 +9,37 @@ test.describe("hero", () => {
     await expect(page.locator(".mark-static")).toHaveCSS("opacity", "0");
   });
 
+  test("falls back to the static mark while the WebGL context is lost", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const mark = page.locator(".mark-static");
+    await expect(mark).toHaveCSS("opacity", "0", { timeout: 5000 });
+
+    await page.evaluate(() => {
+      const canvas = document.querySelector<HTMLCanvasElement>("#field")!;
+      const ext = canvas
+        .getContext("webgl2")!
+        .getExtension("WEBGL_lose_context")!;
+      (window as unknown as { lose: WEBGL_lose_context }).lose = ext;
+      ext.loseContext();
+    });
+    await expect(mark).toHaveCSS("opacity", "1");
+    await expect(page.locator("canvas#field")).toHaveCSS(
+      "visibility",
+      "hidden",
+    );
+
+    await page.evaluate(() =>
+      (window as unknown as { lose: WEBGL_lose_context }).lose.restoreContext(),
+    );
+    await expect(page.locator("canvas#field")).toHaveCSS(
+      "visibility",
+      "visible",
+    );
+    await expect(mark).toHaveCSS("opacity", "0");
+  });
+
   test.describe("reduced motion", () => {
     test.use({ reducedMotion: "reduce" });
 

@@ -4,7 +4,6 @@ import {
   multiply,
   perspective,
   project as projectPoint,
-  type Mat4,
   type Vec3,
 } from "./math";
 
@@ -73,6 +72,8 @@ export interface FieldOptions {
   pointScale?: number;
   mobileScale?: number;
   isMobile?: boolean;
+  onContextLost?: () => void;
+  onContextRestored?: () => void;
 }
 
 export interface RenderOptions {
@@ -105,7 +106,77 @@ export function createField(
     alpha: false,
     powerPreference: "high-performance",
   });
-  return gl ? buildField(canvas, gl, options) : null;
+  if (!gl) return null;
+  const field = buildField(canvas, gl, options);
+  if (!field) gl.getExtension("WEBGL_lose_context")?.loseContext();
+  return field;
+}
+
+type Uniforms = Record<(typeof UNIFORMS)[number], WebGLUniformLocation | null>;
+
+interface Resources {
+  buffers: Map<string, WebGLBuffer>;
+  u: Uniforms;
+  release(): void;
+}
+
+function createResources(
+  gl: WebGL2RenderingContext,
+  attributes: [string, Float32Array, number][],
+): Resources | null {
+  const shaders: WebGLShader[] = [];
+  const buffers = new Map<string, WebGLBuffer>();
+  let program: WebGLProgram | null = null;
+
+  function release() {
+    for (const buffer of buffers.values()) gl.deleteBuffer(buffer);
+    buffers.clear();
+    gl.deleteProgram(program);
+    shaders.forEach((shader) => gl.deleteShader(shader));
+  }
+
+  function fail() {
+    release();
+    return null;
+  }
+
+  for (const [type, source] of [
+    [gl.VERTEX_SHADER, VERTEX],
+    [gl.FRAGMENT_SHADER, FRAGMENT],
+  ] as const) {
+    const shader = gl.createShader(type);
+    if (!shader) return fail();
+    shaders.push(shader);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) return fail();
+  }
+
+  program = gl.createProgram();
+  if (!program) return fail();
+  for (const shader of shaders) gl.attachShader(program, shader);
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return fail();
+  gl.useProgram(program);
+
+  for (const [name, data, size] of attributes) {
+    const buffer = gl.createBuffer();
+    if (!buffer) return fail();
+    buffers.set(name, buffer);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+    const location = gl.getAttribLocation(program, name);
+    gl.enableVertexAttribArray(location);
+    gl.vertexAttribPointer(location, size, gl.FLOAT, false, 0, 0);
+  }
+
+  const linked = program;
+  const u = Object.fromEntries(
+    UNIFORMS.map((name) => [name, gl.getUniformLocation(linked, name)]),
+  ) as Uniforms;
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.ONE, gl.ONE);
+  return { buffers, u, release };
 }
 
 function buildField(
@@ -117,66 +188,60 @@ function buildField(
     pointScale = 8,
     mobileScale = 6,
     isMobile = false,
+    onContextLost,
+    onContextRestored,
   }: FieldOptions,
 ): Field | null {
   const count = positions.length / 3;
-
-  function compile(type: number, source: string) {
-    const shader = gl.createShader(type);
-    if (!shader) return null;
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) return null;
-    return shader;
-  }
-
-  const vertex = compile(gl.VERTEX_SHADER, VERTEX);
-  const fragment = compile(gl.FRAGMENT_SHADER, FRAGMENT);
-  const program = gl.createProgram();
-  if (!vertex || !fragment || !program) return null;
-  gl.attachShader(program, vertex);
-  gl.attachShader(program, fragment);
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return null;
-  gl.useProgram(program);
-
   const seeds = new Float32Array(count).map(() => Math.random());
-  const buffers = new Map<string, WebGLBuffer>();
-  for (const [name, data, size] of [
+  const attributes: [string, Float32Array, number][] = [
     ["aPos", positions, 3],
     ["aTarget", targets, 3],
     ["aSeed", seeds, 1],
-  ] as const) {
-    const buffer = gl.createBuffer();
-    if (!buffer) return null;
-    buffers.set(name, buffer);
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
-    const location = gl.getAttribLocation(program, name);
-    gl.enableVertexAttribArray(location);
-    gl.vertexAttribPointer(location, size, gl.FLOAT, false, 0, 0);
-  }
-
-  const u = Object.fromEntries(
-    UNIFORMS.map((name) => [name, gl.getUniformLocation(program, name)]),
-  ) as Record<(typeof UNIFORMS)[number], WebGLUniformLocation | null>;
-  gl.enable(gl.BLEND);
-  gl.blendFunc(gl.ONE, gl.ONE);
+  ];
+  let gpu = createResources(gl, attributes);
+  if (!gpu) return null;
 
   let base = positions;
   let drawn = count;
-  let mvp: Mat4 = new Array<number>(16).fill(0);
   let morphNow = 0;
+  const projection = new Float32Array(16);
+  const view = new Float32Array(16);
+  const mvp = new Float32Array(16);
 
   function resize() {
     const dpr = Math.min(devicePixelRatio, 2);
     canvas.width = canvas.clientWidth * dpr;
     canvas.height = canvas.clientHeight * dpr;
+    if (!gpu) return;
     gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.uniform1f(u.uScale, (isMobile ? mobileScale : pointScale) * dpr);
+    gl.uniform1f(gpu.u.uScale, (isMobile ? mobileScale : pointScale) * dpr);
   }
   resize();
   addEventListener("resize", resize);
+
+  function uploadBase() {
+    if (!gpu) return;
+    gl.bindBuffer(gl.ARRAY_BUFFER, gpu.buffers.get("aPos")!);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, base.subarray(0, drawn * 3));
+  }
+
+  function contextLost(event: Event) {
+    event.preventDefault();
+    gpu = null;
+    onContextLost?.();
+  }
+
+  function contextRestored() {
+    gpu = createResources(gl, attributes);
+    if (!gpu) return;
+    uploadBase();
+    resize();
+    onContextRestored?.();
+  }
+
+  canvas.addEventListener("webglcontextlost", contextLost);
+  canvas.addEventListener("webglcontextrestored", contextRestored);
 
   function render({
     eye,
@@ -189,10 +254,19 @@ function buildField(
     repel = 0,
   }: RenderOptions) {
     morphNow = morph;
-    mvp = multiply(
-      perspective(fov, canvas.clientWidth / canvas.clientHeight, 0.04, 50),
-      lookAt(eye, target),
+    multiply(
+      perspective(
+        fov,
+        canvas.clientWidth / canvas.clientHeight,
+        0.04,
+        50,
+        projection,
+      ),
+      lookAt(eye, target, view),
+      mvp,
     );
+    if (!gpu) return;
+    const { u } = gpu;
     gl.clearColor(0.039, 0.039, 0.059, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.uniformMatrix4fv(u.uMVP, false, mvp);
@@ -221,17 +295,15 @@ function buildField(
     if (!points) return;
     base = next;
     drawn = points;
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.get("aPos")!);
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, next.subarray(0, points * 3));
+    uploadBase();
   }
 
   function dispose() {
+    canvas.removeEventListener("webglcontextlost", contextLost);
+    canvas.removeEventListener("webglcontextrestored", contextRestored);
     removeEventListener("resize", resize);
-    for (const buffer of buffers.values()) gl.deleteBuffer(buffer);
-    buffers.clear();
-    gl.deleteProgram(program);
-    gl.deleteShader(vertex);
-    gl.deleteShader(fragment);
+    gpu?.release();
+    gpu = null;
     gl.getExtension("WEBGL_lose_context")?.loseContext();
   }
 

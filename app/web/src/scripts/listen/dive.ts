@@ -67,6 +67,11 @@ export function mountDive(
       pointScale: 6,
       mobileScale: 4.4,
       isMobile: mobile,
+      onContextLost: () => root.classList.replace("has-gl", "no-gl"),
+      onContextRestored: () => {
+        root.classList.replace("no-gl", "has-gl");
+        if (reduced) scene?.frame(phase, 0);
+      },
     });
     if (!field) {
       root.classList.add("no-gl");
