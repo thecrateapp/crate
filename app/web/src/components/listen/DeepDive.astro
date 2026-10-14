@@ -106,6 +106,12 @@ const { name, steps, seedLabel } = Astro.props;
     opacity: 1;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    .dive-card {
+      opacity: 1;
+    }
+  }
+
   h3 {
     margin: 0;
     font-family: var(--display);

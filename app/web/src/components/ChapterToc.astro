@@ -40,6 +40,12 @@ const { items, locale = "en" } = Astro.props;
     text-transform: uppercase;
   }
 
+  @media (pointer: coarse) {
+    .toc ol {
+      row-gap: 30px;
+    }
+  }
+
   .toc b {
     margin-right: 6px;
     font-weight: 400;

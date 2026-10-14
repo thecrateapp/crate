@@ -111,6 +111,12 @@ const platforms = [...new Set(downloads.map((download) => download.platform))].m
     gap: 10px 24px;
   }
 
+  @media (pointer: coarse) {
+    dd {
+      row-gap: 28px;
+    }
+  }
+
   @media (max-width: 760px) {
     .get {
       grid-template-columns: 1fr;

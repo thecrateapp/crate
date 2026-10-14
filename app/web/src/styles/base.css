@@ -2,6 +2,10 @@
   box-sizing: border-box;
 }
 
+html {
+  color-scheme: dark;
+}
+
 html,
 body {
   margin: 0;
@@ -20,6 +24,11 @@ body::after {
   z-index: 90;
   opacity: 0.045;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+:focus-visible {
+  outline: 2px solid var(--cyan-hi);
+  outline-offset: 3px;
 }
 
 ::selection {
@@ -378,11 +387,13 @@ body::after {
     opacity 0.3s var(--ease-snap);
 }
 
-.explore a:hover {
+.explore a:hover,
+.explore a:focus-visible {
   color: var(--cyan-hi);
 }
 
-.explore a:hover .arrow {
+.explore a:hover .arrow,
+.explore a:focus-visible .arrow {
   transform: none;
   opacity: 1;
 }
@@ -464,6 +475,18 @@ body::after {
   }
   .cta .pill {
     min-width: 70px;
+  }
+}
+
+@media (pointer: coarse) {
+  .u-link::before {
+    content: "";
+    position: absolute;
+    left: -6px;
+    right: -6px;
+    top: 50%;
+    height: 44px;
+    transform: translateY(-50%);
   }
 }
 
