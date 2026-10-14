@@ -2,7 +2,11 @@ import { mkdir } from "node:fs/promises";
 import { createInterface } from "node:readline/promises";
 import { chromium } from "@playwright/test";
 
-const url = process.env.SCREENCAST_URL ?? "https://listen.lespedants.org";
+const url = process.env.SCREENCAST_URL;
+if (!url) {
+  console.error("Set SCREENCAST_URL to the Listen instance to record.");
+  process.exit(1);
+}
 const statePath = ".auth/state.json";
 
 const browser = await chromium.launch({ headless: false });

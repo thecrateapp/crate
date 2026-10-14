@@ -16,8 +16,8 @@ export type CaptureEvent =
 
 export interface EventLog {
   readonly events: CaptureEvent[];
-  click(box: Box, at: number): void;
-  scroll(deltaY: number, at: number): void;
+  click(box: Box, at: number, offset?: Point): void;
+  scroll(deltaY: number, at: number, point?: Point): void;
 }
 
 export function createEventLog(
@@ -30,11 +30,15 @@ export function createEventLog(
 
   return {
     events,
-    click(box, at) {
-      pointer = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    click(box, at, offset) {
+      pointer = {
+        x: box.x + (offset?.x ?? box.width / 2),
+        y: box.y + (offset?.y ?? box.height / 2),
+      };
       events.push({ t: seconds(at), type: "click", ...pointer, box });
     },
-    scroll(deltaY, at) {
+    scroll(deltaY, at, point) {
+      if (point) pointer = point;
       events.push({ t: seconds(at), type: "scroll", ...pointer, deltaY });
     },
   };

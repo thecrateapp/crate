@@ -4,15 +4,19 @@ import {
   type CalculateMetadataFunction,
 } from "remotion";
 import { Chapter, CHAPTERS, type ChapterProps, type Track } from "./Chapter";
+import type { Frame } from "./frames";
+import { syncTracks } from "./sync";
 
 const FPS = 30;
 const TAIL_SECONDS = 1;
 
-async function loadTrack(
+type Capture = Omit<Track, "knots">;
+
+async function loadCapture(
   chapter: string,
   device: "desktop" | "mobile",
   signal: AbortSignal,
-): Promise<Track> {
+): Promise<Capture> {
   const read = async (name: string) => {
     const response = await fetch(staticFile(`${chapter}/${device}/${name}`), {
       signal,
@@ -24,7 +28,7 @@ async function loadTrack(
     return response.json();
   };
   const [frames, log] = await Promise.all([
-    read("frames.json"),
+    read("frames.json") as Promise<Frame[]>,
     read("events.json"),
   ]);
   return { frames, events: log.events, viewport: log.viewport };
@@ -34,17 +38,27 @@ const calculateMetadata: CalculateMetadataFunction<ChapterProps> = async ({
   props,
   abortSignal,
 }) => {
-  const desktop = await loadTrack(props.chapter, "desktop", abortSignal);
-  const mobile = await loadTrack(props.chapter, "mobile", abortSignal).catch(
+  const desktop = await loadCapture(props.chapter, "desktop", abortSignal);
+  const mobile = await loadCapture(props.chapter, "mobile", abortSignal).catch(
     () => null,
   );
-  const end = Math.max(
-    desktop.frames.at(-1)?.t ?? 0,
-    mobile?.frames.at(-1)?.t ?? 0,
+  const captures = mobile ? [desktop, mobile] : [desktop];
+  const synced = syncTracks(
+    captures.map((capture) => ({
+      events: capture.events,
+      end: capture.frames.at(-1)?.t ?? 0,
+    })),
   );
+  const [desktopTrack, mobileTrack] = captures.map((capture, index) => ({
+    ...capture,
+    ...synced.tracks[index],
+  }));
   return {
-    durationInFrames: Math.max(1, Math.ceil((end + TAIL_SECONDS) * FPS)),
-    props: { ...props, desktop, mobile },
+    durationInFrames: Math.max(
+      1,
+      Math.ceil((synced.duration + TAIL_SECONDS) * FPS),
+    ),
+    props: { ...props, desktop: desktopTrack, mobile: mobileTrack ?? null },
   };
 };
 
@@ -52,6 +66,7 @@ const empty: Track = {
   frames: [],
   events: [],
   viewport: { width: 1440, height: 900 },
+  knots: { local: [0], timeline: [0] },
 };
 
 export function Root() {
@@ -62,8 +77,8 @@ export function Root() {
           key={chapter}
           id={chapter}
           component={Chapter}
-          width={1920}
-          height={1080}
+          width={1280}
+          height={800}
           fps={FPS}
           durationInFrames={FPS}
           defaultProps={{ chapter, desktop: empty, mobile: null }}

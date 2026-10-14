@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { chromium } from "@playwright/test";
-import { createDirector, type ChapterScript, type Device } from "./director";
+import { createDirector, type ChapterModule, type Device } from "./director";
 import { createEventLog } from "./events";
 
 const CHAPTERS = ["library", "player", "radio", "paths", "offline"] as const;
@@ -33,18 +33,26 @@ console.warn(
   "Warning: this drives the real Listen app. Playback during the recording creates play events and scrobbles for the signed-in user.",
 );
 
-const baseUrl = process.env.SCREENCAST_URL ?? "https://listen.lespedants.org";
+const baseUrl = process.env.SCREENCAST_URL;
+if (!baseUrl) {
+  console.error("Set SCREENCAST_URL to the Listen instance to record.");
+  process.exit(1);
+}
 const viewport = VIEWPORTS[device];
 const outDir = join("out", chapter, device);
 const framesDir = join(outDir, "frames");
 await rm(outDir, { recursive: true, force: true });
 await mkdir(framesDir, { recursive: true });
 
-const { default: script } = (await import(`./chapters/${chapter}.ts`)) as {
-  default: ChapterScript;
-};
+const {
+  default: script,
+  start: startPath,
+  warm,
+} = (await import(`./chapters/${chapter}.ts`)) as ChapterModule;
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({
+  args: ["--autoplay-policy=no-user-gesture-required"],
+});
 const context = await browser.newContext({
   storageState: statePath,
   viewport,
@@ -53,8 +61,17 @@ const context = await browser.newContext({
   hasTouch: device === "mobile",
 });
 const page = await context.newPage();
-await page.goto(baseUrl);
-await page.waitForLoadState("networkidle");
+page.setDefaultTimeout(15_000);
+await page.addInitScript(() => {
+  localStorage.setItem("listen-eq-enabled", "true");
+  localStorage.removeItem("listen-player-state:v1");
+});
+
+const rehearsal = createDirector(page, device, createEventLog(0), baseUrl);
+if (warm) await warm(rehearsal);
+await rehearsal.goto(startPath(device));
+await page.getByTestId("listen-content").waitFor();
+await rehearsal.pause(1500);
 
 const cdp = await context.newCDPSession(page);
 const start = Date.now();

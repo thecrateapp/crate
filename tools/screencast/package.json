@@ -5,6 +5,8 @@
   "scripts": {
     "login": "tsx login.ts",
     "capture": "tsx capture.ts",
+    "render": "./render.sh",
+    "shots": "tsx shots.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "studio": "remotion studio remotion/index.ts --public-dir out"

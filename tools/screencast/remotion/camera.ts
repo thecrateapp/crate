@@ -19,7 +19,7 @@ export interface CameraOptions {
 type Click = Extract<CaptureEvent, { type: "click" }>;
 type Settings = Required<CameraOptions>;
 
-const DEFAULTS = { zoom: 1.6, lead: 0.5, hold: 1.4, move: 0.7 };
+const DEFAULTS = { zoom: 1.45, lead: 0.5, hold: 1.4, move: 0.7 };
 
 function progress(settings: Settings, seconds: number): number {
   if (seconds <= 0) return 0;

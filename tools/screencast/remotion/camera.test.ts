@@ -25,9 +25,9 @@ describe("cameraAt", () => {
   });
 
   it("zooms towards a click and holds on it", () => {
-    const camera = cameraAt([click(2, 1000, 600)], 2.4, { viewport, fps });
+    const camera = cameraAt([click(2, 900, 500)], 2.4, { viewport, fps });
 
-    expect(Math.hypot(camera.x - 1000, camera.y - 600)).toBeLessThan(40);
+    expect(Math.hypot(camera.x - 900, camera.y - 500)).toBeLessThan(40);
     expect(camera.zoom).toBeGreaterThan(1.4);
   });
 

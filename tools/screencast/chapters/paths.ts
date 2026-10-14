@@ -1,11 +1,14 @@
 import type { ChapterScript } from "../director";
 import { content } from "./shared";
 
+export const start = () => "/paths";
+
 const paths: ChapterScript = async (director) => {
   const { page } = director;
-  await director.goto("/paths");
+  const saved = content(director).locator('a[href^="/paths/"]').first();
+  await saved.waitFor();
   await director.pause(1500);
-  await director.click(content(director).locator('a[href^="/paths/"]').first());
+  await director.click(saved);
   await page.getByRole("button", { name: "Regenerate" }).waitFor();
   await director.pause(1500);
   await director.click(
@@ -14,8 +17,8 @@ const paths: ChapterScript = async (director) => {
       .first(),
   );
   await director.pause(2500);
-  await director.scroll(500);
-  await director.pause(1200);
+  await director.scroll(600);
+  await director.pause(1800);
 };
 
 export default paths;
