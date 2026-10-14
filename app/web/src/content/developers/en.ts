@@ -21,6 +21,7 @@ export interface DevelopersChapter extends ChapterContent {
   snippets?: Snippet[];
   endpoints?: Endpoint[];
   links?: DocLink[];
+  visual?: "terminal" | "allowlist" | "roadmap";
 }
 
 export interface DevelopersPage extends PageIntro {
@@ -42,6 +43,7 @@ export const developers: DevelopersPage = {
     {
       title: "APIs",
       lede: ["Everything the apps do, you can do too."],
+      visual: "terminal",
       features: [
         {
           title: "REST and OpenAPI",
@@ -56,16 +58,11 @@ export const developers: DevelopersPage = {
           body: "GET /api/capabilities tells a client what this server supports, and what the current token may do, before it asks.",
         },
       ],
-      snippets: [
-        {
-          label: "Ask a server what it supports",
-          code: 'curl \\\n  -H "Authorization: Bearer crv_xxxx" \\\n  https://your-server/api/capabilities',
-        },
-      ],
     },
     {
       title: "Tokens",
       lede: ["Personal access tokens for anything that is not a browser."],
+      visual: "allowlist",
       features: [
         {
           title: "Stored as digests",
@@ -145,23 +142,9 @@ export const developers: DevelopersPage = {
       ],
     },
     {
-      title: "VirtualDJ",
-      status: "coming-soon",
-      lede: ["Crate as an online source inside VirtualDJ."],
-      features: [
-        {
-          title: "Build",
-          body: "A C++20 plugin built with CMake against the private VirtualDJ SDK.",
-        },
-        {
-          title: "Same APIs",
-          body: "It signs in with a personal access token and uses the Smart Mix APIs above.",
-        },
-        {
-          title: "Status",
-          body: "In development. It will require VirtualDJ Pro.",
-        },
-      ],
+      title: "Working on",
+      lede: ["Upcoming work, in one place."],
+      visual: "roadmap",
     },
     {
       title: "Docs",

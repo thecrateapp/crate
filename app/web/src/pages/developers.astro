@@ -7,6 +7,10 @@ import PageHeader from "../components/PageHeader.astro";
 import CodeBlock from "../components/developers/CodeBlock.astro";
 import DocLinks from "../components/developers/DocLinks.astro";
 import EndpointList from "../components/developers/EndpointList.astro";
+import Roadmap from "../components/developers/Roadmap.astro";
+import ApiTerminal from "../components/viz/ApiTerminal.astro";
+import TokenAllowlist from "../components/viz/TokenAllowlist.astro";
+import VizSplit from "../components/viz/VizSplit.astro";
 import { developers } from "../content/developers/en";
 import { t } from "../i18n";
 import Base from "../layouts/Base.astro";
@@ -33,8 +37,21 @@ const chapters = developers.chapters.map((chapter, index) => ({
               <p>{paragraph}</p>
             ))}
           </Fragment>
+          {chapter.visual === "terminal" && (
+            <div class="viz-band">
+              <ApiTerminal />
+            </div>
+          )}
+          {chapter.visual === "roadmap" && <Roadmap />}
           {chapter.endpoints && <EndpointList items={chapter.endpoints} />}
-          {chapter.features && <FeatureList items={chapter.features} />}
+          {chapter.visual === "allowlist" && chapter.features ? (
+            <VizSplit side="right">
+              <FeatureList items={chapter.features} />
+              <TokenAllowlist slot="visual" />
+            </VizSplit>
+          ) : (
+            chapter.features && <FeatureList items={chapter.features} />
+          )}
           {(chapter.install || chapter.snippets) && (
             <div class="commands">
               {chapter.install && (
@@ -58,8 +75,12 @@ const chapters = developers.chapters.map((chapter, index) => ({
 <script>
   import { mountOnPage } from "../scripts/motion/page";
   import { initTextMotion } from "../scripts/motion/text-motion";
+  import { initViz } from "../scripts/viz";
 
-  mountOnPage(".developers", initTextMotion);
+  mountOnPage(".developers", () => {
+    const cleanups = [initTextMotion(), initViz()];
+    return () => cleanups.forEach((cleanup) => cleanup());
+  });
 </script>
 
 <style>

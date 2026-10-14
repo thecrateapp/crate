@@ -1,0 +1,137 @@
+---
+import { CAPABILITIES, TOKEN } from "../../content/developers/viz";
+import { toJsonLines } from "../../lib/json-lines";
+
+const token = `${TOKEN.example.slice(0, TOKEN.displayPrefixLength)}…`;
+const command = `curl -H "Authorization: Bearer ${token}" \\\n  https://your-crate/api/capabilities`;
+const lines = toJsonLines(CAPABILITIES, { maxInline: 4 });
+---
+
+<figure class="term" data-viz="terminal" data-reveal aria-label="A personal access token asks GET /api/capabilities what the server supports">
+  <header class="viz-bar" data-enter>
+    <p class="viz-label"><b>Capabilities</b> example response</p>
+    <p class="viz-label">GET /api/capabilities</p>
+  </header>
+  <div class="window">
+    <p class="chrome viz-label"><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><span>your-crate</span></p>
+    <pre class="screen"><code><span class="prompt" aria-hidden="true">$ </span><span class="cmd" data-term-command data-text={command}>{command}</span><span class="caret" aria-hidden="true"></span><span class="status" data-term-status>HTTP/1.1 200 OK · application/json</span>{lines.map((line, index) => <span class="line" data-term-line={index} style={`--depth:${line.depth}`}>{line.tokens.map((token) => <span class={`t-${token.kind}`}>{token.text}</span>)}</span>)}</code></pre>
+  </div>
+</figure>
+
+<style>
+  .term {
+    margin: 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .window {
+    margin-top: 24px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #0d0e14;
+    overflow: hidden;
+  }
+
+  .chrome {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .chrome i {
+    width: 9px;
+    height: 9px;
+    border: 1px solid rgba(241, 245, 249, 0.25);
+    border-radius: 50%;
+  }
+
+  .chrome span {
+    margin-left: 10px;
+  }
+
+  .screen {
+    min-height: 470px;
+    margin: 0;
+    padding: 20px 22px 26px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.75;
+    color: var(--fg-3);
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+
+  .prompt {
+    color: var(--cyan-hi);
+  }
+
+  .cmd {
+    color: var(--fg);
+    white-space: pre-wrap;
+  }
+
+  .caret {
+    display: inline-block;
+    width: 0.6em;
+    height: 1.1em;
+    margin-left: 2px;
+    vertical-align: -0.2em;
+    background: var(--cyan-hi);
+    opacity: 0;
+  }
+
+  .term:global(.is-typing) .caret {
+    opacity: 1;
+    animation: blink 1s steps(1) infinite;
+  }
+
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+
+  .status {
+    display: block;
+    margin: 12px 0 8px;
+    color: var(--cyan-hi);
+  }
+
+  .line {
+    display: block;
+    padding-left: calc(var(--depth) * 2ch);
+    white-space: pre;
+  }
+
+  .term:global(.is-running) .line,
+  .term:global(.is-running) .status {
+    visibility: hidden;
+  }
+
+  .term:global(.is-running) .line:global(.is-on),
+  .term:global(.is-running) .status:global(.is-on) {
+    visibility: visible;
+  }
+
+  .t-key,
+  .t-number,
+  .t-literal {
+    color: var(--fg);
+  }
+
+  .t-string {
+    color: var(--cyan-hi);
+  }
+
+  @media (max-width: 760px) {
+    .screen {
+      min-height: 0;
+      padding: 16px;
+      font-size: 10.5px;
+    }
+  }
+</style>

@@ -61,6 +61,21 @@ export const en = {
   "paths.title": "Music Paths",
   "paths.steps": "{steps} steps",
   "paths.saved": "Saved · can be regenerated",
+  "working.title": "What we're working on",
+  "working.lede":
+    "Two things are being built in the open. Neither is released yet, and neither is promised a date.",
+  "working.progress": "In development",
+  "working.link": "What we're working on",
+  "working.jams.title": "Jams",
+  "working.jams.body":
+    "Rooms with one shared queue, votes and DJ modes. The feature is built behind a flag while it is finished.",
+  "working.jams.facts":
+    "rooms · shared queue · votes · DJ modes · behind a flag",
+  "working.vdj.title": "VirtualDJ plugin",
+  "working.vdj.body":
+    "Crate as a VirtualDJ online source: search, folders and load to deck, plus a Compatibles folder ranked by tempo, harmony, energy and sound, with Camelot and energy metadata. Requires VirtualDJ Pro.",
+  "working.vdj.facts":
+    "C++20 · CMake · private VirtualDJ SDK · personal access token",
 } as const;
 
 export type MessageKey = keyof typeof en;

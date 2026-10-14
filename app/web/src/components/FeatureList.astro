@@ -18,13 +18,36 @@ const { items, locale = "en" } = Astro.props;
           {item.title}
           {item.status && <StatusBadge kind={item.status} locale={locale} />}
         </h3>
-        <p>{item.body}</p>
+        <p>
+          {item.body}
+          {item.link && (
+            <a class="feature-link" href={item.link.href}>
+              {item.link.label} <span aria-hidden="true">&rarr;</span>
+            </a>
+          )}
+        </p>
       </li>
     ))
   }
 </ul>
 
 <style>
+  .feature-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    margin-left: 6px;
+    color: var(--cyan-hi);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .feature-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
   .features {
     margin: 0;
     padding: 0;

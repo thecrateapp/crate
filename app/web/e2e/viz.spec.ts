@@ -46,6 +46,36 @@ test("the genre wheel explains where an inherited EQ comes from", async ({
   await expect(wheel.locator("[data-walk-preset]")).toHaveText("jazz");
 });
 
+test("Listen points Jams and Decks at the roadmap on /developers", async ({
+  page,
+}) => {
+  await page.goto("/listen");
+  const links = page.locator('a[href="/developers#working-on"]');
+  await expect(links).toHaveCount(2);
+
+  await links.first().click();
+  await expect(page).toHaveURL(/\/developers#working-on$/);
+  const roadmap = page.locator("#working-on");
+  await expect(roadmap).toBeInViewport();
+  await expect(roadmap.locator(".status-badge")).toHaveCount(2);
+  await expect(roadmap).toContainText("Jams");
+  await expect(roadmap).toContainText("VirtualDJ");
+  expect(await roadmap.textContent()).not.toMatch(
+    /beatmatch|bass handoff|automix/i,
+  );
+});
+
+test("every live visual on /developers mounts and the terminal streams the response", async ({
+  page,
+}) => {
+  expect(await mountAll(page, "/developers")).toBe(2);
+  const terminal = page.locator("[data-viz='terminal']");
+  await terminal.scrollIntoViewIfNeeded();
+  await expect(terminal.locator("[data-term-status]")).toHaveClass(/is-on/, {
+    timeout: 8000,
+  });
+});
+
 test("the Smart Mix strip never implies beat matching", async ({ page }) => {
   await page.goto("/listen");
   const text = (await page.locator(".mix").textContent()) ?? "";

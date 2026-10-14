@@ -13,7 +13,7 @@ const { items } = Astro.props;
     items.map((item, index) => (
       <li style={`--i:${index}`}>
         <code>
-          <b>{item.method}</b> {item.path}
+          <b class={item.method.toLowerCase()}>{item.method}</b> {item.path}
         </code>
         <p>{item.body}</p>
       </li>
@@ -54,9 +54,22 @@ const { items } = Astro.props;
   }
 
   b {
-    margin-right: 8px;
+    display: inline-block;
+    margin-right: 10px;
+    padding: 1px 7px;
+    border: 1px solid rgba(103, 232, 249, 0.45);
+    border-radius: 4px;
+    font-size: 10.5px;
     font-weight: 400;
+    letter-spacing: 0.06em;
     color: var(--cyan-hi);
+    vertical-align: 1px;
+  }
+
+  b.post {
+    border-color: var(--cyan-hi);
+    background: var(--cyan-hi);
+    color: var(--bg);
   }
 
   p {

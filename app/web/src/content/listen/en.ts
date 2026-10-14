@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import type { Feature, Step } from "../../lib/chapters";
 
 export interface ListenChapter {
@@ -187,8 +188,9 @@ export const listen: ListenPage = {
         },
         {
           title: "Jams",
-          body: "Rooms with one shared queue, votes and DJ modes.",
+          body: "Rooms with one shared queue and votes.",
           status: "coming-soon",
+          link: { href: "/developers#working-on", label: t("working.link") },
         },
       ],
     },
@@ -254,20 +256,9 @@ export const listen: ListenPage = {
       lede: ["Crate as an online source in VirtualDJ."],
       features: [
         {
-          title: "Search and load",
-          body: "Search your library and browse its folders from inside VirtualDJ, then load a track to a deck.",
-        },
-        {
-          title: "Compatibles",
-          body: "A Compatibles folder ranks tracks for the one on deck by tempo, harmony, energy and sound.",
-        },
-        {
-          title: "Metadata",
-          body: "Camelot key and energy come with every track.",
-        },
-        {
-          title: "Requirements",
-          body: "Requires VirtualDJ Pro.",
+          title: "VirtualDJ plugin",
+          body: "In development.",
+          link: { href: "/developers#working-on", label: t("working.link") },
         },
       ],
     },

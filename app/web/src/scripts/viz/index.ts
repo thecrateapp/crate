@@ -19,6 +19,10 @@ const views: Record<string, () => Promise<View>> = {
   analysis: () =>
     import("./analysis-view").then((module) => module.initAnalysis),
   queues: () => import("./queue-view").then((module) => module.initQueues),
+  terminal: () =>
+    import("./terminal-view").then((module) => module.initTerminal),
+  allowlist: () =>
+    import("./allowlist-view").then((module) => module.initAllowlist),
   governor: () =>
     import("./governor-view").then((module) => module.initGovernor),
 };

@@ -12,6 +12,7 @@ export interface Feature {
   title: string;
   body: string;
   status?: Status;
+  link?: { href: string; label: string };
 }
 
 export interface ChapterContent {
