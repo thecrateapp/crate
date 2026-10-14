@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -479,7 +480,18 @@ function DocMetaLine({ doc, loaded }: { doc: DocEntry; loaded?: LoadedDoc }) {
   );
 }
 
+function hashTarget(hash: string): HTMLElement | null {
+  const raw = hash.slice(1);
+  if (!raw) return null;
+  try {
+    return document.getElementById(decodeURIComponent(raw));
+  } catch {
+    return document.getElementById(raw);
+  }
+}
+
 function LoadedDocument({ doc }: { doc: DocEntry }) {
+  const { hash } = useLocation();
   const [loaded, setLoaded] = useState<LoadedDoc>();
   const [error, setError] = useState<Error>();
 
@@ -507,6 +519,10 @@ function LoadedDocument({ doc }: { doc: DocEntry }) {
       active = false;
     };
   }, [doc]);
+
+  useEffect(() => {
+    if (loaded && hash) hashTarget(hash)?.scrollIntoView();
+  }, [loaded, hash]);
 
   const adjacent = getAdjacentDocs(doc);
 
@@ -589,6 +605,13 @@ function AppShell() {
     setMenuOpen(false);
     if (restoreFocus) toggleRef.current?.focus();
   }).current;
+
+  const previousPath = useRef(location.pathname);
+  useLayoutEffect(() => {
+    if (previousPath.current === location.pathname) return;
+    previousPath.current = location.pathname;
+    if (!location.hash) window.scrollTo(0, 0);
+  }, [location.pathname, location.hash]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {

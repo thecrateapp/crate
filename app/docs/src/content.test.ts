@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   docsBySection,
+  extractHeadings,
   filterDocs,
   parseDocMeta,
   splitFrontmatter,
@@ -52,5 +53,33 @@ describe("filterDocs", () => {
       .map((doc) => doc.title);
     expect(titles).toContain("Federation protocol");
     expect(result.start).toEqual([]);
+  });
+});
+
+describe("extractHeadings", () => {
+  const markdown = [
+    "# Title",
+    "## Using `cn` with **bold** and [links](other.md)",
+    "```bash",
+    "## not a heading",
+    "```",
+    "### Plain, simple",
+    "## Using `cn` with **bold** and [links](other.md)",
+  ].join("\n");
+
+  it("strips inline markdown and skips fenced code", () => {
+    expect(extractHeadings(markdown)).toEqual([
+      {
+        level: 2,
+        text: "Using cn with bold and links",
+        id: "using-cn-with-bold-and-links",
+      },
+      { level: 3, text: "Plain, simple", id: "plain-simple" },
+      {
+        level: 2,
+        text: "Using cn with bold and links",
+        id: "using-cn-with-bold-and-links-2",
+      },
+    ]);
   });
 });

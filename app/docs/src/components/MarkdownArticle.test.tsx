@@ -11,6 +11,8 @@ import {
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { docs, extractHeadings, loadDoc } from "@/content";
+
 import { MarkdownArticle } from "./MarkdownArticle";
 
 function renderMarkdown(markdown: string) {
@@ -37,6 +39,39 @@ describe("MarkdownArticle", () => {
     expect(screen.getAllByRole("heading", { level: 2 })[0]?.id).toBe(
       "runtime-model",
     );
+  });
+
+  it("gives headings with inline code the same ids as the table of contents", () => {
+    const markdown =
+      "## Using `cn` with **bold**\n\n```bash\n## not a heading\n```\n\n### `read_scope()` and `transaction_scope()`\n\n## Using `cn` with **bold**";
+    const { container } = renderMarkdown(markdown);
+    const ids = [...container.querySelectorAll("h2, h3, h4")].map(
+      (heading) => heading.id,
+    );
+    expect(ids).toEqual(extractHeadings(markdown).map((heading) => heading.id));
+    expect(ids).toEqual([
+      "using-cn-with-bold",
+      "read_scope-and-transaction_scope",
+      "using-cn-with-bold-2",
+    ]);
+  });
+
+  it("matches the table of contents for every published document", async () => {
+    for (const doc of docs) {
+      const { markdown, headings } = await loadDoc(doc);
+      const { container, unmount } = render(
+        <MemoryRouter>
+          <MarkdownArticle markdown={markdown} sourcePath={doc.sourcePath} />
+        </MemoryRouter>,
+      );
+      const ids = [...container.querySelectorAll("h2, h3, h4")].map(
+        (heading) => heading.id,
+      );
+      expect(ids, doc.sourcePath).toEqual(
+        headings.map((heading) => heading.id),
+      );
+      unmount();
+    }
   });
 
   it("renders alert blockquotes as labelled callouts", () => {

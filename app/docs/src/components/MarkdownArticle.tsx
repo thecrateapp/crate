@@ -49,15 +49,19 @@ export function MarkdownArticle({
 }) {
   const seenHeadingIds = new Map<string, number>();
 
-  function headingId(children: ReactNode): string {
-    const baseId = slugify(String(children).replace(/,/g, ""));
+  function headingId(node: HastNode | undefined): string {
+    const baseId = slugify(textOf(node).trim());
     const duplicate = seenHeadingIds.get(baseId) ?? 0;
     seenHeadingIds.set(baseId, duplicate + 1);
     return duplicate === 0 ? baseId : `${baseId}-${duplicate + 1}`;
   }
 
-  function renderHeading(level: 2 | 3 | 4, children: ReactNode) {
-    const id = headingId(children);
+  function renderHeading(
+    level: 2 | 3 | 4,
+    node: HastNode | undefined,
+    children: ReactNode,
+  ) {
+    const id = headingId(node);
     const anchor = (
       <a className="heading-anchor" href={`#${id}`}>
         {children}
@@ -74,9 +78,12 @@ export function MarkdownArticle({
         remarkPlugins={[remarkGfm, remarkCallouts]}
         components={{
           h1: ({ children }) => <h1>{children}</h1>,
-          h2: ({ children }) => renderHeading(2, children),
-          h3: ({ children }) => renderHeading(3, children),
-          h4: ({ children }) => renderHeading(4, children),
+          h2: ({ node, children }) =>
+            renderHeading(2, node as HastNode | undefined, children),
+          h3: ({ node, children }) =>
+            renderHeading(3, node as HastNode | undefined, children),
+          h4: ({ node, children }) =>
+            renderHeading(4, node as HastNode | undefined, children),
           a: ({ href = "", children }) => {
             const resolvedHref = resolveDocHref(sourcePath, href);
             if (resolvedHref.startsWith("/")) {

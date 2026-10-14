@@ -6,11 +6,17 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
+
+beforeEach(() => {
+  vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  Element.prototype.scrollIntoView = () => {};
+});
 
 afterEach(() => {
   cleanup();
@@ -150,5 +156,34 @@ describe("docs app", () => {
     expect(container.querySelector<HTMLElement>(".sidebar")?.scrollTop).toBe(
       1000,
     );
+  });
+
+  it("scrolls to the top when navigating to another document", () => {
+    const scrollTo = vi.fn();
+    vi.spyOn(window, "scrollTo").mockImplementation(scrollTo);
+    window.history.pushState(null, "", "/start/quickstart");
+    render(<App />);
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    const index = screen.getByRole("navigation", { name: "Documentation" });
+    fireEvent.click(
+      within(index).getByRole("link", { name: "Development setup" }),
+    );
+    expect(scrollTo).toHaveBeenCalledWith(0, 0);
+  });
+
+  it("scrolls a deep link to its anchor once the document has loaded", async () => {
+    const scrolled: string[] = [];
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this.id);
+    };
+    window.history.pushState(
+      null,
+      "",
+      "/federation/federation-overview#architecture",
+    );
+    render(<App />);
+
+    await waitFor(() => expect(scrolled).toEqual(["architecture"]));
   });
 });

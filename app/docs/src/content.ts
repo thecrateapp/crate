@@ -242,18 +242,38 @@ export function parseDocMeta(frontmatter: string): DocMeta {
   };
 }
 
-function extractHeadings(markdown: string): DocHeading[] {
+export function headingText(raw: string): string {
+  return raw
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/(\*\*|__)(.+?)\1/g, "$2")
+    .replace(/\s+#+\s*$/, "")
+    .trim();
+}
+
+export function extractHeadings(markdown: string): DocHeading[] {
   const headings: DocHeading[] = [];
   const seen = new Map<string, number>();
+  let fence: string | null = null;
 
   for (const line of markdown.split("\n")) {
+    const fenceMatch = /^\s{0,3}(`{3,}|~{3,})/.exec(line);
+    if (fenceMatch?.[1]) {
+      const marker = fenceMatch[1];
+      if (!fence) fence = marker;
+      else if (marker[0] === fence[0] && marker.length >= fence.length)
+        fence = null;
+      continue;
+    }
+    if (fence) continue;
+
     const match = /^(#{2,4})\s+(.+)$/.exec(line.trim());
     if (!match) continue;
     const hashes = match[1];
     const rawText = match[2];
     if (!hashes || !rawText) continue;
 
-    const text = rawText.trim();
+    const text = headingText(rawText);
     const baseId = slugify(text);
     const duplicate = seen.get(baseId) ?? 0;
     seen.set(baseId, duplicate + 1);
