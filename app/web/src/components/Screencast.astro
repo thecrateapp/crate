@@ -8,26 +8,38 @@ interface Props {
 }
 
 const { locale = "en" } = Astro.props;
-const chapters = (["library", "player", "radio", "paths", "offline"] as const).map((id, index) => {
-  const poster = `/screencast/${id}.jpg`;
-  return {
-    id,
-    number: `0${index + 1}`,
-    title: t(`screencast.${id}`, locale),
-    poster: existsSync(join(process.cwd(), "public", poster)) ? poster : undefined,
-  };
-});
+const asset = (file: string) => (existsSync(join(process.cwd(), "public", file)) ? file : undefined);
+const chapters = (["library", "player", "radio", "paths", "offline"] as const).map((id, index) => ({
+  id,
+  number: `0${index + 1}`,
+  title: t(`screencast.${id}`, locale),
+  poster: asset(`/screencast/${id}.jpg`),
+  webm: asset(`/screencast/${id}.webm`),
+  mp4: asset(`/screencast/${id}.mp4`),
+}));
+const hasVideo = chapters.some((chapter) => chapter.mp4);
 ---
 
-<section class="screencast" aria-label={t("screencast.label", locale)}>
+<section
+  class="screencast"
+  aria-label={t("screencast.label", locale)}
+  data-screencast
+  data-play-label={t("screencast.play", locale)}
+  data-pause-label={t("screencast.pause", locale)}
+>
   <div class="frame" data-frame>
     {
       chapters.map((chapter, index) => (
         <figure class="slot" data-chapter={chapter.id} data-active={index === 0 ? "" : undefined}>
-          <video preload="none" muted playsinline poster={chapter.poster} aria-label={chapter.title} />
-          <p class="eyebrow">
-            <b>{chapter.number}</b> / {chapter.title}
-          </p>
+          <video preload="none" muted playsinline disablepictureinpicture poster={chapter.poster} aria-label={chapter.title}>
+            {chapter.webm && <source src={chapter.webm} type="video/webm" />}
+            {chapter.mp4 && <source src={chapter.mp4} type="video/mp4" />}
+          </video>
+          {!chapter.mp4 && (
+            <p class="eyebrow">
+              <b>{chapter.number}</b> / {chapter.title}
+            </p>
+          )}
           {!chapter.poster && (
             <span class="play" aria-hidden="true">
               &#9654;
@@ -36,12 +48,30 @@ const chapters = (["library", "player", "radio", "paths", "offline"] as const).m
         </figure>
       ))
     }
+    {
+      hasVideo && (
+        <button type="button" class="toggle" data-toggle data-state="play" aria-label={t("screencast.play", locale)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path class="icon-play" d="M8 5v14l11-7z" />
+            <path class="icon-pause" d="M7 5h4v14H7zM13 5h4v14h-4z" />
+          </svg>
+        </button>
+      )
+    }
   </div>
   <ol class="chapters">
     {
       chapters.map((chapter, index) => (
         <li data-active={index === 0 ? "" : undefined}>
-          <b>{chapter.number}</b> {chapter.title}
+          {hasVideo ? (
+            <button type="button" data-tab aria-pressed={index === 0 ? "true" : "false"}>
+              <b>{chapter.number}</b> {chapter.title}
+            </button>
+          ) : (
+            <>
+              <b>{chapter.number}</b> {chapter.title}
+            </>
+          )}
         </li>
       ))
     }
@@ -52,15 +82,34 @@ const chapters = (["library", "player", "radio", "paths", "offline"] as const).m
   import { gsap } from "gsap";
   import { ScrollTrigger } from "gsap/ScrollTrigger";
   import { reducedMotion } from "../scripts/motion/env";
+  import { canAutoplay, createScreencast } from "../scripts/screencast/player";
 
   gsap.registerPlugin(ScrollTrigger);
 
   let ctx: gsap.Context | undefined;
+  let disposePlayer: (() => void) | undefined;
 
-  document.addEventListener("astro:page-load", () => {
+  function teardown() {
     ctx?.revert();
     ctx = undefined;
-    if (reducedMotion() || !document.querySelector("[data-frame]")) return;
+    disposePlayer?.();
+    disposePlayer = undefined;
+  }
+
+  document.addEventListener("astro:page-load", () => {
+    teardown();
+    const root = document.querySelector<HTMLElement>("[data-screencast]");
+    if (!root) return;
+    if (root.querySelector("[data-toggle]")) {
+      disposePlayer = createScreencast(root, {
+        autoplay: canAutoplay(reducedMotion()),
+        labels: {
+          play: root.dataset.playLabel ?? "",
+          pause: root.dataset.pauseLabel ?? "",
+        },
+      });
+    }
+    if (reducedMotion()) return;
     ctx = gsap.context(() => {
       gsap.fromTo(
         "[data-frame]",
@@ -76,10 +125,7 @@ const chapters = (["library", "player", "radio", "paths", "offline"] as const).m
     });
   });
 
-  document.addEventListener("astro:before-swap", () => {
-    ctx?.revert();
-    ctx = undefined;
-  });
+  document.addEventListener("astro:before-swap", teardown);
 </script>
 
 <style>
@@ -113,6 +159,57 @@ const chapters = (["library", "player", "radio", "paths", "offline"] as const).m
     background: transparent;
   }
 
+  .toggle {
+    position: absolute;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(103, 232, 249, 0.4);
+    background: rgba(13, 14, 20, 0.72);
+    color: var(--cyan-hi);
+    cursor: pointer;
+    transition:
+      opacity 0.3s ease,
+      transform 0.3s ease;
+  }
+
+  .toggle svg {
+    width: 40%;
+    height: 40%;
+    fill: currentColor;
+  }
+
+  .toggle[data-state="play"] {
+    inset: 0;
+    margin: auto;
+    width: 84px;
+    height: 84px;
+  }
+
+  .toggle[data-state="play"] .icon-pause,
+  .toggle[data-state="pause"] .icon-play {
+    display: none;
+  }
+
+  .toggle[data-state="pause"] {
+    inset: auto 16px 16px auto;
+    width: 44px;
+    height: 44px;
+    opacity: 0;
+  }
+
+  .frame:hover .toggle[data-state="pause"],
+  .toggle[data-state="pause"]:focus-visible {
+    opacity: 1;
+  }
+
+  .toggle:focus-visible {
+    outline: 2px solid var(--cyan-hi);
+    outline-offset: 3px;
+  }
+
   .chapters {
     display: flex;
     flex-wrap: wrap;
@@ -128,6 +225,27 @@ const chapters = (["library", "player", "radio", "paths", "offline"] as const).m
     color: var(--fg-3);
   }
 
+  .chapters button {
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .chapters button:hover {
+    color: var(--fg);
+  }
+
+  .chapters button:focus-visible {
+    outline: 2px solid var(--cyan-hi);
+    outline-offset: 4px;
+  }
+
   .chapters b {
     font-weight: 400;
     margin-right: 6px;
@@ -139,5 +257,11 @@ const chapters = (["library", "player", "radio", "paths", "offline"] as const).m
 
   .chapters [data-active] b {
     color: var(--cyan-hi);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .toggle {
+      transition: none;
+    }
   }
 </style>

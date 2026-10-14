@@ -26,6 +26,8 @@ export const en = {
   "screencast.radio": "Radio",
   "screencast.paths": "Paths",
   "screencast.offline": "Offline",
+  "screencast.play": "Play the walkthrough",
+  "screencast.pause": "Pause the walkthrough",
   "get.title": "Get Crate",
   "get.server": "Server",
   "get.requirements":
