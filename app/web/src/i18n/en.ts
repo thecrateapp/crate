@@ -5,6 +5,8 @@ export const en = {
   "nav.developers": "Developers",
   "nav.docs": "Docs",
   "nav.github": "GitHub",
+  "nav.menu": "Menu",
+  "nav.close": "Close",
   "hero.eyebrow": "Free / open source / self hosted",
   "hero.title": "Crate is not a streaming service.",
   "hero.subline": "It's a tool for revolution.",

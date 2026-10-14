@@ -61,7 +61,8 @@ body::after {
   );
 }
 
-.nav .brand {
+.nav .brand,
+.menu .brand {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -78,7 +79,8 @@ body::after {
   transform: scale(1.04);
 }
 
-.nav .brand img {
+.nav .brand img,
+.menu .brand img {
   width: 24px;
   height: 24px;
 }
@@ -127,6 +129,103 @@ body::after {
 .u-link:hover::after {
   transform: scaleX(1);
   transform-origin: left;
+}
+
+.menu-toggle,
+.menu-close {
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.menu-toggle {
+  display: none;
+}
+
+.menu-close {
+  display: inline-flex;
+}
+
+.menu {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 20px calc(32px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.menu[hidden] {
+  display: none;
+}
+
+.menu-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.menu .brand {
+  min-height: 44px;
+}
+
+.menu ul {
+  margin: auto 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.menu li {
+  border-top: 1px solid var(--line);
+}
+
+.menu li a {
+  display: block;
+  padding: 14px 0;
+  color: var(--fg);
+  text-decoration: none;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(2.2rem, 11vw, 3.2rem);
+  letter-spacing: -0.04em;
+  line-height: 1;
+  animation: menu-in 0.7s var(--spring-snappy) both;
+  animation-delay: calc(60ms + var(--i, 0) * 50ms);
+}
+
+.menu li a:active {
+  color: var(--cyan-hi);
+}
+
+html.menu-open,
+html.menu-open body {
+  overflow: hidden;
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+}
+
+@keyframes menu-fade {
+  from {
+    opacity: 0;
+  }
 }
 
 @keyframes nav-in {
@@ -460,6 +559,9 @@ body::after {
   .nav .links {
     display: none;
   }
+  :where(html.js) .menu-toggle {
+    display: inline-flex;
+  }
   .statement .row {
     grid-template-columns: 1fr;
     gap: 10px;
@@ -500,6 +602,10 @@ body::after {
   .nav,
   .nav .links a {
     animation: fade-in 0.3s linear both;
+  }
+  .menu li a {
+    animation: menu-fade 0.3s linear both;
+    animation-delay: 0ms;
   }
   .w {
     transform: none !important;

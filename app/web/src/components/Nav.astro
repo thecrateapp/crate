@@ -22,4 +22,84 @@ const links = [
   <nav class="links" aria-label="Primary">
     {links.map((link, index) => <a href={link.href} style={`--i:${index}`}>{link.label}</a>)}
   </nav>
+  <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-menu" data-menu-open>
+    {t("nav.menu", locale)}
+  </button>
 </header>
+
+<div class="menu" id="site-menu" role="dialog" aria-modal="true" aria-label={t("nav.menu", locale)} data-lenis-prevent hidden>
+  <div class="menu-bar">
+    <a class="brand" href="/"><img src="/icons/logo.svg" alt="" width="24" height="24" />Crate</a>
+    <button class="menu-close" type="button" data-menu-close>{t("nav.close", locale)}</button>
+  </div>
+  <nav aria-label="Primary">
+    <ul>
+      {
+        links.map((link, index) => (
+          <li>
+            <a href={link.href} style={`--i:${index}`}>
+              {link.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </nav>
+</div>
+
+<script>
+  const panel = () => document.querySelector<HTMLElement>("#site-menu");
+  const toggle = () => document.querySelector<HTMLButtonElement>("[data-menu-open]");
+
+  function open() {
+    const menu = panel();
+    if (!menu) return;
+    menu.hidden = false;
+    toggle()?.setAttribute("aria-expanded", "true");
+    document.documentElement.classList.add("menu-open");
+    menu.querySelector<HTMLElement>("[data-menu-close]")?.focus();
+  }
+
+  function close(restoreFocus = true) {
+    const menu = panel();
+    if (!menu || menu.hidden) return;
+    menu.hidden = true;
+    const button = toggle();
+    button?.setAttribute("aria-expanded", "false");
+    document.documentElement.classList.remove("menu-open");
+    if (restoreFocus) button?.focus();
+  }
+
+  function trapFocus(event: KeyboardEvent, menu: HTMLElement) {
+    const items = [...menu.querySelectorAll<HTMLElement>("a, button")];
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  document.addEventListener("click", (event) => {
+    const target = event.target as Element | null;
+    if (target?.closest("[data-menu-open]")) open();
+    else if (target?.closest("[data-menu-close]")) close();
+    else if (target?.closest("#site-menu a")) close(false);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    const menu = panel();
+    if (!menu || menu.hidden) return;
+    if (event.key === "Escape") close();
+    else if (event.key === "Tab") trapFocus(event, menu);
+  });
+
+  document.addEventListener("astro:before-swap", () => close(false));
+
+  matchMedia("(max-width: 760px)").addEventListener("change", (event) => {
+    if (!event.matches) close(false);
+  });
+</script>
