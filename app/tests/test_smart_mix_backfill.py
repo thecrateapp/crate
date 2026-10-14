@@ -113,6 +113,76 @@ def test_current_generation_profiles_are_not_claimed(pg_db, tmp_path: Path) -> N
     assert claim_smart_mix_backfill_batch(limit=10, claimed_by="test-worker") == []
 
 
+def test_python_profiles_are_claimed_only_when_promotion_is_enabled(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    [track_id] = _create_tracks(tmp_path, count=1)
+    _insert_profile(
+        track_id,
+        analyzer_version=ANALYZER_VERSION,
+        analyzer="crate-python",
+        quality="partial",
+    )
+    _insert_processing(
+        track_id, state="done", attempts=1, target_generation=ANALYZER_VERSION
+    )
+
+    assert claim_smart_mix_backfill_batch(limit=10, claimed_by="test-worker") == []
+    claimed = claim_smart_mix_backfill_batch(
+        limit=10, claimed_by="test-worker", promote_python_profiles=True
+    )
+
+    assert [row["id"] for row in claimed] == [track_id]
+    assert _processing_row(track_id)["attempts"] == 2
+
+
+def test_missing_profiles_are_claimed_before_python_promotions(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    promoted_id, missing_id = _create_tracks(tmp_path, count=2)
+    _insert_profile(
+        promoted_id,
+        analyzer_version=ANALYZER_VERSION,
+        analyzer="crate-python",
+        quality="partial",
+    )
+    _insert_processing(
+        promoted_id, state="done", attempts=1, target_generation=ANALYZER_VERSION
+    )
+
+    claimed = claim_smart_mix_backfill_batch(
+        limit=1, claimed_by="test-worker", promote_python_profiles=True
+    )
+
+    assert [row["id"] for row in claimed] == [missing_id]
+
+
+def test_python_promotions_respect_the_retry_bound(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    [track_id] = _create_tracks(tmp_path, count=1)
+    _insert_profile(
+        track_id,
+        analyzer_version=ANALYZER_VERSION,
+        analyzer="crate-python",
+        quality="partial",
+    )
+    _insert_processing(
+        track_id, state="done", attempts=3, target_generation=ANALYZER_VERSION
+    )
+
+    assert (
+        claim_smart_mix_backfill_batch(
+            limit=10,
+            max_attempts=3,
+            claimed_by="test-worker",
+            promote_python_profiles=True,
+        )
+        == []
+    )
+
+
 def test_fresh_claims_are_not_stolen_but_expired_ones_are(
     pg_db, tmp_path: Path
 ) -> None:
@@ -384,7 +454,13 @@ def _mark_played(track_id: int) -> None:
         )
 
 
-def _insert_profile(track_id: int, *, analyzer_version: str) -> None:
+def _insert_profile(
+    track_id: int,
+    *,
+    analyzer_version: str,
+    analyzer: str = "crate-rust",
+    quality: str = "full",
+) -> None:
     with transaction_scope() as session:
         session.execute(
             text(
@@ -394,15 +470,17 @@ def _insert_profile(track_id: int, *, analyzer_version: str) -> None:
                     analyzer_version, source_revision, quality, analyzed_at
                 )
                 VALUES (
-                    :track_id, 1, :revision, 'crate-rust',
-                    :analyzer_version, 'source', 'full', NOW()
+                    :track_id, 1, :revision, :analyzer,
+                    :analyzer_version, 'source', :quality, NOW()
                 )
                 """
             ),
             {
                 "track_id": track_id,
                 "revision": f"revision-{track_id}",
+                "analyzer": analyzer,
                 "analyzer_version": analyzer_version,
+                "quality": quality,
             },
         )
 
@@ -631,6 +709,27 @@ def test_backfill_handler_claims_free_capacity_and_chains_the_next_batch(
     assert result["next_task_id"] == "task-next"
     assert calls["next"][0]["batches"] == 2
     assert calls["next"][0]["claimed"] == 12
+
+
+def test_backfill_handler_promotes_python_profiles_only_with_crate_cli(
+    monkeypatch,
+) -> None:
+    analysis, calls = _handler_harness(
+        monkeypatch,
+        campaigns=[_running_campaign(), _running_campaign()],
+        in_flight=[0, 0],
+    )
+    monkeypatch.setattr("crate.crate_cli.has_subcommands", lambda: True)
+
+    monkeypatch.setattr("crate.crate_cli.is_available", lambda: False)
+    analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+    monkeypatch.setattr("crate.crate_cli.is_available", lambda: True)
+    analysis._handle_backfill_smart_mix_profiles("task-2", {}, {})
+
+    assert [claim["promote_python_profiles"] for claim in calls["claims"]] == [
+        False,
+        True,
+    ]
 
 
 def test_backfill_handler_completes_the_campaign_when_nothing_is_left(

@@ -1226,11 +1226,14 @@ def _handle_backfill_smart_mix_profiles(
         for track_id in (params.get("offline_track_ids") or [])[:batch_size]
         if track_id
     ]
+    from crate.crate_cli import has_subcommands, is_available
+
     claimed = claim_smart_mix_backfill_batch(
         limit=batch_size - in_flight,
         offline_track_ids=offline_ids,
         max_attempts=max_attempts,
         claimed_by=f"task:{task_id}",
+        promote_python_profiles=is_available() and has_subcommands(),
     )
     queued = 0
     released: list[int] = []

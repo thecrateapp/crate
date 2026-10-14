@@ -11,7 +11,11 @@ from sqlalchemy import text
 
 from crate.db.ops_runtime import get_ops_runtime_state, set_ops_runtime_state
 from crate.db.tx import optional_scope, read_scope
-from crate.smart_mix.versions import ANALYZER_VERSION, PROFILE_SCHEMA_VERSION
+from crate.smart_mix.versions import (
+    ANALYZER_VERSION,
+    PROFILE_SCHEMA_VERSION,
+    PYTHON_ANALYZER,
+)
 
 
 SMART_MIX_PIPELINE = "smart_mix"
@@ -29,6 +33,7 @@ def claim_smart_mix_backfill_batch(
     offline_track_ids: Sequence[int] = (),
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
     claimed_by: str | None = None,
+    promote_python_profiles: bool = False,
     session=None,
 ) -> list[dict[str, Any]]:
     batch_size = max(1, min(int(limit), MAX_BACKFILL_BATCH_SIZE))
@@ -120,6 +125,10 @@ def claim_smart_mix_backfill_batch(
                           OR profile.analyzer_version <> :analyzer_version
                           OR profile.quality = 'unavailable'
                           OR profile.source_stale_at IS NOT NULL
+                          OR (
+                              :promote_python_profiles
+                              AND profile.analyzer = :python_analyzer
+                          )
                       )
                       AND (
                           processing.track_id IS NULL
@@ -136,7 +145,17 @@ def claim_smart_mix_backfill_batch(
                               )
                           )
                       )
-                    ORDER BY ranked.priority, lt.id
+                    ORDER BY
+                        COALESCE(
+                            profile.analyzer = :python_analyzer
+                            AND profile.profile_version = 1
+                            AND profile.analyzer_version = :analyzer_version
+                            AND profile.quality <> 'unavailable'
+                            AND profile.source_stale_at IS NULL,
+                            FALSE
+                        ),
+                        ranked.priority,
+                        lt.id
                     FOR UPDATE OF lt SKIP LOCKED
                     LIMIT :limit
                     """
@@ -147,6 +166,8 @@ def claim_smart_mix_backfill_batch(
                     "offline_track_ids": offline_ids,
                     "max_attempts": retry_limit,
                     "limit": batch_size,
+                    "promote_python_profiles": promote_python_profiles,
+                    "python_analyzer": PYTHON_ANALYZER,
                 },
             )
             .mappings()
