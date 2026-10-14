@@ -98,16 +98,10 @@ test("the architecture trace still follows the scroll after a round trip", async
   const trace = page.locator("[data-trace]");
   await expect(trace).toHaveClass(/is-live/);
   await expect(trace.locator(".trace-step").first()).toHaveClass(/is-active/);
-  await trace.evaluate((el) =>
-    scrollTo(
-      0,
-      el.getBoundingClientRect().top +
-        scrollY +
-        el.offsetHeight -
-        innerHeight -
-        4,
-    ),
-  );
+  await trace.evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    scrollTo(0, box.bottom + scrollY - innerHeight - 4);
+  });
   await expect(trace.locator(".trace-step").last()).toHaveClass(/is-active/);
   await expect(trace.locator(".trace-step.is-active")).toHaveCount(1);
   expect(await trace.locator(".edge-hl.is-past").count()).toBeGreaterThan(0);
