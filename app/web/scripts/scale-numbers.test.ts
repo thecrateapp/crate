@@ -9,6 +9,7 @@ import {
   countRustTests,
   countTaskTypes,
   countVitest,
+  listTaskQueues,
   updateScale,
 } from "./scale-numbers.mjs";
 
@@ -78,6 +79,22 @@ describe("counters", () => {
       "}",
     ].join("\n");
     expect(countTaskTypes(source)).toBe(3);
+  });
+
+  it("groups task types by queue in declaration order", () => {
+    const source = [
+      "TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {",
+      '    "tidal_download": TaskPoolConfig(',
+      '        "default", 0, 14400, 0',
+      "    ),",
+      '    "fetch_cover": TaskPoolConfig("fast", 0, 120, 2),',
+      '    "delete_album": TaskPoolConfig("default", 0, 300, 0),',
+      "}",
+    ].join("\n");
+    expect(listTaskQueues(source)).toEqual({
+      default: ["tidal_download", "delete_album"],
+      fast: ["fetch_cover"],
+    });
   });
 
   it("counts Alembic revision files", () => {
@@ -157,6 +174,7 @@ describe("updateScale", () => {
       rustTests: 2,
       taskTypes: 1,
       migrations: 1,
+      taskQueues: { default: ["a"] },
     };
     expect(result).toEqual(expected);
     expect(JSON.parse(readFileSync(out, "utf8"))).toEqual(expected);

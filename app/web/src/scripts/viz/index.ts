@@ -10,6 +10,17 @@ const views: Record<string, () => Promise<View>> = {
   heatmap: () => import("./heatmap-view").then((module) => module.initHeatmap),
   federation: () =>
     import("./federation-view").then((module) => module.initFederation),
+  health: () => import("./health-view").then((module) => module.initHealth),
+  sidecar: () => import("./sidecar-view").then((module) => module.initSidecar),
+  release: () => import("./release-view").then((module) => module.initRelease),
+  enrichment: () =>
+    import("./enrichment-view").then((module) => module.initEnrichment),
+  genres: () => import("./genre-view").then((module) => module.initGenres),
+  analysis: () =>
+    import("./analysis-view").then((module) => module.initAnalysis),
+  queues: () => import("./queue-view").then((module) => module.initQueues),
+  governor: () =>
+    import("./governor-view").then((module) => module.initGovernor),
 };
 
 export function initViz(root: ParentNode = document): Cleanup {

@@ -109,7 +109,7 @@ export const admin: AdminPage = {
       features: [
         {
           title: "Taxonomy",
-          body: "61 seeded genres connected by five relation types. Paths and Genre rooms are built on it.",
+          body: "61 seeded genres connected by four relation types. Paths and Genre rooms are built on it.",
         },
         {
           title: "Signed releases",

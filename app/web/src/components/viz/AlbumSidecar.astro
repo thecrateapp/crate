@@ -1,0 +1,312 @@
+---
+import { IDENTITY_TAGS, SIDECAR, SIDECAR_TRACKS } from "../../content/admin/viz";
+import { toJsonLines, type JsonLine } from "../../lib/json-lines";
+
+const lines: JsonLine[] = toJsonLines(SIDECAR, { maxInline: 4 });
+const trackEnd = lines.findLastIndex((line) => line.depth === 2 && line.tokens[0]?.text === "}");
+lines[trackEnd]!.tokens.push({ kind: "punct", text: "," });
+lines.splice(trackEnd + 1, 0, {
+  depth: 2,
+  tokens: [{ kind: "comment", text: `… ${SIDECAR_TRACKS.length - 1} more tracks` }],
+});
+const files = SIDECAR_TRACKS.map((title, index) => `${String(index + 1).padStart(2, "0")} - ${title}.flac`);
+---
+
+<figure class="sidecar" data-viz="sidecar" data-reveal aria-label="An album folder carries its catalog metadata in .crate/album.json, so the catalog can be rebuilt from the files">
+  <header class="viz-bar" data-enter>
+    <p class="viz-label"><b>Portable metadata</b> schema_version {SIDECAR.schema_version}</p>
+    <p class="viz-label">sorted keys · written atomically</p>
+  </header>
+
+  <div class="sidecar-body">
+    <div class="tree-col">
+      <ul class="tree" aria-label="Album folder">
+        <li class="dir">/music</li>
+        <li class="dir d1">{SIDECAR.artist.name}/</li>
+        <li class="dir d2">{SIDECAR.album.name}/</li>
+        {
+          files.map((file, index) => (
+            <li class="d3 file" style={`--i:${index}`}>
+              {file}
+            </li>
+          ))
+        }
+        <li class="d3 file" style={`--i:${files.length}`}>cover.jpg</li>
+        <li class="d3 dir" style={`--i:${files.length + 1}`}>.crate/</li>
+        <li class="d4 file target" data-sidecar-target style={`--i:${files.length + 2}`}>album.json</li>
+      </ul>
+      <div class="tags">
+        <p class="viz-label">Tags in every file</p>
+        <ul>{IDENTITY_TAGS.map((tag) => <li>{tag}</li>)}</ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="card-head viz-label"><span>.crate/album.json</span><span data-sidecar-count>{lines.length} lines</span></p>
+      <pre class="json" data-sidecar-scroll tabindex="0"><code>{
+        lines.map((line, index) => (
+          <span class="line" data-line={index} style={`--depth:${line.depth}`}>{line.tokens.map((token) => <span class={`t-${token.kind}`}>{token.text}</span>)}</span>
+        ))
+      }</code></pre>
+    </div>
+  </div>
+
+  <ol class="sidecar-flow">
+    <li data-flow="write">
+      <span class="viz-label"><b>01</b> write_portable_metadata</span>
+      <p>The catalog writes each album's sidecar and identity tags.</p>
+    </li>
+    <li data-flow="rehydrate">
+      <span class="viz-label"><b>02</b> rehydrate_portable_metadata</span>
+      <p>A fresh catalog reads them back: same ids, same analysis, no rescans.</p>
+    </li>
+  </ol>
+</figure>
+
+<style>
+  .sidecar {
+    margin: 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .sidecar-body {
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+    gap: clamp(24px, 4vw, 64px);
+    margin-top: 28px;
+  }
+
+  .tree-col {
+    display: grid;
+    align-content: space-between;
+    gap: 28px;
+  }
+
+  .tree {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 2;
+    color: var(--fg-3);
+  }
+
+  .tree li {
+    position: relative;
+    padding-left: calc(var(--depth, 0) * 18px);
+    white-space: nowrap;
+  }
+
+  .tree .d1 {
+    --depth: 1;
+  }
+
+  .tree .d2 {
+    --depth: 2;
+  }
+
+  .tree .d3 {
+    --depth: 3;
+  }
+
+  .tree .d4 {
+    --depth: 4;
+  }
+
+  .tree .dir {
+    color: var(--fg-2);
+  }
+
+  .tree .target {
+    color: var(--cyan-hi);
+  }
+
+  .tree .target::after {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-left: 10px;
+    border-radius: 50%;
+    background: var(--cyan-hi);
+    box-shadow: 0 0 12px var(--cyan);
+    vertical-align: middle;
+  }
+
+  :global(:where(html.js)) .tree .file {
+    opacity: 0;
+  }
+
+  :global(:where(html.js)) .is-in .tree .file {
+    animation: enter-up 0.6s var(--spring-snappy) both;
+    animation-delay: calc(200ms + var(--i) * 45ms);
+  }
+
+  .tags ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tags li {
+    padding: 3px 9px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--fg-2);
+  }
+
+  .card {
+    min-width: 0;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #0d0e14;
+    overflow: hidden;
+  }
+
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .json {
+    position: relative;
+    height: clamp(320px, 52vh, 520px);
+    margin: 0;
+    padding: 16px 18px 24px;
+    overflow: auto;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--fg-3);
+    tab-size: 2;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+    overscroll-behavior: contain;
+  }
+
+  .line {
+    display: block;
+    padding-left: calc(var(--depth) * 2ch);
+    white-space: pre;
+    transition:
+      opacity 0.25s linear,
+      transform 0.4s var(--spring-snappy);
+  }
+
+  .json:global(.is-typing) .line {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+
+  .json:global(.is-typing) .line:global(.is-on) {
+    opacity: 1;
+    transform: none;
+  }
+
+  .line:global(.is-last) {
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0.1), transparent 80%);
+  }
+
+  .t-key {
+    color: var(--fg);
+  }
+
+  .t-string {
+    color: var(--cyan-hi);
+  }
+
+  .t-number,
+  .t-literal {
+    color: var(--fg);
+  }
+
+  .t-comment {
+    color: var(--fg-3);
+    font-style: italic;
+  }
+
+  .sidecar-flow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin: 28px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .sidecar-flow li {
+    position: relative;
+    display: grid;
+    gap: 8px;
+    padding-top: 14px;
+  }
+
+  .sidecar-flow li::before,
+  .sidecar-flow li::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+    background: var(--line);
+  }
+
+  .sidecar-flow li::after {
+    background: var(--cyan-hi);
+    transform: scaleX(var(--p, 1));
+    transform-origin: left;
+  }
+
+  .sidecar-flow p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--fg-2);
+  }
+
+  @media (max-width: 860px) {
+    .sidecar-body {
+      grid-template-columns: 1fr;
+    }
+    .tree {
+      columns: 2;
+      column-gap: 20px;
+      font-size: 11px;
+    }
+    .tree li {
+      break-inside: avoid;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .tree {
+      columns: 1;
+    }
+    .tree .file:not(.target):nth-child(n + 6):nth-child(-n + 12) {
+      display: none;
+    }
+    .json {
+      height: 360px;
+      font-size: 11px;
+    }
+    .sidecar-flow {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(:where(html.js)) .is-in .tree .file {
+      animation: none;
+      opacity: 1;
+    }
+  }
+</style>

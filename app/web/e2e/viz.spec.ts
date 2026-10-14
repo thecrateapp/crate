@@ -21,6 +21,31 @@ test("every live visual on /listen mounts when it comes into view", async ({
   expect(errors).toEqual([]);
 });
 
+test("every live visual on /admin mounts when it comes into view", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+
+  expect(await mountAll(page, "/admin")).toBe(7);
+  expect(errors).toEqual([]);
+});
+
+test("the genre wheel explains where an inherited EQ comes from", async ({
+  page,
+}) => {
+  await page.goto("/admin");
+  const wheel = page.locator("[data-viz='genres']");
+  await wheel.scrollIntoViewIfNeeded();
+  await expect(wheel).toHaveAttribute("data-viz-ready", "");
+  await wheel.getByRole("button", { name: "funk" }).click();
+
+  await expect(wheel.locator("[data-walk-source]")).toHaveText(
+    "inherited from soul",
+  );
+  await expect(wheel.locator("[data-walk-preset]")).toHaveText("jazz");
+});
+
 test("the Smart Mix strip never implies beat matching", async ({ page }) => {
   await page.goto("/listen");
   const text = (await page.locator(".mix").textContent()) ?? "";

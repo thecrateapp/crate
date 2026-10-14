@@ -46,6 +46,18 @@ export function countTaskTypes(source) {
   return block ? countMatches(block[1], /"\w+"\s*:\s*TaskPoolConfig\(/g) : 0;
 }
 
+export function listTaskQueues(source) {
+  const block = source.match(/^TASK_POOL_CONFIG\b[^\n]*=\s*\{\n([\s\S]*?)^\}/m);
+  const queues = {};
+  if (!block) return queues;
+  for (const [, name, queue] of block[1].matchAll(
+    /"(\w+)"\s*:\s*TaskPoolConfig\(\s*"(\w+)"/g,
+  )) {
+    (queues[queue] ??= []).push(name);
+  }
+  return queues;
+}
+
 export function countMigrations(fileNames) {
   return fileNames.filter((name) => /^\d+[a-z]?_\w+\.py$/.test(name)).length;
 }
@@ -94,6 +106,7 @@ export function updateScale({ appDir, repoDir, out }) {
     ),
     taskTypes: countTaskTypes(readFileSync(actors, "utf8")),
     migrations: countMigrations(readdirSync(migrations)),
+    taskQueues: listTaskQueues(readFileSync(actors, "utf8")),
   };
   writeFileSync(out, `${JSON.stringify(scale, null, 2)}\n`);
   return scale;

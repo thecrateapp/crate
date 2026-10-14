@@ -1,0 +1,239 @@
+---
+import { RELEASE_STAGES } from "../../content/admin/viz";
+---
+
+<figure class="release" data-viz="release" data-reveal aria-label="A release moves from detected, through release day and download, to imported and analysed">
+  <header class="viz-bar" data-enter>
+    <p class="viz-label"><b>Acquisition</b> example timeline</p>
+    <p class="viz-label">Slowdive · Everything Is Alive</p>
+  </header>
+
+  <div class="release-head">
+    <p class="clock" data-enter style="--d:80ms">
+      <span class="viz-label">Release clock</span>
+      <b data-release-clock>Day 0</b>
+    </p>
+    <p class="now" data-enter style="--d:160ms">
+      <span class="viz-label">Now</span>
+      <b data-release-now>{RELEASE_STAGES[RELEASE_STAGES.length - 1]!.title}</b>
+      <span class="task" data-release-task>{RELEASE_STAGES[RELEASE_STAGES.length - 1]!.task}</span>
+    </p>
+  </div>
+
+  <ol class="rail" style="--p:1">
+    {
+      RELEASE_STAGES.map((stage, index) => (
+        <li data-stage={stage.id} class="is-done" style={`--i:${index}`}>
+          <span class="dot" aria-hidden="true" />
+          <span class="viz-label">
+            <b>{String(index + 1).padStart(2, "0")}</b> {stage.title}
+          </span>
+          <code>{stage.task}</code>
+          <p>{stage.body}</p>
+          <ul class="steps">
+            {stage.steps.map((step) => (
+              <li class="is-done">{step}</li>
+            ))}
+          </ul>
+        </li>
+      ))
+    }
+  </ol>
+</figure>
+
+<style>
+  .release {
+    margin: 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .release-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: space-between;
+    gap: 24px 48px;
+    margin: 5vh 0 6vh;
+  }
+
+  .clock,
+  .now {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+  }
+
+  .clock b {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(3.4rem, 9vw, 8.6rem);
+    line-height: 0.85;
+    letter-spacing: -0.05em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .now {
+    justify-items: end;
+    text-align: right;
+  }
+
+  .now b {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.6rem, 3vw, 2.6rem);
+    letter-spacing: -0.035em;
+    color: var(--cyan-hi);
+  }
+
+  .task,
+  code {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    color: var(--fg-2);
+  }
+
+  .rail {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 20px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rail::before,
+  .rail::after {
+    content: "";
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    right: 0;
+    height: 1px;
+    background: var(--line);
+  }
+
+  .rail::after {
+    background: var(--cyan-hi);
+    transform: scaleX(var(--p));
+    transform-origin: left;
+  }
+
+  .rail > li {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 10px;
+    padding-top: 30px;
+    opacity: 0.38;
+    transition: opacity 0.4s var(--ease-snap);
+  }
+
+  .rail > li:global(.is-active),
+  .rail > li:global(.is-done) {
+    opacity: 1;
+  }
+
+  .dot {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    width: 13px;
+    height: 13px;
+    border: 1px solid rgba(241, 245, 249, 0.4);
+    border-radius: 50%;
+    background: var(--bg);
+    transition:
+      background-color 0.3s var(--ease-snap),
+      border-color 0.3s var(--ease-snap),
+      transform 0.5s var(--spring-snappy);
+  }
+
+  li:global(.is-done) > .dot {
+    border-color: var(--cyan-hi);
+    background: var(--cyan-hi);
+  }
+
+  li:global(.is-active) > .dot {
+    border-color: var(--cyan-hi);
+    transform: scale(1.35);
+    box-shadow: 0 0 0 6px rgba(6, 182, 212, 0.14);
+  }
+
+  .rail p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--fg-2);
+  }
+
+  .steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .steps li {
+    padding: 2px 8px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--fg-3);
+    transition:
+      color 0.3s var(--ease-snap),
+      border-color 0.3s var(--ease-snap),
+      transform 0.45s var(--spring-snappy);
+  }
+
+  .steps li:global(.is-done) {
+    border-color: rgba(103, 232, 249, 0.4);
+    color: var(--cyan-hi);
+  }
+
+  .steps li:global(.is-active) {
+    border-color: var(--cyan-hi);
+    color: var(--fg);
+    transform: translateY(-2px);
+  }
+
+  @media (max-width: 900px) {
+    .rail {
+      grid-template-columns: 1fr;
+      gap: 26px;
+      padding-left: 28px;
+    }
+    .rail::before,
+    .rail::after {
+      top: 0;
+      bottom: 0;
+      left: 6px;
+      right: auto;
+      width: 1px;
+      height: auto;
+      transform: scaleY(var(--p));
+      transform-origin: top;
+    }
+    .rail::before {
+      transform: none;
+    }
+    .rail > li {
+      padding-top: 0;
+    }
+    .dot {
+      left: -28px;
+      top: 2px;
+    }
+    .now {
+      justify-items: start;
+      text-align: left;
+    }
+  }
+</style>
