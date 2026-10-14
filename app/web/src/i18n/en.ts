@@ -36,6 +36,17 @@ export const en = {
   "get.docs": "Read the install guide",
   "get.ios":
     "On iPhone, open your server in Safari and add it to the Home Screen.",
+  "inside.title": "Inside Crate",
+  "inside.lede":
+    "Live pieces of the real thing: the same presets, routes and checks the apps use.",
+  "inside.eq": "Equalizer",
+  "inside.eq.body": "21 presets, 10 bands",
+  "inside.path": "Music Paths",
+  "inside.path.body": "A route over the genre map",
+  "inside.heatmap": "Stats",
+  "inside.heatmap.body": "When you listen",
+  "inside.health": "Library health",
+  "inside.health.body": "17 checks, risky fixes ask first",
   "explore.label": "Explore Crate",
   "explore.listen": "Player, radio, paths, offline",
   "explore.admin": "Library health, enrichment, analysis",

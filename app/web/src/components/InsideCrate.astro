@@ -1,0 +1,365 @@
+---
+import { GENRES, HEALTH_CHECKS } from "../content/admin/viz";
+import { EQ_CYCLE, EQ_PRESETS, STATS } from "../content/listen/viz";
+import { t } from "../i18n";
+import { chapterId } from "../lib/chapters";
+import { bandPoints, smoothPath } from "../scripts/viz/eq-math";
+import { generateHeatmap, normalise } from "../scripts/viz/heatmap-math";
+import { buildTaxonomy, genreRoute } from "../scripts/viz/taxonomy-math";
+
+interface Props {
+  locale?: string;
+}
+
+const { locale = "en" } = Astro.props;
+const graph = buildTaxonomy(GENRES);
+const route = genreRoute(graph, "jazz", "techno");
+const cost = (a: string, b: string) =>
+  graph.parents.get(a)?.includes(b) || graph.parents.get(b)?.includes(a) ? "1.0" : "2.5";
+const hops = route.map((slug, index) => ({
+  slug,
+  label: slug.replace(/-/g, " "),
+  cost: index ? cost(route[index - 1]!, slug) : null,
+}));
+const eqFirst = EQ_CYCLE[0]!;
+const eqPath = smoothPath(bandPoints(EQ_PRESETS[eqFirst]!, 0, 240, 8, 112, 8));
+const heat = normalise(generateHeatmap().cells, STATS.hours * 60);
+const heatMax = Math.max(...heat.flat());
+const tiles = [
+  { id: "eq", href: `/listen#${chapterId(1, "Play")}`, title: t("inside.eq", locale), body: t("inside.eq.body", locale) },
+  { id: "path", href: `/listen#${chapterId(3, "Paths")}`, title: t("inside.path", locale), body: t("inside.path.body", locale) },
+  { id: "heatmap", href: `/listen#${chapterId(5, "Yours")}`, title: t("inside.heatmap", locale), body: t("inside.heatmap.body", locale) },
+  { id: "health", href: `/admin#${chapterId(1, "Health")}`, title: t("inside.health", locale), body: t("inside.health.body", locale) },
+];
+---
+
+<section class="inside" aria-labelledby="inside-title" data-reveal>
+  <header class="inside-head">
+    <h2 class="display" id="inside-title" data-enter>{t("inside.title", locale)}</h2>
+    <p data-enter style="--d:120ms">{t("inside.lede", locale)}</p>
+  </header>
+  <ul class="tiles" data-viz="inside">
+    {
+      tiles.map((tile, index) => (
+        <li style={`--i:${index}`} data-tile={tile.id}>
+          <a href={tile.href}>
+            <span class="viz-label">
+              <b>{String(index + 1).padStart(2, "0")}</b> {tile.title}
+            </span>
+            <span class="mini" aria-hidden="true">
+              {tile.id === "eq" && (
+                <svg viewBox="0 0 240 120" preserveAspectRatio="none">
+                  <line class="zero" x1="0" x2="240" y1="60" y2="60" />
+                  <path class="glow" d={eqPath} data-eq-path />
+                  <path class="curve" d={eqPath} data-eq-path />
+                </svg>
+              )}
+              {tile.id === "eq" && (
+                <span class="tag" data-eq-name>
+                  {eqFirst.replace(/_/g, " ")}
+                </span>
+              )}
+              {tile.id === "path" && (
+                <svg viewBox="0 0 240 120">
+                  <path
+                    class="route"
+                    d={hops.map((_, i) => `${i ? "L" : "M"}${12 + i * (216 / (hops.length - 1))} ${i % 2 ? 44 : 76}`).join(" ")}
+                    pathLength="1"
+                    data-route
+                  />
+                  {hops.map((hop, i) => (
+                    <g transform={`translate(${12 + i * (216 / (hops.length - 1))} ${i % 2 ? 44 : 76})`} data-hop={i}>
+                      <circle r="4" />
+                      <text y={i % 2 ? -12 : 22} text-anchor="middle">
+                        {hop.label}
+                      </text>
+                    </g>
+                  ))}
+                  {hops.slice(1).map((hop, i) => (
+                    <text class="cost" x={12 + (i + 0.5) * (216 / (hops.length - 1))} y="64" text-anchor="middle">
+                      {hop.cost}
+                    </text>
+                  ))}
+                </svg>
+              )}
+              {tile.id === "heatmap" && (
+                <span class="heat">
+                  {heat.map((row) =>
+                    row.map((minutes, hour) => <i style={`--l:${(minutes / heatMax).toFixed(3)}`} data-hour={hour} />),
+                  )}
+                </span>
+              )}
+              {tile.id === "health" && (
+                <span class="rows">
+                  {HEALTH_CHECKS.map((check) => (
+                    <i class:list={{ confirm: check.confirm }} />
+                  ))}
+                </span>
+              )}
+            </span>
+            <span class="tile-title">{tile.title}</span>
+            <span class="tile-body">
+              {tile.body} <span aria-hidden="true">&rarr;</span>
+            </span>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</section>
+
+<style>
+  .inside {
+    position: relative;
+    z-index: 5;
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 14vh clamp(20px, 6vw, 96px) 6vh;
+  }
+
+  .inside-head {
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+    gap: 20px 48px;
+    align-items: end;
+  }
+
+  .inside-head h2 {
+    margin: 0;
+    font-size: clamp(2.8rem, 7vw, 6.4rem);
+  }
+
+  .inside-head p {
+    max-width: 44ch;
+    margin: 0;
+    font-size: clamp(1rem, 1.2vw, 1.15rem);
+    line-height: 1.7;
+    color: var(--fg-2);
+  }
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 7vh 0 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--line);
+  }
+
+  .tiles li + li {
+    border-left: 1px solid var(--line);
+  }
+
+  :global(:where(html.js)) .tiles li {
+    opacity: 0;
+  }
+
+  :global(:where(html.js)) .is-in .tiles li {
+    animation: enter-up 0.7s var(--spring-snappy) both;
+    animation-delay: calc(160ms + var(--i) * 90ms);
+  }
+
+  .tiles a {
+    display: grid;
+    gap: 14px;
+    height: 100%;
+    padding: 22px clamp(14px, 1.8vw, 26px) 26px;
+    color: var(--fg);
+    text-decoration: none;
+    transition: background-color 0.4s var(--ease-snap);
+  }
+
+  .tiles li:first-child a {
+    padding-left: 0;
+  }
+
+  .tiles a:hover {
+    background: rgba(6, 182, 212, 0.04);
+  }
+
+  .tiles a:focus-visible {
+    outline: 2px solid var(--cyan-hi);
+    outline-offset: -2px;
+  }
+
+  .mini {
+    position: relative;
+    display: block;
+    height: 120px;
+    margin: 8px 0 6px;
+  }
+
+  .mini svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .zero {
+    stroke: rgba(241, 245, 249, 0.18);
+    stroke-dasharray: 2 4;
+  }
+
+  .curve {
+    fill: none;
+    stroke: var(--cyan-hi);
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .glow {
+    fill: none;
+    stroke: var(--cyan);
+    stroke-width: 10;
+    stroke-opacity: 0.12;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tag {
+    position: absolute;
+    left: 0;
+    bottom: -4px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--cyan-hi);
+  }
+
+  [data-hop] text,
+  .cost {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    fill: var(--fg-3);
+  }
+
+  .route {
+    fill: none;
+    stroke: var(--cyan-hi);
+    stroke-width: 1.5;
+    stroke-dasharray: 1;
+    stroke-dashoffset: var(--route, 0);
+  }
+
+  [data-hop] circle {
+    fill: var(--bg);
+    stroke: var(--cyan-hi);
+    stroke-width: 1.5;
+    transition: fill 0.3s var(--ease-snap);
+  }
+
+  [data-hop]:global(.is-on) circle {
+    fill: var(--cyan-hi);
+  }
+
+  [data-hop]:global(.is-on) text {
+    fill: var(--fg);
+  }
+
+  .cost {
+    fill: rgba(241, 245, 249, 0.35);
+    font-size: 8.5px;
+  }
+
+  .heat {
+    display: grid;
+    grid-template-columns: repeat(24, minmax(0, 1fr));
+    gap: 2px;
+    align-content: center;
+    height: 100%;
+  }
+
+  .heat i {
+    aspect-ratio: 1;
+    border-radius: 1.5px;
+    background: rgba(103, 232, 249, calc(0.05 + var(--l) * 0.95));
+    transition: transform 0.4s var(--spring-snappy);
+  }
+
+  .heat i:global(.is-now) {
+    outline: 1px solid var(--fg);
+  }
+
+  .rows {
+    display: grid;
+    gap: 3px;
+    align-content: center;
+    height: 100%;
+  }
+
+  .rows i {
+    position: relative;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(103, 232, 249, 0.35);
+    transition: background-color 0.3s var(--ease-snap);
+  }
+
+  .rows i.confirm {
+    width: 82%;
+    background: rgba(241, 245, 249, 0.16);
+  }
+
+  .rows i:global(.is-scan) {
+    background: var(--cyan-hi);
+  }
+
+  .rows i.confirm:global(.is-scan) {
+    background: var(--amber);
+  }
+
+  .tile-title {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.4rem, 2vw, 1.9rem);
+    letter-spacing: -0.035em;
+  }
+
+  .tile-body {
+    font-size: 14px;
+    color: var(--fg-2);
+  }
+
+  @media (max-width: 1000px) {
+    .tiles {
+      grid-template-columns: 1fr 1fr;
+    }
+    .tiles li:nth-child(3) {
+      border-left: 0;
+    }
+    .tiles li:nth-child(3) a {
+      padding-left: 0;
+    }
+    .tiles li:nth-child(n + 3) {
+      border-top: 1px solid var(--line);
+    }
+  }
+
+  @media (max-width: 760px) {
+    .inside-head {
+      grid-template-columns: 1fr;
+    }
+    .tiles {
+      grid-template-columns: 1fr;
+    }
+    .tiles li + li {
+      border-left: 0;
+      border-top: 1px solid var(--line);
+    }
+    .tiles a {
+      padding-left: 0;
+      padding-right: 0;
+    }
+    .mini {
+      height: 96px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(:where(html.js)) .is-in .tiles li {
+      animation: none;
+      opacity: 1;
+    }
+  }
+</style>

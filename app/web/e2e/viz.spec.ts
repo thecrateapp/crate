@@ -89,6 +89,29 @@ test("architecture stories mount their visuals and derive the same id for both s
   );
 });
 
+test("the home page shows four live pieces that link to their pages", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const band = page.locator("[data-viz='inside']");
+  await band.scrollIntoViewIfNeeded();
+  await expect(band).toHaveAttribute("data-viz-ready", "");
+  const hrefs = await band
+    .locator("a")
+    .evaluateAll((links) => links.map((link) => link.getAttribute("href")));
+  expect(hrefs).toEqual([
+    "/listen#01-play",
+    "/listen#03-paths",
+    "/listen#05-yours",
+    "/admin#01-health",
+  ]);
+  for (const href of hrefs) {
+    const [path, id] = href!.split("#");
+    await page.goto(path!);
+    await expect(page.locator(`[id="${id}"]`)).toHaveCount(1);
+  }
+});
+
 test("the Smart Mix strip never implies beat matching", async ({ page }) => {
   await page.goto("/listen");
   const text = (await page.locator(".mix").textContent()) ?? "";
