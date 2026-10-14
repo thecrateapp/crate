@@ -38,6 +38,7 @@ export function createPathsScene(
       range.textContent = `${readouts[0].bpm} → ${readouts[STEPS - 1].bpm} BPM`;
   }
 
+  const scrambles: (() => void)[] = [];
   let nodes: number[] = [];
   let planned = false;
 
@@ -72,8 +73,9 @@ export function createPathsScene(
     const label = labels[i];
     if (on === label.classList.contains("is-on")) return;
     label.classList.toggle("is-on", on);
+    scrambles[i]?.();
     if (on)
-      scrambleText(label, label.dataset.text ?? "", {
+      scrambles[i] = scrambleText(label, label.dataset.text ?? "", {
         durationMs: 380,
         reducedMotion: reduced,
       });
@@ -140,6 +142,7 @@ export function createPathsScene(
       planned = false;
     },
     dispose() {
+      scrambles.forEach((cancel) => cancel());
       group.remove();
       labels.forEach((label) => label.remove());
     },
