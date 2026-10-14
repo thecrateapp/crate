@@ -84,6 +84,7 @@ jobs:
         run: |
           npm test --prefix app/web
           npm run build --prefix app/web
+          npm run budget --prefix app/web
 
       - name: Test and build docs site
         env:
