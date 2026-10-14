@@ -20,8 +20,12 @@ export function initTrace(): Cleanup {
     return { stops, edges: routeEdges(stops, traceEdges) };
   });
   const nodeEls = [...root.querySelectorAll<SVGGElement>("[data-node]")];
-  const edgeEls = (id: string) =>
-    root.querySelectorAll<SVGPathElement>(`.edge-hl[data-edge="${id}"]`);
+  const edgePaths = new Map<string, SVGPathElement[]>();
+  root.querySelectorAll<SVGPathElement>(".edge-hl").forEach((path) => {
+    const id = path.dataset.edge ?? "";
+    edgePaths.set(id, [...(edgePaths.get(id) ?? []), path]);
+  });
+  const drawnState = new Map<string, string>();
   const svgs = [...root.querySelectorAll<SVGSVGElement>("svg.map")];
 
   function drawEdge(
@@ -30,9 +34,12 @@ export function initTrace(): Cleanup {
     reversed: boolean,
     past: boolean,
   ) {
-    const offset = reversed ? -(1 - amount) : 1 - amount;
-    edgeEls(id).forEach((path) => {
-      path.style.strokeDashoffset = String(offset);
+    const offset = String(reversed ? -(1 - amount) : 1 - amount);
+    const state = `${offset}|${past}`;
+    if (drawnState.get(id) === state) return;
+    drawnState.set(id, state);
+    edgePaths.get(id)?.forEach((path) => {
+      path.style.strokeDashoffset = offset;
       path.classList.toggle("is-past", past);
     });
   }
@@ -49,10 +56,13 @@ export function initTrace(): Cleanup {
     root!.classList.remove("is-live");
     steps.forEach((step) => step.classList.remove("is-active"));
     markNodes(new Set(), new Set());
-    root!.querySelectorAll<SVGPathElement>(".edge-hl").forEach((path) => {
-      path.style.strokeDashoffset = "";
-      path.classList.remove("is-past");
-    });
+    drawnState.clear();
+    edgePaths.forEach((paths) =>
+      paths.forEach((path) => {
+        path.style.strokeDashoffset = "";
+        path.classList.remove("is-past");
+      }),
+    );
     root!
       .querySelectorAll<SVGCircleElement>(".trace-dot")
       .forEach((dot) => (dot.style.opacity = ""));
@@ -69,6 +79,28 @@ export function initTrace(): Cleanup {
 
   root.classList.add("is-live");
   let active = -1;
+  let svg: SVGSVGElement | undefined;
+  let dot: SVGCircleElement | null = null;
+
+  function pickSvg() {
+    svg = svgs.find((candidate) => candidate.getBoundingClientRect().width > 0);
+    dot = svg?.querySelector<SVGCircleElement>(".trace-dot") ?? null;
+  }
+
+  function settleRoutes(index: number) {
+    routes.forEach((route, i) => {
+      if (i > index)
+        route.edges.forEach((edge) =>
+          drawEdge(edge.id, 0, edge.reversed, false),
+        );
+    });
+    routes.forEach((route, i) => {
+      if (i < index)
+        route.edges.forEach((edge) =>
+          drawEdge(edge.id, 1, edge.reversed, true),
+        );
+    });
+  }
 
   function render(progress: number) {
     const { index, local } = stepAt(progress, steps.length);
@@ -82,19 +114,8 @@ export function initTrace(): Cleanup {
         new Set(routes[index].stops),
         new Set(routes.slice(0, index).flatMap((route) => route.stops)),
       );
+      settleRoutes(index);
     }
-    routes.forEach((route, i) => {
-      if (i > index)
-        route.edges.forEach((edge) =>
-          drawEdge(edge.id, 0, edge.reversed, false),
-        );
-    });
-    routes.forEach((route, i) => {
-      if (i < index)
-        route.edges.forEach((edge) =>
-          drawEdge(edge.id, 1, edge.reversed, true),
-        );
-    });
     const current = routes[index].edges;
     current.forEach((edge, i) =>
       drawEdge(
@@ -105,19 +126,15 @@ export function initTrace(): Cleanup {
       ),
     );
 
-    const svg = svgs.find(
-      (candidate) => candidate.getBoundingClientRect().width > 0,
-    );
-    const dot = svg?.querySelector<SVGCircleElement>(".trace-dot");
     if (!svg || !dot) return;
     const segment = Math.min(
       current.length - 1,
       Math.floor(drawn * current.length),
     );
     const edge = current[segment];
-    const path = svg.querySelector<SVGPathElement>(
-      `.edge-hl[data-edge="${edge.id}"]`,
-    );
+    const path = edgePaths
+      .get(edge.id)
+      ?.find((candidate) => candidate.ownerSVGElement === svg);
     if (!path) return;
     const t = segmentProgress(drawn, current.length, segment);
     const point = path.getPointAtLength(
@@ -128,12 +145,16 @@ export function initTrace(): Cleanup {
     dot.style.opacity = drawn >= 1 ? "0" : "1";
   }
 
+  pickSvg();
   const trigger = ScrollTrigger.create({
     trigger: root,
     start: "top top",
     end: "bottom bottom",
     onUpdate: ({ progress }) => render(progress),
-    onRefresh: ({ progress }) => render(progress),
+    onRefresh: ({ progress }) => {
+      pickSvg();
+      render(progress);
+    },
   });
   render(trigger.progress);
 
