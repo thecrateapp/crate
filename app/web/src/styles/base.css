@@ -162,7 +162,7 @@ body::after {
   z-index: 60;
   display: flex;
   flex-direction: column;
-  padding: 12px 20px calc(32px + env(safe-area-inset-bottom));
+  padding: 22px 20px calc(32px + env(safe-area-inset-bottom));
   background: var(--bg);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -182,8 +182,13 @@ body::after {
   min-height: 44px;
 }
 
+.menu nav {
+  margin-top: auto;
+  padding-top: 32px;
+}
+
 .menu ul {
-  margin: auto 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
