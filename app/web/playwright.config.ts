@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const baseURL = "http://localhost:5176";
+const port = Number(process.env.WEB_PORT ?? 5176);
+const baseURL = `http://localhost:${port}`;
 
 export default defineConfig({
   testDir: "e2e",
@@ -11,7 +12,7 @@ export default defineConfig({
   use: { baseURL },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "npm run preview",
+    command: `npx astro preview --port ${port}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,

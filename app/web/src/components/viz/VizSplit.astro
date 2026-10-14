@@ -1,0 +1,67 @@
+---
+interface Props {
+  side?: "left" | "right";
+  sticky?: boolean;
+}
+
+const { side = "right", sticky = true } = Astro.props;
+---
+
+<div class:list={["viz-split", `visual-${side}`, { sticky }]}>
+  <div class="viz-split-text"><slot /></div>
+  <div class="viz-split-visual">
+    <div class="viz-split-pin"><slot name="visual" /></div>
+  </div>
+</div>
+
+<style>
+  .viz-split {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 48px clamp(28px, 5vw, 88px);
+  }
+
+  .visual-left {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  }
+
+  .visual-left .viz-split-visual {
+    order: -1;
+  }
+
+  .viz-split-text {
+    align-self: center;
+  }
+
+  .sticky .viz-split-text {
+    align-self: start;
+    padding: 6vh 0;
+  }
+
+  .sticky .viz-split-pin {
+    position: sticky;
+    top: max(12vh, 96px);
+  }
+
+  .viz-split-text :global(.features li) {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  @media (max-width: 760px) {
+    .viz-split,
+    .visual-left {
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+    .viz-split-visual {
+      order: -1;
+    }
+    .sticky .viz-split-text {
+      padding: 0;
+    }
+    .sticky .viz-split-pin {
+      position: static;
+    }
+  }
+</style>

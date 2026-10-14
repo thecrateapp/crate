@@ -1,0 +1,184 @@
+---
+import { MOODS } from "../../content/listen/viz";
+import { moodCentre } from "../../scripts/viz/mood-math";
+---
+
+<figure class="moods" data-viz="moods" data-reveal aria-label="The eight moods placed on an energy by valence plane">
+  <header class="viz-bar" data-enter>
+    <p class="viz-label"><b>Moods</b> from audio analysis</p>
+    <p class="viz-label">energy × valence</p>
+  </header>
+  <div class="moods-stage">
+    <canvas class="moods-canvas" aria-hidden="true"></canvas>
+    <ul class="moods-labels">
+      {
+        MOODS.map((mood, index) => {
+          const centre = moodCentre(mood);
+          return (
+            <li style={`--x:${centre.valence};--y:${1 - centre.energy};--i:${index}`}>
+              <button type="button" data-mood={mood.id}>
+                <i />
+                {mood.label}
+              </button>
+            </li>
+          );
+        })
+      }
+    </ul>
+    <span class="axis axis-x" aria-hidden="true">valence →</span>
+    <span class="axis axis-y" aria-hidden="true">energy →</span>
+  </div>
+  <figcaption class="moods-readout">
+    <b data-mood-name>8 moods</b>
+    <span data-mood-filters>thresholds on energy, valence, danceability and acousticness</span>
+  </figcaption>
+</figure>
+
+<style>
+  .moods {
+    margin: 0;
+  }
+
+  .moods-stage {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    max-height: 72vh;
+    margin: 18px auto 0;
+  }
+
+  .moods-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .moods-labels {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    pointer-events: none;
+  }
+
+  .moods-labels li {
+    position: absolute;
+    left: calc(28px + var(--x) * (100% - 56px));
+    top: calc(28px + var(--y) * (100% - 56px));
+  }
+
+  .moods-labels button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px 4px 0;
+    border: 0;
+    background: none;
+    color: var(--fg-2);
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(0.95rem, 1.3vw, 1.2rem);
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    transform: translate(-5px, -50%);
+    cursor: pointer;
+    pointer-events: auto;
+    text-shadow:
+      0 0 8px var(--bg),
+      0 0 18px var(--bg);
+    transition:
+      color 0.35s var(--ease-snap),
+      transform 0.5s var(--spring-snappy);
+  }
+
+  :global(:where(html.js)) .moods-labels button {
+    clip-path: inset(0 100% 0 0);
+  }
+
+  .moods-labels button i {
+    flex: none;
+    width: 9px;
+    height: 9px;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    background: var(--bg);
+    transition: background-color 0.3s var(--ease-snap);
+  }
+
+  .moods-labels button.is-on {
+    color: var(--fg);
+    transform: translate(-5px, -50%) scale(1.08);
+  }
+
+  .moods-labels button.is-on i {
+    background: var(--cyan-hi);
+    border-color: var(--cyan-hi);
+  }
+
+  :global(:where(html.js)) .is-in .moods-labels button {
+    clip-path: inset(-20% -10% -20% -10%);
+    transition:
+      clip-path 0.9s var(--ease-out) calc(700ms + var(--i) * 90ms),
+      color 0.35s var(--ease-snap),
+      transform 0.5s var(--spring-snappy);
+  }
+
+  .axis {
+    position: absolute;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  .axis-x {
+    right: 28px;
+    bottom: 4px;
+  }
+
+  .axis-y {
+    left: 4px;
+    top: 28px;
+    transform-origin: left top;
+    transform: rotate(-90deg) translateX(-100%);
+  }
+
+  .moods-readout {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 16px;
+    min-height: 3.2em;
+    margin-top: 10px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    color: var(--fg-2);
+  }
+
+  .moods-readout b {
+    font-weight: 400;
+    color: var(--cyan-hi);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .moods-labels button {
+      clip-path: none;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .moods-labels button {
+      font-size: 0.82rem;
+    }
+  }
+</style>

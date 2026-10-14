@@ -1,6 +1,7 @@
-import { defineConfig } from "vitest/config";
+/// <reference types="vitest/config" />
+import { getViteConfig } from "astro/config";
 
-export default defineConfig({
+export default getViteConfig({
   test: {
     environment: "jsdom",
     include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],

@@ -323,6 +323,47 @@ html.menu-open body {
   }
 }
 
+.viz-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 24px;
+}
+
+.viz-label {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.viz-label > b:first-child {
+  margin-right: 10px;
+  font-weight: 400;
+  color: var(--cyan-hi);
+}
+
+.viz-band {
+  margin: 0 0 9vh;
+}
+
+.viz-band.gap {
+  margin-top: 12vh;
+}
+
+@media (max-width: 760px) {
+  .viz-band {
+    margin-bottom: 6vh;
+  }
+  .viz-band.gap {
+    margin-top: 8vh;
+  }
+}
+
 .cta {
   display: inline-flex;
   align-items: center;
