@@ -2,7 +2,7 @@
   "tracks": "48,213",
   "albums": "4,400",
   "pytest": 4425,
-  "vitest": 3855,
+  "vitest": 3861,
   "goTests": 255,
   "rustTests": 250,
   "taskTypes": 125,
