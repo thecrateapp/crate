@@ -19,12 +19,23 @@ const command = "curl -fsSL https://cratemusic.app/install.sh | bash";
   style={`--d:${delay}`}
   aria-label={t("cta.copyLabel", locale)}
 >
-  <span class="cmd"><i>$</i> {command}</span>
+  <span class="cmd"><i>$</i> <span data-command>{command}</span></span>
   <span class="pill">{t("cta.copy", locale)}</span>
 </button>
 
 <script>
+  import { copyText } from "../lib/clipboard";
   import { scrambleText } from "../scripts/motion/scramble";
+
+  function selectCommand(button: HTMLElement) {
+    const command = button.querySelector("[data-command]");
+    const selection = getSelection();
+    if (!command || !selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(command);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
 
   document.addEventListener("click", async (event) => {
     const button = (event.target as Element | null)?.closest<HTMLButtonElement>("[data-copy]");
@@ -32,7 +43,10 @@ const command = "curl -fsSL https://cratemusic.app/install.sh | bash";
     if (!button || !pill) return;
     const label = pill.dataset.label ?? pill.textContent ?? "";
     pill.dataset.label = label;
-    await navigator.clipboard?.writeText(button.dataset.copy ?? "").catch(() => {});
+    if (!(await copyText(button.dataset.copy ?? ""))) {
+      selectCommand(button);
+      return;
+    }
     scrambleText(pill, button.dataset.copied ?? label, { durationMs: 320 });
     clearTimeout(Number(pill.dataset.timer));
     pill.dataset.timer = String(setTimeout(() => scrambleText(pill, label, { durationMs: 320 }), 1700));

@@ -42,6 +42,27 @@ test.describe("hero", () => {
       await expect
         .poll(() => page.evaluate(() => navigator.clipboard.readText()))
         .toBe(command);
+      await expect(button.locator(".pill")).toHaveText("Copied");
     });
+  });
+
+  test("keeps the copy label and selects the command when the clipboard refuses", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      navigator.clipboard.writeText = () =>
+        Promise.reject(new DOMException("denied", "NotAllowedError"));
+    });
+    await page.goto("/");
+    const button = page.locator(".hero-copy [data-copy]");
+    const command = await button.getAttribute("data-copy");
+
+    await button.click();
+
+    await expect
+      .poll(() => page.evaluate(() => getSelection()?.toString()))
+      .toBe(command);
+    await page.waitForTimeout(500);
+    await expect(button.locator(".pill")).toHaveText("Copy");
   });
 });
