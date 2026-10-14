@@ -16,6 +16,7 @@ from crate.smart_mix.versions import ANALYZER_VERSION, PYTHON_ANALYZER
 ANALYZER_NAME = PYTHON_ANALYZER
 TARGET_SAMPLE_RATE = 22_050
 HOP_LENGTH = 256
+TEMPO_PRIOR_OCTAVES = 1.5
 WINDOW_SECONDS = 5.0
 FULL_SCAN_HEAD_SECONDS = 240
 FULL_SCAN_TAIL_SECONDS = 120
@@ -62,10 +63,17 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
         sr=sample_rate,
         hop_length=HOP_LENGTH,
     )
+    tempo = librosa.feature.tempo(
+        onset_envelope=onset_envelope,
+        sr=sample_rate,
+        hop_length=HOP_LENGTH,
+        std_bpm=TEMPO_PRIOR_OCTAVES,
+    )
     _, beat_frames = librosa.beat.beat_track(
         onset_envelope=onset_envelope,
         sr=sample_rate,
         hop_length=HOP_LENGTH,
+        bpm=float(np.atleast_1d(tempo)[0]),
         sparse=True,
     )
     beat_frames = np.asarray(beat_frames, dtype=int).reshape(-1)
