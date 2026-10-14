@@ -12,7 +12,7 @@ const VIEWPORTS = [
   { width: 1440, height: 900 },
   { width: 390, height: 844 },
 ];
-const PENDING_ASSETS = ["/data/library-cloud.bin"];
+const PENDING_ASSETS = ["/data/library-cloud.json"];
 
 for (const viewport of VIEWPORTS) {
   test.describe(`${viewport.width}x${viewport.height}`, () => {

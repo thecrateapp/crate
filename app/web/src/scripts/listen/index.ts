@@ -30,7 +30,7 @@ export function initListenDives(): Cleanup {
     return factory ? [mountDive(root, positions, factory)] : [];
   });
   let disposed = false;
-  loadLibraryCloud("/data/library-cloud.bin", count).then((real) => {
+  loadLibraryCloud(count).then((real) => {
     if (real && !disposed) dives.forEach((dive) => dive.setCloud(real));
   });
   return () => {

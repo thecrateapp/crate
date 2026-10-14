@@ -115,16 +115,25 @@ export function decodeCloud(buffer: ArrayBuffer, scale: number): Float32Array {
   return out;
 }
 
+interface CloudMeta {
+  count: number;
+  radius: number;
+}
+
 export async function loadLibraryCloud(
-  url: string,
   count: number,
-  scale = 1.5,
+  base = "/data/library-cloud",
 ): Promise<Float32Array | null> {
+  const init = { priority: "low" } as RequestInit;
   try {
-    const response = await fetch(url, { priority: "low" } as RequestInit);
+    const meta = await fetch(`${base}.json`, init);
+    if (!meta.ok) return null;
+    const { count: exported, radius } = (await meta.json()) as CloudMeta;
+    const response = await fetch(`${base}.bin`, init);
     if (!response.ok) return null;
-    const cloud = decodeCloud(await response.arrayBuffer(), scale);
-    return cloud.length >= count * 3 ? cloud.subarray(0, count * 3) : null;
+    const cloud = decodeCloud(await response.arrayBuffer(), radius);
+    const points = Math.min(count, exported, Math.floor(cloud.length / 3));
+    return points > 0 ? cloud.subarray(0, points * 3) : null;
   } catch {
     return null;
   }

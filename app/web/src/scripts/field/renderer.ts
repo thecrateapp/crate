@@ -164,6 +164,7 @@ function buildField(
   gl.blendFunc(gl.ONE, gl.ONE);
 
   let base = positions;
+  let drawn = count;
   let mvp: Mat4 = new Array<number>(16).fill(0);
   let morphNow = 0;
 
@@ -200,7 +201,7 @@ function buildField(
     gl.uniform3fv(u.uFocus, focus);
     gl.uniform2fv(u.uMouse, mouse);
     gl.uniform1f(u.uRepel, repel);
-    gl.drawArrays(gl.POINTS, 0, count);
+    gl.drawArrays(gl.POINTS, 0, drawn);
   }
 
   function pointAt(index: number, morph = morphNow): Vec3 {
@@ -216,10 +217,12 @@ function buildField(
   }
 
   function setPositions(next: Float32Array) {
-    if (next.length !== count * 3) return;
+    const points = Math.min(count, Math.floor(next.length / 3));
+    if (!points) return;
     base = next;
+    drawn = points;
     gl.bindBuffer(gl.ARRAY_BUFFER, buffers.get("aPos")!);
-    gl.bufferData(gl.ARRAY_BUFFER, next, gl.STATIC_DRAW);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, next.subarray(0, points * 3));
   }
 
   function dispose() {

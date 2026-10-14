@@ -59,7 +59,7 @@ export function initHero(): () => void {
     if (!field) return;
     const active = field;
 
-    loadLibraryCloud("/data/library-cloud.bin", count).then((real) => {
+    loadLibraryCloud(count).then((real) => {
       if (real && !disposed) active.setPositions(real);
     });
 
