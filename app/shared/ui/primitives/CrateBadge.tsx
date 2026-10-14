@@ -98,9 +98,9 @@ export const CratePill = memo(function CratePill({
   className,
 }: CratePillProps) {
   const classes = cn(
-    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-badge transition",
+    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-badge tracking-wide transition-[color,background-color,border-color,transform] duration-300 ease-snap",
     active
-      ? "border-[var(--pill-active-border)] bg-[var(--pill-active-bg)] text-[var(--active-text)]"
+      ? "border-accent-action-hi bg-accent-action-hi text-accent-action-hi-foreground"
       : tone
         ? TONE_CLASS_NAME[tone]
         : "border-[var(--pill-border)] bg-[var(--pill-bg)] text-[var(--idle-text)] hover:border-[var(--hover-border)] hover:text-text-primary",
@@ -117,7 +117,7 @@ export const CratePill = memo(function CratePill({
         data-tone={tone}
         className={cn(
           classes,
-          "outline-none focus-visible:shadow-focus",
+          "outline-none focus-visible:shadow-focus active:scale-95 motion-reduce:active:scale-100",
           className,
         )}
       >

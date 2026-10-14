@@ -51,7 +51,7 @@ describe("UpcomingShowExpandedView", () => {
     );
   });
 
-  it("renders directions and genre pills in the expanded card", () => {
+  it("renders the ticket header, directions and genre pills", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-13T10:00:00"));
 
@@ -77,7 +77,14 @@ describe("UpcomingShowExpandedView", () => {
     }
 
     expect(screen.queryByRole("button", { name: /close/i })).toBeNull();
-    expect(screen.getByText(/\d+ days? to go/i)).toBeInTheDocument();
+    expect(screen.getByText(/\d+ days? to go/i)).toHaveClass(
+      "text-accent-action-hi",
+    );
+    const venueLine = screen.getByText("Circolo Magnolia").closest("p");
+    expect(venueLine).toHaveClass("font-mono", "uppercase");
+    expect(venueLine).toHaveTextContent(
+      "Circolo Magnolia · Via Circonvallazione Idroscalo, 41 20054 · Segrate, Milano, Italy",
+    );
     expect(screen.getByTitle("hardcore")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /directions/i })).toHaveAttribute(
       "href",

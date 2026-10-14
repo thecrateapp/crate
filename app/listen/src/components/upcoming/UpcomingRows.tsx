@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 import { ReleaseRow } from "@/components/upcoming/ReleaseRow";
 import { ShowCard } from "@/components/upcoming/ShowCard";
@@ -38,9 +39,9 @@ export function UpcomingMonthGroup({
 
   return (
     <div className="space-y-2">
-      <div className="border-b border-text-primary/5 pb-2 text-xs font-semibold uppercase tracking-eyebrow text-text-primary/40">
+      <MonoLabel as="div" className="border-b border-border-quiet pb-2">
         {formatMonthLabel(month)}
-      </div>
+      </MonoLabel>
       <div className="space-y-2">
         {items.map((item, index) => {
           const key = itemKey(item, index);

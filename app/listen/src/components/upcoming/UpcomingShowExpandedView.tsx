@@ -12,15 +12,12 @@ import {
 } from "@crate/ui/icons";
 
 import { GenrePillRow } from "@crate/ui/domain/genres/GenrePill";
+import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
 import { IconButton } from "@crate/ui/primitives/IconButton";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { Button } from "@crate/ui/shadcn/button";
-import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
-import {
-  artistBackgroundApiUrl,
-  artistPagePath,
-  artistPhotoApiUrl,
-} from "@/lib/library-routes";
-import { resolveMaybeApiAssetUrl } from "@/lib/api";
+import { artistPagePath } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
 
 import {
@@ -29,107 +26,124 @@ import {
 } from "./UpcomingShowCardModel";
 import type { ExpandedViewProps } from "./UpcomingShowCardViewTypes";
 
-const ACTION_TILE_CLASS_NAME =
-  "h-auto gap-1.5 rounded-lg px-0 py-2.5 text-xs font-semibold has-[>svg]:px-0 [&_svg:not([class*='size-'])]:size-3.5";
+const TICKET_ACTION_CLASS_NAME =
+  "h-9 gap-1.5 border border-border-quiet px-3 font-mono text-label font-normal uppercase tracking-caps text-text-muted hover:border-border-interactive hover:bg-transparent hover:text-text-primary has-[>svg]:px-3";
 
-function ExpandedShowBackground({ backgroundUrl }: { backgroundUrl?: string }) {
-  return (
-    <div className="absolute inset-0 overflow-hidden">
-      <ArtworkSurface
-        source={backgroundUrl ?? null}
-        alt=""
-        imageClassName="object-cover brightness-[0.4] saturate-[0.7]"
-        className="absolute inset-0"
-        fallback={null}
-      />
-      <div className="absolute inset-0 bg-linear-to-t from-surface-canvas via-surface-canvas/60 to-transparent" />
-    </div>
-  );
-}
+type Setlist = NonNullable<ExpandedViewProps["item"]["probable_setlist"]>;
 
-function ExpandedShowHeader({
+function TicketHeader({
   item,
-  artistPhotoUrl,
   dateLabel,
   timeLabel,
   timeRemaining,
+  attending,
   onClose,
   showClose,
 }: {
   item: ExpandedViewProps["item"];
-  artistPhotoUrl?: string;
   dateLabel: string;
   timeLabel: string;
   timeRemaining: string | null;
+  attending: boolean;
   onClose: () => void;
   showClose: boolean;
 }) {
   const { t } = useTranslation();
   const support = (item.lineup || []).slice(1);
+  const addressLabel = [item.address_line1, item.postal_code]
+    .filter(Boolean)
+    .join(" ");
+  const locationLabel = [item.city, item.region, item.country]
+    .filter(Boolean)
+    .join(", ");
+  const genreItems = (item.genres || []).slice(0, 3).map((name) => ({ name }));
 
   return (
-    <div className="relative h-[130px] shrink-0">
+    <header className="relative px-5 pt-5 pb-6 sm:px-7 sm:pt-7">
       {showClose ? (
         <IconButton
           size="sm"
           onClick={onClose}
           label={t("radar.show.closeDetails")}
-          className="absolute top-2.5 left-2.5 z-10 size-7 rounded-lg bg-surface-canvas/40 text-text-primary/60 backdrop-blur-sm hover:text-text-primary"
+          className="absolute top-2.5 right-2.5 z-10 size-7 rounded-lg text-text-muted hover:text-text-primary"
         >
           <X size={CRATE_ICON_SIZE.xs} className="size-3.5" />
         </IconButton>
       ) : null}
 
-      <div className="absolute top-2.5 right-3 z-10 text-right">
-        {timeRemaining ? (
-          <div className="mb-1 text-xs font-bold uppercase tracking-caps text-accent-action">
-            {timeRemaining}
-          </div>
-        ) : null}
-        <div className="text-xs font-bold tracking-wide text-accent-action/70">
-          {dateLabel}
-        </div>
-        {timeLabel && (
-          <div className="text-xs text-text-primary/40">{timeLabel}</div>
-        )}
+      <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 pr-20">
+        <MonoLabel accent={timeRemaining} meta={[dateLabel, timeLabel]} />
+        {attending ? <StatusDot label={t("radar.show.attending")} /> : null}
       </div>
 
-      <div className="absolute bottom-3 left-3 right-3 z-10">
-        <div className="flex items-center gap-2">
-          {artistPhotoUrl && (
-            <ArtworkSurface
-              source={artistPhotoUrl}
-              alt={item.artist}
-              imageClassName="object-cover"
-              className="size-9 shrink-0 rounded-full bg-text-primary/5 ring-2 ring-primary/25"
-              fallback={null}
-            />
-          )}
-          <div className="min-w-0">
-            <Link
-              to={artistPagePath({
-                artistId: item.artist_id,
-                artistSlug: item.artist_slug,
-              })}
-              className="link-meta block w-fit max-w-full truncate text-sm font-bold text-text-primary"
-            >
-              {item.artist}
-            </Link>
-            {support.length > 0 && (
-              <div className="truncate text-xs text-text-primary/40">
-                {t("radar.show.withSupportPrefix")}{" "}
-                {support.slice(0, 4).join(" · ")}
-                {support.length > 4 && " +" + (support.length - 4)}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <Link
+        to={artistPagePath({
+          artistId: item.artist_id,
+          artistSlug: item.artist_slug,
+        })}
+        className="link-meta mt-4 block w-fit max-w-full font-display text-4xl font-extrabold leading-display tracking-display text-balance break-words text-text-primary sm:text-6xl"
+      >
+        {item.artist}
+      </Link>
+      {support.length > 0 && (
+        <p className="mt-3 truncate text-sm text-text-muted">
+          {t("radar.show.withSupportPrefix")} {support.slice(0, 4).join(" · ")}
+          {support.length > 4 && " +" + (support.length - 4)}
+        </p>
+      )}
+
+      <MonoLabel
+        className="mt-5 text-text-secondary"
+        meta={[item.venue, addressLabel, locationLabel]}
+      />
+      <GenrePillRow items={genreItems} max={3} className="mt-4" />
+    </header>
+  );
+}
+
+function TicketPerforation() {
+  return (
+    <div aria-hidden="true" className="relative h-px">
+      <div className="absolute inset-x-0 top-0 border-t border-dashed border-border-interactive" />
+      <span className="absolute top-0 -left-3.5 size-7 -translate-y-1/2 rounded-full border border-border-quiet bg-surface-canvas" />
+      <span className="absolute top-0 -right-3.5 size-7 -translate-y-1/2 rounded-full border border-border-quiet bg-surface-canvas" />
     </div>
   );
 }
 
-type ExpandedShowActionProps = Pick<
+function TicketSetlist({ setlist }: { setlist: Setlist }) {
+  const { t } = useTranslation();
+  if (setlist.length === 0) return null;
+
+  return (
+    <section>
+      <MonoLabel
+        as="h3"
+        accent={t("artist.setlist.title")}
+        meta={[t("artist.setlist.songCount", { count: setlist.length })]}
+      />
+      <HairlineList className="mt-3" label={t("artist.setlist.title")}>
+        {setlist.map((song, index) => (
+          <HairlineRow
+            key={`${song.position ?? index}:${song.title}`}
+            index={index + 1}
+            trailing={
+              typeof song.frequency === "number" ? (
+                <span className="font-mono text-label text-text-subtle tabular-nums">
+                  {Math.round(song.frequency * 100)}%
+                </span>
+              ) : null
+            }
+          >
+            {song.title}
+          </HairlineRow>
+        ))}
+      </HairlineList>
+    </section>
+  );
+}
+
+type TicketActionProps = Pick<
   ExpandedViewProps,
   | "item"
   | "attending"
@@ -139,7 +153,7 @@ type ExpandedShowActionProps = Pick<
   | "onPlaySetlist"
 > & { directionsUrl: string | null };
 
-function ExpandedShowActions({
+function TicketActions({
   item,
   attending,
   savingAttendance,
@@ -147,117 +161,87 @@ function ExpandedShowActions({
   directionsUrl,
   onToggleAttendance,
   onPlaySetlist,
-}: ExpandedShowActionProps) {
+}: TicketActionProps) {
   const { t } = useTranslation();
+  const hasSetlist = Boolean(item.probable_setlist?.length);
 
   return (
-    <div
-      className={cn(
-        "mt-3 grid gap-2 sm:grid-cols-2",
-        directionsUrl ? "lg:grid-cols-4" : "lg:grid-cols-3",
-      )}
-    >
-      <Button
-        variant="ghost"
-        aria-pressed={attending}
-        onClick={(e) => {
-          e.stopPropagation();
-          void onToggleAttendance();
-        }}
-        disabled={!item.id || savingAttendance}
-        className={cn(
-          ACTION_TILE_CLASS_NAME,
-          "border hover:bg-transparent",
-          attending
-            ? "border-accent-action/30 bg-accent-action/10 text-accent-action"
-            : "border-border-quiet text-text-muted hover:border-accent-action/20 hover:text-accent-action",
-        )}
-      >
-        {savingAttendance ? (
-          <Loader2 size={CRATE_ICON_SIZE.xs} className="animate-spin" />
-        ) : attending ? (
-          <CalendarCheck size={CRATE_ICON_SIZE.xs} />
-        ) : (
-          <CalendarPlus size={CRATE_ICON_SIZE.xs} />
-        )}
-        {attending ? t("radar.show.going") : t("radar.show.attend")}
-      </Button>
-      <Button
-        variant="ghost"
-        onClick={() => void onPlaySetlist()}
-        disabled={!item.probable_setlist?.length || playingSetlist}
-        className={cn(
-          ACTION_TILE_CLASS_NAME,
-          "border border-accent-action/20 text-accent-action hover:bg-accent-action/8 hover:text-accent-action disabled:opacity-25",
-        )}
-      >
-        {playingSetlist ? (
-          <Loader2 size={CRATE_ICON_SIZE.xs} className="animate-spin" />
-        ) : (
-          <Play size={CRATE_ICON_SIZE.xs} className="fill-current" />
-        )}
-        {t("radar.show.playSetlist")}
-      </Button>
-      {directionsUrl ? (
-        <a
-          href={directionsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-1.5 rounded-lg border border-border-quiet py-2.5 text-xs font-semibold text-text-muted transition-colors hover:border-accent-action/20 hover:text-accent-action"
+    <div className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+      <div className="flex items-center gap-3.5">
+        <IconButton
+          size="lg"
+          label={t("radar.show.playSetlist")}
+          onClick={() => void onPlaySetlist()}
+          disabled={!hasSetlist}
+          loading={playingSetlist}
+          className="bg-accent-action text-accent-action-foreground hover:translate-y-0 hover:bg-accent-action-hover hover:text-accent-action-foreground hover:drop-shadow-none disabled:opacity-25"
         >
-          <MapPin size={CRATE_ICON_SIZE.xs} />
-          {t("radar.show.directions")}
-        </a>
-      ) : null}
-      <a
-        href={item.url || "#"}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => {
-          if (!item.url) e.preventDefault();
-        }}
-        className="flex items-center justify-center gap-1.5 rounded-lg bg-accent-action/10 py-2.5 text-xs font-semibold text-accent-action transition-colors hover:bg-accent-action/18"
-      >
-        <ExternalLink size={CRATE_ICON_SIZE.xs} />
-        {t("radar.show.getTickets")}
-        {item.status === "onsale" && (
-          <span className="size-[5px] rounded-full bg-state-success" />
-        )}
-      </a>
-    </div>
-  );
-}
-
-function ExpandedShowDetails(props: ExpandedShowActionProps) {
-  const { item } = props;
-  const addressLabel = [item.address_line1, item.postal_code]
-    .filter(Boolean)
-    .join(" · ");
-  const locationLabel = [item.city, item.region, item.country]
-    .filter(Boolean)
-    .join(", ");
-  const genreItems = (item.genres || []).slice(0, 3).map((name) => ({ name }));
-
-  return (
-    <div className="relative flex-1 px-3 pt-2.5 pb-3">
-      <div className="flex items-start gap-2 text-xs text-text-muted">
-        <MapPin
-          size={CRATE_ICON_SIZE.micro}
-          className="mt-0.5 shrink-0 text-accent-action/60"
-        />
-        <div className="min-w-0">
-          <span className="font-medium text-text-primary/70">{item.venue}</span>
-          {addressLabel && (
-            <span className="text-text-primary/40"> · {addressLabel}</span>
+          <Play size={CRATE_ICON_SIZE.md} className="ml-0.5 fill-current" />
+        </IconButton>
+        <span
+          className={cn(
+            "text-sm",
+            hasSetlist ? "text-text-primary" : "text-text-subtle",
           )}
-          {locationLabel && (
-            <div className="text-text-primary/40">{locationLabel}</div>
-          )}
-        </div>
+        >
+          {t("radar.show.playSetlist")}
+        </span>
       </div>
 
-      <GenrePillRow items={genreItems} max={3} className="mt-2" />
-      <ExpandedShowActions {...props} />
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="ghost"
+          aria-pressed={attending}
+          onClick={(e) => {
+            e.stopPropagation();
+            void onToggleAttendance();
+          }}
+          disabled={!item.id || savingAttendance}
+          className={cn(
+            TICKET_ACTION_CLASS_NAME,
+            attending &&
+              "border-accent-action-hi text-accent-action-hi hover:border-accent-action-hi hover:text-accent-action-hi",
+          )}
+        >
+          {savingAttendance ? (
+            <Loader2 size={CRATE_ICON_SIZE.xs} className="animate-spin" />
+          ) : attending ? (
+            <CalendarCheck size={CRATE_ICON_SIZE.xs} />
+          ) : (
+            <CalendarPlus size={CRATE_ICON_SIZE.xs} />
+          )}
+          {attending ? t("radar.show.going") : t("radar.show.attend")}
+        </Button>
+        {directionsUrl ? (
+          <Button variant="ghost" asChild className={TICKET_ACTION_CLASS_NAME}>
+            <a href={directionsUrl} target="_blank" rel="noopener noreferrer">
+              <MapPin size={CRATE_ICON_SIZE.xs} />
+              {t("radar.show.directions")}
+            </a>
+          </Button>
+        ) : null}
+        <Button
+          variant="ghost"
+          asChild
+          className={cn(
+            TICKET_ACTION_CLASS_NAME,
+            "border-accent-action-hi/40 text-accent-action-hi hover:border-accent-action-hi hover:text-accent-action-hi",
+          )}
+        >
+          <a
+            href={item.url || "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => {
+              if (!item.url) e.preventDefault();
+            }}
+          >
+            <ExternalLink size={CRATE_ICON_SIZE.xs} />
+            {t("radar.show.getTickets")}
+            {item.status === "onsale" && <StatusDot className="ml-0.5" />}
+          </a>
+        </Button>
+      </div>
     </div>
   );
 }
@@ -273,25 +257,6 @@ export function UpcomingShowExpandedView({
   showClose = true,
 }: ExpandedViewProps) {
   const { t, i18n } = useTranslation();
-  const backgroundUrl = artistBackgroundApiUrl(
-    {
-      artistId: item.artist_id,
-      artistSlug: item.artist_slug,
-      artistName: item.artist,
-    },
-    { size: 1280 },
-  );
-  const artistPhotoUrl =
-    artistPhotoApiUrl(
-      {
-        artistId: item.artist_id,
-        artistSlug: item.artist_slug,
-        artistName: item.artist,
-      },
-      { size: 640 },
-    ) ||
-    resolveMaybeApiAssetUrl(item.cover_url) ||
-    undefined;
   const date = item.date ? new Date(item.date + "T12:00:00") : null;
   const dateLabel = date
     ? date.toLocaleDateString(i18n.language, {
@@ -307,25 +272,28 @@ export function UpcomingShowExpandedView({
 
   return (
     <div className="relative flex h-full flex-col">
-      <ExpandedShowBackground backgroundUrl={backgroundUrl} />
-      <ExpandedShowHeader
+      <TicketHeader
         item={item}
-        artistPhotoUrl={artistPhotoUrl}
         dateLabel={dateLabel}
         timeLabel={timeLabel}
         timeRemaining={timeRemaining}
+        attending={attending}
         onClose={onClose}
         showClose={showClose}
       />
-      <ExpandedShowDetails
-        item={item}
-        attending={attending}
-        savingAttendance={savingAttendance}
-        playingSetlist={playingSetlist}
-        directionsUrl={directionsUrl}
-        onToggleAttendance={onToggleAttendance}
-        onPlaySetlist={onPlaySetlist}
-      />
+      <TicketPerforation />
+      <div className="px-5 pt-6 pb-5 sm:px-7 sm:pb-7">
+        <TicketSetlist setlist={item.probable_setlist ?? []} />
+        <TicketActions
+          item={item}
+          attending={attending}
+          savingAttendance={savingAttendance}
+          playingSetlist={playingSetlist}
+          directionsUrl={directionsUrl}
+          onToggleAttendance={onToggleAttendance}
+          onPlaySetlist={onPlaySetlist}
+        />
+      </div>
     </div>
   );
 }

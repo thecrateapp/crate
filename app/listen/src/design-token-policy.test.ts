@@ -64,7 +64,6 @@ const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
   },
   "components/settings/ServersSection.tsx": { "text-[0.75rem]": 1 },
   "components/social/ProfileHoverCardContent.tsx": { "text-[8rem]": 1 },
-  "components/upcoming/UpcomingShowCollapsedView.tsx": { "text-[1.25rem]": 1 },
   "i18n/translation-mode/TranslationOverlay.tsx": { "rounded-[4px]": 1 },
   "pages/ExploreLandingSections.tsx": { "tracking-[-0.035em]": 1 },
   "pages/PathDetail.tsx": { "text-[0.75rem]": 1 },

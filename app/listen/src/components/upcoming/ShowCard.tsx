@@ -126,16 +126,11 @@ export const ShowCard = memo(function ShowCard({
   return (
     <article
       className={cn(
-        "item-action-target relative overflow-hidden rounded-xl border",
+        "item-action-target relative overflow-hidden rounded-panel border border-border-quiet bg-card",
         expanded
-          ? cn(
-              variant === "feature"
-                ? "border-accent-action/25 shadow-accent-action-card-featured"
-                : "border-accent-action/20 shadow-accent-action-card",
-              collapsible &&
-                "transition-[height,border-color,box-shadow] duration-400 ease-out",
-            )
-          : "border-text-primary/[0.06] bg-text-primary/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-accent-action/15 hover:bg-text-primary/[0.03]",
+          ? collapsible &&
+              "transition-[height,border-color] duration-400 ease-snap motion-reduce:transition-none"
+          : "transition-[height,border-color] duration-300 ease-snap hover:border-border-interactive motion-reduce:transition-none",
       )}
       data-variant={variant}
       data-expanded={expanded || undefined}
@@ -144,17 +139,14 @@ export const ShowCard = memo(function ShowCard({
     >
       <div ref={contentRef}>
         {!expanded ? (
-          <>
-            <div className="absolute inset-0 bg-raised-surface" />
-            <UpcomingShowCollapsedView
-              item={item}
-              attending={attending}
-              savingAttendance={savingAttendance}
-              actionMenu={actionMenuSlot}
-              onToggleAttendance={toggleAttendance}
-              onToggle={onToggle}
-            />
-          </>
+          <UpcomingShowCollapsedView
+            item={item}
+            attending={attending}
+            savingAttendance={savingAttendance}
+            actionMenu={actionMenuSlot}
+            onToggleAttendance={toggleAttendance}
+            onToggle={onToggle}
+          />
         ) : (
           <>
             <UpcomingShowExpandedView
@@ -174,8 +166,8 @@ export const ShowCard = memo(function ShowCard({
               expanded={controller.open}
               title={t("actions.menu.more")}
               className={cn(
-                "absolute top-2.5 z-20 size-7 rounded-lg bg-surface-canvas/40 text-text-primary/60 backdrop-blur-sm hover:text-text-primary",
-                showClose ? "left-11" : "left-2.5",
+                "absolute top-2.5 z-20 size-7 rounded-lg text-text-muted hover:text-text-primary",
+                showClose ? "right-11" : "right-2.5",
               )}
             />
           </>

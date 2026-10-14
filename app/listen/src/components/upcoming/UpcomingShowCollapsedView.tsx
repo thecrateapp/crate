@@ -7,30 +7,14 @@ import {
   MapPin,
 } from "@crate/ui/icons";
 import { IconButton } from "@crate/ui/primitives/IconButton";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
 
 import { ItemActionMenuButton } from "@/components/actions/ItemActionMenu";
 import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
-import { CrateImage } from "@/components/artwork/CrateImage";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
-import {
-  artistBackgroundApiUrl,
-  artistPhotoApiUrl,
-} from "@/lib/library-routes";
+import { artistPhotoApiUrl } from "@/lib/library-routes";
 
 import type { CollapsedViewProps } from "./UpcomingShowCardViewTypes";
-
-function PreloadBackground({ item }: { item: CollapsedViewProps["item"] }) {
-  const url = artistBackgroundApiUrl(
-    {
-      artistId: item.artist_id,
-      artistSlug: item.artist_slug,
-      artistName: item.artist,
-    },
-    { size: 1280 },
-  );
-  if (!url) return null;
-  return <CrateImage src={url} alt="" className="hidden" />;
-}
 
 function CollapsedShowArtwork({ artistImageUrl }: { artistImageUrl?: string }) {
   return (
@@ -61,28 +45,23 @@ function CollapsedShowDetails({
         <span className="truncate text-caption font-semibold text-text-primary">
           {item.artist}
         </span>
-        {attending && (
-          <span
-            className="size-[6px] shrink-0 rounded-full bg-accent-action"
-            title={t("radar.show.attending")}
-          />
-        )}
+        {attending && <StatusDot title={t("radar.show.attending")} />}
       </span>
-      <span className="mt-1 flex items-center gap-1 text-xs text-text-primary/40">
+      <span className="mt-1 flex items-center gap-1 text-xs text-text-muted">
         <MapPin
           size={CRATE_ICON_SIZE.nano}
-          className="shrink-0 text-accent-action/60"
+          className="shrink-0 text-text-subtle"
         />
         <span className="truncate">{item.venue}</span>
         {item.city && (
           <>
-            <span className="text-text-primary/15">&middot;</span>
+            <span className="text-text-faint">&middot;</span>
             <span className="shrink-0">{item.city}</span>
           </>
         )}
       </span>
       {support.length > 0 && (
-        <span className="mt-0.5 block truncate text-xs text-text-primary/40">
+        <span className="mt-0.5 block truncate text-xs text-text-subtle">
           {t("radar.show.withSupportPrefix")} {support.slice(0, 3).join(", ")}
           {support.length > 3 && ` +${support.length - 3}`}
         </span>
@@ -108,14 +87,14 @@ function CollapsedShowDate({
     : "";
 
   return (
-    <span className="flex shrink-0 flex-col items-center justify-center px-2">
-      <span className="text-xs font-bold leading-none tracking-label text-accent-action/55">
+    <span className="flex shrink-0 flex-col items-center justify-center gap-1 px-2">
+      <span className="font-mono text-label leading-none tracking-caps text-accent-action-hi">
         {month}
       </span>
-      <span className="text-[1.25rem] font-black leading-tight text-accent-action">
+      <span className="font-display text-2xl font-bold leading-none tracking-display text-text-primary tabular-nums">
         {day}
       </span>
-      <span className="text-xs font-medium leading-none text-text-primary/40">
+      <span className="font-mono text-label leading-none tracking-caps text-text-subtle">
         {weekday}
       </span>
     </span>
@@ -194,12 +173,11 @@ export function UpcomingShowCollapsedView({
 
   return (
     <div className="absolute inset-x-0 top-0 z-10 flex h-full items-center gap-0">
-      <PreloadBackground item={item} />
       <button
         type="button"
         aria-expanded={false}
         onClick={onToggle}
-        className="flex h-full min-w-0 flex-1 items-center rounded-l-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
+        className="flex h-full min-w-0 flex-1 items-center rounded-l-panel text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
       >
         <CollapsedShowArtwork artistImageUrl={artistImageUrl} />
         <CollapsedShowDetails item={item} attending={attending} />

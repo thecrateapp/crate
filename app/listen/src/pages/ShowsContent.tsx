@@ -1,17 +1,16 @@
-import type { ReactNode } from "react";
-
 import { PageHeader } from "@crate/ui/domain/navigation";
 import { EmptyState, LoadingState } from "@crate/ui/domain/states";
-import { CRATE_ICON_SIZE, Calendar, Sparkles } from "@crate/ui/icons";
+import { Calendar, Sparkles } from "@crate/ui/icons";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { SearchInput } from "@crate/ui/primitives/SearchInput";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
+import { StatNumber } from "@crate/ui/primitives/StatNumber";
 
 import {
   groupByMonth,
   UpcomingMonthGroup,
   ShowCard,
 } from "@/components/upcoming/UpcomingRows";
-import { cn } from "@/lib/utils";
 import type { ShowsFilter } from "@/pages/shows-page-model";
 import type { ShowsPageController } from "@/pages/use-shows-page-controller";
 
@@ -39,13 +38,12 @@ function ShowsSummary({ page }: ShowsSectionProps) {
   return (
     <ul
       aria-label={page.t("radar.summaryAria")}
-      className="hidden list-none flex-wrap items-center gap-2 md:flex"
+      className="hidden list-none flex-wrap items-end gap-6 md:flex"
     >
       {page.isGenreRadar ? (
         <SummaryPill
           label={page.t("radar.summary.shows")}
           value={page.summary.show_count}
-          accent="cyan"
         />
       ) : (
         <>
@@ -56,17 +54,14 @@ function ShowsSummary({ page }: ShowsSectionProps) {
           <SummaryPill
             label={page.t("radar.summary.shows")}
             value={page.summary.show_count}
-            accent="cyan"
           />
           <SummaryPill
             label={page.t("radar.summary.releases")}
             value={page.summary.release_count}
-            accent="cyan"
           />
           <SummaryPill
             label={page.t("radar.summary.attending")}
             value={page.attendingShows.length}
-            accent="cyan"
           />
         </>
       )}
@@ -74,31 +69,10 @@ function ShowsSummary({ page }: ShowsSectionProps) {
   );
 }
 
-function SummaryPill({
-  label,
-  value,
-  accent = "neutral",
-}: {
-  label: string;
-  value: number;
-  accent?: "neutral" | "cyan";
-}) {
-  const accentClass =
-    accent === "cyan"
-      ? "border-accent-action/20 text-accent-action"
-      : "border-border-quiet text-text-primary/60";
-
+function SummaryPill({ label, value }: { label: string; value: number }) {
   return (
-    <li
-      className={cn(
-        "rounded-lg border bg-text-primary/[0.03] px-3 py-2",
-        accentClass,
-      )}
-    >
-      <div className="text-xs uppercase tracking-kicker opacity-70">
-        {label}
-      </div>
-      <div className="mt-1 text-sm font-semibold">{value}</div>
+    <li className="border-l border-border-quiet pl-4">
+      <StatNumber value={value} label={label} size="sm" />
     </li>
   );
 }
@@ -108,12 +82,7 @@ function ShowsFeatured({ page }: ShowsSectionProps) {
 
   return (
     <section className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Calendar size={CRATE_ICON_SIZE.sm} className="text-accent-action" />
-        <h2 className="text-sm font-semibold uppercase tracking-eyebrow text-accent-action">
-          {page.t("radar.sections.nextShow")}
-        </h2>
-      </div>
+      <MonoLabel as="h2" accent={page.t("radar.sections.nextShow")} />
       <ShowCard item={page.featuredShow} variant="feature" />
     </section>
   );
@@ -222,17 +191,11 @@ function ShowsResults({ page }: ShowsSectionProps) {
   return (
     <div className="space-y-10">
       <ShowsMonthSection
-        icon={
-          <Sparkles size={CRATE_ICON_SIZE.sm} className="text-accent-action" />
-        }
         items={page.comingUp}
         monthTitle={page.t("radar.sections.comingUp")}
         page={page}
       />
       <ShowsMonthSection
-        icon={
-          <Calendar size={CRATE_ICON_SIZE.sm} className="text-text-muted" />
-        }
         items={page.recentlyReleased}
         muted
         monthTitle={page.t("radar.sections.recentlyReleased")}
@@ -243,13 +206,11 @@ function ShowsResults({ page }: ShowsSectionProps) {
 }
 
 function ShowsMonthSection({
-  icon,
   items,
   monthTitle,
   muted = false,
   page,
 }: ShowsSectionProps & {
-  icon: ReactNode;
   items: ShowsPageController["comingUp"];
   monthTitle: string;
   muted?: boolean;
@@ -258,17 +219,11 @@ function ShowsMonthSection({
 
   return (
     <section className="space-y-4">
-      <div className="flex items-center gap-2">
-        {icon}
-        <h2
-          className={cn(
-            "text-sm font-semibold uppercase tracking-eyebrow",
-            muted ? "text-text-muted" : "text-accent-action",
-          )}
-        >
-          {monthTitle}
-        </h2>
-      </div>
+      {muted ? (
+        <MonoLabel as="h2">{monthTitle}</MonoLabel>
+      ) : (
+        <MonoLabel as="h2" accent={monthTitle} />
+      )}
       <div className="space-y-8">
         {groupByMonth(items).map(([month, monthItems]) => (
           <UpcomingMonthGroup

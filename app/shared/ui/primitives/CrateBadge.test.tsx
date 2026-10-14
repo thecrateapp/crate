@@ -28,6 +28,28 @@ describe("CratePill", () => {
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
+  it("renders the v3 chip: mono text, solid bright accent when active", () => {
+    render(
+      <>
+        <CratePill onClick={() => {}} active>
+          punk
+        </CratePill>
+        <CratePill onClick={() => {}}>doom</CratePill>
+      </>,
+    );
+
+    const active = screen.getByRole("button", { name: "punk" });
+    expect(active).toHaveAttribute("aria-pressed", "true");
+    expect(active).toHaveClass(
+      "font-mono",
+      "bg-accent-action-hi",
+      "text-accent-action-hi-foreground",
+    );
+    expect(screen.getByRole("button", { name: "doom" })).not.toHaveClass(
+      "bg-accent-action-hi",
+    );
+  });
+
   it("is disabled when disabled prop is true", () => {
     render(
       <CratePill onClick={() => {}} disabled>

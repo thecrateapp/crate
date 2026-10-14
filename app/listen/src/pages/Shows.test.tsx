@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -145,8 +145,8 @@ describe("Shows page", () => {
 
     const summary = screen.getByRole("list", { name: "Radar summary" });
     expect(summary).toHaveClass("hidden", "md:flex");
-    expect(screen.getByText("Followed artists")).toBeInTheDocument();
-    expect(screen.getByText("Attending")).toBeInTheDocument();
+    expect(within(summary).getByText("Followed artists")).toBeInTheDocument();
+    expect(within(summary).getByText("Attending")).toBeInTheDocument();
     expect(screen.queryByText("Insights")).not.toBeInTheDocument();
   });
 
