@@ -59,6 +59,69 @@ fn rust_extracts_versioned_stable_mix_profile() {
     assert_eq!(profile.time_signature, Some(4));
 }
 
+fn syncopated_band(bpm: f32, duration_seconds: f32) -> Vec<f32> {
+    let mut samples = vec![0.0_f32; (duration_seconds * SAMPLE_RATE as f32) as usize];
+    let mut seed = 0x2545_f491_u32;
+    let mut random = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        seed as f32 / u32::MAX as f32
+    };
+    let hit =
+        |samples: &mut Vec<f32>, time: f32, amplitude: f32, noise: &mut dyn FnMut() -> f32| {
+            let start = (time * SAMPLE_RATE as f32) as usize;
+            let length = (0.06 * SAMPLE_RATE as f32) as usize;
+            for offset in 0..length {
+                if let Some(sample) = samples.get_mut(start + offset) {
+                    *sample += amplitude
+                        * (noise() * 2.0 - 1.0)
+                        * (-5.0 * offset as f32 / length as f32).exp();
+                }
+            }
+        };
+    let beat = 60.0 / bpm;
+    let mut index = 0;
+    while index as f32 * beat < duration_seconds {
+        let time = index as f32 * beat;
+        if random() > 0.3 {
+            hit(&mut samples, time, 0.8, &mut random);
+        }
+        if random() > 0.4 {
+            let sixteenth = 1 + (random() * 3.0) as usize;
+            hit(
+                &mut samples,
+                time + sixteenth as f32 * beat / 4.0,
+                0.8,
+                &mut random,
+            );
+        }
+        index += 1;
+    }
+    for sample in samples.iter_mut() {
+        *sample += 0.05 * (random() * 2.0 - 1.0);
+    }
+    samples
+}
+
+#[test]
+fn rust_keeps_a_steady_grid_through_missing_and_off_beat_hits() {
+    let samples = syncopated_band(140.0, 40.0);
+
+    let profile = analyze_smart_mix_samples(&samples, SAMPLE_RATE);
+
+    let bpm = profile.bpm.unwrap();
+    assert!(
+        (bpm - 140.0).abs() / 140.0 <= 0.04,
+        "detected BPM was {bpm}"
+    );
+    assert!(
+        profile.tempo_stability.unwrap() >= 0.8,
+        "stability was {:?}",
+        profile.tempo_stability
+    );
+}
+
 #[test]
 fn rust_marks_drifting_tempo_as_partial() {
     let samples = click_track(120.0, 132.0, 24.0, 0.0, 0.0);

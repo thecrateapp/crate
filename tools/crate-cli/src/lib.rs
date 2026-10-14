@@ -2,6 +2,8 @@
 
 #[cfg(feature = "analysis")]
 pub mod analyze;
+#[cfg(feature = "analysis")]
+pub mod beat_tracking;
 #[cfg(feature = "bliss")]
 pub mod bliss;
 pub mod diff;

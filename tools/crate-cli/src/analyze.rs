@@ -14,6 +14,7 @@ use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 
+use crate::beat_tracking;
 use crate::loudness::{LoudnessMeter, LoudnessSummary, MEASUREMENT_VERSION};
 use crate::mix_profile::{to_camelot, SmartMixProfileResult, ANALYZER_VERSION};
 use crate::{collect_audio_files, parse_extensions};
@@ -619,45 +620,6 @@ fn median(values: &[f32]) -> f32 {
     percentile(values, 0.5)
 }
 
-fn detect_beat_frames(onsets: &[f32], sample_rate: u32, rough_bpm: Option<f32>) -> Vec<usize> {
-    if onsets.len() < 3 {
-        return Vec::new();
-    }
-    let mean = onsets.iter().sum::<f32>() / onsets.len() as f32;
-    let variance = onsets
-        .iter()
-        .map(|value| {
-            let delta = value - mean;
-            delta * delta
-        })
-        .sum::<f32>()
-        / onsets.len() as f32;
-    let threshold = mean + variance.sqrt() * 0.35;
-    let expected_frames = rough_bpm
-        .filter(|bpm| *bpm > 0.0)
-        .map(|bpm| 60.0 * sample_rate as f32 / (bpm * HOP_SIZE as f32))
-        .unwrap_or(1.0);
-    let minimum_distance = (expected_frames * 0.45).round().max(1.0) as usize;
-
-    let mut peaks = Vec::new();
-    for index in 1..onsets.len() - 1 {
-        let current = onsets[index];
-        if current < threshold || current < onsets[index - 1] || current <= onsets[index + 1] {
-            continue;
-        }
-        if let Some(previous) = peaks.last_mut() {
-            if index - *previous < minimum_distance {
-                if current > onsets[*previous] {
-                    *previous = index;
-                }
-                continue;
-            }
-        }
-        peaks.push(index);
-    }
-    peaks
-}
-
 fn tempo_features(
     beat_frames: &[usize],
     onsets: &[f32],
@@ -896,12 +858,11 @@ pub fn analyze_smart_mix_segments(
         return SmartMixProfileResult::unavailable(duration_ms);
     }
 
-    let onsets = compute_onset_envelope(samples);
-    let rough_bpm = estimate_bpm_from_onsets(&onsets, sample_rate);
-    let beat_frames = detect_beat_frames(&onsets, sample_rate, rough_bpm);
+    let onsets = beat_tracking::onset_strength(samples, sample_rate);
+    let beat_frames = beat_tracking::track_beats(&onsets, sample_rate);
     let beat_grid_ms: Vec<u64> = beat_frames
         .iter()
-        .map(|frame| (*frame + 1) as u64 * HOP_SIZE as u64 * 1_000 / u64::from(sample_rate))
+        .map(|frame| *frame as u64 * HOP_SIZE as u64 * 1_000 / u64::from(sample_rate))
         .collect();
     let (bpm, bpm_confidence, tempo_stability) = tempo_features(&beat_frames, &onsets, sample_rate);
     let (downbeat_anchor_ms, time_signature) =
