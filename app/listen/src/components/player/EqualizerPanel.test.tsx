@@ -48,13 +48,15 @@ describe("EqualizerPanel", () => {
       <EqualizerPanel onClose={vi.fn()} />,
     );
 
-    expect(
-      screen.getByRole("heading", { name: "Equalizer" }),
-    ).toBeInTheDocument();
+    const heading = screen.getByRole("heading", { name: /Equalizer/ });
+    expect(heading).toHaveTextContent(/Equalizer.*Flat/);
+    expect(heading).toHaveClass("font-mono", "uppercase");
     expect(screen.getByRole("button", { name: "Close equalizer" })).toHaveClass(
       "text-text-muted",
     );
-    expect(container.querySelector("svg")).toHaveClass("text-accent-action");
+    expect(
+      container.querySelector("path.stroke-accent-action-hi"),
+    ).toBeInTheDocument();
     expect(container.innerHTML).not.toContain("border-white");
     expect(container.innerHTML).not.toContain("text-white");
     expect(container.innerHTML).not.toContain("cyan-");
@@ -63,7 +65,7 @@ describe("EqualizerPanel", () => {
     expect(container.innerHTML).not.toContain("rgba(");
   });
 
-  it("uses the accent-derived smart surface and danger token", () => {
+  it("shows the Smart EQ chain with the resolved source highlighted", () => {
     equalizerMock.useEqualizer.mockReturnValue(
       makeEqualizerState({
         smart: true,
@@ -80,9 +82,29 @@ describe("EqualizerPanel", () => {
 
     const { container } = renderWithListenProviders(<EqualizerPanel />);
 
-    expect(container.querySelector(".eq-smart-surface")).toBeInTheDocument();
-    expect(container.querySelector(".text-accent-action")).toBeInTheDocument();
+    const active = container.querySelector("[aria-current='true']");
+    expect(active).toHaveAttribute("data-source", "user_track_preset");
+    expect(active).toHaveClass("text-accent-action-hi");
+    expect(container.querySelectorAll("[data-source]")).toHaveLength(6);
+    expect(screen.getByText("Personal curve")).toBeInTheDocument();
     expect(container.innerHTML).not.toContain("cyan-");
     expect(container.innerHTML).not.toContain("red-");
+  });
+
+  it("marks the active preset chip and applies presets from the chips", async () => {
+    const state = makeEqualizerState({ preset: "punk" });
+    equalizerMock.useEqualizer.mockReturnValue(state);
+
+    renderWithListenProviders(<EqualizerPanel />);
+
+    const punk = screen.getByRole("button", { name: "Punk" });
+    expect(punk).toHaveAttribute("aria-pressed", "true");
+    expect(punk).toHaveClass("bg-accent-action-hi", "font-mono");
+    expect(
+      screen.getByRole("heading", { name: /Equalizer/ }),
+    ).toHaveTextContent(/Equalizer.*Punk/);
+
+    screen.getByRole("button", { name: "Shoegaze" }).click();
+    expect(state.applyPreset).toHaveBeenCalledWith("shoegaze");
   });
 });

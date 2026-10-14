@@ -17,6 +17,7 @@ import { EqBands } from "@crate/ui/domain/player/EqBands";
 import { Checkbox } from "@crate/ui/primitives/Checkbox";
 import { CrateBadge, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { IconButton } from "@crate/ui/primitives/IconButton";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Button } from "@crate/ui/shadcn/button";
 import { EqualizerSmartReadout } from "@/components/player/EqualizerSmartReadout";
 import {
@@ -24,6 +25,7 @@ import {
   GenreResolutionChip,
 } from "@/components/player/EqualizerAdaptiveReadouts";
 
+const PRESET_CHIP_CLASS_NAME = "px-3 py-1.5 text-label";
 const PANEL_CLOSE_BUTTON_CLASS_NAME =
   "size-9 text-text-muted hover:translate-y-0 hover:text-text-primary hover:drop-shadow-none";
 const TRACK_PRESET_ACTION_CLASS_NAME =
@@ -57,6 +59,14 @@ const PRESET_LABELS: Record<EqPresetName, string> = {
 
 type EqualizerState = ReturnType<typeof useEqualizer>;
 
+function equalizerModeLabel(eq: EqualizerState, t: TFunction): string {
+  if (eq.smart) return t("player.equalizer.smartCurve");
+  if (eq.adaptive) return t("player.equalizer.adaptiveActive");
+  if (eq.genreAdaptive) return t("player.equalizer.genreActive");
+  if (eq.preset === "custom") return t("player.equalizer.custom");
+  return PRESET_LABELS[eq.preset as EqPresetName] ?? eq.preset;
+}
+
 function EqualizerHeader({
   eq,
   onClose,
@@ -68,15 +78,11 @@ function EqualizerHeader({
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2">
-        <SlidersHorizontal
-          size={CRATE_ICON_SIZE.md}
-          className="text-accent-action"
-        />
-        <h2 className="text-sm font-semibold text-text-primary">
-          {t("player.equalizer")}
-        </h2>
-      </div>
+      <MonoLabel
+        as="h2"
+        accent={t("player.equalizer")}
+        meta={[equalizerModeLabel(eq, t)]}
+      />
       <div className="flex items-center gap-2">
         <CratePill
           active={eq.smart}
@@ -119,10 +125,10 @@ function EqualizerModePicker({ eq, t }: { eq: EqualizerState; t: TFunction }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border-quiet bg-surface-control px-2.5 py-2">
-      <span className="mr-1 text-xs uppercase tracking-eyebrow text-text-subtle">
+    <div className="flex flex-wrap items-center gap-2">
+      <MonoLabel as="span" className="mr-1">
         {t("player.equalizer.manualHelpers")}
-      </span>
+      </MonoLabel>
       <CratePill
         active={eq.genreAdaptive}
         disabled={!eq.enabled}
@@ -157,10 +163,11 @@ function EqualizerPresetPicker({
   manualControlsEnabled: boolean;
 }) {
   return (
-    <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
+    <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto sm:max-h-none">
       {(Object.keys(PRESET_LABELS) as EqPresetName[]).map((name) => (
         <CratePill
           key={name}
+          className={PRESET_CHIP_CLASS_NAME}
           active={
             eq.preset === name && !eq.smart && !eq.adaptive && !eq.genreAdaptive
           }
@@ -293,13 +300,23 @@ export function EqualizerPanelView({
   const hasUserTrackPreset = eq.effectiveEq?.source === "user_track_preset";
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <EqualizerHeader eq={eq} onClose={onClose} t={t} />
+      <div className="border-t border-border-quiet pt-6">
+        <EqBands
+          gains={eq.gains}
+          onBandChange={manualControlsEnabled ? eq.updateBand : undefined}
+          disabled={!eq.enabled}
+          trackHeight={160}
+        />
+      </div>
+      <div className="border-t border-border-quiet pt-4">
+        <EqualizerPresetPicker
+          eq={eq}
+          manualControlsEnabled={manualControlsEnabled}
+        />
+      </div>
       <EqualizerModePicker eq={eq} t={t} />
-      <EqualizerPresetPicker
-        eq={eq}
-        manualControlsEnabled={manualControlsEnabled}
-      />
       <div className="flex items-center justify-between">
         <EqualizerModeBadge
           adaptive={eq.adaptive}
@@ -330,13 +347,6 @@ export function EqualizerPanelView({
           status={eq.genreAdaptiveStatus}
         />
       ) : null}
-      <div className="rounded-xl border border-border-quiet bg-surface-canvas p-3">
-        <EqBands
-          gains={eq.gains}
-          onBandChange={manualControlsEnabled ? eq.updateBand : undefined}
-          disabled={!eq.enabled}
-        />
-      </div>
     </div>
   );
 }

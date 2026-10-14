@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { SlidersHorizontal, Save, RotateCcw, Loader2 } from "lucide-react";
+import { Save, RotateCcw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { AIButton } from "@/components/ui/AIButton";
 import { Button } from "@crate/ui/shadcn/button";
 import { api } from "@/lib/api";
 import { EqBands } from "@crate/ui/domain/player/EqBands";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { useLLMAvailable } from "@/hooks/use-llm";
 
 const EQ_BAND_COUNT = 10;
@@ -130,8 +131,7 @@ export function GenreEqEditor({
     <div className="rounded-md border border-white/12 bg-black/15 p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <SlidersHorizontal size={14} className="text-primary" />
-          <h2 className="text-sm font-semibold">Equalizer preset</h2>
+          <MonoLabel as="h2" accent="Equalizer preset" meta={[canonicalName]} />
           <button
             type="button"
             onClick={() => setGains([...FLAT_GAINS])}
@@ -143,26 +143,14 @@ export function GenreEqEditor({
           </button>
         </div>
         {hasOwnPreset ? (
-          <Badge
-            variant="outline"
-            className="border-primary/40 bg-primary/10 text-primary"
-          >
-            Direct preset
-          </Badge>
+          <StatusDot label="Direct preset" />
         ) : inherited && initialResolved ? (
-          <Badge
-            variant="outline"
-            className="border-white/15 bg-black/15 text-white/80"
-          >
-            Inherits from {initialResolved.name}
-          </Badge>
+          <StatusDot
+            tone="off"
+            label={`Inherits from ${initialResolved.name}`}
+          />
         ) : (
-          <Badge
-            variant="outline"
-            className="border-amber-500/30 bg-amber-500/10 text-amber-100"
-          >
-            No preset
-          </Badge>
+          <StatusDot tone="warn" label="No preset" />
         )}
       </div>
 

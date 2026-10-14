@@ -1,8 +1,8 @@
+import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
-import { Brain } from "@crate/ui/icons";
 
 import type { EffectiveEq } from "@/hooks/use-effective-eq";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 interface EqualizerSmartReadoutProps {
   eq: EffectiveEq | null;
@@ -16,21 +16,20 @@ export function EqualizerSmartReadout({
   const { t } = useTranslation();
   if (status === "loading") {
     return (
-      <div className="rounded-lg border border-accent-action/20 bg-accent-action/[0.07] px-3 py-2 text-xs text-accent-action/80">
+      <MonoLabel accent={t("player.equalizer.smart.label")}>
         {t("player.equalizer.smart.resolving")}
-      </div>
+      </MonoLabel>
     );
   }
 
   if (status === "unavailable" || !eq) {
     return (
-      <div className="rounded-lg border border-border-quiet bg-surface-control px-3 py-2 text-xs text-text-muted">
+      <p className="text-xs text-text-muted">
         {t("player.equalizer.smart.waiting")}
-      </div>
+      </p>
     );
   }
 
-  const label = SMART_EQ_SOURCE_LABELS[eq.source] ?? eq.label;
   const detail =
     eq.source === "genre_taxonomy_preset" && eq.genre
       ? eq.inheritedFrom
@@ -39,21 +38,47 @@ export function EqualizerSmartReadout({
       : eq.reasoning || eq.label;
 
   return (
-    <div className="eq-smart-surface rounded-lg border border-accent-action/25 px-3 py-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <CrateBadge icon={Brain}>
+    <div className="space-y-2">
+      <MonoLabel>
+        <span className="mr-3 text-text-muted">
           {t("player.equalizer.smart.label")}
-        </CrateBadge>
-        <span className="text-xs font-semibold text-text-primary">{label}</span>
-      </div>
+        </span>
+        {SMART_EQ_CHAIN.map((source, index) => (
+          <Fragment key={source}>
+            {index > 0 ? (
+              <span aria-hidden="true" className="px-1.5 opacity-50">
+                →
+              </span>
+            ) : null}
+            <span
+              data-source={source}
+              aria-current={source === eq.source ? "true" : undefined}
+              className={
+                source === eq.source ? "text-accent-action-hi" : undefined
+              }
+            >
+              {SMART_EQ_SOURCE_LABELS[source]}
+            </span>{" "}
+          </Fragment>
+        ))}
+      </MonoLabel>
       {detail ? (
-        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-text-muted">
+        <p className="line-clamp-2 text-xs leading-relaxed text-text-muted">
           {detail}
         </p>
       ) : null}
     </div>
   );
 }
+
+const SMART_EQ_CHAIN: readonly EffectiveEq["source"][] = [
+  "user_track_preset",
+  "instance_track_preset",
+  "instance_album_preset",
+  "genre_taxonomy_preset",
+  "audio_analysis_preset",
+  "flat",
+];
 
 const SMART_EQ_SOURCE_LABELS: Record<EffectiveEq["source"], string> = {
   user_track_preset: "User track preset",
