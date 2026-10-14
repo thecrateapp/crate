@@ -1,4 +1,6 @@
 @import "../../shared/fonts/poppins.css";
+@import "../../shared/fonts/bricolage-grotesque.css";
+@import "../../shared/fonts/jetbrains-mono.css";
 @import "@crate/ui/tokens/index.css";
 @import "tailwindcss";
 @source "../../shared/ui";

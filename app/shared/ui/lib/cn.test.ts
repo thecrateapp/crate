@@ -35,6 +35,13 @@ describe("cn", () => {
     );
   });
 
+  it("keeps the mono label size apart from text colours and merges colours", () => {
+    expect(cn("text-label text-text-subtle", "text-text-secondary")).toBe(
+      "text-label text-text-secondary",
+    );
+    expect(cn("leading-none", "leading-display")).toBe("leading-display");
+  });
+
   it("resolves conflicts with layout and typography tokens", () => {
     expect(cn("rounded-xl", "rounded-panel")).toBe("rounded-panel");
     expect(cn("max-w-md", "max-w-content")).toBe("max-w-content");

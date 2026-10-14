@@ -37,6 +37,7 @@ export interface AppearanceTokenDefinition {
 
 interface AppearanceModeDefinition {
   accents: Record<AccentId, string>;
+  accentsHi: Record<AccentId, string>;
   danger: string;
   surfaces: Record<string, string>;
   extras: {
@@ -89,39 +90,39 @@ export const APPEARANCE_OPTION_VALUES = {
 const DEFAULT_DARK_SURFACES = {
   "--crate-token-color-background": "#0a0a0f",
   "--crate-token-color-foreground": "#f1f5f9",
-  "--crate-token-color-muted-foreground": "#94a3b8",
+  "--crate-token-color-muted-foreground": "#999ca0",
   "--crate-token-scrollbar-thumb": "#252535",
   "--crate-token-scrollbar-hover": "#353545",
   "--crate-token-surface-app": "#0a0a0f",
-  "--crate-token-surface-card-solid": "#16161e",
+  "--crate-token-surface-card-solid": "#0d0e14",
   "--crate-token-surface-card-foreground-solid": "#f1f5f9",
-  "--crate-token-surface-card-glass": "rgba(18, 18, 26, 0.78)",
+  "--crate-token-surface-card-glass": "rgba(13, 14, 20, 0.78)",
   "--crate-token-surface-card-foreground-glass": "#f1f5f9",
-  "--crate-token-surface-secondary-glass": "rgba(28, 28, 40, 0.88)",
+  "--crate-token-surface-secondary-glass": "rgba(21, 22, 29, 0.88)",
   "--crate-token-surface-secondary-foreground-glass": "#f1f5f9",
-  "--crate-token-surface-muted-glass": "rgba(22, 22, 30, 0.72)",
-  "--crate-token-surface-accent-glass": "rgba(255, 255, 255, 0.06)",
+  "--crate-token-surface-muted-glass": "rgba(13, 14, 20, 0.72)",
+  "--crate-token-surface-accent-glass": "rgba(241, 245, 249, 0.06)",
   "--crate-token-surface-accent-foreground-glass": "#f1f5f9",
   "--crate-token-surface-popover-glass": "rgba(18, 18, 26, 0.95)",
   "--crate-token-surface-popover-foreground-glass": "#f1f5f9",
-  "--crate-token-surface-border-glass": "rgba(255, 255, 255, 0.08)",
+  "--crate-token-surface-border-glass": "rgba(241, 245, 249, 0.1)",
   "--crate-token-surface-input-glass": "rgba(20, 20, 25, 0.72)",
   "--crate-token-surface-panel-glass": "#0c0c14",
   "--crate-token-surface-raised-glass": "rgba(18, 18, 26, 0.92)",
   "--crate-token-surface-modal-glass": "rgba(16, 16, 24, 0.95)",
   "--crate-token-surface-overlay-glass": "rgba(18, 18, 26, 0.95)",
-  "--crate-token-surface-secondary-solid": "#1c1c28",
+  "--crate-token-surface-secondary-solid": "#15161d",
   "--crate-token-surface-secondary-foreground-solid": "#f1f5f9",
-  "--crate-token-surface-muted-solid": "#16161e",
-  "--crate-token-surface-accent-solid": "#1c1c28",
+  "--crate-token-surface-muted-solid": "#0d0e14",
+  "--crate-token-surface-accent-solid": "#15161d",
   "--crate-token-surface-accent-foreground-solid": "#f1f5f9",
-  "--crate-token-surface-popover-solid": "#16161e",
+  "--crate-token-surface-popover-solid": "#111218",
   "--crate-token-surface-popover-foreground-solid": "#f1f5f9",
-  "--crate-token-surface-border-solid": "#252535",
-  "--crate-token-surface-input-solid": "#141419",
+  "--crate-token-surface-border-solid": "rgba(241, 245, 249, 0.1)",
+  "--crate-token-surface-input-solid": "#111218",
   "--crate-token-surface-overlay-solid": "rgba(18, 18, 26, 0.95)",
   "--crate-token-surface-panel-solid": "#0c0c14",
-  "--crate-token-surface-raised-solid": "#12121a",
+  "--crate-token-surface-raised-solid": "#0f1016",
   "--crate-token-surface-modal-solid": "rgba(16, 16, 24, 0.95)",
 };
 
@@ -233,20 +234,20 @@ const CRATE_RED_LIGHT_SURFACES = {
 };
 
 const DEFAULT_DARK_EXTRAS: AppearanceModeDefinition["extras"] = {
-  textSecondary: "rgba(255, 255, 255, 0.78)",
-  textSubtle: "#94a3b8",
-  textFaint: "#475569",
-  borderSubtle: "#252535",
-  borderQuiet: "rgba(255, 255, 255, 0.1)",
-  borderQuietSubtle: "rgba(255, 255, 255, 0.06)",
-  idleBorder: "rgba(255, 255, 255, 0.06)",
-  idleBackground: "rgba(255, 255, 255, 0.02)",
-  idleText: "rgba(255, 255, 255, 0.6)",
-  idleTextMuted: "rgba(255, 255, 255, 0.45)",
-  idleTextSubtle: "rgba(255, 255, 255, 0.35)",
-  hoverBorder: "rgba(255, 255, 255, 0.2)",
-  hoverBackground: "rgba(255, 255, 255, 0.05)",
-  hoverBackgroundStrong: "rgba(255, 255, 255, 0.1)",
+  textSecondary: "rgba(241, 245, 249, 0.78)",
+  textSubtle: "#7e8084",
+  textFaint: "#4a4c52",
+  borderSubtle: "rgba(241, 245, 249, 0.1)",
+  borderQuiet: "rgba(241, 245, 249, 0.1)",
+  borderQuietSubtle: "rgba(241, 245, 249, 0.06)",
+  idleBorder: "rgba(241, 245, 249, 0.06)",
+  idleBackground: "rgba(241, 245, 249, 0.02)",
+  idleText: "rgba(241, 245, 249, 0.62)",
+  idleTextMuted: "rgba(241, 245, 249, 0.5)",
+  idleTextSubtle: "rgba(241, 245, 249, 0.35)",
+  hoverBorder: "rgba(241, 245, 249, 0.2)",
+  hoverBackground: "rgba(241, 245, 249, 0.05)",
+  hoverBackgroundStrong: "rgba(241, 245, 249, 0.1)",
   glassShadow: "rgba(0, 0, 0, 0.48)",
 };
 
@@ -367,12 +368,14 @@ export const APPEARANCE_PRESET_REGISTRY = {
     modes: {
       dark: {
         accents: { cyan: "#06b6d4", red: "#ef4444", violet: "#8b5cf6" },
+        accentsHi: { cyan: "#67e8f9", red: "#fda4af", violet: "#c4b5fd" },
         danger: "#ef4444",
         surfaces: DEFAULT_DARK_SURFACES,
         extras: DEFAULT_DARK_EXTRAS,
       },
       light: {
         accents: { cyan: "#0e7490", red: "#dc2626", violet: "#7c3aed" },
+        accentsHi: { cyan: "#0e7490", red: "#b91c1c", violet: "#6d28d9" },
         danger: "#dc2626",
         surfaces: DEFAULT_LIGHT_SURFACES,
         extras: DEFAULT_LIGHT_EXTRAS,
@@ -392,6 +395,7 @@ export const APPEARANCE_PRESET_REGISTRY = {
     modes: {
       dark: {
         accents: { cyan: "#06b6d4", red: "#ff375f", violet: "#8b5cf6" },
+        accentsHi: { cyan: "#67e8f9", red: "#ff8fa3", violet: "#c4b5fd" },
         danger: "#ff453a",
         surfaces: CRATE_RED_DARK_SURFACES,
         extras: {
@@ -406,6 +410,7 @@ export const APPEARANCE_PRESET_REGISTRY = {
       },
       light: {
         accents: { cyan: "#0e7490", red: "#d61f45", violet: "#7c3aed" },
+        accentsHi: { cyan: "#0e7490", red: "#b3123a", violet: "#6d28d9" },
         danger: "#d70015",
         surfaces: CRATE_RED_LIGHT_SURFACES,
         extras: {
@@ -427,6 +432,13 @@ export function getAppearanceAccentColor(
 ): string {
   return APPEARANCE_PRESET_REGISTRY[appearance.preset].modes[appearance.mode]
     .accents[appearance.effective.accent];
+}
+
+export function getAppearanceAccentHiColor(
+  appearance: AppearanceResolution,
+): string {
+  return APPEARANCE_PRESET_REGISTRY[appearance.preset].modes[appearance.mode]
+    .accentsHi[appearance.effective.accent];
 }
 
 export function getAppearanceDangerColor(
@@ -464,6 +476,10 @@ export function resolveAppearanceVariables(
   const materialSuffix = appearance.effective.material;
   const surfaceValue = (name: string): string => surfaces[name]!;
   const accent = getAppearanceAccentColor(appearance);
+  const accentHi = getAppearanceAccentHiColor(appearance);
+  const accentHiForeground =
+    chooseAccessibleForeground(accentHi) ?? DEFAULT_DARK_FOREGROUND;
+  const systemType = appearance.effective.typography === "system";
   const danger = getAppearanceDangerColor(appearance);
   const accentForeground =
     chooseAccessibleForeground(accent) ?? DEFAULT_DARK_FOREGROUND;
@@ -481,6 +497,8 @@ export function resolveAppearanceVariables(
     ...surfaces,
     "--crate-token-color-primary": accent,
     "--crate-token-color-primary-foreground": accentForeground,
+    "--crate-token-color-primary-hi": accentHi,
+    "--crate-token-color-primary-hi-foreground": accentHiForeground,
     "--crate-token-color-ring": accent,
     "--crate-token-color-destructive": danger,
     "--crate-token-color-destructive-foreground": dangerForeground,
@@ -559,6 +577,8 @@ export function resolveAppearanceVariables(
     "--focus-ring": accent,
     "--accent-action": accent,
     "--accent-action-foreground": accentForeground,
+    "--accent-action-hi": accentHi,
+    "--accent-action-hi-foreground": accentHiForeground,
     "--accent-action-glow-soft": accentGlow(glowWeights.soft),
     "--accent-action-glow-medium": accentGlow(glowWeights.medium),
     "--accent-action-glow": accentGlow(glowWeights.regular),
@@ -581,10 +601,13 @@ export function resolveAppearanceVariables(
     "--radius-md": radiusValues["--crate-token-radius-md"]!,
     "--radius-lg": radiusValues["--crate-token-radius-lg"]!,
     "--radius-xl": radiusValues["--crate-token-radius-xl"]!,
-    "--font-brand":
-      appearance.effective.typography === "system"
-        ? "system-ui, sans-serif"
-        : "Poppins",
+    "--font-brand": systemType ? "system-ui, sans-serif" : "Poppins",
+    "--font-display-stack": systemType
+      ? "system-ui, sans-serif"
+      : '"Bricolage Grotesque", Poppins, system-ui, sans-serif',
+    "--font-mono-stack": systemType
+      ? 'ui-monospace, "SF Mono", Menlo, monospace'
+      : '"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace',
     "--brand-logo-start": accent,
     "--brand-logo-end": accent,
     "--brand-logo-glow": accentGlow(glowWeights.logo),

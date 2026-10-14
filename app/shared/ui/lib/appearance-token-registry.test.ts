@@ -153,4 +153,38 @@ describe("appearance token registry", () => {
       ).size,
     ).toBe(3);
   });
+
+  it("aligns the default dark foundation with the v3 hairline palette", () => {
+    const dark = resolveVariables("default", "dark");
+
+    expect(dark["--crate-token-surface-card-solid"]).toBe("#0d0e14");
+    expect(dark["--color-border"]).toBe("rgba(241, 245, 249, 0.1)");
+    expect(dark["--border-quiet-subtle"]).toBe("rgba(241, 245, 249, 0.06)");
+    expect(dark["--text-muted"]).toBe("#999ca0");
+    expect(dark["--text-subtle"]).toBe("#7e8084");
+  });
+
+  it("derives a bright accent and its AA foreground for every accent", () => {
+    const cyan = resolveVariables("default", "dark");
+    const violet = resolveVariables("default", "dark", { accent: "violet" });
+    const light = resolveVariables("default", "light");
+
+    expect(cyan["--accent-action-hi"]).toBe("#67e8f9");
+    expect(cyan["--accent-action-hi-foreground"]).toBe("#0a0a0f");
+    expect(violet["--accent-action-hi"]).toBe("#c4b5fd");
+    expect(light["--accent-action-hi"]).toBe("#0e7490");
+    expect(light["--accent-action-hi-foreground"]).toBe("#ffffff");
+  });
+
+  it("switches the display and mono stacks with the typography preference", () => {
+    const brand = resolveVariables("default", "dark");
+    const system = resolveVariables("default", "dark", {
+      typography: "system",
+    });
+
+    expect(brand["--font-display-stack"]).toMatch(/^"Bricolage Grotesque"/);
+    expect(brand["--font-mono-stack"]).toMatch(/^"JetBrains Mono"/);
+    expect(system["--font-display-stack"]).toBe("system-ui, sans-serif");
+    expect(system["--font-mono-stack"]).not.toContain("JetBrains Mono");
+  });
 });

@@ -13,23 +13,23 @@
   --active-glow: color-mix(in srgb, var(--color-primary) 60%, transparent);
 
   /* ── Default / Idle interactive ── */
-  --idle-border: rgba(255, 255, 255, 0.06);
-  --idle-bg: rgba(255, 255, 255, 0.02);
-  --idle-text: rgba(255, 255, 255, 0.6);
-  --idle-text-muted: rgba(255, 255, 255, 0.45);
-  --idle-text-subtle: rgba(255, 255, 255, 0.35);
+  --idle-border: rgba(241, 245, 249, 0.06);
+  --idle-bg: rgba(241, 245, 249, 0.02);
+  --idle-text: rgba(241, 245, 249, 0.62);
+  --idle-text-muted: rgba(241, 245, 249, 0.5);
+  --idle-text-subtle: rgba(241, 245, 249, 0.35);
 
   /* ── Hover ── */
-  --hover-border: rgba(255, 255, 255, 0.2);
-  --hover-bg: rgba(255, 255, 255, 0.05);
-  --hover-bg-strong: rgba(255, 255, 255, 0.1);
+  --hover-border: rgba(241, 245, 249, 0.2);
+  --hover-bg: rgba(241, 245, 249, 0.05);
+  --hover-bg-strong: rgba(241, 245, 249, 0.1);
 
   /* ── Disabled ── */
   --disabled-opacity: 0.4;
 
   /* ── Pill (rounded-full interactive badges) ── */
-  --pill-border: rgba(255, 255, 255, 0.1);
-  --pill-bg: rgba(255, 255, 255, 0.05);
+  --pill-border: rgba(241, 245, 249, 0.1);
+  --pill-bg: rgba(241, 245, 249, 0.05);
   --pill-active-border: color-mix(
     in srgb,
     var(--color-primary) 50%,
@@ -38,8 +38,8 @@
   --pill-active-bg: color-mix(in srgb, var(--color-primary) 15%, transparent);
 
   /* ── Chip (compact read-only badges) ── */
-  --chip-border: rgba(255, 255, 255, 0.1);
-  --chip-bg: rgba(255, 255, 255, 0.03);
+  --chip-border: rgba(241, 245, 249, 0.1);
+  --chip-bg: rgba(241, 245, 249, 0.03);
   --chip-active-border: color-mix(
     in srgb,
     var(--color-primary) 30%,

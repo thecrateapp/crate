@@ -1,6 +1,9 @@
 /* Poppins is loaded conditionally in main.tsx — web only, not
    Capacitor native. iOS/Android use system fonts (San Francisco /
-   Roboto) for a native feel. */
+   Roboto) for a native feel. The display and mono faces carry the brand
+   and ship on every runtime. */
+@import "../../shared/fonts/bricolage-grotesque.css";
+@import "../../shared/fonts/jetbrains-mono.css";
 @import "@crate/ui/tokens/index.css";
 @import "tailwindcss";
 @source ".";

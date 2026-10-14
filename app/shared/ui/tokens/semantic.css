@@ -5,7 +5,7 @@
   --text-primary: var(--color-foreground);
   --text-secondary: var(--idle-text);
   --text-muted: var(--color-muted-foreground);
-  --text-subtle: var(--idle-text-subtle);
+  --text-subtle: var(--idle-text-muted);
   --text-faint: color-mix(in srgb, var(--text-primary) 20%, transparent);
   --surface-canvas: var(--surface-app);
   --surface-contrast: var(--text-primary);
@@ -130,6 +130,8 @@
   --focus-ring: var(--color-ring);
   --accent-action: var(--color-primary);
   --accent-action-foreground: var(--color-primary-foreground);
+  --accent-action-hi: var(--crate-token-color-primary-hi);
+  --accent-action-hi-foreground: var(--crate-token-color-primary-hi-foreground);
   --accent-action-hover: color-mix(
     in srgb,
     var(--accent-action) 90%,
@@ -149,6 +151,8 @@
   --motion-duration-fast: 150ms;
   --motion-duration-normal: 250ms;
   --font-brand: "Poppins";
+  --font-display-stack: "Bricolage Grotesque", Poppins, system-ui, sans-serif;
+  --font-mono-stack: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --action-shadow: 0 14px 28px
     color-mix(in srgb, var(--accent-action) 22%, transparent);
   --focus-shadow: 0 0 0 2px var(--focus-ring);
@@ -273,6 +277,7 @@
   --color-surface-icon-control: var(--surface-icon-control);
   --color-border-subtle: var(--border-subtle);
   --color-border-quiet: var(--border-quiet);
+  --color-border-quiet-subtle: var(--border-quiet-subtle);
   --color-border-interactive: var(--border-interactive);
   --color-border-focus: var(--focus-ring);
   --color-accent-action: var(--accent-action);
@@ -284,6 +289,8 @@
   --color-state-danger-text: var(--state-danger-text);
   --color-state-info: var(--state-info);
   --color-accent-action-foreground: var(--accent-action-foreground);
+  --color-accent-action-hi: var(--accent-action-hi);
+  --color-accent-action-hi-foreground: var(--accent-action-hi-foreground);
   --color-accent-action-hover: var(--accent-action-hover);
   --color-state-danger-foreground: var(--state-danger-foreground);
   --color-focus-ring: var(--focus-ring);

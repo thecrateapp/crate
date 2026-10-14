@@ -27,10 +27,21 @@ const crateTwMerge = extendTailwindMerge({
         "overline-wide",
       ],
       container: ["content"],
+      leading: ["display"],
     },
     classGroups: {
       "font-size": [
-        { text: ["badge", "counter", "micro", "2xs", "caption", "body"] },
+        {
+          text: [
+            "badge",
+            "counter",
+            "micro",
+            "2xs",
+            "caption",
+            "body",
+            "label",
+          ],
+        },
       ],
       h: [{ h: HERO_HEIGHTS }],
       "min-h": [{ "min-h": HERO_HEIGHTS }],

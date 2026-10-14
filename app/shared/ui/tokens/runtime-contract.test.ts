@@ -61,11 +61,32 @@ describe("runtime token bridge", () => {
     const themes = readTokenFile("themes.css");
 
     expect(themes).toContain("--crate-token-color-primary: #06b6d4");
-    expect(themes).toContain("--crate-token-surface-card-solid: #16161e");
+    expect(themes).toContain("--crate-token-surface-card-solid: #0d0e14");
+    expect(themes).toContain(
+      "--crate-token-surface-border-solid: rgba(241, 245, 249, 0.1)",
+    );
+    expect(themes).toContain("--crate-token-color-primary-hi: #67e8f9");
     expect(themes).toContain("--crate-token-surface-card-glass:");
     expect(themes).toContain("--crate-token-radius-md: 0.25rem");
     expect(themes).toContain("--crate-token-scrollbar-thumb: #252535");
     expect(themes).toContain("--crate-token-scrollbar-hover: #353545");
+  });
+
+  it("exposes the v3 display, mono, label and motion tokens to Tailwind", () => {
+    const typography = readTokenFile("typography.css");
+    const semantic = readTokenFile("semantic.css");
+    const animations = readTokenFile("animations.css");
+
+    expect(typography).toContain("--font-display: var(--font-display-stack)");
+    expect(typography).toContain("--font-mono: var(--font-mono-stack)");
+    expect(typography).toContain("--text-label: 0.6875rem");
+    expect(semantic).toMatch(/--font-display-stack:\s*"Bricolage Grotesque"/);
+    expect(semantic).toMatch(/--font-mono-stack:\s*"JetBrains Mono"/);
+    expect(semantic).toContain(
+      "--color-accent-action-hi: var(--accent-action-hi)",
+    );
+    expect(animations).toContain("--ease-snap: cubic-bezier(0.22, 1, 0.36, 1)");
+    expect(animations).toMatch(/--ease-spring-snappy:\s*linear\(/);
   });
 
   it("disables root view transitions when motion is reduced", () => {

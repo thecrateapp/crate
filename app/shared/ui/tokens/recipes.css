@@ -296,16 +296,6 @@
   text-shadow: var(--_lyrics-active-text-shadow);
 }
 
-.eq-smart-surface {
-  --_eq-smart-surface: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--accent-action) 14%, transparent),
-    color-mix(in srgb, var(--accent-action) 6%, transparent),
-    transparent
-  );
-  background: var(--_eq-smart-surface);
-}
-
 .spectrum-play-button {
   background: var(--play-button-rim);
   box-shadow: var(--play-button-shadow);
