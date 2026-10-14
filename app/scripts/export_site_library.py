@@ -26,7 +26,8 @@ def quantise(points: np.ndarray, radius: float) -> np.ndarray:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--limit", type=int, default=24000)
+    parser.add_argument("--limit", type=int, default=40000)
+    parser.add_argument("--min", type=int, default=12000)
     parser.add_argument("--seed", type=float, default=0.42)
     parser.add_argument("--radius", type=float, default=1.5)
     parser.add_argument("--out", type=Path, default=Path("web/public/data"))
@@ -35,6 +36,10 @@ def main(argv: list[str] | None = None) -> None:
     rows = get_bliss_sample(limit=args.limit, seed=args.seed)
     if not rows:
         raise SystemExit("no tracks with bliss vectors found")
+    if len(rows) < args.min:
+        raise SystemExit(
+            f"only {len(rows)} tracks with bliss vectors; the hero needs at least {args.min}"
+        )
     vectors = np.array([row["bliss_vector"] for row in rows], dtype=np.float64)
     points = project_to_3d(vectors, args.radius)
 

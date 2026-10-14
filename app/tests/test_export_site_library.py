@@ -31,7 +31,9 @@ def test_main_writes_cloud_and_metadata(tmp_path, monkeypatch):
 
     monkeypatch.setattr(export_site_library, "get_bliss_sample", fake_sample)
 
-    export_site_library.main(["--limit", "50", "--seed", "0.3", "--out", str(tmp_path)])
+    export_site_library.main(
+        ["--limit", "50", "--min", "50", "--seed", "0.3", "--out", str(tmp_path)]
+    )
 
     cloud = np.fromfile(tmp_path / "library-cloud.bin", dtype=np.int16)
     meta = json.loads((tmp_path / "library-cloud.json").read_text())
@@ -47,3 +49,33 @@ def test_main_refuses_to_write_an_empty_cloud(tmp_path, monkeypatch):
         export_site_library.main(["--out", str(tmp_path)])
 
     assert not (tmp_path / "library-cloud.bin").exists()
+
+
+def test_main_requests_the_desktop_hero_count_by_default(tmp_path, monkeypatch):
+    rng = np.random.default_rng(3)
+    rows = [{"bliss_vector": list(vector)} for vector in rng.normal(size=(30, 20))]
+    calls = []
+
+    def fake_sample(*, limit, seed):
+        calls.append(limit)
+        return rows
+
+    monkeypatch.setattr(export_site_library, "get_bliss_sample", fake_sample)
+
+    export_site_library.main(["--min", "30", "--out", str(tmp_path)])
+
+    meta = json.loads((tmp_path / "library-cloud.json").read_text())
+    assert calls == [40000]
+    assert meta["count"] == 30
+
+
+def test_main_refuses_a_cloud_below_the_minimum(tmp_path, monkeypatch):
+    rng = np.random.default_rng(4)
+    rows = [{"bliss_vector": list(vector)} for vector in rng.normal(size=(40, 20))]
+    monkeypatch.setattr(export_site_library, "get_bliss_sample", lambda **_: rows)
+
+    with pytest.raises(SystemExit, match="40 tracks.*at least 12000"):
+        export_site_library.main(["--out", str(tmp_path)])
+
+    assert not (tmp_path / "library-cloud.bin").exists()
+    assert not (tmp_path / "library-cloud.json").exists()
