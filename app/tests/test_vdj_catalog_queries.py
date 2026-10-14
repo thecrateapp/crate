@@ -154,6 +154,8 @@ def test_folder_queries_never_scan_library_tracks_at_scale(
 
     with transaction_scope() as session:
         session.execute(text("ANALYZE library_tracks"))
+        session.execute(text("ANALYZE library_albums"))
+        session.execute(text("ANALYZE album_genres"))
         session.execute(text("ANALYZE user_play_events"))
         session.execute(text("ANALYZE playlist_tracks"))
         raw_plan = session.execute(
