@@ -6,13 +6,22 @@
     "login": "tsx login.ts",
     "capture": "tsx capture.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "studio": "remotion studio remotion/index.ts --public-dir out"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
     "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.535",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "remotion": "4.0.535"
   }
 }
