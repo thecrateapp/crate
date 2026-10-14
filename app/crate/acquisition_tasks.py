@@ -90,6 +90,5 @@ def soulseek_download_dedup_key(params: dict) -> str:
     username = str(params.get("username") or "unknown").strip().lower()
     artist = str(params.get("artist") or "").strip().lower()
     album = str(params.get("album") or "").strip().lower()
-    alternate = "alternate" if params.get("find_alternate") else "direct"
     files = sorted(str(item).strip().lower() for item in (params.get("files") or []))
-    return f"soulseek:album:{username}:{artist}:{album}:{alternate}:{'|'.join(files)}"
+    return f"soulseek:album:{username}:{artist}:{album}:{'|'.join(files)}"
