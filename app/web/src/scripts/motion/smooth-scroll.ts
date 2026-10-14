@@ -5,6 +5,9 @@ import { finePointer, reducedMotion } from "./env";
 
 gsap.registerPlugin(ScrollTrigger);
 
+const LAG_THRESHOLD = 500;
+const ADJUSTED_LAG = 33;
+
 let lenis: Lenis | null = null;
 
 function tick(time: number) {
@@ -19,6 +22,7 @@ export function initSmoothScroll(): () => void {
   gsap.ticker.lagSmoothing(0);
   return () => {
     gsap.ticker.remove(tick);
+    gsap.ticker.lagSmoothing(LAG_THRESHOLD, ADJUSTED_LAG);
     lenis?.destroy();
     lenis = null;
   };
