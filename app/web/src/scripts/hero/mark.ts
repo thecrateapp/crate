@@ -16,7 +16,6 @@ gsap.registerPlugin(ScrollTrigger);
 export function initHero(): () => void {
   const canvas = document.querySelector<HTMLCanvasElement>("#field");
   const copy = document.querySelector<HTMLElement>(".hero-copy");
-  const caption = document.querySelector<HTMLElement>(".caption");
   const staticMark = document.querySelector<HTMLElement>(".mark-static");
   if (!canvas || !copy) return () => {};
 
@@ -138,7 +137,6 @@ export function initHero(): () => void {
 
     const mix = {
       intro: 0,
-      caption: 0,
       repel: 0,
       hero: 0,
       statement: 0,
@@ -149,10 +147,6 @@ export function initHero(): () => void {
       gsap.set(canvas, { opacity });
       state.visible = opacity > 0.001;
       state.repel = mix.hero > 0.02 ? 0 : mix.repel;
-      if (caption)
-        gsap.set(caption, {
-          opacity: mix.caption * Math.max(0, 1 - mix.hero * 8),
-        });
     };
 
     ctx.add(() => {
@@ -169,7 +163,6 @@ export function initHero(): () => void {
         ease: "power3.inOut",
       });
       gsap.to(mix, { repel: 1, duration: 0.6, delay: 2.4, onUpdate: apply });
-      gsap.to(mix, { caption: 1, duration: 0.6, delay: 2.6, onUpdate: apply });
 
       ScrollTrigger.create({
         trigger: ".hero-pin",

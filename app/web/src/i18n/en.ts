@@ -10,8 +10,6 @@ export const en = {
   "hero.eyebrow": "Free / open source / self hosted",
   "hero.title": "Crate is not a streaming service.",
   "hero.subline": "It's a tool for revolution.",
-  "hero.caption":
-    "Own your music. Support your artists. Refuse the middleman. Resist.",
   "cta.copy": "Copy",
   "cta.copied": "Copied",
   "cta.copyLabel": "Copy the install command",
