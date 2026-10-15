@@ -43,12 +43,13 @@ Una suite omitida, un build no ejecutado o un gate de host pendiente se registra
 
 Cada release se cierra con su propio gate y se puede desplegar detrás de flags sin esperar a las siguientes. Un gate fallido mantiene abierta solo esa release.
 
-| Release                                        | Paquetes                                                                                                                          | Gate de cierre                                                                                                                                                                                 |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R1 — Smart Mix correcto en Android adaptive    | C00, P01 (versiones, contratos y migraciones), SM01–SM05, SM06 (claves de caché, elegibilidad antes del límite, R15–R17), A01–A05 | Suites automáticas verdes; R01–R06 y R15–R17 con regresión; reanálisis v2 en curso con status correcto; adaptive sin clipping ni underrun en un dispositivo de referencia (subconjunto de A06) |
-| R2 — VirtualDJ A (fuente local) en macOS arm64 | VH01, P02 (incluida UI de tokens en Listen), P03 (routing prod/home/dev y flags), P04, P05, V01–V04                               | Conectar, buscar, navegar carpetas, cargar, seek y revocar en VirtualDJ Pro real macOS arm64; paquete instalable sin origen por defecto                                                        |
-| R3 — VirtualDJ B, Crate Automix y plataformas  | V05, V06, SM07, V09 (filtros DJ y CI nativo), V10 (Windows x64 y macOS Intel)                                                     | Compatibles y metadata Crate visibles; Crate Automix alimenta la cola nativa sin enviar comandos de mezcla; paquetes de las tres plataformas; benchmarks de SM07 registrados                   |
-| R4 — Android avanzado y release conjunta       | A06 (matriz completa), A07, A08, X01–X04                                                                                          | Gates de §7 del diseño para beatmatch y bass; soak y rollback                                                                                                                                  |
+| Release                                        | Paquetes                                                                                                                          | Gate de cierre                                                                                                                                                                                         |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R1 — Smart Mix correcto en Android adaptive    | C00, P01 (versiones, contratos y migraciones), SM01–SM05, SM06 (claves de caché, elegibilidad antes del límite, R15–R17), A01–A05 | Suites automáticas verdes; R01–R06 y R15–R17 con regresión; reanálisis v2 en curso con status correcto; adaptive sin clipping ni underrun en un dispositivo de referencia (subconjunto de A06)         |
+| R2 — VirtualDJ A (fuente local) en macOS arm64 | VH01, P02 (incluida UI de tokens en Listen), P03 (routing prod/home/dev y flags), P04, P05, V01–V04                               | Conectar, buscar, navegar carpetas, cargar, seek y revocar en VirtualDJ Pro real macOS arm64; paquete instalable sin origen por defecto                                                                |
+| R3 — VirtualDJ B, Crate Automix y plataformas  | V05, V06, SM07, V09 (filtros DJ y CI nativo), V10 (Windows x64 y macOS Intel)                                                     | Compatibles y metadata Crate visibles; Crate Automix alimenta la cola nativa sin enviar comandos de mezcla; paquetes de las tres plataformas; benchmarks de SM07 registrados                           |
+| R4 — Android avanzado y release conjunta       | A06 (matriz completa), A07, A08, X01–X04                                                                                          | Gates de §7 del diseño para beatmatch y bass; soak y rollback                                                                                                                                          |
+| R5 — Smart Mix en iOS                          | I01–I06                                                                                                                           | Paridad adaptive con R1 en un iPhone de referencia: transiciones planificadas, segundo plano y pantalla bloqueada, interrupciones y cambios de ruta sin cortes; sin clipping ni underrun en la captura |
 
 **Backlog fuera de R1–R4.** Entra en una release solo editando esta tabla con una decisión explícita: P06 y V07 (radio como fuente de Crate Automix y presencia; los cues privados se retiran para VDJ porque VDJ ya persiste cues por pista online; la corrección de scope de play events sigue en P02 y su cliente nativo en V06), V08 (caché de audio cifrada, offline y prefetch, solo si VH01 confirma rutas locales en `GetStreamUrl`), OAuth integrado del SDK, recorrido federado de SM06, wrapper de compatibilidad v1 sin consumidor distribuido demostrado, y paridad PAT en el readplane de Go.
 
@@ -453,6 +454,19 @@ En este bloque, `JAVA` abrevia `app/listen/android/app/src/main/java/app/cratemu
 
 **DoD:** bass es una opción entregada y probada, sin clipping ni regresión de fase/EQ; no basta parsear el campo o dejarlo permanentemente oculto.
 
+## 5b. iOS — I01 a I06 (R5)
+
+**Empieza tras cerrar R1.** El contrato entre Listen y el reproductor nativo (`setQueue`, `setTransitionPlans`, eventos `transition*`/`trackChanged`, checkpoint) ya probado en Android se reutiliza tal cual; servidor, análisis, planner y la planificación de Listen no cambian. Hoy iOS reproduce en la WebView (HTML5) y solo tiene plugins nativos de media session, Cast, sesión segura y offline.
+
+**Decisión de motor:** `AVAudioEngine` con dos `AVAudioPlayerNode` y mezclador, no dos `AVPlayer`. Cuesta más (alimentación desde caché/descarga en lugar de streaming HTTP directo), pero es el único camino que sirve después para beatmatch (`AVAudioUnitTimePitch`, programación al sample) y bass handoff (`AVAudioUnitEQ` por deck) sin reescribir.
+
+- **I01 — Plugin `CrateNativePlayback` en Swift** con el mismo contrato que Android y un `iosNativeEngine` en Listen detrás de `PlaybackEngine`; sesión de audio `.playback` y vida en segundo plano.
+- **I02 — Alimentación de decks:** descarga progresiva a caché de la pista activa y la siguiente reutilizando el almacenamiento offline; tickets de media y renovación.
+- **I03 — Mezcla:** envelope equal-power con staging ≤0 dB, disparo por cue con margen de buffer, máquina de estados y cancelación ante salto, error o fin de cola; misma telemetría QoE.
+- **I04 — Ciclo de vida:** checkpoint de cola y planes, Now Playing y mandos remotos, interrupciones (llamadas, Siri) y cambios de ruta (auriculares, Bluetooth, AirPlay).
+- **I05 — Pruebas:** XCTest del envelope, trigger y estado; harness equivalente a `drive.mjs` vía Safari Web Inspector; acceso al backend local por HTTPS con certificado de confianza o producción con flags (no hay `adb reverse`).
+- **I06 — Gate en dispositivo:** batería de R1 en un iPhone de referencia y captura con la grabadora del sistema para clipping y huecos.
+
 ## 6. VirtualDJ — VH01 y V01 a V10
 
 El diseño §6.1 recoge lo que permiten el SDK (versión oficial de 2021-10-03) y el host VirtualDJ 8.5, con su evidencia. Las tareas siguientes se ajustan a esa superficie. P01 fija contratos; P02/P03 auth y flags; P04 carpetas y filtros; P05 media; SM06 ranking y perfiles. Cada paso es un checkpoint RED/GREEN/refactor; los resultados se registran en §8.
@@ -776,6 +790,7 @@ Al iniciar una tarea se expande su fila individual: `pendiente → en curso → 
 | 2026-10-13 | Main ocupa 104–108 en producción; la rama renumera sus migraciones a 109–114                            | Módulos `schema_sections` y tests renombrados con el mismo número    |
 | 2026-10-15 | Smart Mix Android se completa antes que VirtualDJ: orden R1 → R4 y después R2–R3                        | El plugin VDJ y su plataforma (PAT, catálogo VDJ) salen del PR de R1 |
 | 2026-10-15 | Con Smart Mix activo se mezcla toda cola automática salvo álbumes; solo el salto manual usa rampa corta | Planner `rules_revision` 2 en la clave de caché de planes            |
+| 2026-10-15 | Smart Mix llega a iOS como R5 tras cerrar R1, con `AVAudioEngine` y el mismo contrato nativo            | Plugin Swift nuevo; servidor y Listen se reutilizan                  |
 
 Una revisión que cambie una decisión debe indicar motivo, evidencia, impacto en contratos/capabilities/migración y tareas afectadas. Toda guía antigua permanece histórica incluso si sus checkboxes dicen completa.
 
