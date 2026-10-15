@@ -487,7 +487,7 @@ export function resolveAppearanceVariables(
     chooseAccessibleForeground(danger) ?? DEFAULT_DARK_FOREGROUND;
   const radiusValues = RADIUS_VALUES[appearance.effective.radius];
   const success = appearance.mode === "dark" ? "#22c55e" : "#15803d";
-  const warning = appearance.mode === "dark" ? "#f59e0b" : "#b45309";
+  const warning = appearance.mode === "dark" ? "#fbbf24" : "#b45309";
   const info = appearance.mode === "dark" ? "#3b82f6" : "#2563eb";
   const glowWeights = EFFECT_GLOW_WEIGHTS[appearance.effective.effects];
   const accentGlow = (weight: number) =>

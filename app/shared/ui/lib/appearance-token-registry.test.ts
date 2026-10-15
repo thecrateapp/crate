@@ -181,6 +181,18 @@ describe("appearance token registry", () => {
     });
   });
 
+  it("uses the site amber for the dark warning state", () => {
+    expect(resolveVariables("default", "dark")["--state-warning"]).toBe(
+      "#fbbf24",
+    );
+    expect(resolveVariables("crateRed", "dark")["--color-warning"]).toBe(
+      "#fbbf24",
+    );
+    expect(resolveVariables("default", "light")["--state-warning"]).toBe(
+      "#b45309",
+    );
+  });
+
   it("derives a bright accent and its AA foreground for every accent", () => {
     const cyan = resolveVariables("default", "dark");
     const violet = resolveVariables("default", "dark", { accent: "violet" });
