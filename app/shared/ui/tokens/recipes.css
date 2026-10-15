@@ -1893,7 +1893,12 @@
     );
 }
 
-.genre-pill,
+.genre-pill {
+  border-color: var(--border-quiet);
+  background: transparent;
+  color: var(--text-primary);
+}
+
 .crate-badge {
   border-color: var(--border-quiet);
   background: var(--surface-canvas-raised);
@@ -1906,8 +1911,9 @@
   backdrop-filter: blur(10px);
 }
 
-button.genre-pill:hover {
-  border-color: var(--border-accent);
+button.genre-pill:hover,
+.genre-pill:focus-within {
+  border-color: color-mix(in srgb, var(--accent-action-hi) 40%, transparent);
 }
 
 .explore-genre-card {

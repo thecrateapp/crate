@@ -38,9 +38,15 @@ export function GenrePill({
     <>
       <span className="min-w-0 truncate">{item.name.toLowerCase()}</span>
       {percent != null ? (
-        <span className="shrink-0 rounded-sm border border-[var(--active-border)] bg-[var(--active-bg-strong)] px-1 py-0.5 text-badge font-semibold text-[var(--active-text)]">
-          {percent}%
-        </span>
+        <>
+          {" "}
+          <span
+            data-slot="genre-percent"
+            className="shrink-0 border-l border-border-quiet pl-2 font-mono text-label font-normal text-accent-action-hi tabular-nums"
+          >
+            {percent}%
+          </span>
+        </>
       ) : null}
     </>
   );
@@ -50,16 +56,21 @@ export function GenrePill({
   if (item.source) titleParts.push(item.source);
   const title = titleParts.join(" · ");
   const pillClassName =
-    "genre-pill inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-badge";
+    "genre-pill inline-flex min-h-8 min-w-0 max-w-full items-center gap-2 rounded-full border px-3 py-1 font-mono text-label font-normal tracking-chip pointer-coarse:min-h-11";
 
   if (onRemove) {
     return (
-      <span className={cn(pillClassName, "pr-1", className)} title={title}>
+      <span
+        className={cn(pillClassName, onClick ? "p-0" : "py-0 pr-0", className)}
+        title={title}
+        data-slot="chip"
+      >
         {onClick ? (
           <button
             type="button"
             onClick={onClick}
-            className="inline-flex min-w-0 items-center gap-1.5 transition-colors hover:text-accent-action"
+            data-slot="chip"
+            className="inline-flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-full px-3 py-1 text-left pointer-coarse:min-h-11"
           >
             {content}
           </button>
@@ -70,7 +81,8 @@ export function GenrePill({
           type="button"
           aria-label={removeLabel ?? `Remove ${item.name}`}
           onClick={onRemove}
-          className="shrink-0 rounded-full p-0.5 text-text-muted transition-colors hover:bg-text-primary/10 hover:text-text-primary"
+          data-slot="chip"
+          className="inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-text-primary/10 hover:text-text-primary pointer-coarse:min-h-11 pointer-coarse:min-w-11"
         >
           <X size={CRATE_ICON_SIZE.micro} />
         </button>
@@ -84,6 +96,7 @@ export function GenrePill({
         type="button"
         onClick={onClick}
         title={title}
+        data-slot="chip"
         className={cn(pillClassName, "transition-colors", className)}
       >
         {content}
@@ -92,7 +105,11 @@ export function GenrePill({
   }
 
   return (
-    <span title={title} className={cn(pillClassName, className)}>
+    <span
+      title={title}
+      data-slot="chip"
+      className={cn(pillClassName, className)}
+    >
       {content}
     </span>
   );
