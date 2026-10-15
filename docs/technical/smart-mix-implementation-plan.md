@@ -762,18 +762,20 @@ Con downbeat el tempo es correcto en el 87 % de las pistas (68 % sin él) y en e
 
 Al iniciar una tarea se expande su fila individual: `pendiente → en curso → verificado` o `bloqueado` con causa concreta y próximo paso. Anotar qué gates faltan, no porcentajes subjetivos de progreso.
 
-| Fecha      | Decisión vigente                                                                                  | Consecuencia                                                         |
-| ---------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| 2026-09-09 | Un solo diseño y un solo plan para Smart Mix+Android+VDJ                                          | Sustituyen planes/spikes anteriores; sin tercera guía por plataforma |
-| 2026-09-09 | Mantener WIP y contratos compartidos;API 2026-09/analyzer v2/planner lote string v2/plan entero 2 | P01 congela fixtures, SM01 migra aditivamente                        |
-| 2026-09-09 | Dos decks Android primero; busPCM solo por gate físico fallido                                    | A06/A07 deciden con captura, no por preferencia arquitectónica       |
-| 2026-09-09 | VDJ A+B y C en dos binarios sin daemon/IPC                                                        | Negociación y estado independientes; SDKhost es gate                 |
-| 2026-09-09 | Todos los entregables anteriores conservados; hitos incrementales                                 | Apagar una opción no cierra trabajo faltante                         |
-| 2026-10-08 | Releases R1–R4 cerrables por separado y backlog explícito                                         | Ningún entregable bloquea a otra release                             |
-| 2026-10-08 | VDJ se ajusta al SDK de 2021: un nivel de carpetas, sin cursores, ticket en URL, covers públicos  | P04, P05, V03 y V04 reescritos; VH01 cierra lo no documentado        |
-| 2026-10-08 | C pasa a Crate Automix sobre el automix nativo de VDJ; sin lease ni ejecutor propio               | P03 sin lease; V06 reescrito; cues privados retirados para VDJ       |
-| 2026-10-08 | Un solo binario Online Source con nombre permanente `Crate`; requisito de licencia Pro            | V02 y V10; segundo binario solo si VH01 lo exige                     |
-| 2026-10-13 | Main ocupa 104–108 en producción; la rama renumera sus migraciones a 109–114                      | Módulos `schema_sections` y tests renombrados con el mismo número    |
+| Fecha      | Decisión vigente                                                                                        | Consecuencia                                                         |
+| ---------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| 2026-09-09 | Un solo diseño y un solo plan para Smart Mix+Android+VDJ                                                | Sustituyen planes/spikes anteriores; sin tercera guía por plataforma |
+| 2026-09-09 | Mantener WIP y contratos compartidos;API 2026-09/analyzer v2/planner lote string v2/plan entero 2       | P01 congela fixtures, SM01 migra aditivamente                        |
+| 2026-09-09 | Dos decks Android primero; busPCM solo por gate físico fallido                                          | A06/A07 deciden con captura, no por preferencia arquitectónica       |
+| 2026-09-09 | VDJ A+B y C en dos binarios sin daemon/IPC                                                              | Negociación y estado independientes; SDKhost es gate                 |
+| 2026-09-09 | Todos los entregables anteriores conservados; hitos incrementales                                       | Apagar una opción no cierra trabajo faltante                         |
+| 2026-10-08 | Releases R1–R4 cerrables por separado y backlog explícito                                               | Ningún entregable bloquea a otra release                             |
+| 2026-10-08 | VDJ se ajusta al SDK de 2021: un nivel de carpetas, sin cursores, ticket en URL, covers públicos        | P04, P05, V03 y V04 reescritos; VH01 cierra lo no documentado        |
+| 2026-10-08 | C pasa a Crate Automix sobre el automix nativo de VDJ; sin lease ni ejecutor propio                     | P03 sin lease; V06 reescrito; cues privados retirados para VDJ       |
+| 2026-10-08 | Un solo binario Online Source con nombre permanente `Crate`; requisito de licencia Pro                  | V02 y V10; segundo binario solo si VH01 lo exige                     |
+| 2026-10-13 | Main ocupa 104–108 en producción; la rama renumera sus migraciones a 109–114                            | Módulos `schema_sections` y tests renombrados con el mismo número    |
+| 2026-10-15 | Smart Mix Android se completa antes que VirtualDJ: orden R1 → R4 y después R2–R3                        | El plugin VDJ y su plataforma (PAT, catálogo VDJ) salen del PR de R1 |
+| 2026-10-15 | Con Smart Mix activo se mezcla toda cola automática salvo álbumes; solo el salto manual usa rampa corta | Planner `rules_revision` 2 en la clave de caché de planes            |
 
 Una revisión que cambie una decisión debe indicar motivo, evidencia, impacto en contratos/capabilities/migración y tareas afectadas. Toda guía antigua permanece histórica incluso si sus checkboxes dicen completa.
 
