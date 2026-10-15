@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from evaluate_tempo import sample_tracks, summarize, tempo_matches
+from evaluate_tempo import library_result, sample_tracks, summarize, tempo_matches
 
 
 def _result(bpm, *, stability=0.9, confidence=0.9, downbeat=1000, quality="full"):
@@ -55,3 +55,28 @@ def test_summary_counts_failures_and_rates_per_analyzer() -> None:
     assert summary["acc2"] == 1.0
     assert summary["stable_share"] == 0.5
     assert summary["downbeat_share"] == 0.5
+
+
+def test_sample_caps_tracks_per_genre_when_asked() -> None:
+    candidates = [
+        {"path": f"/music/{index}.flac", "artist": f"artist-{index}", "genre": genre}
+        for index, genre in enumerate(["metal"] * 8 + ["jazz"] * 2)
+    ]
+
+    picked = sample_tracks(candidates, size=10, per_artist=1, seed=3, per_genre=3)
+
+    assert sum(1 for item in picked if item["genre"] == "metal") == 3
+    assert sum(1 for item in picked if item["genre"] == "jazz") == 2
+
+
+def test_library_bpm_is_scored_like_an_analyzer() -> None:
+    rows = [
+        {"reference_bpm": 120.0, "library": library_result({"library_bpm": 121.5})},
+        {"reference_bpm": 90.0, "library": library_result({"library_bpm": None})},
+    ]
+
+    summary = summarize(rows, "library")
+
+    assert summary["tracks"] == 1
+    assert summary["failed"] == 1
+    assert summary["acc1"] == 1.0

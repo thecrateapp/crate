@@ -76,18 +76,28 @@ def read_reference(path: Path) -> dict[str, Any] | None:
 
 
 def sample_tracks(
-    candidates: list[dict[str, Any]], *, size: int, per_artist: int, seed: int
+    candidates: list[dict[str, Any]],
+    *,
+    size: int,
+    per_artist: int,
+    seed: int,
+    per_genre: int | None = None,
 ) -> list[dict[str, Any]]:
     rng = random.Random(seed)
     shuffled = sorted(candidates, key=lambda item: item["path"])
     rng.shuffle(shuffled)
     by_artist: dict[str, int] = defaultdict(int)
+    by_genre: dict[str, int] = defaultdict(int)
     picked = []
     for item in shuffled:
         artist = item["artist"].casefold()
+        genre = str(item.get("genre") or "unknown").casefold()
         if by_artist[artist] >= per_artist:
             continue
+        if per_genre is not None and by_genre[genre] >= per_genre:
+            continue
         by_artist[artist] += 1
+        by_genre[genre] += 1
         picked.append(item)
         if len(picked) == size:
             break
@@ -233,16 +243,58 @@ def collect_candidates(root: Path) -> list[dict[str, Any]]:
     return candidates
 
 
+def load_candidates(path: Path) -> list[dict[str, Any]]:
+    candidates = []
+    for entry in json.loads(path.read_text()):
+        reference = read_reference(Path(entry["path"]))
+        if not reference:
+            continue
+        candidates.append(
+            {
+                **reference,
+                "path": entry["path"],
+                "artist": entry.get("artist") or reference["artist"],
+                "genre": entry.get("genre") or reference["genre"],
+                "library_bpm": entry.get("library_bpm"),
+            }
+        )
+    return candidates
+
+
+def library_result(row: dict[str, Any]) -> dict[str, Any]:
+    bpm = row.get("library_bpm")
+    if not bpm:
+        return {"ok": False, "error": "no library bpm"}
+    return {
+        "ok": True,
+        "bpm": float(bpm),
+        "bpm_confidence": None,
+        "tempo_stability": None,
+        "downbeat_anchor_ms": None,
+        "quality": None,
+        "seconds": 0.0,
+    }
+
+
 def run(args: argparse.Namespace) -> dict[str, Any]:
-    candidates = collect_candidates(args.library)
+    candidates = (
+        load_candidates(args.candidates)
+        if args.candidates
+        else collect_candidates(args.library)
+    )
     sample = sample_tracks(
-        candidates, size=args.size, per_artist=args.per_artist, seed=args.seed
+        candidates,
+        size=args.size,
+        per_artist=args.per_artist,
+        seed=args.seed,
+        per_genre=args.per_genre,
     )
     analyzers = tuple(
         name
         for name, enabled in (
             ("python", not args.skip_python),
             ("rust", args.crate_cli),
+            ("library", args.candidates),
         )
         if enabled
     )
@@ -250,6 +302,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
         tasks = [(track, args.crate_cli, not args.skip_python) for track in sample]
         for index, row in enumerate(pool.map(_evaluate_track, tasks), start=1):
+            if args.candidates:
+                row["library"] = library_result(row)
             rows.append(row)
             print(f"{index}/{len(sample)} {Path(row['path']).name}", file=sys.stderr)
     return {
@@ -281,7 +335,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--library", type=Path, required=True)
+    parser.add_argument("--library", type=Path)
+    parser.add_argument("--candidates", type=Path)
+    parser.add_argument("--per-genre", type=int)
     parser.add_argument("--size", type=int, default=120)
     parser.add_argument("--per-artist", type=int, default=3)
     parser.add_argument("--seed", type=int, default=20261014)
@@ -291,6 +347,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--note", default="")
     args = parser.parse_args(argv)
+    if not args.library and not args.candidates:
+        parser.error("--library or --candidates is required")
     artifact = run(args)
     args.output.write_text(json.dumps(artifact, indent=2) + "\n")
     print(json.dumps(artifact["metrics"]["overall"], indent=2))
