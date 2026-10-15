@@ -54,7 +54,7 @@ the real Listen search in desktop/mobile and open/closed states. These local Chr
 qualify desktop runtime floors, WebKit, device QA or CI screenshot baselines. Review GenrePill at
 <http://127.0.0.1:5186/#genre-pill> and the new focus block at <http://127.0.0.1:5186/#foco>.
 
-Checkpoint 0 remains open: 0.11 CI baselines/reviews, 0.15 runtime qualification and relevant device
+Checkpoint 0 remains open: 0.11 comparison CI, 0.15 runtime qualification and relevant device
 reviews are pending; 0.14 production measurement may wait until the wheel and needs assignment.
 Admin captures in 0.11 still precede 1.0. Focused tests do not substitute for CI/screenshots/device QA.
 
@@ -114,7 +114,7 @@ is a token-based chart configuration, not a selectable product skin.
 | 0.0 font licence; 0.1 tracking steps 1–2; 0.2 internal clone | Implemented and pushed with 1A; rebase/PR pending approval and Smart Mix integration                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 0.3 decisions                                                | Accepted, including one identity, small Admin captures and 520 KiB budget; calendar estimates provisional                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | 0.4–0.10, 0.12, 0.13                                         | Local implementation recorded; does not certify full CI, screenshots or device QA                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| 0.11 visual baselines                                        | Checkpoint 1E capture infrastructure implemented locally; 7 full-page Admin scenes and desktop/mobile Smart EQ smoke pass. Publication and Linux CI capture authorised by Diego; pending canonical workflow run, Linux PNG import/review and CI green; precedes Admin 1.0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 0.11 visual baselines                                        | Checkpoint 1E capture infrastructure implemented locally; 7 full-page Admin scenes and desktop/mobile Smart EQ smoke pass. Publication and Linux CI capture authorised by Diego; 31 Linux PNGs imported/reviewed from run 38807507930; pending comparison CI on the baseline commit; precedes Admin 1.0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | 0.14 production graph                                        | Pending assignment; required before wheel, may wait during primitives                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 0.15 desktop runtime                                         | Pending qualification or approved fallback                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Checkpoint 0                                                 | Open; no claim of CI/device/visual approval                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -260,7 +260,7 @@ not started. Theme runtime retirement and the deferred 1D focus polish remain la
 - Listen adds the populated Radar probable-setlist contract and Smart EQ with a ten-band curve,
   active genre-taxonomy source and inherited Rock source in desktop popover/mobile sheet.
 - The 22 existing Linux PNGs were renamed without pixel changes; all 22 obsolete Darwin copies
-  were removed. The two EQ and seven Admin canonical PNGs remain absent until the workflow runs.
+  were removed. The two EQ and seven Admin canonical PNGs are now imported from the successful Linux run below.
 - Local verification: Admin 12/12 (seven captures plus five existing functional flows); Listen's
   existing smoke cases 32 pass / four intentional skips, and both new Smart EQ scenes pass.
   All 49 tooling tests pass (27 runtime-guard cases plus 22 existing); 24 preview checks pass,
@@ -269,12 +269,11 @@ not started. Theme runtime retirement and the deferred 1D focus polish remain la
   documentation integrity and formatting pass. SPEC/quality review found a readiness race in
   independently loaded panels; each affected scene now waits for fixture content in Genres,
   Tasks and Settings before capture. These checks certify preparation only, not Linux regression.
-- Review the seven current Admin scenes at <http://127.0.0.1:5186/#base-admin>. Those optional
-  ignored assets are local references, not V3 redesign proposals or canonical baselines. The README
-  explains regeneration. Approved 1A–1C and provisional 1D remain in the same persistent mockup.
+- Review the seven current Admin scenes at <http://127.0.0.1:5186/#base-admin>. The gallery now imports the committed Linux PNGs directly, including on a clean clone. These
+  references precede the V3 Admin redesign. The README explains advisory local rendering. Approved 1A–1C and provisional 1D remain in the same persistent mockup.
 
-Publication and capture execution are authorised. Run the manual workflow on the published SHA,
-verify manifest provenance, import the Linux artifact, review every PNG diff and rerun comparison CI.
+Publication, canonical capture, manifest verification and image review are done. Run comparison
+CI on the imported-baseline revision.
 Only then close 0.11 and continue Admin 1.0 → InstrumentPanel 1.7. Do not claim 0.11 complete from
 local smoke results or move to Admin adoption while the Linux image review is pending.
 
@@ -286,3 +285,22 @@ case: its 300 ms debounced `/api/search` request lacked a fixture. Fast local cl
 the request. The test now waits for the search response before selecting the action, reproducing
 the missing route locally; a typed-shape empty artists/albums/tracks fixture preserves strict
 unknown-route failures. Do not import PNGs from the failed run. Repeat capture on the fix SHA.
+
+### 1E canonical capture review
+
+- Successful run: <https://github.com/thecrateapp/crate/actions/runs/38807507930>, renderer
+  `c7e9e96180d5ae85fcb755319d38e5383c95b828`. Listen 34 pass / four intentional skips; Admin 12 pass.
+- Artifact `12006129308`, SHA-256
+  `8fc02ceddaa43f707d93f1e6e267b5cd10f88efda0f4c921eaa4547297a2023e` verified after download.
+  Manifest confirms `mcr.microsoft.com/playwright:v1.63.0-noble`, Linux x64 and the source SHA;
+  its original JSON is tracked at `tests/visual/capture-manifest.json`.
+- Imported 31 PNGs: 24 Listen, seven Admin. Twelve old Listen images are byte-identical; ten
+  changed and nine are new. Reviewed all changed before/after/diff images, all seven Admin
+  pages and both new EQ states. The intended genre-chip treatment, populated Radar ticket and
+  prior font/token changes account for the diffs. Existing retired-skin captures remain only
+  until runtime removal 1.13; their refresh is not a new variant requirement or visual approval.
+- Full Admin pages include Genres Sound Intelligence and System Resources. EQ shows ten bands,
+  the genre-taxonomy source and inherited Rock in desktop/mobile. No PNG was generated on Mac
+  for baseline import. The mockup's 1E gallery now uses these exact committed references.
+- Canonical recording and image review pass; comparison CI on the imported-baseline revision is
+  the remaining 0.11 gate before starting Admin 1.0. Other Phase 0/runtime/device gates remain open.

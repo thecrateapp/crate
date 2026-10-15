@@ -22,14 +22,14 @@ async function expectAdminReferenceGallery(page: Page) {
     }),
   ).toBeVisible();
   await expect(
-    gallery.getByText(
-      "Vistas locales de referencia. Capturas definitivas de Linux pendientes.",
-      { exact: true },
-    ),
+    gallery.getByText("Referencias de Linux CI. Capturas base verificadas.", {
+      exact: true,
+    }),
   ).toBeVisible();
 
   const figures = gallery.locator("figure");
   await expect(figures).toHaveCount(7);
+  await expect(gallery.locator("img")).toHaveCount(7);
   for (const label of [
     "Dashboard",
     "Tasks",

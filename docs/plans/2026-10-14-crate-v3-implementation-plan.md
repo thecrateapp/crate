@@ -772,11 +772,11 @@ and known-below-AA allowance with the retired runtime. Crate v3 contrast and QA 
 ### Task 0.11: Visual fixtures, Admin captures and re-recorded baselines
 
 **Status — Checkpoint 1E:** capture infrastructure, deterministic seven-page Admin fixtures and
-both Smart EQ scenes are implemented locally. The 22 Linux images are renamed with identical
-bytes; Darwin copies are removed. The shared runtime guard blocks local baseline recording,
-and advisory `CRATE_VISUAL_SMOKE=1` renders write only to ignored test results. Pending: review
-and publication of this checkpoint, canonical workflow run, Linux artifact import, every PNG diff
-reviewed and comparison CI green. **0.11 remains open; do not start Admin 1.0/1.7 yet.**
+both Smart EQ scenes are published. Successful Linux run `38807507930` at `c7e9e961` produced
+31 reviewed PNGs (24 Listen / seven Admin), imported with the original provenance manifest.
+The shared runtime guard blocks local baseline recording; advisory `CRATE_VISUAL_SMOKE=1`
+renders write only to ignored test results. Pending: comparison CI on the imported baselines.
+**0.11 remains open until comparison passes; do not start Admin 1.0/1.7 yet.**
 
 **Files:**
 

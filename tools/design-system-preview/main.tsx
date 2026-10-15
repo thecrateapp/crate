@@ -26,7 +26,7 @@ const disposeFocusRingMotion = installFocusRingMotion();
 import.meta.hot?.dispose(disposeFocusRingMotion);
 
 const adminCaptureImages = import.meta.glob<string>(
-  "./.artifacts/admin-captures/*.png",
+  "../../tests/admin-e2e/captures.spec.ts-snapshots/*.png",
   { eager: true, query: "?url", import: "default" },
 );
 const adminScenes = [
@@ -94,7 +94,7 @@ function App() {
           crate<span className="version">v3</span>
         </a>
         <MonoLabel
-          meta={["Checkpoint 1E", "Base de Admin · En revisión"]}
+          meta={["Checkpoint 1E", "Base de Admin · Linux CI"]}
           className="masthead-meta"
         />
         <a className="jump" href="#primitivas">
@@ -658,14 +658,13 @@ function App() {
         <div className="specimen-heading">
           <div>
             <MonoLabel size="eyebrow" accent="06">
-              Checkpoint 1E · En revisión
+              Checkpoint 1E · Publicado
             </MonoLabel>
             <h2>La base de Admin, antes de cambiarla.</h2>
           </div>
         </div>
         <p className="admin-baseline-note">
-          Vistas locales de referencia. Capturas definitivas de Linux
-          pendientes.
+          Referencias de Linux CI. Capturas base verificadas.
         </p>
         <p className="admin-baseline-note">
           Estas siete pantallas muestran el Admin actual, antes de adaptar sus
@@ -675,7 +674,7 @@ function App() {
           {adminScenes.map(({ key, label }) => {
             const source =
               adminCaptureImages[
-                `./.artifacts/admin-captures/admin-${key}.png`
+                `../../tests/admin-e2e/captures.spec.ts-snapshots/admin-${key}.png`
               ];
             return (
               <figure key={key}>
@@ -701,7 +700,7 @@ function App() {
       </section>
       <footer>
         <MonoLabel
-          meta={["1A–1C publicados", "1D provisional", "1E en revisión"]}
+          meta={["1A–1C publicados", "1D provisional", "1E publicado"]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>
       </footer>
