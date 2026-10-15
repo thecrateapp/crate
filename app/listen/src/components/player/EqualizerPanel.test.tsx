@@ -108,4 +108,33 @@ describe("EqualizerPanel", () => {
     screen.getByRole("button", { name: "Shoegaze" }).click();
     expect(state.applyPreset).toHaveBeenCalledWith("shoegaze");
   });
+
+  it("shows the active mode once, in the header", () => {
+    equalizerMock.useEqualizer.mockReturnValue(
+      makeEqualizerState({ preset: "custom" }),
+    );
+
+    renderWithListenProviders(<EqualizerPanel />);
+
+    expect(screen.getAllByText("Custom")).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { name: /Equalizer/ }),
+    ).toHaveTextContent(/Equalizer.*Custom/);
+  });
+
+  it("translates the preset chips and the header preset name", () => {
+    equalizerMock.useEqualizer.mockReturnValue(
+      makeEqualizerState({ preset: "bass_boost" }),
+    );
+
+    renderWithListenProviders(<EqualizerPanel />, { locale: "es" });
+
+    expect(
+      screen.getByRole("button", { name: "Realce de graves" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Clásica" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      /Realce de graves/,
+    );
+  });
 });

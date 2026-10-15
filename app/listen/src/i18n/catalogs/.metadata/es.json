@@ -3811,6 +3811,90 @@
     "sourceHash": "sha256:625968baeda2c53e90184b6500f1f8e33e40ad6a50da3107fffde085817311be",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "player.equalizer.presets.acoustic": {
+    "sourceHash": "sha256:a737cf668a1e72e879d500f00899293c454e74db357207e0b24f01b8feb4aeb3",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.bassBoost": {
+    "sourceHash": "sha256:32f4f6c949039653ddc331f823d8861095f24426029d0da4f28fe84634c8532e",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.blackMetal": {
+    "sourceHash": "sha256:78697397fc72c9bf13c3905a9dbfbc1144deede7c151f8bf230a6ab6d6f2dd07",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.classical": {
+    "sourceHash": "sha256:91986db139f3149ebe40b1c9b1c0e5dbab3dde17e17f9a0eec9a671c6fe6bf53",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.deathMetal": {
+    "sourceHash": "sha256:e293c216fc88b9053c6bae58e14034a7c18281fd1add86451bdc20ca533c7c0f",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.doom": {
+    "sourceHash": "sha256:4a2357da67d686c910c156c17aa8c5b3bf511f9200c8c32b1d14ef9b147252c1",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.electronic": {
+    "sourceHash": "sha256:143fedf2c9a85e7353997bf4ea6f906741427e545e7ff761a61465430d4c84b6",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.flat": {
+    "sourceHash": "sha256:de05eaaef0a9da2b70dcd800da46c1f013f9a4150b6e39c5e4533bfc5dd69799",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.hardcore": {
+    "sourceHash": "sha256:f3088e7ebc1eac04be112cae1180a123b5f052663341e31acb4688dfae6c1c97",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.hipHop": {
+    "sourceHash": "sha256:dbc34353687c632b725da55e8c1e326e2aa5780298988d33225e693ab865f18e",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.jazz": {
+    "sourceHash": "sha256:142bf9e79c00e902455215a01d09056a043bf56af350e4f6ec2c0e85a9e7917d",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.loFi": {
+    "sourceHash": "sha256:4cdd399a38631986830b983f19a127f6e6a052a48912e4668a4b777114a1ddc7",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.pop": {
+    "sourceHash": "sha256:c7d4f98749f2db633cbe8c82431691d03dc25b14b3acf5925efb20b999aeb4e4",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.postRock": {
+    "sourceHash": "sha256:fcca83c9d4aa092bab2e389ad0fbb65570fc347af7c8c73845ff70f67cb55f76",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.progressive": {
+    "sourceHash": "sha256:e100c7dae33c70fdf5981097ef67ba0e15832c8f7a71968abfcf75557fd42af6",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.punk": {
+    "sourceHash": "sha256:d52104e91d4a87a131aa174937afc689a7090adc1ff4c3cbe235f28b4418fc45",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.rock": {
+    "sourceHash": "sha256:8516ea61baeb010dbd60eb41a272aa9894c6bf105af87cc2e496bfac4e50fc5f",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.shoegaze": {
+    "sourceHash": "sha256:8aeb4a261a4bcd1709a0a73c3f02b94d724dc07603c8f43c2fc7dc442803f1a6",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.thrash": {
+    "sourceHash": "sha256:2f2376b6f289be77b99d9365d313bf0543298529fa9c5f8bd00a0762b29dce2e",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.trebleBoost": {
+    "sourceHash": "sha256:8bba19c653d6f00e7d01735b493b4f072fb6ddf6ad4f73260e759a7fbc1bcbbb",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.presets.vocal": {
+    "sourceHash": "sha256:b713c117b1de32c2b1e914f9034dff7bbd63c284c228fffbd966a9812493b44f",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
   "player.equalizer.reset": {
     "sourceHash": "sha256:2e4da0718dc07a9c07a8024ccd6195bff782fb369df676ccc8bcbe2b8a60d260",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -3834,6 +3918,30 @@
   "player.equalizer.smartCurve": {
     "sourceHash": "sha256:6dafc64647812a1a24b4515ac7e17711dba055b00f7d09967c25dc7ce0baf073",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "player.equalizer.sources.audioAnalysis": {
+    "sourceHash": "sha256:976e9a5877e03e5d32d27d6211dd014cf5fabb4e40e90cc1d9db2f7d7b954560",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.sources.curatorAlbum": {
+    "sourceHash": "sha256:d6b144c870d31db0a5132cfe201a4d186e8c0a18662c0b56e209bbc01e7df44c",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.sources.curatorTrack": {
+    "sourceHash": "sha256:3f6cba719af4a87b83d1dd35dd470022bee8f1cc2417f1eb00dc0dbc3cfc4d1f",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.sources.flat": {
+    "sourceHash": "sha256:f89d70db7b51dc00cc56aa45b32fcfa8fdfeaf145e77bf66e93102daaaedbcfa",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.sources.genreTaxonomy": {
+    "sourceHash": "sha256:3c6c1447d739e6f1b2243eff1cf85731fd2b337587e7bf5356a4349526a6534d",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
+  },
+  "player.equalizer.sources.userTrack": {
+    "sourceHash": "sha256:9b43a01cf2cee2c820eb296f265726073af892e4066359f9e471450d1c89102a",
+    "reviewedAt": "2026-10-15T10:34:36.199Z"
   },
   "player.equalizer.toasts.cannotSave": {
     "sourceHash": "sha256:4ffc920f5ffb3ea82e075c7c98a2dd1bce8a479c67963998a1a8a95442b0f8fc",

@@ -68,6 +68,19 @@ const fullyLocalizedPlayerPrefixes = [
 ] as const;
 const completedPlayerEnglishFallbackAllowlist = new Set<string>([
   "player.equalizer.genre.label",
+  "player.equalizer.presets.blackMetal",
+  "player.equalizer.presets.deathMetal",
+  "player.equalizer.presets.doom",
+  "player.equalizer.presets.hardcore",
+  "player.equalizer.presets.hipHop",
+  "player.equalizer.presets.jazz",
+  "player.equalizer.presets.loFi",
+  "player.equalizer.presets.pop",
+  "player.equalizer.presets.postRock",
+  "player.equalizer.presets.punk",
+  "player.equalizer.presets.rock",
+  "player.equalizer.presets.shoegaze",
+  "player.equalizer.presets.thrash",
   "player.info.metric.valence",
 ]);
 const fullyLocalizedLibraryPrefixes = ["library."] as const;

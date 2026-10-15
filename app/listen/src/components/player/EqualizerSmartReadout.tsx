@@ -2,6 +2,10 @@ import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { EffectiveEq } from "@/hooks/use-effective-eq";
+import {
+  SMART_EQ_CHAIN,
+  SMART_EQ_SOURCE_LABEL_KEYS,
+} from "@/lib/equalizer-labels";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 interface EqualizerSmartReadoutProps {
@@ -33,7 +37,7 @@ export function EqualizerSmartReadout({
   const detail =
     eq.source === "genre_taxonomy_preset" && eq.genre
       ? eq.inheritedFrom
-        ? `Inherited from ${eq.inheritedFrom.name}`
+        ? t("player.equalizer.genre.from", { name: eq.inheritedFrom.name })
         : eq.genre.name
       : eq.reasoning || eq.label;
 
@@ -57,7 +61,7 @@ export function EqualizerSmartReadout({
                 source === eq.source ? "text-accent-action-hi" : undefined
               }
             >
-              {SMART_EQ_SOURCE_LABELS[source]}
+              {t(SMART_EQ_SOURCE_LABEL_KEYS[source])}
             </span>{" "}
           </Fragment>
         ))}
@@ -70,21 +74,3 @@ export function EqualizerSmartReadout({
     </div>
   );
 }
-
-const SMART_EQ_CHAIN: readonly EffectiveEq["source"][] = [
-  "user_track_preset",
-  "instance_track_preset",
-  "instance_album_preset",
-  "genre_taxonomy_preset",
-  "audio_analysis_preset",
-  "flat",
-];
-
-const SMART_EQ_SOURCE_LABELS: Record<EffectiveEq["source"], string> = {
-  user_track_preset: "User track preset",
-  instance_track_preset: "Curator track preset",
-  instance_album_preset: "Curator album preset",
-  genre_taxonomy_preset: "Genre taxonomy",
-  audio_analysis_preset: "Audio analysis",
-  flat: "Flat",
-};

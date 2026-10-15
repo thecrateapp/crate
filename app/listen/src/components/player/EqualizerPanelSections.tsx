@@ -3,7 +3,6 @@ import {
   CRATE_ICON_SIZE,
   RotateCcw,
   Save,
-  SlidersHorizontal,
   Sparkles,
   Tag,
   Trash2,
@@ -13,10 +12,14 @@ import type { TFunction } from "i18next";
 
 import { useEqualizer } from "@/hooks/use-equalizer";
 import { type EqPresetName } from "@/lib/equalizer";
+import {
+  EQ_PRESET_LABEL_ENTRIES,
+  EQ_PRESET_LABEL_KEYS,
+} from "@/lib/equalizer-labels";
 import { EqBands } from "@crate/ui/domain/player/EqBands";
 import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
 import { Checkbox } from "@crate/ui/primitives/Checkbox";
-import { CrateBadge, CratePill } from "@crate/ui/primitives/CrateBadge";
+import { CratePill } from "@crate/ui/primitives/CrateBadge";
 import { IconButton } from "@crate/ui/primitives/IconButton";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Button } from "@crate/ui/shadcn/button";
@@ -32,32 +35,6 @@ const PANEL_CLOSE_BUTTON_CLASS_NAME =
 const TRACK_PRESET_ACTION_CLASS_NAME =
   "h-auto gap-1 border px-2.5 py-0.5 font-normal has-[>svg]:px-2.5 [&_svg:not([class*='size-'])]:size-3";
 
-const PRESET_LABELS: Record<EqPresetName, string> = {
-  flat: "Flat",
-  // General-purpose
-  rock: "Rock",
-  pop: "Pop",
-  jazz: "Jazz",
-  classical: "Classical",
-  bass_boost: "Bass Boost",
-  treble_boost: "Treble Boost",
-  vocal: "Vocal",
-  electronic: "Electronic",
-  acoustic: "Acoustic",
-  hip_hop: "Hip-Hop",
-  // Underground / heavy
-  black_metal: "Black Metal",
-  death_metal: "Death Metal",
-  thrash: "Thrash",
-  doom: "Doom / Sludge",
-  hardcore: "Hardcore",
-  punk: "Punk",
-  progressive: "Progressive",
-  shoegaze: "Shoegaze",
-  post_rock: "Post-Rock",
-  lo_fi: "Indie / Lo-Fi",
-};
-
 type EqualizerState = ReturnType<typeof useEqualizer>;
 
 function equalizerModeLabel(eq: EqualizerState, t: TFunction): string {
@@ -65,7 +42,8 @@ function equalizerModeLabel(eq: EqualizerState, t: TFunction): string {
   if (eq.adaptive) return t("player.equalizer.adaptiveActive");
   if (eq.genreAdaptive) return t("player.equalizer.genreActive");
   if (eq.preset === "custom") return t("player.equalizer.custom");
-  return PRESET_LABELS[eq.preset as EqPresetName] ?? eq.preset;
+  const labelKey = EQ_PRESET_LABEL_KEYS[eq.preset as EqPresetName];
+  return labelKey ? t(labelKey) : eq.preset;
 }
 
 function EqualizerHeader({
@@ -159,13 +137,15 @@ function EqualizerModePicker({ eq, t }: { eq: EqualizerState; t: TFunction }) {
 function EqualizerPresetPicker({
   eq,
   manualControlsEnabled,
+  t,
 }: {
   eq: EqualizerState;
   manualControlsEnabled: boolean;
+  t: TFunction;
 }) {
   return (
     <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto sm:max-h-none">
-      {(Object.keys(PRESET_LABELS) as EqPresetName[]).map((name) => (
+      {EQ_PRESET_LABEL_ENTRIES.map(([name, labelKey]) => (
         <CratePill
           key={name}
           className={PRESET_CHIP_CLASS_NAME}
@@ -175,51 +155,11 @@ function EqualizerPresetPicker({
           disabled={!manualControlsEnabled}
           onClick={() => eq.applyPreset(name)}
         >
-          {PRESET_LABELS[name]}
+          {t(labelKey)}
         </CratePill>
       ))}
     </div>
   );
-}
-
-function EqualizerModeBadge({
-  adaptive,
-  genreAdaptive,
-  preset,
-  smart,
-  t,
-}: {
-  adaptive: boolean;
-  genreAdaptive: boolean;
-  preset: EqualizerState["preset"];
-  smart: boolean;
-  t: TFunction;
-}) {
-  if (smart) {
-    return (
-      <CrateBadge icon={Brain}>{t("player.equalizer.smartCurve")}</CrateBadge>
-    );
-  }
-  if (adaptive) {
-    return (
-      <CrateBadge icon={Sparkles}>
-        {t("player.equalizer.adaptiveActive")}
-      </CrateBadge>
-    );
-  }
-  if (genreAdaptive) {
-    return (
-      <CrateBadge icon={Tag}>{t("player.equalizer.genreActive")}</CrateBadge>
-    );
-  }
-  if (preset === "custom") {
-    return (
-      <CrateBadge icon={SlidersHorizontal} tone="neutral">
-        {t("player.equalizer.custom")}
-      </CrateBadge>
-    );
-  }
-  return <span />;
 }
 
 function EqualizerTrackPresetActions({
@@ -318,17 +258,11 @@ export function EqualizerPanelView({
         <EqualizerPresetPicker
           eq={eq}
           manualControlsEnabled={manualControlsEnabled}
+          t={t}
         />
       </div>
       <EqualizerModePicker eq={eq} t={t} />
-      <div className="flex items-center justify-between">
-        <EqualizerModeBadge
-          adaptive={eq.adaptive}
-          genreAdaptive={eq.genreAdaptive}
-          preset={eq.preset}
-          smart={eq.smart}
-          t={t}
-        />
+      <div className="flex items-center justify-end">
         <EqualizerTrackPresetActions
           eq={eq}
           hasUserTrackPreset={hasUserTrackPreset}
