@@ -56,7 +56,21 @@ test("sends the catalog body and reports when the backend skips the task", async
   });
   await openAdminPage("/");
   await page.keyboard.press("ControlOrMeta+k");
+  const searchResponse = page.waitForResponse(
+    (response) => {
+      const url = new URL(response.url());
+      return (
+        response.request().method() === "GET" &&
+        url.pathname === "/api/search" &&
+        url.searchParams.get("q") === "lyrics"
+      );
+    },
+    { timeout: 5_000 },
+  );
   await page.getByPlaceholder("Type a command or search...").fill("lyrics");
+  const response = await searchResponse;
+  expect(response.ok()).toBe(true);
+  await response.finished();
 
   await page.getByRole("option", { name: "Sync Missing Lyrics" }).click();
 

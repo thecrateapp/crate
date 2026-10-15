@@ -10,6 +10,7 @@ function fixture(name: string): unknown {
 }
 
 const JSON_FIXTURES: Record<string, string> = {
+  "/api/search": "search",
   "/api/auth/me": "auth-me",
   "/api/auth/roles": "auth-roles",
   "/api/admin/llm/status": "llm-status",

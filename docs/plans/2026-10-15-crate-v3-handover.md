@@ -241,7 +241,8 @@ is a token-based chart configuration, not a selectable product skin.
 
 Diego approved Checkpoint 1E and explicitly authorised its commit/push, the canonical Linux CI
 capture run and continuation with the next plan block on 2026-10-15. Task 0.11 preparation is
-verified locally; canonical captures and image review still precede Admin adoption. This checkpoint changes
+verified locally and published as `552a31f1`; canonical captures and image review still precede
+Admin adoption. This checkpoint changes
 fixtures, capture tooling, CI and the mockup; Admin card contrast 1.0 and InstrumentPanel 1.7 have
 not started. Theme runtime retirement and the deferred 1D focus polish remain later work.
 
@@ -276,3 +277,12 @@ Publication and capture execution are authorised. Run the manual workflow on the
 verify manifest provenance, import the Linux artifact, review every PNG diff and rerun comparison CI.
 Only then close 0.11 and continue Admin 1.0 → InstrumentPanel 1.7. Do not claim 0.11 complete from
 local smoke results or move to Admin adoption while the Linux image review is pending.
+
+### 1E CI follow-up
+
+The first canonical run (`38806716768`, source `552a31f1`) passed all 34 Listen cases (four
+intentional skips) and generated seven Admin scenes, but failed one functional command-palette
+case: its 300 ms debounced `/api/search` request lacked a fixture. Fast local clicks had hidden
+the request. The test now waits for the search response before selecting the action, reproducing
+the missing route locally; a typed-shape empty artists/albums/tracks fixture preserves strict
+unknown-route failures. Do not import PNGs from the failed run. Repeat capture on the fix SHA.
