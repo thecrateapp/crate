@@ -1,6 +1,9 @@
 import type { MotionPreference } from "@crate/ui/lib/appearance-types";
+import {
+  isMotionBlocked as isDomMotionBlocked,
+  subscribeToMotionAvailability as subscribeToDomMotionAvailability,
+} from "@crate/ui/lib/motion-gate";
 
-const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 const motionListeners = new Set<() => void>();
 let motionPreference: MotionPreference = "system";
 
@@ -17,42 +20,17 @@ export function setMotionPreference(preference: MotionPreference): void {
 export function isMotionBlocked(
   preference: MotionPreference = motionPreference,
 ): boolean {
-  if (
-    typeof document !== "undefined" &&
-    document.visibilityState === "hidden"
-  ) {
-    return true;
-  }
-
-  return (
-    preference === "reduced" ||
-    (typeof document !== "undefined" &&
-      document.documentElement.dataset.crateMotion === "reduced") ||
-    (typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia(REDUCED_MOTION_QUERY).matches)
-  );
+  return preference === "reduced" || isDomMotionBlocked();
 }
 
 export function subscribeToMotionAvailability(
   onChange: () => void,
 ): () => void {
-  if (typeof document !== "undefined") {
-    document.addEventListener("visibilitychange", onChange);
-  }
   motionListeners.add(onChange);
-
-  const mediaQuery =
-    typeof window !== "undefined" && typeof window.matchMedia === "function"
-      ? window.matchMedia(REDUCED_MOTION_QUERY)
-      : null;
-  mediaQuery?.addEventListener("change", onChange);
+  const unsubscribeDom = subscribeToDomMotionAvailability(onChange);
 
   return () => {
-    if (typeof document !== "undefined") {
-      document.removeEventListener("visibilitychange", onChange);
-    }
     motionListeners.delete(onChange);
-    mediaQuery?.removeEventListener("change", onChange);
+    unsubscribeDom();
   };
 }

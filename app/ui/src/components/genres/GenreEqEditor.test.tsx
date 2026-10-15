@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { GenreEqEditor } from "./GenreEqEditor";
@@ -69,5 +69,33 @@ describe("GenreEqEditor", () => {
     expect(
       screen.getByText("No preset").closest("[data-tone]"),
     ).toHaveAttribute("data-tone", "warn");
+  });
+
+  it("commits a keyboard edit and draws without animation under reduced motion", () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("prefers-reduced-motion"),
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    const requestFrame = vi.fn();
+    vi.stubGlobal("requestAnimationFrame", requestFrame);
+    render(
+      <GenreEqEditor
+        canonicalSlug="shoegaze"
+        canonicalName="Shoegaze"
+        initialGains={FLAT}
+        initialResolved={null}
+      />,
+    );
+    const slider = screen.getAllByRole("slider")[4]!;
+
+    fireEvent.keyDown(slider, { key: "PageUp" });
+    fireEvent.blur(slider);
+
+    expect(slider).toHaveAttribute("aria-valuenow", "3");
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+    expect(requestFrame).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });

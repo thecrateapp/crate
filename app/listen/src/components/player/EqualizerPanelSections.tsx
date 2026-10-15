@@ -14,6 +14,7 @@ import type { TFunction } from "i18next";
 import { useEqualizer } from "@/hooks/use-equalizer";
 import { type EqPresetName } from "@/lib/equalizer";
 import { EqBands } from "@crate/ui/domain/player/EqBands";
+import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
 import { Checkbox } from "@crate/ui/primitives/Checkbox";
 import { CrateBadge, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { IconButton } from "@crate/ui/primitives/IconButton";
@@ -295,6 +296,7 @@ export function EqualizerPanelView({
   saving: boolean;
   t: TFunction;
 }) {
+  const motionAllowed = useMotionAllowed();
   const manualControlsEnabled =
     eq.enabled && !eq.smart && !eq.adaptive && !eq.genreAdaptive;
   const hasUserTrackPreset = eq.effectiveEq?.source === "user_track_preset";
@@ -305,9 +307,11 @@ export function EqualizerPanelView({
       <div className="border-t border-border-quiet pt-6">
         <EqBands
           gains={eq.gains}
+          onBandInput={manualControlsEnabled ? eq.updateBand : undefined}
           onBandChange={manualControlsEnabled ? eq.updateBand : undefined}
           disabled={!eq.enabled}
-          trackHeight={160}
+          animate={motionAllowed}
+          trackClassName="h-40"
         />
       </div>
       <div className="border-t border-border-quiet pt-4">

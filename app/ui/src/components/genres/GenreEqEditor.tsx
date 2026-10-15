@@ -6,6 +6,7 @@ import { AIButton } from "@/components/ui/AIButton";
 import { Button } from "@crate/ui/shadcn/button";
 import { api } from "@/lib/api";
 import { EqBands } from "@crate/ui/domain/player/EqBands";
+import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { useLLMAvailable } from "@/hooks/use-llm";
@@ -59,6 +60,7 @@ export function GenreEqEditor({
   const [generating, setGenerating] = useState(false);
   const [reasoning, setReasoning] = useState(eqReasoning || "");
   const llmAvailable = useLLMAvailable();
+  const motionAllowed = useMotionAllowed();
 
   useEffect(() => {
     setGains(seeded);
@@ -160,7 +162,12 @@ export function GenreEqEditor({
       </p>
 
       <div className="rounded-md border border-white/10 bg-black/30 p-3">
-        <EqBands gains={gains} onBandChange={updateBand} trackHeight={112} />
+        <EqBands
+          gains={gains}
+          onBandChange={updateBand}
+          animate={motionAllowed}
+          trackClassName="h-28"
+        />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
