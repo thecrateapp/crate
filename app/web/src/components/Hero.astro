@@ -1,5 +1,4 @@
 ---
-import scale from "../data/scale.json";
 import { t } from "../i18n";
 import InstallCommand from "./InstallCommand.astro";
 
@@ -12,7 +11,7 @@ const { locale = "en" } = Astro.props;
 
 <canvas id="field" aria-hidden="true"></canvas>
 <div class="scrim" aria-hidden="true"></div>
-<p class="caption" aria-hidden="true">{t("hero.caption", locale, { tracks: scale.tracks })}</p>
+<p class="caption">{t("hero.caption", locale)}</p>
 
 <section class="hero-pin">
   <div class="hero-sticky">

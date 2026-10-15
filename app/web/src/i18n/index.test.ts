@@ -11,9 +11,7 @@ describe("t", () => {
   });
 
   it("interpolates named values", () => {
-    expect(t("hero.caption", "en", { tracks: "48,213" })).toBe(
-      "48,213 tracks · one library",
-    );
+    expect(t("paths.steps", "en", { steps: "12" })).toBe("12 steps");
   });
 
   it("exposes English as the only shipped locale", () => {
