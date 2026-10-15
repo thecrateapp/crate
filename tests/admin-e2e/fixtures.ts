@@ -18,6 +18,12 @@ const JSON_FIXTURES: Record<string, string> = {
   "/api/admin/playback-delivery": "playback-delivery",
   "/api/admin/task-catalog": "task-catalog",
   "/api/settings": "settings",
+  "/api/admin/health-snapshot": "health-snapshot",
+  "/api/manage/repair-catalog": "repair-catalog",
+  "/api/genres": "genres",
+  "/api/genres/sound-intelligence/health": "genre-sound-health",
+  "/api/artist-slugs/quicksand/albums/crystallize": "album",
+  "/api/admin/metrics/dashboard": "metrics-dashboard",
 };
 
 export interface ApiCall {
@@ -103,6 +109,10 @@ export const test = base.extend<AdminFixtures>({
         return;
       }
       const name = JSON_FIXTURES[url.pathname];
+      if (responses.has(url.pathname)) {
+        await route.fulfill({ json: responses.get(url.pathname) });
+        return;
+      }
       if (name) {
         await route.fulfill({ json: fixture(name) });
         return;
@@ -111,7 +121,34 @@ export const test = base.extend<AdminFixtures>({
         await route.fulfill({ json: { needs_setup: false } });
         return;
       }
-      await route.fulfill({ json: {} });
+      if (
+        url.pathname === "/api/genres/unmapped" ||
+        url.pathname === "/api/albums/68/related"
+      ) {
+        await route.fulfill({ json: [] });
+        return;
+      }
+      if (url.pathname === "/api/genres/taxonomy/invalid") {
+        await route.fulfill({
+          json: { invalid_count: 0, alias_count: 0, edge_count: 0, items: [] },
+        });
+        return;
+      }
+      if (url.pathname === "/api/artists/23/analysis-data") {
+        await route.fulfill({ json: {} });
+        return;
+      }
+      if (
+        /^\/api\/albums\/(68|69|71)\/cover$/.test(url.pathname) ||
+        url.pathname === "/api/artists/23/background"
+      ) {
+        await route.fulfill({
+          contentType: "image/svg+xml",
+          body: '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><defs><linearGradient id="a"><stop stop-color="#13343d"/><stop offset="1" stop-color="#0a0a0f"/></linearGradient></defs><path fill="url(#a)" d="M0 0h1200v800H0z"/><circle cx="850" cy="300" r="230" fill="#06b6d4" opacity=".2"/><text x="70" y="710" fill="#f1f5f9" font-size="72" font-family="sans-serif">Crystallize</text></svg>',
+        });
+        return;
+      }
+      throw new Error(`Unhandled Admin API fixture: ${url.pathname}`);
     });
 
     await provide(async (path) => {

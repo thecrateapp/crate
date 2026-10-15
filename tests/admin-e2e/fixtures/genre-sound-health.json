@@ -1,0 +1,29 @@
+{
+  "eq": {
+    "total_tracks": 863,
+    "sources": [
+      {
+        "source": "genre_taxonomy_preset",
+        "count": 650,
+        "percent": 75.32
+      },
+      {
+        "source": "flat",
+        "count": 213,
+        "percent": 24.68
+      }
+    ]
+  },
+  "taxonomy": {
+    "node_count": 94,
+    "top_level_count": 8,
+    "orphan_count": 0,
+    "missing_description_count": 3,
+    "missing_direct_eq_count": 6,
+    "unmapped_raw_count": 0,
+    "edge_count": 112,
+    "locked_edge_count": 10,
+    "manual_edge_count": 12,
+    "ai_edge_count": 90
+  }
+}

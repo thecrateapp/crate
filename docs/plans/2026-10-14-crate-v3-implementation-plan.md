@@ -329,8 +329,7 @@ The original four commits established the visual baseline; subsequent commits im
 of Phase 0. They are history, not a current progress counter. The handover records completion and
 QA separately. Documents are tracked, the internal clone exists and Bricolage is in place.
 
-**Current order:** 1A/1B are approved/pushed; GenrePill 1C is visually approved and committed as `e60e6f50`. Checkpoint 1D is provisionally accepted to keep moving; further focus-fade visual polishing is deferred. Smart Mix and Phase 0 gates remain separate.
-Then wait for Diego. Checkpoint 0 remains open: visual baselines 0.11 and runtime qualification
+**Current order:** 1A/1B are approved/pushed; GenrePill 1C (`e60e6f50`) and provisional 1D (`d881a728`) are pushed with approval. Further focus-fade visual polishing is deferred. Continue capture preparation at Checkpoint 1E (Task 0.11), then stop for review before its publication/canonical capture run. Smart Mix and Phase 0 gates remain separate. Checkpoint 0 remains open: visual baselines 0.11 and runtime qualification
 0.15 are pending; production measurement 0.14 is needed before the wheel and requires assignment.
 No exception authorises 1.0 or the rest of Phase 1 before review; Admin captures still precede 1.0.
 
@@ -772,6 +771,13 @@ and known-below-AA allowance with the retired runtime. Crate v3 contrast and QA 
 
 ### Task 0.11: Visual fixtures, Admin captures and re-recorded baselines
 
+**Status — Checkpoint 1E:** capture infrastructure, deterministic seven-page Admin fixtures and
+both Smart EQ scenes are implemented locally. The 22 Linux images are renamed with identical
+bytes; Darwin copies are removed. The shared runtime guard blocks local baseline recording,
+and advisory `CRATE_VISUAL_SMOKE=1` renders write only to ignored test results. Pending: review
+and publication of this checkpoint, canonical workflow run, Linux artifact import, every PNG diff
+reviewed and comparison CI green. **0.11 remains open; do not start Admin 1.0/1.7 yet.**
+
 **Files:**
 
 - Modify: `tests/listen-visual/fixtures.ts`
@@ -969,6 +975,14 @@ same mockup at `#foco` with keyboard, field, CTA, row and selection examples. Te
 and record local/browser/appearance results separately from pending CI/device QA. Stop for Diego's
 review. Diego explicitly authorised publication of 1C/1D on 2026-10-15; the focus remains provisional.
 Continue Task 0.11 before Admin 1.0 → InstrumentPanel 1.7.
+
+### Checkpoint 1E — capture preparation before Admin changes
+
+Keep the existing mockup and add `#base-admin` with the seven actual current Admin scenes,
+clearly labelled local references with Linux baselines pending. Preserve the approved primitives
+and provisional focus specimen. Stop for review of the capture pipeline; publish only with Diego's
+go-ahead, then run the pinned Linux job and review/import its images before Admin 1.0. This
+checkpoint prepares Task 0.11 and does not close its image/CI gates.
 
 Only primitives and helpers that both apps import directly in the same change.
 

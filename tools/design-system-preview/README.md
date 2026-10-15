@@ -74,3 +74,33 @@ Local verification and the pending visual/CI/device reviews are tracked in the h
 Diego accepted the current 1D implementation provisionally to keep moving on 2026-10-15.
 Further visual polishing of the focus fade is deferred; this is not final visual approval of
 parity with Listen. Keep this specimen and revisit it in a later pass.
+
+## Admin capture preparation / Checkpoint 1E
+
+Open <http://127.0.0.1:5186/#base-admin> for seven current Admin scenes before its card/panel
+adoption. These are optional local references with Linux baselines still pending. The approved
+1A–1C and provisional 1D specimens remain visible. This checkpoint does not change Admin styling.
+
+Generate the local references from the deterministic fixtures, then copy the ignored outputs:
+
+```bash
+CRATE_VISUAL_SMOKE=1 PLAYWRIGHT_CHANNEL=chrome npm run test:admin-e2e -- --workers=1
+mkdir -p tools/design-system-preview/.artifacts/admin-captures
+cp test-results/admin-e2e/captures-*/admin-*.png tools/design-system-preview/.artifacts/admin-captures/
+```
+
+Each thumbnail opens its full-page image. Clones without local assets show an explicit pending
+state; the preview still builds. Regenerate/copy after fixture or Admin changes, then reload.
+
+Listen's advisory capture check is:
+
+```bash
+CRATE_VISUAL_SMOKE=1 PLAYWRIGHT_CHANNEL=chrome npm run test:listen-visual -- --workers=1
+```
+
+Smoke mode writes only to ignored test results and does not compare or approve baselines. Both
+capture configurations default to comparison-only mode; recording is rejected outside the pinned
+Linux amd64 CI runtime. To record canonical PNGs after publication approval, dispatch **Frontend
+Tests** on the published branch with **update_visual = true**. Review the `visual-baselines-<sha>`
+artifact and its commit/image/platform/architecture manifest before importing PNGs and running
+comparison CI. Admin 1.0 / InstrumentPanel 1.7 wait for this review. See the handover for gate status.

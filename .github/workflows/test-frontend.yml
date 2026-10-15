@@ -2,6 +2,11 @@ name: Frontend Tests
 
 on:
   workflow_dispatch:
+    inputs:
+      update_visual:
+        description: Record Listen and Admin baselines for review
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -21,6 +26,7 @@ on:
       - "tests/appearance/**"
       - "tests/listen-visual/**"
       - "tests/admin-e2e/**"
+      - "tests/visual/**"
       - ".github/workflows/test-frontend.yml"
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
@@ -41,10 +47,12 @@ on:
       - "tests/appearance/**"
       - "tests/listen-visual/**"
       - "tests/admin-e2e/**"
+      - "tests/visual/**"
       - ".github/workflows/test-frontend.yml"
 
 jobs:
   test:
+    if: ${{ !inputs.update_visual }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -189,7 +197,11 @@ jobs:
         run: npm run --workspace=app/listen-desktop test
 
   appearance-chromium:
-    runs-on: ubuntu-latest
+    if: ${{ !inputs.update_visual }}
+    runs-on: ubuntu-24.04
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
+    env:
+      CRATE_PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
     steps:
       - uses: actions/checkout@v6
 
@@ -202,9 +214,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
 
       - name: Run appearance contracts
         run: npm run test:appearance -- --project=chromium
@@ -225,5 +234,64 @@ jobs:
             playwright-report/listen-visual/
             playwright-report/admin-e2e/
             test-results/appearance/
+            test-results/listen-visual/
+            test-results/admin-e2e/
+
+  update-listen-visual:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.update_visual }}
+    runs-on: ubuntu-24.04
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
+    permissions:
+      contents: read
+    env:
+      CRATE_PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Record Listen baselines
+        run: npm run test:listen-visual -- --update-snapshots --workers=2
+
+      - name: Record Admin baselines
+        run: npm run test:admin-e2e -- --update-snapshots --workers=2
+
+      - name: Identify capture source
+        run: |
+          node --input-type=module <<'JS'
+          import { writeFileSync } from 'node:fs';
+          writeFileSync('tests/capture-manifest.json', JSON.stringify({
+            commit: process.env.GITHUB_SHA,
+            image: process.env.CRATE_PLAYWRIGHT_IMAGE,
+            platform: process.platform,
+            arch: process.arch,
+          }, null, 2) + '\n');
+          JS
+
+      - name: Upload baselines for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            tests/listen-visual/**/*-snapshots/*.png
+            tests/admin-e2e/**/*-snapshots/*.png
+            tests/capture-manifest.json
+
+      - name: Upload capture diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-capture-report-${{ github.sha }}
+          path: |
+            playwright-report/listen-visual/
+            playwright-report/admin-e2e/
             test-results/listen-visual/
             test-results/admin-e2e/

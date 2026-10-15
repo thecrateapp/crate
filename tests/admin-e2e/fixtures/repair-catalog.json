@@ -1,0 +1,32 @@
+{
+  "items": [
+    {
+      "check_type": "unindexed_files",
+      "scanner_method": "_check_unindexed_files",
+      "fixer_method": "_fix_unindexed_files",
+      "support": "automatic",
+      "risk": "caution",
+      "scope": "hybrid",
+      "requires_confirmation": true,
+      "supports_batch": true,
+      "supports_artist_scope": true,
+      "supports_global_scope": false,
+      "supports_bulk_fix": true,
+      "auto_fixable": true
+    },
+    {
+      "check_type": "artist_layout_fix",
+      "scanner_method": "_check_artist_layout_fix",
+      "fixer_method": "_fix_artist_layout_fix",
+      "support": "automatic",
+      "risk": "caution",
+      "scope": "hybrid",
+      "requires_confirmation": true,
+      "supports_batch": true,
+      "supports_artist_scope": true,
+      "supports_global_scope": false,
+      "supports_bulk_fix": true,
+      "auto_fixable": true
+    }
+  ]
+}

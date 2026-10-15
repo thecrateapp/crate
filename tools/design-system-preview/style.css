@@ -714,3 +714,63 @@ footer p {
 .focus-select {
   margin-top: 20px;
 }
+
+.admin-baseline-feature {
+  padding-top: 58px;
+  scroll-margin-top: 30px;
+}
+.admin-baseline-note {
+  color: var(--text-subtle);
+  font-size: 13px;
+  line-height: 1.7;
+  max-width: 650px;
+}
+.admin-capture-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 30px;
+}
+.admin-capture-grid figure {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-panel);
+  background: var(--color-card);
+}
+.admin-capture-grid a {
+  display: block;
+}
+.admin-capture-grid img {
+  display: block;
+  width: 100%;
+  height: 280px;
+  object-fit: cover;
+  object-position: top;
+}
+.admin-capture-grid figcaption {
+  padding: 18px;
+  border-top: 1px solid var(--border-subtle);
+  font-family: var(--font-mono-stack);
+  font-size: 11px;
+}
+.admin-capture-pending {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+@media (max-width: 600px) {
+  .admin-baseline-feature {
+    padding-top: 38px;
+  }
+  .admin-capture-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-capture-grid img {
+    height: 210px;
+  }
+}

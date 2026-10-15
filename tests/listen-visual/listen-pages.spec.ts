@@ -1,11 +1,10 @@
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";
+import { capturePage } from "../visual/screenshots";
 
 async function expectStablePage(page: Page, name: string) {
-  await expect(page).toHaveScreenshot(`${name}.png`, {
-    fullPage: false,
-  });
+  await capturePage(page, test.info(), name);
 }
 
 test("renders the home shell with the restored player", async ({
@@ -18,6 +17,25 @@ test("renders the home shell with the restored player", async ({
   );
   await expect(page.getByText("Mob DLA", { exact: true })).toBeVisible();
   await expectStablePage(page, "home-player-default-dark");
+});
+
+test("renders the Smart EQ curve and source chain", async ({
+  openListenPage,
+  page,
+}, info) => {
+  await openListenPage("/", { player: true, smartEq: true });
+  if (info.project.name === "mobile") {
+    await page
+      .getByRole("button", { name: "Open fullscreen player", exact: true })
+      .click();
+  }
+  await page.getByRole("button", { name: "Equalizer", exact: true }).click();
+  await expect(
+    page.locator('[data-source="genre_taxonomy_preset"][aria-current="true"]'),
+  ).toBeVisible();
+  await expect(page.getByText("from Rock", { exact: true })).toBeVisible();
+  await expect(page.getByRole("slider", { name: / Hz$/ })).toHaveCount(10);
+  await expectStablePage(page, "equalizer-smart-default-dark");
 });
 
 test("renders the complete artist hero and follow controls", async ({

@@ -1,0 +1,41 @@
+[
+  {
+    "id": 1,
+    "name": "Hardcore",
+    "slug": "hardcore",
+    "artist_count": 12,
+    "album_count": 25,
+    "mapped": true,
+    "description": "Urgent guitars and direct rhythms.",
+    "canonical_slug": "hardcore",
+    "canonical_name": "Hardcore",
+    "top_level_slug": "rock",
+    "top_level_name": "Rock"
+  },
+  {
+    "id": 2,
+    "name": "Post-Hardcore",
+    "slug": "post-hardcore",
+    "artist_count": 9,
+    "album_count": 21,
+    "mapped": true,
+    "description": "Open textures and shifting dynamics.",
+    "canonical_slug": "post-hardcore",
+    "canonical_name": "Post-Hardcore",
+    "top_level_slug": "rock",
+    "top_level_name": "Rock"
+  },
+  {
+    "id": 3,
+    "name": "Alternative Rock",
+    "slug": "alternative-rock",
+    "artist_count": 6,
+    "album_count": 17,
+    "mapped": true,
+    "description": "Guitar music beyond the mainstream.",
+    "canonical_slug": "alternative-rock",
+    "canonical_name": "Alternative Rock",
+    "top_level_slug": "rock",
+    "top_level_name": "Rock"
+  }
+]

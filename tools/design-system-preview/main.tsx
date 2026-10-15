@@ -25,6 +25,20 @@ import "./style.css";
 const disposeFocusRingMotion = installFocusRingMotion();
 import.meta.hot?.dispose(disposeFocusRingMotion);
 
+const adminCaptureImages = import.meta.glob<string>(
+  "./.artifacts/admin-captures/*.png",
+  { eager: true, query: "?url", import: "default" },
+);
+const adminScenes = [
+  { key: "dashboard", label: "Dashboard" },
+  { key: "tasks", label: "Tasks" },
+  { key: "health", label: "Library Health" },
+  { key: "genres", label: "Genres" },
+  { key: "album", label: "Album" },
+  { key: "settings", label: "Settings" },
+  { key: "system", label: "System Health" },
+];
+
 const artistGenreProfile: GenreProfileItem[] = [
   {
     name: "Shoegaze",
@@ -80,7 +94,7 @@ function App() {
           crate<span className="version">v3</span>
         </a>
         <MonoLabel
-          meta={["Checkpoint 1D", "Foco · Provisional"]}
+          meta={["Checkpoint 1E", "Base de Admin · En revisión"]}
           className="masthead-meta"
         />
         <a className="jump" href="#primitivas">
@@ -636,9 +650,58 @@ function App() {
           </article>
         </div>
       </section>
+      <section
+        id="base-admin"
+        className="admin-baseline-feature"
+        aria-label="Checkpoint 1E, referencias visuales de Admin"
+      >
+        <div className="specimen-heading">
+          <div>
+            <MonoLabel size="eyebrow" accent="06">
+              Checkpoint 1E · En revisión
+            </MonoLabel>
+            <h2>La base de Admin, antes de cambiarla.</h2>
+          </div>
+        </div>
+        <p className="admin-baseline-note">
+          Vistas locales de referencia. Capturas definitivas de Linux
+          pendientes.
+        </p>
+        <p className="admin-baseline-note">
+          Estas siete pantallas muestran el Admin actual, antes de adaptar sus
+          tarjetas y paneles a V3. Abre una imagen para verla completa.
+        </p>
+        <div className="admin-capture-grid">
+          {adminScenes.map(({ key, label }) => {
+            const source =
+              adminCaptureImages[
+                `./.artifacts/admin-captures/admin-${key}.png`
+              ];
+            return (
+              <figure key={key}>
+                {source ? (
+                  <a href={source} target="_blank" rel="noreferrer">
+                    <img
+                      src={source}
+                      alt={`Admin actual: ${label}`}
+                      loading="lazy"
+                      width={1440}
+                    />
+                  </a>
+                ) : (
+                  <p className="admin-capture-pending">
+                    Vista local pendiente de generar
+                  </p>
+                )}
+                <figcaption>{label}</figcaption>
+              </figure>
+            );
+          })}
+        </div>
+      </section>
       <footer>
         <MonoLabel
-          meta={["Crate V3", "Checkpoints 1A–1C aprobados · 1D provisional"]}
+          meta={["1A–1C publicados", "1D provisional", "1E en revisión"]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>
       </footer>

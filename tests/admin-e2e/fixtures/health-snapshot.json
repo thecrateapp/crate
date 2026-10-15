@@ -1,0 +1,104 @@
+{
+  "snapshot": {
+    "scope": "health",
+    "subject_key": "library",
+    "version": 12,
+    "stale": false,
+    "generation_ms": 42
+  },
+  "issues": [
+    {
+      "id": 1,
+      "check_type": "unindexed_files",
+      "severity": "medium",
+      "description": "Unindexed audio file 1",
+      "details_json": {
+        "db_artist": "Quicksand",
+        "path": "/music/Quicksand/Crystallize/track-1.flac"
+      },
+      "auto_fixable": true,
+      "status": "open",
+      "artist_id": 23,
+      "album_id": 68,
+      "created_at": "2026-10-10T20:00:00Z"
+    },
+    {
+      "id": 2,
+      "check_type": "unindexed_files",
+      "severity": "medium",
+      "description": "Unindexed audio file 2",
+      "details_json": {
+        "db_artist": "Quicksand",
+        "path": "/music/Quicksand/Crystallize/track-2.flac"
+      },
+      "auto_fixable": true,
+      "status": "open",
+      "artist_id": 23,
+      "album_id": 68,
+      "created_at": "2026-10-10T20:00:00Z"
+    },
+    {
+      "id": 3,
+      "check_type": "unindexed_files",
+      "severity": "medium",
+      "description": "Unindexed audio file 3",
+      "details_json": {
+        "db_artist": "Quicksand",
+        "path": "/music/Quicksand/Crystallize/track-3.flac"
+      },
+      "auto_fixable": true,
+      "status": "open",
+      "artist_id": 23,
+      "album_id": 68,
+      "created_at": "2026-10-10T20:00:00Z"
+    },
+    {
+      "id": 4,
+      "check_type": "unindexed_files",
+      "severity": "medium",
+      "description": "Unindexed audio file 4",
+      "details_json": {
+        "db_artist": "Quicksand",
+        "path": "/music/Quicksand/Crystallize/track-4.flac"
+      },
+      "auto_fixable": true,
+      "status": "open",
+      "artist_id": 23,
+      "album_id": 68,
+      "created_at": "2026-10-10T20:00:00Z"
+    },
+    {
+      "id": 5,
+      "check_type": "artist_layout_fix",
+      "severity": "low",
+      "description": "Artist folder needs canonical layout",
+      "details_json": {
+        "db_artist": "Quicksand",
+        "path": "/music/Quicksand/Crystallize/track-5.flac"
+      },
+      "auto_fixable": true,
+      "status": "open",
+      "artist_id": 23,
+      "album_id": 68,
+      "created_at": "2026-10-10T20:00:00Z"
+    }
+  ],
+  "counts": {
+    "unindexed_files": 4,
+    "artist_layout_fix": 1
+  },
+  "total": 5,
+  "filter": null,
+  "runs": {
+    "unindexed_files": {
+      "last_run_at": "2026-10-10T20:55:00Z",
+      "duration_ms": 480,
+      "issue_count": 4
+    },
+    "artist_layout_fix": {
+      "last_run_at": "2026-10-10T20:55:00Z",
+      "duration_ms": 120,
+      "issue_count": 1
+    }
+  }
+}

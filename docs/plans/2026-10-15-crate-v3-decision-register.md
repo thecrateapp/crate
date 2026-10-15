@@ -189,4 +189,19 @@ commit/push instruction.
 On 2026-10-15 Diego explicitly authorised commit and push of Checkpoints 1C and provisional 1D,
 then continuation with the next block. This supersedes the earlier local-only publication notes;
 it does not resolve the deferred focus polish or the Linux baseline/device QA gates. Checkpoint
-1C is `e60e6f50`. Continue 0.11 → Admin contrast 1.0 → InstrumentPanel 1.7 in that dependency order.
+1C is published as `e60e6f50` and 1D as `d881a728`. Continue 0.11 → Admin contrast 1.0 → InstrumentPanel 1.7 in that dependency order.
+
+## Capture preparation / Checkpoint 1E — 2026-10-15
+
+Prepare Task 0.11 before Admin contrast 1.0 and InstrumentPanel 1.7. The infrastructure uses the
+pinned Playwright 1.63.0 Noble Linux amd64 CI image, a manual recording job and provenance manifest.
+Local renders may populate the persistent mockup as advisory references; they never replace
+committed baselines. Both capture configs default to comparison-only mode and reject noncanonical
+recording. Seven full-page Admin scenes and desktop/mobile Smart EQ cover the initial gate.
+Keep the 22 existing Linux PNG bytes when removing platform suffixes and delete Darwin duplicates.
+0.11 remains open until the published workflow records the new images, every PNG is reviewed and
+comparison CI passes. No Admin restyle or final focus-polish approval is implied.
+
+Diego approved Checkpoint 1E on 2026-10-15 and explicitly authorised its commit/push, the Linux CI
+capture run and continuation with the next plan block. Verify provenance and review/import the
+canonical PNGs before Admin adoption; retain the mockup and review checkpoints.

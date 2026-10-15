@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 async function settleFocusRing(target: Locator) {
   await target.evaluate(async (element) => {
@@ -9,6 +9,87 @@ async function settleFocusRing(target: Locator) {
         .map((animation) => animation.finished.catch(() => undefined)),
     );
   });
+}
+
+async function expectAdminReferenceGallery(page: Page) {
+  await page.goto("/#base-admin");
+  const gallery = page.locator("#base-admin");
+  await expect(
+    gallery.getByRole("heading", {
+      level: 2,
+      name: "La base de Admin, antes de cambiarla.",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    gallery.getByText(
+      "Vistas locales de referencia. Capturas definitivas de Linux pendientes.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+
+  const figures = gallery.locator("figure");
+  await expect(figures).toHaveCount(7);
+  for (const label of [
+    "Dashboard",
+    "Tasks",
+    "Library Health",
+    "Genres",
+    "Album",
+    "Settings",
+    "System Health",
+  ]) {
+    const figure = figures.filter({
+      has: page.locator("figcaption", { hasText: label }),
+    });
+    await expect(figure).toHaveCount(1);
+    await expect(figure.locator("figcaption")).toHaveText(label);
+
+    const image = figure.getByRole("img", {
+      name: `Admin actual: ${label}`,
+      exact: true,
+    });
+    const placeholder = figure.getByText("Vista local pendiente de generar", {
+      exact: true,
+    });
+    if ((await image.count()) > 0) {
+      await expect(figure.locator("img")).toHaveCount(1);
+      await expect(placeholder).toHaveCount(0);
+      await image.scrollIntoViewIfNeeded();
+      await expect(image).toBeVisible();
+      await expect
+        .poll(() =>
+          image.evaluate((element) => {
+            const preview = element as HTMLImageElement;
+            return (
+              preview.complete &&
+              preview.naturalWidth > 0 &&
+              preview.naturalHeight > 0
+            );
+          }),
+        )
+        .toBe(true);
+      const source = await image.evaluate(
+        (element) => (element as HTMLImageElement).currentSrc,
+      );
+      expect(new URL(source).pathname).toMatch(/\.png$/i);
+      const targets = await figure
+        .getByRole("link")
+        .evaluateAll((links) =>
+          links.map((link) => (link as HTMLAnchorElement).href),
+        );
+      expect(targets).toContain(source);
+    } else {
+      await expect(figure.locator("img")).toHaveCount(0);
+      await placeholder.scrollIntoViewIfNeeded();
+      await expect(placeholder).toBeVisible();
+      await expect(figure.locator('a[href*=".png"]')).toHaveCount(0);
+    }
+  }
+
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
 }
 
 test.beforeEach(async ({ page }) => {
@@ -22,6 +103,12 @@ test("preserves the approved specimens alongside the new checkpoint", async ({
   await expect(page.locator("article.specimen")).toHaveCount(3);
   await expect(page.locator(".next-specimen")).toHaveCount(2);
   await expect(page.locator(".rows-preview li")).toHaveCount(4);
+});
+
+test("shows the seven Admin reference scenes with local previews or explicit pending states", async ({
+  page,
+}) => {
+  await expectAdminReferenceGallery(page);
 });
 
 test("selects a whole row through its trailing slot", async ({ page }) => {
@@ -258,6 +345,12 @@ test.describe("touch layout", () => {
     viewport: { width: 390, height: 844 },
     isMobile: true,
     hasTouch: true,
+  });
+
+  test("keeps the Admin reference gallery usable without horizontal overflow", async ({
+    page,
+  }) => {
+    await expectAdminReferenceGallery(page);
   });
 
   test("keeps 44px interactive targets without horizontal overflow", async ({

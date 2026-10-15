@@ -10,6 +10,7 @@ interface ListenVisualFixtures {
     options?: {
       mode?: ColorMode;
       player?: boolean;
+      smartEq?: boolean;
       preset?: AppearancePreset;
     },
   ) => Promise<void>;
@@ -161,6 +162,19 @@ const upcomingItems = [
     country_code: "GB",
     lineup: ["High Vis", "Militarie Gun"],
     genres: ["hardcore"],
+    probable_setlist: [
+      { title: "Mob DLA", artist: "High Vis" },
+      { title: "Trauma Bonds", artist: "High Vis" },
+      { title: "Guided Tour", artist: "High Vis" },
+    ],
+    probable_setlist_context: {
+      model_version: 2,
+      mode: "recent",
+      source_show_count: 12,
+      source_date_from: "2026-08-01",
+      source_date_to: "2026-09-10",
+    },
+    probable_setlist_status: "ready",
     user_attending: true,
   },
   {
@@ -690,6 +704,24 @@ function responseFor(pathname: string): unknown {
     };
   }
   if (pathname === "/api/playback/prepare") return {};
+  if (pathname === "/api/tracks/1/eq") {
+    return {
+      trackId: 1,
+      trackEntityUid: null,
+      albumId: 71,
+      albumEntityUid: null,
+      gains: [2, 1, 0, -1, 0, 1, 2, 1, 0, -1],
+      source: "genre_taxonomy_preset",
+      label: "Hardcore",
+      reasoning: "Inherited from Rock",
+      scope: "instance",
+      targetType: "track",
+      targetEntityUid: null,
+      userId: null,
+      genre: { slug: "hardcore", name: "Hardcore", canonical: true },
+      inheritedFrom: { slug: "rock", name: "Rock" },
+    };
+  }
   if (pathname === "/api/me/now-playing") return {};
   if (pathname === "/api/me/play-events") return {};
   if (pathname === "/api/bandcamp/links/artist/by-entity/artist-high-vis") {
@@ -877,7 +909,7 @@ export const test = base.extend<ListenVisualFixtures>({
       const mode = options.mode ?? "dark";
       const preset = options.preset ?? "default";
       await page.addInitScript(
-        ({ appearance, player }) => {
+        ({ appearance, player, smartEq }) => {
           localStorage.clear();
           localStorage.setItem(
             "crate.listen.appearance.v2",
@@ -886,7 +918,8 @@ export const test = base.extend<ListenVisualFixtures>({
           localStorage.setItem("crate.listen.theme-skin", appearance.preset);
           localStorage.setItem("crate-listen-sidebar-expanded", "true");
           localStorage.setItem("i18nextLng", "en");
-          localStorage.setItem("listen-eq-smart", "false");
+          localStorage.setItem("listen-eq-smart", String(smartEq));
+          localStorage.setItem("listen-eq-enabled", String(smartEq));
           if (player) {
             localStorage.setItem(
               "listen-player-state:v1",
@@ -897,6 +930,7 @@ export const test = base.extend<ListenVisualFixtures>({
         {
           appearance: appearancePreferences(mode, preset),
           player: options.player ? playerSnapshot() : null,
+          smartEq: options.smartEq ?? false,
         },
       );
       await page.goto(path);
