@@ -209,6 +209,180 @@ describe("android native engine flags", () => {
     });
   });
 
+  it("re-plans the loaded queue when capabilities arrive after it", async () => {
+    vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+    const state = {
+      revision: "queue-rev-1",
+      playbackState: "paused",
+      isPlaying: false,
+      index: 0,
+      positionMs: 0,
+      durationMs: 0,
+      queueSize: 2,
+      crossfadeMs: 0,
+      eqEnabled: false,
+    };
+    nativePlaybackMock.getState.mockResolvedValue(state);
+    nativePlaybackMock.setQueue.mockResolvedValue(state);
+    nativePlaybackMock.setTransitionPlans.mockResolvedValue({ accepted: true });
+    const nativeEngineModule = await import("@/lib/android-native-engine");
+    const engine = new nativeEngineModule.AndroidNativeEngine();
+    const gapless = { mode: "gapless" } as unknown as EngineTransitionPlan;
+    const adaptive = { mode: "adaptive" } as unknown as EngineTransitionPlan;
+    const replanTransitionPlans = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValue([adaptive]);
+
+    await engine.loadQueue({
+      revision: "queue-rev-1",
+      tracks: [],
+      currentIndex: 0,
+      positionMs: 0,
+      autoplay: false,
+      repeat: "off",
+      crossfadeMs: 12000,
+      volume: 1,
+      pendingTransitionPlans: Promise.resolve([gapless]),
+      replanTransitionPlans,
+    });
+    await vi.waitFor(() =>
+      expect(nativePlaybackMock.setTransitionPlans).toHaveBeenCalledTimes(1),
+    );
+
+    nativeEngineModule.setAndroidNativeSmartMixCapabilities({
+      available: true,
+      androidNativeCrossfade: true,
+      androidBeatmatch: false,
+    });
+
+    await vi.waitFor(() =>
+      expect(nativePlaybackMock.setTransitionPlans).toHaveBeenCalledTimes(2),
+    );
+    expect(replanTransitionPlans).toHaveBeenCalledTimes(2);
+    expect(nativePlaybackMock.setTransitionPlans).toHaveBeenNthCalledWith(1, {
+      revision: "queue-rev-1",
+      transitionPlans: [gapless],
+    });
+    expect(nativePlaybackMock.setTransitionPlans).toHaveBeenLastCalledWith({
+      revision: "queue-rev-1",
+      transitionPlans: [adaptive],
+    });
+  });
+
+  it("keeps re-planned plans when stale cold-start plans resolve later", async () => {
+    vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+    const state = {
+      revision: "queue-rev-1",
+      playbackState: "paused",
+      isPlaying: false,
+      index: 0,
+      positionMs: 0,
+      durationMs: 0,
+      queueSize: 2,
+      crossfadeMs: 0,
+      eqEnabled: false,
+    };
+    nativePlaybackMock.getState.mockResolvedValue(state);
+    nativePlaybackMock.setQueue.mockResolvedValue(state);
+    nativePlaybackMock.setTransitionPlans.mockResolvedValue({ accepted: true });
+    const { AndroidNativeEngine } = await import("@/lib/android-native-engine");
+    const engine = new AndroidNativeEngine();
+    const gapless = { mode: "gapless" } as unknown as EngineTransitionPlan;
+    const adaptive = { mode: "adaptive" } as unknown as EngineTransitionPlan;
+    let resolveStale: (plans: EngineTransitionPlan[]) => void = () => {};
+
+    await engine.loadQueue({
+      revision: "queue-rev-1",
+      tracks: [],
+      currentIndex: 0,
+      positionMs: 0,
+      autoplay: false,
+      repeat: "off",
+      crossfadeMs: 12000,
+      volume: 1,
+      pendingTransitionPlans: new Promise((resolve) => {
+        resolveStale = resolve;
+      }),
+      replanTransitionPlans: () => Promise.resolve([adaptive]),
+    });
+    await vi.waitFor(() =>
+      expect(nativePlaybackMock.setTransitionPlans).toHaveBeenCalledTimes(1),
+    );
+    resolveStale([gapless]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(nativePlaybackMock.setTransitionPlans).toHaveBeenCalledTimes(1);
+    expect(nativePlaybackMock.setTransitionPlans).toHaveBeenCalledWith({
+      revision: "queue-rev-1",
+      transitionPlans: [adaptive],
+    });
+  });
+
+  it("keeps plans re-planned while the queue load is still in flight", async () => {
+    vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+    const state = {
+      revision: "queue-rev-1",
+      playbackState: "paused",
+      isPlaying: false,
+      index: 0,
+      positionMs: 0,
+      durationMs: 0,
+      queueSize: 2,
+      crossfadeMs: 0,
+      eqEnabled: false,
+    };
+    nativePlaybackMock.getState.mockResolvedValue(state);
+    let finishSetQueue: (value: typeof state) => void = () => {};
+    nativePlaybackMock.setQueue.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishSetQueue = resolve;
+        }),
+    );
+    nativePlaybackMock.setTransitionPlans.mockResolvedValue({ accepted: true });
+    const nativeEngineModule = await import("@/lib/android-native-engine");
+    const engine = new nativeEngineModule.AndroidNativeEngine();
+    const gapless = { mode: "gapless" } as unknown as EngineTransitionPlan;
+    const adaptive = { mode: "adaptive" } as unknown as EngineTransitionPlan;
+
+    const loading = engine.loadQueue({
+      revision: "queue-rev-1",
+      tracks: [],
+      currentIndex: 0,
+      positionMs: 0,
+      autoplay: false,
+      repeat: "off",
+      crossfadeMs: 12000,
+      volume: 1,
+      pendingTransitionPlans: Promise.resolve([gapless]),
+      replanTransitionPlans: vi
+        .fn()
+        .mockResolvedValueOnce([adaptive])
+        .mockResolvedValue(undefined),
+    });
+    await vi.waitFor(() =>
+      expect(nativePlaybackMock.setQueue).toHaveBeenCalled(),
+    );
+    nativeEngineModule.setAndroidNativeSmartMixCapabilities({
+      available: true,
+      androidNativeCrossfade: true,
+      androidBeatmatch: false,
+    });
+    await vi.waitFor(() =>
+      expect(nativePlaybackMock.setTransitionPlans).toHaveBeenCalledTimes(1),
+    );
+    finishSetQueue(state);
+    await loading;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(nativePlaybackMock.setTransitionPlans).toHaveBeenCalledTimes(1);
+    expect(nativePlaybackMock.setTransitionPlans).toHaveBeenLastCalledWith({
+      revision: "queue-rev-1",
+      transitionPlans: [adaptive],
+    });
+  });
+
   it("forwards the requested crossfade once the server enables native mixing", async () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
     const state = {

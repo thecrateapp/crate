@@ -194,11 +194,36 @@ export class AndroidNativeEngine implements PlaybackEngine {
   private notificationPermissionPrompted = false;
   private queueMixRequested = false;
   private appliedCrossfadeMs: number | null = null;
+  private replanTransitionPlans:
+    | (() => Promise<EngineTransitionPlan[] | undefined>)
+    | undefined;
+  private planInstallGeneration = 0;
 
   constructor() {
     subscribeSmartMixCapabilities(() => {
       void this.applySmartMixPreference();
+      this.replanForCapabilities();
     });
+  }
+
+  private replanForCapabilities(): void {
+    const replan = this.replanTransitionPlans;
+    if (!replan || !this.queueMixRequested) return;
+    const revision = this.queueRevision;
+    void replan()
+      .then((transitionPlans) => {
+        if (!transitionPlans?.length) return;
+        return this.installTransitionPlans(
+          revision,
+          Promise.resolve(transitionPlans),
+        );
+      })
+      .catch((error) => {
+        console.warn(
+          "[native-playback] transition plans not replanned:",
+          error,
+        );
+      });
   }
 
   private async applySmartMixPreference(): Promise<void> {
@@ -291,27 +316,42 @@ export class AndroidNativeEngine implements PlaybackEngine {
     if (snapshot.autoplay) {
       await this.ensureNotificationPermission();
     }
-    const { pendingTransitionPlans, ...queue } = snapshot;
+    const { pendingTransitionPlans, replanTransitionPlans, ...queue } =
+      snapshot;
     this.queueRevision = queue.revision;
+    this.replanTransitionPlans = replanTransitionPlans;
     this.queueMixRequested = queue.crossfadeMs > 0;
     this.appliedCrossfadeMs = effectiveNativeCrossfadeMs(queue.crossfadeMs);
+    const pendingGeneration = ++this.planInstallGeneration;
     const state = await nativePlayback.setQueue({
       ...queue,
       crossfadeMs: this.appliedCrossfadeMs,
     });
     if (pendingTransitionPlans) {
-      void this.installTransitionPlans(queue.revision, pendingTransitionPlans);
+      void this.installTransitionPlans(
+        queue.revision,
+        pendingTransitionPlans,
+        pendingGeneration,
+      );
     }
+    this.replanForCapabilities();
     return state;
   }
 
   private async installTransitionPlans(
     revision: string,
     pendingPlans: Promise<EngineTransitionPlan[] | undefined>,
+    generation = ++this.planInstallGeneration,
   ): Promise<void> {
     try {
       const transitionPlans = await pendingPlans;
-      if (!transitionPlans?.length || revision !== this.queueRevision) return;
+      if (
+        !transitionPlans?.length ||
+        revision !== this.queueRevision ||
+        generation !== this.planInstallGeneration
+      ) {
+        return;
+      }
       await nativePlayback.setTransitionPlans({ revision, transitionPlans });
     } catch (error) {
       console.warn("[native-playback] transition plans not installed:", error);

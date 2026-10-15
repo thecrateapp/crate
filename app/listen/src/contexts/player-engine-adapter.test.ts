@@ -525,6 +525,46 @@ describe("player engine adapter", () => {
       expect(transitionPlans?.[0]?.fallbackReason).toBe("planner_timeout");
     });
 
+    it("re-plans a cold-start queue once Smart Mix capabilities arrive", async () => {
+      setSmartMixCapabilities({
+        available: false,
+        androidNativeCrossfade: false,
+        androidBeatmatch: false,
+        plannerVersion: null,
+      });
+      apiMock.mockResolvedValue(null);
+
+      const snapshot = await toStartupEngineQueueSnapshot(
+        nativeSnapshotOptions("cold-start-capabilities"),
+      );
+
+      expect((await snapshot.pendingTransitionPlans)?.[0]?.fallbackReason).toBe(
+        "capability_unavailable",
+      );
+      await expect(snapshot.replanTransitionPlans?.()).resolves.toBeUndefined();
+      expect(apiMock).not.toHaveBeenCalledWith(
+        "/api/playback/transition-plans",
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+      );
+
+      setSmartMixCapabilities({
+        available: true,
+        androidNativeCrossfade: true,
+        androidBeatmatch: false,
+        plannerVersion: "smart-mix-v2",
+      });
+      await snapshot.replanTransitionPlans?.();
+
+      expect(apiMock).toHaveBeenCalledWith(
+        "/api/playback/transition-plans",
+        "POST",
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
     it("does not call the planner while the device is offline", async () => {
       vi.stubGlobal("navigator", { ...navigator, onLine: false });
       apiMock.mockResolvedValue(null);

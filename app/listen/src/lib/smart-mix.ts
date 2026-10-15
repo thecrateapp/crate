@@ -108,7 +108,7 @@ export function getSmartMixCapabilities(): SmartMixCapabilities {
   };
 }
 
-interface SmartMixPlanInput {
+export interface SmartMixPlanInput {
   revision: string;
   tracks: Track[];
   currentIndex: number;

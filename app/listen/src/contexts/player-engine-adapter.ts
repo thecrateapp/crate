@@ -26,6 +26,8 @@ import {
 } from "@/lib/playback-provenance";
 import {
   getSmartMixCapabilities,
+  type SmartMixCapabilities,
+  type SmartMixPlanInput,
   SmartMixTransitionPlanner,
   subscribeSmartMixCapabilities,
 } from "@/lib/smart-mix";
@@ -244,27 +246,36 @@ export async function toStartupEngineQueueSnapshot(
   if (options.tracks.some((track) => !track.offlineOnly)) {
     await ensureFreshAuthToken();
   }
-  const transitionPlansPromise =
-    options.target === "android-native"
-      ? smartMixTransitionPlanner.plan({
-          revision: options.revision,
-          tracks: options.tracks,
-          currentIndex: options.currentIndex,
-          playSource: options.playSource,
-          shuffle: options.shuffle,
-          offline:
-            options.offline ??
-            hasOfflineTransitionWindow(
-              options.tracks,
-              options.currentIndex,
-              streamOptions,
-            ),
-          preferredDurationMs: options.crossfadeMs,
-          capabilities: getSmartMixCapabilities(),
-          networkAvailable: isNetworkAvailable(),
-          identity: getApiBase(),
-        })
-      : Promise.resolve(undefined);
+  const nativeTarget = options.target === "android-native";
+  let planInput: SmartMixPlanInput = {
+    revision: options.revision,
+    tracks: options.tracks,
+    currentIndex: options.currentIndex,
+    playSource: options.playSource,
+    shuffle: options.shuffle,
+    offline:
+      options.offline ??
+      hasOfflineTransitionWindow(
+        options.tracks,
+        options.currentIndex,
+        streamOptions,
+      ),
+    preferredDurationMs: options.crossfadeMs,
+    capabilities: getSmartMixCapabilities(),
+    networkAvailable: isNetworkAvailable(),
+    identity: getApiBase(),
+  };
+  const transitionPlansPromise = nativeTarget
+    ? smartMixTransitionPlanner.plan(planInput)
+    : Promise.resolve(undefined);
+  const replanTransitionPlans = () => {
+    const capabilities = getSmartMixCapabilities();
+    if (sameCapabilities(capabilities, planInput.capabilities)) {
+      return Promise.resolve(undefined);
+    }
+    planInput = { ...planInput, capabilities };
+    return smartMixTransitionPlanner.plan(planInput);
+  };
   const engineTracks = await toStartupEngineTracks(
     options.tracks,
     options.currentIndex,
@@ -282,7 +293,20 @@ export async function toStartupEngineQueueSnapshot(
     crossfadeMs: options.crossfadeMs,
     volume: options.volume,
     pendingTransitionPlans: transitionPlansPromise,
+    replanTransitionPlans: nativeTarget ? replanTransitionPlans : undefined,
   };
+}
+
+function sameCapabilities(
+  left: SmartMixCapabilities,
+  right: SmartMixCapabilities,
+): boolean {
+  return (
+    left.available === right.available &&
+    left.androidNativeCrossfade === right.androidNativeCrossfade &&
+    left.androidBeatmatch === right.androidBeatmatch &&
+    left.plannerVersion === right.plannerVersion
+  );
 }
 
 function hasOfflineTransitionWindow(
