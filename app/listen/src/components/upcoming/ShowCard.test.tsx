@@ -45,7 +45,9 @@ describe("ShowCard ticket", () => {
     );
 
     const article = screen.getByRole("article");
-    expect(article).toHaveClass("rounded-panel", "border-border-quiet");
+    expect(article).toHaveClass("rounded-panel", "border-transparent");
+    expect(article).not.toHaveClass("bg-surface-object");
+    expect(article.querySelector(".setlist-ticket-top")).toBeInTheDocument();
     expect(article.className).not.toMatch(/shadow-/);
     expect(screen.getByRole("link", { name: "Converge" })).toHaveClass(
       "font-display",

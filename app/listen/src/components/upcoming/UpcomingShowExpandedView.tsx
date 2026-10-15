@@ -102,18 +102,22 @@ function TicketHeader({
 }
 
 function TicketPerforation() {
-  return (
-    <div aria-hidden="true" className="relative h-px">
-      <div className="absolute inset-x-0 top-0 border-t border-dashed border-border-interactive" />
-      <span className="absolute top-0 -left-3.5 size-7 -translate-y-1/2 rounded-full border border-border-quiet bg-surface-canvas" />
-      <span className="absolute top-0 -right-3.5 size-7 -translate-y-1/2 rounded-full border border-border-quiet bg-surface-canvas" />
-    </div>
-  );
+  return <div aria-hidden="true" className="setlist-ticket-perforation" />;
+}
+
+function setlistRowKeys(setlist: Setlist): string[] {
+  const seen = new Map<string, number>();
+  return setlist.map((song) => {
+    const count = seen.get(song.title) ?? 0;
+    seen.set(song.title, count + 1);
+    return count === 0 ? song.title : `${song.title}#${count}`;
+  });
 }
 
 function TicketSetlist({ setlist }: { setlist: Setlist }) {
   const { t } = useTranslation();
   if (setlist.length === 0) return null;
+  const rowKeys = setlistRowKeys(setlist);
 
   return (
     <section>
@@ -125,7 +129,8 @@ function TicketSetlist({ setlist }: { setlist: Setlist }) {
       <HairlineList className="mt-3" label={t("artist.setlist.title")}>
         {setlist.map((song, index) => (
           <HairlineRow
-            key={`${song.position ?? index}:${song.title}`}
+            key={rowKeys[index]}
+            className="setlist-ticket-row"
             index={index + 1}
             trailing={
               typeof song.frequency === "number" ? (
@@ -271,18 +276,20 @@ export function UpcomingShowExpandedView({
   const directionsUrl = showDirectionsUrl(item);
 
   return (
-    <div className="relative flex h-full flex-col">
-      <TicketHeader
-        item={item}
-        dateLabel={dateLabel}
-        timeLabel={timeLabel}
-        timeRemaining={timeRemaining}
-        attending={attending}
-        onClose={onClose}
-        showClose={showClose}
-      />
+    <div className="setlist-ticket relative flex h-full flex-col">
+      <div className="setlist-ticket-top">
+        <TicketHeader
+          item={item}
+          dateLabel={dateLabel}
+          timeLabel={timeLabel}
+          timeRemaining={timeRemaining}
+          attending={attending}
+          onClose={onClose}
+          showClose={showClose}
+        />
+      </div>
       <TicketPerforation />
-      <div className="px-5 pt-6 pb-5 sm:px-7 sm:pb-7">
+      <div className="setlist-ticket-bottom flex-1 px-5 pt-6 pb-5 sm:px-7 sm:pb-7">
         <TicketSetlist setlist={item.probable_setlist ?? []} />
         <TicketActions
           item={item}

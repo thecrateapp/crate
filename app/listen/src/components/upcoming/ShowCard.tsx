@@ -126,11 +126,14 @@ export const ShowCard = memo(function ShowCard({
   return (
     <article
       className={cn(
-        "item-action-target relative overflow-hidden rounded-panel border border-border-quiet bg-surface-object",
+        "item-action-target relative overflow-hidden rounded-panel border",
         expanded
-          ? collapsible &&
-              "transition-[height,border-color] duration-400 ease-snap motion-reduce:transition-none"
-          : "transition-[height,border-color] duration-300 ease-snap hover:border-border-interactive motion-reduce:transition-none",
+          ? cn(
+              "border-transparent",
+              collapsible &&
+                "transition-[height,border-color] duration-400 ease-snap motion-reduce:transition-none",
+            )
+          : "border-border-quiet bg-surface-object transition-[height,border-color] duration-300 ease-snap hover:border-border-interactive motion-reduce:transition-none",
       )}
       data-variant={variant}
       data-expanded={expanded || undefined}
