@@ -10,7 +10,70 @@ import {
   parseCssColor,
   parseHexColor,
 } from "./color-contrast";
+import {
+  APPEARANCE_OPTION_VALUES,
+  APPEARANCE_PRESET_REGISTRY,
+  resolveAppearanceVariables,
+} from "./appearance-token-registry";
+import type { AccentId, PresetId, ResolvedColorMode } from "./appearance-types";
 import { SKIN_REGISTRY } from "./theme-skin";
+
+const BODY_TEXT_AA = 4.5;
+const KNOWN_BELOW_AA = new Map([
+  ["crateRed/dark --text-subtle on popover", 4.27],
+]);
+
+function appearanceVariables(
+  preset: PresetId,
+  mode: ResolvedColorMode,
+  accent?: AccentId,
+) {
+  const effective = {
+    ...APPEARANCE_PRESET_REGISTRY[preset].defaults,
+    ...(accent ? { accent } : {}),
+  };
+  return resolveAppearanceVariables({
+    mode,
+    preset,
+    preferences: {
+      version: 2,
+      mode,
+      preset,
+      overrides: accent ? { accent } : {},
+      presentation: { density: "comfortable" },
+      accessibility: { motion: "system" },
+    },
+    effective,
+    density: "comfortable",
+    motion: "system",
+    reducedMotion: false,
+  });
+}
+
+function mixSrgb(first: string, second: string, firstWeight: number): string {
+  const a = parseHexColor(first)!;
+  const b = parseHexColor(second)!;
+  const channel = (x: number, y: number) =>
+    Math.round(x * firstWeight + y * (1 - firstWeight))
+      .toString(16)
+      .padStart(2, "0");
+  return `#${channel(a.red, b.red)}${channel(a.green, b.green)}${channel(
+    a.blue,
+    b.blue,
+  )}`;
+}
+
+function appearanceSkins() {
+  return (Object.keys(APPEARANCE_PRESET_REGISTRY) as PresetId[]).flatMap(
+    (preset) =>
+      (["dark", "light"] as const).map((mode) => ({
+        name: `${preset}/${mode}`,
+        preset,
+        mode,
+        variables: appearanceVariables(preset, mode),
+      })),
+  );
+}
 
 describe("color contrast", () => {
   it("chooses the deterministic foreground with the strongest contrast", () => {
@@ -145,5 +208,83 @@ describe("color contrast", () => {
     expect(themeTokens).toMatch(/data-crate-mode="dark"/);
     expect(themeTokens).toMatch(/data-crate-mode="light"/);
     expect(themeTokens).not.toContain('data-crate-theme="high-contrast"');
+  });
+
+  describe.each(appearanceSkins())(
+    "v3 label and accent pairings in $name",
+    ({ preset, mode, variables }) => {
+      const canvas = variables["--surface-app"]!;
+      const object = variables["--surface-object"]!;
+
+      function ratio(foreground: string, background: string) {
+        return contrastRatioComposited(foreground, background, canvas);
+      }
+
+      it("keeps --text-subtle at AA on canvas, object and popover", () => {
+        const subtle = variables["--text-subtle"]!;
+        const popover = variables["--surface-popover"]!;
+        const knownGap = KNOWN_BELOW_AA.get(
+          `${preset}/${mode} --text-subtle on popover`,
+        );
+
+        expect(ratio(subtle, canvas)).toBeGreaterThanOrEqual(BODY_TEXT_AA);
+        expect(ratio(subtle, object)).toBeGreaterThanOrEqual(BODY_TEXT_AA);
+        if (knownGap === undefined) {
+          expect(ratio(subtle, popover)).toBeGreaterThanOrEqual(BODY_TEXT_AA);
+        } else {
+          expect(ratio(subtle, popover)).toBeCloseTo(knownGap, 2);
+        }
+      });
+
+      it("keeps --accent-action-hi at AA on canvas and object for every accent", () => {
+        APPEARANCE_OPTION_VALUES.accent.forEach((accent) => {
+          const accentHi = appearanceVariables(preset, mode, accent)[
+            "--accent-action-hi"
+          ]!;
+
+          expect(ratio(accentHi, canvas), accent).toBeGreaterThanOrEqual(
+            BODY_TEXT_AA,
+          );
+          expect(ratio(accentHi, object), accent).toBeGreaterThanOrEqual(
+            BODY_TEXT_AA,
+          );
+        });
+      });
+
+      it("keeps --state-warning-text at AA on canvas and object", () => {
+        const warningText = mixSrgb(
+          variables["--state-warning"]!,
+          variables["--text-primary"]!,
+          0.82,
+        );
+
+        expect(ratio(warningText, canvas)).toBeGreaterThanOrEqual(BODY_TEXT_AA);
+        expect(ratio(warningText, object)).toBeGreaterThanOrEqual(BODY_TEXT_AA);
+      });
+    },
+  );
+
+  it("measures --text-subtle near 4.9:1 on the canvas and 4.7:1 on the popover", () => {
+    const variables = appearanceVariables("default", "dark");
+    const canvas = variables["--surface-app"]!;
+
+    expect(
+      contrastRatioComposited(variables["--text-subtle"]!, canvas),
+    ).toBeCloseTo(4.9, 0);
+    expect(
+      contrastRatioComposited(
+        variables["--text-subtle"]!,
+        variables["--surface-popover"]!,
+        canvas,
+      ),
+    ).toBeCloseTo(4.7, 0);
+  });
+
+  it("derives --state-warning-text from the warning and primary tokens", () => {
+    const semantic = readFileSync("tokens/semantic.css", "utf8");
+
+    expect(semantic).toMatch(
+      /--state-warning-text:\s*color-mix\(\s*in srgb,\s*var\(--state-warning\) 82%,\s*var\(--text-primary\)\s*\)/,
+    );
   });
 });
