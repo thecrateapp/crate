@@ -17,6 +17,7 @@ export function initHero(): () => void {
   const canvas = document.querySelector<HTMLCanvasElement>("#field");
   const copy = document.querySelector<HTMLElement>(".hero-copy");
   const staticMark = document.querySelector<HTMLElement>(".mark-static");
+  const solidMark = document.querySelector<HTMLElement>(".mark-solid");
   const cue = document.querySelector<HTMLElement>(".scroll-cue");
   if (!canvas || !copy) return () => {};
 
@@ -55,13 +56,17 @@ export function initHero(): () => void {
     const mobile = isMobile();
     const count = mobile ? 12000 : 40000;
     const { positions: cloud } = cloudPositions(count, clusterCenters(16, 1.1));
+    const markWidth = mobile ? 1.15 : 1.25;
     const mark = await sampleImage("/icons/logo.svg", count, {
-      width: mobile ? 1.15 : 1.25,
+      width: markWidth,
       depth: 0.03,
     });
     if (disposed || !canvas || !copy) return;
     const lift = mobile ? 0.55 : 0.62;
     for (let i = 0; i < count; i++) mark[i * 3 + 1] += lift;
+    const center: Vec3 = [0, lift, 0];
+    let settledAt = -1;
+    let scrolled = false;
 
     field = createField(canvas, {
       positions: cloud,
@@ -91,8 +96,6 @@ export function initHero(): () => void {
     const state = {
       morph: 0,
       dive: 0,
-      repel: 0,
-      mouse: [9, 9] as [number, number],
       yaw: 0,
       pitch: 0,
       targetYaw: 0,
@@ -112,13 +115,43 @@ export function initHero(): () => void {
         0.15 + state.pitch,
         Math.cos(orbit) * distance,
       ];
+      if (state.morph < 0.98) settledAt = -1;
+      else if (settledAt < 0) settledAt = t;
+      const settled = settledAt < 0 ? -1 : t - settledAt;
+      const solid =
+        settled < 0 ? 0 : Math.min(1, Math.max(0, (settled - 0.25) / 0.9));
       active.render({
         eye,
         time: t,
         morph: state.morph,
-        mouse: state.mouse,
-        repel: state.repel,
+        warp: true,
+        center,
+        settled,
+        fade: solid,
       });
+      if (solidMark) placeSolid(eye, orbit, distance, solid);
+    }
+
+    function placeSolid(
+      eye: Vec3,
+      orbit: number,
+      distance: number,
+      solid: number,
+    ) {
+      if (!solidMark) return;
+      const left = active.project([center[0] - markWidth / 2, center[1], 0]);
+      const right = active.project([center[0] + markWidth / 2, center[1], 0]);
+      const middle = active.project(center);
+      const width = right.x - left.x;
+      const height = (width * 1120) / 1052;
+      const lens = innerHeight / 2 / Math.tan(0.85 / 2);
+      const tilt = Math.atan2(eye[1] - center[1], distance);
+      solidMark.style.opacity = `${solid}`;
+      solidMark.style.visibility = solid > 0 ? "visible" : "hidden";
+      solidMark.style.width = `${width}px`;
+      solidMark.style.transform = `translate(${middle.x - width / 2}px, ${
+        middle.y - height / 2
+      }px) perspective(${lens}px) rotateY(${-orbit}rad) rotateX(${-tilt}rad)`;
     }
 
     if (finePointer()) {
@@ -127,15 +160,11 @@ export function initHero(): () => void {
         (event) => {
           const x = (event.clientX / innerWidth) * 2 - 1;
           const y = 1 - (event.clientY / innerHeight) * 2;
-          state.mouse = [x, y];
           state.targetYaw = x * 0.18;
           state.targetPitch = -y * 0.1;
         },
         { signal: listeners.signal },
       );
-      document.addEventListener("pointerleave", () => (state.mouse = [9, 9]), {
-        signal: listeners.signal,
-      });
     }
 
     const loop = (time: number) => {
@@ -146,7 +175,6 @@ export function initHero(): () => void {
 
     const mix = {
       intro: 0,
-      repel: 0,
       hero: 0,
       statement: 0,
       screen: 0,
@@ -155,7 +183,6 @@ export function initHero(): () => void {
       const opacity = mix.intro * (1 - 0.84 * mix.statement) * (1 - mix.screen);
       gsap.set(canvas, { opacity });
       state.visible = opacity > 0.001;
-      state.repel = mix.hero > 0.02 ? 0 : mix.repel;
     };
 
     ctx.add(() => {
@@ -171,7 +198,6 @@ export function initHero(): () => void {
         delay: 0.15,
         ease: "power3.inOut",
       });
-      gsap.to(mix, { repel: 1, duration: 0.6, delay: 2.4, onUpdate: apply });
 
       ScrollTrigger.create({
         trigger: ".hero-pin",
@@ -179,10 +205,11 @@ export function initHero(): () => void {
         end: "bottom bottom",
         scrub: true,
         onUpdate: ({ progress }) => {
-          if (progress > 0) {
+          if (progress > 0 && !scrolled) {
+            scrolled = true;
             gsap.killTweensOf(state, "morph");
-            state.morph = 1 - Math.min(1, progress / 0.45);
           }
+          if (scrolled) state.morph = 1 - Math.min(1, progress / 0.45);
           mix.hero = progress;
           state.dive = Math.max(0, (progress - 0.3) / 0.7);
           const fade = Math.min(1, progress / 0.35);

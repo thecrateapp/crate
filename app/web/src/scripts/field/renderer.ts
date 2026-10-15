@@ -16,29 +16,37 @@ const VERTEX = `#version 300 es
   uniform float uScale;
   uniform float uMorph;
   uniform vec3 uFocus;
-  uniform vec2 uMouse;
-  uniform float uRepel;
+  uniform float uWarp;
+  uniform vec3 uCenter;
+  uniform float uSettled;
+  uniform float uFade;
   out float vAlpha;
   out float vHot;
   void main() {
     float m = clamp(uMorph * 1.25 - aSeed * 0.25, 0.0, 1.0);
     m = m * m * (3.0 - 2.0 * m);
     vec3 base = mix(aPos, aTarget, m);
+    float flight = 4.0 * m * (1.0 - m) * uWarp;
+    float flash = uSettled < 0.0 ? 0.0 : exp(-uSettled * 2.6) * m * uWarp;
+    if (uWarp > 0.5) {
+      vec3 rel = base - uCenter;
+      float a = (1.0 - m) * (2.4 + aSeed * 4.2);
+      float c = cos(a);
+      float s = sin(a);
+      rel = vec3(c * rel.x - s * rel.z, rel.y, s * rel.x + c * rel.z);
+      base = uCenter + rel * (1.0 + flight * (0.25 + aSeed * 0.35));
+    }
     vec3 p = base + 0.007 * vec3(
       sin(uTime * 0.7 + aSeed * 40.0),
       cos(uTime * 0.6 + aSeed * 31.0),
       sin(uTime * 0.5 + aSeed * 17.0));
     gl_Position = uMVP * vec4(p, 1.0);
     float depth = max(gl_Position.w, 0.04);
-    vec2 ndc = gl_Position.xy / gl_Position.w;
-    vec2 away = ndc - uMouse;
-    float d = length(away * vec2(1.0, 0.6));
-    float push = uRepel * smoothstep(0.17, 0.0, d);
-    gl_Position.xy += normalize(away + 0.0001) * push * 0.09 * gl_Position.w;
     float near = smoothstep(0.32, 0.0, distance(base, uFocus));
-    vHot = max(near, push * 0.8);
-    vAlpha = clamp(1.5 / depth, 0.06, 1.0) * (0.3 + aSeed * 0.7);
-    gl_PointSize = min(uScale * (0.6 + aSeed * 1.1 + near * 2.4) / depth, uScale * 2.2);
+    float hot = max(flight * 0.5, flash);
+    vHot = max(near, hot);
+    vAlpha = clamp(1.5 / depth, 0.06, 1.0) * (0.3 + aSeed * 0.7) * (1.0 + hot * 0.8) * (1.0 - uFade);
+    gl_PointSize = min(uScale * (0.6 + aSeed * 1.1 + near * 2.4 + flight * 0.7 + flash * 1.2) / depth, uScale * 3.0);
   }`;
 
 const FRAGMENT = `#version 300 es
@@ -62,8 +70,10 @@ const UNIFORMS = [
   "uScale",
   "uMorph",
   "uFocus",
-  "uMouse",
-  "uRepel",
+  "uWarp",
+  "uCenter",
+  "uSettled",
+  "uFade",
 ] as const;
 
 export interface FieldOptions {
@@ -83,8 +93,10 @@ export interface RenderOptions {
   time?: number;
   morph?: number;
   focus?: Vec3;
-  mouse?: [number, number];
-  repel?: number;
+  warp?: boolean;
+  center?: Vec3;
+  settled?: number;
+  fade?: number;
 }
 
 export interface Field {
@@ -250,8 +262,10 @@ function buildField(
     time = 0,
     morph = 0,
     focus = [99, 99, 99],
-    mouse = [9, 9],
-    repel = 0,
+    warp = false,
+    center = [0, 0, 0],
+    settled = -1,
+    fade = 0,
   }: RenderOptions) {
     morphNow = morph;
     multiply(
@@ -273,8 +287,10 @@ function buildField(
     gl.uniform1f(u.uTime, time);
     gl.uniform1f(u.uMorph, morph);
     gl.uniform3fv(u.uFocus, focus);
-    gl.uniform2fv(u.uMouse, mouse);
-    gl.uniform1f(u.uRepel, repel);
+    gl.uniform1f(u.uWarp, warp ? 1 : 0);
+    gl.uniform3fv(u.uCenter, center);
+    gl.uniform1f(u.uSettled, settled);
+    gl.uniform1f(u.uFade, fade);
     gl.drawArrays(gl.POINTS, 0, drawn);
   }
 

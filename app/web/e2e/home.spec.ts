@@ -33,6 +33,21 @@ test.describe("hero", () => {
     await expect(cue).toHaveCSS("opacity", "1");
   });
 
+  test("hands the particle mark over to the solid logo and back on scroll", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const solid = page.locator(".mark-solid");
+    await expect(solid).toHaveCSS("opacity", "1", { timeout: 8000 });
+    await expect(solid).toHaveCSS("visibility", "visible");
+
+    await page.evaluate(() => scrollTo(0, innerHeight * 0.3));
+    await expect(solid).toHaveCSS("visibility", "hidden");
+
+    await page.evaluate(() => scrollTo(0, 0));
+    await expect(solid).toHaveCSS("opacity", "1", { timeout: 8000 });
+  });
+
   test("leads the top navigation with the manifesto", async ({ page }) => {
     await page.goto("/");
     const first = page.locator(".nav .links a").first();
@@ -101,6 +116,7 @@ test.describe("hero", () => {
 
       await expect(page.locator(".mark-static")).toBeVisible();
       await expect(page.locator(".mark-static")).toHaveCSS("opacity", "1");
+      await expect(page.locator(".mark-solid")).toBeHidden();
       const words = page.locator(".hero-copy .w");
       expect(await words.count()).toBeGreaterThan(0);
       const transforms = await words.evaluateAll((elements) =>
