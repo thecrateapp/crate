@@ -1,12 +1,41 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("hero", () => {
-  test("hands the static mark over to the particle field", async ({ page }) => {
+  test("never shows the static mark before the particle field", async ({
+    page,
+  }) => {
+    await page.goto("/", { waitUntil: "commit" });
+    await page.waitForSelector(".mark-static", { state: "attached" });
+    const samples: string[] = [];
+    for (let i = 0; i < 20; i++) {
+      samples.push(
+        await page
+          .locator(".mark-static")
+          .evaluate((element) => getComputedStyle(element).opacity),
+      );
+      await page.waitForTimeout(100);
+    }
+    expect(new Set(samples)).toEqual(new Set(["0"]));
+    await expect(page.locator("canvas#field")).toHaveCount(1);
+  });
+
+  test("shows the static mark when WebGL2 is unavailable", async ({ page }) => {
+    await page.addInitScript(() => {
+      const original = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (
+        this: HTMLCanvasElement,
+        type: string,
+        ...rest: unknown[]
+      ) {
+        if (type === "webgl2") return null;
+        return original.call(this, type as "2d", ...(rest as []));
+      } as typeof original;
+    });
     await page.goto("/");
 
-    await expect(page.locator("canvas#field")).toHaveCount(1);
-    await page.waitForTimeout(3000);
-    await expect(page.locator(".mark-static")).toHaveCSS("opacity", "0");
+    await expect(page.locator(".mark-static")).toHaveCSS("opacity", "1", {
+      timeout: 5000,
+    });
   });
 
   test("falls back to the static mark while the WebGL context is lost", async ({

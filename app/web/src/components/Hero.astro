@@ -101,6 +101,12 @@ const { locale = "en" } = Astro.props;
     pointer-events: none;
   }
 
+  @media (prefers-reduced-motion: no-preference) {
+    :global(html.js) .mark-static {
+      opacity: 0;
+    }
+  }
+
   .hero-copy {
     position: relative;
     display: flex;

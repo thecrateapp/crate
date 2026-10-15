@@ -34,7 +34,13 @@ export function initHero(): () => void {
   let frame = 0;
   let field: Field | null = null;
 
-  start().catch(() => {});
+  const showStatic = () => {
+    if (!staticMark) return;
+    gsap.killTweensOf(staticMark);
+    gsap.set(staticMark, { opacity: 1 });
+  };
+
+  start().catch(showStatic);
 
   async function start() {
     if (reducedMotion()) return;
@@ -57,17 +63,17 @@ export function initHero(): () => void {
       isMobile: mobile,
       onContextLost() {
         canvas.style.visibility = "hidden";
-        if (staticMark) {
-          gsap.killTweensOf(staticMark);
-          gsap.set(staticMark, { opacity: 1 });
-        }
+        showStatic();
       },
       onContextRestored() {
         canvas.style.visibility = "";
         if (staticMark) gsap.to(staticMark, { opacity: 0, duration: 0.6 });
       },
     });
-    if (!field) return;
+    if (!field) {
+      showStatic();
+      return;
+    }
     const active = field;
 
     loadLibraryCloud(count).then((real) => {
@@ -156,8 +162,6 @@ export function initHero(): () => void {
         ease: "power2.out",
         onUpdate: apply,
       });
-      if (staticMark)
-        gsap.to(staticMark, { opacity: 0, duration: 0.6, ease: "power2.out" });
       gsap.to(state, {
         morph: 1,
         duration: 2.6,
