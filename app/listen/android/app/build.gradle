@@ -68,6 +68,9 @@ sentry {
 
 android {
     namespace = "app.cratemusic.crate"
+    buildFeatures {
+        buildConfig = true
+    }
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "app.cratemusic.crate"

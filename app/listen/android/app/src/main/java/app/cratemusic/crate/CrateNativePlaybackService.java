@@ -138,6 +138,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private NativeTransitionPlan activeTransitionPlan;
     private ExoPlayerNativePlaybackDeck transitionOutgoingDeck;
     private String fallenBackEdge = "";
+    private String lastMixDiagnostic = "";
     private int transitionOutgoingIndex = -1;
     private long transitionStartedWallMs;
     private long lastTransitionProgressEventElapsedMs;
@@ -183,6 +184,12 @@ public class CrateNativePlaybackService extends MediaSessionService {
         setMediaNotificationProvider(notificationProvider);
         deckAAudioProcessor = new NativeMixAudioProcessor();
         deckBAudioProcessor = new NativeMixAudioProcessor();
+        deckAAudioProcessor.setEnvelopeReporter(
+            summary -> Log.i(NativeMixAudioProcessor.QOE_TAG, summary)
+        );
+        deckBAudioProcessor.setEnvelopeReporter(
+            summary -> Log.i(NativeMixAudioProcessor.QOE_TAG, summary)
+        );
         eqController = new NativeEqController();
         deckAPlayer = buildPlayer(deckAAudioProcessor);
         deckBPlayer = buildPlayer(deckBAudioProcessor);
@@ -694,6 +701,21 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 if (activePhysicalPlayer() == physicalPlayer) {
                     applyEqForCurrentTrack();
                 }
+            }
+
+            @Override
+            public void onAudioUnderrun(
+                EventTime eventTime,
+                int bufferSize,
+                long bufferSizeMs,
+                long elapsedSinceLastFeedMs
+            ) {
+                Log.w(
+                    NativeMixAudioProcessor.QOE_TAG,
+                    "underrun active=" + (activePhysicalPlayer() == physicalPlayer)
+                        + " bufferMs=" + bufferSizeMs
+                        + " sinceLastFeedMs=" + elapsedSinceLastFeedMs
+                );
             }
         });
     }
@@ -1276,7 +1298,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
             String authorization = artwork
                 ? track.artworkAuthorization
                 : track.authorization;
-            String origin = httpsOrigin(url);
+            String origin = trustedOrigin(url);
             if (!authorization.isEmpty() && !origin.isEmpty()) {
                 authorizationByOrigin.put(origin, authorization);
             }
@@ -1284,20 +1306,31 @@ public class CrateNativePlaybackService extends MediaSessionService {
         return Collections.unmodifiableMap(authorizationByOrigin);
     }
 
-    private static String httpsOrigin(String url) {
+    private static String trustedOrigin(String url) {
         try {
             URI uri = URI.create(valueOrDefault(url, ""));
-            if (
-                !"https".equalsIgnoreCase(uri.getScheme()) ||
-                uri.getHost() == null ||
-                uri.getRawUserInfo() != null
-            ) {
+            if (uri.getHost() == null || uri.getRawUserInfo() != null) {
                 return "";
             }
-            return "https://" + uri.getRawAuthority();
+            String scheme = uri.getScheme();
+            if ("https".equalsIgnoreCase(scheme)) {
+                return "https://" + uri.getRawAuthority();
+            }
+            if (
+                BuildConfig.DEBUG &&
+                "http".equalsIgnoreCase(scheme) &&
+                isLoopbackHost(uri.getHost())
+            ) {
+                return "http://" + uri.getRawAuthority();
+            }
+            return "";
         } catch (RuntimeException error) {
             return "";
         }
+    }
+
+    private static boolean isLoopbackHost(String host) {
+        return "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host);
     }
 
     private static DataSpec withAuthorization(
@@ -1305,7 +1338,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         Map<String, String> authorizationByOrigin
     ) {
         String authorization = authorizationByOrigin.get(
-            httpsOrigin(dataSpec.uri.toString())
+            trustedOrigin(dataSpec.uri.toString())
         );
         if (authorization == null || authorization.isEmpty()) return dataSpec;
         return dataSpec.withAdditionalHeaders(
@@ -1567,6 +1600,14 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 )
             )
         ) {
+            if (player != null && mixController != null) {
+                logMixDiagnostic(
+                    "ticker idle crossfadeMs=" + crossfadeMs
+                        + " playing=" + player.isPlaying()
+                        + " items=" + player.getMediaItemCount()
+                        + " mixableNext=" + hasMixableAdjacentTrack()
+                );
+            }
             return;
         }
 
@@ -1607,8 +1648,21 @@ public class CrateNativePlaybackService extends MediaSessionService {
         NativeTransitionPlan plan = pendingTransitionPlan();
         if (plan == null) return;
         NativeMixTrigger.Decision decision = evaluatePendingMix(plan);
+        logMixDiagnostic(
+            "decision edge=" + plan.outgoingTrackId + ">" + plan.incomingTrackId
+                + " action=" + decision.action
+                + " mode=" + plan.mode
+                + " cueMs=" + plan.outgoingCueMs
+                + " durationMs=" + plan.durationMs
+                + " outgoingDurationMs=" + currentTrackDurationMs()
+                + " standbyReady=" + mixController.isStandbyReadyAt(
+                    plan.incomingCueMs,
+                    NativeMixTrigger.STANDBY_BUFFER_MARGIN_MS
+                )
+        );
         if (decision.action == NativeMixTrigger.Action.FALL_BACK) {
             fallenBackEdge = edgeKey(plan);
+            logMixDiagnostic("fell back edge=" + edgeKey(plan));
             return;
         }
         if (decision.action != NativeMixTrigger.Action.START) return;
@@ -1627,6 +1681,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         activeTransitionPlan = boundedPlan;
         transitionOutgoingDeck.setPauseAtEndOfTrack(true);
         if (!mixController.beginTransition(boundedPlan)) {
+            logMixDiagnostic("begin rejected edge=" + edgeKey(boundedPlan));
             clearNativeTransitionState();
             return;
         }
@@ -1675,6 +1730,12 @@ public class CrateNativePlaybackService extends MediaSessionService {
             );
         }
         return fallenBackEdge.equals(edgeKey(plan)) ? null : plan;
+    }
+
+    private void logMixDiagnostic(String message) {
+        if (message.equals(lastMixDiagnostic)) return;
+        lastMixDiagnostic = message;
+        Log.i(NativeMixAudioProcessor.QOE_TAG, message);
     }
 
     private String edgeKey(NativeTransitionPlan plan) {

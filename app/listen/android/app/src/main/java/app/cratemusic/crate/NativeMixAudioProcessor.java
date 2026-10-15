@@ -27,6 +27,13 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
         }
     }
 
+    static final String QOE_TAG = "CrateSmartMixQoE";
+
+    interface EnvelopeReporter {
+        void report(String summary);
+    }
+
+    private volatile EnvelopeReporter envelopeReporter;
     private static final Envelope NO_ENVELOPE = new Envelope(Role.INCOMING, 0L, 1.0f);
 
     private final AtomicReference<Envelope> requestedEnvelope =
@@ -46,6 +53,9 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
     private long envelopeFrame;
     private long envelopeFrames;
     private float envelopeFactor = 1.0f;
+    private float envelopePeak;
+    private long envelopeClippedSamples;
+    private boolean envelopeReported = true;
 
     void setGainImmediately(float gain) {
         requestGain(gain, 0);
@@ -111,16 +121,18 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
             while (inputBuffer.remaining() >= channelCount * 4) {
                 float gain = gainForNextFrame();
                 for (int channel = 0; channel < channelCount; channel++) {
-                    float sample = inputBuffer.getFloat();
-                    output.putFloat(clampFloat(sample * gain));
+                    float sample = inputBuffer.getFloat() * gain;
+                    trackEnvelopeLevel(Math.abs(sample));
+                    output.putFloat(clampFloat(sample));
                 }
             }
         } else {
             while (inputBuffer.remaining() >= channelCount * 2) {
                 float gain = gainForNextFrame();
                 for (int channel = 0; channel < channelCount; channel++) {
-                    int sample = inputBuffer.getShort();
-                    output.putShort(clampPcm16(Math.round(sample * gain)));
+                    int sample = Math.round(inputBuffer.getShort() * gain);
+                    trackEnvelopeLevel(Math.abs(sample) / (float) Short.MAX_VALUE);
+                    output.putShort(clampPcm16(sample));
                 }
             }
         }
@@ -130,17 +142,62 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
             envelopeProgressBits.set(
                 Float.floatToIntBits(Math.min(1.0f, envelopeFrame / (float) envelopeFrames))
             );
+            if (envelopeFrame >= envelopeFrames) {
+                reportEnvelope();
+            }
+        }
+    }
+
+    void setEnvelopeReporter(EnvelopeReporter reporter) {
+        envelopeReporter = reporter;
+    }
+
+    private void reportEnvelope() {
+        if (envelopeReported || activeEnvelope == NO_ENVELOPE) {
+            return;
+        }
+        envelopeReported = true;
+        EnvelopeReporter reporter = envelopeReporter;
+        if (reporter == null) {
+            return;
+        }
+        reporter.report(
+            "envelope role=" + activeEnvelope.role
+                + " durationMs=" + activeEnvelope.durationMs
+                + " progress=" + Math.min(1.0f, envelopeFrame / (float) envelopeFrames)
+                + " stagingGain=" + activeEnvelope.stagingGain
+                + " peak=" + envelopePeak
+                + " clippedSamples=" + envelopeClippedSamples
+        );
+    }
+
+    @Override
+    protected void onQueueEndOfStream() {
+        reportEnvelope();
+    }
+
+    private void trackEnvelopeLevel(float level) {
+        if (activeEnvelope == NO_ENVELOPE) {
+            return;
+        }
+        if (level > envelopePeak) {
+            envelopePeak = level;
+        }
+        if (level > 1.0f) {
+            envelopeClippedSamples++;
         }
     }
 
     @Override
     protected void onFlush() {
+        reportEnvelope();
         appliedRevision = -1;
         applyPendingTarget();
     }
 
     @Override
     protected void onReset() {
+        reportEnvelope();
         activeEnvelope = NO_ENVELOPE;
         envelopeFactor = 1.0f;
         requestedEnvelope.set(NO_ENVELOPE);
@@ -202,6 +259,9 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
         int sampleRate = Math.max(1, inputAudioFormat.sampleRate);
         activeEnvelope = requested;
         envelopeFrame = 0L;
+        envelopePeak = 0.0f;
+        envelopeClippedSamples = 0L;
+        envelopeReported = false;
         envelopeFrames = Math.max(1L, requested.durationMs * sampleRate / 1_000L);
     }
 

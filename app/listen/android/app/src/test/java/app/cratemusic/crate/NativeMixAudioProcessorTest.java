@@ -48,6 +48,28 @@ public class NativeMixAudioProcessorTest {
     }
 
     @Test
+    public void reportsPeakAndClippingOnceWhenAnEnvelopeCompletes()
+        throws Exception {
+        NativeMixAudioProcessor processor = new NativeMixAudioProcessor();
+        java.util.List<String> summaries = new java.util.ArrayList<>();
+        processor.setEnvelopeReporter(summaries::add);
+        processor.configure(
+            new AudioProcessor.AudioFormat(1_000, 1, C.ENCODING_PCM_16BIT)
+        );
+        processor.flush();
+        processor.startEnvelope(NativeMixAudioProcessor.Role.INCOMING, 4L, 0.0f);
+
+        processor.queueInput(constantPcm16(4, 1, (short) 16_384));
+        processor.getOutput();
+        processor.queueInput(constantPcm16(4, 1, (short) 16_384));
+        processor.getOutput();
+
+        assertEquals(1, summaries.size());
+        assertTrue(summaries.get(0).contains("role=INCOMING"));
+        assertTrue(summaries.get(0).contains("clippedSamples=0"));
+    }
+
+    @Test
     public void clampsInvalidTargetsAndNeverOverflowsPcm16()
         throws Exception {
         NativeMixAudioProcessor processor = new NativeMixAudioProcessor();
