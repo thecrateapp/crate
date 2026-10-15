@@ -11,6 +11,7 @@
   --surface-contrast: var(--text-primary);
   --text-on-contrast: var(--surface-canvas);
   --surface-container: var(--surface-panel);
+  --surface-object: var(--crate-token-surface-card-solid);
   --surface-elevated: var(--surface-raised);
   --surface-overlay: var(--surface-modal);
   --surface-chrome: color-mix(in srgb, var(--surface-canvas) 68%, transparent);

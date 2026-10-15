@@ -164,6 +164,23 @@ describe("appearance token registry", () => {
     expect(dark["--text-subtle"]).toBe("#7e8084");
   });
 
+  it("resolves the object surface to the solid card in every preset and mode", () => {
+    expect(resolveVariables("default", "dark")["--surface-object"]).toBe(
+      "#0d0e14",
+    );
+
+    PRESETS.forEach((preset) => {
+      MODES.forEach((mode) => {
+        (["solid", "glass"] as const).forEach((material) => {
+          const variables = resolveVariables(preset, mode, { material });
+          expect(variables["--surface-object"]).toBe(
+            variables["--crate-token-surface-card-solid"],
+          );
+        });
+      });
+    });
+  });
+
   it("derives a bright accent and its AA foreground for every accent", () => {
     const cyan = resolveVariables("default", "dark");
     const violet = resolveVariables("default", "dark", { accent: "violet" });

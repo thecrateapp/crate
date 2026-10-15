@@ -69,3 +69,6 @@
 .bg-popover-surface {
   background-color: var(--surface-popover);
 }
+.bg-surface-object {
+  background-color: var(--surface-object);
+}

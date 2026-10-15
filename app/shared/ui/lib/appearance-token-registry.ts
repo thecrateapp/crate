@@ -564,6 +564,7 @@ export function resolveAppearanceVariables(
     "--surface-popover": surfaceValue(
       `--crate-token-surface-overlay-${materialSuffix}`,
     ),
+    "--surface-object": surfaceValue("--crate-token-surface-card-solid"),
     "--scrollbar-thumb": surfaceValue("--crate-token-scrollbar-thumb"),
     "--scrollbar-hover": surfaceValue("--crate-token-scrollbar-hover"),
     "--text-primary": surfaceValue("--crate-token-color-foreground"),

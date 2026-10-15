@@ -126,7 +126,7 @@ export const ShowCard = memo(function ShowCard({
   return (
     <article
       className={cn(
-        "item-action-target relative overflow-hidden rounded-panel border border-border-quiet bg-card",
+        "item-action-target relative overflow-hidden rounded-panel border border-border-quiet bg-surface-object",
         expanded
           ? collapsible &&
               "transition-[height,border-color] duration-400 ease-snap motion-reduce:transition-none"
