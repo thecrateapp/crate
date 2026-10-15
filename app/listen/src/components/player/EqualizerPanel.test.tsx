@@ -30,6 +30,7 @@ function makeEqualizerState(overrides: Record<string, unknown> = {}) {
     toggleGenreAdaptive: vi.fn(),
     applyPreset: vi.fn(),
     updateBand: vi.fn(),
+    commitBand: vi.fn(),
     resetToFlat: vi.fn(),
     saveForCurrentTrack: vi.fn(),
     clearCurrentTrackPreset: vi.fn(),

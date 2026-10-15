@@ -308,7 +308,7 @@ export function EqualizerPanelView({
         <EqBands
           gains={eq.gains}
           onBandInput={manualControlsEnabled ? eq.updateBand : undefined}
-          onBandChange={manualControlsEnabled ? eq.updateBand : undefined}
+          onBandChange={manualControlsEnabled ? eq.commitBand : undefined}
           disabled={!eq.enabled}
           animate={motionAllowed}
           trackClassName="h-40"
