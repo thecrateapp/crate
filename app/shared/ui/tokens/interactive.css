@@ -102,3 +102,21 @@
   border-color: var(--active-border);
   background: var(--active-bg);
 }
+
+@media (forced-colors: active) {
+  .crate-status-dot {
+    border: 1px solid CanvasText;
+  }
+
+  [data-tone="on"] > .crate-status-dot {
+    background-color: Highlight;
+  }
+
+  [data-tone="warn"] > .crate-status-dot {
+    background-color: CanvasText;
+  }
+
+  [data-tone="off"] > .crate-status-dot {
+    background-color: transparent;
+  }
+}

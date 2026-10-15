@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
+import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
 
 export type StatusDotTone = "on" | "off" | "warn";
 
@@ -20,16 +21,33 @@ interface StatusDotProps {
   tone?: StatusDotTone;
   label?: ReactNode;
   title?: string;
+  pulse?: boolean;
   className?: string;
+}
+
+function PulsingDot({ className }: { className: string }) {
+  const motionAllowed = useMotionAllowed();
+
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(className, motionAllowed && "animate-pulse-subtle")}
+    />
+  );
 }
 
 export function StatusDot({
   tone = "on",
   label,
   title,
+  pulse = false,
   className,
 }: StatusDotProps) {
   const dotOnly = !label && Boolean(title);
+  const dotClassName = cn(
+    "crate-status-dot size-1.5 shrink-0 rounded-full",
+    TONE_DOT[tone],
+  );
 
   return (
     <span
@@ -43,10 +61,11 @@ export function StatusDot({
         className,
       )}
     >
-      <span
-        aria-hidden="true"
-        className={cn("size-1.5 shrink-0 rounded-full", TONE_DOT[tone])}
-      />
+      {pulse ? (
+        <PulsingDot className={dotClassName} />
+      ) : (
+        <span aria-hidden="true" className={dotClassName} />
+      )}
       {label}
     </span>
   );

@@ -5,7 +5,14 @@
   --font-mono: var(--font-mono-stack);
   --text-label: 0.6875rem;
   --text-label--line-height: 1.4;
+  --text-eyebrow: 0.71875rem;
+  --text-eyebrow--line-height: 1.4;
+  --text-numeral-sm: clamp(1.1rem, 2.1cqi, 1.9rem);
+  --text-numeral-md: clamp(1.6rem, 2.6cqi, 2.4rem);
+  --text-numeral-lg: clamp(2.8rem, 5.6cqi, 5.4rem);
+  --text-numeral-xl: clamp(3.2rem, 8.4cqi, 8.4rem);
   --leading-display: 0.9;
+  --leading-numeral: 0.85;
   --text-badge: 0.625rem; /* 10px */
   --text-badge--line-height: 1;
   --text-counter: 0.5rem; /* 8px */
@@ -17,6 +24,8 @@
   --tracking-display-tighter: -0.08em;
   --tracking-display-tight: -0.06em;
   --tracking-display: -0.04em;
+  --tracking-numeral: -0.05em;
+  --tracking-numeral-sm: -0.03em;
   --tracking-label: 0.12em;
   --tracking-caps: 0.14em;
   --tracking-kicker: 0.16em;
@@ -24,6 +33,31 @@
   --tracking-eyebrow-wide: 0.2em;
   --tracking-overline: 0.22em;
   --tracking-overline-wide: 0.24em;
+}
+
+@utility text-numeral-sm {
+  @supports not (font-size: 1cqi) {
+    font-size: 1.1rem;
+  }
+}
+
+@utility text-numeral-md {
+  @supports not (font-size: 1cqi) {
+    font-size: 1.6rem;
+  }
+  letter-spacing: -0.035em;
+}
+
+@utility text-numeral-lg {
+  @supports not (font-size: 1cqi) {
+    font-size: 2.8rem;
+  }
+}
+
+@utility text-numeral-xl {
+  @supports not (font-size: 1cqi) {
+    font-size: 3.2rem;
+  }
 }
 
 body {

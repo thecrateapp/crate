@@ -42,6 +42,33 @@ describe("cn", () => {
     expect(cn("leading-none", "leading-display")).toBe("leading-display");
   });
 
+  it.each(["eyebrow", "numeral-sm", "numeral-md", "numeral-lg", "numeral-xl"])(
+    "keeps the %s font size when its text colour is overridden",
+    (size) => {
+      expect(cn(`text-${size} text-text-subtle`, "text-text-primary")).toBe(
+        `text-${size} text-text-primary`,
+      );
+    },
+  );
+
+  it.each(["eyebrow", "numeral-sm", "numeral-md", "numeral-lg", "numeral-xl"])(
+    "resolves font-size conflicts for the %s token in either order",
+    (size) => {
+      expect(cn("text-lg", `text-${size}`)).toBe(`text-${size}`);
+      expect(cn(`text-${size}`, "text-lg")).toBe("text-lg");
+    },
+  );
+
+  it("resolves numeral tracking and leading overrides in either order", () => {
+    expect(cn("tracking-wide", "tracking-numeral")).toBe("tracking-numeral");
+    expect(cn("tracking-numeral", "tracking-wide")).toBe("tracking-wide");
+    expect(cn("tracking-numeral", "tracking-numeral-sm")).toBe(
+      "tracking-numeral-sm",
+    );
+    expect(cn("leading-none", "leading-numeral")).toBe("leading-numeral");
+    expect(cn("leading-numeral", "leading-none")).toBe("leading-none");
+  });
+
   it("resolves conflicts with layout and typography tokens", () => {
     expect(cn("rounded-xl", "rounded-panel")).toBe("rounded-panel");
     expect(cn("max-w-md", "max-w-content")).toBe("max-w-content");

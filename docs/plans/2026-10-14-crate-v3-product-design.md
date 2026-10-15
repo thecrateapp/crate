@@ -1,17 +1,18 @@
 # Crate v3 product design
 
-Status: design, 2026-10-15. Branch `feat/crate_v3` (worktree `worktrees/crate-v3`). Nothing below is
-implemented unless section 2 says so.
+Status: product design, revised 2026-10-15. Canonical clone `/Users/diego/Code/crate-v3`, branch
+`feat/crate_v3`. The handover records implementation and QA status; historical analysis is not a
+current progress report. Only the Checkpoint 1A primitive batch is currently authorised.
 
 Scope: Admin (`app/ui`), Listen (`app/listen`, which also ships as Capacitor iOS/Android and inside the
 Tauri shell `app/listen-desktop`), shared `@crate/ui` (`app/shared/ui`), and the backend work in
 `app/crate` and `app/readplane` that the screens need so the site's visualisations become real
 features on real data.
 
-Visual reference: the new site only, `worktrees/website/app/web`, pinned at `feat/website`
+Visual reference: the new site only, `app/web` at the approved git reference, pinned at `feat/website`
 `258bbaee` (the commit `crate-v3-analysis/site-visuals.md` read). Site line numbers and ported math
 in this document refer to that commit. Each port PR records the site SHA it copied (PR body or test
-fixture). Before each release group that ports site math, a deliberate re-sync step reviewed with
+fixture). Before each internal milestone that ports site math, a deliberate re-sync step reviewed with
 Diego moves the pin and lists what changed. No other design branch is a reference.
 
 Relation to other documents:
@@ -28,45 +29,41 @@ Relation to other documents:
   wrong. Decisions here are numbered `PDn` to avoid colliding with the spec's `[Dn]`; section 6 maps
   every `PDn` to its `[Dn]`.
 - `docs/plans/2026-10-14-crate-v3-implementation-plan.md` (the plan). Its phases (0–7) and its
-  Rollout → Milestones table (release groups R0, Foundation, Ops, Health, Genres, Listen player and
-  EQ, Stats, P1/P2, Smart Mix) are the only delivery order (5.5).
+  Rollout → Internal milestones (Foundation, Genres, player/EQ, Ops, Health, Stats) define dependencies
+  for the joint P0 major; R0 is separately assigned and P1/P2 remain later (5.5).
 - Evidence: `docs/plans/crate-v3-analysis/{site-visuals,site-language,v3-state,admin-audit,
-  listen-audit,genres,backend-admin,backend-listen,platform,coverage}.md`. The mapping cards and
+listen-audit,genres,backend-admin,backend-listen,platform,coverage}.md`. The mapping cards and
   their verification passes used while writing were working notes and are not in the repository;
   every verified correction is already written into this document and the spec, so neither needs
   another source.
-- Tracking: `docs/plans/` is gitignored (`.gitignore:71`). Only the spec is tracked (force-added in
-  `bce7dd92`); this document, the plan and `crate-v3-analysis/` are ignored, so a fresh clone
-  (plan Task 0.2), CI and PR reviewers do not see them. Before Phase 0 either change the ignore line
-  to `docs/plans/*` and add `!docs/plans/2026-10-14-crate-v3-*.md` and
-  `!docs/plans/crate-v3-analysis/` (a negation cannot re-include files under an ignored directory),
-  or add them with `git add -f` (then every docs commit in plan Tasks 0.3 and 0.4 needs `-f` for new
-  files). The ignore change is the simpler option.
+- Tracking: all five canonical v3 docs and `crate-v3-analysis/` are tracked. The reports preserve
+  the original investigation evidence; their counts, paths and implementation snapshots are
+  historical. Use the handover for current state, not the old evidence baseline.
 
 Canonical names (the plan's Task 0.4 alignment table carries these rows; the spec follows them):
 
-| Item | Use |
-| --- | --- |
-| Admin live stream | `GET /api/admin/live-stream?surfaces=` (5.3.1), `app/ui/src/contexts/AdminLiveProvider.tsx` plus `app/ui/src/hooks/use-admin-live.ts`; one stream per tab, no per-surface streams, no polling fallbacks |
-| Health contract | 4.2 (`unattended`, `fix_mode`, `last_scan`, `running.phase`, `trash.albums_quarantined`); one surface `health` carrying the events `health` and `health-scan` |
-| Effective EQ inheritance field | `genrePath` (4.12) |
-| Paths metadata column | `music_paths.plan_meta` (4.16) |
-| Setlist helpers | `@crate/ui/domain/shows/setlist.ts` with explicit `exports` entries (4.18) |
-| Admin page header | `app/ui/src/components/layout/PageHeading.tsx` |
-| Route map layout math | `app/listen/src/components/paths/path-route-layout.ts` |
-| Admin instrument homes | domain folders (5.4), no `components/viz`; `StatStrip` and `StepRail` in `app/ui/src/components/admin/` until Listen adopts them (3.1.4) |
-| EQ blast radius | client-side re-resolve over the wheel snapshot (4.6.1), never a request-time aggregate; tie-break = Python's BFS path order (4.6.1) |
-| Admin-only genre and enrichment reads | `GET /api/admin/genres/wheel` (4.6.3), `GET /api/admin/artists/{id}/enrichment/sources` (4.5) |
-| Curator override columns (G1) | `genre_taxonomy_nodes.local_eq_gains`, `eq_override`, `local_name`, `local_description`; core values stay in `eq_gains`, `name`, `description` (4.6.3 item 5) |
-| Governor runtime key | `crate:runtime:governor` (4.8), like the other `crate:runtime:*` keys |
-| Imports surface | `GET /api/imports/queue` with `ImportsSurface` (4.3) |
-| Health drill-down | `GET /api/admin/health-checks/{check_type}/issues` (4.2) |
-| Coalesced refresh due set | `crate:coalesce:due` (5.3.2) |
+| Item                                  | Use                                                                                                                                                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Admin live stream                     | `GET /api/admin/live-stream?surfaces=` (5.3.1), `app/ui/src/contexts/AdminLiveProvider.tsx` plus `app/ui/src/hooks/use-admin-live.ts`; one stream per tab, no per-surface streams, no polling fallbacks |
+| Health contract                       | 4.2 (`unattended`, `fix_mode`, `last_scan`, `running.phase`, `trash.albums_quarantined`); one surface `health` carrying the events `health` and `health-scan`                                           |
+| Effective EQ inheritance field        | `genrePath` (4.12)                                                                                                                                                                                      |
+| Paths metadata column                 | `music_paths.plan_meta` (4.16)                                                                                                                                                                          |
+| Setlist helpers                       | `@crate/ui/domain/shows/setlist.ts` with explicit `exports` entries (4.18)                                                                                                                              |
+| Admin page header                     | `app/ui/src/components/layout/PageHeading.tsx`                                                                                                                                                          |
+| Route map layout math                 | `app/listen/src/components/paths/path-route-layout.ts`                                                                                                                                                  |
+| Admin instrument homes                | domain folders (5.4), no `components/viz`; `StatStrip` and `StepRail` in `app/ui/src/components/admin/` until Listen adopts them (3.1.4)                                                                |
+| EQ blast radius                       | client-side re-resolve over the wheel snapshot (4.6.1), never a request-time aggregate; tie-break = Python's BFS path order (4.6.1)                                                                     |
+| Admin-only genre and enrichment reads | `GET /api/admin/genres/wheel` (4.6.3), `GET /api/admin/artists/{id}/enrichment/sources` (4.5)                                                                                                           |
+| Curator override columns (G1)         | `genre_taxonomy_nodes.local_eq_gains`, `eq_override`, `local_name`, `local_description`; core values stay in `eq_gains`, `name`, `description` (4.6.3 item 5)                                           |
+| Governor runtime key                  | `crate:runtime:governor` (4.8), like the other `crate:runtime:*` keys                                                                                                                                   |
+| Imports surface                       | `GET /api/imports/queue` with `ImportsSurface` (4.3)                                                                                                                                                    |
+| Health drill-down                     | `GET /api/admin/health-checks/{check_type}/issues` (4.2)                                                                                                                                                |
+| Coalesced refresh due set             | `crate:coalesce:due` (5.3.2)                                                                                                                                                                            |
 
 Conventions:
 
 - Paths are relative to the `crate-v3` worktree.
-- `site:` means `worktrees/website/app/web/`.
+- `site:` means `app/web/` at the approved pinned SHA, read from its git tree until integration.
 - `sm:` means `/Users/diego/Code/Ninja/musicdock/worktrees/smart-mix-phase-1/` (unmerged).
 - Priorities: P0 means v3 does not read as one product without it; P1 is a site chapter or spec
   rollout screen; P2 is the rest. Sizes: S (about 2 days, front end), M (a few days, small additive
@@ -140,85 +137,68 @@ Principles:
 
 ## 2. Status today
 
-### 2.1 Branch
+### 2.1 Branch and execution state
 
-| Item | Value |
-| --- | --- |
-| Commits | `bce7dd92` spec, `d9df9d51` tokens and fonts, `191ed32a` primitives and Radar ticket, `ce506e86` EQ curve chart |
-| Base | `b63e53b7`; 3 commits behind `origin/main` (backend, no overlap) |
-| Upstream | tracks `origin/main`, never pushed. The font licence question is settled (2.3 item 9, PD4, decided 2026-10-15): the font commit was rewritten (now `d9df9d51`, formerly `38c7576c`) to add Bricolage Grotesque (OFL) instead of Cabinet Grotesk, so the branch can be pushed with `git push -u origin feat/crate_v3` |
-| Tests | no recorded green run for any suite (Vitest, policies, typecheck, lint, appearance, listen-visual, `check:bundle`) |
+The canonical working clone is `/Users/diego/Code/crate-v3`, branch `feat/crate_v3`; assigned agents
+use isolated internal-disk worktrees. Product changes remain on the integration branch until the
+joint major. Smart Mix merges first, then the integrator rebases v3 and integrates website with
+approval. No current commit count or stale remote-distance estimate is an execution instruction.
 
-### 2.2 Done and pending
+### 2.2 Implemented foundation versus pending QA
 
-| Area | State |
-| --- | --- |
-| Tokens (default dark), fonts on every runtime, motion tokens | Done. Spring and expo easings are defined but unused. The display face is Bricolage Grotesque (OFL) after the licence decision (2.3 item 9, PD4) |
-| `MonoLabel`, `StatusDot`, `StatNumber` | Done in both apps (`StatNumber` reaches Admin only through `EqBands`) |
-| `HairlineList` | Done, Listen only |
-| `CratePill` v3 chip | Done; renders 6 px corners in Listen (radius rule) |
-| `EqBands` curve chart | Done, static; Listen EQ panel half migrated; Admin `GenreEqEditor` header and status only |
-| Listen Radar ticket | Done except real notches, `in_library` status, "N of M playable" footer, setlist source line, row entrance |
-| Everything else in both apps | Not started |
-| Site visuals as real features | Not in the spec's rollout; this document adds them |
+The handover records 0.0, 0.1 steps 1–2, 0.2–0.10, 0.12 and 0.13 as locally implemented. That
+includes Bricolage, token/drift corrections, EQ morph, ticket notches, contrast coverage, bundle
+checks and the iOS target. CI, screenshots and device QA remain separate and are not declared green.
 
-### 2.3 Problems on the branch
+Tasks 1.2–1.4 have local implementation/focused results reported under Checkpoint 1A; integration,
+full-suite status and Diego review remain pending in the handover.
+Runtime theme retirement (1.13) is planned, not implemented. Other instruments/backend contracts
+remain pending unless the integrator records a verified result after the Smart Mix rebase.
 
-1. EQ regression from `ce506e86`: the curve, bars and numerals jump while the ring handles slide
-   500 ms, so the handles detach from the curve on every preset change.
-2. The CI drift check fails: inline `style={{` 93 against 91 (`EqBands.tsx`), legacy semantic
-   utilities 1 against 0 (`app/listen/src/components/upcoming/ShowCard.tsx`), token definitions
-   138/95 against 134/91.
-3. Ticket notches are painted circles in the canvas colour, wrong on sheets and modals.
-4. `color-contrast.test.ts` does not check fg-3 or `accent-action-hi`.
-5. The 44 Listen visual baselines are stale. The Radar fixture has no setlist; there is no EQ panel
-   baseline.
-6. Admin barely moves with the tokens. In `.ts`/`.tsx` under `app/ui/src`: about 1,400 `*-white/N`
-   opacity utilities plus about 200 bare `*-white`, about 220 `*-black/N` and 89 inline hex values.
-7. Vitest workers time out on the external disk. The `node_modules` patch in this worktree is
-   unversioned and disappears on `npm ci`; suites must run in CI or from an internal-disk clone.
-8. The spec cites `components/lab/viz`; the real path is `site:src/components/viz`.
-9. Font licence (decided 2026-10-15, PD4; not legal advice). The font commit (now `d9df9d51`,
-   formerly `38c7576c`) first committed Cabinet Grotesk woff2 files under the ITF Free Font
-   License 2.0. Its §02 forbids distributing the
-   font "through another … repository, download service, application or platform" and making it
-   available "for use by third parties through any website, application, online service", and
-   forbids modification including subsetting and format conversion. `thecrateapp/crate` is public
-   and its GHCR images are run by third parties, so the font cannot ship in the product or the
-   repository. Decision: Bricolage Grotesque (SIL OFL 1.1) replaces it in every runtime and on
-   cratemusic.app; the font commit and the website commits were rewritten before any push, so no commit
-   contains Cabinet files.
+### 2.3 Historical findings and remaining gates
+
+`crate-v3-analysis/v3-state.md` records the original four-commit audit: static EQ/handle mismatch,
+painted ticket notches, drift violations and external-disk Vitest timeouts. Do not reapply fixes
+from that snapshot. Refer to task diffs and the handover for the current state.
+
+Checkpoint 0 remains open: 0.11 Linux CI baselines/reviews, 0.15 runtime qualification and relevant
+reviews; 0.14 production graph measurement may wait until the wheel and needs explicit assignment.
+The obsolete variant's contrast exception is removed with 1.13, not converted into another theme
+requirement. Semantic Crate v3 AA, keyboard, forced-colors and reduced motion remain mandatory.
+
+Bricolage is the accepted OFL face, with font history rewritten. The documents do not grant push,
+PR, commit, deployment or production access permission.
 
 ### 2.4 Platform findings that block live visuals
 
 All pre-existing on `main`. The fixes are in 5.1; IDs are reused across the document.
 
-| ID | Finding | Where | Impact |
-| --- | --- | --- | --- |
-| B1 | `list_domain_events` reads id `0` first; with an empty PEL Redis returns `[[stream, []]]`, which is truthy, so `>` is never read. The verification pass reproduced it on redis 7 with the repo's redis-py | `app/crate/db/domain_events.py:243-255` | The projector has not consumed new domain events since `1c371d6e` (2026-04-27). Projector-warmed snapshots (ops, home, stats) refresh only through read-through or tasks. UNCERTAIN: confirm on production with `XINFO GROUPS crate:domain_events` |
-| B2 | `ops/dashboard` rebuilds inside the request after 60 s or on `?fresh=1`, with `COUNT/SUM/AVG` over `library_tracks`. Admin fires `fresh=1` on focus, visibility and online | `db/ui_snapshot_building.py:14`, `OpsSnapshotContext.tsx:364-376` | Rule violation (V3); thundering herd |
-| B3 | `/api/admin/metrics/system` and `/dashboard` run `COUNT(*)` on `library_tracks` and evaluate the governor in the API (50 ms sleep, two scans, API env without the governor variables) | `api/admin_metrics.py:173,199` | Rule violation (V1, V2); wrong thresholds shown |
-| B4 | SSE generators read the DB synchronously on the event loop, once per message per client | `api/admin_ops.py:44`, `api/management.py:191`, `api/events.py:92` | V4 |
-| B5 | `/api/insights` runs 10+ `read_scope()` calls with `COUNT/SUM` over `library_tracks` per request | `api/analytics.py` | Blocks Insights and Discover |
-| B6 | Mood counts run `COUNT(*) FILTER` x8 over the global catalog join on every cache miss; mood playback runs `ORDER BY RANDOM()` on every click | `api/browse_media.py:1680`, `db/queries/browse_media_mood.py` | Blocks MoodMap |
-| B7 | Sound Intelligence health scans `library_tracks` per request (G4); catalog and explore genre fallbacks run the global CTE in the request (G5) | `db/queries/sound_intelligence.py:21-79`, `api/catalog.py:221`, `api/browse.py:54` | Blocks the genre pages |
-| B8 | Effective EQ opens up to 6 `read_scope()` calls per track change (8 on the catalog route Listen uses) | `crate/equalizer.py`, `db/repositories/equalizer_presets.py` | Hot path, every Smart EQ listener |
-| B9 | `/api/acquisition/stream` rebuilds per client every 3 s with a synchronous slskd call (up to 10 s) in the async generator; `/new-releases/stream` polls every 5 s; `/snapshot` and `/stream` require only authentication, so any Listen user can read Soulseek usernames and paths | `api/acquisition.py:129-176,283-291,343` | Perf and security |
-| B10 | `/tasks` opens one `EventSource` per running and pending task | `pages/Tasks.tsx` (`ActiveTaskCard`) | N+2 streams per tab |
-| B11 | The projector maps any `federation.*` scope to an `ops/dashboard` rebuild, so every remote stream event rebuilds it | `projector.py:231-238` | Load grows with remote playback |
-| B12 | `StatsDashboardResponse` does not declare `snapshot` and `SnapshotMetadataResponse` has no `pending`, so FastAPI drops them; the cold payload also renders the empty state | `api/schemas/me.py:791`, `api/schemas/common.py:32`, `use-stats-page-controller.ts` | Pending polling is dead in production |
-| B13 | A health check that raises still resolves all its open issues as `fixed` and records 0 issues; `health_check` and `library_pipeline` never publish the health signal | `health_check.py:244-256`, `db/health.py:168-188`, `worker_handlers/management.py:98,589` | The Health instrument would lie |
-| B14 | Federation approve posts `node_uid` where the API expects `pairing_uid`, so it always returns 404; Approve is also offered on outbound pairings | `pages/federation/PeersPanel.tsx:56`, `api/admin_federation.py:317` | Pairing approval broken in Admin |
-| B15 | `/api/radio/next`, `/feedback` and `DELETE /session` do not check the session owner | `api/radio.py` | Security |
-| B16 | `/api/events/task/{id}` requires only authentication; any user with a task id reads its events | `api/events.py` | Security; matters for task-driven Paths |
-| B17 | `/api/admin/global-catalog/status` runs 4 `COUNT(*)`, a `COUNT(DISTINCT)` and band counts per request; the users presence query joins every play event through an `OR` join | `db/queries/admin_global_catalog.py:15-104`, `db/queries/auth_presence.py:48-82` | Rule violations |
-| B18 | `POST /api/paths`, `/regenerate` and `/preview` plan synchronously in the request (up to 100 KNN queries, graph loads, an LLM call) | `api/paths.py:49`, `db/paths_llm_refinement.py` | Do not promote Regenerate until planning is a task |
-| B19 | The ops snapshot persists `recent_events` with `payload_json` (user ids, titles) and `/api/admin/ops-stream` sends it raw | `db/domain_events.py` (`_decode_stream_messages`) | Privacy |
-| B20 | `Download.tsx` reads the Last.fm API key from the API and calls Last.fm from the browser | `pages/Download.tsx` | Security |
-| B21 | Crate Connect presence is written only on socket connect; the WS heartbeat refreshes nothing, so REST `active` is wrong after 90 s and cross-worker `connected_instances` drop after 120 s | `api/connect_ws.py` | Devices would lie |
-| B22 | Setlist reads: one cache read per artist per request; the process L1 keeps `setlistfm:*` for days and no invalidation clears it | `api/me.py:423`, `db/home_builder_upcoming_feed.py:42`, `db/cache_store.py` | N+1 and stale reads |
-| B23 | The genre seeder overwrites curator edits to the 61 core genres on every boot (G1); clearing a core preset does nothing in Python but inherits in Go (G2) | `db/jobs/genre_taxonomy.py:219-252`, `genre_taxonomy.py:910-919`, `readplane/internal/catalog/genre.go:447` | Wheel editing would lie |
-| B24 | Client render loops: `useAudioVisualizer` pushes 1024/2048-float arrays into state at about 20 fps; lyrics lists subscribe to progress at list level; `useCrossfadeProgress` runs its own rAF `setState` loop per mounted instance, and the bar controller (`usePlayerBarController`), `ExtendedPlayer` and `FullscreenPlayer` each mount one, so up to three per-frame loops run together during a crossfade | `hooks/use-audio-visualizer.ts:44-72`, `LyricsPanel.tsx:41`, `hooks/use-crossfade-progress.ts` | Player jank |
+| ID  | Finding                                                                                                                                                                                                                                                                                                                                                                                                       | Where                                                                                                       | Impact                                                                                                                                                                                                                                             |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B1  | `list_domain_events` reads id `0` first; with an empty PEL Redis returns `[[stream, []]]`, which is truthy, so `>` is never read. The verification pass reproduced it on redis 7 with the repo's redis-py                                                                                                                                                                                                     | `app/crate/db/domain_events.py:243-255`                                                                     | The projector has not consumed new domain events since `1c371d6e` (2026-04-27). Projector-warmed snapshots (ops, home, stats) refresh only through read-through or tasks. UNCERTAIN: confirm on production with `XINFO GROUPS crate:domain_events` |
+| B2  | `ops/dashboard` rebuilds inside the request after 60 s or on `?fresh=1`, with `COUNT/SUM/AVG` over `library_tracks`. Admin fires `fresh=1` on focus, visibility and online                                                                                                                                                                                                                                    | `db/ui_snapshot_building.py:14`, `OpsSnapshotContext.tsx:364-376`                                           | Rule violation (V3); thundering herd                                                                                                                                                                                                               |
+| B3  | `/api/admin/metrics/system` and `/dashboard` run `COUNT(*)` on `library_tracks` and evaluate the governor in the API (50 ms sleep, two scans, API env without the governor variables)                                                                                                                                                                                                                         | `api/admin_metrics.py:173,199`                                                                              | Rule violation (V1, V2); wrong thresholds shown                                                                                                                                                                                                    |
+| B4  | SSE generators read the DB synchronously on the event loop, once per message per client                                                                                                                                                                                                                                                                                                                       | `api/admin_ops.py:44`, `api/management.py:191`, `api/events.py:92`                                          | V4                                                                                                                                                                                                                                                 |
+| B5  | `/api/insights` runs 10+ `read_scope()` calls with `COUNT/SUM` over `library_tracks` per request                                                                                                                                                                                                                                                                                                              | `api/analytics.py`                                                                                          | Blocks Insights and Discover                                                                                                                                                                                                                       |
+| B6  | Mood counts run `COUNT(*) FILTER` x8 over the global catalog join on every cache miss; mood playback runs `ORDER BY RANDOM()` on every click                                                                                                                                                                                                                                                                  | `api/browse_media.py:1680`, `db/queries/browse_media_mood.py`                                               | Blocks MoodMap                                                                                                                                                                                                                                     |
+| B7  | Sound Intelligence health scans `library_tracks` per request (G4); catalog and explore genre fallbacks run the global CTE in the request (G5)                                                                                                                                                                                                                                                                 | `db/queries/sound_intelligence.py:21-79`, `api/catalog.py:221`, `api/browse.py:54`                          | Blocks the genre pages                                                                                                                                                                                                                             |
+| B8  | Effective EQ opens up to 6 `read_scope()` calls per track change (8 on the catalog route Listen uses)                                                                                                                                                                                                                                                                                                         | `crate/equalizer.py`, `db/repositories/equalizer_presets.py`                                                | Hot path, every Smart EQ listener                                                                                                                                                                                                                  |
+| B9  | `/api/acquisition/stream` rebuilds per client every 3 s with a synchronous slskd call (up to 10 s) in the async generator; `/new-releases/stream` polls every 5 s; `/snapshot` and `/stream` require only authentication, so any Listen user can read Soulseek usernames and paths                                                                                                                            | `api/acquisition.py:129-176,283-291,343`                                                                    | Perf and security                                                                                                                                                                                                                                  |
+| B10 | `/tasks` opens one `EventSource` per running and pending task                                                                                                                                                                                                                                                                                                                                                 | `pages/Tasks.tsx` (`ActiveTaskCard`)                                                                        | N+2 streams per tab                                                                                                                                                                                                                                |
+| B11 | The projector maps any `federation.*` scope to an `ops/dashboard` rebuild, so every remote stream event rebuilds it                                                                                                                                                                                                                                                                                           | `projector.py:231-238`                                                                                      | Load grows with remote playback                                                                                                                                                                                                                    |
+| B12 | `StatsDashboardResponse` does not declare `snapshot` and `SnapshotMetadataResponse` has no `pending`, so FastAPI drops them; the cold payload also renders the empty state                                                                                                                                                                                                                                    | `api/schemas/me.py:791`, `api/schemas/common.py:32`, `use-stats-page-controller.ts`                         | Pending polling is dead in production                                                                                                                                                                                                              |
+| B13 | A health check that raises still resolves all its open issues as `fixed` and records 0 issues; `health_check` and `library_pipeline` never publish the health signal                                                                                                                                                                                                                                          | `health_check.py:244-256`, `db/health.py:168-188`, `worker_handlers/management.py:98,589`                   | The Health instrument would lie                                                                                                                                                                                                                    |
+| B14 | Federation approve posts `node_uid` where the API expects `pairing_uid`, so it always returns 404; Approve is also offered on outbound pairings                                                                                                                                                                                                                                                               | `pages/federation/PeersPanel.tsx:56`, `api/admin_federation.py:317`                                         | Pairing approval broken in Admin                                                                                                                                                                                                                   |
+| B15 | `/api/radio/next`, `/feedback` and `DELETE /session` do not check the session owner                                                                                                                                                                                                                                                                                                                           | `api/radio.py`                                                                                              | Security                                                                                                                                                                                                                                           |
+| B16 | `/api/events/task/{id}` requires only authentication; any user with a task id reads its events                                                                                                                                                                                                                                                                                                                | `api/events.py`                                                                                             | Security; matters for task-driven Paths                                                                                                                                                                                                            |
+| B17 | `/api/admin/global-catalog/status` runs 4 `COUNT(*)`, a `COUNT(DISTINCT)` and band counts per request; the users presence query joins every play event through an `OR` join                                                                                                                                                                                                                                   | `db/queries/admin_global_catalog.py:15-104`, `db/queries/auth_presence.py:48-82`                            | Rule violations                                                                                                                                                                                                                                    |
+| B18 | `POST /api/paths`, `/regenerate` and `/preview` plan synchronously in the request (up to 100 KNN queries, graph loads, an LLM call)                                                                                                                                                                                                                                                                           | `api/paths.py:49`, `db/paths_llm_refinement.py`                                                             | Do not promote Regenerate until planning is a task                                                                                                                                                                                                 |
+| B19 | The ops snapshot persists `recent_events` with `payload_json` (user ids, titles) and `/api/admin/ops-stream` sends it raw                                                                                                                                                                                                                                                                                     | `db/domain_events.py` (`_decode_stream_messages`)                                                           | Privacy                                                                                                                                                                                                                                            |
+| B20 | `Download.tsx` reads the Last.fm API key from the API and calls Last.fm from the browser                                                                                                                                                                                                                                                                                                                      | `pages/Download.tsx`                                                                                        | Security                                                                                                                                                                                                                                           |
+| B21 | Crate Connect presence is written only on socket connect; the WS heartbeat refreshes nothing, so REST `active` is wrong after 90 s and cross-worker `connected_instances` drop after 120 s                                                                                                                                                                                                                    | `api/connect_ws.py`                                                                                         | Devices would lie                                                                                                                                                                                                                                  |
+| B22 | Setlist reads: one cache read per artist per request; the process L1 keeps `setlistfm:*` for days and no invalidation clears it                                                                                                                                                                                                                                                                               | `api/me.py:423`, `db/home_builder_upcoming_feed.py:42`, `db/cache_store.py`                                 | N+1 and stale reads                                                                                                                                                                                                                                |
+| B23 | The genre seeder overwrites curator edits to the 61 core genres on every boot (G1); clearing a core preset does nothing in Python but inherits in Go (G2)                                                                                                                                                                                                                                                     | `db/jobs/genre_taxonomy.py:219-252`, `genre_taxonomy.py:910-919`, `readplane/internal/catalog/genre.go:447` | Wheel editing would lie                                                                                                                                                                                                                            |
+| B24 | Client render loops: `useAudioVisualizer` pushes 1024/2048-float arrays into state at about 20 fps; lyrics lists subscribe to progress at list level; `useCrossfadeProgress` runs its own rAF `setState` loop per mounted instance, and the bar controller (`usePlayerBarController`), `ExtendedPlayer` and `FullscreenPlayer` each mount one, so up to three per-frame loops run together during a crossfade | `hooks/use-audio-visualizer.ts:44-72`, `LyricsPanel.tsx:41`, `hooks/use-crossfade-progress.ts`              | Player jank                                                                                                                                                                                                                                        |
 
 ---
 
@@ -230,48 +210,51 @@ All pre-existing on `main`. The fixes are in 5.1; IDs are reused across the docu
 
 The token layer from the spec stays. Mapping and remaining gaps:
 
-| Site | Product | Default dark value | Use |
-| --- | --- | --- | --- |
-| `--bg` | `surface-app`, `color-background` | `#0a0a0f` | canvas, text on accent fills |
-| `--fg` | `text-text-primary` | `#f1f5f9` | primary text, numerals |
-| `--fg-2` | `text-text-muted` | `#999ca0` | body secondary, idle chips, readouts on popovers |
-| `--fg-3` | `text-text-subtle` | `#7e8084` | mono labels, meta, axes |
-| `--line` | `border-border-quiet` | `rgba(241,245,249,.1)` | panel top rule, borders |
-| row divider | `border-border-quiet-subtle` | `rgba(241,245,249,.06)` | rows inside lists |
-| `--cyan` | `accent-action` | `#06b6d4` | fills, CTA, play disc, glows |
-| `--cyan-hi` | `accent-action-hi` | `#67e8f9` | strokes, key words, active chips, focus ring |
-| `--amber` | `state-warning` | `#f59e0b` today, site `#fbbf24` | status only (PD11) |
-| `#0d0e14` | new alias `surface-object` (today only legacy `bg-card`) | `#0d0e14` | objects: ticket, JSON, terminal, toast, dialog, tooltip |
-| `#0b1d24` | new `--surface-accent-active` (`bg-`/`fill-surface-accent-active`, DS 1.9.4): `color-mix(in srgb, var(--accent-action) 11%, var(--surface-canvas))` | about `#0a1d25` | active node fill (wheel pinned node, system map). Added in its first consumer's commit (GenreWheel pinned node, plan 3.7) with the definition ceiling raised by 1 and the registry and contrast tests in the same commit (DS 6.2) |
-| alpha ladders | opacity modifiers on tokens: `bg-accent-action/4` (hover), `/8` (active row wash), `/14` (halo), `border-accent-action-hi/40` (chip hover). Tailwind 4 compiles them to `color-mix()`, which sets the iOS floor (PD42) | | no new tokens |
+| Site          | Product                                                                                                                                                                                                                | Default dark value              | Use                                                                                                                                                                                                                               |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--bg`        | `surface-app`, `color-background`                                                                                                                                                                                      | `#0a0a0f`                       | canvas, text on accent fills                                                                                                                                                                                                      |
+| `--fg`        | `text-text-primary`                                                                                                                                                                                                    | `#f1f5f9`                       | primary text, numerals                                                                                                                                                                                                            |
+| `--fg-2`      | `text-text-muted`                                                                                                                                                                                                      | `#999ca0`                       | body secondary, idle chips, readouts on popovers                                                                                                                                                                                  |
+| `--fg-3`      | `text-text-subtle`                                                                                                                                                                                                     | `#7e8084`                       | mono labels, meta, axes                                                                                                                                                                                                           |
+| `--line`      | `border-border-quiet`                                                                                                                                                                                                  | `rgba(241,245,249,.1)`          | panel top rule, borders                                                                                                                                                                                                           |
+| row divider   | `border-border-quiet-subtle`                                                                                                                                                                                           | `rgba(241,245,249,.06)`         | rows inside lists                                                                                                                                                                                                                 |
+| `--cyan`      | `accent-action`                                                                                                                                                                                                        | `#06b6d4`                       | fills, CTA, play disc, glows                                                                                                                                                                                                      |
+| `--cyan-hi`   | `accent-action-hi`                                                                                                                                                                                                     | `#67e8f9`                       | strokes, key words, active chips, focus ring                                                                                                                                                                                      |
+| `--amber`     | `state-warning`                                                                                                                                                                                                        | `#f59e0b` today, site `#fbbf24` | status only (PD11)                                                                                                                                                                                                                |
+| `#0d0e14`     | new alias `surface-object` (today only legacy `bg-card`)                                                                                                                                                               | `#0d0e14`                       | objects: ticket, JSON, terminal, toast, dialog, tooltip                                                                                                                                                                           |
+| `#0b1d24`     | new `--surface-accent-active` (`bg-`/`fill-surface-accent-active`, DS 1.9.4): `color-mix(in srgb, var(--accent-action) 11%, var(--surface-canvas))`                                                                    | about `#0a1d25`                 | active node fill (wheel pinned node, system map). Added in its first consumer's commit (GenreWheel pinned node, plan 3.7) with the definition ceiling raised by 1 and the registry and contrast tests in the same commit (DS 6.2) |
+| alpha ladders | opacity modifiers on tokens: `bg-accent-action/4` (hover), `/8` (active row wash), `/14` (halo), `border-accent-action-hi/40` (chip hover). Tailwind 4 compiles them to `color-mix()`, which sets the iOS floor (PD42) |                                 | no new tokens                                                                                                                                                                                                                     |
 
-The accent is user-selectable (cyan, red, violet) and a light mode and the Crate Red preset exist.
-Visuals never use a literal colour: SVG uses `currentColor` and `stroke-*`/`fill-*` token classes;
-canvas and WebGL use `readCssColorToken` and re-read on appearance change. The minimum bar for
-light mode and Crate Red is PD53.
+Crate v3 is the only visual identity: fixed brand accent, surfaces, radii and typography. No theme,
+skin, mode or accent selectors remain in the target product (PD53). Visuals use semantic tokens:
+SVG uses `currentColor` and token classes; canvas/WebGL read tokens on mount and restoration.
+The current registry/generator stays in place until the full migration in plan 1.13. Motion and
+accessibility preferences remain supported independently.
 
 #### 3.1.2 Type tiers
 
 The values are DS 1.2.2 (sizes and tokens) and DS 1.2.3 (tracking); this table only maps them to
 the screens. If the two ever differ, the spec wins.
 
-| Tier | Recipe | Use |
-| --- | --- | --- |
-| Page title | `text-display-page`: `font-display` 800, `leading-display`, -0.045em, `clamp(2.25rem, 4vw, 3.75rem)`, `text-balance` | every page header |
-| Entity title | `text-display-entity`: same, `clamp(2.6rem, 5vw, 4.4rem)`, two lines max with ellipsis | artist, album, playlist, genre, profile, ticket artist |
-| Readout word | `text-display-readout`: 800, `clamp(2.2rem, 4.2cqi, 3.8rem)`, -0.045em, one line | track readout title, EQ preset word |
-| Numeral XL | `StatNumber size="xl"`: 800, `leading-numeral` (.85), -0.05em, `clamp(3.2rem, 8.4cqi, 8.4rem)` | stats counters, release clock |
-| Numeral L | 800, `clamp(2.8rem, 5.6cqi, 5.4rem)`, .85, -0.05em | health totals, library scale |
-| Numeral M | 700, `clamp(1.6rem, 2.6cqi, 2.4rem)`, 1, -0.035em | readout figures, lane counts |
-| Numeral S | 700, `clamp(1.1rem, 2.1cqi, 1.9rem)`, 1, -0.03em | gauges, EQ band values, legend values |
-| Sub-head | `text-subhead`: Bricolage 700, `clamp(1.25rem, 1.7vw, 1.6rem)`, 1.1, -0.025em (`tracking-tight`) | section and rail titles |
-| Lede | Bricolage 500, 1.15–1.5rem, -0.025em, `text-text-muted`, 36ch | page and bio ledes |
-| Label | `MonoLabel`: JetBrains Mono 11 px, .14em, uppercase, `text-text-subtle`, tabular; key word in `accent-action-hi`; parts joined by ` · ` | every panel header, meta line |
-| Eyebrow | `text-eyebrow`: mono 11.5 px, .16em; `<accent>03</accent> / Acquisition` | page headers backing a site chapter |
-| Micro mono | `text-label` (11 px) and `text-badge` (10 px); smaller sizes only through instrument recipe classes | units, axes, badges. No arbitrary `text-[Npx]` in shared or Listen code (design-token policy budgets) |
+| Tier         | Recipe                                                                                                                                | Use                                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Page title   | `text-display-page`: `font-display` 800, `leading-display`, -0.045em, `clamp(2.25rem, 4vw, 3.75rem)`, `text-balance`                  | every page header                                                                                     |
+| Entity title | `text-display-entity`: same, `clamp(2.6rem, 5vw, 4.4rem)`, two lines max with ellipsis                                                | artist, album, playlist, genre, profile, ticket artist                                                |
+| Readout word | `text-display-readout`: 800, `clamp(2.2rem, 4.2cqi, 3.8rem)`, -0.045em, one line                                                      | track readout title, EQ preset word                                                                   |
+| Numeral XL   | `StatNumber size="xl"`: 800, `leading-numeral` (.85), -0.05em, `clamp(3.2rem, 8.4cqi, 8.4rem)`                                        | stats counters, release clock                                                                         |
+| Numeral L    | 800, `clamp(2.8rem, 5.6cqi, 5.4rem)`, .85, -0.05em                                                                                    | health totals, library scale                                                                          |
+| Numeral M    | 700, `clamp(1.6rem, 2.6cqi, 2.4rem)`, 1, -0.035em                                                                                     | readout figures, lane counts                                                                          |
+| Numeral S    | 700, `clamp(1.1rem, 2.1cqi, 1.9rem)`, 1, -0.03em                                                                                      | gauges, EQ band values, legend values                                                                 |
+| Sub-head     | `text-subhead`: Bricolage 700, `clamp(1.25rem, 1.7vw, 1.6rem)`, 1.1, -0.025em (`tracking-tight`)                                      | section and rail titles                                                                               |
+| Lede         | Bricolage 500, 1.15–1.5rem, -0.025em, `text-text-muted`, 36ch                                                                         | page and bio ledes                                                                                    |
+| Label        | `MonoLabel`: JetBrains Mono 11 px, .14em, uppercase, `text-text-subtle`, tabular; key word in `accent-action-hi`; parts joined by `·` | every panel header, meta line                                                                         |
+| Eyebrow      | `text-eyebrow`: mono 11.5 px, .16em; `<accent>03</accent> / Acquisition`                                                              | page headers backing a site chapter                                                                   |
+| Micro mono   | `text-label` (11 px) and `text-badge` (10 px); smaller sizes only through instrument recipe classes                                   | units, axes, badges. No arbitrary `text-[Npx]` in shared or Listen code (design-token policy budgets) |
 
-- Each `cqi` tier declares a rem `font-size` before the `clamp(…cqi…)` value, so an engine without
-  container units keeps a sized numeral instead of falling back to the inherited body size (PD42).
+- Numeral `cqi` utilities use guarded rem fallbacks inside `@supports not (font-size: 1cqi)`
+  alongside `@theme inline` clamps, verified after Tailwind compilation and LightningCSS
+  minification (Task 1.4). Consecutive rem/clamp declarations are pruned by the minifier. Other
+  display/readout tiers need the same production-output verification when their later tasks land.
 - Bricolage Grotesque only at 20 px and up for titles and 16 px and up for numerals. Exception (DS
   1.2.1): player bar and mini-player track titles at 15–16 px, weight 700 (4.11). The variable
   `opsz` axis picks the display cut at large sizes and the text cut at 15–16 px
@@ -285,43 +268,43 @@ the screens. If the two ever differ, the spec wins.
 Values are DS 1.8 (easings 1.8.1, durations 1.8.2, entrances 1.8.3, data motion 1.8.4); if they
 ever differ, the spec wins.
 
-| Rule | Value |
-| --- | --- |
-| Colour and state changes | 0.3 s `ease-snap` |
-| Line and path drawing | `pathLength=1`, dashoffset 1 → 0, `ease-out-expo` (the site's `--ease-out`); hairlines 500–600 ms, long draws 900 ms, the Paths route 1.2 s |
-| Entrances | panel: opacity plus a 12 px rise, 500–700 ms, `ease-spring-snappy` (longhand) with an `ease-out-expo` fallback; page transition: opacity plus 8 px, 350 ms `ease-out-expo`; list stagger 70 ms (setlist rows 55 ms, devices 140 ms), capped at 8 items (20 for a setlist). Once per mount, never on refetch. No `filter: blur` on Android WebView or WebKitGTK |
-| CSS springs | `ease-spring-snappy` / `ease-spring-smooth` only through longhand properties, behind `@supports (transition-timing-function: linear(0, 1))` with an `ease-snap` fallback. Never inside `transition:` or `animation:` shorthands (iOS < 17.2, WebView2 111, WebKitGTK 2.40, macOS 11 drop the whole declaration). No final state may depend on an animation running |
-| Data springs | JS `stepSpring` (semi-implicit Euler), `dt` clamped to 50 ms (1/60 on the first frame), stop when `abs(delta)` and `abs(velocity)` < 0.01. Defaults 170/18; EQ 120/14; genre mini EQ 140/15; readout `90 + (i % 7) * 8` / 13 |
-| Following a moving target | `x += (target - x) * (1 - exp(-dt * 7))` |
-| Text swap | scramble without I/O/Q, settles left to right, 320–1100 ms, one per element; the scrambled node is `aria-hidden` and a sibling sr-only node holds the final text |
-| Count-up | ease-out cubic over 1600 ms, from the previous value, only on first view or a real change |
-| Loops | one rAF per visual, running only while intersecting, `document.visibilityState === "visible"`, motion allowed and something is unsettled (DS 3.8 rule 3). A loop stops once every spring and position settles, even while a task keeps running. The Tauri window disables background throttling, so loops must stop themselves |
-| Elapsed time | running clocks (`0:42` on a health row, a running chip's elapsed slot) come from one 1 s timer per visual that writes a text node when the formatted string changes; never from a rAF |
-| Reduced motion | final state at once; no springs, scramble, stagger or count-up; interaction unchanged. Gate: Listen `isMotionBlocked()` (`app/listen/src/lib/motion-availability.ts`); shared code uses the new `@crate/ui/lib/motion-gate.ts` (media query, `data-crate-motion`, hidden document); Admin has only the media query |
+| Rule                      | Value                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Colour and state changes  | 0.3 s `ease-snap`                                                                                                                                                                                                                                                                                                                                                  |
+| Line and path drawing     | `pathLength=1`, dashoffset 1 → 0, `ease-out-expo` (the site's `--ease-out`); hairlines 500–600 ms, long draws 900 ms, the Paths route 1.2 s                                                                                                                                                                                                                        |
+| Entrances                 | panel: opacity plus a 12 px rise, 500–700 ms, `ease-spring-snappy` (longhand) with an `ease-out-expo` fallback; page transition: opacity plus 8 px, 350 ms `ease-out-expo`; list stagger 70 ms (setlist rows 55 ms, devices 140 ms), capped at 8 items (20 for a setlist). Once per mount, never on refetch. No `filter: blur` on Android WebView or WebKitGTK     |
+| CSS springs               | `ease-spring-snappy` / `ease-spring-smooth` only through longhand properties, behind `@supports (transition-timing-function: linear(0, 1))` with an `ease-snap` fallback. Never inside `transition:` or `animation:` shorthands (iOS < 17.2, WebView2 111, WebKitGTK 2.40, macOS 11 drop the whole declaration). No final state may depend on an animation running |
+| Data springs              | JS `stepSpring` (semi-implicit Euler), `dt` clamped to 50 ms (1/60 on the first frame), stop when `abs(delta)` and `abs(velocity)` < 0.01. Defaults 170/18; EQ 120/14; genre mini EQ 140/15; readout `90 + (i % 7) * 8` / 13                                                                                                                                       |
+| Following a moving target | `x += (target - x) * (1 - exp(-dt * 7))`                                                                                                                                                                                                                                                                                                                           |
+| Text swap                 | scramble without I/O/Q, settles left to right, 320–1100 ms, one per element; the scrambled node is `aria-hidden` and a sibling sr-only node holds the final text                                                                                                                                                                                                   |
+| Count-up                  | ease-out cubic over 1600 ms, from the previous value, only on first view or a real change                                                                                                                                                                                                                                                                          |
+| Loops                     | one rAF per visual, running only while intersecting, `document.visibilityState === "visible"`, motion allowed and something is unsettled (DS 3.8 rule 3). A loop stops once every spring and position settles, even while a task keeps running. The Tauri window disables background throttling, so loops must stop themselves                                     |
+| Elapsed time              | running clocks (`0:42` on a health row, a running chip's elapsed slot) come from one 1 s timer per visual that writes a text node when the formatted string changes; never from a rAF                                                                                                                                                                              |
+| Reduced motion            | final state at once; no springs, scramble, stagger or count-up; interaction unchanged. Gate: Listen `isMotionBlocked()` (`app/listen/src/lib/motion-availability.ts`); shared code uses the new `@crate/ui/lib/motion-gate.ts` (media query, `data-crate-motion`, hidden document); Admin has only the media query                                                 |
 
 #### 3.1.4 Primitives
 
-| Primitive | Today | v3 change | Home |
-| --- | --- | --- | --- |
-| `MonoLabel` | exists | pass through `id`, `role`, `aria-*` | `@crate/ui/primitives` |
-| `StatusDot` | `on` / `off` / `warn` | add a motion-gated `pulse` for warming; no other tones | same |
-| `StatNumber` | `sm/md/lg`, 700, label below | `xl` tier; weight 800 on `lg`/`xl`; inline mono `unit` slot; `forwardRef`; value node writable by ref | same; visual check in both apps |
-| `HairlineList` / `HairlineRow` | Listen only; children in `span.truncate` | `as`/`href`/`onSelect`, pass-through `id`/`aria-*`, `active` state (2 px `accent-action-hi` bar plus `from-accent-action/8` wash). Admin adopts it in Health | same |
-| `CratePill` | about 24 px, always `aria-pressed` | `min-h-8`; action variant without `aria-pressed`; Listen radius per PD3 | `primitives/CrateBadge.tsx` |
-| `InstrumentPanel` | new | `<figure>` with `pt-5.5 border-t border-border-quiet` and `@container` (`container-type: inline-size`), header row of two `MonoLabel`s, right status slot (`aria-live="polite"`), required `aria-label` sentence (DS 2.3) | `@crate/ui/primitives` |
-| `Meter` | new | 2–4 px track, `scaleX(var(--v))` fill in `accent-action-hi`, optional limit tick, `over` state (`state-warning` plus label text change), `role="meter"`, values written by ref | same |
-| `Readout` | new | one mono line with reserved width plus a separate sr-only live node (hover never announces) | same |
-| `ProgressHairline` | new | determinate `--p` or indeterminate (site Roadmap bar), visibility-gated, static under reduced motion | same |
-| `surface-object` | missing | semantic alias generated from the registry, referenced in the same change | `@crate/ui/tokens` |
-| Motion gate, `eq-curve`, `stepSpring`, `useEqMorph`, `useVisibleLoop` | Listen-only gate | the `EqBands` morph fix (plan 0.7) adds only `@crate/ui/lib/motion-gate.ts` and `@crate/ui/lib/eq-curve.ts`. `stepSpring` and `useEqMorph` stay in `@crate/ui/domain/player/eq-morph.ts` (not exported) until an app imports them directly, because `export-usage-policy.test.ts` checks every `lib/*` export and only follows `export … from`: the spring helpers move to `@crate/ui/lib/spring.ts` in whichever of plan 3.5 (GovernorGauges) or 4.3 (EQ glyph) lands first, and `useEqMorph` to `@crate/ui/lib/use-eq-morph.ts` in 4.3. `useVisibleLoop` is created with its first importer (`QueueLanes`, plan 3.4) | `@crate/ui/lib` once imported by an app |
-| Scramble | none | Admin-local first; moves to `@crate/ui/lib/scramble.ts` in the first Listen consumer (plan 4.5, the EQ trail word), before Stats (4.6) and the mood map (4.8b) use it | `app/ui/src/lib/motion/scramble.ts` (plan 3.1), then `@crate/ui/lib/scramble.ts` |
-| Count-up | `CountUpNumber` in Listen | Listen-local until Admin calls it | app `lib/motion` |
-| Toaster config | two `richColors` toasters | shared class names and durations, no `richColors` | `@crate/ui/lib/toaster-config.ts` |
-| `PageHeading` | `OpsPageHero` plus 7 ad-hoc `h1` recipes | Admin-local page header | `app/ui/src/components/layout/PageHeading.tsx` |
-| `PageHeader` | Listen, shared | restyle in place | `@crate/ui/domain/navigation` |
-| `StatStrip` | `OpsStatTile`, Settings `StatTile`, Timeline `StatCard` | 2–6 `StatNumber`s on hairlines (DS 2.5); also the legend recipe | `app/ui/src/components/admin/StatStrip.tsx`; moves to `@crate/ui/primitives` in the Listen Library change (4.20), deleting the Admin copy |
-| `StepRail` | ad-hoc rails | stages with a `--p` progress, vertical under 900 px container width | `app/ui/src/components/admin/StepRail.tsx`; moves to `@crate/ui/domain/tasks/StepRail.tsx` (`app/shared/ui/domain/tasks/StepRail.tsx`) in the Listen Upload change (4.22, plan 6.15), deleting the Admin copy |
-| `nivoTheme` | 3 `NIVO_THEME` constants (`AudioProfileCard.tsx:30`, `ArtistStats.tsx:9`, `Insights.tsx:67`) plus 6 inline `theme={{…}}` objects (`TrackTable.tsx:647`, `ArtistStats.tsx:237`, `Dashboard.tsx:1080`, `:1124`, `:1177`, `SystemHealth.tsx:483`), 9 in all | one token-resolved theme per app, re-resolved on appearance change, `animate={!reducedMotion}`; the nivo-theme task replaces all 9 | per app |
+| Primitive                                                             | Today                                                                                                                                                                                                                                                    | v3 change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Home                                                                                                                                                                                                          |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MonoLabel`                                                           | exists                                                                                                                                                                                                                                                   | pass through `id`, `role`, `aria-*`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `@crate/ui/primitives`                                                                                                                                                                                        |
+| `StatusDot`                                                           | `on` / `off` / `warn`                                                                                                                                                                                                                                    | add a motion-gated `pulse` for warming; no other tones                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | same                                                                                                                                                                                                          |
+| `StatNumber`                                                          | `sm/md/lg`, 700, label below                                                                                                                                                                                                                             | `xl` tier; weight 800 on `lg`/`xl`; inline mono `unit` slot; `forwardRef`; value node writable by ref                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | same; visual check in both apps                                                                                                                                                                               |
+| `HairlineList` / `HairlineRow`                                        | Listen only; children in `span.truncate`                                                                                                                                                                                                                 | `as`/`href`/`onSelect`, pass-through `id`/`aria-*`, `active` state (2 px `accent-action-hi` bar plus `from-accent-action/8` wash). Admin adopts it in Health                                                                                                                                                                                                                                                                                                                                                                                                                                                           | same                                                                                                                                                                                                          |
+| `CratePill`                                                           | about 24 px, always `aria-pressed`                                                                                                                                                                                                                       | `min-h-8`; action variant without `aria-pressed`; Listen radius per PD3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `primitives/CrateBadge.tsx`                                                                                                                                                                                   |
+| `InstrumentPanel`                                                     | new                                                                                                                                                                                                                                                      | `<figure>` with `pt-5.5 border-t border-border-quiet` and `@container` (`container-type: inline-size`), header row of two `MonoLabel`s, right status slot (`aria-live="polite"`), required `aria-label` sentence (DS 2.3)                                                                                                                                                                                                                                                                                                                                                                                              | `@crate/ui/primitives`                                                                                                                                                                                        |
+| `Meter`                                                               | new                                                                                                                                                                                                                                                      | 2–4 px track, `scaleX(var(--v))` fill in `accent-action-hi`, optional limit tick, `over` state (`state-warning` plus label text change), `role="meter"`, values written by ref                                                                                                                                                                                                                                                                                                                                                                                                                                         | same                                                                                                                                                                                                          |
+| `Readout`                                                             | new                                                                                                                                                                                                                                                      | one mono line with reserved width plus a separate sr-only live node (hover never announces)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | same                                                                                                                                                                                                          |
+| `ProgressHairline`                                                    | new                                                                                                                                                                                                                                                      | determinate `--p` or indeterminate (site Roadmap bar), visibility-gated, static under reduced motion                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | same                                                                                                                                                                                                          |
+| `surface-object`                                                      | missing                                                                                                                                                                                                                                                  | semantic alias generated from the registry, referenced in the same change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | `@crate/ui/tokens`                                                                                                                                                                                            |
+| Motion gate, `eq-curve`, `stepSpring`, `useEqMorph`, `useVisibleLoop` | Listen-only gate                                                                                                                                                                                                                                         | the `EqBands` morph fix (plan 0.7) adds only `@crate/ui/lib/motion-gate.ts` and `@crate/ui/lib/eq-curve.ts`. `stepSpring` and `useEqMorph` stay in `@crate/ui/domain/player/eq-morph.ts` (not exported) until an app imports them directly, because `export-usage-policy.test.ts` checks every `lib/*` export and only follows `export … from`: the spring helpers move to `@crate/ui/lib/spring.ts` in whichever of plan 3.5 (GovernorGauges) or 4.3 (EQ glyph) lands first, and `useEqMorph` to `@crate/ui/lib/use-eq-morph.ts` in 4.3. `useVisibleLoop` is created with its first importer (`QueueLanes`, plan 3.4) | `@crate/ui/lib` once imported by an app                                                                                                                                                                       |
+| Scramble                                                              | none                                                                                                                                                                                                                                                     | Admin-local first; moves to `@crate/ui/lib/scramble.ts` in the first Listen consumer (plan 4.5, the EQ trail word), before Stats (4.6) and the mood map (4.8b) use it                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `app/ui/src/lib/motion/scramble.ts` (plan 3.1), then `@crate/ui/lib/scramble.ts`                                                                                                                              |
+| Count-up                                                              | `CountUpNumber` in Listen                                                                                                                                                                                                                                | Listen-local until Admin calls it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | app `lib/motion`                                                                                                                                                                                              |
+| Toaster config                                                        | two `richColors` toasters                                                                                                                                                                                                                                | shared class names and durations, no `richColors`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | `@crate/ui/lib/toaster-config.ts`                                                                                                                                                                             |
+| `PageHeading`                                                         | `OpsPageHero` plus 7 ad-hoc `h1` recipes                                                                                                                                                                                                                 | Admin-local page header                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `app/ui/src/components/layout/PageHeading.tsx`                                                                                                                                                                |
+| `PageHeader`                                                          | Listen, shared                                                                                                                                                                                                                                           | restyle in place                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | `@crate/ui/domain/navigation`                                                                                                                                                                                 |
+| `StatStrip`                                                           | `OpsStatTile`, Settings `StatTile`, Timeline `StatCard`                                                                                                                                                                                                  | 2–6 `StatNumber`s on hairlines (DS 2.5); also the legend recipe                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | `app/ui/src/components/admin/StatStrip.tsx`; moves to `@crate/ui/primitives` in the Listen Library change (4.20), deleting the Admin copy                                                                     |
+| `StepRail`                                                            | ad-hoc rails                                                                                                                                                                                                                                             | stages with a `--p` progress, vertical under 900 px container width                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `app/ui/src/components/admin/StepRail.tsx`; moves to `@crate/ui/domain/tasks/StepRail.tsx` (`app/shared/ui/domain/tasks/StepRail.tsx`) in the Listen Upload change (4.22, plan 6.15), deleting the Admin copy |
+| `nivoTheme`                                                           | 3 `NIVO_THEME` constants (`AudioProfileCard.tsx:30`, `ArtistStats.tsx:9`, `Insights.tsx:67`) plus 6 inline `theme={{…}}` objects (`TrackTable.tsx:647`, `ArtistStats.tsx:237`, `Dashboard.tsx:1080`, `:1124`, `:1177`, `SystemHealth.tsx:483`), 9 in all | one token-resolved chart configuration per app for the single Crate v3 identity, `animate={!reducedMotion}`; the nivo-theme task replaces all 9                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | per app                                                                                                                                                                                                       |
 
 There is no fifth shared legend primitive: a legend is an inline `dl` inside each instrument
 (swatch or `MonoLabel` key, values as `StatNumber size="sm"`) until two apps share one. The two
@@ -336,37 +319,37 @@ Delete the dead `app/shared/ui/domain/stats/Ops*` and `app/shared/ui/domain/show
 
 Details are in `coverage.md` section 2 and `site-language.md` section 2; the rules:
 
-| Recipe | Rule | Applies to |
-| --- | --- | --- |
-| Page header | optional mono back link; eyebrow `MonoLabel`; display title (3.1.2); optional lede; meta as a `MonoLabel` list or a `StatStrip` of 2–4 numerals; actions on the title baseline (desktop) or wrapped below (mobile); no card, glow or icon tile | every page |
-| Panel and section | data sections use `InstrumentPanel`; content rails use the restyled shared `SectionHeader` (mono eyebrow, Bricolage 700 title, mono count, "See all →" underline link with a 44 px hit area) | all panels, Listen rails |
-| Hairline list | 9 px rows, `border-border-quiet-subtle` dividers, list starts on a `border-border-quiet` rule, mono index `01`, meta in fixed `ch` columns, hover `bg-accent-action/4`, active bar | lists |
-| Table | semantic `<table>` when 3+ comparable columns or sorting; mono uppercase `thead`; no zebra or cell borders; numbers right-aligned tabular; status cell = dot plus word; `aria-sort`; columns drop at 1000 and 760 px | Users, Roles, history, routes, streams |
-| Track row | index (play glyph on hover/focus) / title over artist / mono `124 · 8A` meta on desktop / tabular duration (never re-rendered per tick) / actions; playing row gets the active bar and `accent-action-hi` title; quality and explicit flags as mono tags; remote rows carry `via <node>` | every track list |
-| Media grid | square covers, no shadow, 1 px inset hairline; title sans 14/500; mono meta; hover tints hairline and title, no lift; 40 px play disc overlay; placeholder `accent-action/16` with mono initials | grids and rails |
-| Forms | `MonoLabel` above; 40 px fields (44 on coarse pointers); focus 2 px `accent-action-hi` outline; errors as `StatusDot warn` plus text, `aria-invalid`, never a toast; selects of 7 or fewer options become chip groups | forms |
-| Buttons | primary: pill with `accent-action` fill (Listen radius per PD3); secondary: `CratePill` action variant; round play disc 40 / 56–64 px; icon buttons ghost, 32 px (44 coarse); destructive per PD10 | everywhere |
-| Tabs | `role="tablist"`, mono 11.5 px .14em text, 2 px underline; selected tab in the URL: `?tab=` by default (the plan 1b.3 helper), a path segment where the route already has one (Listen `/collection/:section`), `?section=` for Settings sections, `?queue=` for Tasks | Admin Artist, Federation, Download, Settings; Listen Library (already `?tab=` on `/library` and `/collection/:section`), player tabs |
-| Dialogs and popovers | object surface, hairline, `rounded-panel`; overlay canvas at .72 without blur; `MonoLabel` eyebrow plus Bricolage 700 title; confirm dialogs carry a mono consequence line (`12 files · 1.4 GB · moves to Library Trash`) and typed confirmation for wipe and rebuild; Admin moves to the shared `ConfirmDialog` | all overlays |
-| Toasts | inline feedback first; toast only when the result outlives the control; object card, `MonoLabel` type word (`SAVED`, `QUEUED` in `accent-action-hi`; `FAILED` in `state-warning`); Admin task toasts link `/tasks?task=` | both apps |
-| States | loading keeps the final geometry with `—` values (no shimmer, no spinner inside instruments); empty = one readout, one sentence, at most one CTA; inline error keeps the last data, marks it stale, offers Retry; warming = `MonoLabel BUILDING` plus pulsing warn dot, driven by push or task events; offline (Listen) = mono `OFFLINE` tag and disabled actions with a reason | every surface |
-| Progress | 2 px hairline, `role="progressbar"`, mono `07 / 17` or `42%`; fixed-phase tasks use the step rail | task progress |
-| Status colour | 3.1.6 | everywhere |
-| Numbers | `tabular-nums`; real minus `−`; ` · ` separators; `→` for flows; lower-case mono units after the numeral; `~` for approximations; `m:ss` / `h:mm:ss`; relative time in mono with absolute time in `title`; countdowns `T−12 d`; zero-padded indices | everywhere |
-| Charts (Nivo) | hairline grid, mono ticks in `text-text-subtle`, `accent-action-hi` series and crosshair, object-card tooltips, area fill ≤ .08; pies become a proportional hairline bar with a mono legend; radars become feature bars | Admin Insights, System, Dashboard diagnostics, ArtistStats |
-| Focus | `:focus-visible` 2 px `accent-action-hi` outline at offset 3 (-2 inset on edge-to-edge rows); roving tabindex in chip groups and node sets; skip link in both shells | everywhere |
-| Remote provenance | mono `via north.crate` tag with a ring dot when stale or unhealthy | Listen rows and search, Admin global catalog |
+| Recipe               | Rule                                                                                                                                                                                                                                                                                                                                                                            | Applies to                                                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Page header          | optional mono back link; eyebrow `MonoLabel`; display title (3.1.2); optional lede; meta as a `MonoLabel` list or a `StatStrip` of 2–4 numerals; actions on the title baseline (desktop) or wrapped below (mobile); no card, glow or icon tile                                                                                                                                  | every page                                                                                                                           |
+| Panel and section    | data sections use `InstrumentPanel`; content rails use the restyled shared `SectionHeader` (mono eyebrow, Bricolage 700 title, mono count, "See all →" underline link with a 44 px hit area)                                                                                                                                                                                    | all panels, Listen rails                                                                                                             |
+| Hairline list        | 9 px rows, `border-border-quiet-subtle` dividers, list starts on a `border-border-quiet` rule, mono index `01`, meta in fixed `ch` columns, hover `bg-accent-action/4`, active bar                                                                                                                                                                                              | lists                                                                                                                                |
+| Table                | semantic `<table>` when 3+ comparable columns or sorting; mono uppercase `thead`; no zebra or cell borders; numbers right-aligned tabular; status cell = dot plus word; `aria-sort`; columns drop at 1000 and 760 px                                                                                                                                                            | Users, Roles, history, routes, streams                                                                                               |
+| Track row            | index (play glyph on hover/focus) / title over artist / mono `124 · 8A` meta on desktop / tabular duration (never re-rendered per tick) / actions; playing row gets the active bar and `accent-action-hi` title; quality and explicit flags as mono tags; remote rows carry `via <node>`                                                                                        | every track list                                                                                                                     |
+| Media grid           | square covers, no shadow, 1 px inset hairline; title sans 14/500; mono meta; hover tints hairline and title, no lift; 40 px play disc overlay; placeholder `accent-action/16` with mono initials                                                                                                                                                                                | grids and rails                                                                                                                      |
+| Forms                | `MonoLabel` above; 40 px fields (44 on coarse pointers); focus 2 px `accent-action-hi` outline; errors as `StatusDot warn` plus text, `aria-invalid`, never a toast; selects of 7 or fewer options become chip groups                                                                                                                                                           | forms                                                                                                                                |
+| Buttons              | primary: pill with `accent-action` fill (Listen radius per PD3); secondary: `CratePill` action variant; round play disc 40 / 56–64 px; icon buttons ghost, 32 px (44 coarse); destructive per PD10                                                                                                                                                                              | everywhere                                                                                                                           |
+| Tabs                 | `role="tablist"`, mono 11.5 px .14em text, 2 px underline; selected tab in the URL: `?tab=` by default (the plan 1b.3 helper), a path segment where the route already has one (Listen `/collection/:section`), `?section=` for Settings sections, `?queue=` for Tasks                                                                                                           | Admin Artist, Federation, Download, Settings; Listen Library (already `?tab=` on `/library` and `/collection/:section`), player tabs |
+| Dialogs and popovers | object surface, hairline, `rounded-panel`; overlay canvas at .72 without blur; `MonoLabel` eyebrow plus Bricolage 700 title; confirm dialogs carry a mono consequence line (`12 files · 1.4 GB · moves to Library Trash`) and typed confirmation for wipe and rebuild; Admin moves to the shared `ConfirmDialog`                                                                | all overlays                                                                                                                         |
+| Toasts               | inline feedback first; toast only when the result outlives the control; object card, `MonoLabel` type word (`SAVED`, `QUEUED` in `accent-action-hi`; `FAILED` in `state-warning`); Admin task toasts link `/tasks?task=`                                                                                                                                                        | both apps                                                                                                                            |
+| States               | loading keeps the final geometry with `—` values (no shimmer, no spinner inside instruments); empty = one readout, one sentence, at most one CTA; inline error keeps the last data, marks it stale, offers Retry; warming = `MonoLabel BUILDING` plus pulsing warn dot, driven by push or task events; offline (Listen) = mono `OFFLINE` tag and disabled actions with a reason | every surface                                                                                                                        |
+| Progress             | 2 px hairline, `role="progressbar"`, mono `07 / 17` or `42%`; fixed-phase tasks use the step rail                                                                                                                                                                                                                                                                               | task progress                                                                                                                        |
+| Status colour        | 3.1.6                                                                                                                                                                                                                                                                                                                                                                           | everywhere                                                                                                                           |
+| Numbers              | `tabular-nums`; real minus `−`; `·` separators; `→` for flows; lower-case mono units after the numeral; `~` for approximations; `m:ss` / `h:mm:ss`; relative time in mono with absolute time in `title`; countdowns `T−12 d`; zero-padded indices                                                                                                                               | everywhere                                                                                                                           |
+| Charts (Nivo)        | hairline grid, mono ticks in `text-text-subtle`, `accent-action-hi` series and crosshair, object-card tooltips, area fill ≤ .08; pies become a proportional hairline bar with a mono legend; radars become feature bars                                                                                                                                                         | Admin Insights, System, Dashboard diagnostics, ArtistStats                                                                           |
+| Focus                | `:focus-visible` 2 px `accent-action-hi` outline at offset 3 (-2 inset on edge-to-edge rows); roving tabindex in chip groups and node sets; skip link in both shells                                                                                                                                                                                                            | everywhere                                                                                                                           |
+| Remote provenance    | mono `via north.crate` tag with a ring dot when stale or unhealthy                                                                                                                                                                                                                                                                                                              | Listen rows and search, Admin global catalog                                                                                         |
 
 #### 3.1.6 Status colour policy
 
-| Meaning | Visual |
-| --- | --- |
-| ok, done, active, on, in library | `StatusDot on` and `accent-action-hi` |
-| waiting, needs confirmation, deferred, degraded, stale, over limit | `StatusDot warn` and `state-warning` |
-| off, never run, missing, idle | `StatusDot off` (ring) and `text-text-subtle` |
-| failed | warn dot plus the word "failed" (PD10) |
-| severity, risk, log level | 3-segment grey meter plus a word; never red/orange/yellow |
-| destructive action | PD10 |
+| Meaning                                                            | Visual                                                    |
+| ------------------------------------------------------------------ | --------------------------------------------------------- |
+| ok, done, active, on, in library                                   | `StatusDot on` and `accent-action-hi`                     |
+| waiting, needs confirmation, deferred, degraded, stale, over limit | `StatusDot warn` and `state-warning`                      |
+| off, never run, missing, idle                                      | `StatusDot off` (ring) and `text-text-subtle`             |
+| failed                                                             | warn dot plus the word "failed" (PD10)                    |
+| severity, risk, log level                                          | 3-segment grey meter plus a word; never red/orange/yellow |
+| destructive action                                                 | PD10                                                      |
 
 Decorative state colours go: Listen `MOOD_COLORS`, Info tab `tone="warm"`, profile badge tones
 (`pages/user-profile-model.ts:47`), affinity band tint; Admin's 398 emerald/green/red/rose, about
@@ -417,48 +400,48 @@ Proposed regrouping along the site's /admin chapters. Chapter numbers appear in 
 breadcrumb only for pages that back a chapter. Every page sits in the group of its chapter (3.2.3),
 so the sidebar group, eyebrow and breadcrumb agree; the Sidebar test (plan Task 3.2) asserts it.
 
-| Group | Pages |
-| --- | --- |
-| (top) | Dashboard |
-| Library | Browse, Timeline |
-| 01 Health | Health, Library Trash |
-| 02 Imports | Imports (new, PD16), Contributions |
-| 03 Acquisition | Acquisition (`/download`), New Releases, Upcoming, Bandcamp, Discover (discography completeness) |
-| 04 Enrichment | no page: the Artist page Enrichment tab carries the chapter |
-| 05 Genres | Genres |
-| 06 Analysis & Insights | Analysis, Insights |
-| 07 Operations | Tasks, System, Stack, Logs |
-| Curation | System Playlists, Translations |
-| Access | Users, Roles |
-| Federation | Federation, Global Catalog |
-| Settings | Settings |
+| Group                  | Pages                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------ |
+| (top)                  | Dashboard                                                                                        |
+| Library                | Browse, Timeline                                                                                 |
+| 01 Health              | Health, Library Trash                                                                            |
+| 02 Imports             | Imports (new, PD16), Contributions                                                               |
+| 03 Acquisition         | Acquisition (`/download`), New Releases, Upcoming, Bandcamp, Discover (discography completeness) |
+| 04 Enrichment          | no page: the Artist page Enrichment tab carries the chapter                                      |
+| 05 Genres              | Genres                                                                                           |
+| 06 Analysis & Insights | Analysis, Insights                                                                               |
+| 07 Operations          | Tasks, System, Stack, Logs                                                                       |
+| Curation               | System Playlists, Translations                                                                   |
+| Access                 | Users, Roles                                                                                     |
+| Federation             | Federation, Global Catalog                                                                       |
+| Settings               | Settings                                                                                         |
 
 #### 3.2.3 Admin routes and focal visuals
 
-| Route | Page | Chapter | Focal visual (site source) | P · size |
-| --- | --- | --- | --- | --- |
-| `/` | Dashboard | Operations summary | tile row: Health tile (`site:src/components/InsideCrate.astro`), Operations, Listeners, Library | P0 · M |
-| `/health` | Health | 01 | HealthScan (`site:src/components/viz/HealthScan.astro`) | P0 · L |
-| `/trash` | Trash | 01 | `StatStrip` plus hairline review rows | P2 · S |
-| `/imports` (new) | Imports | 02 | staging queue rail (PD16) | P1 · M |
-| Album detail | Album | 02 / 06 | AlbumSidecar panel (`site:src/components/viz/AlbumSidecar.astro`) plus TrackReadout | P1 · M |
-| `/contributions` | Contributions | 02 | hairline review queue | P2 · S |
-| `/new-releases` | New Releases | 03 | ReleaseTimeline (`site:src/components/viz/ReleaseTimeline.astro`) | P1 · L |
-| `/download` | Acquisition | 03 | acquisition lanes (QueueLanes model) | P1 · L |
-| `/upcoming` | Upcoming | 03 | month cell grid; ticket for shows | P2 · M |
-| `/bandcamp` | Bandcamp | 03 | cover rows, sync dot | P2 · M |
-| `/discover` | Discover | 03 | completeness row meters | P2 · M |
-| Artist, tab `enrichment` | Artist | 04 | EnrichmentOrbit (`site:src/components/viz/EnrichmentOrbit.astro`) | P2 · L |
-| `/genres`, `/genres/:slug` | Genres | 05 | GenreWheel plus EQ inheritance panel (`site:src/components/viz/GenreWheel.astro`) | P0 · L |
-| `/analysis` | Analysis | 06 | TrackReadout (`site:src/components/viz/TrackReadout.astro`) plus coverage | P1 · L |
-| `/insights` | Insights | 06 | Nivo small multiples | P1 · M |
-| `/tasks` | Tasks | 07 | QueueLanes (`site:src/components/viz/QueueLanes.astro`, P0 · L); GovernorGauges (`site:src/components/viz/GovernorGauges.astro`) embedded later (P1 · M, 4.8, plan 3.5) | P0 · L |
-| `/system` | System | 07 | GovernorGauges standalone; event pipeline (`site:src/components/viz/OutboxSequence.astro`) and Redis pair (`site:src/components/viz/RedisPair.astro`) below | P1 · M |
-| `/stack` | Stack | 07 | SystemMap (`site:src/components/architecture/SystemMap.astro`) | P1 · L |
-| `/logs` | Logs | 07 | terminal console | P1 · M |
-| `/federation` | Federation | | topology (`site:src/components/viz/Federation.astro`) | P2 · L |
-| `/browse`, `/timeline`, `/users`, `/roles`, `/playlists*`, `/i18n`, `/settings`, `/global-catalog`, `/login`, `/setup` | | | recipes only (4.9, 4.10) | P1–P2 |
-| Route-level states: `PageSpinner` (`App.tsx:108`, `components/auth/ProtectedRoute.tsx:5`), "Admin console access required", "Permission required", "No console landing page available" | | | `ErrorState` page variant (4.10) | P1 · S |
+| Route                                                                                                                                                                                  | Page          | Chapter            | Focal visual (site source)                                                                                                                                              | P · size |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `/`                                                                                                                                                                                    | Dashboard     | Operations summary | tile row: Health tile (`site:src/components/InsideCrate.astro`), Operations, Listeners, Library                                                                         | P0 · M   |
+| `/health`                                                                                                                                                                              | Health        | 01                 | HealthScan (`site:src/components/viz/HealthScan.astro`)                                                                                                                 | P0 · L   |
+| `/trash`                                                                                                                                                                               | Trash         | 01                 | `StatStrip` plus hairline review rows                                                                                                                                   | P2 · S   |
+| `/imports` (new)                                                                                                                                                                       | Imports       | 02                 | staging queue rail (PD16)                                                                                                                                               | P1 · M   |
+| Album detail                                                                                                                                                                           | Album         | 02 / 06            | AlbumSidecar panel (`site:src/components/viz/AlbumSidecar.astro`) plus TrackReadout                                                                                     | P1 · M   |
+| `/contributions`                                                                                                                                                                       | Contributions | 02                 | hairline review queue                                                                                                                                                   | P2 · S   |
+| `/new-releases`                                                                                                                                                                        | New Releases  | 03                 | ReleaseTimeline (`site:src/components/viz/ReleaseTimeline.astro`)                                                                                                       | P1 · L   |
+| `/download`                                                                                                                                                                            | Acquisition   | 03                 | acquisition lanes (QueueLanes model)                                                                                                                                    | P1 · L   |
+| `/upcoming`                                                                                                                                                                            | Upcoming      | 03                 | month cell grid; ticket for shows                                                                                                                                       | P2 · M   |
+| `/bandcamp`                                                                                                                                                                            | Bandcamp      | 03                 | cover rows, sync dot                                                                                                                                                    | P2 · M   |
+| `/discover`                                                                                                                                                                            | Discover      | 03                 | completeness row meters                                                                                                                                                 | P2 · M   |
+| Artist, tab `enrichment`                                                                                                                                                               | Artist        | 04                 | EnrichmentOrbit (`site:src/components/viz/EnrichmentOrbit.astro`)                                                                                                       | P2 · L   |
+| `/genres`, `/genres/:slug`                                                                                                                                                             | Genres        | 05                 | GenreWheel plus EQ inheritance panel (`site:src/components/viz/GenreWheel.astro`)                                                                                       | P0 · L   |
+| `/analysis`                                                                                                                                                                            | Analysis      | 06                 | TrackReadout (`site:src/components/viz/TrackReadout.astro`) plus coverage                                                                                               | P1 · L   |
+| `/insights`                                                                                                                                                                            | Insights      | 06                 | Nivo small multiples                                                                                                                                                    | P1 · M   |
+| `/tasks`                                                                                                                                                                               | Tasks         | 07                 | QueueLanes (`site:src/components/viz/QueueLanes.astro`, P0 · L); GovernorGauges (`site:src/components/viz/GovernorGauges.astro`) embedded later (P1 · M, 4.8, plan 3.5) | P0 · L   |
+| `/system`                                                                                                                                                                              | System        | 07                 | GovernorGauges standalone; event pipeline (`site:src/components/viz/OutboxSequence.astro`) and Redis pair (`site:src/components/viz/RedisPair.astro`) below             | P1 · M   |
+| `/stack`                                                                                                                                                                               | Stack         | 07                 | SystemMap (`site:src/components/architecture/SystemMap.astro`)                                                                                                          | P1 · L   |
+| `/logs`                                                                                                                                                                                | Logs          | 07                 | terminal console                                                                                                                                                        | P1 · M   |
+| `/federation`                                                                                                                                                                          | Federation    |                    | topology (`site:src/components/viz/Federation.astro`)                                                                                                                   | P2 · L   |
+| `/browse`, `/timeline`, `/users`, `/roles`, `/playlists*`, `/i18n`, `/settings`, `/global-catalog`, `/login`, `/setup`                                                                 |               |                    | recipes only (4.9, 4.10)                                                                                                                                                | P1–P2    |
+| Route-level states: `PageSpinner` (`App.tsx:108`, `components/auth/ProtectedRoute.tsx:5`), "Admin console access required", "Permission required", "No console landing page available" |               |                    | `ErrorState` page variant (4.10)                                                                                                                                        | P1 · S   |
 
 Orphans: `pages/Shows.tsx` and `pages/Profile.tsx` are unrouted; delete them. Verify whether
 `artists/:artistId/:slug` is shadowed by the album route.
@@ -481,37 +464,37 @@ Orphans: `pages/Shows.tsx` and `pages/Profile.tsx` are unrouted; delete them. Ve
 
 #### 3.3.2 Listen routes and focal visuals
 
-| Route | Focal visual (site source) | Data | P · size |
-| --- | --- | --- | --- |
-| Player bar, fullscreen, extended | EQ glyph (`site:src/components/InsideCrate.astro` EQ tile); hairline seek; Info readout; queue mix strip (`site:src/components/viz/MixViz.astro`) | player state, `/api/tracks/*` | P0 · M |
-| EQ panel, popover, sheet | EqViz (`site:src/components/viz/EqViz.astro`) plus inheritance walk | effective EQ chain | P0 · M |
-| `/` Home | Listening DNA heatmap tile (desktop); ticket header for upcoming | home discovery snapshot, stats dashboard | P1 · L |
-| `/explore` | MoodMap (`site:src/components/viz/MoodMap.astro`); genre wheel (phase 2, desktop) | `explore:moods` snapshot; `genre-wheel/crate-core` | P1 · M |
-| `/radio` | sound map (`site:src/components/listen/RadioDive.astro`) | radio session explain, bliss map | P1 · L |
-| `/paths`, `/paths/:id` | route map (`site:src/components/listen/PathsDive.astro`, InsideCrate path tile) | path `plan_meta`, steps | P1 · L |
-| `/stats`, `/stats/global`, `/users/:u/stats` | heatmap band plus XL counters (`site:src/components/viz/Heatmap.astro`) | stats dashboard snapshot | P0 · M |
-| `/upcoming` (Radar) | setlist ticket (`site:src/components/viz/Setlist.astro`) | `/api/me/upcoming` | P1 · M |
-| Artist, Album, Library, Crates, Playlists, Search | recipes (track rows, media grid, entity header) | existing | P1 · M–L |
-| `/home/playlist/:playlistId` (`pages/HomePlaylist.tsx`), `/curation/playlist/:id` (`pages/CuratedPlaylist.tsx`, `CuratedPlaylistContent.tsx`), `/home/section/:sectionId` (`pages/HomeSection.tsx`) | playlist entity header and track rows (4.20); the section page as a media grid under `SectionHeader` | existing | P1 · S |
-| `/artists/:artistSlug/top-tracks` (`pages/ArtistTopTracks.tsx`) | track rows with mono plays and `124 · 8A` (4.19) | existing | P2 · S |
-| `/people` (`pages/People*.tsx`), `/users/:username/followers` and `/following` (`pages/UserConnections.tsx`) | hairline user rows with presence dots and mono counts (4.22 Social) | existing | P2 · S |
-| `/users/:username` (`UserProfile`) | 4.22 Social: affinity numeral, reasons list, `StatStrip` (plan 6.15, coverage L22) | existing | P2 · M |
-| `/catalog/artists/:globalArtistUid`, `/catalog/albums/:globalAlbumUid` (global-catalog `Artist` and `Album`) | 4.19 entity headers and track rows, with the remote-provenance tag `via <node>` (3.1.5) on the header and remote rows (plan 6.13, coverage L14/L15) | existing | P1 · M |
-| `/crate/:crateRef` | 4.20 Crates (plan 6.14, coverage L17) | existing | P2 · M |
-| `/library`, `/collection`, `/collection/:section` | 4.20 Library; the tab stays where it is today (`?tab=` on `/library`, the path segment on `/collection/:section`) (plan 6.14, coverage L16) | existing | P1 · M |
-| `/stats/digging` | 4.17 Digging: XL story numerals (plan 6.16, coverage L19) | stats dashboard snapshot | P2 · M |
-| `/bandcamp` | coverage L23: sync `StatusDot`, cover rows (plan 6.15) | existing | P2 · S |
-| `/settings` | Devices row (`site:src/components/viz/Devices.astro`); Access tokens after the Smart Mix merge (`site:src/components/viz/TokenAllowlist.astro`); offline meters | devices, Connect WS | P1–P2 |
-| Social, Upload, Offline, Auth, Share | recipes | existing | P2 |
-| Jam | out of scope (`JAM_ROOMS_ENABLED = false`) | | |
+| Route                                                                                                                                                                                               | Focal visual (site source)                                                                                                                                      | Data                                               | P · size |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | -------- |
+| Player bar, fullscreen, extended                                                                                                                                                                    | EQ glyph (`site:src/components/InsideCrate.astro` EQ tile); hairline seek; Info readout; queue mix strip (`site:src/components/viz/MixViz.astro`)               | player state, `/api/tracks/*`                      | P0 · M   |
+| EQ panel, popover, sheet                                                                                                                                                                            | EqViz (`site:src/components/viz/EqViz.astro`) plus inheritance walk                                                                                             | effective EQ chain                                 | P0 · M   |
+| `/` Home                                                                                                                                                                                            | Listening DNA heatmap tile (desktop); ticket header for upcoming                                                                                                | home discovery snapshot, stats dashboard           | P1 · L   |
+| `/explore`                                                                                                                                                                                          | MoodMap (`site:src/components/viz/MoodMap.astro`); genre wheel (phase 2, desktop)                                                                               | `explore:moods` snapshot; `genre-wheel/crate-core` | P1 · M   |
+| `/radio`                                                                                                                                                                                            | sound map (`site:src/components/listen/RadioDive.astro`)                                                                                                        | radio session explain, bliss map                   | P1 · L   |
+| `/paths`, `/paths/:id`                                                                                                                                                                              | route map (`site:src/components/listen/PathsDive.astro`, InsideCrate path tile)                                                                                 | path `plan_meta`, steps                            | P1 · L   |
+| `/stats`, `/stats/global`, `/users/:u/stats`                                                                                                                                                        | heatmap band plus XL counters (`site:src/components/viz/Heatmap.astro`)                                                                                         | stats dashboard snapshot                           | P0 · M   |
+| `/upcoming` (Radar)                                                                                                                                                                                 | setlist ticket (`site:src/components/viz/Setlist.astro`)                                                                                                        | `/api/me/upcoming`                                 | P1 · M   |
+| Artist, Album, Library, Crates, Playlists, Search                                                                                                                                                   | recipes (track rows, media grid, entity header)                                                                                                                 | existing                                           | P1 · M–L |
+| `/home/playlist/:playlistId` (`pages/HomePlaylist.tsx`), `/curation/playlist/:id` (`pages/CuratedPlaylist.tsx`, `CuratedPlaylistContent.tsx`), `/home/section/:sectionId` (`pages/HomeSection.tsx`) | playlist entity header and track rows (4.20); the section page as a media grid under `SectionHeader`                                                            | existing                                           | P1 · S   |
+| `/artists/:artistSlug/top-tracks` (`pages/ArtistTopTracks.tsx`)                                                                                                                                     | track rows with mono plays and `124 · 8A` (4.19)                                                                                                                | existing                                           | P2 · S   |
+| `/people` (`pages/People*.tsx`), `/users/:username/followers` and `/following` (`pages/UserConnections.tsx`)                                                                                        | hairline user rows with presence dots and mono counts (4.22 Social)                                                                                             | existing                                           | P2 · S   |
+| `/users/:username` (`UserProfile`)                                                                                                                                                                  | 4.22 Social: affinity numeral, reasons list, `StatStrip` (plan 6.15, coverage L22)                                                                              | existing                                           | P2 · M   |
+| `/catalog/artists/:globalArtistUid`, `/catalog/albums/:globalAlbumUid` (global-catalog `Artist` and `Album`)                                                                                        | 4.19 entity headers and track rows, with the remote-provenance tag `via <node>` (3.1.5) on the header and remote rows (plan 6.13, coverage L14/L15)             | existing                                           | P1 · M   |
+| `/crate/:crateRef`                                                                                                                                                                                  | 4.20 Crates (plan 6.14, coverage L17)                                                                                                                           | existing                                           | P2 · M   |
+| `/library`, `/collection`, `/collection/:section`                                                                                                                                                   | 4.20 Library; the tab stays where it is today (`?tab=` on `/library`, the path segment on `/collection/:section`) (plan 6.14, coverage L16)                     | existing                                           | P1 · M   |
+| `/stats/digging`                                                                                                                                                                                    | 4.17 Digging: XL story numerals (plan 6.16, coverage L19)                                                                                                       | stats dashboard snapshot                           | P2 · M   |
+| `/bandcamp`                                                                                                                                                                                         | coverage L23: sync `StatusDot`, cover rows (plan 6.15)                                                                                                          | existing                                           | P2 · S   |
+| `/settings`                                                                                                                                                                                         | Devices row (`site:src/components/viz/Devices.astro`); Access tokens after the Smart Mix merge (`site:src/components/viz/TokenAllowlist.astro`); offline meters | devices, Connect WS                                | P1–P2    |
+| Social, Upload, Offline, Auth, Share                                                                                                                                                                | recipes                                                                                                                                                         | existing                                           | P2       |
+| Jam                                                                                                                                                                                                 | out of scope (`JAM_ROOMS_ENABLED = false`)                                                                                                                      |                                                    |          |
 
 #### 3.3.3 Runtime matrix for visuals
 
-| Runtime | Live spectrum | EQ | Crossfade | WebGL2 | CSS `linear()` |
-| --- | --- | --- | --- | --- | --- |
-| Web browsers, Tauri desktop | yes (`AnalyserNode` per song, pre-EQ) | Web Audio biquads | Gapless-5 `EqualPower` (gains sqrt(1−p) / sqrt(p)); smart: 2/3/4/6 s (`SMART_TRANSITION_*_SECONDS` in `contexts/player-smart-transition.ts`, 3 s for mixed queues); manual: 0–12 s (`PlaybackSection.tsx`) | yes | yes on current engines; not on WebView2 111, WebKitGTK 2.40, macOS 11 |
-| iOS Capacitor, iPhone PWA, Android web stable pipeline | no (unless enhanced audio at startup) | no | 0 s | yes (iOS floor per PD42) | iOS 17.2+ only |
-| Android native | no FFT | native `setEq` | Smart Mix decks after the merge | GPU-dependent | current WebView |
+| Runtime                                                | Live spectrum                         | EQ                | Crossfade                                                                                                                                                                                                  | WebGL2                   | CSS `linear()`                                                        |
+| ------------------------------------------------------ | ------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------- |
+| Web browsers, Tauri desktop                            | yes (`AnalyserNode` per song, pre-EQ) | Web Audio biquads | Gapless-5 `EqualPower` (gains sqrt(1−p) / sqrt(p)); smart: 2/3/4/6 s (`SMART_TRANSITION_*_SECONDS` in `contexts/player-smart-transition.ts`, 3 s for mixed queues); manual: 0–12 s (`PlaybackSection.tsx`) | yes                      | yes on current engines; not on WebView2 111, WebKitGTK 2.40, macOS 11 |
+| iOS Capacitor, iPhone PWA, Android web stable pipeline | no (unless enhanced audio at startup) | no                | 0 s                                                                                                                                                                                                        | yes (iOS floor per PD42) | iOS 17.2+ only                                                        |
+| Android native                                         | no FFT                                | native `setEq`    | Smart Mix decks after the merge                                                                                                                                                                            | GPU-dependent            | current WebView                                                       |
 
 Mobile visuals are data-driven (analysis fields, snapshots), never analyser-driven (PD41).
 
@@ -519,42 +502,42 @@ Mobile visuals are data-driven (analysis fields, snapshots), never analyser-driv
 
 #### 3.4.1 Changes and constants
 
-| Area | Changes | Stays |
-| --- | --- | --- |
-| Visual language | tokens, primitives and recipes above in every screen | product behaviour except 3.4.2 |
-| Admin navigation | regrouped sidebar (PD14), breadcrumb, new `/imports` (PD16), tabs in the URL | every existing route and capability gate |
-| Listen navigation | Settings gets a top-level Devices section | route table, tab bar items; Library tabs keep their URL state (`?tab=` on `/library`, path segment on `/collection/:section`), so existing deep links keep working |
-| Data | additive fields, new snapshot-backed endpoints, request-time aggregates removed | existing response shapes (additive only, so shipped Capacitor builds keep working) |
-| Realtime | one Admin live stream per tab; per-task streams only on demand | `/api/cache/events`, home discovery stream, Connect WS |
-| Charts | Nivo themed by tokens; instruments hand-built (PD1) | Nivo for statistical charts |
+| Area              | Changes                                                                         | Stays                                                                                                                                                              |
+| ----------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Visual language   | tokens, primitives and recipes above in every screen                            | product behaviour except 3.4.2                                                                                                                                     |
+| Admin navigation  | regrouped sidebar (PD14), breadcrumb, new `/imports` (PD16), tabs in the URL    | every existing route and capability gate                                                                                                                           |
+| Listen navigation | Settings gets a top-level Devices section                                       | route table, tab bar items; Library tabs keep their URL state (`?tab=` on `/library`, path segment on `/collection/:section`), so existing deep links keep working |
+| Data              | additive fields, new snapshot-backed endpoints, request-time aggregates removed | existing response shapes (additive only, so shipped Capacitor builds keep working)                                                                                 |
+| Realtime          | one Admin live stream per tab; per-task streams only on demand                  | `/api/cache/events`, home discovery stream, Connect WS                                                                                                             |
+| Charts            | Nivo themed by tokens; instruments hand-built (PD1)                             | Nivo for statistical charts                                                                                                                                        |
 
 #### 3.4.2 Behaviour changes to warn about before merging
 
-| Change | Section |
-| --- | --- |
-| `library_pipeline` stops auto-applying `shadow_quality_tracks` (destructive, needs confirmation) | PD24 |
-| `fix-type` requires a server-side confirm flag for checks that need confirmation; `POST /health-check` and `fix-type` deduplicate | 4.2 |
-| A failing health check no longer resolves its open issues | 4.2 |
-| `/api/acquisition/snapshot` and `/stream` require acquisition capabilities | PD46 |
-| Genre "Generate with AI" previews instead of applying; core-genre EQ and metadata edits persist across restarts and image rollbacks (G1, plan 2.18d) | 4.6, PD18 |
-| Smart EQ keeps the last resolved gains while the next track's EQ loads (today the audio dips to flat for about 80 ms) | PD32 |
-| Enrichment Settings toggles start doing something (today the pipeline ignores them) | PD29 |
-| `GET /api/artists/{id}/enrichment` stops calling providers inline; Listen's bio hook receives `{}` on a cold artist and a task is enqueued | 4.5 |
-| Federation projector routing: remote stream events stop rebuilding `ops/dashboard` | B11 |
-| Projector consumption fixed (B1): projector work resumes, so ops rebuilds must be coalesced in the same change | 5.1 |
-| The projector resumes its side-effecting projections (post-acquisition `process_new_content`, per-user home rebuilds, recently-played refreshes) behind `CRATE_PROJECTOR_SIDE_EFFECTS_ENABLED`, off at deploy (plan 2.10) | 5.1, B1 |
-| `/api/admin/metrics/system` shows the worker's real governor values (0/0 listeners/streams and the window) instead of the API's defaults | 4.8 |
-| Stack restart denied for `traefik` (restartable today) and the other core services; stop/start only for non-core containers | PD44 |
-| Camelot maps flat keys (`Bb`, `Eb`, `Ab`, …) through enharmonics, so key scoring in Radio and Paths changes for tracks Essentia tagged with flats | 4.7, PD2 (plan 2.9b) |
-| `/api/events/task/{id}` and `GET /api/tasks/{id}` require the task owner or the capability that queued the task (B16); Listen tasks queued before the deploy carry no owner and lose their stream | B16 |
-| Genre counts drop under the shared count definition, in FastAPI and in the Go read plane (`/api/genres`, genre detail) | PD21, 4.6.3 |
-| `GET /api/admin/health-snapshot?check_type=` is replaced by `GET /api/admin/health-checks/{check_type}/issues`; the old route stays one release as a deprecated alias; `/api/admin/health-stream` is deprecated the same way (alias for one release) and the Health page stops opening it | 4.2 |
-| `POST /api/paths`, `/regenerate` and `/preview` (synchronous) skip the LLM refinement, get a per-user rate limit and a deprecation date; new Listen builds plan through the task route | 4.16, B18 |
-| Mood playback samples from a stored pool of at most 400 uids per mood instead of `ORDER BY RANDOM()` over every match | 4.14 |
-| `/api/me/upcoming` moves probable setlist songs into a top-level `probable_setlists` map keyed by artist; the per-show field stays, deprecated, until the minimum supported Listen client reads the map | 4.18 |
-| Below 3 listeners the instance stats builder hides the heatmap: `heatmap.cells` is an all-zero 7×24 grid (shipped Listen builds call `cells.flat()`), `peak` and `night_share` are `null` and `hidden_reason` is `"few_listeners"`; `heatmap_utc` follows the same rule (plan 2.20) | 4.17, PD43 |
-| The v2 genre tree shows `—` counts while the wheel snapshot is cold (its counts come from the snapshot, B7) | 4.6.3 |
-| `reanalyze_album` is deduplicated: a second click attaches to the running task | 4.7 |
+| Change                                                                                                                                                                                                                                                                                    | Section              |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `library_pipeline` stops auto-applying `shadow_quality_tracks` (destructive, needs confirmation)                                                                                                                                                                                          | PD24                 |
+| `fix-type` requires a server-side confirm flag for checks that need confirmation; `POST /health-check` and `fix-type` deduplicate                                                                                                                                                         | 4.2                  |
+| A failing health check no longer resolves its open issues                                                                                                                                                                                                                                 | 4.2                  |
+| `/api/acquisition/snapshot` and `/stream` require acquisition capabilities                                                                                                                                                                                                                | PD46                 |
+| Genre "Generate with AI" previews instead of applying; core-genre EQ and metadata edits persist across restarts and image rollbacks (G1, plan 2.18d)                                                                                                                                      | 4.6, PD18            |
+| Smart EQ keeps the last resolved gains while the next track's EQ loads (today the audio dips to flat for about 80 ms)                                                                                                                                                                     | PD32                 |
+| Enrichment Settings toggles start doing something (today the pipeline ignores them)                                                                                                                                                                                                       | PD29                 |
+| `GET /api/artists/{id}/enrichment` stops calling providers inline; Listen's bio hook receives `{}` on a cold artist and a task is enqueued                                                                                                                                                | 4.5                  |
+| Federation projector routing: remote stream events stop rebuilding `ops/dashboard`                                                                                                                                                                                                        | B11                  |
+| Projector consumption fixed (B1): projector work resumes, so ops rebuilds must be coalesced in the same change                                                                                                                                                                            | 5.1                  |
+| The projector resumes its side-effecting projections (post-acquisition `process_new_content`, per-user home rebuilds, recently-played refreshes) behind `CRATE_PROJECTOR_SIDE_EFFECTS_ENABLED`, off at deploy (plan 2.10)                                                                 | 5.1, B1              |
+| `/api/admin/metrics/system` shows the worker's real governor values (0/0 listeners/streams and the window) instead of the API's defaults                                                                                                                                                  | 4.8                  |
+| Stack restart denied for `traefik` (restartable today) and the other core services; stop/start only for non-core containers                                                                                                                                                               | PD44                 |
+| Camelot maps flat keys (`Bb`, `Eb`, `Ab`, …) through enharmonics, so key scoring in Radio and Paths changes for tracks Essentia tagged with flats                                                                                                                                         | 4.7, PD2 (plan 2.9b) |
+| `/api/events/task/{id}` and `GET /api/tasks/{id}` require the task owner or the capability that queued the task (B16); Listen tasks queued before the deploy carry no owner and lose their stream                                                                                         | B16                  |
+| Genre counts drop under the shared count definition, in FastAPI and in the Go read plane (`/api/genres`, genre detail)                                                                                                                                                                    | PD21, 4.6.3          |
+| `GET /api/admin/health-snapshot?check_type=` is replaced by `GET /api/admin/health-checks/{check_type}/issues`; the old route stays one release as a deprecated alias; `/api/admin/health-stream` is deprecated the same way (alias for one release) and the Health page stops opening it | 4.2                  |
+| `POST /api/paths`, `/regenerate` and `/preview` (synchronous) skip the LLM refinement, get a per-user rate limit and a deprecation date; new Listen builds plan through the task route                                                                                                    | 4.16, B18            |
+| Mood playback samples from a stored pool of at most 400 uids per mood instead of `ORDER BY RANDOM()` over every match                                                                                                                                                                     | 4.14                 |
+| `/api/me/upcoming` moves probable setlist songs into a top-level `probable_setlists` map keyed by artist; the per-show field stays, deprecated, until the minimum supported Listen client reads the map                                                                                   | 4.18                 |
+| Below 3 listeners the instance stats builder hides the heatmap: `heatmap.cells` is an all-zero 7×24 grid (shipped Listen builds call `cells.flat()`), `peak` and `night_share` are `null` and `hidden_reason` is `"few_listeners"`; `heatmap_utc` follows the same rule (plan 2.20)       | 4.17, PD43           |
+| The v2 genre tree shows `—` counts while the wheel snapshot is cold (its counts come from the snapshot, B7)                                                                                                                                                                               | 4.6.3                |
+| `reanalyze_album` is deduplicated: a second click attaches to the running task                                                                                                                                                                                                            | 4.7                  |
 
 The plan task that carries each row is tagged `[BEHAVIOUR]` and ships in its own PR with a
 release-note line. Besides the tasks tagged today, that includes plan 2.2 (task-stream ownership),
@@ -679,24 +662,62 @@ HealthScanTile entries follow it.
 interface HealthChecksSurface {
   state: "ready" | "warming";
   checks: Array<{
-    index: number; check_type: string; label: string; description: string;   // from RepairCatalogEntry
-    risk: "safe" | "caution" | "destructive"; scope: "db" | "filesystem" | "hybrid";
-    unattended: boolean;          // runs in library_pipeline without confirmation (PD24 decides the rule)
+    index: number;
+    check_type: string;
+    label: string;
+    description: string; // from RepairCatalogEntry
+    risk: "safe" | "caution" | "destructive";
+    scope: "db" | "filesystem" | "hybrid";
+    unattended: boolean; // runs in library_pipeline without confirmation (PD24 decides the rule)
     fix_mode: "global" | "bulk" | "per_artist";
-    state: "unknown" | "never_run" | "clean" | "open" | "waiting" | "fixed" | "failed";
-    open: number | null; found_last_run: number | null; fixed_last_run: number | null;
-    last_run_at: string | null; duration_ms: number | null; last_error: string | null;
+    state:
+      | "unknown"
+      | "never_run"
+      | "clean"
+      | "open"
+      | "waiting"
+      | "fixed"
+      | "failed";
+    open: number | null;
+    found_last_run: number | null;
+    fixed_last_run: number | null;
+    last_run_at: string | null;
+    duration_ms: number | null;
+    last_error: string | null;
   }>;
-  totals: { checks: number; unattended: number; confirm: number; open: number;
-            open_unattended: number; waiting: number; fixed_last_run: number } | null;
-  last_scan: { task_id: string | null; task_type: "health_check" | "library_pipeline";
-               trigger: "schedule" | "console"; finished_at: string; failed_checks: number } | null;
-  running: { task_id: string; task_type: "health_check" | "library_pipeline" | "repair";
-             status: "queued" | "running"; phase: "scan" | "repair" | "sync" | "revalidate";
-             scope: "full" | "selected"; index: number; total: number;
-             check_type: string | null; check_started_at: string | null } | null;
-  trash: { track_files: number; albums_quarantined: number; updated_at: string } | null;
-  snapshot: SnapshotMeta;        // existing decorate_snapshot block
+  totals: {
+    checks: number;
+    unattended: number;
+    confirm: number;
+    open: number;
+    open_unattended: number;
+    waiting: number;
+    fixed_last_run: number;
+  } | null;
+  last_scan: {
+    task_id: string | null;
+    task_type: "health_check" | "library_pipeline";
+    trigger: "schedule" | "console";
+    finished_at: string;
+    failed_checks: number;
+  } | null;
+  running: {
+    task_id: string;
+    task_type: "health_check" | "library_pipeline" | "repair";
+    status: "queued" | "running";
+    phase: "scan" | "repair" | "sync" | "revalidate";
+    scope: "full" | "selected";
+    index: number;
+    total: number;
+    check_type: string | null;
+    check_started_at: string | null;
+  } | null;
+  trash: {
+    track_files: number;
+    albums_quarantined: number;
+    updated_at: string;
+  } | null;
+  snapshot: SnapshotMeta; // existing decorate_snapshot block
 }
 // Live, on /api/admin/live-stream?surfaces=health. One surface with two event types; `health-scan`
 // is not a separately requested surface:
@@ -712,9 +733,14 @@ interface HealthChecksSurface {
 // the last artist key; limit = artists per page (default 25, max 100). Artists are never split across pages.
 interface HealthCheckIssuesPage {
   check_type: string;
-  total_issues: number; total_artists: number;
-  artists: Array<{ artist_id: number | null; artist: string | null; issue_count: number;
-                   issues: HealthIssue[] }>;   // existing issue shape (id, description, severity, details_json, …), ≤100 per artist
+  total_issues: number;
+  total_artists: number;
+  artists: Array<{
+    artist_id: number | null;
+    artist: string | null;
+    issue_count: number;
+    issues: HealthIssue[];
+  }>; // existing issue shape (id, description, severity, details_json, …), ≤100 per artist
   next_cursor: string | null;
 }
 // Refetched when a "health" event changes that check's open count. GET /api/admin/health-snapshot?check_type=
@@ -822,22 +848,48 @@ Contract:
 // tracks (idx_tracks_album_id) with lyrics laterals, album_portable_metadata, active task by
 // (type, dedup_key). Never get_portable_metadata_status (COUNT over library_tracks), never /music.
 interface AlbumPortableMetadataView {
-  album_id: number; album_entity_uid: string | null;
-  schema_version: number;                      // PORTABLE_SCHEMA_VERSION (payload stops hardcoding 1)
-  folder: { segments: string[];
-            files: Array<{ relative_path: string; title: string; track_entity_uid: string | null;
-                           has_fingerprint: boolean; changed: boolean | null }>;
-            artwork_files: string[] | null };   // from the last write
-  identity_tags: Array<{ key: string; tracks_with_value: number; tracks_total: number }>;
-  preview: { artist: object; album: object; tracks: object[] };   // compact, all tracks, keys sorted server-side
-  preview_digest: string;                      // excludes volatile and local keys (PD30)
+  album_id: number;
+  album_entity_uid: string | null;
+  schema_version: number; // PORTABLE_SCHEMA_VERSION (payload stops hardcoding 1)
+  folder: {
+    segments: string[];
+    files: Array<{
+      relative_path: string;
+      title: string;
+      track_entity_uid: string | null;
+      has_fingerprint: boolean;
+      changed: boolean | null;
+    }>;
+    artwork_files: string[] | null;
+  }; // from the last write
+  identity_tags: Array<{
+    key: string;
+    tracks_with_value: number;
+    tracks_total: number;
+  }>;
+  preview: { artist: object; album: object; tracks: object[] }; // compact, all tracks, keys sorted server-side
+  preview_digest: string; // excludes volatile and local keys (PD30)
   state: {
     sync: "never" | "in_sync" | "drift" | "unknown";
-    sidecar_written_at: string | null; audio_tags_written_at: string | null; rehydrated_at: string | null;
+    sidecar_written_at: string | null;
+    audio_tags_written_at: string | null;
+    rehydrated_at: string | null;
     written_schema_version: number | null;
-    changed_sections: { album: boolean; artist: boolean; tracks: string[] } | null;   // tracks by relative_path
-    tracks: number; tags_written: number; tag_errors: number; last_error: string | null;
-    active_task: { id: string; type: string; status: "pending" | "running"; progress: object | null } | null;
+    changed_sections: {
+      album: boolean;
+      artist: boolean;
+      tracks: string[];
+    } | null; // tracks by relative_path
+    tracks: number;
+    tags_written: number;
+    tag_errors: number;
+    last_error: string | null;
+    active_task: {
+      id: string;
+      type: string;
+      status: "pending" | "running";
+      progress: object | null;
+    } | null;
   };
 }
 // Live: /api/events/task/{task_id} event "portable_track" {phase, index, total, relative_path} in the tag loop.
@@ -887,13 +939,23 @@ Contract:
 // staging folders: the crate-worker service loop (ImportQueue.refresh_pending_state) keeps the table current.
 interface ImportsSurface {
   items: Array<{
-    id: number; source: string; path: string; artist: string | null; album: string | null;
+    id: number;
+    source: string;
+    path: string;
+    artist: string | null;
+    album: string | null;
     status: "pending" | "queued" | "importing" | "imported" | "failed";
-    discovered_at: string; updated_at: string;
+    discovered_at: string;
+    updated_at: string;
     task: { id: string; status: string; phase: string | null } | null;
     error: string | null;
-  }>;                                   // pending, queued, importing and failed first, then the last 50 imported
-  totals: { pending: number; queued: number; importing: number; failed: number };
+  }>; // pending, queued, importing and failed first, then the last 50 imported
+  totals: {
+    pending: number;
+    queued: number;
+    importing: number;
+    failed: number;
+  };
 }
 // Live: the row that started a task follows /api/events/task/{id}; the list refetches on task_done and on focus.
 // POST /import and /import-all return TaskEnqueueResponse {task_id, deduplicated}.
@@ -945,25 +1007,54 @@ Contract:
 type StageId = "detected" | "release_day" | "fetched" | "imported" | "analysed";
 type StageState = "done" | "active" | "pending" | "failed" | "skipped";
 interface NewReleasesSurface {
-  releases: NewRelease[];     // ≤200, no dismissed, no tracklist_json / preview_tracks_json
+  releases: NewRelease[]; // ≤200, no dismissed, no tracklist_json / preview_tracks_json
   focus_id: number | null;
-  catalog: { stages: Array<{ id: StageId; task: string; steps: Array<{ id: string; label: string }> }> };
+  catalog: {
+    stages: Array<{
+      id: StageId;
+      task: string;
+      steps: Array<{ id: string; label: string }>;
+    }>;
+  };
   last_checked_at: string | null;
   snapshot: SnapshotMeta;
 }
 interface NewRelease {
-  id: number; artist_name: string; artist_id: number | null; album_title: string;
-  library_album_id: number | null;   // named to avoid the existing "alb.id AS album_id" alias
-  release_type: string | null; release_date: string | null; status: "detected" | "downloading" | "downloaded";
-  tidal_url: string | null; detected_at: string; prerelease: boolean;
+  id: number;
+  artist_name: string;
+  artist_id: number | null;
+  album_title: string;
+  library_album_id: number | null; // named to avoid the existing "alb.id AS album_id" alias
+  release_type: string | null;
+  release_date: string | null;
+  status: "detected" | "downloading" | "downloaded";
+  tidal_url: string | null;
+  detected_at: string;
+  prerelease: boolean;
   lifecycle: {
     stages: [StageState, StageState, StageState, StageState, StageState];
-    current: StageId | null; step: string | null; task_id: string | null;
-    reason: "waiting_for_source" | "already_in_library" | "detected_after_release" | null;
+    current: StageId | null;
+    step: string | null;
+    task_id: string | null;
+    reason:
+      | "waiting_for_source"
+      | "already_in_library"
+      | "detected_after_release"
+      | null;
     error: string | null;
-    at: { detected: string; download_queued: string | null; downloaded: string | null;
-          imported: string | null; analysed: string | null };
-    analysis: { tracks: number; features_done: number; bliss_done: number; failed: number } | null;
+    at: {
+      detected: string;
+      download_queued: string | null;
+      downloaded: string | null;
+      imported: string | null;
+      analysed: string | null;
+    };
+    analysis: {
+      tracks: number;
+      features_done: number;
+      bliss_done: number;
+      failed: number;
+    } | null;
     updated_at: string;
   };
 }
@@ -1011,8 +1102,8 @@ problem), so the request only reads a cache:
 // capabilities, PD46). One MGET (or one "= ANY(:keys)" read) of a cover cache keyed by normalised
 // (artist, album); returns hits only. No provider call in the request.
 interface AcquisitionCoversResponse {
-  covers: Record<string, string | null>;   // key → URL; null = known miss (negative cache)
-  pending_task_id: string | null;          // set when misses were enqueued
+  covers: Record<string, string | null>; // key → URL; null = known miss (negative cache)
+  pending_task_id: string | null; // set when misses were enqueued
 }
 // Misses enqueue one deduplicated fast task (quiet; batch; 3 s provider timeout; positive and negative
 // results cached with a TTL). Results arrive through publish_task_signal on the task channel, or on the next
@@ -1032,22 +1123,40 @@ Contract:
 // call and no rebuild per client. The existing fields (tidal_authenticated, tidal_queue, soulseek_queue)
 // stay for shipped clients; `lanes` is additive.
 interface AcquisitionLanesSurface {
-  sampled_at: string; sampled_by: string; interval_seconds: number;
+  sampled_at: string;
+  sampled_by: string;
+  interval_seconds: number;
   tidal_authenticated: boolean;
   lanes: Array<{
-    source: "tidal" | "soulseek" | "upload";        // upload = active library_upload tasks
-    available: boolean; reason: string | null;       // "slskd unreachable", "not authenticated"
-    counts: { queued: number; transferring: number; processing: number; done_24h: number; failed_24h: number };
-    chips: Array<{ id: string; zone: "queued" | "transferring" | "processing" | "done";
-                   artist: string | null; album: string; percent: number | null;
-                   bytes_per_second: number | null; peer: string | null;   // Soulseek username
-                   task_id: string | null; status: string; error: string | null }>;   // ≤12 per lane, zone then age
+    source: "tidal" | "soulseek" | "upload"; // upload = active library_upload tasks
+    available: boolean;
+    reason: string | null; // "slskd unreachable", "not authenticated"
+    counts: {
+      queued: number;
+      transferring: number;
+      processing: number;
+      done_24h: number;
+      failed_24h: number;
+    };
+    chips: Array<{
+      id: string;
+      zone: "queued" | "transferring" | "processing" | "done";
+      artist: string | null;
+      album: string;
+      percent: number | null;
+      bytes_per_second: number | null;
+      peer: string | null; // Soulseek username
+      task_id: string | null;
+      status: string;
+      error: string | null;
+    }>; // ≤12 per lane, zone then age
   }>;
 }
 ```
 
 Writer: an `acquisition-sampler` daemon thread in crate-worker, never the serial service loop (a
 slskd call can stall the scheduler and zombie cleanup). slskd calls use a 2 s timeout. Cadence:
+
 - every 2 s only while `admin:live:viewers:acquisition` exists (set by `/api/acquisition/stream`,
   5.3.1);
 - every 30–60 s while nobody watches but the previous sample showed an active transfer (a Tidal row
@@ -1090,7 +1199,7 @@ blocking; OpenAPI contract.
     (amber stroke plus a short code), empty (hollow plus dash), never (hollow), unconfigured
     (dashed, shows the environment variable name), disabled (PD29).
   - Outer dashed ring: secondary coverage for this artist with provider-agnostic copy (`covers
-    11/12`, `artist photo`, `Wikidata linked`, `3 upcoming shows`, `84 lyrics`, `Bandcamp`); never
+11/12`, `artist photo`, `Wikidata linked`, `3 upcoming shows`, `84 lyrics`, `Bandcamp`); never
     animated by a run.
   - Pool lanes: the last real run, one lane per executor thread actually used, wait and fetch
     segments, cache hits as chips.
@@ -1115,24 +1224,71 @@ Contract:
 // /api/genres to the read plane first (docker-compose.yaml:460), and Admin's nginx proxies /api/ straight to
 // crate-api, so the /api/admin prefix keeps every deployment on FastAPI with uniform capability gating.
 interface ArtistEnrichmentSources {
-  artist: { id: number; entity_uid: string | null; name: string; enriched_at: string | null };
+  artist: {
+    id: number;
+    entity_uid: string | null;
+    name: string;
+    enriched_at: string | null;
+  };
   parallelism: number;
   sources: Array<{
     id: "lastfm" | "spotify" | "musicbrainz" | "setlist" | "fanart" | "discogs";
-    label: string; ttl_seconds: number; min_interval_seconds: number;
-    configured: boolean; config_hint: string | null; enabled: boolean;
-    status: "fresh" | "expired" | "empty" | "error" | "never" | "unconfigured" | "disabled";
-    fetched_at: string | null; attempted_at: string | null; expires_at: string | null;
-    estimated: boolean; error_code: string | null;      // codes only, never messages, URLs or keys
-    last_run: { run_id: string; lane: number; start_ms: number; wait_ms: number; fetch_ms: number;
-                outcome: "ok" | "empty" | "error" | "cache" } | null;
+    label: string;
+    ttl_seconds: number;
+    min_interval_seconds: number;
+    configured: boolean;
+    config_hint: string | null;
+    enabled: boolean;
+    status:
+      | "fresh"
+      | "expired"
+      | "empty"
+      | "error"
+      | "never"
+      | "unconfigured"
+      | "disabled";
+    fetched_at: string | null;
+    attempted_at: string | null;
+    expires_at: string | null;
+    estimated: boolean;
+    error_code: string | null; // codes only, never messages, URLs or keys
+    last_run: {
+      run_id: string;
+      lane: number;
+      start_ms: number;
+      wait_ms: number;
+      fetch_ms: number;
+      outcome: "ok" | "empty" | "error" | "cache";
+    } | null;
   }>;
-  last_run: { run_id: string; task_id: string; started_at: string; threads: number; duration_ms: number } | null;
-  secondary: Array<{ id: string; label: string; scope: "album" | "track" | "artist";
-                     done: number; total: number | null; approximate: boolean }>;
-  active_run: { task_id: string; run_id: string; started_at: string;
-                sources: Record<string, { state: "queued" | "waiting" | "fetching" | "done" | "cache";
-                                          lane: number; outcome?: string }> } | null;
+  last_run: {
+    run_id: string;
+    task_id: string;
+    started_at: string;
+    threads: number;
+    duration_ms: number;
+  } | null;
+  secondary: Array<{
+    id: string;
+    label: string;
+    scope: "album" | "track" | "artist";
+    done: number;
+    total: number | null;
+    approximate: boolean;
+  }>;
+  active_run: {
+    task_id: string;
+    run_id: string;
+    started_at: string;
+    sources: Record<
+      string,
+      {
+        state: "queued" | "waiting" | "fetching" | "done" | "cache";
+        lane: number;
+        outcome?: string;
+      }
+    >;
+  } | null;
 }
 // POST /api/artists/{artist_id}/enrichment/refresh {sources?: string[], force_all?: boolean}
 //   → TaskEnqueueResponse {task_id, deduplicated}; library.metadata.write; 409 when no task id resolves.
@@ -1191,7 +1347,7 @@ edges come from MusicBrainz, AI proposals and curators.
   override), family, direct and roll-up counts as `StatNumber`s, the EQ block (4.6.2), relations
   grouped by the 4 types as `HairlineList` rows with provenance (crate-core with a lucide `Lock`,
   manual, musicbrainz, ai_proposal, other), aliases with origin (`nodes[].aliases`), and `Open
-  genre`. Escape clears.
+genre`. Escape clears.
 - **Modes**: chips `EQ coverage` (default), `Content` (radius and label weight by
   `rollup.artists`, empty dimmed), `Provenance` (edge alpha by source); 4 relation-type filters.
   Clicking a family label zooms its sector (layout over 300°, `ease-spring-smooth` transform).
@@ -1249,8 +1405,8 @@ edges come from MusicBrainz, AI proposals and curators.
   tags, and edges grouped by `source`, `locked` and `created_by IS NULL`. Top N, the 300-pair threshold, the
   unplaced sector and the `+N` collapse are set from those numbers.
 - **Accessibility**: figure sentence (`61 genres in 14 families; 40 have their own EQ, 21
-  inherit`); SVG `role="group"`, nodes focusable `<g>` with labels (`thrash metal, metal family,
-  inherits thrash from metal, 12 artists`); roving tabindex (left/right along the ring, up/down
+inherit`); SVG `role="group"`, nodes focusable `<g>` with labels (`thrash metal, metal family,
+inherits thrash from metal, 12 artists`); roving tabindex (left/right along the ring, up/down
   to parent or first child); `/` focuses a search combobox matching names and `nodes[].aliases`
   (tested with an alias-only query).
 - **Genre detail `/genres/:slug`**: compact locator (family sector, walk, direct neighbours) next to
@@ -1265,7 +1421,7 @@ edges come from MusicBrainz, AI proposals and curators.
 #### 4.6.2 EQ inheritance panel (both apps)
 
 - Admin: the inspector EQ block and the `GenreEqEditor` header. `MonoLabel` `GENRE EQ · inherited
-  from the nearest preset`; walk path in mono (each segment selects that genre); preset word in
+from the nearest preset`; walk path in mono (each segment selects that genre); preset word in
   Bricolage 800 `accent-action-hi`; source line (`its own preset`, `inherited from hardcore punk`, or
   warn dot `no preset · plays flat`); 10-band mini EQ bars (`--g` per bar, written by ref, signed
   values with 0.1 dB precision via the shared `formatGain`); `drives 312 albums · 3,904 tracks`
@@ -1289,36 +1445,100 @@ edges come from MusicBrainz, AI proposals and curators.
 // aliases become plain strings (enough for the "/" search) and the inspector reads alias origin per node
 // from a small GET /api/admin/genres/{slug}/aliases (one query scoped by the node's id).
 type RelationType = "parent" | "related" | "influenced_by" | "fusion_of";
-interface GenreCounts { artists: number; albums: number; tracks: number }
+interface GenreCounts {
+  artists: number;
+  albums: number;
+  tracks: number;
+}
 interface GenreWheelPayload {
-  taxonomy: { id: "crate-core"; version: string; digest: string; released_at: string | null;
-              key_id: string | null; release_status: "ok" | "degraded"; revision: string | null };
-  relation_types: RelationType[];                 // from VALID_RELATION_TYPES
-  eq_templates: Record<string, number[]>;         // _EQ_* plus flat
-  totals: { nodes: number; families: number; parent_edges: number; related_pairs: number;
-            overlay_nodes: number; overridden_nodes: number;   // nodes with flags.overridden
-            unplaced_nodes: number;
-            eq: { direct: number; inherited: number; none: number };
-            eq_reach: Record<"direct" | "inherited" | "none", { albums: number; tracks: number }> };
-  families: Array<{ slug: string; name: string; order: number; node_count: number; counts: GenreCounts }>;
-  nodes: Array<{
-    slug: string; name: string; origin: "core" | "overlay"; top_level: boolean;
-    family: string | null; primary_parent: string | null;   // sorted-first parent, same order as the BFS
-    parents: string[]; depth: number; alias_count: number;
-    aliases: Array<{ alias: string; origin: "core" | "manual" | "inferred" | "legacy" }>;   // genre_taxonomy_aliases.origin
-    counts: { direct: GenreCounts; rollup: GenreCounts };
-    eq: { source: "direct" | "inherited" | "none"; from: string | null; path: string[];   // live value: COALESCE(local, core)
-          template: string | null; gains: number[] | null;   // gains only when template is null
-          overridden: boolean;                                 // eq_override <> 'none'
-          reach: { albums: number; tracks: number } };
-    flags: { orphan: boolean; cycle: boolean; multi_parent: boolean; empty: boolean;
-             overridden: boolean };   // eq_override <> 'none' OR local_name IS NOT NULL OR local_description IS NOT NULL
+  taxonomy: {
+    id: "crate-core";
+    version: string;
+    digest: string;
+    released_at: string | null;
+    key_id: string | null;
+    release_status: "ok" | "degraded";
+    revision: string | null;
+  };
+  relation_types: RelationType[]; // from VALID_RELATION_TYPES
+  eq_templates: Record<string, number[]>; // _EQ_* plus flat
+  totals: {
+    nodes: number;
+    families: number;
+    parent_edges: number;
+    related_pairs: number;
+    overlay_nodes: number;
+    overridden_nodes: number; // nodes with flags.overridden
+    unplaced_nodes: number;
+    eq: { direct: number; inherited: number; none: number };
+    eq_reach: Record<
+      "direct" | "inherited" | "none",
+      { albums: number; tracks: number }
+    >;
+  };
+  families: Array<{
+    slug: string;
+    name: string;
+    order: number;
+    node_count: number;
+    counts: GenreCounts;
   }>;
-  edges: Array<{ source: string; target: string; type: RelationType;
-                 provenance: "crate-core" | "manual" | "musicbrainz" | "ai_proposal" | "other";   // see Modes
-                 locked: boolean; suppressed: boolean; confidence: number }>;   // related deduplicated as unordered pairs
-  unmapped: { total: number; top: Array<{ slug: string; name: string; artist_count: number; album_count: number }> };
-  snapshot: SnapshotMeta;                          // decorate_snapshot
+  nodes: Array<{
+    slug: string;
+    name: string;
+    origin: "core" | "overlay";
+    top_level: boolean;
+    family: string | null;
+    primary_parent: string | null; // sorted-first parent, same order as the BFS
+    parents: string[];
+    depth: number;
+    alias_count: number;
+    aliases: Array<{
+      alias: string;
+      origin: "core" | "manual" | "inferred" | "legacy";
+    }>; // genre_taxonomy_aliases.origin
+    counts: { direct: GenreCounts; rollup: GenreCounts };
+    eq: {
+      source: "direct" | "inherited" | "none";
+      from: string | null;
+      path: string[]; // live value: COALESCE(local, core)
+      template: string | null;
+      gains: number[] | null; // gains only when template is null
+      overridden: boolean; // eq_override <> 'none'
+      reach: { albums: number; tracks: number };
+    };
+    flags: {
+      orphan: boolean;
+      cycle: boolean;
+      multi_parent: boolean;
+      empty: boolean;
+      overridden: boolean;
+    }; // eq_override <> 'none' OR local_name IS NOT NULL OR local_description IS NOT NULL
+  }>;
+  edges: Array<{
+    source: string;
+    target: string;
+    type: RelationType;
+    provenance:
+      | "crate-core"
+      | "manual"
+      | "musicbrainz"
+      | "ai_proposal"
+      | "other"; // see Modes
+    locked: boolean;
+    suppressed: boolean;
+    confidence: number;
+  }>; // related deduplicated as unordered pairs
+  unmapped: {
+    total: number;
+    top: Array<{
+      slug: string;
+      name: string;
+      artist_count: number;
+      album_count: number;
+    }>;
+  };
+  snapshot: SnapshotMeta; // decorate_snapshot
 }
 // Mutation responses (eq-preset PATCH, generate-eq apply, relations PUT incl. suppression, aliases PUT,
 // taxonomy PATCH, both DELETEs) gain wheel_patch: {revision, nodes (structure and eq only), edges?,
@@ -1330,13 +1550,28 @@ interface GenreWheelPayload {
 interface ListenGenreWheelPayload {
   status: "ready" | "stale" | "warming";
   taxonomy: { id: "crate-core"; version: string; digest: string };
-  families: Array<{ slug: string; name: string; order: number; node_count: number }>;
-  nodes: Array<{ slug: string; name: string; family: string | null; primary_parent: string | null;
-                 parents: string[]; depth: number;
-                 rollup: { artists: number; albums: number };       // counts follow the catalog serving mode
-                 eq: { source: "direct" | "inherited" | "none"; from: string | null; path: string[];
-                       template: string | null } }>;                // core nodes only
-  edges: Array<{ source: string; target: string; type: RelationType }>;   // no provenance, lock or suppression flag
+  families: Array<{
+    slug: string;
+    name: string;
+    order: number;
+    node_count: number;
+  }>;
+  nodes: Array<{
+    slug: string;
+    name: string;
+    family: string | null;
+    primary_parent: string | null;
+    parents: string[];
+    depth: number;
+    rollup: { artists: number; albums: number }; // counts follow the catalog serving mode
+    eq: {
+      source: "direct" | "inherited" | "none";
+      from: string | null;
+      path: string[];
+      template: string | null;
+    };
+  }>; // core nodes only
+  edges: Array<{ source: string; target: string; type: RelationType }>; // no provenance, lock or suppression flag
   snapshot: SnapshotMeta;
 }
 // Core nodes only: no unmapped tags, overlay nodes, provenance, suppression flags or custom gains. eq.* is
@@ -1368,6 +1603,7 @@ Backend, in order (genres.md section 10 with the verification corrections):
    key `genre-wheel:local`) and a window of at least 120 s; the handler clears the dirty key before
    building and schedules again if it is set during the build. Triggers come from the choke points
    that change genre membership or taxonomy, not from a list of tasks:
+
    - `set_artist_genres` and `set_album_genres` (`db/repositories/genres_assignments.py`) call it
      after commit, only when the stored set changed. That covers `index_genres`
      (`genre_indexer.py`), `enrich_artist`/`enrich_artists` writing Last.fm tags
@@ -1385,6 +1621,7 @@ Backend, in order (genres.md section 10 with the verification corrections):
    `upsert_genre_taxonomy_node`/`_edge` without a shared session, so every row commits and
    invalidates on its own. They publish one revision and one schedule at the end of the task. PD23
    decides whether `genre:*` invalidations reach the projector.
+
 3. Task `refresh_genre_wheel_snapshot` (`TaskPoolConfig("fast", 1, 300, 1)`) registered in
    `actors.py`, the `worker.py` handler groups, `task_registry.py` and a handler dict.
 4. `resolve_genre_eq_preset` returns `path` and `template`; one Python helper builds preset
@@ -1395,21 +1632,23 @@ Backend, in order (genres.md section 10 with the verification corrections):
    in new columns the pre-v3 seeder never writes, so an image rollback cannot overwrite them (the
    old seeder runs on every boot and rewrites `eq_gains`, `name` and `description` of core genres,
    `db/jobs/genre_taxonomy.py:219-252`).
+
    - `genre_taxonomy_nodes.local_eq_gains`, `eq_override` (`none | set | cleared`; `cleared` makes
      "clear to inherit" representable on a core node), `local_name`, `local_description`;
      `genre_taxonomy_edges.suppressed` (PD18; the seeder never clears it and the runtime graph
      skips suppressed edges).
    - `eq_gains`, `name` and `description` keep meaning "the core release value"; the seeder
      refreshes only those. The live value is `COALESCE(local, core)`, with `eq_override =
-     'cleared'` meaning inherit.
+'cleared'` meaning inherit.
    - The PATCH endpoints write the `local_*` columns; "reset to core" clears them.
    - `nodes[].eq.overridden` is `eq_override <> 'none'`; `flags.overridden` and
      `totals.overridden_nodes` use `eq_override <> 'none' OR local_name IS NOT NULL OR
-     local_description IS NOT NULL`.
+local_description IS NOT NULL`.
 
    G2: the DB is authoritative; NULL means inherit; Go reads the same live value and moves to the
    path tie-break (4.6.1), with a parity test. G3: MusicBrainz edges get `source="musicbrainz"`;
    the health AI filter reads `ai_proposal`. G7: parent-cycle guard (400).
+
 6. Remove request-time aggregates:
    - FastAPI: `/taxonomy/tree` counts and Sound Intelligence health read the snapshot (B7); catalog
      and explore fallbacks serve stale and enqueue; the per-request ed25519 verification in
@@ -1495,6 +1734,7 @@ site's `src/data/scale.json`.
   `portable_audio_tag_tracks`, `portable_tag_errors`, `rich_export_albums` and
   `rich_export_tracks`. Nothing declares them, so the GET drops them. The Coverage rows read these
   existing names. Changes (plan 3.9a, 3.10a):
+
   - `AnalysisStatusResponse` and `_empty_analysis_payload` declare the existing lyrics and
     portable fields plus `recent`, `stale`, `unavailable` and `updated_at`.
   - New: `fingerprint_failed` (one more `FILTER` in the existing query); `recent` (6 items) in the
@@ -1533,17 +1773,40 @@ Contract:
 
 ```ts
 interface TrackAnalysisItem {
-  track: { id: number; entity_uid: string | null; title: string; artist: string | null; album: string | null;
-           album_id: number | null; disc_number: number | null; track_number: number | null };
-  state: { analysis: "done" | "pending" | "analyzing" | "failed"; bliss: "done" | "pending" | "analyzing" | "failed";
-           analysis_completed_at: string | null; bliss_computed_at: string | null;
-           attempts?: number; last_error?: string | null };   // last two only with library.analysis.manage
-  figures: { bpm: number | null; key: string | null; scale: "major" | "minor" | null;
-             loudness: number | null; dynamic_range: number | null };   // labelled dB in v3 (PD25)
-  features: { energy: number | null; danceability: number | null; valence: number | null;
-              acousticness: number | null; instrumentalness: number | null };   // clamped 0..1
-  bliss: { vector: number[] | null };   // 20 floats, clamped to [-1, 1], 3 decimals
-  mood_top: Array<{ mood: string; score: number }> | null;   // ≤3, highest scores from mood_json (PD26)
+  track: {
+    id: number;
+    entity_uid: string | null;
+    title: string;
+    artist: string | null;
+    album: string | null;
+    album_id: number | null;
+    disc_number: number | null;
+    track_number: number | null;
+  };
+  state: {
+    analysis: "done" | "pending" | "analyzing" | "failed";
+    bliss: "done" | "pending" | "analyzing" | "failed";
+    analysis_completed_at: string | null;
+    bliss_computed_at: string | null;
+    attempts?: number;
+    last_error?: string | null;
+  }; // last two only with library.analysis.manage
+  figures: {
+    bpm: number | null;
+    key: string | null;
+    scale: "major" | "minor" | null;
+    loudness: number | null;
+    dynamic_range: number | null;
+  }; // labelled dB in v3 (PD25)
+  features: {
+    energy: number | null;
+    danceability: number | null;
+    valence: number | null;
+    acousticness: number | null;
+    instrumentalness: number | null;
+  }; // clamped 0..1
+  bliss: { vector: number[] | null }; // 20 floats, clamped to [-1, 1], 3 decimals
+  mood_top: Array<{ mood: string; score: number }> | null; // ≤3, highest scores from mood_json (PD26)
 }
 // GET /api/admin/albums/{album_id}/analysis (+ by-entity) → {album_id, items}: one CTE, album_id index.
 // GET /api/admin/tracks/{track_id}/neighbours?limit=8 (1..12): get_track_bliss_neighbours, HNSW probe
@@ -1569,19 +1832,19 @@ copy.
 Nivo theme (3.1.5 Charts) and small multiples. Every panel `pages/Insights.tsx` renders today gets
 a treatment:
 
-| Panel today | v3 treatment |
-| --- | --- |
-| Summary tiles (Countries, Decades, Feature Coverage, Standouts Surfaced, Most Represented Genre, Collection Center of Gravity, Best-Mapped Feature) | one `StatStrip`; text values as a `GenrePill` or a mono value |
-| Genre Footprint | top genres as `GenrePill`s plus hairline bars |
-| Artists by Country | hairline bar rows (mono country, count, share), top 12 plus `+N`; no map |
-| Albums by Decade | hairline histogram |
-| Artist Momentum | hairline rows with mono listeners and popularity |
-| Album Standouts | cover row with mono meta |
-| Artist Depth vs Popularity | Nivo scatter, `accent-action-hi` points at .35, object-card tooltip |
-| Feature Coverage | `Meter` rows per feature |
-| BPM Distribution | Nivo bar histogram |
-| Energy vs Danceability | Nivo scatter, `accent-action-hi` at .35 |
-| Acousticness vs Instrumentalness | Nivo scatter, same recipe |
+| Panel today                                                                                                                                         | v3 treatment                                                             |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Summary tiles (Countries, Decades, Feature Coverage, Standouts Surfaced, Most Represented Genre, Collection Center of Gravity, Best-Mapped Feature) | one `StatStrip`; text values as a `GenrePill` or a mono value            |
+| Genre Footprint                                                                                                                                     | top genres as `GenrePill`s plus hairline bars                            |
+| Artists by Country                                                                                                                                  | hairline bar rows (mono country, count, share), top 12 plus `+N`; no map |
+| Albums by Decade                                                                                                                                    | hairline histogram                                                       |
+| Artist Momentum                                                                                                                                     | hairline rows with mono listeners and popularity                         |
+| Album Standouts                                                                                                                                     | cover row with mono meta                                                 |
+| Artist Depth vs Popularity                                                                                                                          | Nivo scatter, `accent-action-hi` points at .35, object-card tooltip      |
+| Feature Coverage                                                                                                                                    | `Meter` rows per feature                                                 |
+| BPM Distribution                                                                                                                                    | Nivo bar histogram                                                       |
+| Energy vs Danceability                                                                                                                              | Nivo scatter, `accent-action-hi` at .35                                  |
+| Acousticness vs Instrumentalness                                                                                                                    | Nivo scatter, same recipe                                                |
 
 Contract:
 
@@ -1590,7 +1853,7 @@ Contract:
 // cold → the empty shape plus snapshot {version: 0, stale: true, pending: true}. Never builds in the request (B5).
 interface InsightsResponse /* existing fields unchanged: countries, bpm_distribution, energy_danceability,
   top_genres, popularity, albums_by_decade, feature_coverage, artist_depth, top_albums, acoustic_instrumental */ {
-  snapshot: SnapshotMeta;   // declared in the response model
+  snapshot: SnapshotMeta; // declared in the response model
 }
 ```
 
@@ -1606,7 +1869,7 @@ panel state.
 
 - **Focal visual**: QueueLanes (`site:src/components/viz/QueueLanes.astro`,
   `site:src/scripts/viz/queue-view.ts`) as a full-width band headed `OPERATIONS · 125 task types ·
-  five queues`, with GovernorGauges embedded below. Replaces the per-pool chips of
+five queues`, with GovernorGauges embedded below. Replaces the per-pool chips of
   `WorkerControlPanel` and the `ActiveTaskCard` list as the live view.
 - **Lanes**: maintenance, default, fast, heavy, playback. Lane meta: queue name in mono
   `accent-action-hi`, live load numeral (running + pending; PD35 if the site's type count is
@@ -1635,7 +1898,7 @@ panel state.
   amber rows with retry; repair runs with a risk meter; playback delivery as `Meter`s (the 15 s
   poll stays); task detail drawer with a progress hairline, phase line and the terminal log recipe.
 - **States**: loading with lane rows from the catalog; idle (`all queues idle · last task 3 min
-  ago`); stale when `generated_at` is older than 45 s (`stale · 2 min`, fills frozen); reconnecting.
+ago`); stale when `generated_at` is older than 45 s (`stale · 2 min`, fills frozen); reconnecting.
 - **Accessibility**: figure sentence rebuilt per snapshot; polite region announces only failures
   and deferral start or clear, throttled; zone captions decorative.
 - **Motion**: chip positions follow targets with exponential smoothing, written by ref in one
@@ -1647,21 +1910,43 @@ panel state.
 // GET /api/admin/queues (ops.tasks.manage) → ui_snapshots('ops:queues','global'), never builds;
 // {warming: true, task_types, queues: [...static counts]} when missing.
 interface QueuesSurface {
-  generated_at: string;            // excluded from the change hash
+  generated_at: string; // excluded from the change hash
   task_types: number;
   queues: Array<{
     queue: "maintenance" | "default" | "fast" | "heavy" | "playback";
     task_types: number;
-    consumers: Array<{ service: string; processes: number }>;   // [] means no live consumer
-    daemons?: { analysis: string; bliss: string };              // heavy lane only
-    pending: number; running: number; deferred: number; oldest_pending_at: string | null;
-    completed_5m: number; failed_5m: number;
-    running_tasks: Array<{ id: string; type: string; status: "running" | "delegated" | "completing";
-                           started_at: string; percent: number | null; item: string | null; governed: boolean }>;
-    pending_tasks: Array<{ id: string; type: string; created_at: string; priority: number; governed: boolean;
-                           deferred: { family: string; reason: string; until: string } | null }>;
-    recent: Array<{ id: string; type: string; status: "completed" | "failed" | "cancelled";
-                    finished_at: string; duration_ms: number | null }>;   // finished_at = updated_at
+    consumers: Array<{ service: string; processes: number }>; // [] means no live consumer
+    daemons?: { analysis: string; bliss: string }; // heavy lane only
+    pending: number;
+    running: number;
+    deferred: number;
+    oldest_pending_at: string | null;
+    completed_5m: number;
+    failed_5m: number;
+    running_tasks: Array<{
+      id: string;
+      type: string;
+      status: "running" | "delegated" | "completing";
+      started_at: string;
+      percent: number | null;
+      item: string | null;
+      governed: boolean;
+    }>;
+    pending_tasks: Array<{
+      id: string;
+      type: string;
+      created_at: string;
+      priority: number;
+      governed: boolean;
+      deferred: { family: string; reason: string; until: string } | null;
+    }>;
+    recent: Array<{
+      id: string;
+      type: string;
+      status: "completed" | "failed" | "cancelled";
+      finished_at: string;
+      duration_ms: number | null;
+    }>; // finished_at = updated_at
   }>;
   db_heavy_gate: { active: number; pending: number; blocking: boolean };
 }
@@ -1673,9 +1958,9 @@ Backend:
 
 - Query: one CTE in `db/queries/task_queues.py`: per-pool counts on active statuses; pending top N
   as one `LATERAL` per pool (`WHERE status = 'pending' AND pool = :p ORDER BY priority, created_at
-  LIMIT 5`, plus a `pool IS NULL` branch read as `default`), which uses the partial index
+LIMIT 5`, plus a `pool IS NULL` branch read as `default`), which uses the partial index
   `(pool, priority, created_at) WHERE status = 'pending'`. Not `ROW_NUMBER() OVER (PARTITION BY
-  COALESCE(pool,'default') …)`, which sorts every pending row on each run (thousands during an
+COALESCE(pool,'default') …)`, which sorts every pending row on each run (thousands during an
   import or enrichment backlog) and cannot use that index. Running rows, recent terminal rows and
   5-minute throughput bounded by a `created_at` bound or a partial index on terminal rows, checked
   with `EXPLAIN` on production; deferred counted by a canonical progress prefix, never a jsonb cast.
@@ -1684,6 +1969,7 @@ Backend:
   loop (there it would stall behind `ImportQueue.refresh_pending_state()`, a filesystem walk, and
   the scheduler). `publish_tasks_surface_signal` fires after every `update_task` progress write, so
   with any active task the dirty flag is always set; the writer therefore:
+
   - while `admin:live:viewers:queues` exists (5.3.1): honours the dirty flag, never rebuilding more
     often than every 3 s, and upserts `ui_snapshots('ops:queues','global')` when the hash changes,
     the row is missing (for example after a `*` invalidation) or 30 s have passed (keepalive; the
@@ -1695,6 +1981,7 @@ Backend:
   tick (about 1–3 s after the viewer key appears: the writer checks the key once per second,
   5.3.1). Unwatched readers that need queue counts (the Dashboard Operations tile, the Stack
   workers group) read `worker_live` from the ops snapshot instead.
+
 - Structured deferral progress (V12) from a helper in `resource_governor.py`, written only when
   family, reason or until change (every `update_task` wakes `tasks-stream`); `start_task` clears it.
 - Worker heartbeats in one Redis hash plus a sorted set (no `SCAN`).
@@ -1709,10 +1996,10 @@ Backend:
 - **Focal visual**: GovernorGauges (`site:src/components/viz/GovernorGauges.astro`,
   `site:src/scripts/viz/governor-view.ts`): five gauges (load ratio, iowait, swap, listeners,
   plays in the last 3 minutes) with value, 4 px track, limit tick and `max N` (`any listener
-  defers` when the limit is 0); status line `Allowed · background work runs` or `Deferring governed
-  work · load 0.91>0.85 · iowait 31.0%>25.0% · retry in 300 s` with the server's reasons verbatim;
+defers` when the limit is 0); status line `Allowed · background work runs` or `Deferring governed
+work · load 0.91>0.85 · iowait 31.0%>25.0% · retry in 300 s` with the server's reasons verbatim;
   `· 3 tasks waiting` links to the pending block; secondary line `last deferral 4 min ago · Library
-  pipeline · iowait`.
+pipeline · iowait`.
 - **Header**: maintenance window (`window 02:00–07:00 Europe/Madrid · closed · opens in 4 h 12 m`),
   shown separately from the resource verdict. The window applies only when
   `CRATE_MAINTENANCE_WINDOW_ENABLED` is true (code default false; `docker-compose.yaml` and the home
@@ -1735,19 +2022,54 @@ Backend:
 // (TTL 3 × interval), else ops_runtime_state('resource_governor'); {status: "warming"} when neither exists.
 // Live: surface "governor" on the admin live stream.
 interface GovernorSurface {
-  enabled: boolean; sampled_at: string; sampled_by: string; interval_seconds: number;
-  allowed: boolean;                 // resource gate only; the window is separate
-  reasons: string[];                // exact evaluate_resources wording
+  enabled: boolean;
+  sampled_at: string;
+  sampled_by: string;
+  interval_seconds: number;
+  allowed: boolean; // resource gate only; the window is separate
+  reasons: string[]; // exact evaluate_resources wording
   defer_seconds: number;
-  gauges: Array<{ id: "load_ratio" | "iowait_percent" | "swap_used_percent" | "active_users" | "active_streams";
-                  value: number | null; limit: number; over: boolean; window_minutes?: number }>;
-  swap_gate: { active: boolean; min_swap_used_mb: number; min_memory_available_percent: number };
-  window: { enabled: boolean; start: string; end: string; tz: string; in_window: boolean; seconds_until_start: number };
-  governed: { count: number; window_rule: Record<string, "unscoped" | "unscoped_or_large_limit">;   // 14 entries
-              listener_insensitive: string[] };
-  waiting: { deferred_now: number;   // from a FILTER in get_task_activity_snapshot, persisted in worker_live
-             last_deferral: { at: string; task_type: string; source: string; reason: string;
-                              reason_family: string; defer_seconds: number } | null };
+  gauges: Array<{
+    id:
+      | "load_ratio"
+      | "iowait_percent"
+      | "swap_used_percent"
+      | "active_users"
+      | "active_streams";
+    value: number | null;
+    limit: number;
+    over: boolean;
+    window_minutes?: number;
+  }>;
+  swap_gate: {
+    active: boolean;
+    min_swap_used_mb: number;
+    min_memory_available_percent: number;
+  };
+  window: {
+    enabled: boolean;
+    start: string;
+    end: string;
+    tz: string;
+    in_window: boolean;
+    seconds_until_start: number;
+  };
+  governed: {
+    count: number;
+    window_rule: Record<string, "unscoped" | "unscoped_or_large_limit">; // 14 entries
+    listener_insensitive: string[];
+  };
+  waiting: {
+    deferred_now: number; // from a FILTER in get_task_activity_snapshot, persisted in worker_live
+    last_deferral: {
+      at: string;
+      task_type: string;
+      source: string;
+      reason: string;
+      reason_family: string;
+      defer_seconds: number;
+    } | null;
+  };
 }
 ```
 
@@ -1785,7 +2107,7 @@ Backend:
 
 - **Focal visual**: GovernorGauges standalone at the top of Resources.
 - **Above it**: score as an XL numeral with a mono readout (`3 warnings · p95 182 ms · governor
-  allowed`); API latency `StatStrip` (p50, p95, p99).
+allowed`); API latency `StatStrip` (p50, p95, p99).
 - **Below**: 14 metric streams as Nivo small multiples with period chips (`?period=`); route latency
   table with mono p95/p99 and inline 2 px bars; transcoding as `Meter`s.
 - **Event pipeline band** `#event-pipeline` (P2 · M, `site:src/components/viz/OutboxSequence.astro`):
@@ -1793,7 +2115,7 @@ Backend:
   stream, projector group) with readouts (outbox pending, leased, dead letter, oldest pending age;
   relay claimed/delivered/failed and tick ms; stream latest sequence, length, DLQ; projector
   pending, lag, consumers); 6-row trace of the latest processed event (`INSERT … · claim … ·
-  XADD … seq … · XREADGROUP … · UPSERT ui_snapshots … (batch) · XACK … · 2.4 s enqueue→ack`),
+XADD … seq … · XREADGROUP … · UPSERT ui_snapshots … (batch) · XACK … · 2.4 s enqueue→ack`),
   played once per new event, or for a selected event with typing; list of the 12 latest events with
   redacted subjects and status dots. States: unknown, idle, flowing, degraded (Redis unreachable,
   dead letters, oldest pending over 60 s, consumer lag above a batch or no ack for N s), stalled
@@ -1810,22 +2132,49 @@ Backend:
 
   ```ts
   interface EventPipelineSurface {
-    status: "unknown" | "idle" | "flowing" | "degraded" | "stalled"; reasons: string[];
-    updated_at: string; heartbeat_at: string | null;
-    outbox: { pending: number; leased: number; dead_letter: number; oldest_pending_age_s: number | null };
-    relay: { claimed: number; delivered: number; failed: number; tick_ms: number | null };
+    status: "unknown" | "idle" | "flowing" | "degraded" | "stalled";
+    reasons: string[];
+    updated_at: string;
+    heartbeat_at: string | null;
+    outbox: {
+      pending: number;
+      leased: number;
+      dead_letter: number;
+      oldest_pending_age_s: number | null;
+    };
+    relay: {
+      claimed: number;
+      delivered: number;
+      failed: number;
+      tick_ms: number | null;
+    };
     stream: { latest_seq: string | null; length: number; dlq: number };
-    projector: { pending: number; lag: number | null; consumers: number; batch_ms: number | null };
-    latest: Array<{ id: string; type: string; subject: string;   // redacted
-                    status: "ok" | "retry" | "dead"; enqueued_at: string; acked_at: string | null;
-                    trace: Array<{ step: "insert" | "claim" | "xadd" | "xreadgroup" | "project" | "xack";
-                                   at: string; detail: string }> | null }>;   // ≤12; trace for the latest only
+    projector: {
+      pending: number;
+      lag: number | null;
+      consumers: number;
+      batch_ms: number | null;
+    };
+    latest: Array<{
+      id: string;
+      type: string;
+      subject: string; // redacted
+      status: "ok" | "retry" | "dead";
+      enqueued_at: string;
+      acked_at: string | null;
+      trace: Array<{
+        step: "insert" | "claim" | "xadd" | "xreadgroup" | "project" | "xack";
+        at: string;
+        detail: string;
+      }> | null;
+    }>; // ≤12; trace for the latest only
   }
   ```
 
   Tests: while watched the projector writes the Redis key per batch; the row only on a state change
   or after 60 s; no key write, publish, trace or heartbeat without a viewer; subjects redacted; the
   endpoint reads without Redis stream or builder calls; OpenAPI contract.
+
 - **Redis band** (P2 · M, `site:src/components/viz/RedisPair.astro`): two panes. Cache: live flags
   from `CONFIG GET` (INFO fallback), 10×4 waffle (filled = used/maxmemory, cyan share = keys with a
   TTL, grey = no TTL, labelled as a share of keys), memory meter with RSS and fragmentation, hit
@@ -1843,17 +2192,39 @@ Backend:
 
   ```ts
   interface RedisRuntimeSurface {
-    sampled_at: string; interval_seconds: number; single_instance: boolean;
+    sampled_at: string;
+    interval_seconds: number;
+    single_instance: boolean;
     instances: Array<{
-      role: "cache" | "durable"; available: boolean;
-      flags: { maxmemory_bytes: number; maxmemory_policy: string; appendonly: boolean; source: "config" | "info" };
-      memory: { used_bytes: number; rss_bytes: number; fragmentation: number; warn: boolean };   // warn ≥75% of maxmemory on durable
+      role: "cache" | "durable";
+      available: boolean;
+      flags: {
+        maxmemory_bytes: number;
+        maxmemory_policy: string;
+        appendonly: boolean;
+        source: "config" | "info";
+      };
+      memory: {
+        used_bytes: number;
+        rss_bytes: number;
+        fragmentation: number;
+        warn: boolean;
+      }; // warn ≥75% of maxmemory on durable
       keys: { total: number; with_ttl: number };
-      hit_ratio: number | null; ops_per_sec: number | null;
-      log: Array<{ at: string; text: string; level: "info" | "warn" }>;   // ≤6, real sample deltas
-      durable?: { recent_events: Array<{ seq: string; type: string; at: string }>;   // ≤6, subjects redacted
-                  broker: Array<{ queue: string; waiting: number; delayed: number; dead: number }>;
-                  projector: { lag: number | null; dead_letter: number }; aof: string | null };
+      hit_ratio: number | null;
+      ops_per_sec: number | null;
+      log: Array<{ at: string; text: string; level: "info" | "warn" }>; // ≤6, real sample deltas
+      durable?: {
+        recent_events: Array<{ seq: string; type: string; at: string }>; // ≤6, subjects redacted
+        broker: Array<{
+          queue: string;
+          waiting: number;
+          delayed: number;
+          dead: number;
+        }>;
+        projector: { lag: number | null; dead_letter: number };
+        aof: string | null;
+      };
     }>;
   }
   ```
@@ -1880,13 +2251,14 @@ Backend:
   lazy logs (`tail=30`); Restart through `ConfirmDialog` per a server-side policy by compose label
   (PD44); Stop/Start only for other containers.
 - **States**: warming, docker unavailable (ghost topology plus explanation), stale (`sampled 6 s
-  ago`; `SAMPLER STALLED` computed client-side from server time), partial.
+ago`; `SAMPLER STALLED` computed client-side from server time), partial.
 - **Data**: `GET /api/admin/stack-snapshot` and `/api/admin/stack-stream` stay but never sample.
   Each sample goes to the Redis key `crate:runtime:stack` (TTL 3 × interval) plus a publish on
   `crate:sse:admin:stack`, like the other runtime samplers (5.3.2); `ui_snapshots('ops:stack','global')`
   is written only when a node's state, health, restart count or the container set changes, or at
   most once per 60 s, never on every 10 s sample. The GET reads the Redis key, else the row; the
   stack-stream forwards published payloads.
+
   - Sampler placement is PD54. As proposed: crate-api is the only service with the Docker socket
     and also serves all Admin and the Listen fallback traffic, while `docker_ctl._request` is
     synchronous Unix-socket I/O (30 s timeout today). So the sampler is a dedicated daemon thread in
@@ -1917,22 +2289,46 @@ Backend:
   // GET /api/admin/stack-snapshot and /stack-stream (ops.runtime.manage, unchanged), never sample in the request;
   // they read crate:runtime:stack, else ui_snapshots('ops:stack','global').
   interface StackSurface /* existing: snapshot, stack {available, total, running, containers} */ {
-    warming: boolean; sampled_at: string | null; sampled_by: string | null; interval_seconds: number;
+    warming: boolean;
+    sampled_at: string | null;
+    sampled_by: string | null;
+    interval_seconds: number;
     nodes: Array<{
-      id: string;                     // topology id: api, readplane, worker, projector, postgres, redis, durable, …
-      container: string | null;       // null = ghost ("not deployed")
-      image: string | null; digest: string | null;
-      state: "running" | "starting" | "unhealthy" | "restarting" | "exited" | "dead" | "unknown";
-      health: string | null; oom_killed: boolean; last_exit_code: number | null;
-      restarts: number; started_at: string | null;
-      memory: { used_bytes: number | null; limit_bytes: number | null; stale: boolean };
-      music_mount: "ro" | "rw" | null; ports: string[];
-      actions: { restart: boolean; reason: string | null };   // PD44 policy, evaluated server-side
+      id: string; // topology id: api, readplane, worker, projector, postgres, redis, durable, …
+      container: string | null; // null = ghost ("not deployed")
+      image: string | null;
+      digest: string | null;
+      state:
+        | "running"
+        | "starting"
+        | "unhealthy"
+        | "restarting"
+        | "exited"
+        | "dead"
+        | "unknown";
+      health: string | null;
+      oom_killed: boolean;
+      last_exit_code: number | null;
+      restarts: number;
+      started_at: string | null;
+      memory: {
+        used_bytes: number | null;
+        limit_bytes: number | null;
+        stale: boolean;
+      };
+      music_mount: "ro" | "rw" | null;
+      ports: string[];
+      actions: { restart: boolean; reason: string | null }; // PD44 policy, evaluated server-side
     }>;
-    other_containers: Array<{ name: string; image: string; state: string;
-                              actions: { restart: boolean; stop: boolean; start: boolean } }>;
+    other_containers: Array<{
+      name: string;
+      image: string;
+      state: string;
+      actions: { restart: boolean; stop: boolean; start: boolean };
+    }>;
   }
   ```
+
 - **Layout**: wide/tall switch by container query at about 1100 px; tall worker rows re-spaced; SVG
   `role="group"` with focusable nodes.
 
@@ -1946,29 +2342,29 @@ user input (shared with the sidecar); worker roster as hairline rows (seen withi
 
 ### 4.9 Library pages (Admin)
 
-| Page | Treatment | Data | P · size |
-| --- | --- | --- | --- |
-| Browse | media grid with mono `12 albums · 143 tracks`; filter and sort chips; list mode as a table; header shows filtered and total counts | `/api/artists`, `/api/browse/filters` | P1 · M |
-| Artist | entity header (`ARTIST · 12 albums · 143 tracks · MBID linked · enriched 2 d ago`); text tabs in `?tab=`; overview lede and mono facts; top tracks as track rows; discography grouped under `MonoLabel`s; Similar graph retinted through tokens with `/api/shows/artists-with-shows` fetched once per page; Stats with the Nivo theme; artwork editor chrome; Shows use the ticket; Setlist tab uses the shared setlist rows (4.18); Enrichment tab 4.5 | existing | P1 · L |
-| Album | entity header (`ALBUM · 2019 · 10 tracks · 41 min · FLAC 16/44.1`); `TrackTable` per the track-row recipe with analysis and bliss dots; `TagEditor` with mono keys and file-tag diff highlighted; `MatchCard` with a confidence meter; readout 4.7; sidecar 4.3 | existing | P1 · M |
-| Timeline | hairline year bars (`--v` = count/max), decade dividers, `StatStrip` (span, total, peak year), expanded year as a cover row | `/api/timeline` (fine at 4.4K albums) | P2 · S |
-| Trash | `StatStrip` (files, size); hairline rows with restore/delete chips. Precondition: `/api/manage/tracks/quarantine` walks the disk per request; the worker maintains the index | | P2 · S |
-| Contributions | hairline review queue with status dots | | P2 · S |
+| Page          | Treatment                                                                                                                                                                                                                                                                                                                                                                                                                                               | Data                                  | P · size |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | -------- |
+| Browse        | media grid with mono `12 albums · 143 tracks`; filter and sort chips; list mode as a table; header shows filtered and total counts                                                                                                                                                                                                                                                                                                                      | `/api/artists`, `/api/browse/filters` | P1 · M   |
+| Artist        | entity header (`ARTIST · 12 albums · 143 tracks · MBID linked · enriched 2 d ago`); text tabs in `?tab=`; overview lede and mono facts; top tracks as track rows; discography grouped under `MonoLabel`s; Similar graph retinted through tokens with `/api/shows/artists-with-shows` fetched once per page; Stats with the Nivo theme; artwork editor chrome; Shows use the ticket; Setlist tab uses the shared setlist rows (4.18); Enrichment tab 4.5 | existing                              | P1 · L   |
+| Album         | entity header (`ALBUM · 2019 · 10 tracks · 41 min · FLAC 16/44.1`); `TrackTable` per the track-row recipe with analysis and bliss dots; `TagEditor` with mono keys and file-tag diff highlighted; `MatchCard` with a confidence meter; readout 4.7; sidecar 4.3                                                                                                                                                                                         | existing                              | P1 · M   |
+| Timeline      | hairline year bars (`--v` = count/max), decade dividers, `StatStrip` (span, total, peak year), expanded year as a cover row                                                                                                                                                                                                                                                                                                                             | `/api/timeline` (fine at 4.4K albums) | P2 · S   |
+| Trash         | `StatStrip` (files, size); hairline rows with restore/delete chips. Precondition: `/api/manage/tracks/quarantine` walks the disk per request; the worker maintains the index                                                                                                                                                                                                                                                                            |                                       | P2 · S   |
+| Contributions | hairline review queue with status dots                                                                                                                                                                                                                                                                                                                                                                                                                  |                                       | P2 · S   |
 
 ### 4.10 Access, curation, federation, settings (Admin)
 
-| Page | Treatment | P · size |
-| --- | --- | --- |
-| Users | presence `StatStrip` computed from the loaded list; table with role, presence dot, now playing, last seen, sessions; Leaflet with a dark desaturated basemap and token markers. Precondition B17 (presence query as a per-user `LATERAL` top-1, batched now-playing reads); rows refresh on focus | P2 · M |
-| Roles | capability matrix table (mono ids grouped by domain, roles as columns, on/off dots); role chips on mobile | P2 · S |
-| Playlists, editor | hairline rows with mono `smart · 48 tracks · regenerated 2 d ago`; rule builder as chip rows; preview count numeral; generation phase line on the playlist stream (with reconnect) | P2 · M |
-| Translations | one row per locale with a status dot and a stacked coverage meter (translated, stale, missing) from `/quality`; bundles as a table; editor two columns with mono keys | P2 · M |
-| Settings | section navigation in `?section=`; v3 primitives replace the local `Section`, `StatTile`, `PanelCard` and `StatusDot` (name collision); schedules as hairline rows with an elapsed/interval hairline (amber past 1.5x) and Run now, using an additive `last_runs` read of `schedule:last_run:{task}` keys; connections as dot rows; storage meters; audit log table; Downloads quiet-hours heatmap (4.17, phase 2) | P2 · L |
-| Federation | Overview hero is the topology (below); Peers, Policies, Streams (filter by `?node=`), Imports, Security (key rotation step rail), Audit as tables and rails; tabs in `?tab=`; `PanelState` gains Retry and loses red | P2 · L |
-| Global catalog | `StatStrip` of artists, albums, tracks, sources; serving mode dot; taxonomy id and digest; last reconcile as a step rail with real counts; runs table; duplicate review with a confidence meter (ticks at .85 and .90). Precondition B17 (status snapshot written at reconcile completion) | P2 · M |
-| Login, Setup | header anatomy; forms; Setup as a 3-step rail whose last step follows the real `library_pipeline` task | P2 · S/M |
-| Route-level states (`App.tsx` `PageSpinner` and "No console landing page available"; `components/auth/ProtectedRoute.tsx` `PageSpinner`, "Admin console access required", "Permission required") | `ErrorState` page variant: `MonoLabel` eyebrow, sub-head title, one sentence naming the missing capability, one CTA; loading keeps the shell and shows a `ProgressHairline` instead of a spinner | P1 · S |
-| LLM-gated actions (`components/ui/AIButton.tsx`, `LLMStatusProvider` in `hooks/use-llm.tsx`) | the action stays a normal button; when no LLM is configured it is disabled with a neutral mono `LLM · not configured` tag and the reason in `title` (the site's "optional LLM" badge); no sparkle icon tile, no colour | P2 · S |
+| Page                                                                                                                                                                                             | Treatment                                                                                                                                                                                                                                                                                                                                                                                                          | P · size |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| Users                                                                                                                                                                                            | presence `StatStrip` computed from the loaded list; table with role, presence dot, now playing, last seen, sessions; Leaflet with a dark desaturated basemap and token markers. Precondition B17 (presence query as a per-user `LATERAL` top-1, batched now-playing reads); rows refresh on focus                                                                                                                  | P2 · M   |
+| Roles                                                                                                                                                                                            | capability matrix table (mono ids grouped by domain, roles as columns, on/off dots); role chips on mobile                                                                                                                                                                                                                                                                                                          | P2 · S   |
+| Playlists, editor                                                                                                                                                                                | hairline rows with mono `smart · 48 tracks · regenerated 2 d ago`; rule builder as chip rows; preview count numeral; generation phase line on the playlist stream (with reconnect)                                                                                                                                                                                                                                 | P2 · M   |
+| Translations                                                                                                                                                                                     | one row per locale with a status dot and a stacked coverage meter (translated, stale, missing) from `/quality`; bundles as a table; editor two columns with mono keys                                                                                                                                                                                                                                              | P2 · M   |
+| Settings                                                                                                                                                                                         | section navigation in `?section=`; v3 primitives replace the local `Section`, `StatTile`, `PanelCard` and `StatusDot` (name collision); schedules as hairline rows with an elapsed/interval hairline (amber past 1.5x) and Run now, using an additive `last_runs` read of `schedule:last_run:{task}` keys; connections as dot rows; storage meters; audit log table; Downloads quiet-hours heatmap (4.17, phase 2) | P2 · L   |
+| Federation                                                                                                                                                                                       | Overview hero is the topology (below); Peers, Policies, Streams (filter by `?node=`), Imports, Security (key rotation step rail), Audit as tables and rails; tabs in `?tab=`; `PanelState` gains Retry and loses red                                                                                                                                                                                               | P2 · L   |
+| Global catalog                                                                                                                                                                                   | `StatStrip` of artists, albums, tracks, sources; serving mode dot; taxonomy id and digest; last reconcile as a step rail with real counts; runs table; duplicate review with a confidence meter (ticks at .85 and .90). Precondition B17 (status snapshot written at reconcile completion)                                                                                                                         | P2 · M   |
+| Login, Setup                                                                                                                                                                                     | header anatomy; forms; Setup as a 3-step rail whose last step follows the real `library_pipeline` task                                                                                                                                                                                                                                                                                                             | P2 · S/M |
+| Route-level states (`App.tsx` `PageSpinner` and "No console landing page available"; `components/auth/ProtectedRoute.tsx` `PageSpinner`, "Admin console access required", "Permission required") | `ErrorState` page variant: `MonoLabel` eyebrow, sub-head title, one sentence naming the missing capability, one CTA; loading keeps the shell and shows a `ProgressHairline` instead of a spinner                                                                                                                                                                                                                   | P1 · S   |
+| LLM-gated actions (`components/ui/AIButton.tsx`, `LLMStatusProvider` in `hooks/use-llm.tsx`)                                                                                                     | the action stays a normal button; when no LLM is configured it is disabled with a neutral mono `LLM · not configured` tag and the reason in `title` (the site's "optional LLM" badge); no sparkle icon tile, no colour                                                                                                                                                                                             | P2 · S   |
 
 **Federation topology** (`site:src/components/viz/Federation.astro`,
 `site:src/scripts/viz/federation-view.ts`): your node in the centre with display name and key
@@ -1989,6 +2385,7 @@ item `COUNT`; counts written by the sync worker), effective pairing state derive
 Rebuild discipline (otherwise B11 moves from ops to this snapshot):
 `federation.stream.ticket.created` (`api/federation.py:2071`) and
 `federation.stream.proxy.completed` (`api/federation_remote.py:858`) fire on every remote track play.
+
 - Structural events (pairing, grant, peer changes, `federation.catalog.sync.completed`,
   `federation.health.polled`) rebuild with trailing-edge coalescing over a window of at least 5 s
   (5.3.2).
@@ -2006,16 +2403,43 @@ rebuild; a structural event rebuilds after the window.
 // (≤1 per 5 s), with the health poll as a 60 s floor (rebuild discipline above).
 // Live: surface "federation" on the admin live stream.
 interface FederationTopologySurface {
-  node: { uid: string; display_name: string; fingerprint: string; listeners: number; serving: number };
+  node: {
+    uid: string;
+    display_name: string;
+    fingerprint: string;
+    listeners: number;
+    serving: number;
+  };
   peers: Array<{
-    uid: string; display_name: string; url_host: string | null;
-    pairing: { uid: string; direction: "inbound" | "outbound"; state: "pending" | "approved" | "awaiting_peer"
-               | "expired" | "failed" | "disabled"; expires_at: string | null };   // state derived from expires_at
-    health: { ok: boolean; stale: boolean; failures: number; checked_at: string | null };
+    uid: string;
+    display_name: string;
+    url_host: string | null;
+    pairing: {
+      uid: string;
+      direction: "inbound" | "outbound";
+      state:
+        | "pending"
+        | "approved"
+        | "awaiting_peer"
+        | "expired"
+        | "failed"
+        | "disabled";
+      expires_at: string | null;
+    }; // state derived from expires_at
+    health: {
+      ok: boolean;
+      stale: boolean;
+      failures: number;
+      checked_at: string | null;
+    };
     grant: { preset: string | null; scopes: string[] } | null;
-    relay: { sessions_5m: number; serving_5m: number };                            // sessions, never "bytes now"
-    catalog: { item_count: number | null; last_delta_count: number | null; synced_at: string | null };
-  }>;                                                   // pending first; the client draws ≤9 plus +N
+    relay: { sessions_5m: number; serving_5m: number }; // sessions, never "bytes now"
+    catalog: {
+      item_count: number | null;
+      last_delta_count: number | null;
+      synced_at: string | null;
+    };
+  }>; // pending first; the client draws ≤9 plus +N
   snapshot: SnapshotMeta;
 }
 ```
@@ -2055,7 +2479,7 @@ diff).
   `clamp(1.6rem, 6vw, 2.2rem)`; mono artist/album; seek with 44 px targets; 64 px disc; text tabs;
   the EQ sheet loses its glass.
 - **Extended player**: header `NOW PLAYING · from <source>` from `playSource`; text tabs; Suggested
-  tab rows with mono `92% · 124 BPM · 8A` from the existing `distance`; album palette tint per PD40.
+  tab rows with mono `92% · 124 BPM · 8A` from the existing `distance`; fixed Crate v3 chrome per PD40; content-derived artwork/visualizer palettes remain content.
 - **Queue** (panel, extended tab, fullscreen tab): header `QUEUE · 24 tracks · 1 h 42 min`; source
   line; track rows with drag handles; past tracks subtle.
 - **Mix strip** (`site:src/components/viz/MixViz.astro`, P2 · L, Smart Mix dependent):
@@ -2084,7 +2508,7 @@ diff).
     mode and reason string in all 7 catalogs.
 - **Lyrics**: synced lines in Bricolage 700 (active primary, past subtle, future muted); active line
   underline at `scaleX(lineProgress)` written by ref from a leaf; footer `LYRICS · synced · lrclib`.
-- **Visualizer family**: token palette (cyan default, album palette opt-in, PD40); gated by
+- **Visualizer family**: Crate v3 chrome tokens, with data-derived palettes inside the visualizer where they represent content (PD40); no selectable skin/chrome opt-in; gated by
   `data-crate-effects`; `SpectrumRibbonCanvas` removed (PD47).
 - **Resume prompt and sleep timer**: object card `RESUME · <device> · 2:14` with a hairline at the
   saved position; mono sleep countdown.
@@ -2096,7 +2520,7 @@ diff).
   scroll), the extended header panel and the mobile sheet. Chart 200–240 px on desktop (the site
   uses `clamp(260px, 44vh, 460px)`; this is a deliberate app reduction), 220 px on mobile.
 - **Anatomy**: `MonoLabel` `EQ · 10 bands · ±12 dB · 21 presets` with a trail `previous → current →
-  fallback` (the current word scrambles for 420 ms when it changes; this is Listen's first scramble
+fallback` (the current word scrambles for 420 ms when it changes; this is Listen's first scramble
   consumer, 3.1.4); bars from 0 dB with separate up and down gradients; curve with glow and area fill;
   ghost curve for the target during a morph and for hover previews of a preset chip or a shadowed
   chain link; handles positioned by ref in the same frame as the curve (fixes the regression;
@@ -2118,6 +2542,7 @@ diff).
   `useEqualizerRuntime` re-runs its effect, which on Android native is a Capacitor bridge call
   `androidNativeEngine.setEq(…, 80)` (`hooks/use-equalizer-runtime.ts:96-101`). Batching that to
   one write per frame is still 60 writes a second (DS 3.8 rule 4). So, during a drag or key repeat:
+
   - gains go to the engine imperatively through a ref: Web Audio `setTargetAtTime` on web and
     desktop; native `setEq` throttled to 15–20 Hz with its ramp;
   - curve and handles are drawn by ref; the live store (glyph) gets at most one publish per
@@ -2127,6 +2552,7 @@ diff).
 
   Tests (Vitest): a 60-move drag causes 1 `localStorage` commit and 1 `EQ_PREFS_EVENT`; the native
   `setEq` call count stays within the throttle; key repeat commits once after 150 ms.
+
 - **States**: loading (PD32 decides between showing flat, which is what the audio plays today, and
   holding the last gains); unavailable (`Flat · Smart EQ unavailable` with a warn dot); remote track
   (flat, chain absent with reason); EQ off (40% opacity, sliders `aria-disabled`); engine without EQ
@@ -2148,11 +2574,17 @@ interface EffectiveEq /* existing fields unchanged */ {
   source: EqSource | "unavailable";
   genrePath: Array<{ slug: string; name: string }> | null;
   chain: Array<{
-    source: EqSource;               // fixed order: user track, curator track, curator album, genre, analysis, flat
+    source: EqSource; // fixed order: user track, curator track, curator album, genre, analysis, flat
     status: "applied" | "shadowed" | "absent";
     label: string | null;
-    gains: number[] | null;         // applied and shadowed only
-    reason: "no_preset" | "no_canonical_genre" | "no_genre_preset" | "no_analysis" | "remote_track" | null;
+    gains: number[] | null; // applied and shadowed only
+    reason:
+      | "no_preset"
+      | "no_canonical_genre"
+      | "no_genre_preset"
+      | "no_analysis"
+      | "remote_track"
+      | null;
     genre?: { slug: string; name: string } | null;
     genrePath?: Array<{ slug: string; name: string }> | null;
   }>;
@@ -2172,7 +2604,7 @@ glyph store, popover height; i18n keys in 7 catalogs plus metadata hashes.
 - **Focal visual**: the Listening DNA tile on desktop (the site's Inside heatmap tile, inside
   `components/home/HomeReplaySection.tsx`): a mini 7×24 grid from the 30-day `heatmap` the Home
   already fetches (`STATS_DASHBOARD_LIMITS`), header `STATS · 30 days · night 34%`, mono line `Peak
-  Sat 23:00 · now Thu 22:00`; the now outline moves once per hour (one timeout computed in the
+Sat 23:00 · now Thu 22:00`; the now outline moves once per hour (one timeout computed in the
   dashboard timezone; DST and :30/:45 offsets tested); the tile links to `/stats#listening` (needs
   an `id` through `StatsReveal`, a scroll effect after load and `scroll-margin-top`). Hidden when
   pending, empty or failed; not added to mobile Home (no new mobile fetch).
@@ -2188,11 +2620,11 @@ glyph store, popover height; i18n keys in 7 catalogs plus metadata hashes.
 #### Mood map
 
 - **Focal visual**: MoodMap (`site:src/components/viz/MoodMap.astro`, `site:src/scripts/viz/
-  mood-view.ts`, `mood-math.ts`) replacing `MoodBrowseSection` and its `MOOD_COLORS`
+mood-view.ts`, `mood-math.ts`) replacing `MoodBrowseSection` and its `MOOD_COLORS`
   (`pages/ExploreLandingSections.tsx:194`). The figure keeps the site's composition: header
   `MOODS from audio analysis` / `energy × valence`, square stage, readout and CTA below.
 - **Content**: up to 1,500 real points (700 on mobile, a prefix of the same hash-ordered sample) on
-  Canvas 2D with token-coloured sprites (`lighter` compositing on dark skins only); points that
+  Canvas 2D with token-coloured sprites (`lighter` compositing on the fixed Crate v3 canvas); points that
   belong to no mood as pale dust; 8 mood labels as DOM buttons at the real centroids of this library
   with a tested deterministic nudge so `energetic` and `intense` do not overlap; 4×4 grid; dashed
   threshold rectangle for the active mood.
@@ -2202,7 +2634,7 @@ glyph store, popover height; i18n keys in 7 catalogs plus metadata hashes.
   share; `Play <mood> mix` keeps today's playback through `/api/browse/mood/{mood}`; Escape clears.
   Offline-only disables Play with a reason.
 - **States**: loading (grid and axes, disabled labels); warming (labels at region centres, `Mapping
-  moods from audio analysis`); empty (`No analysed tracks yet`); stale (meta shows the build time);
+moods from audio analysis`); empty (`No analysed tracks yet`); stale (meta shows the build time);
   error (moods as a `HairlineList` with counts and Play); live (on a new snapshot version, points
   cross-fade, counters count from the previous value, selection kept).
 - **Accessibility**: canvas `aria-hidden`; labels are buttons in preset order; a separate sr-only
@@ -2215,11 +2647,22 @@ interface MoodMapResponse {
   status: "ready" | "warming" | "empty";
   snapshot: { version: number; built_at: string; stale: boolean };
   axes: { x: "valence"; y: "energy" };
-  coverage: { analysed_tracks: number; plotted_tracks: number; catalog_tracks: number };
-  moods: Array<{ id: string; filters: Record<string, number>; region: { energy: [number, number]; valence: [number, number] };
-                 third_axis: string[]; track_count: number; share: number;
-                 centroid: { energy: number; valence: number } | null; spread: { energy: number; valence: number } | null }>;
-  sample: { count: number; encoding: "u8x3"; data: string } | null;   // energy·255, valence·255, mood bit mask
+  coverage: {
+    analysed_tracks: number;
+    plotted_tracks: number;
+    catalog_tracks: number;
+  };
+  moods: Array<{
+    id: string;
+    filters: Record<string, number>;
+    region: { energy: [number, number]; valence: [number, number] };
+    third_axis: string[];
+    track_count: number;
+    share: number;
+    centroid: { energy: number; valence: number } | null;
+    spread: { energy: number; valence: number } | null;
+  }>;
+  sample: { count: number; encoding: "u8x3"; data: string } | null; // energy·255, valence·255, mood bit mask
 }
 // /api/browse/moods and explore-page read counts from the same snapshot (shape unchanged).
 // /api/browse/mood/{mood}: random.sample from ui_snapshots('explore:moods','pool:<mood>') (≤400 uids)
@@ -2303,17 +2746,49 @@ open Explore pages refetch the wheel (plan 5.10; Vitest that the URL never resol
 ```ts
 // GET /api/radio/session/{session_id} (owner only, 404 otherwise): Redis session read, no DB.
 interface RadioSessionExplain {
-  session_id: string; mode: "seeded" | "discovery";
-  profile: "discovery" | "track" | "contextual" | "global_catalog"; explainable: boolean;
+  session_id: string;
+  mode: "seeded" | "discovery";
+  profile: "discovery" | "track" | "contextual" | "global_catalog";
+  explainable: boolean;
   seed: { type: string; label: string; vector: number[] | null };
-  weights: { sound: number; artists: number; genre: number; bpm: number; energy: number; key: number; era: number };
-  target: { initial: number[] | null; current: number[] | null; like_blend: number; blend_step: 0.08; max_blend: 0.4;
-            liked_count: number; session_disliked_count: number; dislike_radius: 0.1 };
-  picks: Array<{ track_id: number; order: number; source: string; camelot: string | null; distance: number;
-                 pool: { size: number; by_source: Record<string, number> };
-                 terms: Record<"sound" | "artists" | "genre" | "bpm" | "energy" | "key" | "era", number | null>;  // penalty, null = no data
-                 adjustments: { source: number; variant: number; curation: number; artist_repeat: 1 | 2 };
-                 cost: number }>;            // ring of the last 60 picks, penalties at 4 decimals
+  weights: {
+    sound: number;
+    artists: number;
+    genre: number;
+    bpm: number;
+    energy: number;
+    key: number;
+    era: number;
+  };
+  target: {
+    initial: number[] | null;
+    current: number[] | null;
+    like_blend: number;
+    blend_step: 0.08;
+    max_blend: 0.4;
+    liked_count: number;
+    session_disliked_count: number;
+    dislike_radius: 0.1;
+  };
+  picks: Array<{
+    track_id: number;
+    order: number;
+    source: string;
+    camelot: string | null;
+    distance: number;
+    pool: { size: number; by_source: Record<string, number> };
+    terms: Record<
+      "sound" | "artists" | "genre" | "bpm" | "energy" | "key" | "era",
+      number | null
+    >; // penalty, null = no data
+    adjustments: {
+      source: number;
+      variant: number;
+      curation: number;
+      artist_repeat: 1 | 2;
+    };
+    cost: number;
+  }>; // ring of the last 60 picks, penalties at 4 decimals
 }
 // POST /api/radio/feedback adds the same target block. Client fit = clamp(1 − Σ w·p / Σ w, 0, 1) over available terms.
 // GET /api/bliss/map → ui_snapshots('bliss:map','global'): {status: "ready"|"warming"|"empty", revision, count,
@@ -2334,13 +2809,13 @@ and nightly; always upserts (also `empty`); router registered with the `radio` t
 
 - **Focal visual**: route map on `/paths/:id` replacing `PathRouteVisualization`
   (`pages/PathDetailParts.tsx`), from the site's PathsDive (`site:src/components/listen/
-  PathsDive.astro`, `site:src/scripts/listen/paths.ts`) and Inside path tile.
+PathsDive.astro`, `site:src/scripts/listen/paths.ts`) and Inside path tile.
   - Phase A (2D, existing data): x = step progress, y = energy (interpolated across unanalysed
     steps; flat line with `N OF M ANALYSED` when none); nodes `START`, `NN` (index + 1) and `END`
     with `NN BPM · 8A` labels (all when 8 steps or fewer; else ends, active and focused); a genre rail
     below for scene planners (`JAZZ → SOUL → FUNK`, one text node or `GenrePill`s) with edge chips
     (`PARENT 1.0`, `FUSION 1.6`, `RELATED 2.5`, `JUMP`); header `MUSIC PATH · 20 STEPS · 92 → 128
-    BPM` and `PLANNER · GENRE MAP | SCENES | SOUND LINE` plus `LLM REVIEW · N SWAPS` when it ran;
+BPM` and `PLANNER · GENRE MAP | SCENES | SOUND LINE` plus `LLM REVIEW · N SWAPS` when it ran;
     footer `SAVED · 3 d ago` with Regenerate and Delete as ghost buttons.
   - Traveller: the step whose track is playing (`currentTrack`, conditioned on `playSource` being
     this path) gets a ring; the segment up to it is lit. Changes per track, never per frame.
@@ -2356,7 +2831,7 @@ and nightly; always upserts (also `empty`); router registered with the `radio` t
   - Phase B (bliss map): the same SVG over the WebGL cloud with steps projected from their
     `bliss_vector`; falls back to phase A.
 - **List `/paths`**: each row's leading slot is a 64×24 energy sparkline with endpoints; meta `20
-  STEPS · 92 → 128 BPM · 3 d`; bliss rows keep origin → waypoints → destination.
+STEPS · 92 → 128 BPM · 3 d`; bliss rows keep origin → waypoints → destination.
 - **Edge cases**: genre → same genre falls back to the sound line; fewer than 2 steps shows endpoints
   and `NO ROUTE · REGENERATE`; a regenerate dims the old route until the new one draws.
 
@@ -2366,12 +2841,27 @@ and nightly; always upserts (also `empty`); router registered with the `radio` t
 // the hand-built payloads.
 interface PathPlanMeta {
   planner: "genre_graph" | "artist_scene" | "bliss_line";
-  genre_route: Array<{ slug: string; name: string;   // name capitalised client-side
-                       edge: "start" | "parent" | "child" | "influence" | "fusion" | "related" | "excursion" | "jump";
-                       cost: number | null }>;        // from path_genre changes in the final tracks, edge looked up both ways
+  genre_route: Array<{
+    slug: string;
+    name: string; // name capitalised client-side
+    edge:
+      | "start"
+      | "parent"
+      | "child"
+      | "influence"
+      | "fusion"
+      | "related"
+      | "excursion"
+      | "jump";
+    cost: number | null;
+  }>; // from path_genre changes in the final tracks, edge looked up both ways
   review: { ran: boolean; replaced: number };
   planned_at: string;
-  summary: { bpm_start: number | null; bpm_end: number | null; energy: Array<number | null> };   // list glyph
+  summary: {
+    bpm_start: number | null;
+    bpm_end: number | null;
+    energy: Array<number | null>;
+  }; // list glyph
 }
 // Each step adds camelot (derived in the serializer from app/crate/camelot.py with enharmonics, 4.7).
 // Legacy rows: plan_meta null; planner shown as "—"; scenes inferred when path_genre exists.
@@ -2383,6 +2873,7 @@ interface PathPlanMeta {
 B18 (warning): `POST /api/paths`, `/regenerate` and `/preview` plan synchronously in the request (up
 to 100 KNN queries, graph loads, an LLM call). Adding `plan_meta` and a visible Regenerate there
 would grow that path, so the task route lands first, inside plan 4.9a, and:
+
 - new Listen builds call only the task route; the route map's Regenerate (plan 4.9b) uses it;
 - the synchronous routes stay for shipped Capacitor builds with a deprecation date in the release
   note, a per-user rate limit, and no LLM refinement (`refine_music_path_with_llm` is skipped);
@@ -2444,7 +2935,7 @@ fallbacks and Listen, with a pytest asserting the subject keys match.
   - footer `9 of 11 playable from your library` with the round play button; N always equals the
     queue `Play setlist` builds (same stored match, same cap).
   - States: pending (`Preparing setlist`, warn dot, arrives by SSE), missing (`No recent setlists on
-    Setlist.fm`), partial (old entries without a match: rows without status until the rematch
+Setlist.fm`), partial (old entries without a match: rows without status until the rematch
     lands), zero local (Play disabled with the reason).
   - Row entrance only on mount (55 ms stagger, longhand animation properties, no `opacity: 0` base).
 - **Shared**: `@crate/ui/domain/shows/{SetlistTicket,ProbableSetlist}.tsx` plus `setlist.ts`
@@ -2454,12 +2945,25 @@ fallbacks and Listen, with a pytest asserting the subject keys match.
 - **Home**: show prep and the upcoming feature use the ticket header and the summary.
 
 ```ts
-interface ProbableSetlistSong { title: string; position?: number; frequency?: number; play_count?: number;
-  last_played?: string; on_tour?: boolean;
-  library_status?: "local" | "missing"; library_track_id?: number; track_entity_uid?: string }
-interface ProbableSetlistContext { mode: "active_tour" | "recent_shows" | "historical_weighted";
-  source_show_count: number; source_date_from: string | null; source_date_to: string | null;
-  tour_name?: string; matched_at?: string }
+interface ProbableSetlistSong {
+  title: string;
+  position?: number;
+  frequency?: number;
+  play_count?: number;
+  last_played?: string;
+  on_tour?: boolean;
+  library_status?: "local" | "missing";
+  library_track_id?: number;
+  track_entity_uid?: string;
+}
+interface ProbableSetlistContext {
+  mode: "active_tour" | "recent_shows" | "historical_weighted";
+  source_show_count: number;
+  source_date_from: string | null;
+  source_date_to: string | null;
+  tour_name?: string;
+  matched_at?: string;
+}
 // /api/me/upcoming: shows gain probable_setlist_status ("ready" | "pending" | "missing"); source already exists
 // (api/me.py:1553; only the Admin /api/upcoming adds it, 4.4); a top-level
 // probable_setlists map keyed by artist carries {songs (≤20), context} so 120 shows do not repeat songs. The
@@ -2526,7 +3030,7 @@ mode stores the listener's location (section 7).
     `status` added to `PlayerConnectValue`; refetch on device set, active instance or pause/stop
     changes. Behind the Crate Connect build flag (PD38).
 - **Access tokens** (P2 · M, after the Smart Mix merge, `site:src/components/viz/
-  TokenAllowlist.astro`): list of tokens (display name, 12-character prefix bright plus masked
+TokenAllowlist.astro`): list of tokens (display name, 12-character prefix bright plus masked
   rest, scope chips, created/expires/last used, status dot: used in 7 days on, never or idle off,
   expiring in 7 days or expired warn); per token a folded `Reach · N routes` list (method badge plus
   route, reachable rows lit; HEAD not shown for the stream route that returns 405); create form
@@ -2541,7 +3045,7 @@ mode stores the listener's location (section 7).
 - **Playback**: crossfade and smart-transition controls with a static equal-power glyph sized by the
   chosen seconds.
 - Language as chips; servers as a list with reachability dots; shows location field; sleep timer
-  chips; appearance editor behind its flag.
+  chips; independent motion/accessibility controls. The visual theme editor is removed in plan 1.13.
 
 ### 4.22 Social, Upload, Offline library, Auth, Share (P2)
 
@@ -2559,7 +3063,7 @@ mode stores the listener's location (section 7).
 - Share sheet per the dialog recipe; story canvas with v3 faces loaded via `FontFace` and colours via
   `readCssColorToken`.
 - Remote provenance tag (3.1.5) and an Info tab "Source" mini route (`north.crate → your node → this
-  device · relayed`) from `Track.remote` and `lib/playback-provenance.ts`.
+device · relayed`) from `Track.remote` and `lib/playback-provenance.ts`.
 
 ---
 
@@ -2567,65 +3071,65 @@ mode stores the listener's location (section 7).
 
 ### 5.1 Preconditions (fix first)
 
-| ID | Fix | Size | Ships |
-| --- | --- | --- | --- |
-| B1 | `list_domain_events` checks `any(msgs for _, msgs in entries)`; reads the PEL and `>` in the same tick (or `XAUTOCLAIM`) so deferred events do not block; fake Redis in tests returns `[(stream, [])]`. In the same change coalesce ops refreshes to one per 60 s, trailing-edge (5.3.2), otherwise V5 rebuilds `ops/dashboard` every 5 s during analysis | M | before any snapshot-driven visual |
-| B2 | Serve-stale-and-schedule for `ops/dashboard`, health, tasks, stack and logs surfaces; drop `fresh=1` from HTTP and from focus refreshes | M | first |
-| B3 | Metrics system reads the persisted governor sample and `build_analysis_payload()` | S | with the governor |
-| B4 | SSE generators read in `asyncio.to_thread`, debounce, never build | S | first |
-| B5 | `insights` snapshot built by `refresh_insights_snapshot` (4.7) | M | before Insights and Discover |
-| B6 | Mood snapshot and pools (4.14) | M | can ship alone |
-| B7 | Genre counts and Sound Intelligence from the wheel snapshot; catalog fallbacks serve stale; the Go read plane's `/api/genres` and genre detail read the `genre_counts` the builder writes (4.6.3 item 6) | M | with the wheel |
-| B8 | One-query EQ resolver (4.12) | M | with the EQ panel |
-| B9 | Acquisition sampler in its own crate-worker thread (2 s slskd timeout; every 2 s while watched, every 30–60 s while transfers are active and nobody watches, off otherwise; 4.4), pubsub stream, capability gate | M | before Download |
-| B10 | Per-task streams only for the selected task | S | with QueueLanes |
-| B11 | Projector routes only `federation.import` to ops; other federation events to the topology, where structural events rebuild coalesced (≥5 s) and `federation.stream.*` events rebuild only while the topology is watched (4.10) | S | can ship alone |
-| B12 | Declare `snapshot` (with `pending`) and the new fields in the stats schemas; treat pending as not empty | S | can ship alone |
-| B13 | Failed checks keep their issues; health signals published | S | can ship alone |
-| B14 | Approve with `pairing_uid`, inbound only; `approve_pairing` checks `expires_at` | S | hotfix |
-| B15, B16 | Owner checks on radio routes and task event streams (`params_json->>'user_id'` with an admin bypass) | S | hotfix |
-| B17 | Global catalog status snapshot at reconcile completion; presence query rewrite | M | before those pages |
-| B18 | Paths planning as a task (`compute_music_path`); synchronous routes deprecated, rate-limited and without LLM refinement (4.16) | L | with the `plan_meta` backend (plan 4.9a), before the route map |
-| B19 | Strip `payload_json` and redact user subjects before persisting runtime state | S | hotfix |
-| B20 | Server-side cover lookup for Download: cache read only in the request, misses through one deduplicated task (contract in 4.4) | M | before Download |
-| B21 | WS heartbeat refreshes presence and hub TTLs; disconnect touches `last_seen_at` | S | before Devices |
-| B22 | Batched setlist reads without L1 | S | with the ticket |
-| B23 | G1, G2, G3, G7 (`local_*` override columns, 4.6.3 item 5) | M | plan 2.18d, in the Genres group before the wheel (3.7) |
-| B24 | Client loops to refs; one shared crossfade clock | M | with the player |
+| ID       | Fix                                                                                                                                                                                                                                                                                                                                                       | Size | Ships                                                          |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------- |
+| B1       | `list_domain_events` checks `any(msgs for _, msgs in entries)`; reads the PEL and `>` in the same tick (or `XAUTOCLAIM`) so deferred events do not block; fake Redis in tests returns `[(stream, [])]`. In the same change coalesce ops refreshes to one per 60 s, trailing-edge (5.3.2), otherwise V5 rebuilds `ops/dashboard` every 5 s during analysis | M    | before any snapshot-driven visual                              |
+| B2       | Serve-stale-and-schedule for `ops/dashboard`, health, tasks, stack and logs surfaces; drop `fresh=1` from HTTP and from focus refreshes                                                                                                                                                                                                                   | M    | first                                                          |
+| B3       | Metrics system reads the persisted governor sample and `build_analysis_payload()`                                                                                                                                                                                                                                                                         | S    | with the governor                                              |
+| B4       | SSE generators read in `asyncio.to_thread`, debounce, never build                                                                                                                                                                                                                                                                                         | S    | first                                                          |
+| B5       | `insights` snapshot built by `refresh_insights_snapshot` (4.7)                                                                                                                                                                                                                                                                                            | M    | before Insights and Discover                                   |
+| B6       | Mood snapshot and pools (4.14)                                                                                                                                                                                                                                                                                                                            | M    | can ship alone                                                 |
+| B7       | Genre counts and Sound Intelligence from the wheel snapshot; catalog fallbacks serve stale; the Go read plane's `/api/genres` and genre detail read the `genre_counts` the builder writes (4.6.3 item 6)                                                                                                                                                  | M    | with the wheel                                                 |
+| B8       | One-query EQ resolver (4.12)                                                                                                                                                                                                                                                                                                                              | M    | with the EQ panel                                              |
+| B9       | Acquisition sampler in its own crate-worker thread (2 s slskd timeout; every 2 s while watched, every 30–60 s while transfers are active and nobody watches, off otherwise; 4.4), pubsub stream, capability gate                                                                                                                                          | M    | before Download                                                |
+| B10      | Per-task streams only for the selected task                                                                                                                                                                                                                                                                                                               | S    | with QueueLanes                                                |
+| B11      | Projector routes only `federation.import` to ops; other federation events to the topology, where structural events rebuild coalesced (≥5 s) and `federation.stream.*` events rebuild only while the topology is watched (4.10)                                                                                                                            | S    | can ship alone                                                 |
+| B12      | Declare `snapshot` (with `pending`) and the new fields in the stats schemas; treat pending as not empty                                                                                                                                                                                                                                                   | S    | can ship alone                                                 |
+| B13      | Failed checks keep their issues; health signals published                                                                                                                                                                                                                                                                                                 | S    | can ship alone                                                 |
+| B14      | Approve with `pairing_uid`, inbound only; `approve_pairing` checks `expires_at`                                                                                                                                                                                                                                                                           | S    | hotfix                                                         |
+| B15, B16 | Owner checks on radio routes and task event streams (`params_json->>'user_id'` with an admin bypass)                                                                                                                                                                                                                                                      | S    | hotfix                                                         |
+| B17      | Global catalog status snapshot at reconcile completion; presence query rewrite                                                                                                                                                                                                                                                                            | M    | before those pages                                             |
+| B18      | Paths planning as a task (`compute_music_path`); synchronous routes deprecated, rate-limited and without LLM refinement (4.16)                                                                                                                                                                                                                            | L    | with the `plan_meta` backend (plan 4.9a), before the route map |
+| B19      | Strip `payload_json` and redact user subjects before persisting runtime state                                                                                                                                                                                                                                                                             | S    | hotfix                                                         |
+| B20      | Server-side cover lookup for Download: cache read only in the request, misses through one deduplicated task (contract in 4.4)                                                                                                                                                                                                                             | M    | before Download                                                |
+| B21      | WS heartbeat refreshes presence and hub TTLs; disconnect touches `last_seen_at`                                                                                                                                                                                                                                                                           | S    | before Devices                                                 |
+| B22      | Batched setlist reads without L1                                                                                                                                                                                                                                                                                                                          | S    | with the ticket                                                |
+| B23      | G1, G2, G3, G7 (`local_*` override columns, 4.6.3 item 5)                                                                                                                                                                                                                                                                                                 | M    | plan 2.18d, in the Genres group before the wheel (3.7)         |
+| B24      | Client loops to refs; one shared crossfade clock                                                                                                                                                                                                                                                                                                          | M    | with the player                                                |
 
 Small bug seen on the way: `api/curation.py` deletes `listen:explore_page:v1:{user}` but the key is
 `v2` (Explore follow state stale up to 600 s).
 
 ### 5.2 Visual → contract
 
-| Visual | Contract | Exists | Computed where | Freshness |
-| --- | --- | --- | --- | --- |
-| Health scan and tile | `GET /api/admin/health-checks`, live surface `health` (events `health`, `health-scan`); drill-down `GET /api/admin/health-checks/{check_type}/issues` | partial | worker at scan start/end, `refresh_admin_surface` after mutations; CTE in `db/queries/health_issues.py` | push (seconds), per-check events live |
-| Album sidecar | `GET /api/manage/albums/{id}/portable-metadata` | partial | per request, one `read_scope` scoped by album | on mount, after task done; per-track task events |
-| Release timeline | `acquisition:new_releases` snapshot and stream | partial | projector on release events; reconciler 60 s | ~5–10 s; analysis counts ≤60 s |
-| Acquisition lanes | `GET /api/acquisition/snapshot` (+ `lanes`), `/stream`; `POST /api/acquisition/covers` | partial | `acquisition-sampler` thread in crate-worker, Redis key; DB row on change or ≤ 1 per 60 s; covers from a cache filled by one deduplicated task | 2 s while watched; 30–60 s while transferring unwatched; off otherwise |
-| Imports | `GET /api/imports/queue` | no | per request, one CTE over `import_queue_items` and tasks | on mount, task events, focus |
-| Enrichment orbit | `GET /api/admin/artists/{id}/enrichment/sources`, `POST /api/artists/{id}/enrichment/refresh`, `enrichment.source` signals | partial | per request (one CTE); worker writes source rows | on mount, run signals live |
-| Genre wheel | `GET /api/admin/genres/wheel`; Listen `/api/catalog/genre-wheel` | partial | `refresh_genre_wheel_snapshot` (fast, deduped, trailing-edge ≥120 s), also writing `genre_counts` | membership choke points, taxonomy events, nightly floor; mutation patches immediate |
-| EQ inheritance | path on preset payloads, `chain[]` | partial | in-memory runtime graph per request | per track change, invalidations |
-| Track readout | album analysis, neighbours, ops `analysis.recent`, `/info` `bliss_vector` | partial | per request by index; recent off-request | static per track; recent ≤120 s |
-| Queue lanes | `GET /api/admin/queues`, live `queues` | partial | `queue-lanes-writer` thread in crate-worker, single writer | ≥3 s apart while watched; row not written otherwise (an unwatched GET may serve an older row, shown as `updating`, until the first watched tick, about 1–3 s); `worker_live` every 15 s |
-| Governor gauges | `GET /api/admin/governor`, live `governor` | no | `governor-sampler` thread, Redis key; DB row on verdict change or ≤ 1 per 60 s | 5 s while watched, 60 s otherwise |
-| Event pipeline | `GET /api/admin/event-pipeline`, live `pipeline` | partial | projector after `XACK` batches; Redis key and publish only while watched; DB row on state change or ≤ 1 per 60 s | push and 15 s heartbeat while watched; row ≤ 60 s old otherwise, shown as `updating` |
-| Redis pair | `GET /api/admin/redis`, live `redis` | no | `redis-sampler` thread in crate-worker, Redis key; DB row ≤ 1 per 60 s | 15 s while watched, 300 s otherwise |
-| System map | `stack-snapshot`, `stack-stream` | partial | sampler thread (placement PD54) with leader lock, one-shot stats, bounded pool; Redis key plus publish; row on state change or ≤ 1 per 60 s | 10 s while watched; container list every 10 min otherwise |
-| Federation topology | `GET /api/admin/federation/topology`, live `federation` | no | projector: structural events coalesced ≥5 s; stream events only while watched; health poll floor 60 s | structural ~5–10 s; relay counts ≤5 s while watched, ≤60 s otherwise |
-| EQ curve, glyph | effective EQ + client live store | partial | resolver per track; client | per change |
-| Mix strip | client model (phase A); plans and profiles (phase B) | partial / branch | client; Smart Mix planner | live clock |
-| Mood map | `GET /api/browse/mood-map`, pools | no | `refresh_explore_mood_map` | trailing-edge ≥900 s, nightly; max age 24 h |
-| Insights | `GET /api/insights` (+ `snapshot`) | partial | `refresh_insights_snapshot` (maintenance, deduped) | nightly plus coalesced events (30 min) |
-| Heatmap | stats dashboard (+ `night_hours`, instance `heatmap_utc`) | yes | stats projections in workers | 300 s, history invalidation |
-| Setlist ticket | upcoming fields, setlist-playable | partial | worker match at setlist write, rematch task | minutes after library changes |
-| Radio sound map | session explain, bliss map | partial | engine (Redis); `build_bliss_map` | per session event; map ≤ daily |
-| Paths route map | `plan_meta`, steps; planning task events | partial | inside `compute_music_path` | static per path |
-| Devices | devices + checkpoint, Connect WS | partial | per request (one join) | WS push |
-| Access tokens | policy endpoint | branch | code constants | on mount |
-| Coverage-only data visuals: schedules, presence strip, reconcile rail, setup and upload rails, offline meters, i18n meters, completeness meters, lyrics line progress, affinity numeral | existing payloads plus the additive `last_runs` settings read | yes | existing | existing |
+| Visual                                                                                                                                                                                  | Contract                                                                                                                                              | Exists           | Computed where                                                                                                                                 | Freshness                                                                                                                                                                               |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Health scan and tile                                                                                                                                                                    | `GET /api/admin/health-checks`, live surface `health` (events `health`, `health-scan`); drill-down `GET /api/admin/health-checks/{check_type}/issues` | partial          | worker at scan start/end, `refresh_admin_surface` after mutations; CTE in `db/queries/health_issues.py`                                        | push (seconds), per-check events live                                                                                                                                                   |
+| Album sidecar                                                                                                                                                                           | `GET /api/manage/albums/{id}/portable-metadata`                                                                                                       | partial          | per request, one `read_scope` scoped by album                                                                                                  | on mount, after task done; per-track task events                                                                                                                                        |
+| Release timeline                                                                                                                                                                        | `acquisition:new_releases` snapshot and stream                                                                                                        | partial          | projector on release events; reconciler 60 s                                                                                                   | ~5–10 s; analysis counts ≤60 s                                                                                                                                                          |
+| Acquisition lanes                                                                                                                                                                       | `GET /api/acquisition/snapshot` (+ `lanes`), `/stream`; `POST /api/acquisition/covers`                                                                | partial          | `acquisition-sampler` thread in crate-worker, Redis key; DB row on change or ≤ 1 per 60 s; covers from a cache filled by one deduplicated task | 2 s while watched; 30–60 s while transferring unwatched; off otherwise                                                                                                                  |
+| Imports                                                                                                                                                                                 | `GET /api/imports/queue`                                                                                                                              | no               | per request, one CTE over `import_queue_items` and tasks                                                                                       | on mount, task events, focus                                                                                                                                                            |
+| Enrichment orbit                                                                                                                                                                        | `GET /api/admin/artists/{id}/enrichment/sources`, `POST /api/artists/{id}/enrichment/refresh`, `enrichment.source` signals                            | partial          | per request (one CTE); worker writes source rows                                                                                               | on mount, run signals live                                                                                                                                                              |
+| Genre wheel                                                                                                                                                                             | `GET /api/admin/genres/wheel`; Listen `/api/catalog/genre-wheel`                                                                                      | partial          | `refresh_genre_wheel_snapshot` (fast, deduped, trailing-edge ≥120 s), also writing `genre_counts`                                              | membership choke points, taxonomy events, nightly floor; mutation patches immediate                                                                                                     |
+| EQ inheritance                                                                                                                                                                          | path on preset payloads, `chain[]`                                                                                                                    | partial          | in-memory runtime graph per request                                                                                                            | per track change, invalidations                                                                                                                                                         |
+| Track readout                                                                                                                                                                           | album analysis, neighbours, ops `analysis.recent`, `/info` `bliss_vector`                                                                             | partial          | per request by index; recent off-request                                                                                                       | static per track; recent ≤120 s                                                                                                                                                         |
+| Queue lanes                                                                                                                                                                             | `GET /api/admin/queues`, live `queues`                                                                                                                | partial          | `queue-lanes-writer` thread in crate-worker, single writer                                                                                     | ≥3 s apart while watched; row not written otherwise (an unwatched GET may serve an older row, shown as `updating`, until the first watched tick, about 1–3 s); `worker_live` every 15 s |
+| Governor gauges                                                                                                                                                                         | `GET /api/admin/governor`, live `governor`                                                                                                            | no               | `governor-sampler` thread, Redis key; DB row on verdict change or ≤ 1 per 60 s                                                                 | 5 s while watched, 60 s otherwise                                                                                                                                                       |
+| Event pipeline                                                                                                                                                                          | `GET /api/admin/event-pipeline`, live `pipeline`                                                                                                      | partial          | projector after `XACK` batches; Redis key and publish only while watched; DB row on state change or ≤ 1 per 60 s                               | push and 15 s heartbeat while watched; row ≤ 60 s old otherwise, shown as `updating`                                                                                                    |
+| Redis pair                                                                                                                                                                              | `GET /api/admin/redis`, live `redis`                                                                                                                  | no               | `redis-sampler` thread in crate-worker, Redis key; DB row ≤ 1 per 60 s                                                                         | 15 s while watched, 300 s otherwise                                                                                                                                                     |
+| System map                                                                                                                                                                              | `stack-snapshot`, `stack-stream`                                                                                                                      | partial          | sampler thread (placement PD54) with leader lock, one-shot stats, bounded pool; Redis key plus publish; row on state change or ≤ 1 per 60 s    | 10 s while watched; container list every 10 min otherwise                                                                                                                               |
+| Federation topology                                                                                                                                                                     | `GET /api/admin/federation/topology`, live `federation`                                                                                               | no               | projector: structural events coalesced ≥5 s; stream events only while watched; health poll floor 60 s                                          | structural ~5–10 s; relay counts ≤5 s while watched, ≤60 s otherwise                                                                                                                    |
+| EQ curve, glyph                                                                                                                                                                         | effective EQ + client live store                                                                                                                      | partial          | resolver per track; client                                                                                                                     | per change                                                                                                                                                                              |
+| Mix strip                                                                                                                                                                               | client model (phase A); plans and profiles (phase B)                                                                                                  | partial / branch | client; Smart Mix planner                                                                                                                      | live clock                                                                                                                                                                              |
+| Mood map                                                                                                                                                                                | `GET /api/browse/mood-map`, pools                                                                                                                     | no               | `refresh_explore_mood_map`                                                                                                                     | trailing-edge ≥900 s, nightly; max age 24 h                                                                                                                                             |
+| Insights                                                                                                                                                                                | `GET /api/insights` (+ `snapshot`)                                                                                                                    | partial          | `refresh_insights_snapshot` (maintenance, deduped)                                                                                             | nightly plus coalesced events (30 min)                                                                                                                                                  |
+| Heatmap                                                                                                                                                                                 | stats dashboard (+ `night_hours`, instance `heatmap_utc`)                                                                                             | yes              | stats projections in workers                                                                                                                   | 300 s, history invalidation                                                                                                                                                             |
+| Setlist ticket                                                                                                                                                                          | upcoming fields, setlist-playable                                                                                                                     | partial          | worker match at setlist write, rematch task                                                                                                    | minutes after library changes                                                                                                                                                           |
+| Radio sound map                                                                                                                                                                         | session explain, bliss map                                                                                                                            | partial          | engine (Redis); `build_bliss_map`                                                                                                              | per session event; map ≤ daily                                                                                                                                                          |
+| Paths route map                                                                                                                                                                         | `plan_meta`, steps; planning task events                                                                                                              | partial          | inside `compute_music_path`                                                                                                                    | static per path                                                                                                                                                                         |
+| Devices                                                                                                                                                                                 | devices + checkpoint, Connect WS                                                                                                                      | partial          | per request (one join)                                                                                                                         | WS push                                                                                                                                                                                 |
+| Access tokens                                                                                                                                                                           | policy endpoint                                                                                                                                       | branch           | code constants                                                                                                                                 | on mount                                                                                                                                                                                |
+| Coverage-only data visuals: schedules, presence strip, reconcile rail, setup and upload rails, offline meters, i18n meters, completeness meters, lyrics line progress, affinity numeral | existing payloads plus the additive `last_runs` settings read                                                                                         | yes              | existing                                                                                                                                       | existing                                                                                                                                                                                |
 
 ### 5.3 Cross-cutting backend
 
@@ -2692,6 +3196,7 @@ Small bug seen on the way: `api/curation.py` deletes `listen:explore_page:v1:{us
   whose `updated_at` is older than 300 s. Creating the row up front and sending the Dramatiq message
   with `delay=window` would collapse every window over 300 s (mood map 900 s, insights 30 min, bliss
   map 6 h) to about 5 minutes, and the delayed message would then fire a second build. Recipe:
+
   - the first trigger sets `<key>:dirty` and `ZADD NX crate:coalesce:due <now + window> <key>`;
     later triggers only set the dirty key (`NX` keeps the first due time);
   - a due check in the crate-worker service loop (the projector loop for projector actions) reads
@@ -2703,6 +3208,7 @@ Small bug seen on the way: `api/curation.py` deletes `listen:explore_page:v1:{us
   Tests per surface: a burst of N events produces exactly one build after the window, and that
   build reflects the last event; with a 900 s window nothing is dispatched at 360 s (the
   redispatcher cannot pick it up) and exactly one build runs after 900 s.
+
 - Runtime samples (governor, Redis, acquisition, event pipeline, stack) live in a Redis key with a TTL
   plus a publish. They are persisted to `ops_runtime_state` (an `INSERT … ON CONFLICT UPDATE` of
   JSONB, `db/ops_runtime.py:41`) only on a verdict or state change or at most once per 60 s, never
@@ -2740,39 +3246,37 @@ notifying. A test in
 
 #### 5.3.4 Migrations
 
-`main` is canonical for migration numbers. Each v3 migration takes head + 1 of `main` when its PR
-merges, with DDL in an immutable `db/schema_sections/*_vNNN.py`, `ADD COLUMN IF NOT EXISTS`,
-`autocommit_block` for concurrent indexes, and the head test updated. `codex/feat-smart-mix-phase-1`
-is about 100 commits ahead of `main`, still active, and defines 109–114, including revisions that
-are not Smart Mix (`110_user_access_tokens`, `113_vdj_mood_indexes`) and schema sections
-`smart_mix_v111`, `v112`, `v114` and `vdj_catalog_v113`. Freezing those numbers on `main` would put
-schema for unmerged features there, and every later v3 migration would collide again. So whichever
-branch is unmerged renumbers its revisions and schema-section files each time it merges `main` (Smart
-Mix already merges `main` regularly), with a renumber script and an `alembic stamp` recipe for the
-dev and lab databases at 114. This is not a one-time decision and not a precondition for the first
-v3 migration (PD2).
+`main` is canonical for migration numbers. After Smart Mix merges and v3 rebases, inspect the
+actual head, schema and integration tooling before allocating a new revision. Keep immutable
+`db/schema_sections/*_vNNN.py` DDL, `ADD COLUMN IF NOT EXISTS`, concurrent-index
+`autocommit_block` and the single-head test. The original analysis's 108/109–114 inventory and
+reported dev/lab versions are historical, not current deployment instructions. Reuse resolved
+Camelot/migration work; add or extend a renumber helper only if an actual unmerged collision
+remains (plan 2.13). Never renumber deployed revisions. Any schema-version repair needs verified
+mapping, backup and separate operational approval; there is no unconditional stamp step.
 
-| Change | For |
-| --- | --- |
-| `health_check_runs.task_id`, `last_error`; `health_issues.resolution`, `resolved_task_id` | Health |
-| `trash_track_files` (`quarantine_path` PK, size, mtime, artist, album, title, format, quarantined_at, source_track_id) | Health footer and Trash (plan 2.17e) |
-| `album_portable_metadata` digest, section digests, artwork files, rehydrated_at, last task, last error, `catalog_changed_at` | Sidecar, coverage drift (4.3, 4.7) |
-| `new_releases` lifecycle columns plus backfill | Release timeline |
-| `artist_enrichment_sources` | Enrichment |
-| `genre_taxonomy_nodes.local_eq_gains`, `eq_override` (`none\|set\|cleared`), `local_name`, `local_description`; `genre_taxonomy_edges.suppressed` | Genres (G1, PD18; plan 2.18d) |
-| `genre_counts` (`genre_id` PK, artists, albums, tracks, computed_at) | Genre counts for FastAPI and the read plane (B7, PD21) |
-| `import_queue_items.task_id`, `last_error` | Imports |
-| `music_paths.plan_meta` plus summary backfill | Paths |
-| `user_play_events (ended_at DESC)` concurrent index | Governor (V8) |
-| partial index on terminal `tasks` (if `EXPLAIN` needs it) | Queue lanes |
-| `federation_catalog_cursors.item_count`, `last_delta_count` | Federation |
-| later: `track_mix_profiles.rms_envelope`, token telemetry columns | Mix lanes, tokens phase 2 |
+| Change                                                                                                                                            | For                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `health_check_runs.task_id`, `last_error`; `health_issues.resolution`, `resolved_task_id`                                                         | Health                                                 |
+| `trash_track_files` (`quarantine_path` PK, size, mtime, artist, album, title, format, quarantined_at, source_track_id)                            | Health footer and Trash (plan 2.17e)                   |
+| `album_portable_metadata` digest, section digests, artwork files, rehydrated_at, last task, last error, `catalog_changed_at`                      | Sidecar, coverage drift (4.3, 4.7)                     |
+| `new_releases` lifecycle columns plus backfill                                                                                                    | Release timeline                                       |
+| `artist_enrichment_sources`                                                                                                                       | Enrichment                                             |
+| `genre_taxonomy_nodes.local_eq_gains`, `eq_override` (`none\|set\|cleared`), `local_name`, `local_description`; `genre_taxonomy_edges.suppressed` | Genres (G1, PD18; plan 2.18d)                          |
+| `genre_counts` (`genre_id` PK, artists, albums, tracks, computed_at)                                                                              | Genre counts for FastAPI and the read plane (B7, PD21) |
+| `import_queue_items.task_id`, `last_error`                                                                                                        | Imports                                                |
+| `music_paths.plan_meta` plus summary backfill                                                                                                     | Paths                                                  |
+| `user_play_events (ended_at DESC)` concurrent index                                                                                               | Governor (V8)                                          |
+| partial index on terminal `tasks` (if `EXPLAIN` needs it)                                                                                         | Queue lanes                                            |
+| `federation_catalog_cursors.item_count`, `last_delta_count`                                                                                       | Federation                                             |
+| later: `track_mix_profiles.rms_envelope`, token telemetry columns                                                                                 | Mix lanes, tokens phase 2                              |
 
 #### 5.3.5 Invalidation scopes
 
 New Listen scopes, each mapped by an explicit `scopesForUrl` branch placed before the
 `/api/browse` and `/api/catalog` prefix rules, which map everything else to `library`
 (`lib/cache.ts:200-205`):
+
 - `explore`: `/api/browse/mood-map` and `/api/browse/explore-page`, mapped to `explore` only;
   broadcast only when the mood counts or sample change (4.14);
 - `genre_wheel`: `/api/catalog/genre-wheel`, broadcast by `refresh_genre_wheel_snapshot` only when
@@ -2790,19 +3294,19 @@ reuse URLs so they do not add fetches.
 The site (`feat/website`) and v3 merge into the same monorepo; the site's Vitest suite reads these
 product files. Whichever branch lands second updates the site tests.
 
-| Product file | Pinned shape | v3 change touching it |
-| --- | --- | --- |
-| `app/ui/src/pages/Health.tsx` | `CHECK_LABELS`, `CHECK_DESCRIPTIONS` literals | labels move to `repair_catalog.py` |
-| `app/crate/repair_catalog.py` | positional `RepairCatalogEntry(` strings | kwargs appended at the end only |
-| `app/listen/src/lib/equalizer.ts` | `EQ_PRESETS` block, `label:` entries, `EQ_GAIN_MAX = 12;` | none (labels go to a new file) |
-| `app/crate/genre_taxonomy.py`, `genres_taxonomy_edges.py`, taxonomy release JSON | definitions, `_EQ_*`, `VALID_RELATION_TYPES` | none in shape; new release only by PD22 |
-| `app/crate/enrichment.py` | constants and the parallelism literal | instrumentation below the definitions |
-| `app/crate/resource_governor.py` | `DEFAULT_*`, governed `frozenset(` | pure helpers added, names kept |
-| `app/crate/actors.py` | `TASK_POOL_CONFIG` entries | new task types: regenerate `scale.json` |
-| `app/crate/portable_metadata.py`, `db/queries/portable_metadata.py` | keys, schema version literal, feature lines | session refactor keeps the lines |
-| `app/crate/api/browse_media.py` | `MOOD_PRESETS` dict | moves to `crate/moods.py`: site test path updated |
-| `docker-compose.yaml` | redis flags | PD45 lowers `crate-redis` `maxmemory`; the second-landing branch updates the site test (plan Task 7.6 lists the redis flags) |
-| `app/crate/api/auth.py` and token repositories (after the Smart Mix merge) | allowlist block between the constant and the def | metadata after the def |
+| Product file                                                                     | Pinned shape                                              | v3 change touching it                                                                                                        |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `app/ui/src/pages/Health.tsx`                                                    | `CHECK_LABELS`, `CHECK_DESCRIPTIONS` literals             | labels move to `repair_catalog.py`                                                                                           |
+| `app/crate/repair_catalog.py`                                                    | positional `RepairCatalogEntry(` strings                  | kwargs appended at the end only                                                                                              |
+| `app/listen/src/lib/equalizer.ts`                                                | `EQ_PRESETS` block, `label:` entries, `EQ_GAIN_MAX = 12;` | none (labels go to a new file)                                                                                               |
+| `app/crate/genre_taxonomy.py`, `genres_taxonomy_edges.py`, taxonomy release JSON | definitions, `_EQ_*`, `VALID_RELATION_TYPES`              | none in shape; new release only by PD22                                                                                      |
+| `app/crate/enrichment.py`                                                        | constants and the parallelism literal                     | instrumentation below the definitions                                                                                        |
+| `app/crate/resource_governor.py`                                                 | `DEFAULT_*`, governed `frozenset(`                        | pure helpers added, names kept                                                                                               |
+| `app/crate/actors.py`                                                            | `TASK_POOL_CONFIG` entries                                | new task types: regenerate `scale.json`                                                                                      |
+| `app/crate/portable_metadata.py`, `db/queries/portable_metadata.py`              | keys, schema version literal, feature lines               | session refactor keeps the lines                                                                                             |
+| `app/crate/api/browse_media.py`                                                  | `MOOD_PRESETS` dict                                       | moves to `crate/moods.py`: site test path updated                                                                            |
+| `docker-compose.yaml`                                                            | redis flags                                               | PD45 lowers `crate-redis` `maxmemory`; the second-landing branch updates the site test (plan Task 7.6 lists the redis flags) |
+| `app/crate/api/auth.py` and token repositories (after the Smart Mix merge)       | allowlist block between the constant and the def          | metadata after the def                                                                                                       |
 
 Claims on the site with no test that the product contradicts:
 
@@ -2853,30 +3357,24 @@ durable meter measures against `maxmemory` (384 MB), never the container limit (
 
 ### 5.5 Delivery order
 
-The implementation plan's phases (0–7) and its Rollout → Milestones table (release groups R0,
-Foundation, Ops, Health, Genres, Listen player and EQ, Stats, P1/P2, Smart Mix) are the only
-delivery order. This document and the spec (DS 6.11) no longer carry their own lists; where an
-older copy of either disagrees with the plan, the plan wins. The ordering constraints this document
-relies on:
+The implementation plan owns dependencies and internal milestones; the handover owns live status.
+The accepted sequence is Smart Mix → approved v3 rebase → website integration → one joint P0 major
+for Listen, Admin, site and docs. Foundation, Genres, player/EQ, Ops, Health and Stats are internal
+review groups, not intermediate UI releases. Keep the integration branch until that major.
 
-- Nothing is pushed until the font licence is settled (PD4, 2.3 item 9), and these documents are
-  tracked before Phase 0 (header).
-- `main` is canonical for migration numbers; the unmerged branch renumbers on each merge of `main`
-  (5.3.4). PD2 decides only the code merge order and gates no v3 migration, so plan 2.13 (a
-  performance index) does not wait for it. The Camelot module PR lands on `main` first either way.
-- Independent fixes and platform preconditions (B1 with coalescing, B2, B4) go to `main` first
-  (Phases 2A and 2B, release group R0).
-- The health surface (plan 2.17c) lands before the Dashboard Health tile (plan 3.3).
-- In the Genres group, 2.18a–e (including G1, G2, G3, G7 and suppression) land before the
-  read-only wheel (plan 3.7); 3.8 (editing) is frontend only. EQ writes on core genres are never
-  disabled in a release.
-- Paths planning as a task (B18) ships with the `plan_meta` backend (plan 4.9a), before the route
-  map (4.9b).
-- System's event pipeline and Redis bands, Stack and Logs are Phase 5 (release group P1/P2), after
-  the Operations P0 set.
-- Rules for every task: one recipe or screen per commit, tests in the same commit, intentional
-  re-baselines, the drift check green, and both apps' `check:bundle` (Listen from plan 0.12, Admin
-  from the same task, PD48).
+- Only 1.2–1.4 may proceed before integration/Checkpoint 0 under the approved Checkpoint 1A.
+  Stop for Diego's review afterwards. 0.11 must precede 1.0; 0.14 may wait until the wheel.
+- Retire the complete visual theme runtime in 1.13 before the major; retain semantic design tokens,
+  accessibility and motion. No runtime removal is claimed by this documentation change.
+- Independent R0 `[MAIN]` fixes require explicit assignment. Critical deployments, especially the
+  projector restart and 2.11a–c, retain isolated operational observation and approval.
+- Contracts precede instruments: Health before its tile, genre overrides/count parity before the
+  wheel, task-based Paths planning before its map. Smart Mix overlap is reconciled after rebase.
+- Preserve the existing P0 boundary for the joint major; P1/P2, Phase 6 coverage and follow-ons
+  remain later unless expressly reprioritised. The single identity applies to every released screen.
+- Small reviewable task diffs, tests and intentional CI baselines remain required. One integrator
+  owns status, shared token/cn/budget serialisation and integration. Commit/push/PR/deploy/production
+  actions still require Diego's go-ahead.
 
 ---
 
@@ -2895,62 +3393,62 @@ The `[Dn]` column maps each decision to the spec's register (DS 6.12). Spec-only
 closed by PD4), `[D35]` Generate with AI as a draft (part of PD18 here), `[D37]` chapter index (no,
 7), and `[D23]`'s third clause (console scans apply no fixes).
 
-| ID | `[Dn]` | Decision | Options | Recommendation | Status |
-| --- | --- | --- | --- | --- | --- |
-| PD1 | [D1] | Chart rule for instruments | (a) keep "charts use Nivo" literally; (b) amend root `AGENTS.md:69`, `app/ui/AGENTS.md:28`, `app/listen/AGENTS.md:60` and `app/shared/AGENTS.md`: Nivo for statistical charts, hand-built SVG/HTML/Canvas/WebGL for instruments | (b). Precedent: `EqBands`, Listen Stats. Without it every card in this document conflicts with a repo rule | decided 2026-10-15: (b); plan 0.5 amends the four `AGENTS.md` files |
-| PD2 | [D19] | Merge order of `smart-mix-phase-1` and v3 code (not migration numbers: `main` is canonical and the unmerged branch renumbers on each merge of `main`, 5.3.4) | (a) Smart Mix first; (b) v3 first | (a), whenever Smart Mix is ready; it gates no v3 migration (plan 2.13 is a performance index and can ship in the Ops group). Smart Mix changes no file under `app/listen/src/components/player` or `hooks`, so the Listen player tasks are not gated on it. Its real overlap is the Phase 2 backend files (`actors.py`, `task_registry.py`, `worker.py`, `resource_governor.py`, `api/browse_media.py`, `bliss.py`), all 7 Listen catalogs plus `.metadata`, `SettingsPrimitives.tsx`, `Settings.tsx` and Admin `Analysis.tsx`. Camelot: `sm:app/crate/smart_mix/camelot.py` (enharmonics, already used by its `bliss._key_compatibility`) moves to `app/crate/camelot.py` in a small `[MAIN]` `[BEHAVIOUR]` PR that both branches use; v3 writes no second copy (4.7). Conflict rule: merge catalog keys by hand, never hand-merge `.metadata` (regenerate with `node scripts/i18n-check.mjs --write-metadata`), refresh the `browse_media.py` line references after the merge. Migrations: renumber script plus an `alembic stamp` recipe for the dev and lab databases at 114 (5.3.4). Blocks the mix strip, access tokens and the Analysis Smart Mix coverage row | decided 2026-10-15: recommendation |
-| PD3 | [D2] | Listen pill radius | (a) keep 6 px everywhere; (b) exempt `CratePill` (a `data-slot="chip"` the rule skips) and update `radius-policy.test.ts`; (c) lift the rule for all text pills | (b) now; revisit CTAs with (c) after the shell lands | decided 2026-10-15: recommendation |
-| PD4 | [D3] | Brand fonts in the product (all runtimes) | The Cabinet Grotesk licence (ITF Free Font License, 2.3 item 9, not legal advice) forbids distribution through a public repository and making the font available to third parties through an application, so it cannot ship in a public, self-hosted product. (a) written permission from ITF; (b) an OFL display face. `--font-display-stack` stays, so a swap is a token change and the type scale is unchanged | (b): Bricolage Grotesque (SIL OFL 1.1) in every runtime and on cratemusic.app; check the Capacitor asset list and `tnum` ([D31]) | decided 2026-10-15: (b) with no Cabinet anywhere. Bricolage Grotesque, weights 500/700/800 from the variable `opsz` file (latin + latin-ext), every runtime including Capacitor, plus cratemusic.app and the docs site. `d9df9d51` and the website commits are rewritten so no commit contains Cabinet files. Bricolage has `tnum`, closing [D31]. Metric notes in the decision register |
-| PD5 | [D32] | Setlist `in_library` | (a) worker match at setlist write plus rematch on library change, local/missing only; (b) also `remote` for federated copies; (c) per-request match | (a), hardened title matching, staleness accepted until the next refresh or rematch. (b) later | decided 2026-10-15: recommendation |
-| PD6 | [D6] | Flat card contrast in Admin when the token commit merges | (a) keep `#0d0e14` and add hairlines to the ~36 borderless card usages in one mechanical commit; (b) a lifted value for Admin until each screen migrates | (a) | decided 2026-10-15: recommendation |
-| PD7 | [D7] | Auto-cycling | (a) drop everywhere; (b) idle-state only | (a). The product shows real state; empty states say so | decided 2026-10-15: recommendation |
-| PD8 | [D8] | `StatNumber` tiers | add `xl`, weight 800 on `lg`/`xl`, inline unit | yes | decided 2026-10-15: recommendation |
-| PD9 | [D14] | App display scale | cap page titles at `clamp(2.25rem, 4vw, 3.75rem)`, entities at 4.4 rem | yes | decided 2026-10-15: recommendation |
-| PD10 | [D4] | Failed and destructive colour (both apps) | (a) amber plus the word for failed; one `danger` token only on destructive confirm buttons; (b) keep red for failures | (a); no green or blue anywhere | decided 2026-10-15: recommendation |
-| PD11 | [D5] | Amber value | (a) align `state-warning` to the site's `#fbbf24`; (b) keep `#f59e0b` | (a), through the registry, contrast tests updated | decided 2026-10-15: recommendation |
-| PD12 | [D10] | Toasts | drop `richColors`, shared config, inline feedback first | yes | decided 2026-10-15: recommendation |
-| PD13 | — | Tests on the external disk | (a) CI only; (b) internal-disk clone; (c) version the Vitest timeout patch | (a) plus (b) for local work; never rely on the unversioned patch | decided 2026-10-15: recommendation |
-| PD14 | [D18] conflict | Admin sidebar | (a) regroup by site chapters (3.2.2); (b) keep Tools / Music / Insights / System | (a) | decided 2026-10-15: (a); conflict with `[D18]` resolved for PD14 |
-| PD15 | — | Admin pills | (a) chips and CTAs as pills, inputs and selects at 6 px; (b) everything pill | (a) | decided 2026-10-15: recommendation |
-| PD16 | — | Imports | (a) new `/imports` page for staged imports, sidecar on Album; (b) staging inside `/download` | (a) | decided 2026-10-15: recommendation |
-| PD17 | — | Enrichment scope | (a) Artist tab only; (b) plus a library-wide coverage view | (a) in v3 | decided 2026-10-15: recommendation |
-| PD18 | [D20], [D35] | Genre overrides (G1) | (a) local edits to core genres persist with "reset to core", core relations hideable through a suppressed column (not a fifth relation type); (b) core read-only, curators only add overlays | (a), as the site copy promises: `genre_taxonomy_edges.suppressed`, set through the relations PUT, `edges[].suppressed` in the payload and a `Hide on this server` inspector action (4.6.1, 4.6.3). Overrides live in `local_*` columns plus `eq_override`, so they survive restarts and image rollbacks (4.6.3 item 5); they ship in plan 2.18d before the wheel, so EQ writes on core genres are never disabled. `Generate with AI` previews instead of applying | decided 2026-10-15: recommendation |
-| PD19 | [D21] | Wheel as default `/genres` view; retire `GenreNetworkGraph` | yes / no | yes; tree and grid stay; the force graph goes once the locator ships | decided 2026-10-15: recommendation |
-| PD20 | [D21] | Listen wheel in v3 | (a) Admin first, Listen Explore and genre-page locator as phase 2 inside v3; (b) Admin only | (a); the component moves to `@crate/ui/domain/genres` in the Listen PR | decided 2026-10-15: recommendation |
-| PD21 | [D24] | Count definitions | adopt the read plane genre-page thresholds (`genre.go:15-17`: artist 0.70, album 0.45, union across aliases) everywhere, including the Go `/api/genres` list (`genresSQL`, unthresholded today) and the genre-detail related counts, which read the builder's `genre_counts` (4.6.3 item 6) | yes; Admin and Listen list numbers drop compared with today; tests updated | decided 2026-10-15: recommendation |
-| PD22 | — | Signed core release 1.0.1 | bundle the `folk → americana` fix and any EQ retunes | yes, later; runtime de-duplication now | decided 2026-10-15: recommendation |
-| PD23 | — | Taxonomy invalidations | (a) keep `library`, `home`, `curation`, `genre:<slug>`; (b) narrow after adding a `genre_taxonomy` scope to Listen's `/eq` and `/genre` URL mapping; also whether `genre:*` reaches the projector | (b), never narrow before the Listen mapping exists | decided 2026-10-15: recommendation |
-| PD24 | [D23] (gating) | Health "fix on their own" | (a) gate `library_pipeline` on `requires_confirmation` (4 unattended checks; `shadow_quality_tracks` stops auto-running); (b) keep `globally_runnable` (5, including a destructive check) and show it | (a); behaviour change | decided 2026-10-15: recommendation; behaviour change, own PR to `main` |
-| PD25 | [D34] | Loudness and dynamic range units | (a) label `dB` in v3, LUFS only from Smart Mix measurements; (b) add `analysis_method` now | (a) | decided 2026-10-15: recommendation |
-| PD26 | — | Album readout loses mood top-3 and spectral complexity | keep (add `mood_top`) / drop | keep `mood_top` (3 entries); drop spectral complexity | decided 2026-10-15: recommendation |
-| PD27 | [D33] | Release timelines for non-Tidal acquisitions | (a) link at import by MusicBrainz release group, then normalised names; (b) stop at "detected" | (a) | decided 2026-10-15: recommendation |
-| PD28 | [D23] conflict (trash routing) | Library Trash claim | (a) keep the footer factual (track files only); (b) route destructive deletes through the trash first | (a) in v3; (b) as a separate fix | decided 2026-10-15: (a) factual footer in v3; trash routing as a separate fix after 2.17e |
-| PD29 | [D38] conflict | Enrichment Settings toggles | (a) wire them into the pipeline (alias `setlistfm → setlist`, add Discogs); (b) hide `disabled` | (a); behaviour change for admins who turned sources off | decided 2026-10-15: (a); conflict with `[D38]` resolved for PD29; behaviour change, own PR to `main` |
-| PD30 | — | Sidecar drift keys | exclude artist `similar_json`, `tags_json`, `latest_release_date` from the digest | yes (they change with every enrichment) | decided 2026-10-15: recommendation |
-| PD31 | — | Artist hero Enrich button | (a) keep `process_new_content(force)`, add the scoped refresh in the tab; (b) switch to scoped `enrich_artist` | (a) | decided 2026-10-15: recommendation |
-| PD32 | [D29] conflict | Smart EQ while the next track loads | (a) hold the last resolved gains (audio change); (b) show and play flat as today | (a), as a separate `fix(eq)` with a runtime test | decided 2026-10-15: (a); conflict with `[D29]` resolved for PD32; behaviour change, own PR to `main` |
-| PD33 | [D22] | Governor listener and stream thresholds | compose 0/0 vs code and site 10/10 | the UI shows configured values; choose the product default and align the site copy | decided 2026-10-15: product default 10/10 (code value), compose 0/0 documented as an operator override, site copy "default 10/10, configurable" |
-| PD34 | — | Radio score panel on the site | (a) keep the weights (they are the Discovery Radio weights: `radio_engine.py` imports `_W_*` from `db/paths_candidates.py` and `_seeded_radio_weights` returns them for the discovery profile, also listed in 4.15) and rename the "Camelot 0.05" term to "Key 0.05" in `RadioDive.astro` and `content/listen/en.ts:75`; optionally note that track and contextual profiles override sound, artists and genre (.16/.30/.20, .01/.44/.26); (b) leave as is | (a). The only site fix is the "Key" label; the product shows the real profile weights per session | decided 2026-10-15: recommendation |
-| PD35 | [D39] | Queue lane numeral | live load vs the site's task-type count | live load; type count in the meta | decided 2026-10-15: recommendation |
-| PD36 | [D36] | Paths | (a) persist `plan_meta` at planning time; (b) derive at read | (a), written only inside the planning task; the task route ships with `plan_meta` (plan 4.9a, B18) and the synchronous routes are deprecated (4.16) | decided 2026-10-15: recommendation |
-| PD37 | — | Mix strip | web/desktop: show the client crossfade labelled vs hide outside Android; `rms_envelope` before or after the merge | show labelled; envelope after the merge as a nullable column with a throttled backfill | decided 2026-10-15: recommendation |
-| PD38 | [D28] | Crate Connect build flag | Devices is invisible if `VITE_CRATE_CONNECT_FEATURE_ENABLED` is off in production | confirm the production flag before building Devices; keep P2 | decided 2026-10-15: build Devices in v3 although Crate Connect is off in production; "review Crate Connect" is the next initiative after v3 |
-| PD39 | [D17] | Linux GTK accent | (a) cyan everywhere; (b) derive both accents from GTK | (a) | decided 2026-10-15: recommendation |
-| PD40 | [D16] | Album palette tint in the extended player and visualizer | cyan default, palette opt-in / keep | cyan default | decided 2026-10-15: recommendation |
-| PD41 | — | Audio-reactive visuals on mobile | hide / static analysed state / a Listen endpoint for the Cast spectrum artefact | static analysed state; no new endpoint in v3 | decided 2026-10-15: recommendation |
-| PD42 | [D11] | iOS deployment target (today 15.0: `Podfile` `platform :ios, '15.0'`, pbxproj `IPHONEOS_DEPLOYMENT_TARGET = 15.0`) | (a) raise to 16.4, Tailwind 4's own floor; (b) keep 15.0 and state that 15.0–16.3 gets a degraded, unsupported rendering | (a), decided in Phase 0 (plan 0.3) and applied in plan 0.13, with the Podfile, pbxproj, the plan's Tech Stack and Task 7.3 matrix and a release note updated together. Keeping 15.0 fails in three places: (1) Tailwind 4.2.4's `color-mix()` fallback cannot resolve `var()`-based token colours and falls back to `transparent`, so every alpha ladder in 3.1.1 (`bg-accent-action/4`, `/8`, `/14`, `border-accent-action-hi/40`) disappears below Safari 16.2, and the token CSS already has 374 `color-mix` uses ("no `color-mix` in instruments" cannot be met); (2) the numeral and readout tiers use `cqi` and `InstrumentPanel` uses `@container`, which iOS 15 lacks, so XL numerals fall back to about 15 px; (3) the heatmap's subgrid rows. Whatever the target: no `subgrid` (4.17) and a rem `font-size` before each `cqi` value (3.1.2). If 15.0 is kept anyway: literal rgba tokens for the four alpha steps, `@supports (container-type: inline-size)` guards on panels, and a named real iOS 15 device at Checkpoint 4 (CI cannot test it) | decided 2026-10-15: (a) raise to 16.4; iOS 15 users stay on v2 |
-| PD43 | [D30] | Crate Pulse privacy | hide the instance heatmap below 3 listeners | yes | decided 2026-10-15: recommendation |
-| PD44 | [D40] | Stack restart policy (today a prefix allowlist returns 403 for every `crate-*` container while `traefik` is restartable, 4.8) | deny `api`, `traefik`, `postgres`, `redis`, `redis-durable` with a reason; stop/start only for other containers | yes; denying `traefik` is a behaviour change (3.4.2) | decided 2026-10-15: recommendation; behaviour change, own PR to `main` |
-| PD45 | — | `crate-redis` `maxmemory` equals `mem_limit` (512m) | lower `maxmemory` (e.g. 448mb) | yes, separate compose change; the site test pins these flags, so the second-landing branch updates it (5.3.6) | decided 2026-10-15: recommendation; behaviour change, own PR to `main` |
-| PD46 | [D26] | Acquisition snapshot and stream permissions | require `library.import.manage` or `library.tidal.manage` | yes; warn API clients | decided 2026-10-15: recommendation; behaviour change, own PR to `main` |
-| PD47 | — | Unused code | remove `SpectrumRibbonCanvas`, unused Nivo packages (Admin bump, chord, geo, heatmap, network; Listen core, line), Listen `leaflet`, Admin `components/ui/error-state.tsx`, orphan pages | remove in cleanup commits | decided 2026-10-15: recommendation |
-| PD48 | [D25] | Bundle and screenshot checks | run Listen `check:bundle` in `test-frontend.yml`; an Admin bundle ceiling (Admin has no `check:bundle` today); Admin screenshot coverage | Listen and Admin `check:bundle` both from Phase 0 (plan 0.12): Admin's ceiling is today's measured value plus a small margin, so a regression shows up in the PR that causes it rather than at the end against a baseline that already includes it; each Phase 3 and 5 PR records its delta and raises the ceiling deliberately, and each instrument route gets an AppRouter-style lazy-boundary assertion. Screenshots: Listen yes; Admin a small capture set from plan 0.11 (Dashboard, Tasks, Health, Genres, Album, Settings, System), recorded before plan 1.0 and extended by each P0 page task | decided 2026-10-15: recommendation |
-| PD49 | [D15] | `<html lang>` in Listen | sync with the active locale | yes | decided 2026-10-15: recommendation |
-| PD50 | — | Spinners | remove `animate-spin` outside buttons as a migration rule | yes, file by file as screens migrate | decided 2026-10-15: recommendation |
-| PD51 | — | Ticket header key word | countdown (implemented) vs the site's `Upcoming show` | countdown | decided 2026-10-15: recommendation |
-| PD52 | — | Album energy arc (coverage A6/L15, not a site visual) | add / skip | skip in v3 | decided 2026-10-15: recommendation |
-| PD53 | [D41], [D42] (reconciles DS 1.1.5 and 6.9 item 6) | Minimum v3 bar for light mode, Crate Red and the red and violet accents, and the hue of `StatusDot on` | (a) every v3 visual works and stays legible in all of them: tokens only, no literal colours, canvas and WebGL re-resolve on appearance change (tested with the resolver event), contrast suite green, `VISUAL` captures in `light` and `crateRed` for the P0 Listen instruments (heatmap, EQ panel, EQ glyph, ticket), and a full art-direction pass stays out of scope (7); `StatusDot on` follows the accent, so state never relies on hue (filled vs ring plus a word), and the destructive confirm keeps its consequence label (plus typed confirmation where 3.1.5 requires it) so a red-accent `on` dot never reads as danger; (b) dark default only in v3, other appearances unsupported until their pass | (a). It matches DS 6.9 item 6 and `docs/technical/listen-design-system-visual-qa.md`, which treats `light` and `crateRed` as explicit variants its visual suite checks. The plan's Definition of done gains the line "no literal colours; canvas and WebGL re-resolve on appearance change". `StatusDot on` follows the accent, as `[D42]` recommends; plan Task 0.3 step 3 asks this same question and should carry this recommendation, not a fixed hue. A fixed hue would need PD53, `[D42]` and DS 1.1.4 changed together plus a non-accent `on` token | decided 2026-10-15: recommendation |
-| PD54 | [D43] | Stack sampler placement (4.8 Stack) | (a) a dedicated daemon thread in crate-api behind an owner-checked Redis leader lock (crate-api already holds the Docker socket for restart, logs and detail reads); (b) crate-worker behind a read-only docker-socket-proxy, keeping crate-api, which serves all Admin and the Listen fallback traffic, free of background work (one more container in every compose) | (a) for v3: the thread never runs on the event loop, takes stats only while `admin:live:viewers:stack` exists, has a bounded pool and budget, and the socket stays where the actions already need it. Revisit (b) if Stack actions move to worker tasks. Asked in Task 0.3's Phase 4–5 row; plan 5.5's files follow the answer | decided 2026-10-15: recommendation |
+| ID   | `[Dn]`                         | Decision                                                                                                                      | Options                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Recommendation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Status                                                                                                                                                                                                                                                                                                                                                                                   |
+| ---- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PD1  | [D1]                           | Chart rule for instruments                                                                                                    | (a) keep "charts use Nivo" literally; (b) amend root `AGENTS.md:69`, `app/ui/AGENTS.md:28`, `app/listen/AGENTS.md:60` and `app/shared/AGENTS.md`: Nivo for statistical charts, hand-built SVG/HTML/Canvas/WebGL for instruments                                                                                                                                                                                                                           | (b). Precedent: `EqBands`, Listen Stats. Without it every card in this document conflicts with a repo rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | decided 2026-10-15: (b); plan 0.5 amends the four `AGENTS.md` files                                                                                                                                                                                                                                                                                                                      |
+| PD2  | [D19]                          | Smart Mix and v3 integration                                                                                                  | Smart Mix merges to `main` first; then approved v3 rebase and website integration                                                                                                                                                                                                                                                                                                                                                                         | Reconcile Camelot, migrations, Android EQ and catalogs against the actual merged code before running stale recipes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | decided 2026-10-15; integration sequence confirmed                                                                                                                                                                                                                                                                                                                                       |
+| PD3  | [D2]                           | Listen pill radius                                                                                                            | (a) keep 6 px everywhere; (b) exempt `CratePill` (a `data-slot="chip"` the rule skips) and update `radius-policy.test.ts`; (c) lift the rule for all text pills                                                                                                                                                                                                                                                                                           | (b) now; revisit CTAs with (c) after the shell lands                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD4  | [D3]                           | Brand fonts in the product (all runtimes)                                                                                     | The Cabinet Grotesk licence (ITF Free Font License, 2.3 item 9, not legal advice) forbids distribution through a public repository and making the font available to third parties through an application, so it cannot ship in a public, self-hosted product. (a) written permission from ITF; (b) an OFL display face. `--font-display-stack` stays, so a swap is a token change and the type scale is unchanged                                         | (b): Bricolage Grotesque (SIL OFL 1.1) in every runtime and on cratemusic.app; check the Capacitor asset list and `tnum` ([D31])                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | decided 2026-10-15: (b) with no Cabinet anywhere. Bricolage Grotesque, weights 500/700/800 from the variable `opsz` file (latin + latin-ext), every runtime including Capacitor, plus cratemusic.app and the docs site. `d9df9d51` and the website commits are rewritten so no commit contains Cabinet files. Bricolage has `tnum`, closing [D31]. Metric notes in the decision register |
+| PD5  | [D32]                          | Setlist `in_library`                                                                                                          | (a) worker match at setlist write plus rematch on library change, local/missing only; (b) also `remote` for federated copies; (c) per-request match                                                                                                                                                                                                                                                                                                       | (a), hardened title matching, staleness accepted until the next refresh or rematch. (b) later                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD6  | [D6]                           | Flat card contrast in Admin when the token commit merges                                                                      | (a) keep `#0d0e14` and add hairlines to the ~36 borderless card usages in one mechanical commit; (b) a lifted value for Admin until each screen migrates                                                                                                                                                                                                                                                                                                  | (a)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD7  | [D7]                           | Auto-cycling                                                                                                                  | (a) drop everywhere; (b) idle-state only                                                                                                                                                                                                                                                                                                                                                                                                                  | (a). The product shows real state; empty states say so                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD8  | [D8]                           | `StatNumber` tiers                                                                                                            | add `xl`, weight 800 on `lg`/`xl`, inline unit                                                                                                                                                                                                                                                                                                                                                                                                            | yes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD9  | [D14]                          | App display scale                                                                                                             | cap page titles at `clamp(2.25rem, 4vw, 3.75rem)`, entities at 4.4 rem                                                                                                                                                                                                                                                                                                                                                                                    | yes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD10 | [D4]                           | Failed and destructive colour (both apps)                                                                                     | (a) amber plus the word for failed; one `danger` token only on destructive confirm buttons; (b) keep red for failures                                                                                                                                                                                                                                                                                                                                     | (a); no green or blue anywhere                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD11 | [D5]                           | Amber value                                                                                                                   | (a) align `state-warning` to the site's `#fbbf24`; (b) keep `#f59e0b`                                                                                                                                                                                                                                                                                                                                                                                     | (a), through the registry, contrast tests updated                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD12 | [D10]                          | Toasts                                                                                                                        | drop `richColors`, shared config, inline feedback first                                                                                                                                                                                                                                                                                                                                                                                                   | yes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD13 | —                              | Tests on the external disk                                                                                                    | (a) CI only; (b) internal-disk clone; (c) version the Vitest timeout patch                                                                                                                                                                                                                                                                                                                                                                                | (a) plus (b) for local work; never rely on the unversioned patch                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD14 | [D18] conflict                 | Admin sidebar                                                                                                                 | (a) regroup by site chapters (3.2.2); (b) keep Tools / Music / Insights / System                                                                                                                                                                                                                                                                                                                                                                          | (a)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | decided 2026-10-15: (a); conflict with `[D18]` resolved for PD14                                                                                                                                                                                                                                                                                                                         |
+| PD15 | —                              | Admin pills                                                                                                                   | (a) chips and CTAs as pills, inputs and selects at 6 px; (b) everything pill                                                                                                                                                                                                                                                                                                                                                                              | (a)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD16 | —                              | Imports                                                                                                                       | (a) new `/imports` page for staged imports, sidecar on Album; (b) staging inside `/download`                                                                                                                                                                                                                                                                                                                                                              | (a)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD17 | —                              | Enrichment scope                                                                                                              | (a) Artist tab only; (b) plus a library-wide coverage view                                                                                                                                                                                                                                                                                                                                                                                                | (a) in v3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD18 | [D20], [D35]                   | Genre overrides (G1)                                                                                                          | (a) local edits to core genres persist with "reset to core", core relations hideable through a suppressed column (not a fifth relation type); (b) core read-only, curators only add overlays                                                                                                                                                                                                                                                              | (a), as the site copy promises: `genre_taxonomy_edges.suppressed`, set through the relations PUT, `edges[].suppressed` in the payload and a `Hide on this server` inspector action (4.6.1, 4.6.3). Overrides live in `local_*` columns plus `eq_override`, so they survive restarts and image rollbacks (4.6.3 item 5); they ship in plan 2.18d before the wheel, so EQ writes on core genres are never disabled. `Generate with AI` previews instead of applying                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD19 | [D21]                          | Wheel as default `/genres` view; retire `GenreNetworkGraph`                                                                   | yes / no                                                                                                                                                                                                                                                                                                                                                                                                                                                  | yes; tree and grid stay; the force graph goes once the locator ships                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD20 | [D21]                          | Listen wheel in v3                                                                                                            | (a) Admin first, Listen Explore and genre-page locator as phase 2 inside v3; (b) Admin only                                                                                                                                                                                                                                                                                                                                                               | (a); the component moves to `@crate/ui/domain/genres` in the Listen PR                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD21 | [D24]                          | Count definitions                                                                                                             | adopt the read plane genre-page thresholds (`genre.go:15-17`: artist 0.70, album 0.45, union across aliases) everywhere, including the Go `/api/genres` list (`genresSQL`, unthresholded today) and the genre-detail related counts, which read the builder's `genre_counts` (4.6.3 item 6)                                                                                                                                                               | yes; Admin and Listen list numbers drop compared with today; tests updated                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD22 | —                              | Signed core release 1.0.1                                                                                                     | bundle the `folk → americana` fix and any EQ retunes                                                                                                                                                                                                                                                                                                                                                                                                      | yes, later; runtime de-duplication now                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD23 | —                              | Taxonomy invalidations                                                                                                        | (a) keep `library`, `home`, `curation`, `genre:<slug>`; (b) narrow after adding a `genre_taxonomy` scope to Listen's `/eq` and `/genre` URL mapping; also whether `genre:*` reaches the projector                                                                                                                                                                                                                                                         | (b), never narrow before the Listen mapping exists                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD24 | [D23] (gating)                 | Health "fix on their own"                                                                                                     | (a) gate `library_pipeline` on `requires_confirmation` (4 unattended checks; `shadow_quality_tracks` stops auto-running); (b) keep `globally_runnable` (5, including a destructive check) and show it                                                                                                                                                                                                                                                     | (a); behaviour change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | decided 2026-10-15: recommendation; behaviour change, own PR to `main`                                                                                                                                                                                                                                                                                                                   |
+| PD25 | [D34]                          | Loudness and dynamic range units                                                                                              | (a) label `dB` in v3, LUFS only from Smart Mix measurements; (b) add `analysis_method` now                                                                                                                                                                                                                                                                                                                                                                | (a)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD26 | —                              | Album readout loses mood top-3 and spectral complexity                                                                        | keep (add `mood_top`) / drop                                                                                                                                                                                                                                                                                                                                                                                                                              | keep `mood_top` (3 entries); drop spectral complexity                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD27 | [D33]                          | Release timelines for non-Tidal acquisitions                                                                                  | (a) link at import by MusicBrainz release group, then normalised names; (b) stop at "detected"                                                                                                                                                                                                                                                                                                                                                            | (a)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD28 | [D23] conflict (trash routing) | Library Trash claim                                                                                                           | (a) keep the footer factual (track files only); (b) route destructive deletes through the trash first                                                                                                                                                                                                                                                                                                                                                     | (a) in v3; (b) as a separate fix                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | decided 2026-10-15: (a) factual footer in v3; trash routing as a separate fix after 2.17e                                                                                                                                                                                                                                                                                                |
+| PD29 | [D38] conflict                 | Enrichment Settings toggles                                                                                                   | (a) wire them into the pipeline (alias `setlistfm → setlist`, add Discogs); (b) hide `disabled`                                                                                                                                                                                                                                                                                                                                                           | (a); behaviour change for admins who turned sources off                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | decided 2026-10-15: (a); conflict with `[D38]` resolved for PD29; behaviour change, own PR to `main`                                                                                                                                                                                                                                                                                     |
+| PD30 | —                              | Sidecar drift keys                                                                                                            | exclude artist `similar_json`, `tags_json`, `latest_release_date` from the digest                                                                                                                                                                                                                                                                                                                                                                         | yes (they change with every enrichment)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD31 | —                              | Artist hero Enrich button                                                                                                     | (a) keep `process_new_content(force)`, add the scoped refresh in the tab; (b) switch to scoped `enrich_artist`                                                                                                                                                                                                                                                                                                                                            | (a)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD32 | [D29] conflict                 | Smart EQ while the next track loads                                                                                           | (a) hold the last resolved gains (audio change); (b) show and play flat as today                                                                                                                                                                                                                                                                                                                                                                          | (a), as a separate `fix(eq)` with a runtime test                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | decided 2026-10-15: (a); conflict with `[D29]` resolved for PD32; behaviour change, own PR to `main`                                                                                                                                                                                                                                                                                     |
+| PD33 | [D22]                          | Governor listener and stream thresholds                                                                                       | compose 0/0 vs code and site 10/10                                                                                                                                                                                                                                                                                                                                                                                                                        | the UI shows configured values; choose the product default and align the site copy                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | decided 2026-10-15: product default 10/10 (code value), compose 0/0 documented as an operator override, site copy "default 10/10, configurable"                                                                                                                                                                                                                                          |
+| PD34 | —                              | Radio score panel on the site                                                                                                 | (a) keep the weights (they are the Discovery Radio weights: `radio_engine.py` imports `_W_*` from `db/paths_candidates.py` and `_seeded_radio_weights` returns them for the discovery profile, also listed in 4.15) and rename the "Camelot 0.05" term to "Key 0.05" in `RadioDive.astro` and `content/listen/en.ts:75`; optionally note that track and contextual profiles override sound, artists and genre (.16/.30/.20, .01/.44/.26); (b) leave as is | (a). The only site fix is the "Key" label; the product shows the real profile weights per session                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD35 | [D39]                          | Queue lane numeral                                                                                                            | live load vs the site's task-type count                                                                                                                                                                                                                                                                                                                                                                                                                   | live load; type count in the meta                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD36 | [D36]                          | Paths                                                                                                                         | (a) persist `plan_meta` at planning time; (b) derive at read                                                                                                                                                                                                                                                                                                                                                                                              | (a), written only inside the planning task; the task route ships with `plan_meta` (plan 4.9a, B18) and the synchronous routes are deprecated (4.16)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD37 | —                              | Mix strip                                                                                                                     | web/desktop: show the client crossfade labelled vs hide outside Android; `rms_envelope` before or after the merge                                                                                                                                                                                                                                                                                                                                         | show labelled; envelope after the merge as a nullable column with a throttled backfill                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD38 | [D28]                          | Crate Connect build flag                                                                                                      | Devices is invisible if `VITE_CRATE_CONNECT_FEATURE_ENABLED` is off in production                                                                                                                                                                                                                                                                                                                                                                         | confirm the production flag before building Devices; keep P2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | decided 2026-10-15: build Devices in v3 although Crate Connect is off in production; "review Crate Connect" is the next initiative after v3                                                                                                                                                                                                                                              |
+| PD39 | [D17]                          | Linux GTK accent                                                                                                              | (a) cyan everywhere; (b) derive both accents from GTK                                                                                                                                                                                                                                                                                                                                                                                                     | (a)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD40 | [D16]                          | Album palette tint                                                                                                            | Fixed Crate v3 chrome and token palette; no album-driven visual identity override                                                                                                                                                                                                                                                                                                                                                                         | Retire saved chrome tint in 1.13; artwork/data-derived visualizer palettes remain content; visualizer follow-up 4.11 stays P2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | amended 2026-10-15 with PD53                                                                                                                                                                                                                                                                                                                                                             |
+| PD41 | —                              | Audio-reactive visuals on mobile                                                                                              | hide / static analysed state / a Listen endpoint for the Cast spectrum artefact                                                                                                                                                                                                                                                                                                                                                                           | static analysed state; no new endpoint in v3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD42 | [D11]                          | iOS deployment target (today 15.0: `Podfile` `platform :ios, '15.0'`, pbxproj `IPHONEOS_DEPLOYMENT_TARGET = 15.0`)            | (a) raise to 16.4, Tailwind 4's own floor; (b) keep 15.0 and state that 15.0–16.3 gets a degraded, unsupported rendering                                                                                                                                                                                                                                                                                                                                  | (a), decided in Phase 0 (plan 0.3) and applied in plan 0.13, with the Podfile, pbxproj, the plan's Tech Stack and Task 7.3 matrix and a release note updated together. Keeping 15.0 fails in three places: (1) Tailwind 4.2.4's `color-mix()` fallback cannot resolve `var()`-based token colours and falls back to `transparent`, so every alpha ladder in 3.1.1 (`bg-accent-action/4`, `/8`, `/14`, `border-accent-action-hi/40`) disappears below Safari 16.2, and the token CSS already has 374 `color-mix` uses ("no `color-mix` in instruments" cannot be met); (2) the numeral and readout tiers use `cqi` and `InstrumentPanel` uses `@container`, which iOS 15 lacks, so XL numerals fall back to about 15 px; (3) the heatmap's subgrid rows. Whatever the target: no `subgrid` (4.17) and minifier-safe guarded rem numeral fallbacks (3.1.2). If 15.0 is kept anyway: literal rgba tokens for the four alpha steps, `@supports (container-type: inline-size)` guards on panels, and a named real iOS 15 device at Checkpoint 4 (CI cannot test it) | decided 2026-10-15: (a) raise to 16.4; iOS 15 users stay on v2                                                                                                                                                                                                                                                                                                                           |
+| PD43 | [D30]                          | Crate Pulse privacy                                                                                                           | hide the instance heatmap below 3 listeners                                                                                                                                                                                                                                                                                                                                                                                                               | yes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD44 | [D40]                          | Stack restart policy (today a prefix allowlist returns 403 for every `crate-*` container while `traefik` is restartable, 4.8) | deny `api`, `traefik`, `postgres`, `redis`, `redis-durable` with a reason; stop/start only for other containers                                                                                                                                                                                                                                                                                                                                           | yes; denying `traefik` is a behaviour change (3.4.2)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | decided 2026-10-15: recommendation; behaviour change, own PR to `main`                                                                                                                                                                                                                                                                                                                   |
+| PD45 | —                              | `crate-redis` `maxmemory` equals `mem_limit` (512m)                                                                           | lower `maxmemory` (e.g. 448mb)                                                                                                                                                                                                                                                                                                                                                                                                                            | yes, separate compose change; the site test pins these flags, so the second-landing branch updates it (5.3.6)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | decided 2026-10-15: recommendation; behaviour change, own PR to `main`                                                                                                                                                                                                                                                                                                                   |
+| PD46 | [D26]                          | Acquisition snapshot and stream permissions                                                                                   | require `library.import.manage` or `library.tidal.manage`                                                                                                                                                                                                                                                                                                                                                                                                 | yes; warn API clients                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | decided 2026-10-15: recommendation; behaviour change, own PR to `main`                                                                                                                                                                                                                                                                                                                   |
+| PD47 | —                              | Unused code                                                                                                                   | remove `SpectrumRibbonCanvas`, unused Nivo packages (Admin bump, chord, geo, heatmap, network; Listen core, line), Listen `leaflet`, Admin `components/ui/error-state.tsx`, orphan pages                                                                                                                                                                                                                                                                  | remove in cleanup commits                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD48 | [D25]                          | Bundle and screenshot checks                                                                                                  | Listen/Admin bundle checks; small Admin capture set (Dashboard, Tasks, Health, Genres, Album, Settings, System) before 1.0                                                                                                                                                                                                                                                                                                                                | Admin ceiling accepted at 520 KiB, recorded baseline 514,659 B gzip. Linux CI PNGs only; implementation does not imply screenshots/CI approved                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | decided 2026-10-15; confirmed                                                                                                                                                                                                                                                                                                                                                            |
+| PD49 | [D15]                          | `<html lang>` in Listen                                                                                                       | sync with the active locale                                                                                                                                                                                                                                                                                                                                                                                                                               | yes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD50 | —                              | Spinners                                                                                                                      | remove `animate-spin` outside buttons as a migration rule                                                                                                                                                                                                                                                                                                                                                                                                 | yes, file by file as screens migrate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD51 | —                              | Ticket header key word                                                                                                        | countdown (implemented) vs the site's `Upcoming show`                                                                                                                                                                                                                                                                                                                                                                                                     | countdown                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD52 | —                              | Album energy arc (coverage A6/L15, not a site visual)                                                                         | add / skip                                                                                                                                                                                                                                                                                                                                                                                                                                                | skip in v3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
+| PD53 | [D13], [D16], [D41], [D42]     | One Crate v3 visual identity                                                                                                  | Remove the entire selectable theme/skin system, modes and accent/material/radius/typography overrides; fixed brand accent for `StatusDot on`                                                                                                                                                                                                                                                                                                              | Keep semantic tokens, accessibility, motion and functional preferences. Full runtime/preferences/tests migration is plan 1.13, still pending; no variant matrix or retired contrast exception remains in the target                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | amended and accepted 2026-10-15                                                                                                                                                                                                                                                                                                                                                          |
+| PD54 | [D43]                          | Stack sampler placement (4.8 Stack)                                                                                           | (a) a dedicated daemon thread in crate-api behind an owner-checked Redis leader lock (crate-api already holds the Docker socket for restart, logs and detail reads); (b) crate-worker behind a read-only docker-socket-proxy, keeping crate-api, which serves all Admin and the Listen fallback traffic, free of background work (one more container in every compose)                                                                                    | (a) for v3: the thread never runs on the event loop, takes stats only while `admin:live:viewers:stack` exists, has a bounded pool and budget, and the socket stays where the actions already need it. Revisit (b) if Stack actions move to worker tasks. Asked in Task 0.3's Phase 4–5 row; plan 5.5's files follow the answer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | decided 2026-10-15: recommendation                                                                                                                                                                                                                                                                                                                                                       |
 
 ---
 
@@ -2960,7 +3458,7 @@ closed by PD4), `[D35]` Generate with AI as a draft (part of PD18 here), `[D37]`
   terminal, UUID derivation (optional later as the global catalog duplicate readout), scale figures
   (used only as a recipe).
 - Scroll-scrubbed stories, GSAP, Lenis and any new animation library; the site's grain texture.
-- A light mode and Crate Red art-direction pass (PD53 sets the minimum bar v3 must meet).
+- Alternative visual identities or theme editors: retired by PD53, not a future v3 art-direction pass.
 - Jam (gated off) and Decks.
 - Cast receiver styling.
 - `/api/me/upcoming` as a snapshot (depends on the `near_me` location model).

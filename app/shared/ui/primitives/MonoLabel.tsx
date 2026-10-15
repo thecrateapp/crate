@@ -1,11 +1,20 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, type HTMLAttributes, type ReactNode } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
 
-type MonoLabelElement = "p" | "span" | "div" | "h2" | "h3";
+type MonoLabelElement =
+  | "p"
+  | "span"
+  | "div"
+  | "h2"
+  | "h3"
+  | "dt"
+  | "figcaption"
+  | "legend";
 
-interface MonoLabelProps {
+interface MonoLabelProps extends Omit<HTMLAttributes<HTMLElement>, "children"> {
   as?: MonoLabelElement;
+  size?: "label" | "eyebrow";
   accent?: ReactNode;
   meta?: readonly (string | null | undefined | false)[];
   children?: ReactNode;
@@ -14,22 +23,28 @@ interface MonoLabelProps {
 
 export function MonoLabel({
   as: Element = "p",
+  size = "label",
   accent,
   meta,
   children,
   className,
+  ...props
 }: MonoLabelProps) {
   const parts = (meta ?? []).filter((part): part is string => Boolean(part));
 
   return (
     <Element
+      {...props}
       className={cn(
-        "m-0 font-mono text-label font-normal uppercase tracking-caps text-text-subtle tabular-nums",
+        "m-0 font-mono font-normal uppercase text-text-subtle tabular-nums",
+        size === "eyebrow"
+          ? "text-eyebrow tracking-kicker"
+          : "text-label tracking-caps",
         className,
       )}
     >
       {accent ? (
-        <span className="mr-2 text-accent-action-hi">{accent} </span>
+        <span className="mr-2.5 text-accent-action-hi">{accent} </span>
       ) : null}
       {parts.map((part, index) => (
         <Fragment key={`${index}:${part}`}>

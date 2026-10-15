@@ -8,7 +8,9 @@
     "design-system:tokens:generate": "CRATE_UPDATE_THEME_TOKENS=1 npm run --workspace=app/shared/ui test -- lib/appearance-theme-css.test.ts",
     "test:appearance": "playwright test --config=playwright.appearance.config.ts",
     "test:listen-visual": "playwright test --config=playwright.listen-visual.config.ts",
-    "test:admin-e2e": "playwright test --config=playwright.admin.config.ts"
+    "test:admin-e2e": "playwright test --config=playwright.admin.config.ts",
+    "design-system:preview": "vite --config tools/design-system-preview/vite.config.mjs",
+    "design-system:preview:build": "vite build --config tools/design-system-preview/vite.config.mjs"
   },
   "workspaces": [
     "app/cast-receiver",

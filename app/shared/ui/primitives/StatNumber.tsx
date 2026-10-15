@@ -2,50 +2,67 @@ import type { ReactNode } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
 
-export type StatNumberSize = "sm" | "md" | "lg";
+export type StatNumberSize = "sm" | "md" | "lg" | "xl";
 
 const SIZE_CLASS_NAME: Record<StatNumberSize, string> = {
-  sm: "text-base sm:text-xl",
-  md: "text-3xl",
-  lg: "text-5xl",
+  sm: "text-numeral-sm font-bold leading-none tracking-numeral-sm",
+  md: "text-numeral-md font-bold leading-none",
+  lg: "text-numeral-lg font-extrabold leading-numeral tracking-numeral",
+  xl: "text-numeral-xl font-extrabold leading-numeral tracking-numeral",
 };
 
 interface StatNumberProps {
   value: ReactNode;
+  unit?: ReactNode;
   label?: ReactNode;
+  labelPosition?: "above" | "below";
   size?: StatNumberSize;
   align?: "start" | "center";
+  as?: "span" | "dd" | "div";
   className?: string;
 }
 
 export function StatNumber({
   value,
+  unit,
   label,
+  labelPosition = "below",
   size = "md",
   align = "start",
+  as: Element = "span",
   className,
 }: StatNumberProps) {
+  const caption = label ? (
+    <span className="font-mono text-label uppercase tracking-label text-text-subtle">
+      {label}
+    </span>
+  ) : null;
+
   return (
-    <span
+    <Element
       className={cn(
-        "inline-flex flex-col gap-1.5",
+        "m-0 inline-flex flex-col gap-1.5",
         align === "center" ? "items-center text-center" : "items-start",
         className,
       )}
     >
-      <span
-        className={cn(
-          "font-display font-bold leading-none tracking-display text-text-primary tabular-nums",
-          SIZE_CLASS_NAME[size],
-        )}
-      >
-        {value}
-      </span>
-      {label ? (
-        <span className="font-mono text-label uppercase tracking-label text-text-subtle">
-          {label}
+      {labelPosition === "above" ? caption : null}
+      <span className="inline-flex items-baseline gap-1.5">
+        <span
+          className={cn(
+            "font-display text-text-primary tabular-nums",
+            SIZE_CLASS_NAME[size],
+          )}
+        >
+          {value}
         </span>
-      ) : null}
-    </span>
+        {unit != null ? (
+          <span className="font-mono text-label font-normal text-text-subtle">
+            {unit}
+          </span>
+        ) : null}
+      </span>
+      {labelPosition === "below" ? caption : null}
+    </Element>
   );
 }

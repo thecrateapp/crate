@@ -2,7 +2,8 @@
 
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
-> for Diego.
+> for Diego. Commit messages below describe future commits; do not create a commit without
+> Diego's go-ahead. Checkpoint 1A is approved for commit/push; the next local batch stops at Checkpoint 1B.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -48,11 +49,11 @@ Shared components live in `@crate/ui` only when both apps render them in the sam
   anatomy, motion, accessibility, governance and the `[Dn]` decisions.
 - `docs/plans/crate-v3-analysis/*.md`: evidence. `coverage.md` §8 indexes the surfaces with no site
   visual (`A1`–`A26`, `L1`–`L29`).
-- This plan is the only delivery order. After Task 0.4, PD §5.5 and DS §6.11 point here.
-- `docs/plans/` is gitignored (`.gitignore:71`); only the design-system spec is tracked
-  (force-added in `bce7dd92`). Task 0.1 un-ignores the product design, this plan and
-  `crate-v3-analysis/` and commits them, so the internal working tree, CI and PR reviewers see the
-  same sources.
+- This plan owns task dependencies and internal milestone order; the handover owns current status.
+  The approved joint-release sequence and the Checkpoint 1A exception below supersede the original
+  phased public rollout. No task list grants permission to publish, commit or access production.
+- The five canonical v3 documents and `crate-v3-analysis/` are tracked. The analysis reports
+  describe the original investigation baseline, not the current implementation status.
 - The "26 verified mapping cards" cited by PD and DS are not in the repo or in
   `crate-v3-analysis/` (`coverage.md:13` names them without a path). They are not a source for
   this plan: PD and DS already carry every verified correction, and Task 0.4 removes the
@@ -60,7 +61,7 @@ Shared components live in `@crate/ui` only when both apps render them in the sam
   `docs/plans/crate-v3-analysis/cards/` instead and Task 0.4 cites that path. Phase 0 closes the
   open decisions.
 
-**Visual reference:** the new site only. `site:` means `worktrees/website/app/web/`. Port values,
+**Visual reference:** the new site only. `site:` means `app/web/` at the approved site SHA, read from its git tree until website is integrated. Port values,
 geometry and math from:
 
 - `site:src/components/viz/*.astro` and `site:src/scripts/viz/*.ts`
@@ -76,9 +77,9 @@ simulated thread pools. Do not read or use any other design branch.
 - every `site:` line number in PD, DS and this plan refers to `258bbaee`;
 - each port PR records the site SHA it copied, in the PR body or in the header of the ported test
   fixture;
-- before each release group that ports site math (Genres, Ops, Health, Stats, and the P1 groups),
+- before each internal milestone that ports site math (Genres, Ops, Health, Stats, and the P1 groups),
   one re-sync step diffs the ported `site:` files between the pin and the site head
-  (`git -C worktrees/website diff 258bbaee..HEAD -- app/web/src/scripts app/web/src/lib`),
+  (diff `app/web/src/scripts` and `app/web/src/lib` between the pin and the proposed site SHA),
   reviews the changes with Diego and moves the pin only then.
 
 **Repo rules that apply:**
@@ -94,39 +95,34 @@ simulated thread pools. Do not read or use any other design branch.
 
 **Conventions in this plan:**
 
+- Registry, generator and harness names below are current paths, not a requirement to retain the
+  theme system. Preserve them through the primitive batch; Task 1.13 migrates their consumers.
+  Later tasks use the resulting single-identity equivalent and never recreate removed variants.
+
 - Paths are relative to the `crate-v3` worktree. `sm:` means
   `/Users/diego/Code/Ninja/musicdock/worktrees/smart-mix-phase-1/` (branch
   `codex/feat-smart-mix-phase-1`, not merged).
 - `[MAIN]` marks a task that ships as its own small PR against `main`; `feat/crate_v3` takes it by
-  merging `main` while that branch exists (until the foundation release).
+  an integrator-approved update from `main`. Start these tasks only when Diego assigns them;
+  critical operational deployments remain independent of the joint UI release.
 - `[BLOCKED: smart-mix]` marks a task that needs `codex/feat-smart-mix-phase-1` merged into `main`
   first.
 - `[BEHAVIOUR]` marks a task that changes behaviour (listed in PD §3.4.2; Task 0.4 adds the rows
   that are missing there). It goes in its own PR with a release-note line.
 - IDs: `Bn`, `PDn`, `Vn`, `Gn` and `[Dn]` as in the two design documents. `P0`/`P1`/`P2` and sizes
   `S`/`M`/`L` as in PD.
-- Migrations are linear Alembic revisions with literal ids (`revision = "108"`,
-  `down_revision = "107"`), and `test_crate_schema_definition.py:99` asserts the single head
-  (`get_heads() == ["108"]`; lines 97–98 are the 107/108 `down_revision` asserts).
-  **`main` is canonical for numbering.** A v3 migration takes `main`'s head + 1 when it merges,
-  and whichever branch is still unmerged renumbers its own migrations each time it merges `main`.
-  No schema for features that are not on `main` lands on `main` early, and no active branch's
-  schema is frozen.
-  - Today the unmerged branch is `codex/feat-smart-mix-phase-1`: about 100 commits ahead of
-    `main` (367 files, +46K lines, still active), and it already merges `main` regularly (10-08,
-    10-13). It defines six revisions: `109_smart_mix_profiles.py`, `110_user_access_tokens.py`,
-    `111_smart_mix_measurement_provenance.py`, `112_smart_mix_target_generation.py`,
-    `113_vdj_mood_indexes.py` and `114_smart_mix_source_stale.py`. Only four of them have
-    schema-section files (`smart_mix_v111.py`, `smart_mix_v112.py`, `vdj_catalog_v113.py`,
-    `smart_mix_v114.py`); 109 and 110 carry inline DDL (`op.create_table`). A renumber therefore
-    touches six revision files, four section files and their bootstrap imports, plus the head
-    test.
-  - Task 2.13 (the first v3 migration) adds `scripts/db/renumber_migrations.py` and the
-    `alembic stamp` recipe for the dev and lab databases that already applied Smart Mix
-    (`alembic_version` 114). PD2 decides when Smart Mix merges; it is not a precondition of any v3
-    migration.
+- Migrations are linear Alembic revisions; `main` is canonical for numbering. The original
+  analysis recorded head 108 and Smart Mix revisions 109–114. Those numbers and the reported
+  dev/lab database versions are historical inventory, not the state to deploy against.
+  After Smart Mix merges and v3 rebases, inspect the actual schema and single-head test, then
+  allocate a new revision from the actual `main` head. Reuse any integration tooling already
+  present; never renumber deployed revisions or recreate a resolved migration.
+  Task 2.13 adds or extends a renumber helper only if the resulting unmerged branch needs one.
+  Any database version repair requires a verified code-to-schema mapping, backup and separate
+  operational approval; there is no unconditional `alembic stamp` step.
 
   Migration numbers are written `NNN` below. Every migration:
+
   - puts its DDL in an immutable `app/crate/db/schema_sections/<area>_vNNN.py` called from
     `upgrade()` and from the bootstrap;
   - uses `ADD COLUMN IF NOT EXISTS`, nullable columns, and `autocommit_block` for concurrent
@@ -134,8 +130,10 @@ simulated thread pools. Do not read or use any other design branch.
   - updates `app/tests/test_crate_schema_definition.py` (head assertion);
   - is checked before merge: `alembic heads` on the PR's merge result prints one head;
   - never changes the meaning of a column an older image still writes (see Rollback).
+
 - New task types are registered in five places, checked by `app/tests/test_task_runtime_contract.py`
   and `test_task_queue_routing.py`:
+
   1. `app/crate/actors.py` `TASK_POOL_CONFIG`;
   2. a `TaskTypeInfo` in `app/crate/task_registry.py`;
   3. a handler in a `*_TASK_HANDLERS` dict;
@@ -150,9 +148,10 @@ simulated thread pools. Do not read or use any other design branch.
 
   Each new type also requires regenerating the site's `src/data/scale.json` (Site drift,
   Phase 7).
+
 - **Coalescing is trailing-edge, and no `tasks` row exists before the build is due.**
   - Recipe (helper `app/crate/coalesce.py`, Task 2.11b: `schedule_coalesced(key, task_type,
-    params, window_seconds)` and `dispatch_due()`): the first trigger sets `<key>:dirty` and
+params, window_seconds)` and `dispatch_due()`): the first trigger sets `<key>:dirty` and
     `ZADD crate:coalesce:due NX <now + window> <key>`; later triggers only set dirty. A due step in
     the crate-worker service loop (single writer, every iteration, about 2 s) reads
     `ZRANGEBYSCORE crate:coalesce:due -inf <now>`, removes each due key with `ZREM` and only then
@@ -208,7 +207,13 @@ simulated thread pools. Do not read or use any other design branch.
   `publish_task_signal` (Task 2.17c): task channel only, no `task_events` row, no `worker_logs`, no
   `crate:sse:global`.
 
-Status: plan only. Nothing in it has been built or run.
+Status: implementation in progress. Tasks 0.0, 0.1 steps 1–2, 0.2–0.10, 0.12 and 0.13 have
+local implementation recorded in the handover. This does not close CI, screenshot or device QA.
+Checkpoint 0 remains open for 0.11/0.14/0.15 and its reviews (0.14 may wait until the wheel).
+Diego approved Checkpoint 1A (1.2–1.4) on 2026-10-15 after reviewing the mockup and authorised
+commit/push of that batch and its persistent preview. The next local batch is 1.5–1.6, stopping at
+Checkpoint 1B. Runtime theme retirement (1.13) is planned, not implemented. Local full-suite results
+are in the handover; CI, production screenshot baselines and device QA remain pending.
 
 ---
 
@@ -216,69 +221,57 @@ Status: plan only. Nothing in it has been built or run.
 
 ### Where tests run
 
-Until Task 0.2, the worktree lives on the external disk (`/Volumes/MacData`), where Vitest 4.1.6
-workers time out on start (`START_TIMEOUT = 6e4`, `WORKER_START_TIMEOUT = 9e4` in
-`node_modules/vitest/dist/chunks/cli-api.*.js`). Note that `~/Code/Ninja` is a symlink to
-`/Volumes/MacData/Projects/Ninja`, so anything under it is on the external disk too. Rules (PD13):
+The canonical clone is `/Users/diego/Code/crate-v3`, with its own `.git`, `node_modules` and
+`.venv`. Assigned agents use isolated worktrees on the internal disk. The removed external
+worktree is not an execution target; its Vitest timeout patch is historical and must not be used.
 
-1. **Edit and test in one tree on the internal disk.** Task 0.2 moves `feat/crate_v3` to a
-   standalone clone at `/Users/diego/Code/crate-v3` (a real internal path, not under
-   `~/Code/Ninja`) with its own `.git`, `node_modules` and `.venv`, so nothing depends on the
-   external disk being mounted. Every task writes its failing test, runs it, implements and
-   commits in that tree, so no work-in-progress is ever pushed to get a test run, and generated
-   files (`TOKENS-GEN`, baselines) land in the tree that commits them. Nobody edits the external
-   worktree after Task 0.2.
-2. **CI is the source of truth** for the full suites. Push each finished task (one task, one
-   commit, with Diego's go-ahead) and read the "Frontend Tests" and "Backend Tests" workflow runs.
-3. **Local runs are single files** (the named commands below).
-4. If the external worktree must stay for some reason, sync it without a commit before each run,
-   `rsync -a --exclude node_modules --exclude .git <external worktree>/ /Users/diego/Code/crate-v3-tests/`
-   (never `--delete`), and copy generated files (`themes.css`, PNGs) back. The hand-patched Vitest
-   timeouts on the external disk are unversioned, lost on every `npm ci`, and never committed or
-   relied on.
+Local task tests run in the tree being edited. The integrator repeats the task verification after
+integration. CI remains required for full QA and is not implied by local results. Pushes, commits,
+PRs and workflow dispatches require Diego's go-ahead; no agent pushes work merely to obtain QA.
+Committed visual PNGs come only from the approved Linux amd64 CI job, never from the Mac.
 
 ### Named commands used by the tasks
 
-| Name | Command (repo root unless noted) |
-| --- | --- |
-| `PY <file>` | `cd app && ../.venv/bin/python -m pytest tests/<file> -q` in `/Users/diego/Code/crate-v3` (venv from Task 0.2). `pg_db` tests need Docker running (Testcontainers fallback) |
-| `PY-ALL` | `make dev-test-backend` (pyright, ruff, full pytest in the isolated test stack) |
-| `GO` | `make readplane-test && make readplane-vet` |
-| `GO-SMOKE` | `make dev-back`, then `make readplane-contract-smoke` |
-| `VT-UI <path>` | `npm run --workspace=@crate/ui test -- <path>` |
-| `VT-ADMIN <path>` | `npm run --workspace=app/ui test -- <path>` |
-| `VT-LISTEN <path>` | `npm run --workspace=app/listen test -- <path>` |
-| `TYPES` | `npm run --workspace=@crate/ui typecheck && npm run --workspace=app/ui typecheck && npm run --workspace=app/listen typecheck && npm run --workspace=app/listen-desktop typecheck` |
-| `LINT` | `npm run --workspace=app/ui lint && npm run --workspace=app/listen lint && uv run ruff check app/crate app/tests && uv run ruff format --check app/crate app/tests` |
-| `GATES` | `node --test scripts/design-system/*.test.mjs && npm run design-system:drift -- --check && npm run design-system:tokens:check && npm run design-system:layers` |
-| `TOKENS-GEN` | `npm run design-system:tokens:generate`, after any change to `app/shared/ui/lib/appearance-token-registry.ts`. Commit the generated `app/shared/ui/tokens/themes.css` |
-| `I18N` | `npm run --workspace=app/listen i18n:check`. After editing catalogs: `(cd app/listen && node scripts/i18n-check.mjs --write-metadata)` |
-| `BUNDLE` | `npm run --workspace=app/listen build && npm run --workspace=app/listen check:bundle` (300 KB gzip of initial JS; write the measured number in the PR) |
-| `BUNDLE-ADMIN` | `npm run --workspace=app/ui build && npm run --workspace=app/ui check:bundle` (from Task 0.12; the PR records the delta against the ceiling) |
-| `VISUAL` | `docker run --rm --platform linux/amd64 --ipc=host -v "$PWD":/work -v crate-v3-node-modules:/work/node_modules -w /work mcr.microsoft.com/playwright:v1.63.0-noble bash -lc 'h=$(sha256sum package-lock.json \| cut -d" " -f1); [ "$(cat node_modules/.lock-hash 2>/dev/null)" = "$h" ] \|\| { npm ci && echo "$h" > node_modules/.lock-hash; }; npm run test:listen-visual'`. The host is an Apple M5 (arm64) and CI runs linux/amd64; Chromium text antialiasing can differ between architectures by more than `maxDiffPixels: 250`, so a local run forces amd64 (emulated and slow) and is advisory. **Committed PNGs come only from the `update-listen-visual` `workflow_dispatch` job** (amd64, Task 0.11): run it and download its artefact; never commit baselines recorded on the Mac. `npm ci` runs only when the `package-lock.json` hash differs from the stamp in the named volume. Baselines are Linux only (no `{platform}` in `snapshotPathTemplate`) |
-| `ADMIN-E2E` | `npm run test:admin-e2e` (from Task 0.11 it also checks the Linux-only Admin captures in the same container image; their PNGs come from the same `workflow_dispatch` job) |
-| `APPEARANCE` | `npm run test:appearance -- --project=chromium` |
+| Name               | Command (repo root unless noted)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PY <file>`        | `cd app && ../.venv/bin/python -m pytest tests/<file> -q` in `/Users/diego/Code/crate-v3` (venv from Task 0.2). `pg_db` tests need Docker running (Testcontainers fallback)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `PY-ALL`           | `make dev-test-backend` (pyright, ruff, full pytest in the isolated test stack)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `GO`               | `make readplane-test && make readplane-vet`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `GO-SMOKE`         | `make dev-back`, then `make readplane-contract-smoke`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `VT-UI <path>`     | `npm run --workspace=@crate/ui test -- <path>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `VT-ADMIN <path>`  | `npm run --workspace=app/ui test -- <path>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `VT-LISTEN <path>` | `npm run --workspace=app/listen test -- <path>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `TYPES`            | `npm run --workspace=@crate/ui typecheck && npm run --workspace=app/ui typecheck && npm run --workspace=app/listen typecheck && npm run --workspace=app/listen-desktop typecheck`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `LINT`             | `npm run --workspace=app/ui lint && npm run --workspace=app/listen lint && uv run ruff check app/crate app/tests && uv run ruff format --check app/crate app/tests`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `GATES`            | `node --test scripts/design-system/*.test.mjs && npm run design-system:drift -- --check && npm run design-system:tokens:check && npm run design-system:layers`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `TOKENS-GEN`       | `npm run design-system:tokens:generate`, after any change to `app/shared/ui/lib/appearance-token-registry.ts`. Commit the generated `app/shared/ui/tokens/themes.css`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `I18N`             | `npm run --workspace=app/listen i18n:check`. After editing catalogs: `(cd app/listen && node scripts/i18n-check.mjs --write-metadata)`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `BUNDLE`           | `npm run --workspace=app/listen build && npm run --workspace=app/listen check:bundle` (300 KB gzip of initial JS; write the measured number in the PR)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `BUNDLE-ADMIN`     | `npm run --workspace=app/ui build && npm run --workspace=app/ui check:bundle` (from Task 0.12; the PR records the delta against the ceiling)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `VISUAL`           | `docker run --rm --platform linux/amd64 --ipc=host -v "$PWD":/work -v crate-v3-node-modules:/work/node_modules -w /work mcr.microsoft.com/playwright:v1.63.0-noble bash -lc 'h=$(sha256sum package-lock.json \| cut -d" " -f1); [ "$(cat node_modules/.lock-hash 2>/dev/null)" = "$h" ] \|\| { npm ci && echo "$h" > node_modules/.lock-hash; }; npm run test:listen-visual'`. The host is an Apple M5 (arm64) and CI runs linux/amd64; Chromium text antialiasing can differ between architectures by more than `maxDiffPixels: 250`, so a local run forces amd64 (emulated and slow) and is advisory. **Committed PNGs come only from the `update-listen-visual` `workflow_dispatch` job** (amd64, Task 0.11): run it and download its artefact; never commit baselines recorded on the Mac. `npm ci` runs only when the `package-lock.json` hash differs from the stamp in the named volume. Baselines are Linux only (no `{platform}` in `snapshotPathTemplate`) |
+| `ADMIN-E2E`        | `npm run test:admin-e2e` (from Task 0.11 it also checks the Linux-only Admin captures in the same container image; their PNGs come from the same `workflow_dispatch` job)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `APPEARANCE`       | `npm run test:appearance -- --project=chromium` (existing harness name; migrate to the single Crate v3 token contract in 1.13, with no variant matrix)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 ### Definition of done (applies to every task)
 
 - [ ] **Tests first for logic.** Write table tests for pure math and models. Render tests check the
-  final state, interactions and lifecycle (the loop stops on unmount and when hidden; a stream
-  opens once). pytest covers every changed public function; Go table tests cover every read-plane
-  change. A `TEST_GAP:` comment is allowed only for rAF, IntersectionObserver or WebGL scheduling,
-  which Playwright or the QA pass covers instead.
+      final state, interactions and lifecycle (the loop stops on unmount and when hidden; a stream
+      opens once). pytest covers every changed public function; Go table tests cover every read-plane
+      change. A `TEST_GAP:` comment is allowed only for rAF, IntersectionObserver or WebGL scheduling,
+      which Playwright or the QA pass covers instead.
 - [ ] **Drift tests** wherever data is copied across languages, apps or repos. Each task lists its
-  drift tests.
+      drift tests.
 - [ ] **Reduced motion** renders the final state without rAF, springs, scramble, stagger or
-  count-up, and interaction is unchanged.
+      count-up, and interaction is unchanged.
 - [ ] **Loops settle.** rAF runs only while a spring or position is unsettled (DS §3.8 rule 3,
-  PD7). Elapsed-time text (running chips, the active Health row) is written into text nodes from a
-  1 s timer, never from a rAF. Idle states render one static frame. Each visual has a test that its
-  loop stops after settling while the underlying task is still running. This matters on Capacitor
-  and Tauri, where background throttling is disabled.
+      PD7). Elapsed-time text (running chips, the active Health row) is written into text nodes from a
+      1 s timer, never from a rAF. Idle states render one static frame. Each visual has a test that its
+      loop stops after settling while the underlying task is still running. This matters on Capacitor
+      and Tauri, where background throttling is disabled.
   - Gates: Listen `isMotionBlocked()`; shared code `@crate/ui/lib/motion-gate.ts`; Admin
     `useMotionAllowed()` (media query only).
   - CSS springs only through longhand properties behind `@supports (transition-timing-function:
-    linear(0, 1))`, and no final state may depend on an animation running.
+linear(0, 1))`, and no final state may depend on an animation running.
 - [ ] **Mobile.**
   - Listen: 375 px wide, 44 px hit areas on coarse pointers, `--listen-safe-*` insets, and no
     `filter: blur` on Android WebView or WebKitGTK.
@@ -301,12 +294,14 @@ workers time out on start (`START_TIMEOUT = 6e4`, `WORKER_START_TIMEOUT = 9e4` i
   - No new `style={{}}`.
   - Background work follows the Conventions: trailing-edge coalescing, demand gating, single
     writers, quiet refresh tasks.
-- [ ] **Appearance.** No literal colours. Canvas and WebGL instruments re-resolve their tokens on
-  appearance change (tested with the resolver event, as `nivo-theme` is). P0 Listen instruments
-  also get `light` and `crateRed` captures if the appearance decision in Task 0.3 includes them.
+- [ ] **Single visual identity.** Crate v3 only, with semantic design tokens and no literal colours
+      in consumers. No alternate skins, modes, accent, material, radius or typography selectors.
+      Canvas, WebGL and Nivo resolve the Crate v3 tokens; resize/context restoration keeps them correct.
+      Until 1.13 removes the old runtime, preserve its token generation and compatibility plumbing;
+      do not add new variants or widen the screenshot matrix. Motion and accessibility remain supported.
 - [ ] **Older servers.** Every Listen instrument that reads a new endpoint or field has a test with
-  a fixture returning 404 or the old shape, asserting the defined fallback renders (Rollout →
-  Flags).
+      a fixture returning 404 or the old shape, asserting the defined fallback renders (Rollout →
+      Flags).
 - [ ] **Budgets.**
   - `GATES` stays green. Drift ceilings move only deliberately, and the commit body lists the
     tokens added.
@@ -319,34 +314,29 @@ workers time out on start (`START_TIMEOUT = 6e4`, `WORKER_START_TIMEOUT = 9e4` i
   - A `forced-colors` pass.
   - State is never conveyed by colour alone.
 - [ ] **Visual baselines.** Re-record them intentionally whenever a Listen screen or an Admin
-  capture changes, through the `update-listen-visual` job (the only source of committed PNGs,
-  `VISUAL`), and review every diff. Tasks that change Listen pixels in the same area are grouped
-  into one PR with a single re-baseline.
+      capture changes, through the `update-listen-visual` job (the only source of committed PNGs,
+      `VISUAL`), and review every diff. Tasks that change Listen pixels in the same area are grouped
+      into one PR with a single re-baseline.
 - [ ] **Site drift coupling** checked (DS §6.5). Note in the PR when the site test must change on
-  the `feat/website` merge, and record the site SHA any ported math or values came from (pinned
-  `258bbaee`).
+      the `feat/website` merge, and record the site SHA any ported math or values came from (pinned
+      `258bbaee`).
 
 ---
 
 ## Phase 0 — Close the open decisions and stabilise the committed foundation
 
-The branch has 4 commits:
+The original four commits established the visual baseline; subsequent commits implemented most
+of Phase 0. They are history, not a current progress counter. The handover records completion and
+QA separately. Documents are tracked, the internal clone exists and Bricolage is in place.
 
-| Commit | Content |
-| --- | --- |
-| `bce7dd92` | v3 spec |
-| `d9df9d51` | tokens and fonts |
-| `191ed32a` | primitives and the Radar ticket |
-| `ce506e86` | EQ curve chart |
+**Current order:** Checkpoint 1A is approved; prepare and review Checkpoint 1B (1.5–1.6) locally while Smart Mix is pending.
+Then wait for Diego. Checkpoint 0 remains open: visual baselines 0.11 and runtime qualification
+0.15 are pending; production measurement 0.14 is needed before the wheel and requires assignment.
+No exception authorises 1.0 or the rest of Phase 1 before review; Admin captures still precede 1.0.
 
-It has never been pushed and has no recorded green run. Its known problems are in PD §2.3. Phase 0
-leaves it legally publishable, pushed, decided and green.
-
-**Order inside Phase 0:** Task 0.1 steps 1–3 (track the docs, commit, rebase; no push) → Task 0.2
-(internal disk) → Task 0.0 (font licence), which gates only the push in Task 0.1 step 4. Task 0.0
-and Task 0.3 are done (2026-10-15): the display face is Bricolage Grotesque and the font commit (now `d9df9d51`, formerly `38c7576c`) no longer
-contains Cabinet files, so the push is unblocked.
-The `[MAIN]` work of Phase 2A and 2B does not wait for Phase 0 at all (Order and checkpoints).
+The integration sequence is Smart Mix on `main` → approved rebase of `feat/crate_v3` → website
+integration → internal milestones → one joint P0 major for Listen, Admin, site and docs. R0 work
+on `main` starts only when assigned, with critical deployments observed independently.
 
 ### Task 0.0: Settle the brand font licence before anything is pushed (PD4 / [D3])
 
@@ -361,6 +351,7 @@ run its GHCR images, so the font cannot ship in the product. Diego chose an OFL 
 ITF for an exception: it removes the question for every runtime and every fork.
 
 **Files (done on `feat/crate_v3`, folded into the original font commit):**
+
 - Removed: `app/shared/fonts/cabinet-grotesk/*`, `app/shared/fonts/cabinet-grotesk.css`
 - Added: `app/shared/fonts/bricolage-grotesque/` (`bricolage-grotesque-latin-opsz-normal.woff2`,
   `bricolage-grotesque-latin-ext-opsz-normal.woff2`, `OFL.txt`; unmodified from
@@ -381,173 +372,60 @@ ITF for an exception: it removes the question for every runtime and every fork.
 4. Metric follow-ups (opsz, tracking, vertical metrics) are in DS 1.2.1 and the decision register;
    Task 0.11's `VISUAL` captures check them.
 
-### Task 0.1: Track the v3 docs, push the branch and catch up with `main`
+### Task 0.1: Track docs and integrate the branches
 
-**Files:**
-- Modify: `.gitignore:71` (`docs/plans/` becomes `docs/plans/*`, because git cannot re-include a
-  file whose parent directory is excluded; then add `!docs/plans/2026-10-14-crate-v3-*.md` and
-  `!docs/plans/crate-v3-analysis/`)
-- Add: `docs/plans/2026-10-14-crate-v3-product-design.md`, this plan,
-  `docs/plans/crate-v3-analysis/*.md` (and `crate-v3-analysis/cards/*.md` if the cards exist)
+**Status:** tracking steps 1–2 done. Rebase, push and PR work are pending Diego's go-ahead.
+The five canonical docs and historical evidence are tracked; do not repeat the old ignore changes.
 
-**Steps:**
+**Remaining steps (when assigned):**
 
-1. Change `.gitignore`, then `git status --ignored docs/plans` must show the three paths as
-   untracked (`??`), not ignored (`!!`). Run `node scripts/check-docs.mjs` to confirm the tracked
-   plan docs do not trip the docs check.
-2. Commit: `docs(v3): track the v3 product design, plan and analysis`.
-3. `git -C worktrees/crate-v3 fetch origin && git -C worktrees/crate-v3 rebase origin/main`. The
-   branch is 3 commits behind `main` (backend only, so no overlap is expected).
-   - After the rebase, re-resolve every `file:line` reference in this plan with `grep`: the three
-     `main` commits move `app/crate/worker_handlers/acquisition.py` by 4 lines
-     (`_handle_import_queue_item` 2597 → 2601, `_handle_import_queue_all` 2645 → 2649, the
-     `library_upload` `TaskProgress(phase="preparing")` 2301 → 2305, checked with
-     `git show origin/main:`).
-   - From here on, tasks name a file plus a symbol (`_handle_import_queue_item`) and treat line
-     numbers as hints; a task that edits by line number greps for the symbol first.
-4. Only after Task 0.0, from the internal clone of Task 0.2:
-   `git -C /Users/diego/Code/crate-v3 push -u origin feat/crate_v3`.
-5. Open a draft PR `feat/crate_v3 → main` titled "Crate v3 foundation" (Phases 0 and 1, 1b.3 and
-   1b.4; Rollout). Every later PR in this plan targets either this branch (until the foundation
-   release) or `main` (Rollout).
-6. Verify: `git -C /Users/diego/Code/crate-v3 rev-list --count HEAD..origin/main` prints `0`.
+1. After Smart Mix merges to `main`, update remote refs from `/Users/diego/Code/crate-v3` and
+   rebase the integration branch onto that actual merge result. The integrator owns this operation;
+   coordinate any published history before rewriting it.
+2. Reconcile Smart Mix overlap: Android EQ, Camelot, migrations, backend runtime, settings and
+   catalogs. Re-evaluate 2.9b, 2.13 and 5.14 against the integrated code; do not recreate modules or
+   renumber migrations already settled by the Smart Mix agent. Resolve symbols, not stale lines.
+3. Integrate `feat/website` (`app/web` and `app/docs`) into `feat/crate_v3` after a reviewed diff.
+   Keep visual reference pin `258bbaee` until Diego approves a resync and all three design docs
+   record the replacement SHA. A branch location alone never changes the pin.
+4. Push, open PRs or dispatch CI only after explicit approval. Keep `feat/crate_v3` as the product
+   integration branch until the joint P0 major. Foundation is an internal checkpoint, not a public
+   release or permission to retire the branch.
+5. Verify the integrated result with the relevant task and release gates when assigned. The site
+   screencast and screenshots are re-recorded from the final v3 UI, with no instance domain.
 
-### Task 0.2: Move the working tree to the internal disk and record baseline numbers
+### Task 0.2: Internal working clone
 
-**Files:** none (outside the repo).
+**Status: done.** The standalone clone is `/Users/diego/Code/crate-v3`; its object store and local
+dependencies are on the internal disk. Do not recreate it or restore the removed external worktree.
+Assigned agents use isolated internal-disk worktrees; the integrator owns canonical status updates.
+Baseline measurements and CI/device results must remain attributed to the revision actually tested.
+No new verification is implied by this status entry.
 
-**Steps:**
+### Task 0.3: Reconciled decisions and delivery protocol
 
-1. With `git status` clean in the external worktree (Task 0.1 steps 1–3 committed and rebased the
-   branch), make a standalone clone on the internal disk, point its `origin` at GitHub, and remove
-   the external worktree so nobody edits it again. A `git worktree add` is not enough: its index
-   and object store stay under the external repo's `.git/worktrees/crate-v3`, so the internal tree
-   would still depend on the slow disk being mounted.
+**Status: product decisions accepted.** The decision register carries PD1–PD54. The latest accepted
+amendment replaces all theme/skin/mode/accent variants with the single Crate v3 identity (PD53,
+DS D13/D16/D41/D42). It preserves semantic tokens, accessibility and motion. Full runtime removal
+is Task 1.13, not part of the current primitive batch.
 
-   ```bash
-   git clone --branch feat/crate_v3 /Volumes/MacData/Projects/Ninja/musicdock /Users/diego/Code/crate-v3
-   git -C /Users/diego/Code/crate-v3 remote set-url origin "$(git -C /Volumes/MacData/Projects/Ninja/musicdock remote get-url origin)"
-   git -C /Users/diego/Code/crate-v3 fetch origin
-   git -C /Volumes/MacData/Projects/Ninja/musicdock worktree remove worktrees/crate-v3
-   cd /Users/diego/Code/crate-v3 && npm ci && python3.13 -m venv .venv && .venv/bin/pip install -r app/requirements-test.txt
-   ```
+PD48 now includes the small Admin capture set and the accepted 520 KiB initial-JS ceiling; the
+recorded Admin baseline is 514,659 B gzip. Baselines and CI results still require actual review.
+The joint major retains the existing P0 boundary; P1/P2 and coverage remain later work unless Diego
+expressly changes scope. R0 `[MAIN]` fixes remain separately assigned and operationally isolated.
 
-   The external repo keeps a stale `feat/crate_v3` ref; never use it again.
-2. From here on, "the `crate-v3` worktree" means `/Users/diego/Code/crate-v3`. The `[MAIN]` work
-   (Phase 2A and 2B) uses a second worktree of this clone on `main`
-   (`git -C /Users/diego/Code/crate-v3 worktree add ../crate-main origin/main`).
-3. Record the baseline in the draft PR description:
-   - the `GATES` output. Expected to fail with inline styles 93 > 91, legacy utilities 1 > 0, and
-     token definitions 138/95 > 134/91 (DS §6.2);
-   - the `BUNDLE` number (the spec reports about 198 KB; record the real value);
-   - the CI result of every job on the draft PR.
-4. Smoke the loop once: run `VT-UI lib/cn.test.ts` and `PY test_crate_schema_definition.py` in the
-   new tree. Both must start without timeouts.
-
-No commit.
-
-### Task 0.3: Decision session and one reconciled register
-
-**Status: decided 2026-10-15.** Every decision takes the recommendation below, with the specifics
-recorded in `docs/plans/2026-10-15-crate-v3-decision-register.md`: PD1 amends the chart rule (Task
-0.5); PD4 is Bricolage Grotesque everywhere, including cratemusic.app (Task 0.0); PD38 builds
-Devices in v3 although Crate Connect is off in production, and "review Crate Connect" is the next
-initiative after v3; PD42 raises iOS to 16.4 and iOS 15 users stay on v2. The four conflicts go to
-PD14, PD32, PD29 and PD28. Behaviour changes that ship as their own PR to `main`: PD24, PD29, PD32,
-PD44, PD46 and PD45. Only step 4 (estimates) is still open.
-
-The two documents keep separate registers (`PDn`, `[Dn]`). Some entries overlap, and four of them
-disagree with each other. One answer per question, recorded in both.
-
-**Files:**
-- Create: `docs/plans/2026-10-15-crate-v3-decision-register.md` (done)
-- Modify: `docs/plans/2026-10-14-crate-v3-product-design.md` (§6, status column per PD; done)
-- Modify: `docs/plans/2026-10-14-crate-v3-design-system.md` (§6.12, status column per D; done)
-
-**Steps:**
-
-1. Walk Diego through the decisions in blocking order:
-
-   | Blocks | Decisions |
-   | --- | --- |
-   | Before any push | PD4 = [D3] brand fonts on every runtime (Task 0.0: licence; decided, Bricolage Grotesque) |
-   | Phase 0–1 | PD1 = [D1] chart rule for instruments; PD3 = [D2] Listen pill radius; PD15 Admin pills (chips and CTAs as pills, inputs at 6 px); PD10 = [D4] failed/destructive colour; PD11 = [D5] amber `#fbbf24`; PD6 = [D6] card contrast (Task 1.0 implements it); PD8 = [D8] `StatNumber` tiers; PD9 = [D14] display scale; PD12 = [D10] toasts; PD13 tests on the external disk (answered by Task 0.2); PD7 = [D7] no auto-cycling; [D9] Admin `data-crate-motion`; PD42 = [D11] iOS target (Task 0.13; the registers now agree); PD53 = [D41], [D42] appearance bar and the `StatusDot on` hue (step 3); PD48 = [D25] bundle and screenshot checks (Tasks 0.11, 0.12) |
-   | Phase 2–3 | PD2 = [D19] Smart Mix merge order (no longer a migration precondition, Conventions → migrations; it decides whether 4.3 and 4.4 build on the Smart Mix Android path); PD24 health "fix on their own"; the third clause of [D23] ("console scans apply safe fixes"); PD33 = [D22] governor thresholds; PD35 = [D39] lane numeral; PD44 = [D40] stack restart policy; PD18 = [D20] genre overrides, including whether core relations are hideable; PD22 signed core release 1.0.1; PD19/PD20 = [D21] wheel default and Listen scope; PD21 = [D24] count definitions; PD23 taxonomy invalidations; PD16 `/imports`; PD17 enrichment scope; PD26 `mood_top`; PD27 = [D33] non-Tidal timelines (Task 3.11c); PD29 = [D38] enrichment toggles (Task 3.12c); PD30 sidecar drift keys; PD31 Enrich button; PD46 = [D26] acquisition permissions |
-   | Phase 4–5 | PD5 = [D32] setlist `in_library`; PD25 = [D34] loudness units; PD34 radio weights copy; PD36 = [D36] Paths regenerate (the task route moves into 4.9a); PD37 mix strip; PD38 = [D28] Connect build flag; PD39 = [D17] GTK accent; PD40 = [D16] palette tint (Task 4.11); PD41 mobile audio visuals (Task 4.12); PD43 = [D30] Crate Pulse privacy (server-side in 2.20); PD49 = [D15] `<html lang>`; PD51 ticket key word; PD54 = [D43] stack sampler placement (new, Task 5.5) |
-   | Later | PD45 redis `maxmemory`; PD47 unused code; PD50 spinners; PD52 energy arc; [D12] grain; [D13] glass; [D27] federation in Listen; [D31] display-face `tnum` (closed: Bricolage has `tnum`); [D35] Generate with AI draft; [D37] chapter index |
-
-   Recommendations for the entries the registers leave open:
-   - **PD33:** make the code's 10 listeners / 10 streams the product default, document the
-     compose 0/0 as an operator override in `docker-compose.yaml` comments and the governor docs,
-     and make the site copy say "default 10/10, configurable". The gauges show the configured
-     values either way.
-   - **PD34:** the site's Radio weights (`content/listen/en.ts:75`, `RadioDive.astro`) are correct
-     for discovery radio: `radio_engine.py` imports `_W_*` from `db/paths_candidates.py`
-     (.34/.22/.16/.09/.08/.05/.03). Only the label "Camelot 0.05" is wrong; the term is key/scale
-     compatibility, so the copy says "Key". Optionally note that track and contextual radio
-     override sound/artists/genre (.16/.30/.20 and .01/.44/.26).
-   - **PD2:** no longer gates a migration: `main` is canonical for numbers and Smart Mix
-     renumbers on each merge of `main` with the 2.13 script (Conventions → migrations). What PD2
-     still decides is the player overlap. Smart Mix changes no file under
-     `app/listen/src/components/player` or `hooks`, but it rewrites the Android native playback
-     path:
-     - `CrateNativePlaybackService.java` (about 1,200 lines changed; per-track `eqGains` removed);
-     - a new `NativeEqController.java` with `apply(enabled, audioSessionIds[], gains)`, which
-       applies one gain set to every deck;
-     - `lib/android-native-engine.ts` and `contexts/player-*.ts` (engine adapter, smart
-       transition, native event bridge, queue sync).
-
-     Its overlap is therefore the Phase 2 backend (`actors.py`, `task_registry.py`, `worker.py`,
-     `resource_governor.py`, `browse_media.py`, `bliss.py`), the Android EQ path (Checkpoint 0's
-     Android `setEq` review, Tasks 4.3 and 4.4), all 7 Listen catalogs plus `.metadata`,
-     `SettingsPrimitives.tsx`, `Settings.tsx` and Admin `Analysis.tsx`. Recommend merging Smart
-     Mix before the Listen player and EQ group, so 4.3 and 4.4 build on its Android path;
-     otherwise their Android parts are re-verified after the merge (Risk #2).
-   - **PD54 = [D43] (new): Stack sampler placement.** (a) a dedicated daemon thread in crate-api
-     behind an owner-checked Redis leader lock (crate-api already holds the Docker socket; the
-     thread never touches the event loop); (b) crate-worker behind a read-only
-     docker-socket-proxy container (containers and stats only), leaving crate-api, which serves
-     all Admin and the Listen fallback traffic, with no background Docker I/O. Recommend (a): no
-     new container, the socket is already there, and the thread is demand-gated (full stats only
-     while `admin:live:viewers:stack` exists). Task 5.5's Files follow the answer.
-
-2. Resolve the four conflicts (the registers disagree). Each has one recommendation, and each was
-   decided for the recommendation on 2026-10-15. PD42 and [D11] now agree (raise iOS to 16.4,
-   Task 0.13) and are no longer a conflict.
-
-   | Topic | Product design | Spec | Recommendation and why |
-   | --- | --- | --- | --- |
-   | Admin sidebar | PD14 regroup by chapters | [D18] keep current groups | PD14: the breadcrumb (`ADMIN · 07 / OPERATIONS · TASKS`) and `/imports` under 02 assume chapter groups; routes and capability gates do not change |
-   | Smart EQ while resolving | PD32 hold the last gains (audio change) | [D29] flat as today | PD32: removes the ~80 ms dip to flat between tracks; ships alone as Task 4.4 with a runtime test |
-   | Enrichment toggles | PD29 wire them | [D38] do not wire, no "disabled" state | PD29: a setting the pipeline ignores is a bug; wired in Task 3.12c, its own `[BEHAVIOUR]` PR after 3.12a |
-   | Trash routing | PD28 factual footer now, routing later | [D23] route hard deletes through the trash | PD28 in v3; [D23]'s routing as a separate fix after the trash index (2.17e) exists |
-
-3. **Appearance bar (PD53 = [D41] + [D42]).** DS §6.9 item 6 requires every visual to work in solid
-   and glass, dark and light, default and Crate Red, and all three accents; PD §7 puts the light
-   mode and Crate Red redesign out of scope; `docs/technical/listen-design-system-visual-qa.md`
-   treats `light` and `crateRed` as release-gate variants. PD53 (a), [D41] and [D42] already
-   recommend the same answer, which this plan follows:
-   - every instrument stays legible and correct in `light` and `crateRed` without a redesign,
-     verified by captures of the P0 Listen instruments ([D41]);
-   - `StatusDot on` follows the accent (the one-accent rule) and stays distinguishable without
-     hue: filled vs ring plus a word, while the destructive confirm keeps its consequence label
-     ([D42]).
-
-   If Diego wants a fixed `on` hue instead, PD53, [D42] and DS §1.1.4 change together and the
-   registry gains a non-accent `on` token (`TOKENS-GEN`, contrast tests). Record the answer in
-   PD53, [D41] and [D42].
-4. **Estimates.** Diego confirms the per-group estimates, the calendar critical path and the
-   release-gate days per Listen release in Rollout → Milestones (Tasks 7.3 and 7.7).
-5. Write each answer into both registers (status `decided 2026-10-15`, the option chosen, one line of
-   why). Done, plus the reconciled register file.
-6. Commit: `docs: record Crate v3 phase 0 decisions`. Done.
-
-**Checkpoint:** no Phase 1 work starts until PD1, PD3, PD10, PD11, PD6 and the iOS target are
-decided. Migrations do not wait for PD2 (Conventions → migrations).
+Task estimates and calendar assumptions are provisional and need updating for the joint-release
+protocol and Task 1.13. Do not treat summed task-days as an accepted delivery date or reopen the
+settled visual decisions. No commit, push, PR, deployment or production query is authorised by a
+recorded decision.
 
 ### Task 0.4: Align names, contracts, facts and order across the v3 docs
 
+**Status:** original alignment implemented. Comparison columns below preserve the pre-alignment
+baseline; the current decision register and rollout supersede historical alternatives.
+
 **Files:**
+
 - Modify: `docs/plans/2026-10-14-crate-v3-design-system.md` (the sections named below)
 - Modify: `docs/plans/2026-10-14-crate-v3-product-design.md` (the sections named below)
 
@@ -555,55 +433,55 @@ decided. Migrations do not wait for PD2 (Conventions → migrations).
 
 1. Settle each name and contract once, and edit every place in PD and DS that differs:
 
-   | Item | Spec says | Product design says | Use |
-   | --- | --- | --- | --- |
-   | Admin live stream route | `/api/admin/live` (DS §3.9, §4.19, §4.20), a separate `/api/admin/health-checks-stream` (DS §4.14), 5 s and 15 s polling "until the live stream exists" (DS §4.23, §4.24) | `/api/admin/live-stream` | `/api/admin/live-stream` everywhere. Delete the health-checks stream alternative and the polling fallbacks: 2.14 ships before those panels, and a second per-surface stream breaks the one-stream-per-tab rule. Close PD §5.3.1's UNCERTAIN: Traefik routes only the listed GET prefixes to the read plane (`docker-compose.yaml:460-478`) and `/api/admin/*` goes straight to crate-api, so the suffix is a naming convention, not a routing need |
-   | Admin live files | `contexts/AdminLiveContext.tsx`, `hooks/use-admin-live.ts` | `contexts/AdminLiveProvider.tsx` | `app/ui/src/contexts/AdminLiveProvider.tsx` plus `app/ui/src/hooks/use-admin-live.ts` |
-   | Admin module homes | DS §4.0 homes under `components/viz/…` (`QueueLanes`, enrichment, stack map, event pipeline), `components/viz/StepRail.tsx` | domain folders, no `components/viz` | domain folders (`components/{health,ops,genres,analysis,acquisition,federation}`, `components/album/portable-metadata`, `components/artist/enrichment`); `StepRail` in `components/admin/StepRail.tsx` (moves to `app/shared/ui/domain/tasks/StepRail.tsx` in 6.15; PD §3.1.4 and §4.22 name that path, not `@crate/ui/domain`) |
-   | `PageHeading` | `components/layout` (DS §2.5) | `components/admin` (PD §3.1.4) | `app/ui/src/components/layout/PageHeading.tsx` |
-   | Snapshot reconnect hook | `use-snapshot-stream.ts` | same | `app/ui/src/hooks/use-snapshot-stream.ts`; replaces `use-sse.ts` |
-   | Effective-EQ inheritance field | `inheritedPath` (DS §4.1 `EffectiveEq`) | `genrePath` (PD §4.12; also DS §4.4, plan 2.19) | `genrePath`. Replace DS §4.1's type with a pointer to PD §4.12, whose chain links carry the optional `genre`/`genrePath` |
-   | Paths column | `music_paths.plan JSONB` (DS §4.8, DS §4.0 "blocked by `music_paths.plan`") | `music_paths.plan_meta` | `plan_meta` |
-   | Setlist helper | `@crate/ui/lib/setlist.ts` "to avoid explicit exports" (DS §4.6) | `@crate/ui/domain/shows/setlist.ts` with explicit exports (PD §4.18) | `@crate/ui/domain/shows/setlist.ts` with explicit `exports` entries |
-   | Route layout module | `lib/sound-map/path-route-layout.ts` (DS §4.8) | — | `app/listen/src/components/paths/path-route-layout.ts` |
-   | Health surface (PD §4.2 is canonical) | DS §4.14: `auto`, `bulk_fix`, `totals.{auto_checks,confirm_checks,auto_open}`, `last_run{started_at,duration_ms}`, `phase: scan\|fix\|revalidate\|sync`, `trash{track_files,updated_at}`, separate stream with `event: surface`/`event: check`, 6 h stale threshold | `checks[].unattended`, `fix_mode: global\|bulk\|per_artist`, `totals.{unattended,confirm,open_unattended}`, `last_scan`, `running.phase: scan\|repair\|sync\|revalidate`, `trash.albums_quarantined` | PD §4.2 fields. `health-scan` is an event type on the single `health` surface, not a second surface (PD §4.2, §5.3.1, plan 2.14, 2.17c). The event union keeps `fixed`, emitted by repair runs (2.17d). Rewrite DS §4.14 Data to match |
-   | Active node fill (`SystemMap.astro:185`, `#0b1d24`) | new `--surface-accent-active` = `color-mix(accent-action 11%, surface-canvas)` ≈ `#0a1d25` | "no new tokens", `color-mix(accent-action-hi 10%, surface-object)` ≈ `#16242b` (PD §3.1.1) | DS's `--surface-accent-active`; delete PD's formula. Created in its first consumer, Task 3.7 |
-   | EQ blast radius | client re-resolve (DS §4.4) vs "server-computed" (DS §4.3) | client re-resolve, with the tie-break described as current behaviour: "depth first, then slug order; Go `ORDER BY depth, path COLLATE "C"`" (PD §4.6.1) | client re-resolve over the wheel payload; albums and tracks are the sum of `eq.reach` over the nodes whose resolved source changes, exact because reach follows the track's single primary genre. Tie-break, stated as it is: the client mirrors Python's `resolve_genre_eq_preset` (`genre_taxonomy.py`), a BFS over parents sorted at each level, so equal-depth ties resolve in path order. Go today orders by the owner's slug (`ORDER BY depth, slug` in `genreTaxonomyContext` and `genrePresetSQL`, `readplane/internal/catalog/genre.go`), so the servers can disagree: owners `c` and `z` at depth 2 via parents `b` and `a` give `z` in Python and `c` in Go. Go moves to path order in Task 2.18a (G2 parity). "Slug order" describes neither implementation. The `a`/`b`/`z`/`c` case goes into `genre_eq_path_cases.json` (2.18a), read by pytest, the Go table test and `genre-wheel-math.test.ts`. Delete "server-computed" from PD §4.6.1 and DS §4.3 |
-   | Genre wheel node aliases | — | "aliases with origin" and alias search, but `nodes[]` carries only `alias_count` (PD §4.6.1, §4.6.3) | add `aliases: {alias: string; origin: string}[]` per node to `GenreWheelPayload` (Task 2.18b) |
-   | Admin genre wheel and enrichment sources endpoints | `GET /api/genres/taxonomy/wheel` with `_require_auth` (DS §4.3); `GET /api/artists/{id}/enrichment/sources` (DS §4.18, plan 2.18c, 3.7, 3.12a) | `GET /api/admin/genres/wheel` and `GET /api/admin/artists/{id}/enrichment/sources`, both `library.view` (PD §1 table, §4.5, §4.6.3) | the PD routes and permission, in DS §4.3, DS §4.18 and plan 2.18c, 3.7 (`use-genre-wheel`), 3.12a. `POST /api/artists/{id}/enrichment/refresh` keeps its path (PD §4.5) |
-   | Listen wheel contract | "rebuild when the global catalog serving mode flips" (DS §4.3) | `ListenGenreWheelPayload`, core nodes only, "no local overrides" (PD §4.6.3) | `ListenGenreWheelPayload` with its triggers (Task 5.10): core nodes only; structure and `eq.*` come from the live, override-aware runtime graph (local overrides and suppression applied, as `/eq` resolves them), so the Listen wheel and the genre-page "EQ inherited from …" line agree with Smart EQ's `genrePath`; still no unmapped tags, provenance, suppression flags or custom gains. Cached under its own Listen scope `genre_wheel` (5.10), never `library` |
-   | `LegendStrip` | fifth shared primitive used by both apps (DS §2.3, §3.2) | four primitives (PD §3.1.4) | drop it from DS §2.3 and §3.2; legends are an inline `dl` of swatch plus `MonoLabel` inside each instrument until two apps share one |
-   | Scramble and count-up | `@crate/ui/lib/scramble.ts` (DS §1.8.4, §2.4) | app-local until both apps call it (PD §3.1.4) | app-local first, moved to `@crate/ui/lib/` by the task where the second app adopts it: scramble is Admin-local from 3.1 (first caller: 3.7's `GenreEqInheritancePanel` display word) and moves in 4.5 (Listen's EQ trail; 4.6's Stats top genre reuses it); count-up moves in 3.6. Correct DS §1.8.4 and §2.4 to "Admin-local until 4.5" |
-   | Spring, `use-eq-morph`, visible loop | `lib/spring.ts`, `lib/use-eq-morph.ts`, `lib/use-visible-loop.ts` in `@crate/ui/lib` from the `EqBands` fix (DS §2.4, §4.1 Home) | "Motion gate, `stepSpring`, `useVisibleLoop`" in `@crate/ui/lib` at the `EqBands` morph fix (PD §3.1.4) | only `motion-gate.ts` and `eq-curve.ts` go into `@crate/ui/lib` in 0.7 (`export-usage-policy.test.ts` checks every `lib/*` export and follows only `export … from`). Spring and `useEqMorph` live in `domain/player/eq-morph.ts` (not exported) until 4.3, where Listen's `EqGlyph` imports `use-eq-morph` directly and `use-eq-morph.ts` re-exports the spring helpers; 3.5's `GovernorGauges` is the second, direct importer of `spring.ts`. `use-visible-loop` is Admin-local from 3.4 and moves with its first Listen importer. Fix PD §3.1.4, DS §2.4 and DS §4.1 Home |
-   | `nivoTheme` count | "replaces six inline themes" (DS §2.5) | "3 hex themes plus inline objects" (PD §3.1.4) | 3 `NIVO_THEME` constants (`AudioProfileCard.tsx`, `ArtistStats.tsx`, `Insights.tsx`) plus 6 inline `theme={{…}}` objects in 4 files (`TrackTable.tsx`, `ArtistStats.tsx`, `Dashboard.tsx` ×3, `SystemHealth.tsx`); Task 3.1 lists them |
-   | `.stats-heatmap*` recipe | visual CSS lives in the app (DS §6.7) | extend the shared recipe (PD §4.17) | Listen CSS in 4.6, moved to shared `recipes.css` in 5.12 when Admin adopts it |
-   | Ticket recipe | `.setlist-ticket-*` in shared `recipes.css` (DS §4.6) | — | Listen `index.css` in 0.9, moved to shared `recipes.css` in 4.7b when Admin adopts the ticket |
-   | Imports surface | — | `GET /api/imports/queue` with `updated_at`, four totals, a fixed order and a 50-imported cap (PD §4.3) | PD §4.3's contract is canonical and Task 5.7a implements it: route `/api/imports/queue` (not `/surface`), items with `updated_at`, `totals {pending, queued, importing, failed}`, pending, queued, importing and failed first, then the last 50 imported. Staged imports run `import_queue_item` and `import_queue_all`, not `process_new_content`; both write per-item status |
-   | Maintenance window | catalog `maintenance_window` as `"unscoped" \| "unscoped_or_large_limit" \| null` (DS §4.19) and "the two values only" (DS §4.20) | `"none" \| "unscoped" \| "unscoped_or_large_limit"` (PD §4.8, plan 2.15c) | 14 types, all only when unscoped; `backfill_track_audio_fingerprints` also when `limit` > `CRATE_MAINTENANCE_WINDOW_FINGERPRINT_LIMIT`. No type is "always" (`_requires_maintenance_window` returns `not _has_specific_scope(params)` for the 11 `MAINTENANCE_WINDOW_TASK_TYPES` too). Two shapes: the task-catalog field is `"none" \| "unscoped" \| "unscoped_or_large_limit"` for every type (2.15c); `GovernorSurface.governed.window_rule` is a 14-entry record holding only the two scoped values (2.16). Fix DS §4.19 and §4.20. The window applies only when `CRATE_MAINTENANCE_WINDOW_ENABLED` is true (code default false, compose true) |
-   | G1 data model (blocking) | `core_eq_gains`, `eq_source`, `metadata_overridden`; the live columns hold the curator value (DS §4.3 Preconditions and pytest list) | same (PD §4.6.3 item 5, PD §5.3.4 "Genres (G1, PD18)" row) | Task 2.18d's model is canonical: `genre_taxonomy_nodes.local_eq_gains`, `eq_override` (`none \| set \| cleared`), `local_name`, `local_description`; `eq_gains`, `name` and `description` keep the core release value; live = `COALESCE(local, core)`, with `eq_override = 'cleared'` meaning inherit. The PD model is not rollback-safe: the pre-v3 seeder runs on every boot and rewrites `eq_gains`, `name` and `description` of core genres. Derived fields: `nodes[].eq.overridden = eq_override <> 'none'`; `totals.overridden_nodes` counts nodes with `eq_override <> 'none' OR local_name IS NOT NULL OR local_description IS NOT NULL`; Go `genrePresetSQL` reads the same live value. Add 2.18d's rollback test (run the pre-v3 seeder SQL over a v3 row; every override survives) to the PD and DS test lists. `genre_taxonomy_edges.suppressed` stays as it is |
-   | G1 ship order | read-only wheel before G1; "EQ edit … after G1, G2, G3 and G7, plan Task 3.8"; "G3 (plan Task 3.8)", "Edge hiding (plan Task 3.8)"; core writes hidden "until G1 ships" (DS §4.3, §4.4, §6.11) | "The read-only wheel (plan 3.7) ships before G1, G2, G3, G7"; "Until G1 and G2 ship, every EQ write on a core genre is disabled" (PD §4.6.1, PD18, §5.5) | 2.18a–e (G1, G2, G3, G7 and suppression) land in the Genres group before 3.7; 3.8 is frontend only; nothing is disabled in any release. Delete PD §4.6.1's "Until G1 and G2 ship…" paragraph, PD18's "Until it ships, EQ writes on core genres are disabled", the ordering lines in PD §5.5 and DS §6.11, and DS §4.3/§4.4's "until G1" gating. In DS §4.3, G3 and edge hiding become backend 2.18e / 2.18d, UI 3.8 |
-   | Analysis coverage fields | "no lyrics coverage, no portable-metadata coverage" (DS §4.5 Coverage) | same, with new `lyrics_done`, `portable_written`, `portable_never`, `portable_drift` (PD §4.7 Data) | as Task 3.9a: the `analysis_status` block (cheap counters every 120 s, full scans every 15 min) already spreads `get_portable_metadata_status()` (`db/jobs/analysis_status.py`), which stores `lyrics_cached`, `lyrics_found`, `lyrics_missing`, `portable_sidecar_albums`, `portable_audio_tag_albums`, `portable_audio_tag_tracks`, `portable_tag_errors` and `rich_export_*`. `AnalysisStatusResponse` declares them under those names; only `fingerprint_failed` (3.9a) and portable `drift` (3.10a) are new. Rewrite PD §4.7 Data and the DS §4.5 Coverage bullet |
-   | Smart Mix coverage row | — | "Smart Mix after its merge" in the Coverage panel (PD §4.7) | add to PD §4.7: `StatusDot` plus the word `idle`, `running` or `paused`; Start, Pause and Resume as `CratePill` actions; Cancel through `ConfirmDialog`; campaign state from `GET /api/admin/smart-mix/status` (`sm:app/crate/api/smart_mix_admin.py`), refetched on the task's `task_done`, no new stream (Task 5.14 item 3) |
-   | Health `running` key and writers | "a Redis key with a 90 s TTL refreshed by each scan event"; `refresh_admin_surface` with a "generation counter" (DS §4.14 Data) | 30 s heartbeat thread, deletion in `finally`, snapshot written at start and end of `health_check`, `repair` and `library_pipeline`; `refresh_admin_surface` trailing-edge (PD §4.2 items 5–6, §5.3.2) | PD §4.2 items 5–6 (Tasks 2.17b, 2.17c); `refresh_admin_surface` uses the Conventions due-set recipe, no generation counter (2.11b). Rewrite DS §4.14 Data |
-   | Health drill-down | — | "a paginated read of open issues" for one check type, with no route or shape (PD §4.2 item 9) | add Task 2.17c's contract to PD §4.2 item 9: `GET /api/admin/health-checks/{check_type}/issues?cursor=&limit=` (`library.repair.run`), keyset-paginated by artist, returning `{check_type, total_issues, total_artists, artists: [{artist_id, artist, issues: […]}], next_cursor}`, refetched when the `health` live event changes that check's `open`. `/api/admin/health-stream` becomes a deprecated alias for one release; the Health page opens no stream of its own (3.6) |
-   | Coalescing recipe | "enqueue with `delay=window`" (DS §3.9) | same (PD §5.3.2, §4.2 item 6, §4.6.3 item 2) | the Conventions due-set recipe: no `tasks` row before the build is due, because `redispatch_stale_pending_tasks(age_seconds=300)` re-dispatches older pending rows with no delay; cold reads schedule at once. Windows: genre wheel ≥ 120 s, mood map ≥ 900 s, insights 30 min, bliss map 6 h, ops 60 s, admin surfaces 5 s, federation structure ≥ 5 s. Rewrite DS §3.9 and PD §5.3.2 |
-   | Demand gating cadence | "check the key on every tick" (DS §3.4, §3.9); "the next tick rebuilds" (DS §4.19) | "check the key once per second (one Redis `EXISTS`)" (PD §5.3.1) | PD's 1 s `EXISTS` check, also in DS §3.4, §3.9, §4.19, §4.20, §4.23 and §4.24. Add the hidden-tab rule to PD §4.1, §5.3.1 and DS §3.9: `AdminLiveProvider` closes the stream after 30 s hidden, and the Dashboard never subscribes to `queues` or `governor` (3.1, 3.3) |
-   | Viewer and runtime key names | `stack:viewers` (DS §3.9, §4.22) | `admin:live:viewers:stack` (PD §4.8, §5.3.1); runtime keys `crate:runtime:<surface>` | `admin:live:viewers:<surface>` everywhere, one constant per surface in `app/crate/admin_viewers.py`; runtime samples in `crate:runtime:<surface>` (`governor`, `acquisition`, `event_pipeline`, `redis`, `stack`); never `crate:ops:governor` |
-   | Stack persistence | — | stack endpoints "only read `ui_snapshots('ops:stack','global')`", sampled every 10 s (PD §4.8) | each sample goes to `crate:runtime:stack` plus a publish; `ui_snapshots('ops:stack','global')` is written only on a state change or at most once per 60 s; the GET reads the Redis key, else the row; `stack-stream` forwards published payloads (5.5). Fix PD §4.8 Stack and DS §4.22 |
-   | Mood map refresh | 300 s window; `scopesForUrl` maps mood map and explore page to `explore` and `library`; `explore` broadcast on every build (DS §4.10) | ≥ 900 s; `explore` only; broadcast only when counts or sample change (PD §4.14) | PD §4.14 (Tasks 4.8a, 4.8b). Fix DS §4.10 |
-   | Genre wheel Listen scope | — | `/api/catalog/genre-wheel` with no scope; by prefix `lib/cache.ts` maps it to `library` | a dedicated `genre_wheel` scope, broadcast by `refresh_genre_wheel_snapshot` only when the `crate-core` row's version or digest changes; an explicit `scopesForUrl` branch before the `/api/catalog` and `/api/browse` prefix rules (5.10). Add to PD §4.6.3, §5.3.5 and DS §4.3 |
-   | Genre wheel triggers | — | `index_genres` and `process_new_content` completion, deletes, curator mutations (PD §4.6.3 item 2) | trigger from the choke point: `set_artist_genres` and `set_album_genres` (`db/repositories/genres_assignments.py`) schedule a refresh after commit, only when the stored set changed (covering `enrich_artist(s)` Last.fm tags, `POST …/enrichment/refresh` and the genre indexer), plus `db/jobs/repair_artist_jobs.py`'s `artist_genres` rewrite, curator mutations, deletes and a nightly floor (2.18b). Update PD §4.6.3 item 2 |
-   | EQ drag writes | "Drag updates are batched to one `onBandChange` per frame" (DS §4.1 Motion) | per-frame writes (PD §4.12 Actions) | during a drag or key repeat, gains go to the engine through a ref (Web Audio ramp; Android native `setEq` throttled to 15–20 Hz) and to the live store at most once per frame; prefs (`localStorage` plus `EQ_PREFS_EVENT`) are written once on pointerup, blur or 150 ms after the last key (0.7, 4.3). Fix DS §4.1 and PD §4.12 |
-   | Federation topology triggers | — | "other federation events to the topology", no coalescing (PD §4.10) | structural events (pairing, grant, peer, `catalog.sync.completed`, `health.polled`) rebuild with trailing-edge coalescing ≥ 5 s; `federation.stream.*` and relay events only set a dirty key, honoured while `admin:live:viewers:federation` exists (at most one rebuild per 5 s) and otherwise left to the 60 s health-poll floor (5.8). Fix PD §4.10 and DS §4.21 |
-   | Acquisition covers (B20) | — | "server-side cover lookup" as an endpoint (PD §4.4) | `POST /api/acquisition/covers {items: [{artist, album}]}` (≤ 50): one `MGET` or `= ANY(:keys)` read of a cover cache keyed by normalised (artist, album), hits only; misses enqueue one deduplicated fast task (batch, 3 s provider timeout, positive and negative results cached with a TTL); results arrive through `publish_task_signal` or a later request; no provider call in a request (5.6). Add to PD §4.4 |
-   | Acquisition sampler cadence | 2 s while watched or while transfers are active (DS §3.9) | same (PD §4.4) | 2 s only while `admin:live:viewers:acquisition` exists; every 30–60 s without viewers while transfers are active (keeps `ops_runtime_state('acquisition')` and the lifecycle reconciler current); idle otherwise (5.6). Fix PD §4.4 and DS §3.9 |
-   | Paths planning (B18) | — | synchronous routes kept through v3.0; phase C in Phase 5 (PD §4.16) | the task route (`compute_music_path`, `POST /api/paths/plan`, `/regenerate?mode=task` → 202) lands in 4.9a; new Listen builds and 4.9b's Regenerate use only it; `plan_meta` is written only inside the task (plus a backfill); the synchronous routes get a deprecation date, a per-user rate limit, and skip LLM refinement. Update PD §4.16 and PD36 |
-   | PD43 on the server | — | hidden below 3 listeners in the UI (PD §4.17) | the instance builder hides it: below 3 listeners `heatmap.cells` is an all-zero 7×24 grid (shipped Listen builds call `cells.flat()`), `peak` and `night_share` are `null`, and `hidden_reason` is `"few_listeners"`; same for `heatmap_utc` (2.20, 5.12). Add the response change to PD §3.4.2 and §4.17 |
-   | Redis-durable memory | "512 MB … the value in `docker-compose.yaml`, which the site test reads; 384m is only the home compose" (DS §6.5) | same (PD §5.3.6) | crate-redis-durable has `mem_limit` 512m (`docker-compose.yaml`) or 384m (`docker-compose.home.yaml`), and `--maxmemory 384mb` in both. The site test (`content/architecture/viz.test.ts`) pins the redis-server flags (`--maxmemory 384mb`, `noeviction`) from `viz.ts`, not the container limit; `map.ts` memory figures are untested. The RedisPair durable meter uses `maxmemory` (384 MB), not the container limit (5.4) |
-   | Admin screenshots | "Admin has no screenshot suite; functional Playwright only [D25]" (DS §6.6) | PD48: "Admin functional tests only until instruments stabilise" | a small Admin capture set from Task 0.11 (before Task 1.0), extended by each P0 page task; the Admin bundle ceiling from Task 0.12. Fix DS §6.6 and PD48 |
-   | New tokens | first consumers listed (DS §1.9.4) | — | owning tasks: `--text-display-page` and `--tracking-headline` in 3.1; `--text-display-entity` in 4.7b; `--text-display-readout` (rem `font-size` before `cqi`) in 3.9b; `--text-subhead` in 4.1; each with `cn.ts` registration and the ceiling bump listed in the commit |
-   | Camelot module | — | "moved in a small `[MAIN]` PR tagged `[BEHAVIOUR]`" that rewires `bliss._key_compatibility` (PD §4.7, PD2) | 2.9b adds `app/crate/camelot.py` and its fixture and rewires `bliss._key_compatibility` to it, tagged `[BEHAVIOUR]`: flat keys (`Bb`, `Eb`, `Ab`, …) stop falling back to neutral compatibility, so Radio and Paths key scoring changes for tracks Essentia tagged with flats (PD §3.4.2, §4.7). The Smart Mix branch imports `crate.camelot` when it next merges `main` |
-   | Site pin and register range | — | "decision register `[D1]`–`[D40]`" (PD header); PD53 mapped to "—" | pin `258bbaee` in the PD and DS headers (plan header); PD header range `[D1]`–`[D43]` (DS has [D41] and [D42]; Task 0.3 adds [D43] = PD54); PD53's column becomes `[D41], [D42]` |
+   | Item                                                | Spec says                                                                                                                                                                                                                                                           | Product design says                                                                                                                                                                                   | Use                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+   | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | Admin live stream route                             | `/api/admin/live` (DS §3.9, §4.19, §4.20), a separate `/api/admin/health-checks-stream` (DS §4.14), 5 s and 15 s polling "until the live stream exists" (DS §4.23, §4.24)                                                                                           | `/api/admin/live-stream`                                                                                                                                                                              | `/api/admin/live-stream` everywhere. Delete the health-checks stream alternative and the polling fallbacks: 2.14 ships before those panels, and a second per-surface stream breaks the one-stream-per-tab rule. Close PD §5.3.1's UNCERTAIN: Traefik routes only the listed GET prefixes to the read plane (`docker-compose.yaml:460-478`) and `/api/admin/*` goes straight to crate-api, so the suffix is a naming convention, not a routing need                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+   | Admin live files                                    | `contexts/AdminLiveContext.tsx`, `hooks/use-admin-live.ts`                                                                                                                                                                                                          | `contexts/AdminLiveProvider.tsx`                                                                                                                                                                      | `app/ui/src/contexts/AdminLiveProvider.tsx` plus `app/ui/src/hooks/use-admin-live.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+   | Admin module homes                                  | DS §4.0 homes under `components/viz/…` (`QueueLanes`, enrichment, stack map, event pipeline), `components/viz/StepRail.tsx`                                                                                                                                         | domain folders, no `components/viz`                                                                                                                                                                   | domain folders (`components/{health,ops,genres,analysis,acquisition,federation}`, `components/album/portable-metadata`, `components/artist/enrichment`); `StepRail` in `components/admin/StepRail.tsx` (moves to `app/shared/ui/domain/tasks/StepRail.tsx` in 6.15; PD §3.1.4 and §4.22 name that path, not `@crate/ui/domain`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+   | `PageHeading`                                       | `components/layout` (DS §2.5)                                                                                                                                                                                                                                       | `components/admin` (PD §3.1.4)                                                                                                                                                                        | `app/ui/src/components/layout/PageHeading.tsx`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+   | Snapshot reconnect hook                             | `use-snapshot-stream.ts`                                                                                                                                                                                                                                            | same                                                                                                                                                                                                  | `app/ui/src/hooks/use-snapshot-stream.ts`; replaces `use-sse.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+   | Effective-EQ inheritance field                      | `inheritedPath` (DS §4.1 `EffectiveEq`)                                                                                                                                                                                                                             | `genrePath` (PD §4.12; also DS §4.4, plan 2.19)                                                                                                                                                       | `genrePath`. Replace DS §4.1's type with a pointer to PD §4.12, whose chain links carry the optional `genre`/`genrePath`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+   | Paths column                                        | `music_paths.plan JSONB` (DS §4.8, DS §4.0 "blocked by `music_paths.plan`")                                                                                                                                                                                         | `music_paths.plan_meta`                                                                                                                                                                               | `plan_meta`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+   | Setlist helper                                      | `@crate/ui/lib/setlist.ts` "to avoid explicit exports" (DS §4.6)                                                                                                                                                                                                    | `@crate/ui/domain/shows/setlist.ts` with explicit exports (PD §4.18)                                                                                                                                  | `@crate/ui/domain/shows/setlist.ts` with explicit `exports` entries                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+   | Route layout module                                 | `lib/sound-map/path-route-layout.ts` (DS §4.8)                                                                                                                                                                                                                      | —                                                                                                                                                                                                     | `app/listen/src/components/paths/path-route-layout.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+   | Health surface (PD §4.2 is canonical)               | DS §4.14: `auto`, `bulk_fix`, `totals.{auto_checks,confirm_checks,auto_open}`, `last_run{started_at,duration_ms}`, `phase: scan\|fix\|revalidate\|sync`, `trash{track_files,updated_at}`, separate stream with `event: surface`/`event: check`, 6 h stale threshold | `checks[].unattended`, `fix_mode: global\|bulk\|per_artist`, `totals.{unattended,confirm,open_unattended}`, `last_scan`, `running.phase: scan\|repair\|sync\|revalidate`, `trash.albums_quarantined`  | PD §4.2 fields. `health-scan` is an event type on the single `health` surface, not a second surface (PD §4.2, §5.3.1, plan 2.14, 2.17c). The event union keeps `fixed`, emitted by repair runs (2.17d). Rewrite DS §4.14 Data to match                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+   | Active node fill (`SystemMap.astro:185`, `#0b1d24`) | new `--surface-accent-active` = `color-mix(accent-action 11%, surface-canvas)` ≈ `#0a1d25`                                                                                                                                                                          | "no new tokens", `color-mix(accent-action-hi 10%, surface-object)` ≈ `#16242b` (PD §3.1.1)                                                                                                            | DS's `--surface-accent-active`; delete PD's formula. Created in its first consumer, Task 3.7                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+   | EQ blast radius                                     | client re-resolve (DS §4.4) vs "server-computed" (DS §4.3)                                                                                                                                                                                                          | client re-resolve, with the tie-break described as current behaviour: "depth first, then slug order; Go `ORDER BY depth, path COLLATE "C"`" (PD §4.6.1)                                               | client re-resolve over the wheel payload; albums and tracks are the sum of `eq.reach` over the nodes whose resolved source changes, exact because reach follows the track's single primary genre. Tie-break, stated as it is: the client mirrors Python's `resolve_genre_eq_preset` (`genre_taxonomy.py`), a BFS over parents sorted at each level, so equal-depth ties resolve in path order. Go today orders by the owner's slug (`ORDER BY depth, slug` in `genreTaxonomyContext` and `genrePresetSQL`, `readplane/internal/catalog/genre.go`), so the servers can disagree: owners `c` and `z` at depth 2 via parents `b` and `a` give `z` in Python and `c` in Go. Go moves to path order in Task 2.18a (G2 parity). "Slug order" describes neither implementation. The `a`/`b`/`z`/`c` case goes into `genre_eq_path_cases.json` (2.18a), read by pytest, the Go table test and `genre-wheel-math.test.ts`. Delete "server-computed" from PD §4.6.1 and DS §4.3 |
+   | Genre wheel node aliases                            | —                                                                                                                                                                                                                                                                   | "aliases with origin" and alias search, but `nodes[]` carries only `alias_count` (PD §4.6.1, §4.6.3)                                                                                                  | add `aliases: {alias: string; origin: string}[]` per node to `GenreWheelPayload` (Task 2.18b)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+   | Admin genre wheel and enrichment sources endpoints  | `GET /api/genres/taxonomy/wheel` with `_require_auth` (DS §4.3); `GET /api/artists/{id}/enrichment/sources` (DS §4.18, plan 2.18c, 3.7, 3.12a)                                                                                                                      | `GET /api/admin/genres/wheel` and `GET /api/admin/artists/{id}/enrichment/sources`, both `library.view` (PD §1 table, §4.5, §4.6.3)                                                                   | the PD routes and permission, in DS §4.3, DS §4.18 and plan 2.18c, 3.7 (`use-genre-wheel`), 3.12a. `POST /api/artists/{id}/enrichment/refresh` keeps its path (PD §4.5)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+   | Listen wheel contract                               | "rebuild when the global catalog serving mode flips" (DS §4.3)                                                                                                                                                                                                      | `ListenGenreWheelPayload`, core nodes only, "no local overrides" (PD §4.6.3)                                                                                                                          | `ListenGenreWheelPayload` with its triggers (Task 5.10): core nodes only; structure and `eq.*` come from the live, override-aware runtime graph (local overrides and suppression applied, as `/eq` resolves them), so the Listen wheel and the genre-page "EQ inherited from …" line agree with Smart EQ's `genrePath`; still no unmapped tags, provenance, suppression flags or custom gains. Cached under its own Listen scope `genre_wheel` (5.10), never `library`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+   | `LegendStrip`                                       | fifth shared primitive used by both apps (DS §2.3, §3.2)                                                                                                                                                                                                            | four primitives (PD §3.1.4)                                                                                                                                                                           | drop it from DS §2.3 and §3.2; legends are an inline `dl` of swatch plus `MonoLabel` inside each instrument until two apps share one                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+   | Scramble and count-up                               | `@crate/ui/lib/scramble.ts` (DS §1.8.4, §2.4)                                                                                                                                                                                                                       | app-local until both apps call it (PD §3.1.4)                                                                                                                                                         | app-local first, moved to `@crate/ui/lib/` by the task where the second app adopts it: scramble is Admin-local from 3.1 (first caller: 3.7's `GenreEqInheritancePanel` display word) and moves in 4.5 (Listen's EQ trail; 4.6's Stats top genre reuses it); count-up moves in 3.6. Correct DS §1.8.4 and §2.4 to "Admin-local until 4.5"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+   | Spring, `use-eq-morph`, visible loop                | `lib/spring.ts`, `lib/use-eq-morph.ts`, `lib/use-visible-loop.ts` in `@crate/ui/lib` from the `EqBands` fix (DS §2.4, §4.1 Home)                                                                                                                                    | "Motion gate, `stepSpring`, `useVisibleLoop`" in `@crate/ui/lib` at the `EqBands` morph fix (PD §3.1.4)                                                                                               | only `motion-gate.ts` and `eq-curve.ts` go into `@crate/ui/lib` in 0.7 (`export-usage-policy.test.ts` checks every `lib/*` export and follows only `export … from`). Spring and `useEqMorph` live in `domain/player/eq-morph.ts` (not exported) until 4.3, where Listen's `EqGlyph` imports `use-eq-morph` directly and `use-eq-morph.ts` re-exports the spring helpers; 3.5's `GovernorGauges` is the second, direct importer of `spring.ts`. `use-visible-loop` is Admin-local from 3.4 and moves with its first Listen importer. Fix PD §3.1.4, DS §2.4 and DS §4.1 Home                                                                                                                                                                                                                                                                                                                                                                                           |
+   | `nivoTheme` count                                   | "replaces six inline themes" (DS §2.5)                                                                                                                                                                                                                              | "3 hex themes plus inline objects" (PD §3.1.4)                                                                                                                                                        | 3 `NIVO_THEME` constants (`AudioProfileCard.tsx`, `ArtistStats.tsx`, `Insights.tsx`) plus 6 inline `theme={{…}}` objects in 4 files (`TrackTable.tsx`, `ArtistStats.tsx`, `Dashboard.tsx` ×3, `SystemHealth.tsx`); Task 3.1 lists them                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+   | `.stats-heatmap*` recipe                            | visual CSS lives in the app (DS §6.7)                                                                                                                                                                                                                               | extend the shared recipe (PD §4.17)                                                                                                                                                                   | Listen CSS in 4.6, moved to shared `recipes.css` in 5.12 when Admin adopts it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+   | Ticket recipe                                       | `.setlist-ticket-*` in shared `recipes.css` (DS §4.6)                                                                                                                                                                                                               | —                                                                                                                                                                                                     | Listen `index.css` in 0.9, moved to shared `recipes.css` in 4.7b when Admin adopts the ticket                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+   | Imports surface                                     | —                                                                                                                                                                                                                                                                   | `GET /api/imports/queue` with `updated_at`, four totals, a fixed order and a 50-imported cap (PD §4.3)                                                                                                | PD §4.3's contract is canonical and Task 5.7a implements it: route `/api/imports/queue` (not `/surface`), items with `updated_at`, `totals {pending, queued, importing, failed}`, pending, queued, importing and failed first, then the last 50 imported. Staged imports run `import_queue_item` and `import_queue_all`, not `process_new_content`; both write per-item status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+   | Maintenance window                                  | catalog `maintenance_window` as `"unscoped" \| "unscoped_or_large_limit" \| null` (DS §4.19) and "the two values only" (DS §4.20)                                                                                                                                   | `"none" \| "unscoped" \| "unscoped_or_large_limit"` (PD §4.8, plan 2.15c)                                                                                                                             | 14 types, all only when unscoped; `backfill_track_audio_fingerprints` also when `limit` > `CRATE_MAINTENANCE_WINDOW_FINGERPRINT_LIMIT`. No type is "always" (`_requires_maintenance_window` returns `not _has_specific_scope(params)` for the 11 `MAINTENANCE_WINDOW_TASK_TYPES` too). Two shapes: the task-catalog field is `"none" \| "unscoped" \| "unscoped_or_large_limit"` for every type (2.15c); `GovernorSurface.governed.window_rule` is a 14-entry record holding only the two scoped values (2.16). Fix DS §4.19 and §4.20. The window applies only when `CRATE_MAINTENANCE_WINDOW_ENABLED` is true (code default false, compose true)                                                                                                                                                                                                                                                                                                                    |
+   | G1 data model (blocking)                            | `core_eq_gains`, `eq_source`, `metadata_overridden`; the live columns hold the curator value (DS §4.3 Preconditions and pytest list)                                                                                                                                | same (PD §4.6.3 item 5, PD §5.3.4 "Genres (G1, PD18)" row)                                                                                                                                            | Task 2.18d's model is canonical: `genre_taxonomy_nodes.local_eq_gains`, `eq_override` (`none \| set \| cleared`), `local_name`, `local_description`; `eq_gains`, `name` and `description` keep the core release value; live = `COALESCE(local, core)`, with `eq_override = 'cleared'` meaning inherit. The PD model is not rollback-safe: the pre-v3 seeder runs on every boot and rewrites `eq_gains`, `name` and `description` of core genres. Derived fields: `nodes[].eq.overridden = eq_override <> 'none'`; `totals.overridden_nodes` counts nodes with `eq_override <> 'none' OR local_name IS NOT NULL OR local_description IS NOT NULL`; Go `genrePresetSQL` reads the same live value. Add 2.18d's rollback test (run the pre-v3 seeder SQL over a v3 row; every override survives) to the PD and DS test lists. `genre_taxonomy_edges.suppressed` stays as it is                                                                                           |
+   | G1 ship order                                       | read-only wheel before G1; "EQ edit … after G1, G2, G3 and G7, plan Task 3.8"; "G3 (plan Task 3.8)", "Edge hiding (plan Task 3.8)"; core writes hidden "until G1 ships" (DS §4.3, §4.4, §6.11)                                                                      | "The read-only wheel (plan 3.7) ships before G1, G2, G3, G7"; "Until G1 and G2 ship, every EQ write on a core genre is disabled" (PD §4.6.1, PD18, §5.5)                                              | 2.18a–e (G1, G2, G3, G7 and suppression) land in the Genres group before 3.7; 3.8 is frontend only; nothing is disabled in any release. Delete PD §4.6.1's "Until G1 and G2 ship…" paragraph, PD18's "Until it ships, EQ writes on core genres are disabled", the ordering lines in PD §5.5 and DS §6.11, and DS §4.3/§4.4's "until G1" gating. In DS §4.3, G3 and edge hiding become backend 2.18e / 2.18d, UI 3.8                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+   | Analysis coverage fields                            | "no lyrics coverage, no portable-metadata coverage" (DS §4.5 Coverage)                                                                                                                                                                                              | same, with new `lyrics_done`, `portable_written`, `portable_never`, `portable_drift` (PD §4.7 Data)                                                                                                   | as Task 3.9a: the `analysis_status` block (cheap counters every 120 s, full scans every 15 min) already spreads `get_portable_metadata_status()` (`db/jobs/analysis_status.py`), which stores `lyrics_cached`, `lyrics_found`, `lyrics_missing`, `portable_sidecar_albums`, `portable_audio_tag_albums`, `portable_audio_tag_tracks`, `portable_tag_errors` and `rich_export_*`. `AnalysisStatusResponse` declares them under those names; only `fingerprint_failed` (3.9a) and portable `drift` (3.10a) are new. Rewrite PD §4.7 Data and the DS §4.5 Coverage bullet                                                                                                                                                                                                                                                                                                                                                                                                |
+   | Smart Mix coverage row                              | —                                                                                                                                                                                                                                                                   | "Smart Mix after its merge" in the Coverage panel (PD §4.7)                                                                                                                                           | add to PD §4.7: `StatusDot` plus the word `idle`, `running` or `paused`; Start, Pause and Resume as `CratePill` actions; Cancel through `ConfirmDialog`; campaign state from `GET /api/admin/smart-mix/status` (`sm:app/crate/api/smart_mix_admin.py`), refetched on the task's `task_done`, no new stream (Task 5.14 item 3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+   | Health `running` key and writers                    | "a Redis key with a 90 s TTL refreshed by each scan event"; `refresh_admin_surface` with a "generation counter" (DS §4.14 Data)                                                                                                                                     | 30 s heartbeat thread, deletion in `finally`, snapshot written at start and end of `health_check`, `repair` and `library_pipeline`; `refresh_admin_surface` trailing-edge (PD §4.2 items 5–6, §5.3.2) | PD §4.2 items 5–6 (Tasks 2.17b, 2.17c); `refresh_admin_surface` uses the Conventions due-set recipe, no generation counter (2.11b). Rewrite DS §4.14 Data                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+   | Health drill-down                                   | —                                                                                                                                                                                                                                                                   | "a paginated read of open issues" for one check type, with no route or shape (PD §4.2 item 9)                                                                                                         | add Task 2.17c's contract to PD §4.2 item 9: `GET /api/admin/health-checks/{check_type}/issues?cursor=&limit=` (`library.repair.run`), keyset-paginated by artist, returning `{check_type, total_issues, total_artists, artists: [{artist_id, artist, issues: […]}], next_cursor}`, refetched when the `health` live event changes that check's `open`. `/api/admin/health-stream` becomes a deprecated alias for one release; the Health page opens no stream of its own (3.6)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+   | Coalescing recipe                                   | "enqueue with `delay=window`" (DS §3.9)                                                                                                                                                                                                                             | same (PD §5.3.2, §4.2 item 6, §4.6.3 item 2)                                                                                                                                                          | the Conventions due-set recipe: no `tasks` row before the build is due, because `redispatch_stale_pending_tasks(age_seconds=300)` re-dispatches older pending rows with no delay; cold reads schedule at once. Windows: genre wheel ≥ 120 s, mood map ≥ 900 s, insights 30 min, bliss map 6 h, ops 60 s, admin surfaces 5 s, federation structure ≥ 5 s. Rewrite DS §3.9 and PD §5.3.2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+   | Demand gating cadence                               | "check the key on every tick" (DS §3.4, §3.9); "the next tick rebuilds" (DS §4.19)                                                                                                                                                                                  | "check the key once per second (one Redis `EXISTS`)" (PD §5.3.1)                                                                                                                                      | PD's 1 s `EXISTS` check, also in DS §3.4, §3.9, §4.19, §4.20, §4.23 and §4.24. Add the hidden-tab rule to PD §4.1, §5.3.1 and DS §3.9: `AdminLiveProvider` closes the stream after 30 s hidden, and the Dashboard never subscribes to `queues` or `governor` (3.1, 3.3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+   | Viewer and runtime key names                        | `stack:viewers` (DS §3.9, §4.22)                                                                                                                                                                                                                                    | `admin:live:viewers:stack` (PD §4.8, §5.3.1); runtime keys `crate:runtime:<surface>`                                                                                                                  | `admin:live:viewers:<surface>` everywhere, one constant per surface in `app/crate/admin_viewers.py`; runtime samples in `crate:runtime:<surface>` (`governor`, `acquisition`, `event_pipeline`, `redis`, `stack`); never `crate:ops:governor`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+   | Stack persistence                                   | —                                                                                                                                                                                                                                                                   | stack endpoints "only read `ui_snapshots('ops:stack','global')`", sampled every 10 s (PD §4.8)                                                                                                        | each sample goes to `crate:runtime:stack` plus a publish; `ui_snapshots('ops:stack','global')` is written only on a state change or at most once per 60 s; the GET reads the Redis key, else the row; `stack-stream` forwards published payloads (5.5). Fix PD §4.8 Stack and DS §4.22                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+   | Mood map refresh                                    | 300 s window; `scopesForUrl` maps mood map and explore page to `explore` and `library`; `explore` broadcast on every build (DS §4.10)                                                                                                                               | ≥ 900 s; `explore` only; broadcast only when counts or sample change (PD §4.14)                                                                                                                       | PD §4.14 (Tasks 4.8a, 4.8b). Fix DS §4.10                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+   | Genre wheel Listen scope                            | —                                                                                                                                                                                                                                                                   | `/api/catalog/genre-wheel` with no scope; by prefix `lib/cache.ts` maps it to `library`                                                                                                               | a dedicated `genre_wheel` scope, broadcast by `refresh_genre_wheel_snapshot` only when the `crate-core` row's version or digest changes; an explicit `scopesForUrl` branch before the `/api/catalog` and `/api/browse` prefix rules (5.10). Add to PD §4.6.3, §5.3.5 and DS §4.3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+   | Genre wheel triggers                                | —                                                                                                                                                                                                                                                                   | `index_genres` and `process_new_content` completion, deletes, curator mutations (PD §4.6.3 item 2)                                                                                                    | trigger from the choke point: `set_artist_genres` and `set_album_genres` (`db/repositories/genres_assignments.py`) schedule a refresh after commit, only when the stored set changed (covering `enrich_artist(s)` Last.fm tags, `POST …/enrichment/refresh` and the genre indexer), plus `db/jobs/repair_artist_jobs.py`'s `artist_genres` rewrite, curator mutations, deletes and a nightly floor (2.18b). Update PD §4.6.3 item 2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+   | EQ drag writes                                      | "Drag updates are batched to one `onBandChange` per frame" (DS §4.1 Motion)                                                                                                                                                                                         | per-frame writes (PD §4.12 Actions)                                                                                                                                                                   | during a drag or key repeat, gains go to the engine through a ref (Web Audio ramp; Android native `setEq` throttled to 15–20 Hz) and to the live store at most once per frame; prefs (`localStorage` plus `EQ_PREFS_EVENT`) are written once on pointerup, blur or 150 ms after the last key (0.7, 4.3). Fix DS §4.1 and PD §4.12                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+   | Federation topology triggers                        | —                                                                                                                                                                                                                                                                   | "other federation events to the topology", no coalescing (PD §4.10)                                                                                                                                   | structural events (pairing, grant, peer, `catalog.sync.completed`, `health.polled`) rebuild with trailing-edge coalescing ≥ 5 s; `federation.stream.*` and relay events only set a dirty key, honoured while `admin:live:viewers:federation` exists (at most one rebuild per 5 s) and otherwise left to the 60 s health-poll floor (5.8). Fix PD §4.10 and DS §4.21                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+   | Acquisition covers (B20)                            | —                                                                                                                                                                                                                                                                   | "server-side cover lookup" as an endpoint (PD §4.4)                                                                                                                                                   | `POST /api/acquisition/covers {items: [{artist, album}]}` (≤ 50): one `MGET` or `= ANY(:keys)` read of a cover cache keyed by normalised (artist, album), hits only; misses enqueue one deduplicated fast task (batch, 3 s provider timeout, positive and negative results cached with a TTL); results arrive through `publish_task_signal` or a later request; no provider call in a request (5.6). Add to PD §4.4                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+   | Acquisition sampler cadence                         | 2 s while watched or while transfers are active (DS §3.9)                                                                                                                                                                                                           | same (PD §4.4)                                                                                                                                                                                        | 2 s only while `admin:live:viewers:acquisition` exists; every 30–60 s without viewers while transfers are active (keeps `ops_runtime_state('acquisition')` and the lifecycle reconciler current); idle otherwise (5.6). Fix PD §4.4 and DS §3.9                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+   | Paths planning (B18)                                | —                                                                                                                                                                                                                                                                   | synchronous routes kept through v3.0; phase C in Phase 5 (PD §4.16)                                                                                                                                   | the task route (`compute_music_path`, `POST /api/paths/plan`, `/regenerate?mode=task` → 202) lands in 4.9a; new Listen builds and 4.9b's Regenerate use only it; `plan_meta` is written only inside the task (plus a backfill); the synchronous routes get a deprecation date, a per-user rate limit, and skip LLM refinement. Update PD §4.16 and PD36                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+   | PD43 on the server                                  | —                                                                                                                                                                                                                                                                   | hidden below 3 listeners in the UI (PD §4.17)                                                                                                                                                         | the instance builder hides it: below 3 listeners `heatmap.cells` is an all-zero 7×24 grid (shipped Listen builds call `cells.flat()`), `peak` and `night_share` are `null`, and `hidden_reason` is `"few_listeners"`; same for `heatmap_utc` (2.20, 5.12). Add the response change to PD §3.4.2 and §4.17                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+   | Redis-durable memory                                | "512 MB … the value in `docker-compose.yaml`, which the site test reads; 384m is only the home compose" (DS §6.5)                                                                                                                                                   | same (PD §5.3.6)                                                                                                                                                                                      | crate-redis-durable has `mem_limit` 512m (`docker-compose.yaml`) or 384m (`docker-compose.home.yaml`), and `--maxmemory 384mb` in both. The site test (`content/architecture/viz.test.ts`) pins the redis-server flags (`--maxmemory 384mb`, `noeviction`) from `viz.ts`, not the container limit; `map.ts` memory figures are untested. The RedisPair durable meter uses `maxmemory` (384 MB), not the container limit (5.4)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+   | Admin screenshots                                   | "Admin has no screenshot suite; functional Playwright only [D25]" (DS §6.6)                                                                                                                                                                                         | PD48: "Admin functional tests only until instruments stabilise"                                                                                                                                       | a small Admin capture set from Task 0.11 (before Task 1.0), extended by each P0 page task; the Admin bundle ceiling from Task 0.12. Fix DS §6.6 and PD48                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+   | New tokens                                          | first consumers listed (DS §1.9.4)                                                                                                                                                                                                                                  | —                                                                                                                                                                                                     | owning tasks: `--text-display-page` and `--tracking-headline` in 3.1; `--text-display-entity` in 4.7b; `--text-display-readout` (a minifier-safe guarded fallback, verified when 3.9b implements it) in 3.9b; `--text-subhead` in 4.1; each with `cn.ts` registration and the ceiling bump listed in the commit                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+   | Camelot module                                      | —                                                                                                                                                                                                                                                                   | "moved in a small `[MAIN]` PR tagged `[BEHAVIOUR]`" that rewires `bliss._key_compatibility` (PD §4.7, PD2)                                                                                            | 2.9b adds `app/crate/camelot.py` and its fixture and rewires `bliss._key_compatibility` to it, tagged `[BEHAVIOUR]`: flat keys (`Bb`, `Eb`, `Ab`, …) stop falling back to neutral compatibility, so Radio and Paths key scoring changes for tracks Essentia tagged with flats (PD §3.4.2, §4.7). The Smart Mix branch imports `crate.camelot` when it next merges `main`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+   | Site pin and register range                         | —                                                                                                                                                                                                                                                                   | "decision register `[D1]`–`[D40]`" (PD header); PD53 mapped to "—"                                                                                                                                    | pin `258bbaee` in the PD and DS headers (plan header); PD header range `[D1]`–`[D43]` (DS has [D41] and [D42]; Task 0.3 adds [D43] = PD54); PD53's column becomes `[D41], [D42]`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 2. Fix the facts and examples that contradict the code:
    - EQ example strings (PD §4.11, §4.6.2, DS §4.2, DS §4.4). `black-metal` has `_EQ_BLACK_METAL`,
@@ -654,9 +532,9 @@ decided. Migrations do not wait for PD2 (Conventions → migrations).
      the minimum client version stated in PD §4.18 (Task 4.7a);
    - `reanalyze_album` is deduplicated (Task 3.9a);
    - the v2 genre tree shows `—` counts while the wheel snapshot is cold (Task 2.18c).
-   Also state in PD §4.18 that per-show `probable_setlist` fields stay in `/api/me/upcoming` until
-   that minimum client version. Keep the PD §3.4.2 row that says Task 2.9b changes Camelot key
-   scoring: it is a behaviour change (flat keys now score), shipped with the `bliss.py` rewire.
+     Also state in PD §4.18 that per-show `probable_setlist` fields stay in `/api/me/upcoming` until
+     that minimum client version. Keep the PD §3.4.2 row that says Task 2.9b changes Camelot key
+     scoring: it is a behaviour change (flat keys now score), shipped with the `bliss.py` rewire.
 4. One delivery order. Replace PD §5.5 and DS §6.11 with a one-line pointer to this plan's phases
    and Rollout → Milestones. PD §3.1.7's "must be reconciled into one order" is then closed. That
    pointer replaces PD §5.5's "With PD2 = (a), Smart Mix merges before plan Phase 2B" and "The
@@ -665,10 +543,9 @@ decided. Migrations do not wait for PD2 (Conventions → migrations).
 5. Mapping cards: remove the "26 verified mapping cards" references (PD header and "Relation to
    other documents", DS §4 intro) and state that PD and DS carry every verified correction, or cite
    `docs/plans/crate-v3-analysis/cards/` if Task 0.1 committed them.
-6. Write the Task 0.3 appearance decision into DS §6.9 item 6 and PD §7 so they agree.
+6. Keep the single Crate v3 identity decision aligned in DS §6.9 item 6, PD53 and Task 1.13.
 7. Verify:
-   - `grep -n "inheritedPath\|music_paths.plan JSONB\|lib/setlist\|health-checks-stream\|/api/admin/live?\|LegendStrip\|server-computed\|Black metal\|Doom ← metal\|hardcore from punk\|core_eq_gains\|eq_source\|metadata_overridden\|crate:ops:governor\|/api/imports/surface\|stack:viewers\|Until G1\|until G1\|lyrics_done\|portable_written\|then slug order" docs/plans/2026-10-14-crate-v3-{product-design,design-system}.md | grep -v "no \`LegendStrip\`"`
-     prints nothing (DS keeps its two "there is no `LegendStrip`" lines);
+   - `grep -n "inheritedPath\|music_paths.plan JSONB\|lib/setlist\|health-checks-stream\|/api/admin/live?\|LegendStrip\|server-computed\|Black metal\|Doom ← metal\|hardcore from punk\|core_eq_gains\|eq_source\|metadata_overridden\|crate:ops:governor\|/api/imports/surface\|stack:viewers\|Until G1\|until G1\|lyrics_done\|portable_written\|then slug order" docs/plans/2026-10-14-crate-v3-{product-design,design-system}.md | grep -v "no \`LegendStrip\`"`prints nothing (DS keeps its two "there is no`LegendStrip`" lines);
    - `grep -c "local_eq_gains" docs/plans/2026-10-14-crate-v3-{product-design,design-system}.md`
      prints a non-zero count for both files.
 
@@ -679,6 +556,7 @@ Commit: `docs(v3): align names, contracts and delivery order across the v3 docs`
 Only after Diego approves PD1 (b).
 
 **Files:**
+
 - Modify: `AGENTS.md:69`
 - Modify: `app/ui/AGENTS.md:28`
 - Modify: `app/listen/AGENTS.md:60`
@@ -702,6 +580,7 @@ Commit: `docs(agents): allow hand-built instruments next to Nivo charts`.
 The drift check fails today. This task and Task 0.7 bring it back to green and land in the same PR.
 
 **Files:**
+
 - Modify: `app/shared/ui/lib/appearance-token-registry.ts` (new role `surface-object` = card solid, `#0d0e14` in default dark)
 - Modify (generated): `app/shared/ui/tokens/themes.css`
 - Modify: `app/shared/ui/tokens/surfaces.css` (utility `bg-surface-object`)
@@ -736,6 +615,7 @@ helper moves to `lib/` in the task where an app imports it directly (DS §2.4: t
 keeps a local copy until then).
 
 **Files:**
+
 - Create: `app/shared/ui/domain/player/eq-morph.ts` (not exported), test `eq-morph.test.ts`
   - `stepSpring` (semi-implicit Euler), `springsSettled` (|Δ| and |v| below 0.01), `createSpringSet`
   - `dt` clamped to 50 ms, 1/60 on the first frame
@@ -813,6 +693,7 @@ keeps a local copy until then).
 ### Task 0.8: Listen EQ panel residue and Admin editor flattening
 
 **Files:**
+
 - Create: `app/listen/src/lib/equalizer-labels.ts`
   - `PRESET_LABELS` moved out of `EqualizerPanelSections.tsx`
   - Smart EQ source labels moved out of `EqualizerSmartReadout.tsx:83-90`, now as i18n keys
@@ -841,6 +722,7 @@ keeps a local copy until then).
 ### Task 0.9: Real ticket notches and setlist row entrance
 
 **Files:**
+
 - Modify: `app/listen/src/components/upcoming/UpcomingShowExpandedView.tsx`
   - notches as a CSS mask on two stacked boxes, with `-webkit-mask` for iOS 15
   - rows keyed by title
@@ -865,7 +747,12 @@ keeps a local copy until then).
 
 ### Task 0.10: Contrast pairings and the amber hue
 
+**Status:** local implementation recorded. The retired variant's contrast exception is not a v3
+requirement and must not be fixed by adding variant tokens. Task 1.13 removes the obsolete fixture
+and known-below-AA allowance with the retired runtime. Crate v3 contrast and QA still apply.
+
 **Files:**
+
 - Modify: `app/shared/ui/lib/color-contrast.test.ts`
   - `--text-subtle` on canvas, object and popover
   - `--accent-action-hi` on canvas and object
@@ -874,7 +761,7 @@ keeps a local copy until then).
 
 **Steps:**
 
-1. Add the pairings and assert AA at body size for each skin. fg-3 is expected around 4.9:1 on the
+1. Add the pairings and assert AA at body size for the Crate v3 identity. fg-3 is expected around 4.9:1 on the
    canvas and 4.7:1 on the popover.
 2. If PD11 = (a), change the hue.
 3. Verify: `VT-UI lib/color-contrast.test.ts lib/appearance-token-registry.test.ts`, `GATES`,
@@ -886,6 +773,7 @@ keeps a local copy until then).
 ### Task 0.11: Visual fixtures, Admin captures and re-recorded baselines
 
 **Files:**
+
 - Modify: `tests/listen-visual/fixtures.ts`
   - the Radar show gets `probable_setlist`, `probable_setlist_context` and
     `probable_setlist_status`
@@ -930,12 +818,13 @@ keeps a local copy until then).
 ### Task 0.12: Bundle budgets in CI for both apps (PD48)
 
 **Files:**
+
 - Modify: `.github/workflows/test-frontend.yml`: after the "Build Listen" step, add
   `npm run --workspace=app/listen check:bundle`; after the "Build Admin" step, add
   `npm run --workspace=app/ui check:bundle`
 - Create: `app/ui/scripts/check-bundle-budget.mjs` (port of `app/listen/scripts/check-bundle-budget.mjs`)
-  and the `check:bundle` script in `app/ui/package.json`, with today's measured initial-JS gzip plus
-  a small margin as the ceiling
+  and the `check:bundle` script in `app/ui/package.json`, with the accepted 520 KiB ceiling
+  (recorded initial-JS baseline 514,659 B gzip; compare future results to the revision measured)
 - Create: `app/ui/src/App.bundle.test.tsx` (pattern of Listen's `AppRouter.bundle.test.tsx`): every
   page route in `App.tsx` stays behind `lazy()`; each instrument route added later (Genres wheel,
   Tasks lanes, Health scan, Stack map, Federation topology, Analysis readout) adds its assertion in
@@ -956,7 +845,7 @@ keeps a local copy until then).
 Keeping iOS 15.0 (`app/listen/ios/App/Podfile:1`, `platform :ios, '15.0'`) breaks three things:
 
 - Tailwind 4.2.4's `color-mix` fallback cannot resolve `--color-accent-action:
-  var(--accent-action)` and falls back to `transparent`, so every `bg-accent-action/4`, `/8`,
+var(--accent-action)` and falls back to `transparent`, so every `bg-accent-action/4`, `/8`,
   `/14` and `border-accent-action-hi/40` (hover, active row wash, halo, chip hover) disappears
   below Safari 16.2. The token CSS already has about 374 `color-mix` uses.
 - The numeral tiers and readout word use `cqi`, and `InstrumentPanel` uses `@container`; iOS 15
@@ -965,10 +854,12 @@ Keeping iOS 15.0 (`app/listen/ios/App/Podfile:1`, `platform :ios, '15.0'`) break
 - Subgrid rows need Safari 16 or Chrome 117 (also above the WebView2 111 Windows floor).
 
 **Files (if [D11], the recommendation):**
+
 - Modify: `app/listen/ios/App/Podfile` (`platform :ios, '16.4'`), `app/listen/ios/App/App.xcodeproj/project.pbxproj` (`IPHONEOS_DEPLOYMENT_TARGET = 16.4`)
 - Release note: iOS 15 devices stay on the last v2 build.
 
-**Whatever the target:** Task 1.4 declares a rem `font-size` before each `cqi` value, and Task 4.6
+**Fallback contract:** Task 1.4 guards rem numeral fallbacks with `@supports not (font-size: 1cqi)`
+so LightningCSS retains them after minification; Task 4.6
 uses no subgrid.
 
 **If 15.0 is kept anyway:** add literal rgba tokens for the four alpha steps through the registry
@@ -1001,6 +892,7 @@ Windows WebView2 111, but no such host exists:
 Pending", only 2.50 and 2.52 were ever run, and CI checks symbols only.
 
 **Files:**
+
 - Create: `tests/desktop-webkitgtk/Dockerfile` (Debian 12 with `libwebkit2gtk-4.1-0=2.40.*` from
   `snapshot.debian.org`, plus Xvfb) and a script that runs the Tauri Linux build in it against the
   dev stack and takes the Linux desktop smoke captures
@@ -1036,6 +928,27 @@ He also reviews the ticket on Radar on a phone.
 
 ## Phase 1 — Shared visual infrastructure in `@crate/ui`
 
+### Checkpoint 1A — Authorised pre-merge primitive batch
+
+Tasks 1.2 (`MonoLabel`), 1.3 (`StatusDot`) and 1.4 (`StatNumber`) are implemented and locally
+validated. Diego reviewed and approved their mockup on 2026-10-15 and authorised the batch's
+commit/push together with a persistent preview. CI baselines and device QA remain pending.
+
+- Keep existing semantic tokens and generation; no theme runtime removal in this batch.
+- Serialise changes to `typography.css`, `cn.ts`, token definitions, generated CSS and drift ceilings.
+- The ongoing review surface is `tools/design-system-preview/`; run `npm run design-system:preview`.
+  Extend it at each checkpoint using real components and preserve approved examples.
+- Never claim Checkpoint 0 passed from a focused test or mockup review.
+
+### Checkpoint 1B — Rows and chips, independent of Smart Mix
+
+After the approved 1A batch is committed/pushed, implement **1.5 HairlineList / HairlineRow and
+1.6 CratePill / CrateChip**, with tests first and an updated persistent preview. Stop for Diego's
+review with a local diff and actual results; no automatic commit/push of this next batch.
+
+Task 1.7's first Admin adoption waits for 1.0; Task 0.11's Admin captures still precede 1.0. Theme
+runtime removal 1.13 remains later. The production measurement 0.14 can wait until the wheel.
+
 Only primitives and helpers that both apps import directly in the same change.
 
 - `export-usage-policy.test.ts` only proves that one app imports a module, so the both-apps rule is
@@ -1056,6 +969,7 @@ pages are restyled early, so every other page would ship cards that blend into t
 This task runs before any Admin adoption (1.7 onwards).
 
 **Files:**
+
 - If PD6 = (a): Modify every borderless `bg-card`, `bg-muted` and `bg-secondary` in `app/ui/src`
   (inventory: `grep -rn -E "bg-(card|muted|secondary)\b" app/ui/src | grep -v "border"`), adding
   `border border-border-quiet` in one mechanical commit.
@@ -1072,6 +986,7 @@ Commit: `fix(ui): keep Admin cards visible on the v3 canvas`.
 ### Task 1.1: Global focus and selection rules
 
 **Files:**
+
 - Modify: `app/shared/ui/tokens/interactive.css`:
   - `:focus-visible` 2 px `accent-action-hi` outline, offset 3 px (4 px on CTAs, −2 px inset on
     edge-to-edge rows);
@@ -1091,6 +1006,7 @@ Commit: `fix(ui): keep Admin cards visible on the v3 canvas`.
 ### Task 1.2: `MonoLabel` ARIA pass-through and eyebrow size
 
 **Files:**
+
 - Modify: `app/shared/ui/primitives/MonoLabel.tsx`
   - `id`, `role` and `aria-*` pass through
   - `as`: `p|span|div|h2|h3|dt|figcaption|legend`
@@ -1107,12 +1023,14 @@ Commit: `fix(ui): keep Admin cards visible on the v3 canvas`.
    - the eyebrow class is applied;
    - `twMerge` keeps `text-eyebrow`.
 2. Implement.
-3. Verify: `VT-UI primitives/MonoLabel.test.tsx lib/cn.test.ts`, `GATES` (+1 token in the ceiling).
+3. Verify: `VT-UI primitives/MonoLabel.test.tsx lib/cn.test.ts`, `GATES` with existing ceilings.
+   Typography utilities belong to `@theme`; do not raise the root semantic-definition budget.
 4. Commit: `feat(ui): let MonoLabel carry ARIA props and an eyebrow size`.
 
 ### Task 1.3: `StatusDot` pulse and forced colors
 
 **Files:**
+
 - Modify: `app/shared/ui/primitives/StatusDot.tsx`
   - `pulse` gated by `motion-gate`
   - `title`-only dot becomes `role="img"`
@@ -1128,13 +1046,15 @@ Commit: `feat(ui): add a motion-gated pulse to StatusDot`.
 ### Task 1.4: `StatNumber` tiers (PD8 / [D8])
 
 **Files:**
+
 - Modify: `app/shared/ui/primitives/StatNumber.tsx`
   - sizes `sm|md|lg|xl`, weight 800 on `lg`/`xl`
   - `unit` slot, `labelPosition`, `as: span|dd|div`, `align`
   - value node accepts a ref'd child; always `tabular-nums`
 - Modify: `app/shared/ui/tokens/typography.css` (`--text-numeral-{xl,lg,md,sm}`, `--tracking-numeral`, `--tracking-numeral-sm`, `--leading-numeral`); `app/shared/ui/lib/cn.ts`
-  - each numeral tier declares a rem `font-size` before its `cqi` value, so a runtime without
-    container units (iOS 15, Task 0.13) keeps a sized numeral instead of the body size
+  - each numeral tier uses `@theme inline` for its clamp and `@utility text-numeral-*` for a
+    guarded rem fallback inside `@supports not (font-size: 1cqi)`. Consecutive rem/clamp declarations
+    are insufficient: LightningCSS removes the fallback during minification
 - Test: `app/shared/ui/primitives/StatNumber.test.tsx`
 
 **Steps:**
@@ -1145,15 +1065,19 @@ Commit: `feat(ui): add a motion-gated pulse to StatusDot`.
    - the label renders above and below;
    - `as="dd"`;
    - a ref'd child span keeps its node across re-renders;
-   - the generated CSS has a rem `font-size` before each `cqi` declaration.
+   - Tailwind-compiled and LightningCSS-minified CSS retain each guarded rem fallback and clamp.
+     The focused CSS regression suite covers all four numeral tiers; other display tiers remain
+     their later tasks' responsibility.
 2. Implement.
-3. Verify: the test, `GATES` (+7 tokens), `VISUAL` (the Stats and EQ baselines may move; review
-   them), `BUNDLE`.
+3. Verify: the test and `GATES` with unchanged ceilings; typography `@theme` declarations do not
+   count as root semantic definitions. `VISUAL` and `BUNDLE` remain applicable follow-up gates;
+   do not claim CI screenshots reviewed from the focused local pass.
 4. Commit: `feat(ui): add display numeral tiers to StatNumber`.
 
 ### Task 1.5: `HairlineList` / `HairlineRow` v3 API
 
 **Files:**
+
 - Modify: `app/shared/ui/primitives/HairlineList.tsx`
   - `ruled` (default true)
   - `active`: 2 px `accent-action-hi` bar plus `from-accent-action/8` wash, scaleY in 250 ms
@@ -1176,6 +1100,7 @@ Admin adopts it in Task 3.3, which fixes the "Listen only" rule breach.
 ### Task 1.6: `CratePill` variants and the Listen radius exemption (PD3 / [D2])
 
 **Files:**
+
 - Modify: `app/shared/ui/primitives/CrateBadge.tsx`
   - `CratePill`: `variant: toggle|action|static`; only `toggle` emits `aria-pressed`
   - `min-h-8` (44 px on coarse pointers), `tracking-chip`
@@ -1201,6 +1126,7 @@ Admin adopts it in Task 3.3, which fixes the "Listen only" rule breach.
 ### Task 1.7: `InstrumentPanel` with first adopters in both apps
 
 **Files:**
+
 - Create: `app/shared/ui/primitives/InstrumentPanel.tsx`, test `InstrumentPanel.test.tsx` (DS §2.3)
   - `<figure aria-label={summary}>`, `pt-5.5 border-t border-border-quiet`, `@container`
   - header made of two `MonoLabel`s and a status slot in `aria-live="polite"`
@@ -1221,13 +1147,14 @@ Admin adopts it in Task 3.3, which fixes the "Listen only" rule breach.
    - Settings sections and the System Resources panel render inside a figure or section with the
      rule.
 2. Implement.
-3. Verify: the three tests, `GATES`, `TYPES`, `VISUAL` (12 settings baselines: default, Crate Red,
-   dark, light; re-record).
+3. Verify: the three tests, `GATES`, `TYPES`, `VISUAL` (single Crate v3 Settings captures;
+   re-record through the approved CI job).
 4. Commit: `feat(ui): add InstrumentPanel and adopt it in Settings and System`.
 
 ### Task 1.8: `Meter` with first adopters
 
 **Files:**
+
 - Create: `app/shared/ui/primitives/Meter.tsx`, test `Meter.test.tsx` (DS §2.3)
   - `role="meter"`; `--v` written through a ref
   - limit tick; `over` changes the label text; `null` shows `n/a`
@@ -1251,6 +1178,7 @@ Admin adopts it in Task 3.3, which fixes the "Listen only" rule breach.
 ### Task 1.9: `Readout` with first adopters
 
 **Files:**
+
 - Create: `app/shared/ui/primitives/Readout.tsx`, test `Readout.test.tsx`
   - visible mono line with reserved width
   - separate sr-only `announcement`, updated only on commit
@@ -1266,6 +1194,7 @@ Commit: `feat(ui): add Readout for live text that never reflows`.
 ### Task 1.10: `ProgressHairline` with first adopters
 
 **Files:**
+
 - Create: `app/shared/ui/primitives/ProgressHairline.tsx`, test `ProgressHairline.test.tsx`
   - determinate `role="progressbar"` with `--p` through a ref
   - indeterminate 36% block only while visible and motion is allowed; static otherwise
@@ -1284,6 +1213,7 @@ Commit: `feat(ui): add Readout for live text that never reflows`.
 ### Task 1.11: Shared toaster config (PD12 / [D10])
 
 **Files:**
+
 - Create: `app/shared/ui/lib/toaster-config.ts`, test `toaster-config.test.ts` (class names and durations; no `richColors`)
 - Modify: `app/ui/src/App.tsx:466`, `app/listen/src/main.tsx:71` (mount `Toaster` with the config)
 - Modify: `app/listen/src/toast-policy.test.ts` (or the Listen toast policy file) to forbid `richColors`
@@ -1299,6 +1229,7 @@ Commit: `feat(ui): add Readout for live text that never reflows`.
 ### Task 1.12: Remove dead shared components
 
 **Files:**
+
 - Delete: `app/shared/ui/domain/stats/{OpsPageHero,OpsPanel,OpsStatTile}.tsx`, `app/shared/ui/domain/shows/ShowCard.tsx` (verify no importer with `grep -rn` first)
 - Modify:
   - `app/shared/ui/export-usage-policy.test.ts:33` (allowlist)
@@ -1314,6 +1245,56 @@ Commit: `feat(ui): add Readout for live text that never reflows`.
 
 Commit: `chore(ui): remove unused shared ops and show components`.
 
+### Task 1.13: Retire the theme runtime and migrate visual preferences (PD53)
+
+**Status: planned, not implemented.** Outside Checkpoint 1A. Run only after Diego reviews that
+batch and assigns this task, using the integrated Smart Mix/site baseline. This is a deliberate
+behaviour change required for the joint major: Crate v3 is the sole visual identity.
+
+**Inventory before editing:**
+
+- Shared: `app/shared/ui/lib/{appearance-types,appearance-resolver,appearance-token-registry,theme-skin}.ts`,
+  `app/shared/ui/primitives/ThemeScope.tsx`, their tests and exports, CSS generation and
+  `app/shared/ui/tokens/{themes,semantic,surfaces,radius,typography}.css`.
+- Listen/Admin: startup/bootstrap, `app/listen/src/components/settings/ThemeSkinSection.tsx`,
+  `app/listen/src/lib/{theme-color,motion-availability,content-density}.ts`, Settings, the seven
+  catalogs and metadata, toaster/native status bars, user/local storage persistence, media-query
+  and runtime subscribers. Follow all callers; include Smart Mix-added settings after rebase.
+- Desktop: `app/listen-desktop/src/lib/linux-theme.ts`, `linux-theme.css`, startup, native window
+  chrome and tests. Inventory Capacitor bootstrap, manifest/theme-colour and share rendering.
+- Compatibility: `app/listen/src/lib/{playback-target-cast,cast-session-client}.ts`, cast appearance
+  payload types and `app/crate/api/schemas/cast.py`; retain a safe fixed-value compatibility shape
+  for older receivers/servers where required. Do not redesign Cast or change public schemas casually.
+- Verification: shared appearance/contrast/runtime tests, `tests/appearance`, Listen visual and
+  Admin captures, mobile/desktop tests, token generation/drift/bundle policies and technical docs.
+
+**Steps:**
+
+1. Record actual consumers, persisted preference keys, transport contracts and obsolete exports.
+   Separate functional preferences (motion, effects safety, density, locale) from visual overrides.
+2. Write migration tests for default, every legacy skin/mode/override, invalid/unknown payloads,
+   returning users and old-server/receiver compatibility. All resolve to the fixed Crate v3 design;
+   preserve reduced motion and functional preferences, including OS accessibility settings.
+   Keep palettes derived from artwork/visualizer data as content, without chrome-theme opt-ins.
+3. Replace the selectable theme runtime and Settings UI with fixed Crate v3 tokens. Remove skin,
+   light/dark/system mode, accent, material, radius and typography overrides, their editors, previews,
+   flags and runtime subscriptions. Retire GTK accent and album-driven chrome tint overrides.
+4. Migrate/normalise stored visual preferences safely and idempotently; clear only inventoried
+   obsolete keys. Keep motion/accessibility controls independent of the removed appearance store.
+   Keep semantic design tokens, the Nivo chart configuration and token-based canvas/WebGL palettes.
+5. Simplify the registry/generator to one Crate v3 output. Preserve existing registry paths and
+   generation until their consumers are migrated in this task; rename files only if justified.
+   Remove obsolete variant CSS, exports, the retired variant's known-below-AA exception, selectors,
+   subscriptions and fixtures. Regenerate tokens and adjust exact drift ceilings deliberately.
+6. Replace variant-matrix tests with one Crate v3 contract: text/accent/warning AA on actual surfaces,
+   deterministic startup despite legacy preferences, motion/forced-colors/keyboard behaviour,
+   stable canvas/WebGL on resize or context restoration, native chrome and older-peer transport.
+7. Run focused tests, `TOKENS-GEN`, `GATES`, `TYPES`, `LINT`, `I18N`, both bundle gates and the
+   single-identity visual/device QA when assigned. Baselines remain CI-only and require review.
+   Record behaviour migration in the release note; no public release before the joint major.
+
+**Proposed commit after approval:** `refactor(ui): retire visual themes for the Crate v3 identity`.
+
 ### Checkpoint 1
 
 Before this checkpoint:
@@ -1325,8 +1306,9 @@ Before this checkpoint:
 - CI is green and `BUNDLE` is within the Phase 0 baseline plus less than 3 KB; `BUNDLE-ADMIN`
   is within its ceiling.
 
-Diego reviews Settings and System side by side with the site's panel anatomy. The foundation
-release follows this checkpoint plus Tasks 1b.3 and 1b.4 (Rollout → Milestones).
+Diego reviews Settings and System side by side with the site's panel anatomy. Foundation is an
+internal milestone, completed with Tasks 1b.3/1b.4 and the single-identity runtime retirement 1.13.
+It grants no public release and does not retire the integration branch.
 
 ---
 
@@ -1337,9 +1319,9 @@ Phase 1 covers primitives, focus and the toaster. The components that render on 
 DS §5.5–5.11 and PD §3.1.5, and need an owner before any screen is restyled.
 
 Only two of these tasks are needed by the instruments: 1b.3 (tabs, e.g. the Wheel/Tree/Grid toggle)
-and 1b.4 (warming, empty and error states). They ship in the foundation release. 1b.1, 1b.2, 1b.5,
-1b.6 and 1b.7 run in parallel with the release groups and gate only Phase 6; once the foundation
-has merged they target `main` and ship in whichever release is next (Rollout → Milestones).
+and 1b.4 (warming, empty and error states). They complete the internal Foundation milestone.
+1b.1, 1b.2, 1b.5, 1b.6 and 1b.7 may run alongside later internal groups when assigned and gate
+only Phase 6. Product work continues into `feat/crate_v3`; it does not move to `main` after Foundation.
 
 Each task below follows the same shape: inventory with `grep`, failing render and a11y tests,
 implement, `VISUAL` re-baseline (one per task), `ADMIN-E2E` with the Admin captures re-recorded and
@@ -1348,6 +1330,7 @@ reviewed (Task 0.11), `TYPES`, `LINT`, `GATES`, one commit.
 ### Task 1b.1: Dialogs, sheets, popovers, menus and tooltips
 
 **Files:**
+
 - Modify: `app/shared/ui/shadcn/{dialog,alert-dialog,sheet,popover,dropdown-menu,context-menu,tooltip}.tsx`, `app/shared/ui/primitives/{AppModal,AppPopover}.tsx`, `app/shared/ui/composites/ConfirmDialog.tsx`
 - Modify (Listen): `app/listen/src/components/actions/{ItemActionMenu,entity-menu}.tsx`
 - Modify (Admin): the 17 importers of `app/ui/src/components/ui/confirm-dialog.tsx` move to the shared `ConfirmDialog`; `app/ui/src/components/ui/{AppPopover,music-context-menu}.tsx`
@@ -1395,6 +1378,7 @@ Commit: `feat(ui): restyle track rows and media grids`.
 ### Task 1b.6: Admin status colour
 
 **Files:**
+
 - Modify: `app/ui/src/**`, a codemod following the PD §3.1.6 table and PD10 (a) / [D4] (about 398,
   288 and 48 classes):
   - emerald/green (ok, done, active, on) → `text-accent-action-hi` or `StatusDot on`;
@@ -1426,8 +1410,7 @@ Commit: `feat(a11y): add a skip link to both shells`.
 After the last of the parallel 1b tasks, Diego walks Admin and Listen with the shared layer
 restyled. Unrestyled screens then read as v3 at the level of tokens, dialogs, forms, states, rows
 and status colour. Until then the baseline for an un-migrated screen is the foundation (tokens,
-focus, toasts, tabs, states) plus whichever 1b tasks have shipped (Rollout → Mixed-language
-releases). This checkpoint gates Phase 6, not the foundation release.
+focus, toasts, tabs, states) plus whichever 1b tasks have shipped (Rollout → Partial migration during development). This checkpoint gates Phase 6, not the internal Foundation milestone.
 
 ---
 
@@ -1435,29 +1418,30 @@ releases). This checkpoint gates Phase 6, not the foundation release.
 
 Three groups:
 
-- **2A**: independent hotfixes `[MAIN]`. Ship them now, as patch releases.
-- **2B**: platform preconditions, with no UI change. Each ships to `main` alone as soon as it is
-  green (2.10 in particular is never bundled with other fixes; 2.11a–c ship one at a time).
-- 2A and 2B start now, on `fix/*` or `perf/*` branches from `main`, in parallel with Phase 0. They
-  touch only `main` code and need nothing from `feat/crate_v3`, so the security (B15, B16), privacy
-  (B19), federation approval (B14) and stats (B12) fixes do not wait for the font licence, the
-  baselines or the EQ-morph device review.
-- **2C**: contracts for the P0 instruments: Operations, Health, Genres, EQ, Stats. Each ships with
-  its release group (Rollout → Milestones), or earlier only when its consumer list below is empty.
-  Several already have live consumers on `main`:
+- **2A**: independent `[MAIN]` hotfixes, started only when Diego assigns them. Small separately
+  approved PRs/releases remain possible; the joint product major grants no automatic assignment.
+- **2B**: platform preconditions, each reviewed and observed independently when assigned. 2.10
+  keeps its isolated deployment; 2.11a–c keep separate operational observation.
+- These fixes may proceed separately from the product branch when assigned. After Smart Mix
+  merges, inspect the actual `main` code before applying the original recipes; overlap may have
+  changed consumers or already fixed a finding. Production actions still require approval.
+- **2C**: P0 instrument contracts for Operations, Health, Genres, EQ and Stats. Integrate them
+  before their UI in the relevant internal milestone. Existing-client compatibility still applies;
+  an empty consumer list allows technical isolation, not unapproved publication.
+  The original `main` consumers below must be revalidated against the Smart Mix merge result:
 
-  | Task | Consumers on `main` today | Consequence |
-  | --- | --- | --- |
-  | 2.14, 2.15a–c | none (additive) | can ship early |
-  | 2.20 | `night_hours` and `listener_count` are additive; shipped Listen builds read the instance `heatmap.cells` with `cells.flat()` | the PD43 hidden shape keeps a zero 7×24 grid, never `null`; `[BEHAVIOUR]` for the hiding |
-  | 2.16 | v2 `SystemHealth.tsx` reads `/api/admin/metrics/system` | values change to the worker's real ones (PD §3.4.2 row) |
-  | 2.17a | v2 `Health.tsx`, `ArtistRepairDialog.tsx`, `Dashboard.tsx` labels | the task updates them in the same PR |
-  | 2.17c | v2 `Health.tsx:568` `handleFixType` posts no body; the `shadow_quality_tracks` fix-all and the bulk `artist_layout_fix` from #289 would get 409 | the task updates v2 `Health.tsx` in the same PR |
-  | 2.17b, 2.17d | scheduled `health_check` and `library_pipeline` runs | 2.17d is `[BEHAVIOUR]` (PD24); ships with the Health group |
-  | 2.17e | v2 `Trash.tsx` reads `/api/manage/tracks/quarantine` | response shape kept; pagination params optional |
-  | 2.18c, 2.18c-go | v2 Genres tree counts; `/api/catalog/genres` and Explore fallbacks read by shipped Listen builds; Go `/api/genres` and genre-detail counts | ship together with the Genres group; `[BEHAVIOUR]`; the migration is additive |
-  | 2.18d, 2.18e | the seeder on every boot; v2 `GenreEqEditor` writes; MusicBrainz sync; `generate-eq` callers | ship with the Genres group; `[BEHAVIOUR]` each |
-  | 2.19 | shipped Listen builds read `/eq` | additive fields only |
+  | Task            | Consumers on `main` today                                                                                                                       | Consequence                                                                              |
+  | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+  | 2.14, 2.15a–c   | none (additive)                                                                                                                                 | can ship early                                                                           |
+  | 2.20            | `night_hours` and `listener_count` are additive; shipped Listen builds read the instance `heatmap.cells` with `cells.flat()`                    | the PD43 hidden shape keeps a zero 7×24 grid, never `null`; `[BEHAVIOUR]` for the hiding |
+  | 2.16            | v2 `SystemHealth.tsx` reads `/api/admin/metrics/system`                                                                                         | values change to the worker's real ones (PD §3.4.2 row)                                  |
+  | 2.17a           | v2 `Health.tsx`, `ArtistRepairDialog.tsx`, `Dashboard.tsx` labels                                                                               | the task updates them in the same PR                                                     |
+  | 2.17c           | v2 `Health.tsx:568` `handleFixType` posts no body; the `shadow_quality_tracks` fix-all and the bulk `artist_layout_fix` from #289 would get 409 | the task updates v2 `Health.tsx` in the same PR                                          |
+  | 2.17b, 2.17d    | scheduled `health_check` and `library_pipeline` runs                                                                                            | 2.17d is `[BEHAVIOUR]` (PD24); ships with the Health group                               |
+  | 2.17e           | v2 `Trash.tsx` reads `/api/manage/tracks/quarantine`                                                                                            | response shape kept; pagination params optional                                          |
+  | 2.18c, 2.18c-go | v2 Genres tree counts; `/api/catalog/genres` and Explore fallbacks read by shipped Listen builds; Go `/api/genres` and genre-detail counts      | ship together with the Genres group; `[BEHAVIOUR]`; the migration is additive            |
+  | 2.18d, 2.18e    | the seeder on every boot; v2 `GenreEqEditor` writes; MusicBrainz sync; `generate-eq` callers                                                    | ship with the Genres group; `[BEHAVIOUR]` each                                           |
+  | 2.19            | shipped Listen builds read `/eq`                                                                                                                | additive fields only                                                                     |
 
 Every endpoint task adds `app/tests/test_openapi_contract.py` assertions.
 
@@ -1466,6 +1450,7 @@ Every endpoint task adds `app/tests/test_openapi_contract.py` assertions.
 #### Task 2.1: Federation approve uses the pairing id (B14) `[MAIN]`
 
 **Files:**
+
 - Modify: `app/crate/db/repositories/federation.py:155`
   - `list_peers()` gains `pending_pairing_uid`
   - one `LEFT JOIN LATERAL` picking the latest inbound `remote_pending` pairing that has not
@@ -1506,12 +1491,14 @@ so an "ops only" rule would take task progress away from them. `GET /api/tasks/{
 Threading the owner through each would hold a security hotfix behind a wide refactor.
 
 **Files (PR 1, B15):**
+
 - Modify: `app/crate/api/radio.py`. `/api/radio/next`, `/feedback` and `DELETE /session/{id}` load the
   session through one helper. That helper returns 404 when `session["user_id"]` does not match the
   caller.
 - Test: `app/tests/test_radio_contracts.py`: another user gets 404 on next, feedback and delete
 
 **Files (PR 2, B16):**
+
 - Create: `app/crate/request_context.py` (outside `api/` and `db/`): a `contextvars.ContextVar`
   holding `{user_id, capability}` for the current request (precedent: `_trace_id_var` in
   `api/trace_middleware.py`)
@@ -1553,6 +1540,7 @@ tasks.
 #### Task 2.3: Keep play-event payloads out of the ops snapshot (B19) `[MAIN]`
 
 **Files:**
+
 - Modify: `app/crate/db/domain_events.py` (`_decode_stream_messages`, `get_domain_event_runtime`)
   - drop `payload_json`
   - redact subjects of scope `user`, `home:discovery` and `home:user:*` before anything is persisted
@@ -1571,6 +1559,7 @@ tasks.
 #### Task 2.4: Remote stream events stop rebuilding ops (B11) `[MAIN]`
 
 **Files:**
+
 - Modify: `app/crate/projector.py:231-238` (`_projection_actions`)
   - only scope `federation.import` (and the `federation.import.*` types) maps to `ops`
   - remove `federation.stream.*` and `federation.catalog.*` from `_OPS_EVENT_TYPES`
@@ -1580,10 +1569,10 @@ tasks.
 
 1. Failing table test:
 
-   | Event | Actions |
-   | --- | --- |
-   | `federation.stream.*`, `federation.relay.*`, `federation.catalog.*`, `federation.peer.*`, `federation.health.*` | none |
-   | `federation.import.*` | `ops` |
+   | Event                                                                                                           | Actions |
+   | --------------------------------------------------------------------------------------------------------------- | ------- |
+   | `federation.stream.*`, `federation.relay.*`, `federation.catalog.*`, `federation.peer.*`, `federation.health.*` | none    |
+   | `federation.import.*`                                                                                           | `ops`   |
 
 2. Implement.
 3. Verify: `PY test_projector.py`.
@@ -1592,6 +1581,7 @@ tasks.
 #### Task 2.5: Stats schemas keep `snapshot.pending` (B12) `[MAIN]`
 
 **Files:**
+
 - Modify: `app/crate/api/schemas/me.py:791` (`StatsDashboardResponse.snapshot: StatsSnapshotResponse | None` with `version`, `built_at`, `stale`, `pending`)
 - Modify: `app/crate/api/schemas/common.py:32` (`SnapshotMetadataResponse.pending: bool = False`)
 - Modify: `app/listen/src/pages/use-stats-page-controller.ts` (`hasStats` is true when `overview.play_count` is set or `snapshot.pending`)
@@ -1609,6 +1599,7 @@ Commit: `fix(stats): keep the pending flag so snapshot polling works`.
 `/stats/global` sends 14. So Crate Pulse never hits the prewarmed key.
 
 **Files:**
+
 - Create: `app/crate/stats_dashboard_limits.py` (`DEFAULT_STATS_DASHBOARD_LIMITS = {tracks: 12, artists: 10, albums: 14, genres: 10, replay: 36}`)
 - Create: `app/tests/fixtures/stats_dashboard_limits.json` (the same values; the drift fixture)
 - Modify:
@@ -1629,6 +1620,7 @@ Commit: `fix(stats): use one limits constant so prewarmed snapshots hit`.
 #### Task 2.7: A failing health check keeps its issues (B13) `[MAIN]`
 
 **Files:**
+
 - Modify: `app/crate/health_check.py:244-256` (`_run_entries`)
   - a raising check skips `resolve_stale_issues` and keeps its previous `issue_count`
   - the error is logged, and kept for `last_error` after Task 2.17b
@@ -1647,6 +1639,7 @@ Commit: `fix(stats): use one limits constant so prewarmed snapshots hit`.
 #### Task 2.8: Curation clears the current explore cache key `[MAIN]`
 
 **Files:**
+
 - Modify: `app/crate/api/curation.py:123,139` (`listen:explore_page:v1:{user}` → `v2`)
 - Test: the curation API test file (`grep -rln "api/curation" app/tests`), with a new case asserting the v2 key is deleted
 
@@ -1655,6 +1648,7 @@ Commit: `fix(curation): clear the current explore page cache key`.
 #### Task 2.9: Acquisition snapshot and stream require acquisition rights (PD46) `[MAIN]` `[BEHAVIOUR]`
 
 **Files:**
+
 - Modify: `app/crate/api/acquisition.py:283-291,343` (`require_any_permission(request, ("library.import.manage", "library.tidal.manage"))`)
 - Test: the acquisition API tests (`grep -rln "acquisition/snapshot" app/tests`). A Listen-only user gets 403; an acquisition role gets 200.
 
@@ -1663,6 +1657,10 @@ Commit: `fix(security): require acquisition rights for the acquisition stream`.
 Release note: API clients reading Soulseek or Tidal queues need the capability.
 
 #### Task 2.9b: One Camelot mapping for v3 and Smart Mix `[MAIN]` `[BEHAVIOUR]`
+
+**Rebase gate:** re-evaluate after Smart Mix merges. The original recipe below describes the
+pre-merge code; keep one mapping, avoid recreating an existing module, and update tests/callers
+for the actual integrated behaviour. This `[MAIN]` work starts only on explicit assignment.
 
 **Why:** Smart Mix already ships `sm:app/crate/smart_mix/camelot.py` with enharmonics and rewires
 `bliss._key_compatibility` to it. A second copy in v3 would conflict on merge. One module on
@@ -1673,6 +1671,7 @@ neutral key compatibility today and score through the enharmonics afterwards, wh
 and Paths key scoring.
 
 **Files:**
+
 - Create: `app/crate/camelot.py` (ported from `sm:app/crate/smart_mix/camelot.py`: pure;
   enharmonics Db→C#, Eb→D#, Gb→F#, Ab→G#, Bb→A#; `to_camelot`, `camelot_relationship`)
 - Create: `app/tests/fixtures/camelot_cases.json` (read later by `@crate/ui/lib/camelot.ts` in 3.9b)
@@ -1711,6 +1710,7 @@ scoped sync, forces enrichment and writes to the library; the others are per-use
 and recently-played refreshes. They come back behind their own switch, deployed off.
 
 **Files:**
+
 - Modify: `app/crate/db/domain_events.py:243-255` (`list_domain_events`)
   - `any(msgs for _, msgs in entries)` decides whether the PEL was empty
   - the PEL and `>` are read in the same tick, or with `XAUTOCLAIM` on min-idle, so deferred
@@ -1780,6 +1780,7 @@ create, start, update and complete registers the tasks-surface signal (`tasks_cr
 `tasks_updates.py:19,85,112`). The frequent refresh tasks v3 adds must do none of that.
 
 **Files:**
+
 - Modify: `app/crate/task_registry.py` (`TaskTypeInfo.notify: bool = True`, `TaskTypeInfo.quiet: bool = False`)
 - Modify: `app/crate/actors.py` (skip `notify_task_completed` when `notify` is false; skip the
   global publish when `quiet`)
@@ -1799,8 +1800,9 @@ Commit: `feat(tasks): add notify and quiet flags to task types`.
 #### Task 2.11b: Serve stale ops surfaces and coalesce their refreshes `[BEHAVIOUR]`
 
 **Files:**
+
 - Create: `app/crate/coalesce.py` (Conventions → coalescing): `schedule_coalesced(key, task_type,
-  params, window_seconds)` and `dispatch_due()` over `crate:coalesce:due`; the due step runs in
+params, window_seconds)` and `dispatch_due()` over `crate:coalesce:due`; the due step runs in
   `app/crate/worker.py` `_run_service_loop` (crate-worker only), which also warms new surfaces
   once at start (deduplicated)
 - Create: `app/crate/db/ui_snapshot_serving.py` (part of the `ui_snapshot_*` family)
@@ -1856,6 +1858,7 @@ the stream, find the surface stale and schedule another refresh: one task per de
 forever, while any Tasks or History tab is open.
 
 **Files:**
+
 - Create: `app/crate/admin_viewers.py` (Conventions → demand gating): key constants per surface;
   `async def amark_viewer(*surfaces)` (one pipelined `SET admin:live:viewers:<surface> 1 EX 60` on
   `api/redis_sse.get_async_redis()`); sync `mark_viewer(*surfaces)` and `has_viewers(surface)` for
@@ -1881,6 +1884,7 @@ Commit: `perf(admin): build the tasks surface in one worker thread`.
 #### Task 2.12: SSE reads off the event loop; pubsub on several channels (B4)
 
 **Files:**
+
 - Modify:
   - `app/crate/api/admin_ops.py:44`, `app/crate/api/management.py:191`, `app/crate/api/events.py:92`: reads in `asyncio.to_thread`, debounced, never build
   - `app/crate/api/redis_sse.py`: `open_pubsub(*channels)`, `close_pubsub`
@@ -1893,21 +1897,20 @@ Commit: `perf(api): read SSE payloads off the event loop`.
 
 #### Task 2.13: Play events by end time (V8) and one presence count
 
-This is the first v3 migration. It is not gated on PD2: `main` is canonical for numbers
-(Conventions → migrations), and the index is a pure performance fix for code already on `main`
-(the dispatch-path governor, `actors.py` and `build_runtime_payload`), so it ships in R0 or with the
-Ops group, whichever is ready first. Smart Mix renumbers with the script below when it next merges
-`main`.
+This performance index is assigned independently or integrated before Ops. After Smart Mix is on
+`main` and v3 has rebased, take the actual migration head plus one; do not use the old 108/114
+snapshot as current state. Re-evaluate any renumber helper against what the Smart Mix integration
+already provided. A stamp/backup recipe applies only to databases proven to need it and requires
+its own operational approval. `main` remains canonical for numbering.
 
 **Files:**
-- Create: `scripts/db/renumber_migrations.py`: renames a branch's revisions above `main`'s head
-  (`NNN_*.py`), rewrites their `revision`/`down_revision` literals, renames the
-  `schema_sections/*_vNNN.py` files and their imports in the revisions and the bootstrap, and
-  updates the head assertion in `test_crate_schema_definition.py`; `--dry-run` prints the plan. Its
-  `--help` carries the stamp recipe for databases that already applied the old numbers (dev and lab
-  at `alembic_version` 114): `alembic stamp <new head>` after the renumbered code is deployed, with
-  a backup first. Test `app/tests/test_renumber_migrations.py` (on a temporary copy of a versions
-  folder with inline-DDL and section-file revisions, like Smart Mix's 109/110 and 111–114)
+
+- Conditional: reuse `scripts/db/renumber_migrations.py` if Smart Mix integration supplied it.
+  Add or extend it only when inspection proves a remaining unmerged branch needs renumbering;
+  otherwise omit this helper and its proposed commit. It must dry-run the revision/section-file/
+  bootstrap/head-test mapping and test inline-DDL and section-file fixtures. Do not assume a
+  database is at revision 114 or run a stamp from a historical example. Any repair recipe is
+  specific to the inspected database/schema and separately approved after backup.
 - Create: `app/crate/db/migrations/versions/NNN_user_play_events_ended_at.py` (`CREATE INDEX CONCURRENTLY idx_user_play_events_ended_at ON user_play_events (ended_at DESC)` inside `autocommit_block`)
 - Create: `app/crate/db/schema_sections/activity_vNNN.py`
 - Modify: `app/crate/db/queries/management.py`
@@ -1926,7 +1929,7 @@ Ops group, whichever is ready first. Smart Mix renumbers with the script below w
 
 Commits:
 
-- `chore(db): add a migration renumbering script for unmerged branches`
+- `chore(db): add a migration renumbering script for unmerged branches` (only if the conditional helper work remains necessary)
 - `perf(db): index play events by end time for presence counts`
 
 ### 2C — Contracts for the P0 instruments
@@ -1934,7 +1937,9 @@ Commits:
 #### Task 2.14: One Admin live stream
 
 **Files:**
+
 - Create: `app/crate/api/admin_live.py`. Route `GET /api/admin/live-stream?surfaces=...`:
+
   - surface registry `{name: (capability, channel, kind, reader)}`;
   - at connect, filter to allowed surfaces; 403 only when none is allowed; 400 on an unknown name;
   - snapshot surfaces re-read the row by primary key with `asyncio.to_thread(get_ui_snapshot)` on
@@ -1949,6 +1954,7 @@ Commits:
   Initial surfaces: `queues`, `governor`, `health` (which carries two event types, `health` and
   `health-scan`; `health-scan` is not a separate surface). Later tasks add `pipeline`, `redis` and
   `federation`.
+
 - Modify: `app/crate/api/__init__.py` (`create_app()` registers the router with an existing ops tag)
 - Modify: `app/crate/api/schemas/operations.py` (event payload models)
 - Test:
@@ -1972,6 +1978,7 @@ Commit: `feat(admin): add one live stream for the v3 instruments`.
 #### Task 2.15a: Structured deferrals (V12) and worker heartbeats
 
 **Files:**
+
 - Modify: `app/crate/resource_governor.py`
   - add `deferral_progress(family, reason, until)` with the canonical JSON prefix
     `{"phase": "deferred"`
@@ -1993,19 +2000,15 @@ Commit: `feat(worker): record structured deferrals and worker heartbeats`.
 #### Task 2.15b: Queue lanes query, payload and writer
 
 **Files:**
+
 - Create: `app/crate/db/queries/task_queues.py`
   - `get_queue_lanes_activity(pending_per_queue=5, running_per_queue=10, recent_per_queue=5, *, session=None)`,
-    one CTE:
-    - counts per pool on active statuses;
-    - pending top N as one `LATERAL` per pool (`WHERE status='pending' AND pool=:p ORDER BY
-      priority, created_at LIMIT :n`, plus a `pool IS NULL` branch read as `default`), so each
-      branch uses the partial index `(pool, priority, created_at) WHERE status='pending'`. No
-      `ROW_NUMBER() OVER (PARTITION BY …)`: it sorts every pending row on each run (thousands
-      during an import or enrichment backlog) and cannot use that index;
-    - running = `running | delegated | completing`;
-    - recent terminal rows in the last 10 minutes and 5-minute throughput, bounded by
-      `created_at > now() - interval '1 day'` (or a partial index; see step 4);
-    - deferred counted with `progress LIKE '{"phase": "deferred"%'`, never a jsonb cast.
+    one CTE: - counts per pool on active statuses; - pending top N as one `LATERAL` per pool (`WHERE status='pending' AND pool=:p ORDER BY
+priority, created_at LIMIT :n`, plus a `pool IS NULL` branch read as `default`), so each
+    branch uses the partial index `(pool, priority, created_at) WHERE status='pending'`. No
+    `ROW_NUMBER() OVER (PARTITION BY …)`: it sorts every pending row on each run (thousands
+    during an import or enrichment backlog) and cannot use that index; - running = `running | delegated | completing`; - recent terminal rows in the last 10 minutes and 5-minute throughput, bounded by
+    `created_at > now() - interval '1 day'` (or a partial index; see step 4); - deferred counted with `progress LIKE '{"phase": "deferred"%'`, never a jsonb cast.
 - Create: `app/crate/ops_queues.py` (outside `db/`)
   - `build_queues_surface_payload()` merges:
     - `TASK_POOL_CONFIG` counts;
@@ -2018,6 +2021,7 @@ Commit: `feat(worker): record structured deferrals and worker heartbeats`.
   never the serial service loop, where it would stall behind `ImportQueue.refresh_pending_state()`
   and the scheduler). `publish_tasks_surface_signal` fires on every `update_task` progress write,
   so with any active task the dirty flag is always set; the cadence therefore is:
+
   - while `admin:live:viewers:queues` exists: rebuild when `GETDEL crate:ops:queues:dirty` is set,
     at most once per 3 s;
   - otherwise: rebuild every 15 s, only for `worker_live`.
@@ -2027,6 +2031,7 @@ Commit: `feat(worker): record structured deferrals and worker heartbeats`.
   the viewer key once per second, so a new viewer gets a fresh row within about 1 s (never sooner
   than 3 s after the previous rebuild), and the GET serves the stale row meanwhile. `worker_live` is derived from the same query (retiring the full-table scan) and is
   still written every 15 s, not at the rebuild cadence.
+
 - Modify: `app/crate/db/admin_tasks_surface.py` (`publish_tasks_surface_signal` also sets the dirty key, EX 60)
 - Optional: migration `NNN_tasks_terminal_partial_index.py`, only if `EXPLAIN` on production shows a
   scan
@@ -2060,6 +2065,7 @@ Commit: `feat(worker): record structured deferrals and worker heartbeats`.
 #### Task 2.15c: Queue endpoint and task-catalog flags
 
 **Files:**
+
 - Modify: `app/crate/api/admin_ops.py` (`GET /api/admin/queues`, `ops.tasks.manage`, reads the row, `{warming: true, ...static counts}` when it is missing)
 - Modify: `app/crate/api/schemas/operations.py` (`QueuesSurfaceResponse`, PD §4.8)
 - Modify: `app/crate/api/tasks.py` (`api_task_catalog`) and `app/crate/api/schemas/tasks.py` (`TaskCatalogResponse`)
@@ -2075,6 +2081,7 @@ Commit: `feat(worker): record structured deferrals and worker heartbeats`.
 - Modify: `app/crate/api/admin_live.py` (`queues` surface)
 - Modify: `app/crate/db/queries/tasks.py` and `app/crate/api/tasks.py` (`list_tasks` gains a `pool` filter for `?queue=`)
 - Test: `app/tests/test_tasks_api.py`
+
   - the endpoint never builds;
   - permission is enforced;
   - catalog flags equal `TASK_POOL_CONFIG` and the frozensets;
@@ -2092,6 +2099,7 @@ Commit: `feat(api): expose queue lanes and task catalog flags`.
 #### Task 2.16: Governor sampler and surface (fixes B3)
 
 **Files:**
+
 - Modify: `app/crate/resource_governor.py`
   - pure `load_limits()` and `evaluate_snapshot()`; `evaluate_resources` uses them, wording
     unchanged
@@ -2146,6 +2154,7 @@ Commits:
 #### Task 2.17a: Health labels move into the repair catalog
 
 **Files:**
+
 - Modify: `app/crate/repair_catalog.py`
   - `label=` and `description=` keyword arguments appended after the positional strings of every
     `RepairCatalogEntry` (the site's positional parser keeps working); labels in Title Case
@@ -2164,6 +2173,7 @@ Commit: `refactor(health): move check labels into the repair catalog`.
 #### Task 2.17b: Per-check results and scan events
 
 **Files:**
+
 - Create: migration `NNN_health_check_results.py` and `app/crate/db/schema_sections/health_vNNN.py`
   - `health_check_runs.task_id`, `last_error`
   - `health_issues.resolution` (`repaired|disappeared|manual|dismissed`), `resolved_task_id`
@@ -2212,12 +2222,18 @@ interface HealthCheckIssuesPage {
   check_type: string;
   total_issues: number;
   total_artists: number;
-  artists: Array<{ artist_id: number | null; artist: string | null; issue_count: number; issues: HealthIssue[] }>;   // existing issue shape, ≤ 100 per artist
+  artists: Array<{
+    artist_id: number | null;
+    artist: string | null;
+    issue_count: number;
+    issues: HealthIssue[];
+  }>; // existing issue shape, ≤ 100 per artist
   next_cursor: string | null;
 }
 ```
 
 **Files:**
+
 - Modify: `app/crate/db/queries/health_issues.py` (`get_health_check_summary_rows(*, session=None)`: one CTE grouping open issues on `idx_health_issues_open_identity`, the 17 run rows, the quarantined album count and the trash totals from `trash_track_files`)
 - Modify: `app/crate/db/admin_health_surface.py` (orchestration only)
   - `build_health_checks_payload` (PD §4.2 fields, including `trash.albums_quarantined`)
@@ -2280,6 +2296,7 @@ Release note: `fix-type` requires `{confirm: true}` for checks that need confirm
 #### Task 2.17d: Pipeline phases and the unattended set (PD24) `[MAIN]` `[BEHAVIOUR]`
 
 **Files:**
+
 - Modify: `app/crate/worker_handlers/management.py`
   - `_handle_library_pipeline` runs health → repair → sync and closes the health part after
     repair
@@ -2307,6 +2324,7 @@ quarantine root on every request. The Health footer (P0) links to `/trash` with 
 Trash `StatStrip` (Task 6.4) shows files and size, so both need an index the worker maintains.
 
 **Files:**
+
 - Create: migration `NNN_trash_track_files.py` and `app/crate/db/schema_sections/trash_vNNN.py`
   (`trash_track_files`: `quarantine_path` PK, `size`, `mtime`, `artist`, `album`, `title`,
   `format`, `quarantined_at`, `source_track_id`)
@@ -2329,6 +2347,7 @@ Commit: `perf(trash): read the trash from an index the worker maintains`.
 #### Task 2.18a: The EQ inheritance path from every resolver
 
 **Files:**
+
 - Modify: `app/crate/genre_taxonomy.py:1043`
   - `resolve_genre_eq_preset` tracks predecessors and returns `path` and `template`
   - export `EQ_TEMPLATES`, built from the `_EQ_*` constants; keep the literals and the
@@ -2372,6 +2391,7 @@ Commit: `feat(genres): return the EQ inheritance path from every resolver`.
 #### Task 2.18b: Genre wheel snapshot builder and triggers
 
 **Files:**
+
 - Create: `app/crate/db/jobs/genre_wheel.py`. `build_genre_wheel_payload(scope)`:
   - reads `genre_taxonomy:revision` first;
   - one CTE over `artist_genres`, `album_genres`, aliases and `library_albums.track_count`
@@ -2448,10 +2468,11 @@ Commit: `feat(genres): build the taxonomy wheel snapshot in a task`.
 
 #### Task 2.18c: Wheel endpoint; remove request-time genre aggregates (B7) `[BEHAVIOUR]`
 
-Ships with the Genres release group (2.18a–e, 3.7), not early: the v2 Genres page and shipped
+Ships with the Genres internal milestone (2.18a–e, 3.7), not early: the v2 Genres page and shipped
 Listen builds read the endpoints it changes.
 
 **Files:**
+
 - Modify: `app/crate/api/genres.py`
   - `GET /api/admin/genres/wheel` (permission `library.view`, PD §4.6.3): plain `def`; returns `ready`/`stale` with
     the payload, or `warming` with a `task_id` that may be null
@@ -2497,6 +2518,7 @@ thresholds, so Listen and Admin would show different numbers and the request-tim
 remain. PD §4.6.3 item 6 makes the builder write the counts and the Go routes read them.
 
 **Files:**
+
 - Create: migration `NNN_genre_counts.py` and `app/crate/db/schema_sections/library_vNNN.py`:
   `genre_counts` (`genre_id` PK, `artists`, `albums`, `tracks`, `computed_at`), additive,
   `CREATE TABLE IF NOT EXISTS`; updates `test_crate_schema_definition.py`
@@ -2541,6 +2563,7 @@ new columns the old seeder never writes, so an image rollback cannot overwrite t
 canonical; Task 0.4 rewrites PD §4.6.3 item 5, the PD §5.3.4 G1 row and DS §4.3 to match.
 
 **Files:**
+
 - Create: migration `NNN_genre_overrides.py` and `app/crate/db/schema_sections/library_genres_vNNN.py`
   - `genre_taxonomy_nodes.local_eq_gains`, `eq_override` (`none|set|cleared`, so "clear to
     inherit" is representable on a core node), `local_name`, `local_description`
@@ -2561,7 +2584,7 @@ canonical; Task 0.4 rewrites PD §4.6.3 item 5, the PD §5.3.4 G1 row and DS §4
     `suppressed`
 - Modify: `app/crate/db/jobs/genre_wheel.py` (2.18b): `nodes[].eq.overridden = eq_override <> 'none'`;
   `totals.overridden_nodes` counts nodes with `eq_override <> 'none' OR local_name IS NOT NULL OR
-  local_description IS NOT NULL`
+local_description IS NOT NULL`
 - Modify: `app/tests/fixtures/genre_eq_path_cases.json` (2.18a): override and cleared cases
 - Test:
   - `app/tests/test_genre_taxonomy.py`:
@@ -2587,6 +2610,7 @@ Release note: core-genre EQ and metadata edits persist across restarts and image
 Separate from 2.18d so the override model ships and is observed on its own.
 
 **Files:**
+
 - Modify: MusicBrainz sync (`genre_descriptions.py`, `sync_musicbrainz_genre_graph_batch`) writes
   `source="musicbrainz"`; the health AI filter reads `ai_proposal` (G3). The 2.18b provenance
   fallback for legacy `manual` + `created_by IS NULL` edges stays for rows written before this
@@ -2608,6 +2632,7 @@ Release note: "Generate with AI" previews instead of applying.
 #### Task 2.19: Effective EQ chain in one query (B8)
 
 **Files:**
+
 - Create: `app/crate/db/queries/equalizer_resolution.py`
   - `get_track_eq_resolution_inputs(key, user_id, *, session=None)`, where the key is a global
     uid, entity uid or track id
@@ -2660,6 +2685,7 @@ authenticated user through `/api/stats/dashboard`, and shipped Capacitor builds 
 client rule.
 
 **Files:**
+
 - Modify: `app/crate/db/queries/user_library_stats_signal.py`
   - `_heatmap` adds `night_hours` (from `_NIGHT_HOURS`)
   - the instance builder adds `listener_count` (in the same CTE pass as the heatmap)
@@ -2687,21 +2713,18 @@ Release note: Crate Pulse shows no listening hours on servers with fewer than 3 
 
 ### Checkpoint 2
 
-1. 2A ships to production as patch releases (`v2.6.x`) via `make deploy-preflight` and
-   `make deploy`. Each 2B task ships alone as soon as it is green. 2C tasks ship with their
-   release group, or earlier only when the consumer table in the Phase 2 intro says they have no
-   consumer.
-2. On production, read-only and with Diego's approval:
-   - `XINFO GROUPS crate:domain_events` shows lag going down;
-   - `make pg-perf-snapshot` shows no request-time builds;
-   - `EXPLAIN` of the queues, health summary, genre wheel and EQ resolution CTEs.
-3. Diego confirms the release notes for each `[BEHAVIOUR]` item.
+1. Review assigned 2A/2B results and actual compatibility tests. Their independent operational
+   releases need explicit approval; 2.10 and 2.11a–c retain their isolated observation protocols.
+   Integrate 2C contracts before the matching UI milestone; no intermediate public UI release.
+2. Only with Diego's approval, record production evidence: domain-event lag, request-time build
+   absence and the new CTE plans. Local implementation does not imply this gate has passed.
+3. Diego reviews each `[BEHAVIOUR]` diff and release-note entry. The joint P0 major stays gated.
 
 ---
 
 ## Phase 3 — Admin instruments
 
-P0 first, in release-group order (Genres, then Operations and the shell, then Health and the
+P0 first, in internal-milestone order (Genres, then Operations and the shell, then Health and the
 Dashboard; Rollout → Milestones), then the rest of the Admin chapters in priority order:
 
 - Analysis readout (P1)
@@ -2716,10 +2739,11 @@ screenshot harness of Task 0.11, and one lazy-route assertion to `App.bundle.tes
 
 ### Task 3.1: Admin building blocks
 
-Lands with the first release group (Genres): 3.7 needs `PageHeading`, the Nivo theme and the
+Lands with the first internal milestone (Genres): 3.7 needs `PageHeading`, the Nivo theme and the
 Admin scramble.
 
 **Files:**
+
 - Create: `app/ui/src/components/layout/PageHeading.tsx` (eyebrow `MonoLabel`, display title in `text-display-page` with `tracking-headline`, lede, meta, actions), test `PageHeading.test.tsx`
 - Modify: `app/shared/ui/tokens/typography.css` (`--text-display-page` and `--tracking-headline`,
   DS §1.9.4, their first consumer) and `app/shared/ui/lib/cn.ts` (register both keys); drift
@@ -2741,7 +2765,7 @@ Admin scramble.
   - tests `AdminLiveProvider.test.tsx`: no EventSource while no surface is registered, and exactly one once the first registers; one EventSource across N updates; a 403 surface is never
     requested; the URL updates only when the surface set changes; after 30 s hidden there is no
     open EventSource (so no viewer key is renewed) and becoming visible reopens exactly one
-- Create: `app/ui/src/lib/nivo-theme.ts` (token-resolved through `readCssColorToken`, re-resolved on appearance change), test `nivo-theme.test.ts`
+- Create: `app/ui/src/lib/nivo-theme.ts` (token-resolved through `readCssColorToken`, resolved from the single Crate v3 tokens), test `nivo-theme.test.ts`
 - Modify (every Nivo theme in Admin moves to `nivo-theme.ts`, so none is missed): the 3
   `NIVO_THEME` constants (`components/album/AudioProfileCard.tsx:30`, which 3.9b later deletes;
   `components/artist/ArtistStats.tsx:9`; `pages/Insights.tsx:67`) and the 6 inline
@@ -2775,6 +2799,7 @@ Admin scramble.
 ### Task 3.2: Admin shell chrome
 
 **Files:**
+
 - Modify: `app/ui/src/components/layout/Sidebar.tsx`
   - `MonoLabel` group labels; regrouped if PD14 = (a)
   - active item with a 2 px `accent-action-hi` bar
@@ -2808,6 +2833,7 @@ Admin scramble.
 ### Task 3.3: Dashboard tiles and the health tile (P0 · M)
 
 **Files:**
+
 - Create: `app/ui/src/components/health/HealthScanTile.tsx`
   - 17 bars in catalog order: unattended checks full width, confirm checks at 82%
   - tone from `checkTone`; waiting issues as a `StatNumber`
@@ -2859,6 +2885,7 @@ Admin scramble.
 ### Task 3.4: Tasks page with QueueLanes (P0 · L; fixes B10)
 
 **Files:**
+
 - Create: `app/ui/src/components/ops/queue-lanes-model.ts`, test `queue-lanes-model.test.ts`. Pure
   `reconcileLanes(prev, surface, width)` returns chip intents and zone targets:
   - queued: fit count by width, plus `+N`;
@@ -2920,6 +2947,7 @@ Admin scramble.
 `@crate/ui/lib/spring.ts`. Do not pull 3.5 ahead of 4.3.
 
 **Files:**
+
 - Create: `app/ui/src/components/ops/governor-format.ts` (scale, sticky upward scale, status copy, announcement, `any listener defers` when the limit is 0), test `governor-format.test.ts`
 - Create: `app/ui/src/components/ops/governor-store.ts` (external store; `useSyncExternalStore` for the discrete verdict, window and staleness only; values flow through `store.subscribe` into springs), test `governor-store.test.ts`
 - `GovernorGauges` imports `@crate/ui/lib/spring.ts` directly: Admin becomes its second, direct
@@ -2956,6 +2984,7 @@ Admin scramble.
 ### Task 3.5b: System residue (P1 · M; coverage A16)
 
 **Files:**
+
 - Modify: `app/ui/src/pages/SystemHealth.tsx`
   - XL health score as `StatNumber size="xl"`
   - API latency strip on hairlines
@@ -2972,6 +3001,7 @@ Commit: `feat(ui): restyle System metrics as small multiples`.
 ### Task 3.6: Health page with HealthScan (P0 · L+)
 
 **Files:**
+
 - Create: `app/ui/src/components/health/health-scan-model.ts` (pure reducer), test `health-scan-model.test.ts`
   - 150 ms minimum dwell queue
   - reconnect merge with `running`
@@ -3030,6 +3060,7 @@ porting, run the site re-sync step (plan header: pinned site reference) for
 `site:src/scripts/viz/taxonomy-math.ts` and `genre-view.ts`.
 
 **Files:**
+
 - Create: `app/ui/src/lib/genre-wheel-math.ts`, test `genre-wheel-math.test.ts`
   - port of `site:src/scripts/viz/taxonomy-math.ts` (`buildTaxonomy`, `radialLayout`) with:
     - visited-set guards;
@@ -3065,7 +3096,7 @@ porting, run the site re-sync step (plan header: pinned site reference) for
 - Modify: `app/ui/src/components/genres/GenreTaxonomyTree.tsx`
   - `:617` passes `initialGains` only for direct presets and uses display names
   - remove the dead "Generate playlist" action at `:951` (G9)
-- EQ writes on core genres stay enabled: Tasks 2.18d and 2.18e, in the same release group and
+- EQ writes on core genres stay enabled: Tasks 2.18d and 2.18e, in the same internal milestone and
   landed before this task, make them persist, so nothing is disabled.
 - Test:
   - `genre-wheel-math.test.ts`
@@ -3099,6 +3130,7 @@ and suppression in Task 2.18d; MusicBrainz provenance, the cycle guard and AI dr
 2.18e) ships before Task 3.7.
 
 **Files:**
+
 - Modify: `GenreWheelInspector.tsx` (edit EQ, reset to core, link mode, unmapped mapper; if
   PD18 = (a), a "Hide on this server" action on locked core edges, drawn dashed when
   `edges[].suppressed`), `GenreEqEditor.tsx` (ghost of the persisted curve; consumes the PATCH
@@ -3116,6 +3148,7 @@ Commit: `feat(ui): edit relations, aliases and EQ from the genre wheel`.
 Camelot is not part of this task: `app/crate/camelot.py` and its fixture come from Task 2.9b.
 
 **Files:**
+
 - Create: `app/crate/db/queries/track_analysis_readout.py`
   - `get_album_track_analysis`
   - `get_recent_analysed_tracks`
@@ -3146,7 +3179,7 @@ Camelot is not part of this task: `app/crate/camelot.py` and its fixture come fr
 - Modify: `app/crate/api/management.py:1479-1497` (`/api/manage/analysis-status`): returns
   `build_analysis_payload()` (reads `ops_runtime_state`, `_empty_analysis_payload()` when missing)
   and never calls `get_analysis_status()`, whose cold path runs `SELECT COUNT(*) FROM
-  library_tracks` plus a `MATERIALIZED` regexp CTE over every track
+library_tracks` plus a `MATERIALIZED` regexp CTE over every track
 - Modify: `/info` adds `bliss_vector`, rounded and clamped identically in:
   - `app/crate/api/browse_media.py` (`_serialize_track_info_row`), `api/schemas/media.py`
     (`TrackInfoResponse`) and the `api/catalog.py` allowlist (at most 20 floats);
@@ -3181,6 +3214,7 @@ Release note: re-analysing an album that is already queued returns the queued ta
 ### Task 3.9b: Shared `TrackReadout` in Admin Analysis, Admin Album and Listen Info tab
 
 **Files:**
+
 - Create: `app/shared/ui/domain/analysis/TrackReadout.tsx` (props only; title slot for the Admin scramble; `reducedMotion` prop; `dl` figures; five feature bars; 20-bar bliss strip; springs through refs from `@crate/ui/lib/spring.ts`), test `TrackReadout.test.tsx`
 - Create: `app/shared/ui/lib/camelot.ts`, test `camelot.test.ts`. It reads `app/tests/fixtures/camelot_cases.json` (Task 2.9b): a drift test against Python.
   - Only the shared `TrackReadout` imports it, and `export-usage-policy.test.ts` follows
@@ -3188,8 +3222,9 @@ Release note: re-analysing an album that is already queued returns the queued ta
     `export { toCamelot } from "../../lib/camelot"`; Listen's track-row meta (`124 · 8A`, Task
     6.13) later becomes a direct importer
 - Modify: `app/shared/ui/tokens/typography.css` and `app/shared/ui/lib/cn.ts`:
-  `--text-display-readout` (DS §1.9.4, its first consumer), declared with a rem `font-size` before
-  the `cqi` value (Task 0.13 rule); drift ceilings +1
+  `--text-display-readout` (DS §1.9.4, its first consumer), with a guarded fallback verified after
+  compilation/minification when this later task implements it; update only the measured drift
+  metric affected, with no automatic root semantic-definition ceiling increase
 - Create: `app/ui/src/components/analysis/LatestAnalysisPanel.tsx` (chips, "Latest" follows new arrivals, a chip pins), `AlbumAnalysisPanel.tsx` (selection from `TrackTable`; Re-analyse with `library.analysis.manage`; 10 s polling while tracks are pending, page visible only, 10 min cap), tests
 - Modify:
   - `app/ui/src/pages/Analysis.tsx`: coverage 5fr and readout 7fr; the empty state is not
@@ -3219,6 +3254,7 @@ Commit: `feat(analysis): show one track readout in Admin and Listen`.
 ### Task 3.10a: Album sidecar backend (P1 · M)
 
 **Files:**
+
 - Create: migration `NNN_album_portable_metadata_state.py` and `app/crate/db/schema_sections/library_vNNN.py`. New `album_portable_metadata` columns:
   `schema_version`, `payload_digest`, `section_digests`, `artwork_files`, `rehydrated_at`,
   `last_task_id`, `last_error`, `catalog_changed_at` (`ADD COLUMN IF NOT EXISTS`, nullable).
@@ -3280,6 +3316,7 @@ Commit: `feat(sidecar): track portable metadata sync per album`.
 ### Task 3.10b: Album sidecar panel
 
 **Files:**
+
 - Create: `app/ui/src/lib/json-lines.ts` (port of `site:src/lib/json-lines.ts` without `typedAt`) and its ported test
 - Create: `app/ui/src/hooks/use-auto-follow-scroll.ts` (yields on wheel, pointer or key; reused by Logs in 5.1), test
 - Create: `app/ui/src/components/album/portable-metadata/{PortableMetadataPanel,SidecarTree,SidecarJson,SidecarFlow}.tsx`, `use-portable-metadata.ts`, tests
@@ -3297,6 +3334,7 @@ Commit: `feat(ui): show the album sidecar and its sync state`.
 ### Task 3.11a: Release lifecycle backend (P1 · L)
 
 **Files:**
+
 - Create: migration `NNN_new_release_lifecycle.py` and `app/crate/db/schema_sections/acquisition_vNNN.py`
   - columns: `library_album_id`, `download_task_id`, `download_queued_at`, `import_task_id`,
     `imported_at`, `analysed_at`, `failed_stage`, `last_error`, `lifecycle_reason`,
@@ -3331,6 +3369,7 @@ Commit: `feat(acquisition): track each new release from detection to analysis`.
 ### Task 3.11b: ReleaseRail on New Releases
 
 **Files:**
+
 - Create: `app/ui/src/components/admin/StepRail.tsx` (shared by release, setup, imports and key rotation; vertical under a 900 px container), test
 - Create: `app/ui/src/components/acquisition/{ReleaseRail,ReleaseRailCompact}.tsx`, `release-lifecycle.ts` (`clockLabel`, `railProgress`, `stageTitle`), tests
 - Modify: `app/ui/src/pages/NewReleases.tsx`
@@ -3357,6 +3396,7 @@ reach Fetched, Imported or Analysed on the ReleaseRail, one of the site mocks be
 **If PD27 = (a)** (the recommendation):
 
 **Files:**
+
 - Modify: `app/crate/db/jobs/acquisition.py` (`mark_imported`, `link_downloaded_albums`): for any
   import source, match a `new_releases` row to the imported `library_albums` row by
   `new_releases.mb_release_group_id = library_albums.musicbrainz_releasegroupid` first, then by
@@ -3380,6 +3420,7 @@ with a `ReleaseRail.test.tsx` case, and the stage copy says so.
 ### Task 3.12a: Enrichment sources backend (P2 · L) `[BEHAVIOUR]`
 
 **Files:**
+
 - Create: migration `NNN_artist_enrichment_sources.py` and `app/crate/db/schema_sections/enrichment_sources_vNNN.py`
 - Modify: `app/crate/enrichment.py`
   - add the `FetchOutcome`, lane, wait and fetch timings, and `force_sources` (skips min-age and
@@ -3409,6 +3450,7 @@ Commit: `feat(enrichment): record each source fetch per artist`.
 ### Task 3.12b: EnrichmentOrbit tab
 
 **Files:**
+
 - Create: `app/ui/src/components/artist/enrichment/{EnrichmentOrbit,PoolLanes}.tsx`, `orbit-math.ts`, `run-model.ts`, `orbit-frame.ts`, tests (outer offset −π/2 + π/7)
 - Create: `app/ui/src/components/artist/ArtistEnrichmentPanel.tsx` (lazy), `app/ui/src/hooks/use-artist-enrichment-sources.ts`, `use-enrichment-run.ts` (open `EventSource` first, then GET, then filter `enrichment.source`)
 - Modify:
@@ -3427,6 +3469,7 @@ Only if PD29 = (a) (the Task 0.3 recommendation); with (b) the Settings toggles 
 (`app/ui/src/pages/Settings.tsx`, a page test) and this task is "no backend work".
 
 **Files:**
+
 - Modify: `app/crate/enrichment.py`: each provider fetch checks the `enrichment_sources` setting
   (`api/settings.py`, `VALID_ENRICHMENT_SOURCES`); a disabled source is skipped and recorded as
   `disabled` in the 3.12a source rows (instrumentation below the constant definitions, site drift)
@@ -3447,6 +3490,9 @@ Commit: `feat(enrichment): honour source toggles`.
 Release note: enrichment sources switched off in Settings are no longer fetched.
 
 ### Checkpoint 3
+
+Apply this review to the Admin milestone just completed. The P0 major reviews Dashboard, Tasks,
+Health and read-only Genres; gauges/editing/readouts are later P1 work and do not expand the P0 gate.
 
 Diego reviews in the dev stack with real data:
 
@@ -3486,6 +3532,7 @@ Every task re-records the affected baselines and runs `BUNDLE`.
 ### Task 4.1: Shell chrome and client loops (P0 · M; B24)
 
 **Files:**
+
 - Modify:
   - `app/listen/src/components/layout/sidebar/Sidebar.tsx` (active bar, mono labels; the
     Discovery-radio glow driven by `useAudioVisualizer` at `:7,21` removed)
@@ -3522,6 +3569,7 @@ Every task re-records the affected baselines and runs `BUNDLE`.
 ### Task 4.2: Player bar, fullscreen, extended player and queue (P0 · M)
 
 **Files:**
+
 - Modify: `app/listen/src/components/player/PlayerBar.tsx`, `bar/*`
   - title in display 700; mono time codes written by ref
   - hairline seek that grows on hover; round play disc; ghost icons
@@ -3541,6 +3589,7 @@ Commit: `feat(listen): restyle the player bar, fullscreen and queue`.
 ### Task 4.3: EQ live store and EQ glyph (P0 · M)
 
 **Files:**
+
 - Create: `app/listen/src/lib/equalizer-live-store.ts`
   - initialised lazily from `getEqualizerSnapshot()`
   - `publishEqualizerLiveState` deduplicates by value
@@ -3602,6 +3651,7 @@ Commit: `fix(eq): keep the last Smart EQ curve while the next track resolves`.
 ### Task 4.5: EQ panel v3, Smart EQ chain and the shared genre walk (P0 · M)
 
 **Files:**
+
 - Modify:
   - `app/listen/src/components/player/EqualizerPanel.tsx`
   - `EqualizerPanelSections.tsx`: trail as a `Readout`; 21 presets as `CratePill` toggles; chain
@@ -3644,6 +3694,7 @@ Commit: `feat(eq): explain the Smart EQ chain and its genre walk`.
 ### Task 4.6: Stats heatmap band, counters and the Home tile (P0 · M)
 
 **Files:**
+
 - Create: `app/listen/src/components/stats/heatmap-model.ts`, test `heatmap-model.test.ts`
   - `cellLevel`, `nowCell(tz, date)`, `msUntilNextHour(tz, date)`
   - DST in Europe/Madrid, America/St_Johns, Asia/Kathmandu, and an invalid timezone
@@ -3667,7 +3718,7 @@ Commit: `feat(eq): explain the Smart EQ chain and its genre walk`.
   - `scroll-margin-top`
   - the now outline only on the user's own stats
   - Crate Pulse labelled "listener local time"; when the server sends `hidden_reason:
-    "few_listeners"` (Task 2.20 hides it below 3 listeners, PD43) the band renders a one-line
+"few_listeners"` (Task 2.20 hides it below 3 listeners, PD43) the band renders a one-line
     hidden state instead of the zero grid
 - Modify: `StatsHeadlineNumbers.tsx` (`StatNumber size="xl"`; the top genre scrambles only when it
   changes, through the shared `@crate/ui/lib/scramble.ts` from 4.5), `CountUpNumber.tsx` (duration prop)
@@ -3692,6 +3743,7 @@ Commit: `feat(stats): show listening hours as a full heatmap band`.
 ### Task 4.7a: Setlist library match backend (P1 · M; PD5, B22) `[BEHAVIOUR]`
 
 **Files:**
+
 - Create: `app/crate/setlist_matching.py`
   - matcher moved from `app/crate/api/browse_artist.py:254-300`
   - hardened `contains` rule: word boundary, at least 4 characters, both directions
@@ -3734,6 +3786,7 @@ per-show fields are deprecated.
 ### Task 4.7b: Shared SetlistTicket in Listen and Admin (P1 · M)
 
 **Files:**
+
 - Create: `app/shared/ui/domain/shows/{SetlistTicket,ProbableSetlist}.tsx`, `app/shared/ui/domain/shows/setlist.ts`
   - `setlist.ts` gets explicit `exports` and `publishConfig.exports` entries in
     `app/shared/ui/package.json`
@@ -3770,6 +3823,7 @@ Commit: `feat(setlists): show in-library songs on one shared ticket`.
 ### Task 4.8a: Mood map backend (P1 · M; B6) `[BEHAVIOUR]`
 
 **Files:**
+
 - Create: `app/crate/moods.py` (`MOOD_PRESETS` moved from `app/crate/api/browse_media.py:1643`, plus `mood_region` and `third_axis`)
 - Create: `app/crate/db/jobs/explore_mood_map.py`
   - one `MATERIALIZED` features CTE
@@ -3820,10 +3874,11 @@ random order over every match.
 ### Task 4.8b: MoodMap on Explore (P1 · M)
 
 **Files:**
+
 - Create: `app/listen/src/components/explore/mood-map/MoodMap.tsx`, `mood-map-model.ts`, `use-mood-map-canvas.ts`, `use-mood-map-playback.ts`, tests
   - Canvas 2D
   - sprites from `readCanvasColorToken`, with alpha from parsed rgba
-  - `lighter` compositing on dark skins only
+  - `lighter` compositing on the fixed Crate v3 canvas
   - labels nudged so they do not collide
   - points cross-fade on a new version
 - Uses `@crate/ui/lib/scramble.ts` (moved to shared in Task 4.5) for the readout word.
@@ -3845,8 +3900,7 @@ random order over every match.
 - Test:
   - model tests: decode, region, label nudge, pick
   - `MoodMap.test.tsx`: warming, empty, error list fallback; offline-only disables Play; a
-    separate sr-only node; no canvas in jsdom does not throw; the sprites re-resolve on an
-    appearance change
+    separate sr-only node; no canvas in jsdom does not throw; the sprites resolve Crate v3 tokens and rebuild on canvas restoration
   - older server: `/api/browse/mood-map` 404 renders the hairline list
   - `app/listen/src/lib/cache.test.ts`: the three URLs resolve to `explore` and never to `library`
   - a new Explore landing baseline (fixture `/api/browse/mood-map`), `BUNDLE`, `I18N`
@@ -3864,6 +3918,7 @@ task route (formerly phase C of 5.11) lands here, before the route map, and the 
 shrink.
 
 **Files:**
+
 - Create: migration `NNN_music_paths_plan_meta.py` (`music_paths.plan_meta` JSONB plus a summary backfill)
 - Create task type `compute_music_path` (fast, priority 0, `notify=False`, registered in the five
   places): plans, refines with the LLM and writes the steps and `plan_meta` in the worker; emits
@@ -3905,6 +3960,7 @@ is deprecated in favour of the task route.
 ### Task 4.9b: Route map on Paths, phase A (P1 · L)
 
 **Files:**
+
 - Create: `app/listen/src/components/paths/{PathRouteMap,PathRouteGlyph,PathGenreRail}.tsx`, `path-route-layout.ts`, tests
   - SVG; `pathLength`
   - `:nth-child` delays in a recipe, no inline styles
@@ -3937,6 +3993,7 @@ Commit: `feat(paths): draw each path as a route through its genres`.
 ### Task 4.10a: Radio explain and bliss map backend (P1 · L)
 
 **Files:**
+
 - Modify: `app/crate/radio_engine.py`
   - per-pick terms captured in `_select_radio_candidate_from_rows`
   - a ring of 60 explanations, penalties rounded to 4 decimals
@@ -3971,9 +4028,10 @@ Commit: `feat(radio): explain each radio pick and precompute the sound map`.
 ### Task 4.10b: Sound map on Radio (P1 · L)
 
 **Files:**
+
 - Create: `app/listen/src/lib/sound-map/{math,projection,cloud,scene-math,radio-fit}.ts` (ports of `site:src/scripts/field/math.ts`, `decodeCloud`, `scene.ts` nearest and segment; projection tested against the shared fixture), tests
 - Create: `app/listen/src/components/sound-map/{sound-field,sound-field-2d}.ts`, `SoundMapFigure.tsx`
-  - WebGL2 with colours as uniforms from tokens, re-resolved on appearance change; handling
+  - WebGL2 with colours as uniforms from tokens, resolved from the single Crate v3 tokens; handling
     context lost and restored; DPR ≤ 2
   - Canvas 2D fallback
   - dynamic import
@@ -3993,7 +4051,7 @@ Commit: `feat(radio): explain each radio pick and precompute the sound map`.
   - pure math tests: fit, projection parity
   - panels: legacy queue, `global_catalog`, 404 back to idle
   - older server: `/api/bliss/map` 404 renders the hero without the map
-  - idle schedules no frame after the first; uniforms re-resolve on the appearance event
+  - idle schedules no frame after the first; uniforms resolve from the single Crate v3 tokens on mount/context restoration
   - `TEST_GAP:` for WebGL
   - a `/radio` baseline with the static fallback
   - `BUNDLE`: the renderer in a lazy chunk
@@ -4003,24 +4061,23 @@ Commit: `feat(radio): explain each radio pick and precompute the sound map`.
 
 Commit: `feat(radio): show the live session on the library sound map`.
 
-### Task 4.11: Visualizer palette source (PD40 / [D16]; P2 · S)
+### Task 4.11: Visualizer palette from Crate v3 tokens (PD40 / [D16]; P2 · S)
 
-**Files:**
-- Modify: `app/listen/src/components/player/visualizer/useVisualizerPalette.ts`,
-  `useVisualizerConfig.ts` and `visualizer-colors.ts`: a palette source `accent | album`, default
-  `accent` (cyan); the extended player tint and the visualizer read the album palette only when the
-  user opts in
-- Modify: the Listen visualizer settings (the existing visualizer section in
-  `components/settings/`) with an "Album colours" toggle; the 7 catalogs
-- Test: `useVisualizerConfig.test.ts` (default accent; opt-in uses the album palette; the
-  preference persists), `visualizer-colors.test.ts` (tokens re-resolve on appearance change),
-  `I18N`, the `home-player` baseline
+**Files:** `app/listen/src/components/player/visualizer/{useVisualizerPalette,useVisualizerConfig,visualizer-colors}.ts`
+and their tests, settings/catalog consumers identified in 1.13.
 
-Commit: `feat(listen): default the visualizer to the accent with an album opt-in`.
+Use fixed Crate v3 tokens for product chrome. Data-derived palettes inside the visualizer/artwork
+remain content; do not introduce a selectable skin or an album-palette chrome tint option. Task 1.13
+retires persisted overrides and theme controls; this later visualizer task must not reintroduce them.
+Album artwork remains content. Test the token palette, native/static fallback and any remaining
+functional visualizer settings; run `I18N`, focused tests and the single-identity `home-player` baseline.
+
+Proposed commit after approval: `refactor(listen): use Crate v3 tokens in the visualizer`.
 
 ### Task 4.12: Static analysed state for audio-reactive visuals on mobile (PD41; P2 · S)
 
 **Files:**
+
 - Modify: the analyser-driven components (`components/player/SpectrumPlayButton.tsx`, the
   visualizer family under `components/player/visualizer/`): on Capacitor (iOS and Android native
   playback, where no Web Audio analyser carries the signal) they render a static state from the
@@ -4034,6 +4091,10 @@ Commit: `feat(listen): show analysed state instead of live audio on mobile`.
 
 ### Checkpoint 4
 
+Review the Listen milestone just completed. The joint P0 gate covers shell/player/EQ/Stats plus
+existing ticket changes; complete moods, Paths, Radio and other P1/P2 reviews only when those
+tasks are assigned. Their list below is not additional scope for the P0 major.
+
 Diego tests on Listen web, Tauri (macOS and Linux), Android native and iOS Capacitor:
 
 - player and EQ (glyph and chain);
@@ -4044,8 +4105,7 @@ Diego tests on Listen web, Tauri (macOS and Linux), Android native and iOS Capac
 - Radio.
 
 `BUNDLE` stays at or below the Phase 0 baseline plus the agreed delta. The Linux baselines are
-re-recorded and reviewed. On iOS, the test device is the oldest supported version (16.4 if Task
-0.13 raised it; otherwise a named iOS 15 device).
+re-recorded and reviewed. On iOS, use the supported minimum 16.4 established by Task 0.13.
 
 ---
 
@@ -4061,6 +4121,7 @@ filter chips plus search, task-id links, auto-follow that yields to user input, 
 (seen within 60 s is on).
 
 **Files:**
+
 - Modify: `app/crate/api/admin_metrics.py` (`/api/admin/logs-snapshot`, served stale since
   Task 2.11b): an additive `workers` field read from the `crate:workers` hash and the
   `crate:workers:seen` sorted set of Task 2.15a (`{service, host, queues, last_seen_at}`; no
@@ -4094,6 +4155,7 @@ interactive work (covers, artwork, `refresh_admin_surface`), and with no window 
 event.
 
 **Files:**
+
 - Create:
   - `app/crate/db/queries/insights_surface.py` (the existing queries as one CTE where they share
     scans)
@@ -4126,6 +4188,7 @@ Commits:
 ### Task 5.3: Event pipeline band (P2 · M; requires 2.10)
 
 **Files:**
+
 - Create: `app/crate/event_pipeline.py` (pure record and redaction)
 - Modify:
   - `app/crate/domain_event_relay.py`, `app/crate/projector.py`: an optional `trace=` collector;
@@ -4156,6 +4219,7 @@ Commit: `feat(ops): trace domain events from outbox to projector`.
 release note (decision register, "Behaviour changes"); the Redis pair itself stays in the v3 work.
 
 **Files:**
+
 - Create: `app/crate/redis_runtime.py` (own short-timeout clients; `pipeline(transaction=False)`, `execute(raise_on_error=False)`)
 - Modify:
   - `app/crate/config.py`: `get_broker_redis_url` via `urlsplit`
@@ -4207,6 +4271,7 @@ only, single writer) against a read-only docker-socket-proxy service added to th
 leader lock is dropped. Everything else is the same.
 
 **Files:**
+
 - Modify: `app/crate/docker_ctl.py`
   - `get_container()` gains health, OOM, exit code, RW mount and labels
   - stats through `GET /containers/{id}/stats?stream=false&one-shot=true` (without `one-shot`
@@ -4276,8 +4341,8 @@ the threadpool that also serves Admin and the Listen fallback routes:
 // One get_cache_many read (Task 4.7a: Redis MGET, one `key = ANY(:keys)` fallback) of a cover cache
 // keyed by normalised (artist, album). Never calls a provider in the request.
 interface AcquisitionCoversResponse {
-  covers: Record<string, string | null>;   // hits only: key → URL, or null for a cached negative
-  task_id: string | null;                   // set when misses were enqueued
+  covers: Record<string, string | null>; // hits only: key → URL, or null for a cached negative
+  task_id: string | null; // set when misses were enqueued
 }
 ```
 
@@ -4287,6 +4352,7 @@ caches positive and negative results with a TTL, and publishes the hits on the t
 `publish_task_signal`; the client applies them as they arrive, or simply re-requests.
 
 **Files:**
+
 - Create: `app/crate/acquisition_runtime.py`, an `acquisition-sampler` daemon thread in
   crate-worker (service loop only; never in the serial loop, where a slskd call with a 10 s timeout
   would stall the scheduler and zombie cleanup). slskd and Tidal calls use a 2 s timeout. Cadence:
@@ -4296,9 +4362,9 @@ caches positive and negative results with a TTL, and publishes the hits on the t
     Tidal backlog lasts hours, and polling slskd every 2 s for nobody breaks the demand-gating
     rule;
   - not at all when idle with no viewers.
-  It writes the Tidal and Soulseek queues to `crate:runtime:acquisition` with a TTL plus a
-  publish, and persists `ops_runtime_state('acquisition')` only when the lane counts change or at
-  most once per 60 s.
+    It writes the Tidal and Soulseek queues to `crate:runtime:acquisition` with a TTL plus a
+    publish, and persists `ops_runtime_state('acquisition')` only when the lane counts change or at
+    most once per 60 s.
 - Modify: `app/crate/api/acquisition.py` (the stream and snapshot handlers; grep for the routes)
   - the stream forwards on pubsub, reads in `to_thread`, and calls
     `await amark_viewer("acquisition")` (Task 2.11c) on connect and on each heartbeat
@@ -4347,6 +4413,7 @@ there (one contract, no second shape here):
   by `task_id = ANY(:ids)`; it never walks `/music` or the staging folders.
 
 **Files:**
+
 - Create: migration `NNN_import_queue_task_link.py` and `app/crate/db/schema_sections/acquisition_vNNN.py` (`import_queue_items.task_id`, `last_error`)
 - Modify: the enqueue paths in `api/imports.py`: `create_task_dedup(dedup_key="import:{source}:{path}")`
   (`import:all` for import-all), setting `status='queued'` and `task_id` on the row in the same
@@ -4367,6 +4434,7 @@ Commit: `feat(imports): link staged imports to their tasks and phases`.
 ### Task 5.7b: `/imports` page
 
 **Files:**
+
 - Create: `app/ui/src/pages/Imports.tsx` (hairline queue; a `StepRail` per import draws only the
   phases the handler actually emits; items without a task show a status dot), `Imports.test.tsx`
 - Modify: route and sidebar (02 Imports)
@@ -4385,6 +4453,7 @@ so routing them to an uncoalesced topology action would bring B11 back on the to
 two CTE rebuilds, a `ui_snapshots` upsert and a publish per play, growing with remote playback.
 
 **Files (backend):**
+
 - Create: migration `NNN_federation_catalog_counts.py` (`federation_catalog_cursors.item_count`, `last_delta_count`)
 - Create: `app/crate/db/queries/federation_topology.py` (one CTE; effective pairing state derived
   from `expires_at`, since `expire_pairings` is never called; counts read from
@@ -4405,6 +4474,7 @@ two CTE rebuilds, a `ui_snapshots` upsert and a publish per play, growing with r
   `federation.nodes.view`), `app/crate/api/admin_live.py` (the `federation` surface)
 
 **Files (UI):**
+
 - Create: `app/ui/src/components/federation/{FederationTopology,TopologyInspector}.tsx`, `topology-layout.ts`, `topology-diff.ts`, `use-topology-animation.ts`, tests
 - Modify: `app/ui/src/pages/Federation.tsx`
   - tabs in the URL, `?tab=&node=`
@@ -4413,6 +4483,7 @@ two CTE rebuilds, a `ui_snapshots` upsert and a publish per play, growing with r
 - Modify: `app/ui/src/App.bundle.test.tsx` (the Federation route stays lazy)
 
 **Test:**
+
 - `app/tests/test_federation_topology.py` (new, `pg_db`): the CTE; pairing state derived from
   `expires_at`; counts read from `federation_catalog_cursors` with no catalog-item `COUNT`; the
   endpoint with the builder patched to raise (never builds); the cold shape
@@ -4446,6 +4517,7 @@ it stays invisible until `VITE_CRATE_CONNECT_FEATURE_ENABLED` is on. "Review Cra
 next initiative after v3.
 
 **Files:**
+
 - Modify: `app/crate/api/connect_ws.py` (B21: heartbeat refreshes presence and hub TTLs; disconnect touches `last_seen_at`)
 - Modify: `app/crate/db/repositories/playback_state.py:228` (one LEFT JOIN with a raw checkpoint), `app/crate/db/cache_store.py` (`get_cache_many` from 4.7a)
 - Modify: `app/listen/src/lib/listen-device.ts:231` (`form_factor`, `os`, `display_mode`), `contexts/player-context.ts` (WS `status`)
@@ -4470,6 +4542,7 @@ Commit: `feat(listen): show your devices and the shared playback position`.
 ### Task 5.10: Listen genre wheel, phase 2 (PD20)
 
 **Files:**
+
 - Move: `app/ui/src/components/genres/GenreWheel.tsx` → `app/shared/ui/domain/genres/GenreWheel.tsx`; `app/ui/src/lib/genre-wheel-math.ts` → `app/shared/ui/lib/genre-wheel-math.ts` (deleting the Admin copies in the same PR); `genre-wheel-math.test.ts` moves too and keeps reading `app/tests/fixtures/genre_eq_path_cases.json`
 - Create:
   - builder subject `crate-core` (`ListenGenreWheelPayload`, PD §4.6.3 after Task 0.4), built in
@@ -4509,6 +4582,7 @@ Commit: `feat(explore): browse genres on the taxonomy wheel`.
 Phase C (planning in a task, B18) moved into Task 4.9a, ahead of the route map.
 
 **Files:**
+
 - `app/listen/src/components/paths/PathRouteMap.tsx`: the route drawn over `SoundMapFigure`
   (4.10b), with steps projected from `bliss_vector` and the phase A layout as the fallback (no
   bliss map, older server, or WebGL unavailable)
@@ -4520,6 +4594,7 @@ Commit: `feat(paths): draw paths over the sound map`.
 ### Task 5.12: Admin quiet-hours heatmap, heatmap phase 2
 
 **Files:**
+
 - Modify: the instance builder (`heatmap_utc` in the same CTE pass; below 3 listeners it gets the
   same hidden shape as Task 2.20: a zero grid, `peak: null`, `hidden_reason: "few_listeners"`)
 - Move: `ListeningHeatmap` and its model → `app/shared/ui/domain/stats/` (explicit `.ts` exports); update the Listen and Admin chart exceptions in the AGENTS files in the same PR
@@ -4545,6 +4620,7 @@ Commit: `feat(ui): pick the download window from real listening hours`.
 Not blocked: built from client data only.
 
 **Files:**
+
 - Create: `app/listen/src/components/player/mix/{TransitionStrip,TransitionInstrument}.tsx`, `mix-model.ts`, `mix-math.ts` (Gapless-5 `sqrtPower` and the Android `equalPower`), `transition-clock.ts`
 - Modify: `contexts/use-player-engine-callbacks.ts` (clear `crossfadeTransition` on prev, jump and seek; freeze the playhead while paused via a ref)
 - Mount points:
@@ -4561,18 +4637,24 @@ Not blocked: built from client data only.
 
 Commit: `feat(listen): show the next crossfade in the queue`.
 
-### Task 5.14: `[BLOCKED: smart-mix]` work
+### Task 5.14: Smart Mix-dependent follow-ons
 
-Starts only after `codex/feat-smart-mix-phase-1` is merged into `main`. Migration numbering
-follows Conventions → migrations: `main` is canonical, so Smart Mix renumbers its six revisions and
-four section files onto `main`'s head with `scripts/db/renumber_migrations.py` (Task 2.13) before
-it merges, and stamps the dev and lab databases; v3 never renumbers.
+**Integration note:** the current protocol merges Smart Mix before v3 rebase. The merge rules below
+record the expected overlap, not instructions to delay its independent merge until v3 tasks exist.
+After rebase, mark already-satisfied prerequisites from evidence and adapt 2.9b/2.13 to the actual
+Camelot and migration state. No duplicate module or unnecessary migration rewrite.
+
+Follow-on implementation starts only after Smart Mix is on `main` and integrated into v3.
+Migration numbering follows the actual merged head: `main` is canonical. The original six-revision
+renumber/stamp recipe is conditional history; do not apply it if the Smart Mix merge already settled
+those numbers. Any required stamp/deployment operation remains separately approved.
 
 Merge rules for the Smart Mix merge, whichever side lands second:
 
 - Listen catalogs: merge keys by hand; never hand-merge `app/listen/src/i18n/catalogs/.metadata/*.json`,
   regenerate it with `(cd app/listen && node scripts/i18n-check.mjs --write-metadata)`.
-- Camelot: Smart Mix imports `crate.camelot` (Task 2.9b) and deletes `crate/smart_mix/camelot.py`.
+- Camelot: reconcile the actual integrated mapping with 2.9b; maintain one implementation and
+  move/retarget imports only where still required. Do not require a nonexistent pre-merge v3 module.
 - Refresh the `browse_media.py`, `actors.py`, `worker.py` and `resource_governor.py` line
   references in this plan's open tasks after the merge.
 - Android EQ: re-verify the Android parts of Tasks 4.3 and 4.4 on `NativeEqController` (published
@@ -4584,19 +4666,23 @@ Merge rules for the Smart Mix merge, whichever side lands second:
    clock from `resolveNativeCrossfadeTransition`. `includeProfiles` is behind a server capability,
    because the request model is `extra='forbid'`. Tests include an old-server compatibility case.
 2. **Access tokens.** Covers:
+
    - `app/listen/src/components/settings/access-tokens/*`;
    - `GET /api/auth/access-tokens/policy`, with route metadata defined after
      `_is_vdj_access_token_request`;
    - `last_used_at` touched only on allowed requests.
 
    Tests include the parametrised scope × route table.
+
 3. **Smart Mix coverage, units and settings.** The site's Analysis chapter sells "Backfills you
    control": the Smart Mix profile backfill can be started, paused, resumed and cancelled
    (`sm:app/crate/api/smart_mix_admin.py`: `GET /api/admin/smart-mix/status`, `POST /backfill`,
    `/backfill/pause`, `/backfill/resume`, `/backfill/cancel`; `SmartMixCoverage.tsx` with
    `idle | running | paused`).
+
    - Files: `app/ui/src/components/SmartMixCoverage.tsx` (from `sm:`) restyled as a row of the
      3.9b Coverage panel on `app/ui/src/pages/Analysis.tsx`:
+
      - the stacked hairline bar reads counters added to the 120 s `analysis_status` block (never
        counted in a request);
      - campaign state as `StatusDot` plus the word `idle`, `running` or `paused`;
@@ -4608,11 +4694,13 @@ Merge rules for the Smart Mix merge, whichever side lands second:
      LUFS and loudness units per PD25 in `@crate/ui/domain/analysis/TrackReadout.tsx` and Listen
      `InfoTabReadout.tsx`; `app/listen/src/components/settings/SmartMixSettings.tsx` (from `sm:`)
      on `InstrumentPanel` and the Phase 1b form controls.
+
    - Tests: pytest for the new counters in the 120 s block (`pg_db`); `AnalysisStatusResponse`
      declares them; Vitest for the coverage row in each state (idle shows Start, running shows
      Pause, paused shows Resume; Cancel asks first and posts only after confirmation; `task_done`
      refetches the status once) and the unit labels in both apps; `SmartMixSettings` render test;
      `I18N` for any new unit strings; settings baselines.
+
 4. **Later: `rms_envelope` lanes.**
    - Files: migration `NNN_track_rms_envelope.py` (nullable column), a throttled
      `backfill_track_rms_envelope` task (`notify=False`, maintenance queue, governed), the mix
@@ -4640,25 +4728,25 @@ Phase 1b (this phase depends on it). Rules:
 - no new primitives, except moving an existing Admin-local component into `@crate/ui` when a
   Listen screen in this phase adopts it (6.14, 6.15), deleting the Admin copy in the same change.
 
-| Task | Surface (coverage id) | Files | Tests | Commit |
-| --- | --- | --- | --- | --- |
-| 6.1 | Admin Browse (A4) | `app/ui/src/pages/Browse.tsx` | `Browse.test.tsx` | `feat(ui): restyle Browse as a media grid` |
-| 6.2 | Admin Artist residue (A5) | `pages/Artist.tsx`, `components/artist/*` (tabs in `?tab=`, `ArtistNetworkGraph` retinted by tokens) | `Artist.test.tsx` | `feat(ui): restyle the artist page` |
-| 6.3 | Admin Album residue (A6) | `pages/Album.tsx`, `TrackTable.tsx`, `TagEditor`, `MatchCard` | `Album.test.tsx` | `feat(ui): restyle the album page` |
-| 6.4 | Timeline (A14), Trash (A7: `StatStrip` of files and size plus paginated rows, read from the 2.17e index), Contributions | `pages/Timeline.tsx`, `pages/Trash.tsx`, `pages/Contributions.tsx` | page tests; Trash paginates and never triggers a disk walk | `feat(ui): restyle timeline, trash and contributions` |
-| 6.5 | Upcoming calendar (A9; `source` per show on `/api/upcoming`, PD §4.4), Bandcamp (A10), Discover (A11, after B5) | `api/upcoming` router and schema (additive `source`), `pages/Upcoming.tsx`, `pages/Bandcamp.tsx`, `pages/Discover.tsx` | pytest for `source` plus `test_openapi_contract.py`; page tests | one commit per page |
-| 6.6 | Users (A18; B17 presence rewrite first), Roles (A19) | `db/queries/auth_presence.py:48-82` (`LATERAL` top-1, one `MGET`), `pages/Users.tsx`, `pages/Roles.tsx` | pytest plus `EXPLAIN`; page tests | `perf(users): find each user's last play with one lateral` + restyles |
-| 6.7 | Global catalog (A24; B17 status snapshot at reconcile completion) | `db/queries/admin_global_catalog.py`, reconcile handler, `pages/GlobalCatalog.tsx` | pytest, page test | `perf(catalog): write global catalog status at reconcile end` |
-| 6.8 | Playlists and editor (A20), Translations (A21) | `pages/Playlists*.tsx`, `pages/I18nReview.tsx` | page tests | per page |
-| 6.9 | Admin Settings (A22): section nav in `?section=`; shared primitives replace the local `Section`/`StatTile`/`PanelCard`/`StatusDot`; schedules with an additive `last_runs` read | `pages/Settings.tsx`, `api/settings.py` | pytest for `last_runs`; `Settings.test.tsx` | `feat(ui): restyle Admin settings with live schedules` |
-| 6.10 | Federation tabs (A23), Login/Setup (A3, setup step rail following the real pipeline) | `pages/federation/*`, `pages/Login.tsx`, `pages/Setup.tsx` | page tests | per page |
-| 6.11 | Genres residue (A25): tree as hairlines, grid as `GenrePill`s | `components/genres/GenreTaxonomyTree.tsx` | tree test | `feat(ui): restyle the genre tree and grid` |
-| 6.12 | Listen Home residue (L11), Explore residue (L12) | `pages/HomeContent.tsx`, `components/home/*`, `pages/ExploreLandingSections.tsx` | tests, baselines | per screen |
-| 6.13 | Listen Search (L13), Artist (L14), Album (L15) | `pages/Search*.tsx`, `pages/Artist*.tsx`, `pages/Album.tsx` | tests, baselines (artist ×4) | per screen |
-| 6.14 | Listen Library (L16), Crates (L17), Playlists (L18). Library renders a `StatStrip` (PD §4.20): move `app/ui/src/components/admin/StatStrip.tsx` to `app/shared/ui/primitives/StatStrip.tsx` with token-only class names, switch Admin to it and delete the Admin copy | `pages/Library*.tsx`, `pages/Crate*.tsx`, `pages/Playlist*.tsx`, the `StatStrip` move | tests, baselines; `StatStrip.test.tsx` in `@crate/ui`; `export-usage-policy.test.ts` | per screen; `refactor(ui): share StatStrip with Listen` |
-| 6.15 | Listen Settings residue (L21), Social (L22, `StatStrip` from 6.14), Bandcamp (L23), Upload (L24: after upload, a step rail of the returned `library_upload` task's own phases emitted through `TaskProgress`, preparing → importing → syncing, drawn only as emitted (PD §4.22); move `app/ui/src/components/admin/StepRail.tsx` to `app/shared/ui/domain/tasks/StepRail.tsx`, the one destination named by PD §3.1.4 and DS §2.5, Admin switched and its copy deleted), Offline library (L25), Auth (L26), Share (L27) | the corresponding pages, the `StepRail` move | tests, settings baselines; `StepRail.test.tsx` in `@crate/ui` | per screen; `refactor(ui): share StepRail with Listen` |
-| 6.16 | Listen Stats residue and Digging (L19), Radar residue (L20), Radio and Paths residue (L28), Lyrics (L8), Visualizer family (L9), Resume and sleep timer (L10), Tauri chrome (L3: `LinuxWindowTitlebar.tsx` → `@crate/ui/icons`) | the corresponding files | tests, baselines | per screen |
-| 6.17 | Cleanup (PD47, PD50) | remove `SpectrumRibbonCanvas`; unused Nivo packages (Admin bump, chord, geo, heatmap if unused, network; Listen core and line), `leaflet` in Listen, `gl-matrix` in Admin; `animate-spin` outside buttons | `TYPES`, builds, `BUNDLE` | `chore: remove unused visual dependencies` |
+| Task | Surface (coverage id)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Files                                                                                                                                                                                                     | Tests                                                                                | Commit                                                                |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| 6.1  | Admin Browse (A4)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | `app/ui/src/pages/Browse.tsx`                                                                                                                                                                             | `Browse.test.tsx`                                                                    | `feat(ui): restyle Browse as a media grid`                            |
+| 6.2  | Admin Artist residue (A5)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `pages/Artist.tsx`, `components/artist/*` (tabs in `?tab=`, `ArtistNetworkGraph` retinted by tokens)                                                                                                      | `Artist.test.tsx`                                                                    | `feat(ui): restyle the artist page`                                   |
+| 6.3  | Admin Album residue (A6)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `pages/Album.tsx`, `TrackTable.tsx`, `TagEditor`, `MatchCard`                                                                                                                                             | `Album.test.tsx`                                                                     | `feat(ui): restyle the album page`                                    |
+| 6.4  | Timeline (A14), Trash (A7: `StatStrip` of files and size plus paginated rows, read from the 2.17e index), Contributions                                                                                                                                                                                                                                                                                                                                                                                                 | `pages/Timeline.tsx`, `pages/Trash.tsx`, `pages/Contributions.tsx`                                                                                                                                        | page tests; Trash paginates and never triggers a disk walk                           | `feat(ui): restyle timeline, trash and contributions`                 |
+| 6.5  | Upcoming calendar (A9; `source` per show on `/api/upcoming`, PD §4.4), Bandcamp (A10), Discover (A11, after B5)                                                                                                                                                                                                                                                                                                                                                                                                         | `api/upcoming` router and schema (additive `source`), `pages/Upcoming.tsx`, `pages/Bandcamp.tsx`, `pages/Discover.tsx`                                                                                    | pytest for `source` plus `test_openapi_contract.py`; page tests                      | one commit per page                                                   |
+| 6.6  | Users (A18; B17 presence rewrite first), Roles (A19)                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `db/queries/auth_presence.py:48-82` (`LATERAL` top-1, one `MGET`), `pages/Users.tsx`, `pages/Roles.tsx`                                                                                                   | pytest plus `EXPLAIN`; page tests                                                    | `perf(users): find each user's last play with one lateral` + restyles |
+| 6.7  | Global catalog (A24; B17 status snapshot at reconcile completion)                                                                                                                                                                                                                                                                                                                                                                                                                                                       | `db/queries/admin_global_catalog.py`, reconcile handler, `pages/GlobalCatalog.tsx`                                                                                                                        | pytest, page test                                                                    | `perf(catalog): write global catalog status at reconcile end`         |
+| 6.8  | Playlists and editor (A20), Translations (A21)                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | `pages/Playlists*.tsx`, `pages/I18nReview.tsx`                                                                                                                                                            | page tests                                                                           | per page                                                              |
+| 6.9  | Admin Settings (A22): section nav in `?section=`; shared primitives replace the local `Section`/`StatTile`/`PanelCard`/`StatusDot`; schedules with an additive `last_runs` read                                                                                                                                                                                                                                                                                                                                         | `pages/Settings.tsx`, `api/settings.py`                                                                                                                                                                   | pytest for `last_runs`; `Settings.test.tsx`                                          | `feat(ui): restyle Admin settings with live schedules`                |
+| 6.10 | Federation tabs (A23), Login/Setup (A3, setup step rail following the real pipeline)                                                                                                                                                                                                                                                                                                                                                                                                                                    | `pages/federation/*`, `pages/Login.tsx`, `pages/Setup.tsx`                                                                                                                                                | page tests                                                                           | per page                                                              |
+| 6.11 | Genres residue (A25): tree as hairlines, grid as `GenrePill`s                                                                                                                                                                                                                                                                                                                                                                                                                                                           | `components/genres/GenreTaxonomyTree.tsx`                                                                                                                                                                 | tree test                                                                            | `feat(ui): restyle the genre tree and grid`                           |
+| 6.12 | Listen Home residue (L11), Explore residue (L12)                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | `pages/HomeContent.tsx`, `components/home/*`, `pages/ExploreLandingSections.tsx`                                                                                                                          | tests, baselines                                                                     | per screen                                                            |
+| 6.13 | Listen Search (L13), Artist (L14), Album (L15)                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | `pages/Search*.tsx`, `pages/Artist*.tsx`, `pages/Album.tsx`                                                                                                                                               | tests, baselines (artist ×4)                                                         | per screen                                                            |
+| 6.14 | Listen Library (L16), Crates (L17), Playlists (L18). Library renders a `StatStrip` (PD §4.20): move `app/ui/src/components/admin/StatStrip.tsx` to `app/shared/ui/primitives/StatStrip.tsx` with token-only class names, switch Admin to it and delete the Admin copy                                                                                                                                                                                                                                                   | `pages/Library*.tsx`, `pages/Crate*.tsx`, `pages/Playlist*.tsx`, the `StatStrip` move                                                                                                                     | tests, baselines; `StatStrip.test.tsx` in `@crate/ui`; `export-usage-policy.test.ts` | per screen; `refactor(ui): share StatStrip with Listen`               |
+| 6.15 | Listen Settings residue (L21), Social (L22, `StatStrip` from 6.14), Bandcamp (L23), Upload (L24: after upload, a step rail of the returned `library_upload` task's own phases emitted through `TaskProgress`, preparing → importing → syncing, drawn only as emitted (PD §4.22); move `app/ui/src/components/admin/StepRail.tsx` to `app/shared/ui/domain/tasks/StepRail.tsx`, the one destination named by PD §3.1.4 and DS §2.5, Admin switched and its copy deleted), Offline library (L25), Auth (L26), Share (L27) | the corresponding pages, the `StepRail` move                                                                                                                                                              | tests, settings baselines; `StepRail.test.tsx` in `@crate/ui`                        | per screen; `refactor(ui): share StepRail with Listen`                |
+| 6.16 | Listen Stats residue and Digging (L19), Radar residue (L20), Radio and Paths residue (L28), Lyrics (L8), Visualizer family (L9), Resume and sleep timer (L10), Tauri chrome (L3: `LinuxWindowTitlebar.tsx` → `@crate/ui/icons`)                                                                                                                                                                                                                                                                                         | the corresponding files                                                                                                                                                                                   | tests, baselines                                                                     | per screen                                                            |
+| 6.17 | Cleanup (PD47, PD50)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | remove `SpectrumRibbonCanvas`; unused Nivo packages (Admin bump, chord, geo, heatmap if unused, network; Listen core and line), `leaflet` in Listen, `gl-matrix` in Admin; `animate-spin` outside buttons | `TYPES`, builds, `BUNDLE`                                                            | `chore: remove unused visual dependencies`                            |
 
 Mobile, i18n and reduced-motion rules apply to every row.
 
@@ -4671,9 +4759,14 @@ side by side.
 
 ## Phase 7 — QA and release gates
 
+Apply the following gates to the joint P0 scope before the major. Examples of P1/P2 instruments
+below receive these same checks only in their later assigned milestones; they do not expand P0.
+Internal reviews record partial results without claiming the final gate passed.
+
 ### Task 7.1: Full CI on each release
 
-Run on each release PR (Rollout → Milestones), all green:
+Run on the joint P0 release candidate and the appropriate internal integration checks, all green
+before publication; separately assigned R0 releases retain their own approved scope:
 
 - `TYPES`, `LINT`, `GATES`, `I18N`, `BUNDLE`, `BUNDLE-ADMIN`;
 - Vitest for all packages; `VISUAL` (Linux amd64, in the pinned image); `APPEARANCE`; `ADMIN-E2E`
@@ -4697,13 +4790,13 @@ Record both bundle numbers in the PR.
 Matrix: web Chromium/Firefox/Safari; Tauri on macOS, Windows (WebView2 111) and Linux (WebKitGTK
 2.40, in the pinned runtime of Task 0.15, or the symbol check plus CSS feature audit if 0.15
 downgraded the gate); iOS Capacitor on the oldest supported version (16.4, the deployment target
-since Task 0.13); a mid-range Android device. Appearance: `light` and `crateRed` per the Task
-0.3 bar.
+since Task 0.13); a mid-range Android device. Visual target: the single Crate v3 identity,
+including startup migration from legacy visual preferences (1.13); no variant matrix.
 
-Scope per release: run only the runtimes the release changes. An Admin-only group (for example
-Ops or Health) needs the web browsers only; a release that changes Listen or `@crate/ui` runs the
-whole matrix. Budget about 2 days of gate work per Listen release (Diego confirms the figure in
-Task 0.3 step 4; Rollout → Milestones counts it).
+At internal milestones, test the affected runtimes and record what remains pending. The joint
+major changes Listen and `@crate/ui`, so the full matrix is required before release; an internal
+Admin-only review is not a substitute. Runtime-gate effort remains a provisional estimate to
+refresh after integration, not an accepted schedule.
 
 For each runtime, check:
 
@@ -4736,9 +4829,10 @@ Any regression blocks the release.
 
 ### Task 7.5: Final visual baselines
 
-Re-record every Listen baseline (Linux, `VISUAL` or the `update-listen-visual` job) from the
-release commit, including the `light` and `crateRed` captures of the P0 instruments if the Task
-0.3 bar requires them. Review all diffs.
+Re-record every Listen baseline from the final single-identity Crate v3 release candidate through
+the approved Linux amd64 `update-listen-visual` job; review all diffs. Add the small Admin set and
+the final site/docs screenshots and screencast. Remove retired variant fixtures in 1.13; no
+instance domain may appear in recorded assets.
 
 Commit: `test(listen): re-record visual baselines for v3`.
 
@@ -4775,12 +4869,13 @@ Commit: `test(web): follow v3 source changes in the drift tests`.
 
 ### Task 7.7: Release
 
-Runs for every release in Rollout → Milestones; `v3.0.0` is the release that completes the P0
-groups.
+Runs for the jointly approved P0 `v3.0.0` release after all internal milestones. Assigned R0
+operational releases use their own approved scope and isolated rollout; no intermediate product
+milestone publishes Listen/Admin/site/docs independently.
 
 1. Release notes: every `[BEHAVIOUR]` item in the release and every matching PD §3.4.2 line; the
    API permission changes (2.2, 2.9); the count definition change (PD21); the iOS target (0.13);
-   the mixed-language note (Rollout).
+   the P0 coverage boundary and single-identity preference migration (Rollout).
 2. Mobile release gates: for a release that changes Listen or `@crate/ui`, satisfy
    `docs/technical/listen-mobile-release-gates.md` and record the devices used in
    `docs/technical/listen-mobile-device-matrix.md`. The tag always builds Android and iOS, but an
@@ -4803,10 +4898,10 @@ samplers and writers, trailing-edge coalescing through the due set and why `dela
 the projector side-effects switch, the migration renumbering script), `08-frontends-admin-and-listen.md`
 (instrument conventions, `AdminLiveProvider`, the shared layer),
 `listen-design-system-visual-qa.md` (Linux-only baselines, the container, the update job,
-appearance captures).
+single-identity captures and the preference migration).
 
 Verify: `node scripts/check-docs.mjs`. Commit: `docs(technical): document the v3 contracts and
-conventions`. Lands with each release group's PR, or at the latest before `v3.0.0`.
+conventions`. Lands with each internal milestone's review, or at the latest before `v3.0.0`.
 
 ### Task 7.9: Review of the bundle and visual checks
 
@@ -4824,67 +4919,62 @@ Commit: `ci(ui): review the Admin bundle ceiling after the v3 instruments`.
 
 ## Rollout and release strategy
 
+**Integration and publication are separate.** Task groups below are internal milestones with
+review checkpoints, not permission to publish intermediate UI releases. Listen, Admin, site and
+docs ship together once as the v3 major. The existing P0 boundary is retained: complete Genres,
+player/EQ, Ops, Health and Stats plus their foundations and release gates. P1/P2 and Phase 6
+coverage follow later unless Diego explicitly changes scope. Theme-runtime retirement 1.13 is a
+foundation prerequisite for this major, not an expansion of the instrument scope.
+
 **Branches and PRs:**
 
-- `[MAIN]` tasks (2A, 2.9b) and the platform preconditions (2B) start now, independent of Phase 0,
-  and go to `main` as small PRs from short-lived `fix/*` or `perf/*` branches, released as patches
-  (`v2.6.x`, then `v2.7.x`). `feat/crate_v3` takes them by merging `origin/main` weekly while it
-  exists. The branch is shared, so merge rather than rebase-and-force-push.
-- Phases 0 and 1, plus 1b.3 and 1b.4, go as one PR per task, or per small group, into
-  `feat/crate_v3`, each with full CI. They are behaviour-identical by design, so nothing forces
-  them to wait for the instruments: after Checkpoint 1 and those two 1b tasks, the foundation PR
-  merges into `main` and the integration branch is retired. The other 1b tasks (1b.1, 1b.2,
-  1b.5–1b.7) then target `main` directly, run in parallel with the release groups, and gate only
-  Phase 6.
-- From then on, every PR targets `main`. A release group's backend (2C) and UI land as separate
-  PRs and ship together in the group's release. Each `[BEHAVIOUR]` change stays in its own PR with
-  a release-note line.
+1. Smart Mix merges to `main` under its own assignment. The integrator then rebases
+   `feat/crate_v3` onto that result, with approval and coordination of any published history.
+   Reconcile migrations, Camelot, native EQ and catalogs before applying stale task recipes.
+2. Integrate `feat/website` (site `app/web`, docs `app/docs`) into `feat/crate_v3`. Keep source pin
+   `258bbaee` until a resync is reviewed and recorded. The final site assets show the real v3 UI.
+3. Keep product changes and reviewed task diffs on `feat/crate_v3` through all P0 milestones.
+   Foundation is internal; it neither publishes `v2.8.0` nor retires the branch. Integrate agent work
+   through the single integrator, with verification after integration and no unsolicited commits.
+4. R0 2A/2B and 2.9b remain independent `[MAIN]` work only when Diego assigns it. Backend fixes
+   can use their own small PRs/releases after explicit approval. Preserve the isolated 2.10
+   deployment and observation, and 2.11a–c's independent observation; do not bury these operational
+   changes in the joint UI rollout. Absorb their actual `main` result through coordinated updates.
+5. `[BEHAVIOUR]` changes remain separately reviewable with tests and release-note entries. An own
+   PR requirement does not authorise merging, publishing or deploying ahead of the assigned gate.
+   No push, PR, tag, deploy or production access without Diego's explicit go-ahead.
 
-**Milestones:** defined by priority; the phases above follow dependency. Estimates are rough task
-days summed from PD's sizes (S ≈ 2, M ≈ 4, L ≈ 8, L+ ≈ 10). The P0 groups ship in the order below:
-Genres first, because the genre wheel is the feature Diego called out and its real dependencies are
-small (Phase 1 primitives, 1b.3 and 1b.4, 2.11a/b, 2.18a–e, 0.14 and 3.1's `PageHeading`); Phase
-1b's dialogs, forms, track rows, status-colour codemod and skip link are needed only by Phase 6.
-Diego confirms the estimates in Task 0.3.
+**Internal milestones and dependencies:**
 
-| Release | Content | Tag | Rough estimate |
-| --- | --- | --- | --- |
-| R0 | 2A hotfixes and 2.9b; each 2B task alone (2.10 never bundled; 2.11a–c one at a time); starts now, in parallel with Phase 0 | `v2.6.x` / `v2.7.x` patches | ~42 d |
-| Foundation | Phases 0 and 1 (including Tasks 0.15 and 1.0), 1b.3, 1b.4 | `v2.8.0` | ~43 d (the former ~75 d minus ~34 d of deferred 1b tasks, plus ~2 d for 0.15) |
-| Shared layer (parallel) | 1b.1, 1b.2, 1b.5, 1b.6, 1b.7, each in the next release when ready; gates Phase 6 | any minor | ~34 d (L for 1b.1, 1b.2, 1b.5, 1b.6; S for 1b.7) |
-| Genres | 3.1, 2.18a–e, 3.7; starts once 2.11a/b are on `main` (backend) and the foundation has merged (UI) | minor | ~32 d (3.1 moves here from Ops) |
-| Listen player and EQ | 2.19, 4.1–4.5 (after Genres: 4.5's `GenreEqWalk` is adopted by 3.7's panel, and 4.5 moves 3.7's scramble to `@crate/ui`) | minor | ~22 d |
-| Ops | 2.14, 2.15a–c, 3.2, 3.4 | minor | ~24 d |
-| Health | 2.17a–e, 3.3, 3.6 | minor | ~30 d |
-| Stats | 2.20, 4.6, plus the Phase 7 gates on the whole P0 scope | `v3.0.0` | ~6 d + gates |
-| P1/P2 | governor (2.16, 3.5 after 4.3), System residue (3.5b), genre editing UI (3.8), 3.9–3.12 (3.11c, 3.12c included), 4.7–4.12, Phase 5 (except blocked work), Phase 6 (after the shared layer) | `v3.x` minors | per task |
-| Smart Mix | `[BLOCKED: smart-mix]` work after the Smart Mix merge | `v3.x` | per task |
+| Milestone                   | Content and gate                                                                                                               | Publication                    |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------ |
+| 1A pre-merge                | 1.2–1.4 approved by Diego on 2026-10-15 for commit/push. CI/device gates stay open.                                            | Local review only              |
+| Integration                 | Smart Mix → rebase → website; reconcile overlap and approved source pin.                                                       | None                           |
+| R0 (assigned independently) | 2A, 2.9b, 2B; 2.11a → 2.11b → 2.11c, isolated operational gates.                                                               | Only separately approved fixes |
+| 1B pre-merge                | 1.5–1.6 local implementation and persistent preview, then Diego review.                                                        | Local review only              |
+| Foundation                  | Applicable Phase 0 gates, 1.0–1.13, 1b.3/1b.4. Admin captures precede 1.0; 1.13 follows 1A review. 0.14 may wait until Genres. | None                           |
+| Genres                      | 3.1, 2.18a–e including Go, 3.7; needs Foundation, 2.11a/b and 0.14.                                                            | None                           |
+| Listen player and EQ        | 2.19, 4.1–4.5; needs Genres and integrated Smart Mix Android path.                                                             | None                           |
+| Ops                         | 2.14, 2.15a–c, 3.2, 3.4; backend contracts precede instruments.                                                                | None                           |
+| Health                      | 2.17a–e, 3.3, 3.6.                                                                                                             | None                           |
+| Stats / joint P0 major      | 2.20, 4.6; all P0 gates, native QA and final site/docs assets reviewed.                                                        | One jointly approved `v3.0.0`  |
+| Later                       | P1/P2, Phase 5/6 and Smart Mix-dependent follow-ons; parallel 1b tasks gate Phase 6.                                           | Subsequent approved work       |
 
-**Calendar critical path.** Backend (R0 and the 2C contracts, all `main`-only code) and frontend
-run in parallel, so the frontend chain sets the calendar:
+The dependency chain remains Foundation → Genres → player/EQ → Ops → Health → Stats; it is not a
+phase-number execution loop. In particular 4.5 shares the Admin panel from 3.7, and 3.5 needs 4.3's
+shared spring helper. Smart Mix-first may satisfy or reshape formerly blocked tasks; inspect before
+marking them complete. Backend contracts land before consumers, in the same reviewed milestone.
 
-- To the genre wheel: foundation (~43 d) → 3.1 (~4 d) → 3.7 (~8 d), about 55 task-days, with
-  2.11a/b and 2.18a–e (about 20 d of backend) landing on `main` during the foundation. In the
-  previous order (Foundation ~75, Ops ~28, Health ~30, then Genres) the wheel arrived about 160
-  task-days in.
-- To `v3.0.0`: foundation ~43 → Genres UI ~12 → Listen player and EQ UI (4.1–4.5) ~18 → Ops UI
-  (3.2, 3.4) ~12 → Health UI (3.3, 3.6) ~14 → Stats UI (4.6) ~4, about 103 task-days plus the
-  release gates (about 2 d per Listen release, Task 7.3), against about 190 summed task-days for
-  the same groups in the previous order. The summed total barely changes; the order and the
-  parallel backend do.
+**Planning estimates:** the old estimates (~43 Foundation task-days, ~103 frontend task-days to P0,
+plus runtime gates) were assumptions for several public releases. They are historical planning
+inputs, not a delivery commitment. Re-estimate remaining work after 1A and branch integration,
+including 1.13 and actual QA. Do not add P1/P2 to the major to justify a new date.
 
-GovernorGauges (3.5) is P1 in PD, so it is not in the first group, and it needs 4.3's
-`@crate/ui/lib/spring.ts`. The Dashboard's Operations tile omits the governor word until 2.16
-ships.
-
-**Mixed-language releases (explicit decision).** From the foundation release until each screen's
-own task lands, `main` ships screens in two states: restyled instruments, and screens that inherit
-only the token and shared-layer changes: Phases 0 and 1 plus 1b.3 and 1b.4 (tokens, focus, toasts,
-tabs, states), and whichever of the parallel 1b tasks have shipped (dialogs, forms, rows, media
-grids, status colour). That is the acceptance bar for an un-migrated screen at every release,
-including `v3.0.0`: it uses the shared layer as far as it has shipped, keeps its behaviour, and
-has no broken contrast (Task 1.0). Every release note carries one line saying which screens are on
-the v3 language so far. Checkpoint 6 closes the gap.
+**Partial migration during development:** the integration branch may contain screens that inherit
+only tokens/primitives while others are fully restyled. The P0 major still follows the original
+coverage boundary: non-P0 screens use the shared layer already delivered, keep behaviour and
+readable contrast; Phase 6 completes coverage later. Every released surface uses the one Crate v3
+identity. There are no selectable theme variants and no intermediate public Foundation UI release.
 
 **Flags (no new flag framework):**
 
@@ -4902,7 +4992,8 @@ the v3 language so far. Checkpoint 6 closes the gap.
   until their deprecation date (4.9a).
 - **Existing build flags:**
   - Devices stays behind `VITE_CRATE_CONNECT_FEATURE_ENABLED` (PD38).
-  - The appearance editor stays behind `VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED`.
+  - Task 1.13 removes `VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED` with its editor and runtime;
+    preserve the current plumbing until that assigned migration, with no new variant features.
 - **Server off-switches** for the new background work: `CRATE_DOMAIN_EVENTS_CONSUMER_ENABLED`
   and `CRATE_PROJECTOR_SIDE_EFFECTS_ENABLED` (2.10; the second is deployed off and turned on after
   a day of observation), `CRATE_GOVERNOR_SAMPLER_ENABLED`, `CRATE_STACK_SAMPLER_ENABLED`, and the
@@ -4930,58 +5021,45 @@ know in advance.
 
 ## Risks
 
-| # | Risk | Mitigation |
-| --- | --- | --- |
-| 0 | The brand font licence forbids shipping Cabinet Grotesk in a public repo and in images third parties run | Closed by Task 0.0 (2026-10-15): Bricolage Grotesque (OFL) behind `--font-display-stack`, history rewritten before the first push |
-| 1 | Fixing B1 replays about six months of retained domain events (side effects included), wakes a 0.25 CPU projector, and switches side-effecting projections (forced `process_new_content` per acquisition, home rebuilds) back on in steady state | 2.10 is `[BEHAVIOUR]`: it moves the group to the stream tip once, acks only events older than that cut without projecting (deferred and post-outage events are never dropped by age), coalesces ops trailing-edge, ships alone, deploys side effects off behind `CRATE_PROJECTOR_SIDE_EFFECTS_ENABLED`, watches queue depth and `process_new_content` runs per hour before turning them on, and keeps `CRATE_DOMAIN_EVENTS_CONSUMER_ENABLED` as an off-switch without an image rollback |
-| 2 | Smart Mix (PD2, about 100 commits, still active) collides with v3 on migration numbers 109–114, the Phase 2 backend, the Android native EQ path (`CrateNativePlaybackService.java`, `NativeEqController.java`, `lib/android-native-engine.ts`, `contexts/player-*.ts`), catalogs, Settings and Admin Analysis | `main` is canonical for migration numbers and the unmerged branch renumbers on each merge of `main` with the 2.13 script plus `alembic stamp`; one shared `crate/camelot.py` (2.9b, no behaviour change); the Android parts of 4.3 and 4.4 are re-verified after the merge, 4.4 defines the two-deck hold; merge rules in 5.14; single-head check on every migration PR |
-| 3 | A long-lived integration branch drifts from `main` | The integration branch lives only for the behaviour-identical Phases 0 and 1 plus 1b.3 and 1b.4; afterwards every group ships to `main` as its own release; weekly merges of `main` until then |
-| 4 | Slow test feedback on the external disk | A standalone clone on the internal disk (0.2), done before the font licence answer; CI as source of truth; single-file local runs; never commit the timeout patch |
-| 5 | Behaviour changes surprise operators: projector side effects resuming, PD24, PD29, PD43, PD46, G1, the Smart EQ hold, enrichment GET `{}`, task stream ownership, fix-type confirm, synchronous Paths without LLM, genre counts, mood pools, setlist map | One PR each, release notes, Diego's sign-off per item; consumers on `main` updated in the same PR (Phase 2 intro) |
-| 6 | New background loops add load: governor, Redis, acquisition and stack samplers, surface writers, pipeline trace, refresh tasks; hidden Admin tabs or an idle Dashboard keeping samplers fast; coalescing windows collapsed to 5 minutes by the pending-task redispatcher | Demand gating with viewer keys and a 1 s check; hidden tabs close their stream after 30 s and the Dashboard never subscribes to fast surfaces; async viewer marking in SSE generators; Redis-first runtime samples with rate-limited persistence; single writers in the service-loop process; samplers in their own threads; quiet refresh tasks; trailing-edge coalescing through the due set (no `tasks` row before it is due); off-switches; 7.4 idle-load measurements |
-| 7 | Drift and policy budgets with exact counts (inline styles, raw buttons, arbitrary values) cause merge conflicts and silent widening | Ceilings move only with listed tokens; prefer SVG attributes, refs and `:nth-child`; `GATES` on every PR |
-| 8 | Shared component placement breaks the both-apps rule (it is review-only) | Each Phase 1 task names its adopter in both apps; Phase 3/4 tasks move components into `@crate/ui` only in the PR where the second app adopts them |
-| 9 | Visual baseline churn hides real regressions; local arm64 and CI amd64 pixels differ | Committed PNGs come only from the amd64 `update-listen-visual` job; Admin captures from 0.11, before the foundation changes Admin pixels; re-baseline per screen with a manual diff review; final re-record in 7.5 |
-| 10 | Site drift tests break when `feat/website` merges, and ports copy different site states | Task 7.6 lists every pinned file; whichever branch lands second updates the site; the site reference is pinned at `258bbaee`, each port records its SHA, and a re-sync step precedes each group that ports site math |
-| 11 | WebGL2 on mid-range Android and WebKitGTK (sound map), and Canvas memory | 2D fallback, DPR ≤ 2, point caps by `deviceMemory`, context-loss handling, 7.3 device tests |
-| 12 | Bundle creep: Listen's `PlayerBar` is eager and the EQ glyph and shared primitives sit in the initial chunk; Admin gains many instruments | `BUNDLE` and `BUNDLE-ADMIN` in CI from 0.12, with lazy-route assertions per instrument; the glyph imports `lib/eq-curve`, not `EqBands`; heavy instruments lazy |
-| 13 | Hand-built SVG instruments regress accessibility | HTML equivalents, roving tabindex, quiet live regions, forced-colors pass (7.2) |
-| 14 | Genre counts drop after the count definition change (PD21); curators read it as data loss | Release note; same definition in Admin, Listen and the read plane |
-| 15 | Privacy: instance heatmap with few listeners, ops events, task streams | PD43 enforced by the server below 3 listeners (2.20), so shipped clients never receive the grid; B19 and B16 hotfixes ship first, from `main`, without waiting for Phase 0 |
-| 16 | iOS 15 CSS gaps: Tailwind's alpha ladders fall back to `transparent`, `cqi` and `@container` are missing, subgrid needs Safari 16 | Raise the target to 16.4 (Task 0.13, recommended); whatever the target, rem fallbacks before `cqi` (1.4) and no subgrid (4.6); if 15.0 stays, rgba tokens, `@supports` guards and a named iOS 15 device |
-| 17 | Unconfirmed facts: B1 on production, `EXPLAIN` plans, the production genre overlay size | Verify each at the task that depends on it (marked UNCERTAIN in PD); the overlay size is measured in 0.14. Telegram is confirmed unfiltered and handled by `notify`/`quiet` |
-| 18 | Scope: about 30 instruments plus 50 coverage surfaces | Releases by group with rough estimates and a stated calendar critical path; Genres first; P2 items (enrichment orbit, federation topology, Redis pair, pipeline, devices, mix strip) can slip past `v3.0.0` without blocking it |
-| 19 | Release gates assume runtimes nobody has (WebKitGTK 2.40, WebView2 111) and run mobile device passes on every tag | Task 0.15 provisions a pinned WebKitGTK 2.40 runtime or downgrades that gate to the symbol check plus a CSS audit; 7.3 and 7.7 run only the runtimes a release changes |
+| #   | Risk                                                                                                                                                                                                                                                                                                          | Mitigation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0   | The brand font licence forbids shipping Cabinet Grotesk in a public repo and in images third parties run                                                                                                                                                                                                      | Closed by Task 0.0 (2026-10-15): Bricolage Grotesque (OFL) behind `--font-display-stack`, history rewritten before the first push                                                                                                                                                                                                                                                                                                                                                                               |
+| 1   | Fixing B1 replays about six months of retained domain events (side effects included), wakes a 0.25 CPU projector, and switches side-effecting projections (forced `process_new_content` per acquisition, home rebuilds) back on in steady state                                                               | 2.10 is `[BEHAVIOUR]`: it moves the group to the stream tip once, acks only events older than that cut without projecting (deferred and post-outage events are never dropped by age), coalesces ops trailing-edge, ships alone, deploys side effects off behind `CRATE_PROJECTOR_SIDE_EFFECTS_ENABLED`, watches queue depth and `process_new_content` runs per hour before turning them on, and keeps `CRATE_DOMAIN_EVENTS_CONSUMER_ENABLED` as an off-switch without an image rollback                         |
+| 2   | Smart Mix (PD2, about 100 commits, still active) collides with v3 on migration numbers 109–114, the Phase 2 backend, the Android native EQ path (`CrateNativePlaybackService.java`, `NativeEqController.java`, `lib/android-native-engine.ts`, `contexts/player-*.ts`), catalogs, Settings and Admin Analysis | `main` is canonical for migration numbers; inspect the actual integrated head and reuse any Smart Mix resolution. Renumber only remaining unmerged conflicts; any proven repair/stamp needs backup and separate operational approval; one shared `crate/camelot.py` (2.9b, separately reviewed enharmonic scoring change where still applicable); the Android parts of 4.3 and 4.4 are re-verified after the merge, 4.4 defines the two-deck hold; merge rules in 5.14; single-head check on every migration PR |
+| 3   | The joint release keeps the integration branch alive longer                                                                                                                                                                                                                                                   | A single integrator coordinates updates from `main`, small task diffs, CI and internal review checkpoints; keep the branch until the approved P0 major and re-estimate after Smart Mix/site integration                                                                                                                                                                                                                                                                                                         |
+| 4   | Slow test feedback on the external disk                                                                                                                                                                                                                                                                       | A standalone clone on the internal disk (0.2), done before the font licence answer; CI as source of truth; single-file local runs; never commit the timeout patch                                                                                                                                                                                                                                                                                                                                               |
+| 5   | Behaviour changes surprise operators: projector side effects resuming, PD24, PD29, PD43, PD46, G1, the Smart EQ hold, enrichment GET `{}`, task stream ownership, fix-type confirm, synchronous Paths without LLM, genre counts, mood pools, setlist map                                                      | One PR each, release notes, Diego's sign-off per item; consumers on `main` updated in the same PR (Phase 2 intro)                                                                                                                                                                                                                                                                                                                                                                                               |
+| 6   | New background loops add load: governor, Redis, acquisition and stack samplers, surface writers, pipeline trace, refresh tasks; hidden Admin tabs or an idle Dashboard keeping samplers fast; coalescing windows collapsed to 5 minutes by the pending-task redispatcher                                      | Demand gating with viewer keys and a 1 s check; hidden tabs close their stream after 30 s and the Dashboard never subscribes to fast surfaces; async viewer marking in SSE generators; Redis-first runtime samples with rate-limited persistence; single writers in the service-loop process; samplers in their own threads; quiet refresh tasks; trailing-edge coalescing through the due set (no `tasks` row before it is due); off-switches; 7.4 idle-load measurements                                      |
+| 7   | Drift and policy budgets with exact counts (inline styles, raw buttons, arbitrary values) cause merge conflicts and silent widening                                                                                                                                                                           | Ceilings move only with listed tokens; prefer SVG attributes, refs and `:nth-child`; `GATES` on every PR                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 8   | Shared component placement breaks the both-apps rule (it is review-only)                                                                                                                                                                                                                                      | Each Phase 1 task names its adopter in both apps; Phase 3/4 tasks move components into `@crate/ui` only in the PR where the second app adopts them                                                                                                                                                                                                                                                                                                                                                              |
+| 9   | Visual baseline churn hides real regressions; local arm64 and CI amd64 pixels differ                                                                                                                                                                                                                          | Committed PNGs come only from the amd64 `update-listen-visual` job; Admin captures from 0.11, before the foundation changes Admin pixels; re-baseline per screen with a manual diff review; final re-record in 7.5                                                                                                                                                                                                                                                                                              |
+| 10  | Site drift tests break when `feat/website` merges, and ports copy different site states                                                                                                                                                                                                                       | Task 7.6 lists every pinned file; whichever branch lands second updates the site; the site reference is pinned at `258bbaee`, each port records its SHA, and a re-sync step precedes each group that ports site math                                                                                                                                                                                                                                                                                            |
+| 11  | WebGL2 on mid-range Android and WebKitGTK (sound map), and Canvas memory                                                                                                                                                                                                                                      | 2D fallback, DPR ≤ 2, point caps by `deviceMemory`, context-loss handling, 7.3 device tests                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 12  | Bundle creep: Listen's `PlayerBar` is eager and the EQ glyph and shared primitives sit in the initial chunk; Admin gains many instruments                                                                                                                                                                     | `BUNDLE` and `BUNDLE-ADMIN` in CI from 0.12, with lazy-route assertions per instrument; the glyph imports `lib/eq-curve`, not `EqBands`; heavy instruments lazy                                                                                                                                                                                                                                                                                                                                                 |
+| 13  | Hand-built SVG instruments regress accessibility                                                                                                                                                                                                                                                              | HTML equivalents, roving tabindex, quiet live regions, forced-colors pass (7.2)                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 14  | Genre counts drop after the count definition change (PD21); curators read it as data loss                                                                                                                                                                                                                     | Release note; same definition in Admin, Listen and the read plane                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 15  | Privacy: instance heatmap with few listeners, ops events, task streams                                                                                                                                                                                                                                        | PD43 enforced by the server below 3 listeners (2.20), so shipped clients never receive the grid; B19 and B16 hotfixes ship first, from `main`, without waiting for Phase 0                                                                                                                                                                                                                                                                                                                                      |
+| 16  | iOS 15 CSS gaps: Tailwind's alpha ladders fall back to `transparent`, `cqi` and `@container` are missing, subgrid needs Safari 16                                                                                                                                                                             | Raise the target to 16.4 (Task 0.13, recommended); whatever the target, minifier-safe guarded rem numeral fallbacks (1.4) and no subgrid (4.6); if 15.0 stays, rgba tokens, `@supports` guards and a named iOS 15 device                                                                                                                                                                                                                                                                                        |
+| 17  | Unconfirmed facts: B1 on production, `EXPLAIN` plans, the production genre overlay size                                                                                                                                                                                                                       | Verify each at the task that depends on it (marked UNCERTAIN in PD); the overlay size is measured in 0.14. Telegram is confirmed unfiltered and handled by `notify`/`quiet`                                                                                                                                                                                                                                                                                                                                     |
+| 18  | Scope: about 30 instruments plus 50 coverage surfaces                                                                                                                                                                                                                                                         | Internal milestones preserve the P0 major boundary; P1/P2 and coverage remain later. The one joint release does not pull enrichment, federation, Redis, pipeline, devices or mix strip into P0                                                                                                                                                                                                                                                                                                                  |
+| 19  | Release gates assume runtimes nobody has (WebKitGTK 2.40, WebView2 111) and run mobile device passes on every tag                                                                                                                                                                                             | Task 0.15 provisions a pinned WebKitGTK 2.40 runtime or downgrades that gate to the symbol check plus a CSS audit; 7.3 and 7.7 run only the runtimes a release changes                                                                                                                                                                                                                                                                                                                                          |
 
 ---
 
 ## Order and checkpoints
 
-```
-Phase 2A/2B on main, starting now (hotfixes, preconditions; 2.11a → 2.11b → 2.11c) ──────────────┐
-Task 0.1 steps 1–3 → 0.2 (internal clone) → 0.0 (font licence, gates the push) → rest of Phase 0  │
-  └─ Phase 1 (shared primitives) + 1b.3, 1b.4 → foundation release ─────────────────────────────┤
-       └─ 1b.1, 1b.2, 1b.5–1b.7 in parallel (gate Phase 6 only)                                   │
-Phase 2C contracts on main, per release group ───────────────────────────────────────────────────┤
-  └─ Genres (3.1, 2.18a–e, 3.7) → Listen player and EQ (2.19, 4.1–4.5) → Ops (2.14, 2.15, 3.2, 3.4)
-       → Health (2.17a–e, 3.3, 3.6) → Stats (2.20, 4.6) = v3.0.0
-         └─ P1/P2: 3.5 (after 4.3), 3.5b, 3.8→3.12c, 4.7→4.12, Phase 5 (5.14 blocked on Smart Mix)
-              └─ Phase 6 (coverage; needs the parallel 1b tasks) → Phase 7 gates per release
-```
-
-- Phase 2A and 2B start now on `fix/*` or `perf/*` branches from `main`, in parallel with Phase 0.
-  They touch only `main` code and need nothing from `feat/crate_v3`, so the security (B15, B16),
-  privacy (B19), federation approval (B14) and stats (B12) fixes do not wait for the font licence,
-  the baselines or the EQ-morph device review. No migration waits for PD2 (Conventions →
-  migrations). Only the 2C contracts follow the release groups.
-- Release groups ship in the order of the Milestones table: Genres → Listen player and EQ → Ops →
-  Health → Stats. Genres starts as soon as 2.11a/b are on `main` and the foundation has merged.
-  Inside a group, the 2C backend lands first, then the UI. Dependencies that cross groups or apps:
-  - `GenreEqWalk` (4.5) needs the Admin inheritance panel from 3.7, so Genres ships before the
-    Listen player and EQ group; 4.5 also moves 3.7's scramble into `@crate/ui`;
-  - `GovernorGauges` (3.5) needs 4.3's `@crate/ui/lib/spring.ts`;
-  - `TrackReadout` (3.9b) needs Listen ready in the same PR;
-  - the setlist ticket (4.7b) touches both apps.
-- Every release ends with a checkpoint where Diego reviews on real data, and Phase 7's gates (7.1–
-  7.5, 7.7) run on that release's scope (only the runtimes it changes). `v3.0.0` is tagged when the
-  last P0 group passes them.
+1. Checkpoint 1A (1.2–1.4) is approved for commit/push, including the persistent preview.
+   Continue locally with 1.5 → 1.6, update that preview, and stop at Checkpoint 1B for review.
+   Serialise overlapping token/cn/budget edits; no automatic commit/push of the new batch.
+2. Complete/review the applicable open Phase 0 gates when assigned. 0.11 precedes Admin 1.0;
+   0.15 qualifies desktop or records the approved fallback; 0.14 waits only until the wheel.
+3. Integrator-approved sequence: Smart Mix on `main` → rebase → website integration. Keep the
+   visual source SHA pinned until a reviewed resync. Reconcile Smart Mix overlap before backend work.
+4. Assigned R0 fixes keep separate `[MAIN]` branches and operational review/deployment gates;
+   nothing starts automatically. 2.10 stays isolated; 2.11a → 2.11b → 2.11c are observed separately.
+5. After review, complete Foundation (including 1.13), then Genres → player/EQ → Ops → Health →
+   Stats as internal milestones. Contracts precede instruments; the shared-layer 1b tasks gate Phase 6.
+6. Stop at each checkpoint for Diego. The joint `v3.0.0` contains the existing P0 scope plus the
+   single Crate v3 identity across Listen, Admin, site and docs. P1/P2 remain subsequent work.
+7. Full applicable Phase 7 QA and reviewed final screenshots/screencast precede the major. No
+   checklist grants permission for commits, push, PRs, tags, deploys or production access.
