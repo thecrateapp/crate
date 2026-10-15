@@ -310,3 +310,47 @@ def test_short_tracks_are_still_scanned_in_full(monkeypatch, tmp_path: Path) -> 
     assert profile.duration_ms == 15_000
     assert profile.quality == "full"
     assert max(profile.beat_grid_ms) > 10_000
+
+
+def _bar_features(bar_starts, kick_beats, beats, spacing=20):
+    frames = beats * spacing + spacing
+    onsets = np.full(frames, 0.2)
+    low_onsets = np.full(frames, 0.1)
+    chroma = np.zeros((frames, 12))
+    chord = 0
+    for beat in range(beats):
+        frame = beat * spacing
+        if beat in bar_starts:
+            chord = (chord + 5) % 12
+        onsets[frame] = 1.0
+        if beat in kick_beats:
+            low_onsets[frame] = 1.0
+        chroma[frame : frame + spacing] = 0.0
+        chroma[frame : frame + spacing, chord] = 1.0
+        chroma[frame : frame + spacing, (chord + 4) % 12] = 0.8
+        chroma[frame : frame + spacing, (chord + 7) % 12] = 0.6
+    beat_frames = np.arange(beats) * spacing
+    return beat_frames, {"onsets": onsets, "low_onsets": low_onsets, "chroma": chroma}
+
+
+@pytest.mark.parametrize(
+    ("bars", "kicks", "beats", "expected"),
+    [
+        (range(1, 33, 4), range(1, 33, 2), 33, 1),
+        ((), range(32), 32, None),
+        (
+            [*range(0, 16, 4), *range(18, 34, 4)],
+            [*range(0, 16, 4), *range(18, 34, 4)],
+            34,
+            None,
+        ),
+        (range(0, 12, 4), range(0, 12, 4), 12, None),
+    ],
+    ids=["pickup", "no-bar-structure", "bar-shifts-halfway", "short-grid"],
+)
+def test_downbeat_phase_needs_a_consistent_bar(bars, kicks, beats, expected) -> None:
+    from crate.smart_mix.analyzer import _downbeat_phase
+
+    beat_frames, features = _bar_features(set(bars), set(kicks), beats)
+
+    assert _downbeat_phase(beat_frames, window_frames=2, **features) == expected

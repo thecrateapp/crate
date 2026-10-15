@@ -17,6 +17,13 @@ ANALYZER_NAME = PYTHON_ANALYZER
 TARGET_SAMPLE_RATE = 22_050
 HOP_LENGTH = 256
 TEMPO_PRIOR_OCTAVES = 1.5
+_FFT_SIZE = 2048
+_MEL_BANDS = 128
+_LOW_BAND_HZ = 200.0
+_DOWNBEAT_WINDOW_SECONDS = 0.046
+_DOWNBEAT_MIN_BEATS = 16
+_DOWNBEAT_MIN_CONFIDENCE = 0.65
+_DOWNBEAT_MARGIN = 0.3
 WINDOW_SECONDS = 5.0
 FULL_SCAN_HEAD_SECONDS = 240
 FULL_SCAN_TAIL_SECONDS = 120
@@ -58,11 +65,7 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
             quality=MixProfileQuality.UNAVAILABLE,
         )
 
-    onset_envelope = librosa.onset.onset_strength(
-        y=audio,
-        sr=sample_rate,
-        hop_length=HOP_LENGTH,
-    )
+    onset_envelope, low_onsets, chroma = _frame_features(audio, sample_rate)
     tempo = librosa.feature.tempo(
         onset_envelope=onset_envelope,
         sr=sample_rate,
@@ -92,9 +95,14 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
     )
     downbeat_anchor_ms, time_signature = _downbeat_features(
         beat_grid_ms,
-        onset_envelope,
         beat_frames,
         bpm_confidence,
+        onsets=onset_envelope,
+        low_onsets=low_onsets,
+        chroma=chroma,
+        window_frames=max(
+            1, round(_DOWNBEAT_WINDOW_SECONDS * sample_rate / HOP_LENGTH)
+        ),
     )
     key, scale, camelot, key_confidence = _key_features(audio, sample_rate)
     cues = detect_mix_cues(audio, sample_rate, beat_grid_ms)
@@ -306,30 +314,112 @@ def _tempo_features(
     return round(bpm, 3), round(confidence, 4), round(tempo_stability, 4)
 
 
+def _frame_features(
+    audio: np.ndarray, sample_rate: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    import librosa
+
+    power = np.abs(librosa.stft(audio, n_fft=_FFT_SIZE, hop_length=HOP_LENGTH)) ** 2
+    mel_db = librosa.power_to_db(
+        librosa.feature.melspectrogram(S=power, sr=sample_rate, n_mels=_MEL_BANDS),
+        top_db=80.0,
+    )
+    centers = librosa.mel_frequencies(n_mels=_MEL_BANDS + 2, fmax=sample_rate / 2)[1:-1]
+    low_bands = max(1, int(np.sum(centers < _LOW_BAND_HZ)))
+    onsets = librosa.onset.onset_strength(
+        S=mel_db, sr=sample_rate, hop_length=HOP_LENGTH, n_fft=_FFT_SIZE
+    )
+    low_onsets = librosa.onset.onset_strength(
+        S=mel_db[:low_bands], sr=sample_rate, hop_length=HOP_LENGTH, n_fft=_FFT_SIZE
+    )
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=UserWarning)
+        chroma = librosa.feature.chroma_stft(S=power, sr=sample_rate)
+    lead = 1 + _FFT_SIZE // (2 * HOP_LENGTH)
+    chroma = np.pad(chroma, ((0, 0), (lead - 1, 0)), mode="edge")[:, : onsets.size]
+    return onsets, low_onsets, chroma.T
+
+
+def _standardized(values: np.ndarray) -> np.ndarray:
+    deviation = float(np.std(values))
+    if deviation <= 1e-8:
+        return np.zeros_like(values)
+    return (values - float(np.mean(values))) / deviation
+
+
+def _best_phase(scores: np.ndarray, indices: range) -> tuple[int, float] | None:
+    phases = [
+        [scores[index] for index in indices if index % 4 == phase] for phase in range(4)
+    ]
+    if any(not members for members in phases):
+        return None
+    means = np.array([float(np.mean(members)) for members in phases])
+    ordered = np.sort(means)[::-1]
+    return int(np.argmax(means)), float(ordered[0] - ordered[1])
+
+
+def _downbeat_phase(
+    beat_frames: np.ndarray,
+    *,
+    onsets: np.ndarray,
+    low_onsets: np.ndarray,
+    chroma: np.ndarray,
+    window_frames: int,
+) -> int | None:
+    count = beat_frames.size
+    if count < _DOWNBEAT_MIN_BEATS:
+        return None
+
+    def window_peak(values: np.ndarray, frame: int) -> float:
+        start = max(0, frame - window_frames)
+        end = min(values.size, frame + window_frames + 1)
+        return float(np.max(values[start:end])) if start < end else 0.0
+
+    def harmonic_change(index: int) -> float:
+        if index == 0 or index + 1 == count:
+            return 0.0
+        before = chroma[beat_frames[index - 1] : beat_frames[index]].sum(axis=0)
+        after = chroma[beat_frames[index] : beat_frames[index + 1]].sum(axis=0)
+        norm = float(np.linalg.norm(before) * np.linalg.norm(after))
+        return 0.0 if norm <= 1e-8 else 1.0 - float(np.dot(before, after)) / norm
+
+    low = _standardized(np.array([window_peak(low_onsets, f) for f in beat_frames]))
+    broad = _standardized(np.array([window_peak(onsets, f) for f in beat_frames]))
+    harmonic = _standardized(np.array([harmonic_change(i) for i in range(count)]))
+    scores = low + harmonic + 0.5 * broad
+    overall = _best_phase(scores, range(count))
+    if overall is None or overall[1] < _DOWNBEAT_MARGIN:
+        return None
+    middle = count // 2
+    first = _best_phase(scores, range(middle))
+    second = _best_phase(scores, range(middle, count))
+    if first is None or second is None:
+        return None
+    return overall[0] if first[0] == overall[0] == second[0] else None
+
+
 def _downbeat_features(
     beat_grid_ms: tuple[int, ...],
-    onset_envelope: np.ndarray,
     beat_frames: np.ndarray,
     bpm_confidence: float,
+    *,
+    onsets: np.ndarray,
+    low_onsets: np.ndarray,
+    chroma: np.ndarray,
+    window_frames: int,
 ) -> tuple[int | None, int | None]:
-    if len(beat_grid_ms) < 12 or bpm_confidence < 0.65:
+    if bpm_confidence < _DOWNBEAT_MIN_CONFIDENCE:
         return None, None
     valid_count = min(len(beat_grid_ms), beat_frames.size)
-    strengths = np.array(
-        [
-            float(onset_envelope[frame]) if 0 <= frame < onset_envelope.size else 0.0
-            for frame in beat_frames[:valid_count]
-        ],
-        dtype=np.float64,
+    phase = _downbeat_phase(
+        beat_frames[:valid_count],
+        onsets=onsets,
+        low_onsets=low_onsets,
+        chroma=chroma,
+        window_frames=window_frames,
     )
-    phase_scores = np.array([float(np.mean(strengths[phase::4])) for phase in range(4)])
-    ordered = np.sort(phase_scores)
-    onset_contrast = float(np.std(onset_envelope)) / (
-        float(np.mean(onset_envelope)) + 1e-8
-    )
-    if onset_contrast < 1.0 or ordered[-1] <= 0 or ordered[-1] < ordered[-2] * 1.2:
+    if phase is None:
         return None, None
-    phase = int(np.argmax(phase_scores))
     return beat_grid_ms[phase], 4
 
 
