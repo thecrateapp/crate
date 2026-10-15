@@ -20,6 +20,11 @@ const { locale = "en" } = Astro.props;
       <p class="sub" data-split style="--d:300ms;--step:40ms">{t("hero.subline", locale)}</p>
       <InstallCommand locale={locale} delay="440ms" />
     </div>
+    <div class="scroll-cue" aria-hidden="true">
+      <span class="scroll-label">{t("hero.scroll", locale)}</span>
+      <span class="scroll-track"></span>
+      <svg class="scroll-arrow" viewBox="0 0 12 8" width="12" height="8"><path d="M1 1.5 6 6.5 11 1.5" /></svg>
+    </div>
   </div>
 </section>
 
@@ -89,6 +94,90 @@ const { locale = "en" } = Astro.props;
     }
   }
 
+  .scroll-cue {
+    position: absolute;
+    right: clamp(16px, 2.6vw, 40px);
+    bottom: 7vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    color: var(--fg-3);
+    pointer-events: none;
+    animation: cue-in 0.8s ease-out 2.4s both;
+    transition: opacity 0.4s ease;
+  }
+
+  .scroll-cue.is-hidden {
+    opacity: 0;
+  }
+
+  .scroll-label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    writing-mode: vertical-rl;
+  }
+
+  .scroll-track {
+    position: relative;
+    width: 1px;
+    height: 56px;
+    overflow: hidden;
+    background: rgba(241, 245, 249, 0.14);
+  }
+
+  .scroll-track::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1px;
+    height: 40%;
+    background: var(--cyan-hi);
+    animation: cue-run 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  }
+
+  .scroll-arrow {
+    fill: none;
+    stroke: var(--cyan-hi);
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    animation: cue-bob 1.8s ease-in-out infinite;
+  }
+
+  @keyframes cue-in {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+  }
+
+  @keyframes cue-run {
+    from {
+      transform: translateY(-100%);
+    }
+    to {
+      transform: translateY(250%);
+    }
+  }
+
+  @keyframes cue-bob {
+    50% {
+      transform: translateY(4px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scroll-cue,
+    .scroll-track::after,
+    .scroll-arrow {
+      animation: none;
+    }
+  }
+
   .hero-copy {
     position: relative;
     display: flex;
@@ -113,6 +202,18 @@ const { locale = "en" } = Astro.props;
   }
 
   @media (max-width: 760px) {
+    .scroll-cue {
+      left: 0;
+      right: 0;
+      bottom: calc(max(0px, 100% - 100svh) + 3svh);
+      gap: 10px;
+    }
+    .scroll-label {
+      display: none;
+    }
+    .scroll-track {
+      height: 36px;
+    }
     .mark-static {
       top: 31.5vh;
       width: 38.8vh;

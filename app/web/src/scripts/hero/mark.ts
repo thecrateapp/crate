@@ -17,6 +17,7 @@ export function initHero(): () => void {
   const canvas = document.querySelector<HTMLCanvasElement>("#field");
   const copy = document.querySelector<HTMLElement>(".hero-copy");
   const staticMark = document.querySelector<HTMLElement>(".mark-static");
+  const cue = document.querySelector<HTMLElement>(".scroll-cue");
   if (!canvas || !copy) return () => {};
 
   copy.querySelectorAll<HTMLElement>("[data-split]").forEach((element) => {
@@ -30,6 +31,14 @@ export function initHero(): () => void {
     650,
   );
   let disposed = false;
+  if (cue) {
+    const toggleCue = () => cue.classList.toggle("is-hidden", scrollY > 24);
+    toggleCue();
+    addEventListener("scroll", toggleCue, {
+      passive: true,
+      signal: listeners.signal,
+    });
+  }
   let frame = 0;
   let field: Field | null = null;
 

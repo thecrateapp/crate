@@ -19,6 +19,20 @@ test.describe("hero", () => {
     await expect(page.locator("canvas#field")).toHaveCount(1);
   });
 
+  test("shows a scroll cue that fades once the visitor scrolls", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const cue = page.locator(".scroll-cue");
+    await expect(cue).toHaveCSS("opacity", "1", { timeout: 5000 });
+
+    await page.evaluate(() => scrollTo(0, 200));
+    await expect(cue).toHaveCSS("opacity", "0");
+
+    await page.evaluate(() => scrollTo(0, 0));
+    await expect(cue).toHaveCSS("opacity", "1");
+  });
+
   test("shows the static mark when WebGL2 is unavailable", async ({ page }) => {
     await page.addInitScript(() => {
       const original = HTMLCanvasElement.prototype.getContext;
