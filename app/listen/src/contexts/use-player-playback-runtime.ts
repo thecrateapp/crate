@@ -102,6 +102,8 @@ export function usePlayerPlaybackRuntime({
     isPlayingRef,
     shuffleRef,
     unshuffledQueueRef,
+    playSource,
+    playSourceRef,
   });
 
   useEqualizerRuntime(currentTrack);

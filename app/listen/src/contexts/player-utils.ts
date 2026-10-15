@@ -1,4 +1,4 @@
-import type { RepeatMode, Track } from "@/contexts/player-types";
+import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 import { apiStreamUrl, getApiBase } from "@/lib/api";
 import { isNative } from "@/lib/capacitor-runtime";
 import { recordDevLog, redactUrl } from "@/lib/dev-logs";
@@ -50,6 +50,7 @@ export interface StoredQueue {
    * active at persistence time. `null` when shuffle was off.
    */
   unshuffledQueue: Track[] | null;
+  playSource: PlaySource | null;
   savedAt: string | null;
 }
 
@@ -74,6 +75,7 @@ export function getStoredQueue(): StoredQueue {
           wasPlaying: parsed.wasPlaying === true,
           shuffle: parsed.shuffle === true,
           unshuffledQueue,
+          playSource: persistablePlaySource(parsed.playSource),
           savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : null,
         };
         if (fromLegacy) {
@@ -97,7 +99,38 @@ export function getStoredQueue(): StoredQueue {
     wasPlaying: false,
     shuffle: false,
     unshuffledQueue: null,
+    playSource: null,
     savedAt: null,
+  };
+}
+
+const PERSISTED_PLAY_SOURCE_TYPES = new Set<PlaySource["type"]>([
+  "album",
+  "crate",
+  "playlist",
+  "radio",
+  "track",
+  "queue",
+]);
+
+function persistablePlaySource(value: unknown): PlaySource | null {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Partial<PlaySource>;
+  if (
+    !source.type ||
+    !PERSISTED_PLAY_SOURCE_TYPES.has(source.type) ||
+    typeof source.name !== "string"
+  ) {
+    return null;
+  }
+  return {
+    type: source.type,
+    name: source.name,
+    id:
+      typeof source.id === "string" || typeof source.id === "number"
+        ? source.id
+        : null,
+    href: typeof source.href === "string" ? source.href : null,
   };
 }
 
@@ -122,6 +155,7 @@ export interface SaveQueueOptions {
   wasPlaying?: boolean;
   shuffle?: boolean;
   unshuffledQueue?: Track[] | null;
+  playSource?: PlaySource | null;
 }
 
 export function saveQueue(
@@ -143,6 +177,7 @@ export function saveQueue(
         wasPlaying: options.wasPlaying ?? false,
         shuffle: options.shuffle ?? false,
         unshuffledQueue: safeUnshuffled,
+        playSource: persistablePlaySource(options.playSource),
         savedAt: new Date().toISOString(),
       }),
     );
