@@ -1471,7 +1471,7 @@ regenerating the site's `scale.json` (6.5). Behaviour changes are marked
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 4.1 | `EqBands` curve chart | `viz/EqViz.astro` | both | `@crate/ui/domain/player` | P0 | M | rule amendment [D1] |
 | 4.2 | `EqGlyph` | `InsideCrate.astro` EQ tile | Listen | `app/listen/src/components/player` | P0 | M | 4.1 math |
-| 4.3 | `GenreWheel` | `viz/GenreWheel.astro` | Admin, then Listen | `app/ui/src/components/genres` | P0 | L | wheel snapshot plus G1, G2, G3, G7 (plan 2.18a–d, all before the wheel) |
+| 4.3 | `GenreWheel` | `viz/GenreWheel.astro` | Admin, then Listen | `app/ui/src/components/genres` | P0 | L | wheel snapshot plus G1, G2, G3, G7 (plan 2.18a–e, all before the wheel) |
 | 4.4 | `GenreEqWalk` | `viz/GenreWheel.astro` panel | both | `@crate/ui/domain/genres` | P0 | M | resolver `path` |
 | 4.5 | `TrackReadout` | `viz/TrackReadout.astro` | both | `@crate/ui/domain/analysis` | P1 | L | V3 fix for `/analysis` live |
 | 4.6 | `SetlistTicket` | `viz/Setlist.astro` | both | `@crate/ui/domain/shows` | P1 | M | setlist match in worker |
@@ -1575,9 +1575,11 @@ interface EffectiveEq /* existing fields unchanged */ {
   shadowed links focusable with ghost preview, absent links `text-text-subtle` with the reason.
   Client-only modes (manual preset, Adaptive, Genre adaptive) are not chain links; "your preset"
   means `user_track_preset` only.
-- Loading in Smart without cache, no track, or `unavailable`: the audio is flat
-  (`useResolvedEqualizer` returns `FLAT_GAINS`), so the chart is flat with the indeterminate line.
-  Holding the last gains is an audio behaviour change [D29].
+- Loading in Smart without cache: the audio holds the last resolved gains until the next track
+  resolves (PD32 / [D29], plan Task 4.4, a behaviour change shipped alone to `main`; today
+  `useResolvedEqualizer` returns `FLAT_GAINS`), so the chart keeps that curve with the
+  indeterminate line. With no previous resolve, no track, or `unavailable`, the audio and the
+  chart are flat.
 - Error: "Flat · Smart EQ unavailable" with `StatusDot warn`. EQ off: 40% opacity, sliders
   `aria-disabled`. Engine without EQ: the panel is not mounted (existing gating).
 - Admin `GenreEqEditor`: flat panel (remove box-in-box and `white/*`), `MonoLabel "EQ · {genre}"`,
@@ -1693,8 +1695,9 @@ prop. SVG `aria-hidden`. Forced colors: curve `CanvasText`, glow hidden. 48 px t
 (published gains equal engine gains), `EqGlyph`, `PlayerBar`, `FullscreenPlayer`. Under 2 KB in the
 initial chunk: import from `lib/eq-curve`, not `EqBands`.
 
-**Decisions and risks.** Smart track changes briefly fall to flat in the audio; the glyph shows it
-truthfully unless [D29] changes the runtime. Genre and Adaptive caches are module-level and never
+**Decisions and risks.** On Smart track changes the audio holds the last resolved gains until the
+next track resolves (PD32 / [D29], plan Task 4.4); the glyph draws the gains the engine plays, so
+it shows the held curve. Genre and Adaptive caches are module-level and never
 invalidated (edits reach audio and glyph only after reload). TS and Python adaptive EQ are twin
 implementations without a shared fixture.
 
@@ -1706,7 +1709,7 @@ implementations without a shared fixture.
 | --- | --- |
 | Site source | `viz/GenreWheel.astro`, `scripts/viz/genre-view.ts`, `scripts/viz/taxonomy-math.ts` (+ tests) |
 | Home | Admin: `app/ui/src/components/genres/GenreWheel.tsx`, `GenreWheelInspector.tsx`, `app/ui/src/lib/genre-wheel-math.ts`. Moves to `@crate/ui/domain/genres/GenreWheel.tsx` + `lib/genre-wheel-math.ts` in the PR where Listen adopts it |
-| Priority · effort | P0 · L (backend 2.18a–d, including G1, G2, G3, G7 and edge suppression, lands first; then the read-only wheel, inspector and EQ walk, plan Task 3.7, with EQ writes on core genres enabled; EQ edit, link mode, edge hiding and the unmapped mapper in the inspector, plan Task 3.8, frontend only) |
+| Priority · effort | P0 · L (backend 2.18a–e, including G1, G2, G3, G7 and edge suppression, lands first; then the read-only wheel, inspector and EQ walk, plan Task 3.7, with EQ writes on core genres enabled; EQ edit, link mode, edge hiding and the unmapped mapper in the inspector, plan Task 3.8, frontend only) |
 
 **Surfaces.** Admin `/genres` default view (Wheel / Tree / Grid; tree and grid remain the list and
 accessible alternative), `/genres/:slug` locator next to `GenreEqEditor` (may retire
@@ -1745,7 +1748,7 @@ with `eq_override <> 'none' OR local_name IS NOT NULL OR local_description IS NO
   `created_by` and `locked=false`, while curator edges always set `created_by`
   (`api/genres.py:606,654`). The builder maps `source='manual' AND created_by IS NULL AND NOT
   locked` to `other`, so the Provenance mode (shipped read-only in plan Task 3.7) never labels
-  MusicBrainz edges as curator edits. G3 (backend in plan Task 2.18d, before 3.7) writes
+  MusicBrainz edges as curator edits. G3 (backend in plan Task 2.18e, before 3.7; UI in 3.8) writes
   `musicbrainz` from then on; the fallback still covers edges synced earlier.
 - Task `refresh_genre_wheel_snapshot` (`TaskPoolConfig('fast', 1, 300, 1)`, dedup key
   `genre-wheel:local`, `quiet=True`), scheduled by `schedule_genre_wheel_refresh()` with
@@ -2775,8 +2778,10 @@ DB flag and `/trash` does not list albums).
   `crate:sse:admin:health:scan` without DB reads). `health-scan` is an event type of the `health`
   surface, not a surface of its own; `fixed` is emitted by the repair phase per check. There is no
   separate health stream route. `open_pubsub` gains multi-channel support.
-- `running` is a Redis key with a 90 s TTL refreshed by each scan event, merged at read time and
-  dropped when its task is no longer pending or running; only full and selected scans write it
+- `running` is a Redis key with a 90 s TTL, refreshed by each scan event and by a 30 s heartbeat
+  thread for the whole task (scan events fire only at the start and end of a check), deleted in the
+  task's `finally`, merged at read time and dropped when its task is no longer pending or running
+  (product design 4.2 item 5); only full and selected scans write it
   (not artist rechecks). `queued` is written by a hook in the `actors.py` dispatch path (governor
   deferral and DB-heavy lock wait).
 - Backend fixes: labels and descriptions as keyword arguments appended to each
@@ -2788,8 +2793,11 @@ DB flag and `/trash` does not list albums).
   the task channel (not `crate:sse:global`); the drill-down read below replaces
   `GET /api/admin/health-snapshot?check_type=`, which stays as a deprecated alias for one release
   (behaviour change: the old route is removed after that);
-  `POST /health-check` deduplicates and returns the existing task; a refresh task with a
-  generation counter for API mutations (`quiet=True`); `library_pipeline` runs health → repair → sync and
+  `POST /health-check` deduplicates and returns the existing task; the worker writes the
+  snapshot at start and end of `health_check`, `repair` and `library_pipeline`; API mutations
+  schedule `refresh_admin_surface(surface="health")` (`quiet=True`, dedup key
+  `admin-surface:health`) through the trailing-edge due-set recipe (3.9), with no generation
+  counter (product design 4.2 item 6); `library_pipeline` runs health → repair → sync and
   closes the health part after repair; health and pipeline handlers publish (V10).
 - Drill-down (`HealthIssueDrilldown`, the action surface for the 11 confirm checks):
   `GET /api/admin/health-checks/{check_type}/issues?cursor=&limit=` (`library.repair.run`), one
@@ -2988,7 +2996,8 @@ to the tab and follows the run instead of reloading the page (it calls `refetch(
 
 **Content.** VizSplit 5fr/7fr: orbit (core with the artist, inner ring of 6 sources with TTL arcs and
 states fresh, expired, error with a short code, empty, unconfigured with the env variable name,
-disabled only if Settings toggles are wired [D38]) and pool lanes of the last real run (wait and
+disabled when the Settings toggle is off: the pipeline honours the toggles, PD29 / [D38], plan
+Task 3.12c) and pool lanes of the last real run (wait and
 fetch segments per source, cache hits as chips); outer dashed ring of 7 secondary sources showing
 coverage with agnostic copy ("artist photo", "covers", "84 lyrics", "3 upcoming"). Right: panel
 header, `StatStrip` (fresh 4/6, next expiry, last run), `HairlineList` of the 6 sources with state
@@ -3524,8 +3533,8 @@ Admin (`components/layout/{Shell,Sidebar,SearchBar,CommandPalette}.tsx`):
 - Flat canvas, no glass; bottom hairline appears after scroll.
 - Sidebar: group labels `MonoLabel`; items sans 14; active item = 2 px accent-hi bar on the left plus
   `text-text-primary` (replaces the filled `bg-white/10` pill); badges = mono tabular count plus
-  `StatusDot` (`warn` issues, `on` running); the 72 px collapsed rail keeps dots only. Regrouping
-  by site chapters is open [D18].
+  `StatusDot` (`warn` issues, `on` running); the 72 px collapsed rail keeps dots only. Groups follow
+  the site chapters (PD14 / [D18], plan Task 3.2); routes and capability gates do not change.
 - Header: mono breadcrumb (`ADMIN · 07 / OPERATIONS · TASKS`, chapter number in accent hi); back and
   forward as ghost icon buttons without shadows; search per 5.6.
 - Command palette: popover recipe, `MonoLabel` groups, hairline rows with the active bar, keyboard
@@ -3840,7 +3849,9 @@ Also unchecked: `genreRoute` parity and the mix numbers.
 - The P0 Listen instruments (player bar with the EQ glyph, EQ panel, Stats heatmap band) are also
   captured in `light` and `crateRed` [D41], the variants
   `docs/technical/listen-design-system-visual-qa.md` treats as release gates.
-- Admin has no screenshot suite; functional Playwright only [D25].
+- Admin: a small capture set (Dashboard, Tasks, Health, Genres, Album, Settings, System) from plan
+  Task 0.11, recorded before Task 1.0 and extended by each P0 page task; the Admin bundle ceiling
+  from plan Task 0.12 (PD48 / [D25]).
 - `npm run test:appearance` covers token contracts (Chromium in CI).
 
 ### 6.7 Bundle and performance budgets
@@ -3946,7 +3957,7 @@ else; this document does not keep its own list. Its constraints on that order:
 - Commits stay small: one recipe, one screen or one instrument per commit, behaviour-identical for
   Track A, with tests and intentional re-baselines.
 - A backend precondition (the entry's "Blocked by") merges before its instrument: for example the
-  health surface (plan Task 2.17c) before the Dashboard tile (3.3), and plan Tasks 2.18a–d (the
+  health surface (plan Task 2.17c) before the Dashboard tile (3.3), and plan Tasks 2.18a–e (the
   wheel snapshot plus G1, G2, G3, G7 and edge suppression) before the read-only wheel (3.7), in
   the same Genres release; 3.8 is frontend only. Core-genre EQ writes are never disabled in a
   release.
@@ -3984,7 +3995,7 @@ Where the Status differs from the Default (D3, D18, D29, D38), the Status wins.
 | D22 | Governor defaults: compose 0/0 vs code and site 10/10 listeners and streams | show the real configured values | decided 2026-10-15: product default 10/10, compose 0/0 documented as an operator override, site copy "default 10/10, configurable" (PD33) |
 | D23 | `shadow_quality_tracks` runs unattended in the daily pipeline although it requires confirmation; route hard deletes through Library Trash; console scans apply safe fixes | gate on confirmation; trash routing; no | decided 2026-10-15: gate on confirmation (PD24, own PR to `main`); trash footer factual in v3 and routing as a separate fix after 2.17e (PD28); console scans apply no fixes |
 | D24 | One genre count definition (read-plane thresholds .70 / .45) everywhere | adopt | decided 2026-10-15: adopt (PD21) |
-| D25 | Admin screenshot coverage for instruments | functional tests only for now | decided 2026-10-15: Listen and Admin `check:bundle` from Phase 0; Admin functional tests only (PD48) |
+| D25 | Admin screenshot coverage for instruments | functional tests only for now | decided 2026-10-15: Listen and Admin `check:bundle` from Phase 0; Admin gets a small capture set from plan Task 0.11, extended by each P0 page task (PD48) |
 | D26 | Tighten `/api/acquisition/snapshot` and `/stream` to acquisition capabilities | tighten | decided 2026-10-15: tighten; behaviour change, own PR to `main` (PD46) |
 | D27 | Federation in Listen: provenance tag only, no network view | tag only | decided 2026-10-15: tag only |
 | D28 | Crate Connect production build flag (off by default everywhere) | confirm before building 4.12 | decided 2026-10-15: build Devices in v3 although Crate Connect is off in production; "review Crate Connect" is the next initiative after v3 (PD38) |

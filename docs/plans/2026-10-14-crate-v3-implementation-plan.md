@@ -2277,7 +2277,7 @@ Commit: `feat(api): serve the health checks surface from a snapshot`.
 Release note: `fix-type` requires `{confirm: true}` for checks that need confirmation;
 `/api/admin/health-snapshot` and `/api/admin/health-stream` are deprecated.
 
-#### Task 2.17d: Pipeline phases and the unattended set (PD24) `[BEHAVIOUR]`
+#### Task 2.17d: Pipeline phases and the unattended set (PD24) `[MAIN]` `[BEHAVIOUR]`
 
 **Files:**
 - Modify: `app/crate/worker_handlers/management.py`
@@ -3421,7 +3421,7 @@ Commit: `feat(enrichment): record each source fetch per artist`.
 
 Commit: `feat(ui): show enrichment sources as a live orbit on the artist page`.
 
-### Task 3.12c: Honour the enrichment source toggles (PD29 / [D38]) `[BEHAVIOUR]`
+### Task 3.12c: Honour the enrichment source toggles (PD29 / [D38]) `[MAIN]` `[BEHAVIOUR]`
 
 Only if PD29 = (a) (the Task 0.3 recommendation); with (b) the Settings toggles are hidden instead
 (`app/ui/src/pages/Settings.tsx`, a page test) and this task is "no backend work".
@@ -3584,7 +3584,7 @@ Commit: `feat(listen): restyle the player bar, fullscreen and queue`.
 
 Commit: `feat(listen): show the live EQ curve as the EQ button glyph`.
 
-### Task 4.4: Hold the last Smart EQ curve while resolving (PD32 / [D29]) `[BEHAVIOUR]`
+### Task 4.4: Hold the last Smart EQ curve while resolving (PD32 / [D29]) `[MAIN]` `[BEHAVIOUR]`
 
 Only if the decision is to hold.
 
@@ -4150,7 +4150,10 @@ Commits:
 
 Commit: `feat(ops): trace domain events from outbox to projector`.
 
-### Task 5.4: Redis pair (P2 · M)
+### Task 5.4: Redis pair (P2 · M) `[MAIN]` (PD45 only)
+
+`[MAIN]` applies to the PD45 compose change: it ships alone as a small PR to `main` with its
+release note (decision register, "Behaviour changes"); the Redis pair itself stays in the v3 work.
 
 **Files:**
 - Create: `app/crate/redis_runtime.py` (own short-timeout clients; `pipeline(transaction=False)`, `execute(raise_on_error=False)`)
@@ -4192,7 +4195,11 @@ Commits:
 - PD45 separately: `chore(compose): leave headroom under the redis memory limit`. The site's drift
   test pins the redis flags in `docker-compose.yaml`; note it in the PR (Task 7.6).
 
-### Task 5.5: Stack map (P1 · L) `[BEHAVIOUR]`
+### Task 5.5: Stack map (P1 · L) `[MAIN]` (PD44 only) `[BEHAVIOUR]`
+
+`[MAIN]` applies to the PD44 restart policy: the `api/stack.py` deny list and its tests ship alone
+as a small PR to `main` with its release note, before the Stack map (decision register,
+"Behaviour changes"); the sampler and the map stay in the v3 work.
 
 **Depends on:** PD54 = [D43] (Task 0.3). The Files below follow the recommendation (a), a thread
 in crate-api; with (b) `stack_sampler.py` runs as a daemon thread in crate-worker (service loop
@@ -4249,7 +4256,11 @@ leader lock is dropped. Everything else is the same.
   - the boundary test: `db/admin_stack_surface.py` does not import `crate.docker_ctl`
   - Vitest
 
-Commit: `feat(ops): draw the live stack as a system map`.
+Commits:
+
+- PD44 separately, first: `fix(stack): deny restarts of core services` (`api/stack.py` policy and
+  `TestStackAPI` policy cases).
+- `feat(ops): draw the live stack as a system map`.
 
 ### Task 5.6: Acquisition lanes on `/download` (P1 · L; B9, B20)
 

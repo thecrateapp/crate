@@ -18,7 +18,7 @@ Relation to other documents:
 
 - `docs/plans/2026-10-14-crate-v3-design-system.md` (the design-system spec, `DS`). The committed
   version (`bce7dd92`) covered the language migration only; the 2026-10-15 revision (Track A
-  language, Track B instruments, decision register `[D1]`–`[D42]`, plus `[D43]` for PD54) is
+  language, Track B instruments, decision register `[D1]`–`[D43]`, where `[D43]` is PD54) is
   complete. Division of ownership: the spec owns tokens, primitives, panel anatomy, motion and
   accessibility rules; this
   document owns information architecture, per-screen design, data contracts, backend work and
@@ -542,6 +542,7 @@ Mobile visuals are data-driven (analysis fields, snapshots), never analyser-driv
 | `GET /api/artists/{id}/enrichment` stops calling providers inline; Listen's bio hook receives `{}` on a cold artist and a task is enqueued | 4.5 |
 | Federation projector routing: remote stream events stop rebuilding `ops/dashboard` | B11 |
 | Projector consumption fixed (B1): projector work resumes, so ops rebuilds must be coalesced in the same change | 5.1 |
+| The projector resumes its side-effecting projections (post-acquisition `process_new_content`, per-user home rebuilds, recently-played refreshes) behind `CRATE_PROJECTOR_SIDE_EFFECTS_ENABLED`, off at deploy (plan 2.10) | 5.1, B1 |
 | `/api/admin/metrics/system` shows the worker's real governor values (0/0 listeners/streams and the window) instead of the API's defaults | 4.8 |
 | Stack restart denied for `traefik` (restartable today) and the other core services; stop/start only for non-core containers | PD44 |
 | Camelot maps flat keys (`Bb`, `Eb`, `Ab`, …) through enharmonics, so key scoring in Radio and Paths changes for tracks Essentia tagged with flats | 4.7, PD2 (plan 2.9b) |
@@ -551,6 +552,7 @@ Mobile visuals are data-driven (analysis fields, snapshots), never analyser-driv
 | `POST /api/paths`, `/regenerate` and `/preview` (synchronous) skip the LLM refinement, get a per-user rate limit and a deprecation date; new Listen builds plan through the task route | 4.16, B18 |
 | Mood playback samples from a stored pool of at most 400 uids per mood instead of `ORDER BY RANDOM()` over every match | 4.14 |
 | `/api/me/upcoming` moves probable setlist songs into a top-level `probable_setlists` map keyed by artist; the per-show field stays, deprecated, until the minimum supported Listen client reads the map | 4.18 |
+| Below 3 listeners the instance stats builder hides the heatmap: `heatmap.cells` is an all-zero 7×24 grid (shipped Listen builds call `cells.flat()`), `peak` and `night_share` are `null` and `hidden_reason` is `"few_listeners"`; `heatmap_utc` follows the same rule (plan 2.20) | 4.17, PD43 |
 | The v2 genre tree shows `—` counts while the wheel snapshot is cold (its counts come from the snapshot, B7) | 4.6.3 |
 | `reanalyze_album` is deduplicated: a second click attaches to the running task | 4.7 |
 
@@ -2424,7 +2426,10 @@ limit returns 429; task events and dedup; ownership; the Listen client deduplica
 
 Contract: existing `heatmap {cells[7][24], peak, night_share}` plus `night_hours`; instance payload
 adds `heatmap.listener_count` and `heatmap_utc` (one CTE with the local heatmap in the instance
-builder); `StatsDashboardResponse` declares `snapshot` with `pending` and the new fields (B12); one
+builder). PD43 is enforced by the instance builder, not the UI: below 3 listeners `heatmap.cells`
+is an all-zero 7×24 grid (shipped Listen builds call `cells.flat()`), `peak` and `night_share` are
+`null`, and `hidden_reason: "few_listeners"` is set; `heatmap_utc` follows the same rule (plan 2.20,
+5.12; behaviour change, 3.4.2); `StatsDashboardResponse` declares `snapshot` with `pending` and the new fields (B12); one
 limits constant (`albums_limit` 14) for user prewarm, instance prewarm, API defaults, worker
 fallbacks and Listen, with a pytest asserting the subject keys match.
 
@@ -2862,7 +2867,7 @@ relies on:
 - Independent fixes and platform preconditions (B1 with coalescing, B2, B4) go to `main` first
   (Phases 2A and 2B, release group R0).
 - The health surface (plan 2.17c) lands before the Dashboard Health tile (plan 3.3).
-- In the Genres group, 2.18a–d (including G1, G2, G3, G7 and suppression) land before the
+- In the Genres group, 2.18a–e (including G1, G2, G3, G7 and suppression) land before the
   read-only wheel (plan 3.7); 3.8 (editing) is frontend only. EQ writes on core genres are never
   disabled in a release.
 - Paths planning as a task (B18) ships with the `plan_meta` backend (plan 4.9a), before the route
@@ -2939,7 +2944,7 @@ closed by PD4), `[D35]` Generate with AI as a draft (part of PD18 here), `[D37]`
 | PD45 | — | `crate-redis` `maxmemory` equals `mem_limit` (512m) | lower `maxmemory` (e.g. 448mb) | yes, separate compose change; the site test pins these flags, so the second-landing branch updates it (5.3.6) | decided 2026-10-15: recommendation; behaviour change, own PR to `main` |
 | PD46 | [D26] | Acquisition snapshot and stream permissions | require `library.import.manage` or `library.tidal.manage` | yes; warn API clients | decided 2026-10-15: recommendation; behaviour change, own PR to `main` |
 | PD47 | — | Unused code | remove `SpectrumRibbonCanvas`, unused Nivo packages (Admin bump, chord, geo, heatmap, network; Listen core, line), Listen `leaflet`, Admin `components/ui/error-state.tsx`, orphan pages | remove in cleanup commits | decided 2026-10-15: recommendation |
-| PD48 | [D25] | Bundle and screenshot checks | run Listen `check:bundle` in `test-frontend.yml`; an Admin bundle ceiling (Admin has no `check:bundle` today); Admin screenshot coverage | Listen and Admin `check:bundle` both from Phase 0 (plan 0.12): Admin's ceiling is today's measured value plus a small margin, so a regression shows up in the PR that causes it rather than at the end against a baseline that already includes it; each Phase 3 and 5 PR records its delta and raises the ceiling deliberately, and each instrument route gets an AppRouter-style lazy-boundary assertion. Screenshots: Listen yes; Admin functional tests only until instruments stabilise | decided 2026-10-15: recommendation |
+| PD48 | [D25] | Bundle and screenshot checks | run Listen `check:bundle` in `test-frontend.yml`; an Admin bundle ceiling (Admin has no `check:bundle` today); Admin screenshot coverage | Listen and Admin `check:bundle` both from Phase 0 (plan 0.12): Admin's ceiling is today's measured value plus a small margin, so a regression shows up in the PR that causes it rather than at the end against a baseline that already includes it; each Phase 3 and 5 PR records its delta and raises the ceiling deliberately, and each instrument route gets an AppRouter-style lazy-boundary assertion. Screenshots: Listen yes; Admin a small capture set from plan 0.11 (Dashboard, Tasks, Health, Genres, Album, Settings, System), recorded before plan 1.0 and extended by each P0 page task | decided 2026-10-15: recommendation |
 | PD49 | [D15] | `<html lang>` in Listen | sync with the active locale | yes | decided 2026-10-15: recommendation |
 | PD50 | — | Spinners | remove `animate-spin` outside buttons as a migration rule | yes, file by file as screens migrate | decided 2026-10-15: recommendation |
 | PD51 | — | Ticket header key word | countdown (implemented) vs the site's `Upcoming show` | countdown | decided 2026-10-15: recommendation |
