@@ -186,7 +186,7 @@ def _insert_fixture(session, text, name: str, sizes: dict[str, int]) -> None:
                 duration_ms, analyzed_at
             )
             SELECT track.id, 1, 'lab-' || track.id, 'crate-rust',
-                   'smart-mix-audio-v2', 'lab-source-' || track.id,
+                   'smart-mix-audio-v3', 'lab-source-' || track.id,
                    CASE WHEN track.id % 10 = 0 THEN 'partial' ELSE 'full' END,
                    80 + (track.id % 90), 0.9, 0.95, 400, 400, 4,
                    ((track.id % 12) + 1)::text || CASE WHEN track.id % 2 = 0 THEN 'A' ELSE 'B' END,

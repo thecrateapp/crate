@@ -283,7 +283,7 @@ def _library(
                         key_camelot, global_energy, analyzed_at
                     )
                     VALUES (
-                        :track_id, 1, :revision, 'crate-rust', 'smart-mix-audio-v2',
+                        :track_id, 1, :revision, 'crate-rust', 'smart-mix-audio-v3',
                         :revision, 'full', :bpm, :camelot, :energy, NOW()
                     )
                     """

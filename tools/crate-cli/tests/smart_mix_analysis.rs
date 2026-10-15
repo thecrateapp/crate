@@ -230,7 +230,7 @@ fn rust_profile_serializes_the_shared_camel_case_schema() {
     let payload = serde_json::to_value(profile).unwrap();
 
     assert_eq!(payload["schemaVersion"], 1);
-    assert_eq!(payload["analyzerVersion"], "smart-mix-audio-v2");
+    assert_eq!(payload["analyzerVersion"], "smart-mix-audio-v3");
     assert!(payload.get("measurementVersion").is_some());
     assert!(payload.get("integratedLufs").is_some());
     assert!(payload.get("activeStartMs").is_some());
