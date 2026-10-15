@@ -1,4 +1,5 @@
 export const en = {
+  "nav.manifesto": "Manifesto",
   "nav.listen": "Listen",
   "nav.admin": "Admin",
   "nav.architecture": "Architecture",

@@ -125,6 +125,11 @@ body::after {
   color: var(--fg);
 }
 
+.nav .links a.is-accent,
+.menu li a.is-accent {
+  color: var(--cyan-hi);
+}
+
 .nav .links a:hover::after,
 .u-link:hover::after {
   transform: scaleX(1);

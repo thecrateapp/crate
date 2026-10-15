@@ -8,6 +8,7 @@ interface Props {
 const { locale = "en" } = Astro.props;
 
 const links = [
+  { href: "/why", label: t("nav.manifesto", locale), accent: true },
   { href: "/listen", label: t("nav.listen", locale) },
   { href: "/admin", label: t("nav.admin", locale) },
   { href: "/architecture", label: t("nav.architecture", locale) },
@@ -20,7 +21,13 @@ const links = [
 <header class="nav">
   <a class="brand" href="/"><img src="/icons/logo.svg" alt="" width="24" height="24" />Crate</a>
   <nav class="links" aria-label="Primary">
-    {links.map((link, index) => <a href={link.href} style={`--i:${index}`}>{link.label}</a>)}
+    {
+      links.map((link, index) => (
+        <a href={link.href} class:list={{ "is-accent": link.accent }} style={`--i:${index}`}>
+          {link.label}
+        </a>
+      ))
+    }
   </nav>
   <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-menu" data-menu-open>
     {t("nav.menu", locale)}
@@ -37,7 +44,7 @@ const links = [
       {
         links.map((link, index) => (
           <li>
-            <a href={link.href} style={`--i:${index}`}>
+            <a href={link.href} class:list={{ "is-accent": link.accent }} style={`--i:${index}`}>
               {link.label}
             </a>
           </li>
