@@ -130,7 +130,7 @@ export function GenreEqEditor({
   };
 
   return (
-    <div className="rounded-md border border-white/12 bg-black/15 p-5">
+    <div className="rounded-md border border-border-quiet p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <MonoLabel as="h2" accent="Equalizer preset" meta={[canonicalName]} />
@@ -139,7 +139,7 @@ export function GenreEqEditor({
             onClick={() => setGains([...FLAT_GAINS])}
             disabled={saving || clearing}
             title="Reset sliders to flat"
-            className="rounded-md p-1 text-white/30 transition-colors hover:bg-white/5 hover:text-white/60 disabled:opacity-30"
+            className="rounded-md p-1 text-text-subtle transition-colors hover:bg-surface-control hover:text-text-secondary disabled:opacity-30"
           >
             <RotateCcw size={12} />
           </button>
@@ -156,12 +156,12 @@ export function GenreEqEditor({
         )}
       </div>
 
-      <p className="mb-4 text-xs leading-5 text-white/55">
+      <p className="mb-4 text-xs leading-5 text-text-muted">
         {reasoning ||
           'Curve applied when a track in this genre plays with "Genre Adaptive" on. Saving stores gains on this taxonomy node directly. Clearing drops back to the first ancestor that has a preset.'}
       </p>
 
-      <div className="rounded-md border border-white/10 bg-black/30 p-3">
+      <div className="border-t border-border-quiet pt-4">
         <EqBands
           gains={gains}
           onBandChange={updateBand}
@@ -171,7 +171,7 @@ export function GenreEqEditor({
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-        <div className="text-[11px] text-white/45">
+        <div className="text-label text-text-subtle">
           {dirty ? "Unsaved changes" : "In sync with database"}
         </div>
         <div className="flex flex-wrap gap-2">

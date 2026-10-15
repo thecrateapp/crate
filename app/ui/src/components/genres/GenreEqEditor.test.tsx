@@ -98,4 +98,24 @@ describe("GenreEqEditor", () => {
     expect(requestFrame).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
+
+  it("renders one flat hairline panel on tokens, with no nested boxes", () => {
+    const { container } = render(
+      <GenreEqEditor
+        canonicalSlug="shoegaze"
+        canonicalName="Shoegaze"
+        initialGains={FLAT}
+        initialResolved={null}
+      />,
+    );
+
+    const boxed = Array.from(
+      container.querySelectorAll<HTMLElement>("div"),
+    ).filter((node) => /(^|\s)border(\s|$)/.test(node.className));
+    expect(boxed).toHaveLength(1);
+    expect(boxed[0]).toHaveClass("border-border-quiet");
+    expect(container.innerHTML).not.toMatch(
+      /white\/|bg-black|#[0-9a-f]{3,6}\b/i,
+    );
+  });
 });
