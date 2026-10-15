@@ -124,7 +124,7 @@ def plan_transition(
             policy=policy,
         )
 
-    if context.source == "manual" or not context.automatic:
+    if not context.automatic:
         window = _fit_window(outgoing, incoming, policy.manual_ramp_ms, 1.0, policy)
         return _base_plan(
             outgoing_uid,

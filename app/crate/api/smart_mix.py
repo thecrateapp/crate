@@ -36,6 +36,7 @@ from crate.smart_mix.models import (
     TransitionContext,
 )
 from crate.smart_mix.planner import plan_transition
+from crate.smart_mix.policy import PLANNER_POLICY
 from crate.smart_mix.versions import PLANNER_IDENTIFIER
 
 
@@ -243,6 +244,7 @@ def _plan_cache_key(
 ) -> str:
     cache_identity = {
         "plannerVersion": PLANNER_IDENTIFIER,
+        "plannerRules": PLANNER_POLICY.rules_revision,
         "outgoingTrackEntityUid": str(edge.outgoing_track_entity_uid),
         "outgoingProfileRevision": (
             outgoing.profile_revision if outgoing is not None else "missing"

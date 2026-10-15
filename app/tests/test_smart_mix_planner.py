@@ -85,6 +85,7 @@ def _amplitude(db: float) -> float:
             _context(source="manual", automatic=False),
             TransitionMode.ADAPTIVE,
         ),
+        (_context(source="manual"), TransitionMode.BEATMATCH),
         (_context(source="radio"), TransitionMode.BEATMATCH),
         (_context(source="shuffle"), TransitionMode.BEATMATCH),
         (_context(source="playlist"), TransitionMode.BEATMATCH),
@@ -99,8 +100,10 @@ def test_selects_transition_mode(
     assert plan.mode is expected_mode
     if expected_mode is TransitionMode.GAPLESS:
         assert plan.duration_ms == 0
-    elif context.source == "manual":
+    elif not context.automatic:
         assert plan.duration_ms == PLANNER_POLICY.manual_ramp_ms
+    else:
+        assert plan.duration_ms > PLANNER_POLICY.manual_ramp_ms
 
 
 @pytest.mark.parametrize(
