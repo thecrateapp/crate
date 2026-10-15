@@ -531,9 +531,9 @@ export function Stack() {
           </Button>
         }
       >
-        <CratePill active icon={Server}>
+        <CrateChip active icon={Server}>
           {data?.running ?? 0}/{data?.total ?? 0} running
-        </CratePill>
+        </CrateChip>
         <CratePill icon={Wifi}>{publicRoutes} public routes</CratePill>
         <CratePill>
           {data?.available ? "Docker available" : "Docker unavailable"}

@@ -8,12 +8,21 @@ describe("CratePill", () => {
   it("renders children", () => {
     const { container } = render(<CratePill>Label</CratePill>);
     expect(screen.getByText("Label")).toBeInTheDocument();
-    expect(container.firstElementChild).toHaveClass("text-badge");
+    expect(container.firstElementChild).toHaveClass(
+      "font-mono",
+      "text-label",
+      "tracking-chip",
+      "min-h-8",
+      "[@media(pointer:coarse)]:min-h-11",
+    );
+    expect(container.firstElementChild).toHaveAttribute("data-slot", "chip");
   });
 
   it("renders as a button when onClick is provided", () => {
     render(<CratePill onClick={() => {}}>Clickable</CratePill>);
-    expect(screen.getByRole("button")).toBeInTheDocument();
+    expect(screen.getByRole("button")).toHaveAttribute("type", "button");
+    expect(screen.getByRole("button")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button")).toHaveAttribute("data-slot", "chip");
   });
 
   it("renders as a span when onClick is not provided", () => {
@@ -26,6 +35,100 @@ describe("CratePill", () => {
     render(<CratePill onClick={handleClick}>Clickable</CratePill>);
     await userEvent.click(screen.getByRole("button"));
     expect(handleClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders an explicit toggle as a button even without a callback", () => {
+    render(
+      <CratePill variant="toggle" active>
+        Selected
+      </CratePill>,
+    );
+    expect(
+      screen.getByRole("button", { name: "Selected", pressed: true }),
+    ).toHaveAttribute("type", "button");
+  });
+
+  it("updates the pressed state and styling of an explicit toggle", () => {
+    const { rerender } = render(<CratePill variant="toggle">Jazz</CratePill>);
+    expect(screen.getByRole("button", { pressed: false })).not.toHaveClass(
+      "bg-accent-action-hi",
+    );
+    rerender(
+      <CratePill variant="toggle" active>
+        Jazz
+      </CratePill>,
+    );
+    expect(screen.getByRole("button", { pressed: true })).toHaveClass(
+      "border-accent-action-hi",
+      "bg-accent-action-hi",
+      "text-accent-action-hi-foreground",
+    );
+  });
+
+  it("keeps actions as ordinary buttons and ignores the toggle active prop", async () => {
+    const onClick = vi.fn();
+    render(
+      <CratePill variant="action" active onClick={onClick}>
+        Resume
+      </CratePill>,
+    );
+    const action = screen.getByRole("button", { name: "Resume" });
+    expect(action).toHaveAttribute("type", "button");
+    expect(action).not.toHaveAttribute("aria-pressed");
+    expect(action).not.toHaveClass("bg-accent-action-hi");
+    await userEvent.click(action);
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  it("renders an action button without a callback", () => {
+    render(<CratePill variant="action">Start</CratePill>);
+    expect(screen.getByRole("button", { name: "Start" })).not.toHaveAttribute(
+      "aria-pressed",
+    );
+  });
+
+  it("keeps explicit static pills non-interactive even if a callback and active are passed", async () => {
+    const onClick = vi.fn();
+    render(
+      <CratePill variant="static" active onClick={onClick}>
+        Imported
+      </CratePill>,
+    );
+    const pill = screen.getByText("Imported");
+    expect(pill.tagName).toBe("SPAN");
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(pill).not.toHaveAttribute("aria-pressed");
+    expect(pill).not.toHaveClass("bg-accent-action-hi");
+    await userEvent.click(pill);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it.each(["toggle", "action"] as const)(
+    "prevents callbacks when a %s is disabled",
+    async (variant) => {
+      const onClick = vi.fn();
+      render(
+        <CratePill variant={variant} onClick={onClick} disabled>
+          Unavailable
+        </CratePill>,
+      );
+      const button = screen.getByRole("button");
+      expect(button).toBeDisabled();
+      await userEvent.click(button);
+      expect(onClick).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps a visible keyboard outline while the global focus recipe is pending", async () => {
+    render(<CratePill variant="action">Resume</CratePill>);
+    const button = screen.getByRole("button");
+    expect(button).toHaveClass(
+      "focus-visible:outline-2",
+      "focus-visible:outline-accent-action-hi",
+    );
+    expect(button).not.toHaveClass("focus-visible:shadow-focus");
+    await userEvent.tab();
+    expect(button).toHaveFocus();
   });
 
   it("renders the v3 chip: mono text, solid bright accent when active", () => {
@@ -45,6 +148,7 @@ describe("CratePill", () => {
       "bg-accent-action-hi",
       "text-accent-action-hi-foreground",
     );
+    expect(active).not.toHaveClass("hover:text-text-primary");
     expect(screen.getByRole("button", { name: "doom" })).not.toHaveClass(
       "bg-accent-action-hi",
     );
@@ -64,7 +168,14 @@ describe("CrateChip", () => {
   it("renders children", () => {
     const { container } = render(<CrateChip>Tag</CrateChip>);
     expect(screen.getByText("Tag")).toBeInTheDocument();
-    expect(container.firstElementChild).toHaveClass("text-badge");
+    expect(container.firstElementChild).toHaveClass(
+      "rounded-full",
+      "border",
+      "px-2",
+      "py-0.5",
+      "font-mono",
+      "text-badge",
+    );
   });
 
   it("renders as a span", () => {
@@ -108,15 +219,13 @@ describe("CrateBadge tones", () => {
     expect(chip).not.toHaveClass("text-badge");
   });
 
-  it("exposes aria-pressed and a focus ring on interactive pills", () => {
+  it("exposes aria-pressed on inferred toggle pills", () => {
     const { rerender } = render(
       <CratePill onClick={() => {}} active>
         On
       </CratePill>,
     );
-    expect(screen.getByRole("button", { pressed: true })).toHaveClass(
-      "focus-visible:shadow-focus",
-    );
+    expect(screen.getByRole("button", { pressed: true })).toBeInTheDocument();
     rerender(<CratePill onClick={() => {}}>On</CratePill>);
     expect(screen.getByRole("button", { pressed: false })).toBeInTheDocument();
   });
@@ -124,6 +233,7 @@ describe("CrateBadge tones", () => {
   it("does not set aria-pressed on static pills", () => {
     render(<CratePill active>Static</CratePill>);
     expect(screen.getByText("Static")).not.toHaveAttribute("aria-pressed");
+    expect(screen.getByText("Static")).not.toHaveClass("bg-accent-action-hi");
   });
 });
 

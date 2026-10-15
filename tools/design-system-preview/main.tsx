@@ -2,12 +2,28 @@ import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
+import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
+import { CratePill, CrateChip } from "@crate/ui/primitives/CrateBadge";
 import { StatNumber } from "@crate/ui/primitives/StatNumber";
 import "./style.css";
 
 function App() {
   const [motion, setMotion] = useState(true);
   const [above, setAbove] = useState(false);
+  const [selected, setSelected] = useState(0);
+  const [genres, setGenres] = useState(["Jazz", "Ambient"]);
+  const tracks = [
+    "Everything in Its Right Place",
+    "Daydreaming",
+    "Weird Fishes / Arpeggi",
+  ];
+  function toggleGenre(genre: string) {
+    setGenres((current) =>
+      current.includes(genre)
+        ? current.filter((item) => item !== genre)
+        : [...current, genre],
+    );
+  }
   function toggleMotion() {
     const next = !motion;
     document.documentElement.dataset.crateMotion = next ? "full" : "reduced";
@@ -20,7 +36,7 @@ function App() {
           crate<span className="version">v3</span>
         </a>
         <MonoLabel
-          meta={["Checkpoint 1A", "Vista local"]}
+          meta={["Checkpoint 1B", "En revisión"]}
           className="masthead-meta"
         />
         <a className="jump" href="#primitivas">
@@ -216,8 +232,146 @@ function App() {
           </div>
         </div>
       </section>
+      <section
+        id="filas-y-chips"
+        className="next-batch"
+        aria-label="Checkpoint 1B, filas y chips"
+      >
+        <div className="specimen-heading">
+          <div>
+            <MonoLabel size="eyebrow" accent="03">
+              Checkpoint 1B · Nuevo
+            </MonoLabel>
+            <h2>
+              Filas que guían.
+              <br className="mobile-break" /> Controles que responden.
+            </h2>
+          </div>
+          <a className="jump" href="#primitivas">
+            Volver a 1A <span aria-hidden="true">↑</span>
+          </a>
+        </div>
+        <div className="next-grid">
+          <article className="next-specimen">
+            <div className="specimen-title">
+              <MonoLabel as="h3" accent="04">
+                HairlineList / Row
+              </MonoLabel>
+              <span>Activa · enlace · multilínea</span>
+            </div>
+            <HairlineList
+              label="Vista previa de canciones"
+              className="rows-preview"
+            >
+              {tracks.slice(0, 2).map((track, index) => (
+                <HairlineRow
+                  key={track}
+                  asChild
+                  index={index + 1}
+                  active={selected === index}
+                  trailing={
+                    <MonoLabel as="span">
+                      {index === 0 ? "4:11" : "6:24"}
+                    </MonoLabel>
+                  }
+                >
+                  <button
+                    type="button"
+                    aria-pressed={selected === index}
+                    onClick={() => setSelected(index)}
+                  >
+                    {track}
+                  </button>
+                </HairlineRow>
+              ))}
+              <HairlineRow
+                asChild
+                index={3}
+                active={selected === 2}
+                trailing={<MonoLabel as="span">5:18</MonoLabel>}
+              >
+                <a href="#detalle-cancion" onClick={() => setSelected(2)}>
+                  {tracks[2]}
+                </a>
+              </HairlineRow>
+              <HairlineRow index={4} truncate={false} muted>
+                <div>
+                  Una fila que respira.
+                  <p className="row-description">
+                    Contenido en varias líneas, sin recortar la información que
+                    necesitas leer.
+                  </p>
+                </div>
+              </HairlineRow>
+            </HairlineList>
+            <div
+              id="detalle-cancion"
+              className="track-detail"
+              aria-live="polite"
+            >
+              <MonoLabel accent="/">Fila seleccionada</MonoLabel>
+              <p>{tracks[selected]}</p>
+            </div>
+          </article>
+          <article className="next-specimen">
+            <div className="specimen-title">
+              <MonoLabel as="h3" accent="05">
+                Pills / Chips
+              </MonoLabel>
+              <span>Filtro · acción · etiqueta</span>
+            </div>
+            <MonoLabel className="example-label">
+              Filtros seleccionables
+            </MonoLabel>
+            <div
+              role="group"
+              aria-label="Géneros musicales"
+              className="pill-group"
+            >
+              {["Jazz", "Ambient", "Rock", "Electrónica"].map((genre) => (
+                <CratePill
+                  key={genre}
+                  variant="toggle"
+                  active={genres.includes(genre)}
+                  onClick={() => toggleGenre(genre)}
+                >
+                  {genre}
+                </CratePill>
+              ))}
+            </div>
+            <p className="filter-feedback" aria-live="polite">
+              {genres.length
+                ? `${genres.length} géneros seleccionados`
+                : "Todos los géneros"}
+            </p>
+            <div className="pill-group">
+              <CratePill variant="action" onClick={() => setGenres([])}>
+                Limpiar filtros
+              </CratePill>
+              <CratePill variant="action" disabled>
+                Próximamente
+              </CratePill>
+            </div>
+            <MonoLabel className="example-label">
+              Etiquetas sin interacción
+            </MonoLabel>
+            <div className="pill-group">
+              <CrateChip tone="accent">FLAC</CrateChip>
+              <CrateChip active>24 bit</CrateChip>
+              <CrateChip>Estéreo</CrateChip>
+              <CrateChip tone="warning">Sin portada</CrateChip>
+            </div>
+            <p className="explanation">
+              Los filtros anuncian su selección. Las acciones ejecutan. Las
+              etiquetas informan.
+            </p>
+          </article>
+        </div>
+      </section>
       <footer>
-        <MonoLabel meta={["Crate V3", "MonoLabel · StatusDot · StatNumber"]} />
+        <MonoLabel
+          meta={["Crate V3", "Checkpoint 1A aprobado · 1B en revisión"]}
+        />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>
       </footer>
     </main>

@@ -10,7 +10,8 @@
     "test:listen-visual": "playwright test --config=playwright.listen-visual.config.ts",
     "test:admin-e2e": "playwright test --config=playwright.admin.config.ts",
     "design-system:preview": "vite --config tools/design-system-preview/vite.config.mjs",
-    "design-system:preview:build": "vite build --config tools/design-system-preview/vite.config.mjs"
+    "design-system:preview:build": "vite build --config tools/design-system-preview/vite.config.mjs",
+    "design-system:preview:test": "playwright test --config tools/design-system-preview/playwright.config.mjs"
   },
   "workspaces": [
     "app/cast-receiver",

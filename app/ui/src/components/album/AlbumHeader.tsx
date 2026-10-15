@@ -17,7 +17,7 @@ import { toast } from "sonner";
 
 import { ImageLightbox } from "@crate/ui/primitives/ImageLightbox";
 import { Button } from "@crate/ui/shadcn/button";
-import { CratePill } from "@crate/ui/primitives/CrateBadge";
+import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
 import {
   GenrePillRow,
   type GenreProfileItem,
@@ -393,14 +393,14 @@ export function AlbumHeader({
               {hasCover ? (
                 <CratePill icon={Music}>Cover</CratePill>
               ) : (
-                <CratePill active>No cover</CratePill>
+                <CrateChip active>No cover</CrateChip>
               )}
               {albumTags.musicbrainz_albumid ? (
                 <CratePill>
                   MBID {albumTags.musicbrainz_albumid.slice(0, 8)}
                 </CratePill>
               ) : (
-                <CratePill active>No MBID</CratePill>
+                <CrateChip active>No MBID</CrateChip>
               )}
             </div>
 

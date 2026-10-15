@@ -565,7 +565,7 @@ html[data-keyboard-open] select {
   border-radius: var(--radius-lg);
 }
 
-:is(button, a).rounded-full[class*="px-"] {
+:is(button, a).rounded-full[class*="px-"]:not([data-slot="chip"]) {
   border-radius: var(--radius-lg);
 }
 

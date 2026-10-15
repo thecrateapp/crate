@@ -143,9 +143,9 @@ describe("UpcomingShowExpandedView", () => {
     const list = screen.getByRole("list", { name: "Probable Setlist" });
     const before = within(list).getAllByRole("listitem");
     expect(before.map((row) => row.textContent)).toEqual([
-      "01Concubine",
-      "02Dark Horse",
-      "03Concubine",
+      "01 Concubine",
+      "02 Dark Horse",
+      "03 Concubine",
     ]);
     before.forEach((row) => expect(row).toHaveClass("setlist-ticket-row"));
 

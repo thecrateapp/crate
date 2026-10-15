@@ -81,3 +81,39 @@ describe("status dot forced colors", () => {
     }
   });
 });
+
+describe("row and chip motion CSS", () => {
+  it("transitions the chip scale longhand with a spring and a compatible fallback", async () => {
+    const compiler = await compile(tokenFile("interactive.css"));
+    const css = compiler.build([]);
+
+    expect(css).toMatch(/\.crate-pill\s*\{[^}]*transition-property:[^;]*scale/);
+    expect(css).toMatch(
+      /\.crate-pill(?::where\()?:active:not\(:disabled\)\)?\s*\{[^}]*scale:\s*0?\.95;/,
+    );
+    expect(css).toMatch(
+      /\.crate-pill\s*\{[^}]*transition-timing-function:\s*var\(--ease-snap\)/,
+    );
+    expect(css).toMatch(
+      /@supports\s*\(transition-timing-function:\s*linear\(0,\s*1\)\)/,
+    );
+    expect(css).toContain(
+      "transition-timing-function: var(--ease-spring-snappy)",
+    );
+  });
+
+  it("disables chip and row motion for both system and Crate reduced motion", async () => {
+    const compiler = await compile(tokenFile("interactive.css"));
+    const css = compiler.build([]);
+
+    expect(css).toMatch(
+      /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*\.crate-pill\s*\{[^}]*scale:\s*1;[^}]*transition:\s*none;/,
+    );
+    expect(css).toMatch(
+      /\[data-crate-motion=["']?reduced["']?\]\s+\.crate-pill\s*\{[^}]*scale:\s*1;[^}]*transition:\s*none;/,
+    );
+    expect(css).toMatch(
+      /\[data-crate-motion=["']?reduced["']?\]\s+\.crate-hairline-active-bar\s*\{[^}]*transition:\s*none;/,
+    );
+  });
+});

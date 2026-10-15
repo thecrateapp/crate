@@ -472,9 +472,9 @@ export function Analysis() {
           </>
         }
       >
-        <CratePill active icon={Music}>
+        <CrateChip active icon={Music}>
           {status.total.toLocaleString()} tracks
-        </CratePill>
+        </CrateChip>
         <CratePill icon={Gauge}>
           {metrics.analysisPercent}% audio covered
         </CratePill>

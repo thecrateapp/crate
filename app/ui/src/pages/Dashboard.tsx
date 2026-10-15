@@ -352,13 +352,22 @@ export function Dashboard() {
         description="First-glance state of the library, worker queues, and the things that need attention now."
         actions={
           <>
-            <CratePill onClick={() => navigate("/health")} icon={HeartPulse}>
+            <CratePill
+              variant="action"
+              onClick={() => navigate("/health")}
+              icon={HeartPulse}
+            >
               Health
             </CratePill>
-            <CratePill onClick={() => navigate("/tasks")} icon={Clock}>
+            <CratePill
+              variant="action"
+              onClick={() => navigate("/tasks")}
+              icon={Clock}
+            >
               Tasks
             </CratePill>
             <CratePill
+              variant="action"
               onClick={() => navigate("/upcoming")}
               icon={CalendarDays}
             >

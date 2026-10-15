@@ -580,9 +580,9 @@ export function NewReleases() {
           </>
         }
       >
-        <CratePill active icon={Sparkles}>
+        <CrateChip active icon={Sparkles}>
           {releases.length} total
-        </CratePill>
+        </CrateChip>
         <CratePill icon={Download}>{stats.detected} need action</CratePill>
         <CratePill icon={Loader2}>{stats.downloading} downloading</CratePill>
         <CratePill icon={CheckCircle2}>{stats.downloaded} in library</CratePill>

@@ -394,9 +394,9 @@ function DiscoverView({
           </>
         }
       >
-        <CratePill active icon={Compass}>
+        <CrateChip active icon={Compass}>
           {summary.opportunityArtists} acquisition targets
-        </CratePill>
+        </CrateChip>
         <CratePill icon={Sparkles}>
           {summary.detectedReleases} detected releases
         </CratePill>

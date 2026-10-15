@@ -363,9 +363,9 @@ export function Logs() {
           </>
         }
       >
-        <CratePill active icon={ScrollText}>
+        <CrateChip active icon={ScrollText}>
           {visibleLogs.length} lines
-        </CratePill>
+        </CrateChip>
         <CratePill icon={Wifi}>
           {summary.onlineWorkers}/{workers.length} workers online
         </CratePill>

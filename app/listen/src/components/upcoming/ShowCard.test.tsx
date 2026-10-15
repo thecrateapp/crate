@@ -63,8 +63,8 @@ describe("ShowCard ticket", () => {
     const setlist = screen.getByRole("list", { name: "Probable Setlist" });
     const rows = within(setlist).getAllByRole("listitem");
     expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveTextContent("01Concubine92%");
-    expect(rows[1]).toHaveTextContent(/^02Dark Horse$/);
+    expect(rows[0]).toHaveTextContent("01 Concubine 92%");
+    expect(rows[1]).toHaveTextContent(/^02 Dark Horse$/);
     expect(
       screen.getByRole("heading", { level: 3, name: /Probable Setlist/ }),
     ).toHaveTextContent("2 songs");

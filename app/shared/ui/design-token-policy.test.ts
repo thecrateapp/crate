@@ -32,7 +32,6 @@ const ICON_SIZE_BUDGET: Record<string, Record<string, number>> = {
   "composites/AdminSelect.tsx": { "13": 1 },
   "domain/shows/ShowCard.tsx": { "10": 1, "11": 1, "13": 2 },
   "domain/stats/OpsPageHero.tsx": { "22": 1 },
-  "primitives/CrateBadge.tsx": { "10": 1, "11": 2 },
   "primitives/ErrorState.tsx": { "32": 1 },
 };
 

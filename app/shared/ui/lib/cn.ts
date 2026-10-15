@@ -20,6 +20,7 @@ const crateTwMerge = extendTailwindMerge({
         "display",
         "numeral",
         "numeral-sm",
+        "chip",
         "label",
         "caps",
         "kicker",

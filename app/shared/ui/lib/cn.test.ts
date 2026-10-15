@@ -69,6 +69,11 @@ describe("cn", () => {
     expect(cn("leading-numeral", "leading-none")).toBe("leading-none");
   });
 
+  it("resolves chip tracking overrides in either order", () => {
+    expect(cn("tracking-wide", "tracking-chip")).toBe("tracking-chip");
+    expect(cn("tracking-chip", "tracking-wide")).toBe("tracking-wide");
+  });
+
   it("resolves conflicts with layout and typography tokens", () => {
     expect(cn("rounded-xl", "rounded-panel")).toBe("rounded-panel");
     expect(cn("max-w-md", "max-w-content")).toBe("max-w-content");

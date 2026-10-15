@@ -7,6 +7,8 @@
 @source "../../app/shared/ui/primitives/MonoLabel.tsx";
 @source "../../app/shared/ui/primitives/StatusDot.tsx";
 @source "../../app/shared/ui/primitives/StatNumber.tsx";
+@source "../../app/shared/ui/primitives/HairlineList.tsx";
+@source "../../app/shared/ui/primitives/CrateBadge.tsx";
 :root {
   color-scheme: dark;
   background: var(--surface-canvas);
@@ -22,10 +24,6 @@ body {
 a {
   color: inherit;
   text-decoration: none;
-}
-button {
-  font: inherit;
-  cursor: pointer;
 }
 button:focus-visible,
 a:focus-visible {
@@ -233,6 +231,7 @@ main {
   margin: 32px 0 30px;
 }
 .control {
+  cursor: pointer;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -439,4 +438,102 @@ footer p {
 
 .sample-note {
   margin-top: 10px !important;
+}
+
+.next-batch {
+  padding-top: 58px;
+  scroll-margin-top: 30px;
+}
+.next-grid {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-panel);
+  background: var(--color-card);
+  overflow: hidden;
+}
+.next-specimen {
+  padding: 27px;
+  min-width: 0;
+}
+.next-specimen + .next-specimen {
+  border-left: 1px solid var(--border-subtle);
+}
+.rows-preview {
+  margin-top: 30px !important;
+  font-size: 12px;
+}
+.rows-preview button,
+.rows-preview a {
+  padding-left: 12px;
+  padding-right: 12px;
+  text-align: left;
+}
+.rows-preview [data-muted] {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+.row-description {
+  font-size: 11px;
+  line-height: 1.7;
+  margin: 6px 0 0;
+  max-width: 280px;
+}
+.track-detail {
+  padding-top: 23px;
+  scroll-margin-top: 30px;
+}
+.track-detail > p:not(.font-mono) {
+  font-family: var(--font-display-stack);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 12px 0 0;
+}
+.example-label {
+  margin: 30px 0 14px !important;
+}
+.pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.filter-feedback {
+  font-size: 10px;
+  color: var(--text-subtle);
+  margin: 13px 0 22px;
+}
+.next-specimen > .explanation {
+  margin-top: 25px;
+  max-width: 320px;
+}
+@media (max-width: 900px) {
+  .next-grid {
+    grid-template-columns: 1fr;
+  }
+  .next-specimen + .next-specimen {
+    border-left: 0;
+    border-top: 1px solid var(--border-subtle);
+  }
+}
+@media (max-width: 600px) {
+  .next-batch {
+    padding-top: 38px;
+  }
+  .next-batch .specimen-heading {
+    gap: 15px;
+    align-items: flex-start;
+  }
+  .next-batch .jump {
+    display: none;
+  }
+  .next-specimen {
+    padding: 23px;
+  }
+  .next-specimen .specimen-title > span {
+    display: none;
+  }
+  .rows-preview {
+    font-size: 11px;
+  }
 }

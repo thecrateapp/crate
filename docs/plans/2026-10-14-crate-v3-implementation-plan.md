@@ -3,7 +3,7 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Checkpoint 1A is approved for commit/push; the next local batch stops at Checkpoint 1B.
+> Diego's go-ahead. Checkpoints 1A and 1B are approved for commit/push; preserve review stops for subsequent batches.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -211,8 +211,8 @@ Status: implementation in progress. Tasks 0.0, 0.1 steps 1–2, 0.2–0.10, 0.12
 local implementation recorded in the handover. This does not close CI, screenshot or device QA.
 Checkpoint 0 remains open for 0.11/0.14/0.15 and its reviews (0.14 may wait until the wheel).
 Diego approved Checkpoint 1A (1.2–1.4) on 2026-10-15 after reviewing the mockup and authorised
-commit/push of that batch and its persistent preview. The next local batch is 1.5–1.6, stopping at
-Checkpoint 1B. Runtime theme retirement (1.13) is planned, not implemented. Local full-suite results
+commit/push of that batch and its persistent preview, published as `efe6cf2e` on `origin/feat/crate_v3`.
+Tasks 1.5–1.6 are implemented and approved at Checkpoint 1B; Diego authorised their commit/push. Runtime theme retirement (1.13) is planned, not implemented. Local full-suite results
 are in the handover; CI, production screenshot baselines and device QA remain pending.
 
 ---
@@ -329,7 +329,7 @@ The original four commits established the visual baseline; subsequent commits im
 of Phase 0. They are history, not a current progress counter. The handover records completion and
 QA separately. Documents are tracked, the internal clone exists and Bricolage is in place.
 
-**Current order:** Checkpoint 1A is approved; prepare and review Checkpoint 1B (1.5–1.6) locally while Smart Mix is pending.
+**Current order:** Checkpoints 1A and 1B are approved. Review GenrePill with percentages in the persistent mockup before the next infrastructure block; Smart Mix and Phase 0 gates remain separate.
 Then wait for Diego. Checkpoint 0 remains open: visual baselines 0.11 and runtime qualification
 0.15 are pending; production measurement 0.14 is needed before the wheel and requires assignment.
 No exception authorises 1.0 or the rest of Phase 1 before review; Admin captures still precede 1.0.
@@ -942,9 +942,13 @@ commit/push together with a persistent preview. CI baselines and device QA remai
 
 ### Checkpoint 1B — Rows and chips, independent of Smart Mix
 
-After the approved 1A batch is committed/pushed, implement **1.5 HairlineList / HairlineRow and
-1.6 CratePill / CrateChip**, with tests first and an updated persistent preview. Stop for Diego's
-review with a local diff and actual results; no automatic commit/push of this next batch.
+Checkpoint 1A was committed/pushed as `efe6cf2e`. **1.5 HairlineList / HairlineRow and 1.6 CratePill /
+CrateChip** are implemented locally, with tests first and an updated persistent preview at
+<http://127.0.0.1:5186/#filas-y-chips>. Stop for Diego's review with this local diff and actual
+results in the handover. Diego approved this checkpoint on 2026-10-15 and authorised its commit/push.
+Seven local browser checks cover
+real typography, interaction, coarse targets and held-pointer reduced motion; CI captures and
+native/runtime qualification remain separate gates.
 
 Task 1.7's first Admin adoption waits for 1.0; Task 0.11's Admin captures still precede 1.0. Theme
 runtime removal 1.13 remains later. The production measurement 0.14 can wait until the wheel.
@@ -1076,6 +1080,9 @@ Commit: `feat(ui): add a motion-gated pulse to StatusDot`.
 
 ### Task 1.5: `HairlineList` / `HairlineRow` v3 API
 
+**Status:** implemented and approved by Diego at Checkpoint 1B on 2026-10-15; commit/push authorised. The setlist tests retain
+row identity/order while expecting readable spaces between index, title and trailing metadata.
+
 **Files:**
 
 - Modify: `app/shared/ui/primitives/HairlineList.tsx`
@@ -1099,6 +1106,11 @@ Admin adopts it in Task 3.3, which fixes the "Listen only" rule breach.
 
 ### Task 1.6: `CratePill` variants and the Listen radius exemption (PD3 / [D2])
 
+**Status:** implemented and approved by Diego at Checkpoint 1B on 2026-10-15; commit/push authorised. Existing static+active
+Admin labels use CrateChip; Dashboard navigation uses action pills. Defaults infer toggle from a
+callback and static otherwise; explicit static/action ignore `active`. Browser checks verify the
+scale effect is off under OS and Crate reduced-motion preferences, even while pressed.
+
 **Files:**
 
 - Modify: `app/shared/ui/primitives/CrateBadge.tsx`
@@ -1107,7 +1119,12 @@ Admin adopts it in Task 3.3, which fixes the "Listen only" rule breach.
   - press `scale(.95)` through longhand `ease-spring-snappy`
   - `data-slot="chip"`
   - `CrateChip` static tag recipe
-- Modify: `app/shared/ui/tokens/typography.css` (`--tracking-chip`)
+- Modify: `app/shared/ui/tokens/typography.css` (`--tracking-chip`) and `lib/cn.ts` (tracking merge)
+- Modify: `app/shared/ui/tokens/interactive.css` (scale-longhand feedback, spring feature fallback,
+  reduced-motion cascade) and the compiled CSS regression tests
+- Adapt the eight static+active Admin pill consumers to CrateChip, and the three Dashboard
+  navigation pills to `variant="action"`; retain data/callback behavior
+- Extend `tools/design-system-preview/` and its local browser smoke checks for Checkpoint 1B
 - Modify: `app/listen/src/index.css` (radius pin selector `:is(button,a).rounded-full[class*="px-"]` gains `:not([data-slot="chip"])`)
 - Modify: `app/listen/src/radius-policy.test.ts` (exemption asserted)
 - Test: `app/shared/ui/primitives/CrateBadge.test.tsx`
@@ -5049,8 +5066,9 @@ know in advance.
 ## Order and checkpoints
 
 1. Checkpoint 1A (1.2–1.4) is approved for commit/push, including the persistent preview.
-   Continue locally with 1.5 → 1.6, update that preview, and stop at Checkpoint 1B for review.
-   Serialise overlapping token/cn/budget edits; no automatic commit/push of the new batch.
+   Checkpoint 1B (1.5–1.6) is also approved for commit/push on 2026-10-15. Before the next
+   infrastructure block, show GenrePill with percentages in the same persistent mockup for review.
+   Serialise overlapping token/cn/budget edits; future batches still stop for review.
 2. Complete/review the applicable open Phase 0 gates when assigned. 0.11 precedes Admin 1.0;
    0.15 qualifies desktop or records the approved fallback; 0.14 waits only until the wheel.
 3. Integrator-approved sequence: Smart Mix on `main` → rebase → website integration. Keep the

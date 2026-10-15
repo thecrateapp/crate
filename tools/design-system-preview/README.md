@@ -30,3 +30,22 @@ The optional static build is written to this directory's ignored `dist/` folder.
   CI/device QA in the handover. This preview does not replace production visual baselines.
 
 Current: Checkpoint 1A approved by Diego on 2026-10-15: MonoLabel, StatusDot and StatNumber.
+Checkpoint 1B approved by Diego on 2026-10-15: HairlineList / HairlineRow and CratePill / CrateChip.
+Jump directly to <http://127.0.0.1:5186/#filas-y-chips> for the additions. Row selection and genre
+filters are interactive; the reset action clears filters without toggle semantics.
+
+## Browser smoke checks
+
+```bash
+npm run design-system:preview:test
+```
+
+Uses the installed Playwright Chromium by default. For a local Chrome installation instead:
+
+```bash
+PLAYWRIGHT_CHANNEL=chrome npm run design-system:preview:test
+```
+
+The checks cover desktop/mobile layout, real typography, 44px touch targets, row selection,
+filter semantics and held-pointer reduced-motion behavior (both system and Crate preferences).
+They run without screenshots or backend access; they do not approve the Linux CI visual baselines.

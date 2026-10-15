@@ -103,6 +103,42 @@
   background: var(--active-bg);
 }
 
+.crate-pill {
+  transition-property: color, background-color, border-color, scale;
+  transition-duration: 180ms;
+  transition-timing-function: var(--ease-snap);
+}
+
+.crate-pill:where(:active:not(:disabled)) {
+  scale: 0.95;
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+  .crate-pill {
+    transition-timing-function: var(--ease-spring-snappy);
+  }
+}
+
+[data-crate-motion="reduced"] .crate-pill {
+  scale: 1;
+  transition: none;
+}
+
+[data-crate-motion="reduced"] .crate-hairline-active-bar {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crate-pill {
+    scale: 1;
+    transition: none;
+  }
+
+  .crate-hairline-active-bar {
+    transition: none;
+  }
+}
+
 @media (forced-colors: active) {
   .crate-status-dot {
     border: 1px solid CanvasText;

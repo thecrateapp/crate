@@ -80,6 +80,7 @@ export const CrateBadge = memo(function CrateBadge({
 
 interface CratePillProps {
   children: ReactNode;
+  variant?: "toggle" | "action" | "static";
   active?: boolean;
   onClick?: () => void;
   disabled?: boolean;
@@ -92,43 +93,50 @@ export const CratePill = memo(function CratePill({
   children,
   active = false,
   onClick,
+  variant = onClick ? "toggle" : "static",
   disabled = false,
   icon: Icon,
   tone,
   className,
 }: CratePillProps) {
+  const pressed = variant === "toggle" && active;
   const classes = cn(
-    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-badge tracking-wide transition-[color,background-color,border-color,transform] duration-300 ease-snap",
-    active
+    "inline-flex min-h-8 items-center gap-1.5 rounded-full border bg-transparent px-3 py-1 font-mono text-label tracking-chip [@media(pointer:coarse)]:min-h-11",
+    pressed
       ? "border-accent-action-hi bg-accent-action-hi text-accent-action-hi-foreground"
       : tone
         ? TONE_CLASS_NAME[tone]
-        : "border-[var(--pill-border)] bg-[var(--pill-bg)] text-[var(--idle-text)] hover:border-[var(--hover-border)] hover:text-text-primary",
+        : "border-border-subtle text-text-muted",
+    variant !== "static" &&
+      !pressed &&
+      !disabled &&
+      "hover:border-accent-action-hi/40 hover:text-text-primary",
     disabled && "cursor-not-allowed opacity-[var(--disabled-opacity)]",
   );
 
-  if (onClick) {
+  if (variant !== "static") {
     return (
       <button
         type="button"
         onClick={onClick}
         disabled={disabled}
-        aria-pressed={active}
+        aria-pressed={variant === "toggle" ? active : undefined}
+        data-slot="chip"
         data-tone={tone}
         className={cn(
           classes,
-          "outline-none focus-visible:shadow-focus active:scale-95 motion-reduce:active:scale-100",
+          "crate-pill focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-accent-action-hi",
           className,
         )}
       >
-        {Icon && <Icon size={11} />}
+        {Icon && <Icon size={CRATE_ICON_SIZE.micro} />}
         {children}
       </button>
     );
   }
   return (
-    <span className={cn(classes, className)} data-tone={tone}>
-      {Icon && <Icon size={11} />}
+    <span className={cn(classes, className)} data-tone={tone} data-slot="chip">
+      {Icon && <Icon size={CRATE_ICON_SIZE.micro} />}
       {children}
     </span>
   );
@@ -153,16 +161,18 @@ export const CrateChip = memo(function CrateChip({
     <span
       data-tone={tone}
       className={cn(
-        "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-badge",
+        "inline-flex items-center gap-1 rounded-full border bg-transparent px-2 py-0.5 font-mono text-badge",
         active
           ? "border-[var(--chip-active-border)] bg-[var(--chip-active-bg)] text-[var(--active-text)]"
-          : tone
-            ? TONE_CLASS_NAME[tone]
-            : "border-[var(--chip-border)] bg-[var(--chip-bg)] text-[var(--idle-text-muted)]",
+          : tone === "accent"
+            ? "border-accent-action-hi/40 text-accent-action-hi"
+            : tone
+              ? TONE_CLASS_NAME[tone]
+              : "border-[var(--chip-border)] bg-[var(--chip-bg)] text-[var(--idle-text-muted)]",
         className,
       )}
     >
-      {Icon && <Icon size={10} />}
+      {Icon && <Icon size={CRATE_ICON_SIZE.micro} />}
       {children}
     </span>
   );

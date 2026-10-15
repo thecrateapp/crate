@@ -1875,9 +1875,9 @@ export function Tasks() {
           </>
         }
       >
-        <CratePill active icon={Activity}>
+        <CrateChip active icon={Activity}>
           {tasks.length} tasks
-        </CratePill>
+        </CrateChip>
         <CratePill icon={Loader2}>{activeTasks.length} active</CratePill>
         <CratePill icon={Clock}>
           {activeTasks.filter((task) => task.status === "pending").length}{" "}
