@@ -7,8 +7,8 @@ implementation plan. Status as of 2026-10-15.
 
 - Working tree: `/Users/diego/Code/crate-v3`, branch `feat/crate_v3`. This is the only tree you
   edit and test in. It has its own `node_modules` and `.venv`.
-- Do not use `/Volumes/MacData/Projects/Ninja/musicdock/worktrees/crate-v3`: it is the old
-  external-disk worktree, Vitest times out there, and it is frozen.
+- The old external-disk worktree (`/Volumes/MacData/.../worktrees/crate-v3`) was removed. Older
+  docs that mention it, or `git -C worktrees/crate-v3`, mean this clone now.
 - Remotes: `origin` is GitHub. `feat/crate_v3` has **not** been pushed yet (Task 0.1 step 4 needs
   Diego's go-ahead).
 
