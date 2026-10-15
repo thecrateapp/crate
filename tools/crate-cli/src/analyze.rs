@@ -23,6 +23,7 @@ const TARGET_SAMPLE_RATE: u32 = 22050;
 const FFT_SIZE: usize = 2048;
 const HOP_SIZE: usize = 512;
 const MEASUREMENT_WINDOW_MS: u64 = 5_000;
+const DOWNBEAT_MIN_CONFIDENCE: f32 = 0.65;
 const FULL_SCAN_HEAD_SECONDS: u32 = 600;
 const FULL_SCAN_TAIL_SECONDS: u32 = 120;
 
@@ -661,50 +662,6 @@ fn tempo_features(
     (Some(bpm), confidence, stability)
 }
 
-fn downbeat_features(
-    beat_frames: &[usize],
-    beat_grid_ms: &[u64],
-    onsets: &[f32],
-    bpm_confidence: f32,
-) -> (Option<u64>, Option<u8>) {
-    if beat_frames.len() < 12 || bpm_confidence < 0.65 {
-        return (None, None);
-    }
-    let mean = onsets.iter().sum::<f32>() / onsets.len() as f32;
-    let variance = onsets
-        .iter()
-        .map(|value| {
-            let delta = value - mean;
-            delta * delta
-        })
-        .sum::<f32>()
-        / onsets.len() as f32;
-    if variance.sqrt() / (mean + f32::EPSILON) < 1.0 {
-        return (None, None);
-    }
-    let mut phase_scores = [0.0_f32; 4];
-    let mut phase_counts = [0_usize; 4];
-    for (index, frame) in beat_frames.iter().enumerate() {
-        phase_scores[index % 4] += onsets.get(*frame).copied().unwrap_or_default();
-        phase_counts[index % 4] += 1;
-    }
-    for phase in 0..4 {
-        phase_scores[phase] /= phase_counts[phase].max(1) as f32;
-    }
-    let mut ordered = phase_scores;
-    ordered.sort_by(f32::total_cmp);
-    if ordered[3] <= 0.0 || ordered[3] < ordered[2] * 1.2 {
-        return (None, None);
-    }
-    let phase = phase_scores
-        .iter()
-        .enumerate()
-        .max_by(|left, right| left.1.total_cmp(right.1))
-        .map(|(index, _)| index)
-        .unwrap_or_default();
-    (beat_grid_ms.get(phase).copied(), Some(4))
-}
-
 fn frame_rms(samples: &[f32], sample_rate: u32) -> (Vec<f32>, usize, usize) {
     let frame_length = ((sample_rate as f32 * 0.05).round() as usize).max(256);
     let hop_length = (frame_length / 2).max(128);
@@ -858,15 +815,21 @@ pub fn analyze_smart_mix_segments(
         return SmartMixProfileResult::unavailable(duration_ms);
     }
 
-    let onsets = beat_tracking::onset_strength(samples, sample_rate);
-    let beat_frames = beat_tracking::track_beats(&onsets, sample_rate);
+    let features = beat_tracking::frame_features(samples, sample_rate);
+    let onsets = &features.onsets;
+    let beat_frames = beat_tracking::track_beats(onsets, sample_rate);
     let beat_grid_ms: Vec<u64> = beat_frames
         .iter()
         .map(|frame| *frame as u64 * HOP_SIZE as u64 * 1_000 / u64::from(sample_rate))
         .collect();
-    let (bpm, bpm_confidence, tempo_stability) = tempo_features(&beat_frames, &onsets, sample_rate);
-    let (downbeat_anchor_ms, time_signature) =
-        downbeat_features(&beat_frames, &beat_grid_ms, &onsets, bpm_confidence);
+    let (bpm, bpm_confidence, tempo_stability) = tempo_features(&beat_frames, onsets, sample_rate);
+    let downbeat_anchor_ms = if bpm_confidence >= DOWNBEAT_MIN_CONFIDENCE {
+        beat_tracking::downbeat_phase(&features, &beat_frames)
+            .and_then(|phase| beat_grid_ms.get(phase).copied())
+    } else {
+        None
+    };
+    let time_signature = downbeat_anchor_ms.map(|_| 4);
     let (key, scale, key_confidence) = detect_key(samples, sample_rate);
     let camelot = to_camelot(&key, &scale).map(str::to_owned);
     let (active_start_ms, intro_cue_ms, mut outro_cue_ms, mut active_end_ms) =

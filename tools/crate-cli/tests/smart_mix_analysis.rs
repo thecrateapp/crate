@@ -122,6 +122,77 @@ fn rust_keeps_a_steady_grid_through_missing_and_off_beat_hits() {
     );
 }
 
+fn rock_bars(bpm: f32, bars: usize, pickup_beats: usize) -> Vec<f32> {
+    let beat = 60.0 / bpm;
+    let beats = pickup_beats + bars * 4;
+    let mut samples = vec![0.0_f32; (beats as f32 * beat * SAMPLE_RATE as f32) as usize];
+    let mut seed = 0x9e37_79b9_u32;
+    let mut noise = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        seed as f32 / u32::MAX as f32 * 2.0 - 1.0
+    };
+    let roots = [110.0_f32, 146.83, 123.47, 164.81];
+    let bar_samples = (4.0 * beat * SAMPLE_RATE as f32) as usize;
+    let pickup = (pickup_beats as f32 * beat * SAMPLE_RATE as f32) as usize;
+    for (index, sample) in samples.iter_mut().enumerate() {
+        let bar = index.saturating_sub(pickup) / bar_samples;
+        let root = roots[(bar + usize::from(index < pickup) * 3) % roots.len()];
+        let t = index as f32 / SAMPLE_RATE as f32;
+        *sample = [1.0_f32, 1.26, 1.5]
+            .iter()
+            .map(|ratio| 0.08 * (2.0 * std::f32::consts::PI * root * ratio * t).sin())
+            .sum();
+    }
+    for step in 0..beats * 2 {
+        let start = (step as f32 * beat / 2.0 * SAMPLE_RATE as f32) as usize;
+        let beat_in_bar = (step / 2 + 4 - pickup_beats % 4) % 4;
+        let on_beat = step % 2 == 0;
+        let hat = (0.03 * SAMPLE_RATE as f32) as usize;
+        for offset in 0..hat {
+            if let Some(sample) = samples.get_mut(start + offset) {
+                *sample += 0.15 * noise() * (-6.0 * offset as f32 / hat as f32).exp();
+            }
+        }
+        if on_beat && (beat_in_bar == 0 || beat_in_bar == 2) {
+            let kick = (0.12 * SAMPLE_RATE as f32) as usize;
+            for offset in 0..kick {
+                let t = offset as f32 / SAMPLE_RATE as f32;
+                if let Some(sample) = samples.get_mut(start + offset) {
+                    *sample +=
+                        0.8 * (2.0 * std::f32::consts::PI * 55.0 * t).sin() * (-30.0 * t).exp();
+                }
+            }
+        }
+        if on_beat && (beat_in_bar == 1 || beat_in_bar == 3) {
+            let snare = (0.1 * SAMPLE_RATE as f32) as usize;
+            for offset in 0..snare {
+                if let Some(sample) = samples.get_mut(start + offset) {
+                    *sample += 0.5 * noise() * (-6.0 * offset as f32 / snare as f32).exp();
+                }
+            }
+        }
+    }
+    samples
+}
+
+#[test]
+fn rust_places_the_downbeat_on_bar_starts_after_a_pickup() {
+    let samples = rock_bars(120.0, 12, 1);
+
+    let profile = analyze_smart_mix_samples(&samples, SAMPLE_RATE);
+
+    let anchor = profile.downbeat_anchor_ms.expect("downbeat");
+    let bar_ms = 2_000_i64;
+    let offset = (anchor as i64 - 500).rem_euclid(bar_ms);
+    assert!(
+        offset <= 60 || offset >= bar_ms - 60,
+        "downbeat {anchor} ms is {offset} ms away from a bar start"
+    );
+    assert_eq!(profile.time_signature, Some(4));
+}
+
 #[test]
 fn rust_marks_drifting_tempo_as_partial() {
     let samples = click_track(120.0, 132.0, 24.0, 0.0, 0.0);

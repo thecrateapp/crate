@@ -16,6 +16,12 @@ const START_BPM: f32 = 120.0;
 const PRIOR_OCTAVES: f32 = 1.5;
 const MAX_TEMPO: f32 = 320.0;
 const TIGHTNESS: f32 = 100.0;
+const LOW_BAND_HZ: f32 = 200.0;
+const CHROMA_MIN_HZ: f32 = 55.0;
+const CHROMA_MAX_HZ: f32 = 5_000.0;
+const DOWNBEAT_WINDOW_FRAMES: usize = 2;
+const DOWNBEAT_MIN_BEATS: usize = 16;
+const DOWNBEAT_MARGIN: f32 = 0.3;
 
 fn hz_to_mel(hz: f32) -> f32 {
     let f_sp = 200.0 / 3.0;
@@ -65,12 +71,56 @@ fn mel_filterbank(sample_rate: u32) -> Vec<Vec<(usize, f32)>> {
         .collect()
 }
 
-/// Mean positive first difference of a log-power mel spectrogram, one value per hop.
-pub fn onset_strength(samples: &[f32], sample_rate: u32) -> Vec<f32> {
+/// Per-hop signals shared by beat and downbeat tracking, aligned on the onset envelope.
+pub struct FrameFeatures {
+    pub onsets: Vec<f32>,
+    pub low_onsets: Vec<f32>,
+    pub chroma: Vec<[f32; 12]>,
+}
+
+fn low_band_count(sample_rate: u32) -> usize {
+    let max_mel = hz_to_mel(sample_rate as f32 / 2.0);
+    (0..MEL_BANDS)
+        .take_while(|band| {
+            mel_to_hz(max_mel * (*band + 1) as f32 / (MEL_BANDS + 1) as f32) < LOW_BAND_HZ
+        })
+        .count()
+        .max(1)
+}
+
+fn pitch_classes(sample_rate: u32) -> Vec<Option<usize>> {
+    let bin_hz = sample_rate as f32 / FFT_SIZE as f32;
+    (0..=FFT_SIZE / 2)
+        .map(|bin| {
+            let hz = bin as f32 * bin_hz;
+            (CHROMA_MIN_HZ..=CHROMA_MAX_HZ).contains(&hz).then(|| {
+                let midi = (12.0 * (hz / 440.0).log2() + 69.0).round() as i32;
+                midi.rem_euclid(12) as usize
+            })
+        })
+        .collect()
+}
+
+fn mean_rise(current: &[f32], previous: &[f32]) -> f32 {
+    current
+        .iter()
+        .zip(previous)
+        .map(|(now, before)| (now - before).max(0.0))
+        .sum::<f32>()
+        / current.len() as f32
+}
+
+pub fn frame_features(samples: &[f32], sample_rate: u32) -> FrameFeatures {
     if samples.len() < FFT_SIZE || sample_rate == 0 {
-        return Vec::new();
+        return FrameFeatures {
+            onsets: Vec::new(),
+            low_onsets: Vec::new(),
+            chroma: Vec::new(),
+        };
     }
     let filters = mel_filterbank(sample_rate);
+    let classes = pitch_classes(sample_rate);
+    let low_bands = low_band_count(sample_rate);
     let mut planner = RealFftPlanner::<f32>::new();
     let fft = planner.plan_fft_forward(FFT_SIZE);
     let window: Vec<f32> = (0..FFT_SIZE)
@@ -83,6 +133,7 @@ pub fn onset_strength(samples: &[f32], sample_rate: u32) -> Vec<f32> {
     let mut input = vec![0.0_f32; FFT_SIZE];
     let mut spectrum = fft.make_output_vec();
     let mut mel_db = vec![0.0_f32; frames * MEL_BANDS];
+    let mut frame_chroma = vec![[0.0_f32; 12]; frames];
     let mut peak_db = f32::MIN;
 
     for frame in 0..frames {
@@ -105,6 +156,16 @@ pub fn onset_strength(samples: &[f32], sample_rate: u32) -> Vec<f32> {
             peak_db = peak_db.max(db);
             mel_db[frame * MEL_BANDS + band] = db;
         }
+        let chroma = &mut frame_chroma[frame];
+        for (bin, class) in classes.iter().enumerate() {
+            if let Some(class) = class {
+                chroma[*class] += spectrum[bin].norm_sqr();
+            }
+        }
+        let peak = chroma.iter().copied().fold(0.0_f32, f32::max);
+        if peak > 0.0 {
+            chroma.iter_mut().for_each(|value| *value /= peak);
+        }
     }
     let floor = peak_db - TOP_DB;
     for value in mel_db.iter_mut() {
@@ -113,6 +174,8 @@ pub fn onset_strength(samples: &[f32], sample_rate: u32) -> Vec<f32> {
 
     let lead = 1 + FFT_SIZE / (2 * HOP_SIZE);
     let mut onsets = vec![0.0_f32; frames];
+    let mut low_onsets = vec![0.0_f32; frames];
+    let mut chroma = vec![[0.0_f32; 12]; frames];
     for frame in 1..frames {
         let target = frame + lead - 1;
         if target >= frames {
@@ -120,14 +183,136 @@ pub fn onset_strength(samples: &[f32], sample_rate: u32) -> Vec<f32> {
         }
         let current = &mel_db[frame * MEL_BANDS..(frame + 1) * MEL_BANDS];
         let previous = &mel_db[(frame - 1) * MEL_BANDS..frame * MEL_BANDS];
-        onsets[target] = current
-            .iter()
-            .zip(previous)
-            .map(|(now, before)| (now - before).max(0.0))
-            .sum::<f32>()
-            / MEL_BANDS as f32;
+        onsets[target] = mean_rise(current, previous);
+        low_onsets[target] = mean_rise(&current[..low_bands], &previous[..low_bands]);
+        chroma[target] = frame_chroma[frame];
     }
-    onsets
+    FrameFeatures {
+        onsets,
+        low_onsets,
+        chroma,
+    }
+}
+
+/// Mean positive first difference of a log-power mel spectrogram, one value per hop.
+pub fn onset_strength(samples: &[f32], sample_rate: u32) -> Vec<f32> {
+    frame_features(samples, sample_rate).onsets
+}
+
+fn window_peak(values: &[f32], frame: usize) -> f32 {
+    let start = frame.saturating_sub(DOWNBEAT_WINDOW_FRAMES);
+    let end = (frame + DOWNBEAT_WINDOW_FRAMES + 1).min(values.len());
+    values[start.min(end)..end]
+        .iter()
+        .copied()
+        .fold(0.0_f32, f32::max)
+}
+
+fn mean_chroma(chroma: &[[f32; 12]], start: usize, end: usize) -> [f32; 12] {
+    let mut total = [0.0_f32; 12];
+    let end = end.min(chroma.len());
+    if start >= end {
+        return total;
+    }
+    for frame in &chroma[start..end] {
+        for (sum, value) in total.iter_mut().zip(frame) {
+            *sum += value;
+        }
+    }
+    total
+}
+
+fn chroma_distance(left: &[f32; 12], right: &[f32; 12]) -> f32 {
+    let dot: f32 = left.iter().zip(right).map(|(a, b)| a * b).sum();
+    let norm = left.iter().map(|a| a * a).sum::<f32>().sqrt()
+        * right.iter().map(|b| b * b).sum::<f32>().sqrt();
+    if norm <= f32::EPSILON {
+        0.0
+    } else {
+        1.0 - dot / norm
+    }
+}
+
+fn standardized(values: Vec<f32>) -> Vec<f32> {
+    let count = values.len() as f32;
+    let mean = values.iter().sum::<f32>() / count;
+    let deviation = (values
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f32>()
+        / count)
+        .sqrt();
+    if deviation <= f32::EPSILON {
+        return vec![0.0; values.len()];
+    }
+    values
+        .iter()
+        .map(|value| (value - mean) / deviation)
+        .collect()
+}
+
+fn best_phase(scores: &[f32], indices: std::ops::Range<usize>) -> Option<(usize, f32)> {
+    let mut totals = [0.0_f32; 4];
+    let mut counts = [0_usize; 4];
+    for index in indices {
+        totals[index % 4] += scores[index];
+        counts[index % 4] += 1;
+    }
+    if counts.contains(&0) {
+        return None;
+    }
+    let means: Vec<f32> = totals
+        .iter()
+        .zip(counts)
+        .map(|(total, count)| total / count as f32)
+        .collect();
+    let mut ordered = means.clone();
+    ordered.sort_by(|left, right| right.total_cmp(left));
+    let phase = means.iter().position(|mean| *mean == ordered[0])?;
+    Some((phase, ordered[0] - ordered[1]))
+}
+
+/// Index of the first downbeat in `beats` (4/4 assumed) when bass onsets and harmonic
+/// changes consistently favor one bar phase across both halves of the track.
+pub fn downbeat_phase(features: &FrameFeatures, beats: &[usize]) -> Option<usize> {
+    if beats.len() < DOWNBEAT_MIN_BEATS {
+        return None;
+    }
+    let low = standardized(
+        beats
+            .iter()
+            .map(|frame| window_peak(&features.low_onsets, *frame))
+            .collect(),
+    );
+    let broad = standardized(
+        beats
+            .iter()
+            .map(|frame| window_peak(&features.onsets, *frame))
+            .collect(),
+    );
+    let harmonic = standardized(
+        (0..beats.len())
+            .map(|index| {
+                if index == 0 || index + 1 == beats.len() {
+                    return 0.0;
+                }
+                let before = mean_chroma(&features.chroma, beats[index - 1], beats[index]);
+                let after = mean_chroma(&features.chroma, beats[index], beats[index + 1]);
+                chroma_distance(&before, &after)
+            })
+            .collect(),
+    );
+    let scores: Vec<f32> = (0..beats.len())
+        .map(|index| low[index] + harmonic[index] + 0.5 * broad[index])
+        .collect();
+    let (phase, margin) = best_phase(&scores, 0..beats.len())?;
+    if margin < DOWNBEAT_MARGIN {
+        return None;
+    }
+    let middle = beats.len() / 2;
+    let (first, _) = best_phase(&scores, 0..middle)?;
+    let (second, _) = best_phase(&scores, middle..beats.len())?;
+    (first == phase && second == phase).then_some(phase)
 }
 
 fn frames_per_second(sample_rate: u32) -> f32 {
@@ -394,6 +579,76 @@ mod tests {
             let interval = (pair[1] - pair[0]) as f32;
             assert!((interval - spacing).abs() <= 1.5, "interval {interval}");
         }
+    }
+
+    fn bar_features(bar_starts: &[usize], kick_beats: &[usize], beats: usize) -> FrameFeatures {
+        let spacing = 20;
+        let frames = beats * spacing + spacing;
+        let mut features = FrameFeatures {
+            onsets: vec![0.2; frames],
+            low_onsets: vec![0.1; frames],
+            chroma: vec![[0.0; 12]; frames],
+        };
+        let mut chord = 0;
+        for beat in 0..beats {
+            let frame = beat * spacing;
+            if bar_starts.contains(&beat) {
+                chord = (chord + 5) % 12;
+            }
+            features.onsets[frame] = 1.0;
+            if kick_beats.contains(&beat) {
+                features.low_onsets[frame] = 1.0;
+            }
+            for slot in &mut features.chroma[frame..frame + spacing] {
+                *slot = [0.0; 12];
+                slot[chord] = 1.0;
+                slot[(chord + 4) % 12] = 0.8;
+                slot[(chord + 7) % 12] = 0.6;
+            }
+        }
+        features
+    }
+
+    fn beat_frames(beats: usize) -> Vec<usize> {
+        (0..beats).map(|beat| beat * 20).collect()
+    }
+
+    #[test]
+    fn downbeat_follows_bass_and_chord_changes_after_a_pickup() {
+        let beats = 33;
+        let bars: Vec<usize> = (1..beats).step_by(4).collect();
+        let kicks: Vec<usize> = (1..beats).step_by(2).collect();
+        let features = bar_features(&bars, &kicks, beats);
+
+        assert_eq!(downbeat_phase(&features, &beat_frames(beats)), Some(1));
+    }
+
+    #[test]
+    fn no_downbeat_without_bar_structure() {
+        let beats = 32;
+        let kicks: Vec<usize> = (0..beats).collect();
+        let features = bar_features(&[], &kicks, beats);
+
+        assert_eq!(downbeat_phase(&features, &beat_frames(beats)), None);
+    }
+
+    #[test]
+    fn no_downbeat_when_the_bar_shifts_halfway() {
+        let beats = 34;
+        let mut bars: Vec<usize> = (0..16).step_by(4).collect();
+        bars.extend((18..beats).step_by(4));
+        let features = bar_features(&bars, &bars, beats);
+
+        assert_eq!(downbeat_phase(&features, &beat_frames(beats)), None);
+    }
+
+    #[test]
+    fn short_grids_have_no_downbeat() {
+        let beats = 12;
+        let bars: Vec<usize> = (0..beats).step_by(4).collect();
+        let features = bar_features(&bars, &bars, beats);
+
+        assert_eq!(downbeat_phase(&features, &beat_frames(beats)), None);
     }
 
     #[test]
