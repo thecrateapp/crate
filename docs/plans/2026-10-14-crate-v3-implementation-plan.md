@@ -36,7 +36,7 @@ Shared components live in `@crate/ui` only when both apps render them in the sam
   plane.
 - Backend tests: pytest with the `pg_db` fixture (Testcontainers fallback); Go table tests and the
   read-plane contract smoke.
-- Runtimes: Capacitor (iOS 15.0 today, 16.4 if Task 0.13 raises it; Android WebView) and Tauri 2
+- Runtimes: Capacitor (iOS 16.4 from Task 0.13; Android WebView) and Tauri 2
   (WebKit, WebView2, WebKitGTK).
 
 **Sources of truth (read the relevant section before each task):**
@@ -4696,8 +4696,8 @@ Record both bundle numbers in the PR.
 
 Matrix: web Chromium/Firefox/Safari; Tauri on macOS, Windows (WebView2 111) and Linux (WebKitGTK
 2.40, in the pinned runtime of Task 0.15, or the symbol check plus CSS feature audit if 0.15
-downgraded the gate); iOS Capacitor on the oldest supported version (16.4 after Task 0.13, or a
-named iOS 15 device); a mid-range Android device. Appearance: `light` and `crateRed` per the Task
+downgraded the gate); iOS Capacitor on the oldest supported version (16.4, the deployment target
+since Task 0.13); a mid-range Android device. Appearance: `light` and `crateRed` per the Task
 0.3 bar.
 
 Scope per release: run only the runtimes the release changes. An Admin-only group (for example
