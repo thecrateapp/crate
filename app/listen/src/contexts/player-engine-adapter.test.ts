@@ -565,6 +565,37 @@ describe("player engine adapter", () => {
       );
     });
 
+    it("plans ahead from the new index while capabilities stay the same", async () => {
+      apiMock.mockResolvedValue(null);
+      const snapshot = await toStartupEngineQueueSnapshot({
+        ...nativeSnapshotOptions("plan-ahead"),
+        tracks: [
+          ...NATIVE_QUEUE,
+          {
+            id: "runtime-3",
+            entityUid: "33333333-3333-4333-8333-333333333333",
+            title: "Three",
+            artist: "Band C",
+          },
+        ],
+      });
+      await snapshot.pendingTransitionPlans;
+      apiMock.mockClear();
+
+      await expect(
+        snapshot.replanTransitionPlans?.(0),
+      ).resolves.toBeUndefined();
+      expect(apiMock).not.toHaveBeenCalled();
+
+      await snapshot.replanTransitionPlans?.(1);
+      expect(apiMock).toHaveBeenCalledWith(
+        "/api/playback/transition-plans",
+        "POST",
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
     it("does not call the planner while the device is offline", async () => {
       vi.stubGlobal("navigator", { ...navigator, onLine: false });
       apiMock.mockResolvedValue(null);

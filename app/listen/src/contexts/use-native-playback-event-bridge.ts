@@ -463,6 +463,7 @@ export function useNativePlaybackEventBridge({
       trackChanged: (event) => {
         if (disposed) return;
         onNativeTrackChange(event);
+        androidNativeEngine.planAhead(event.index);
       },
       transitionStarted: (event) => {
         if (disposed) return;

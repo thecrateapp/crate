@@ -268,12 +268,15 @@ export async function toStartupEngineQueueSnapshot(
   const transitionPlansPromise = nativeTarget
     ? smartMixTransitionPlanner.plan(planInput)
     : Promise.resolve(undefined);
-  const replanTransitionPlans = () => {
+  const replanTransitionPlans = (currentIndex = planInput.currentIndex) => {
     const capabilities = getSmartMixCapabilities();
-    if (sameCapabilities(capabilities, planInput.capabilities)) {
+    if (
+      currentIndex === planInput.currentIndex &&
+      sameCapabilities(capabilities, planInput.capabilities)
+    ) {
       return Promise.resolve(undefined);
     }
-    planInput = { ...planInput, capabilities };
+    planInput = { ...planInput, currentIndex, capabilities };
     return smartMixTransitionPlanner.plan(planInput);
   };
   const engineTracks = await toStartupEngineTracks(

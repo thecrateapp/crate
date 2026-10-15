@@ -195,7 +195,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
   private queueMixRequested = false;
   private appliedCrossfadeMs: number | null = null;
   private replanTransitionPlans:
-    | (() => Promise<EngineTransitionPlan[] | undefined>)
+    | ((currentIndex?: number) => Promise<EngineTransitionPlan[] | undefined>)
     | undefined;
   private planInstallGeneration = 0;
 
@@ -206,11 +206,15 @@ export class AndroidNativeEngine implements PlaybackEngine {
     });
   }
 
-  private replanForCapabilities(): void {
+  planAhead(currentIndex: number): void {
+    this.replanForCapabilities(currentIndex);
+  }
+
+  private replanForCapabilities(currentIndex?: number): void {
     const replan = this.replanTransitionPlans;
     if (!replan || !this.queueMixRequested) return;
     const revision = this.queueRevision;
-    void replan()
+    void replan(currentIndex)
       .then((transitionPlans) => {
         if (!transitionPlans?.length) return;
         return this.installTransitionPlans(

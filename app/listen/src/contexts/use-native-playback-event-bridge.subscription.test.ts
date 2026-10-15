@@ -29,6 +29,7 @@ vi.mock("@/lib/android-native-engine", async (importOriginal) => ({
   androidNativeEngine: {
     drainEvents: vi.fn().mockResolvedValue([]),
     getState: vi.fn().mockResolvedValue(null),
+    planAhead: vi.fn(),
   },
 }));
 
@@ -80,6 +81,8 @@ describe("useNativePlaybackEventBridge subscription", () => {
     expect(subscriptions).toHaveLength(1);
     subscriptions[0]?.handlers.trackChanged?.({ index: 3 });
     expect(latestTrackChange).toHaveBeenCalledWith({ index: 3 });
+    const { androidNativeEngine } = await import("@/lib/android-native-engine");
+    expect(androidNativeEngine.planAhead).toHaveBeenCalledWith(3);
     expect(first.applyNativeTrackChange).not.toHaveBeenCalled();
 
     unmount();

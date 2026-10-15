@@ -64,7 +64,9 @@ export interface EngineQueueSnapshot {
   volume: number;
   transitionPlans?: EngineTransitionPlan[];
   pendingTransitionPlans?: Promise<EngineTransitionPlan[] | undefined>;
-  replanTransitionPlans?: () => Promise<EngineTransitionPlan[] | undefined>;
+  replanTransitionPlans?: (
+    currentIndex?: number,
+  ) => Promise<EngineTransitionPlan[] | undefined>;
 }
 
 export interface EngineState extends NativeEventMetadata {

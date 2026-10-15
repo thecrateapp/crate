@@ -383,6 +383,51 @@ describe("android native engine flags", () => {
     });
   });
 
+  it("installs plans for the next edges when playback advances", async () => {
+    vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+    const state = {
+      revision: "queue-rev-1",
+      playbackState: "playing",
+      isPlaying: true,
+      index: 0,
+      positionMs: 0,
+      durationMs: 0,
+      queueSize: 6,
+      crossfadeMs: 12000,
+      eqEnabled: false,
+    };
+    nativePlaybackMock.getState.mockResolvedValue(state);
+    nativePlaybackMock.setQueue.mockResolvedValue(state);
+    nativePlaybackMock.setTransitionPlans.mockResolvedValue({ accepted: true });
+    const { AndroidNativeEngine } = await import("@/lib/android-native-engine");
+    const engine = new AndroidNativeEngine();
+    const ahead = { mode: "adaptive" } as unknown as EngineTransitionPlan;
+    const replanTransitionPlans = vi.fn(async (index?: number) =>
+      index === 3 ? [ahead] : undefined,
+    );
+
+    await engine.loadQueue({
+      revision: "queue-rev-1",
+      tracks: [],
+      currentIndex: 0,
+      positionMs: 0,
+      autoplay: true,
+      repeat: "off",
+      crossfadeMs: 12000,
+      volume: 1,
+      replanTransitionPlans,
+    });
+    engine.planAhead(3);
+
+    await vi.waitFor(() =>
+      expect(nativePlaybackMock.setTransitionPlans).toHaveBeenCalledWith({
+        revision: "queue-rev-1",
+        transitionPlans: [ahead],
+      }),
+    );
+    expect(replanTransitionPlans).toHaveBeenLastCalledWith(3);
+  });
+
   it("forwards the requested crossfade once the server enables native mixing", async () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
     const state = {
