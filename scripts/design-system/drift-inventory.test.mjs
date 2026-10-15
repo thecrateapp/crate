@@ -245,6 +245,28 @@ test("detects surface tokens used in border and text declarations", () => {
   ]);
 });
 
+test("allows canvas foreground only in the global text-selection rule", () => {
+  const metrics = analyzeSemanticTokens(`
+    ::selection {
+      background: var(--accent-action);
+      color: var(--surface-canvas);
+      border: 1px solid var(--surface-canvas);
+      fill: var(--surface-canvas);
+    }
+    .card { color: var(--surface-canvas); }
+    .card, ::selection { color: var(--surface-canvas); }
+    ::selection { color: var(--surface-quiet); }
+  `);
+
+  assert.deepEqual(metrics.roleViolations, [
+    { property: "border", token: "--surface-canvas" },
+    { property: "fill", token: "--surface-canvas" },
+    { property: "color", token: "--surface-canvas" },
+    { property: "color", token: "--surface-canvas" },
+    { property: "color", token: "--surface-quiet" },
+  ]);
+});
+
 test("enforces the normalized semantic token budget", () => {
   const inventory = buildDriftInventory();
   assert.equal(inventory.version, 4);

@@ -11,7 +11,7 @@ test.describe("appearance contracts", () => {
     await expect(page.getByTestId("theme-skin")).toHaveText("default");
     await expect(page.getByTestId("appearance-card")).toHaveCSS(
       "background-color",
-      "rgba(18, 18, 26, 0.78)",
+      "rgba(13, 14, 20, 0.78)",
     );
     await expect(page.getByTestId("appearance-card")).toHaveCSS(
       "color",
@@ -41,7 +41,7 @@ test.describe("appearance contracts", () => {
     );
     await expect(
       page.getByTestId("secondary-scope").locator(".appearance-card"),
-    ).toHaveCSS("background-color", "rgba(18, 18, 26, 0.78)");
+    ).toHaveCSS("background-color", "rgba(13, 14, 20, 0.78)");
   });
 
   test("updates system mode live and respects reduced motion", async ({

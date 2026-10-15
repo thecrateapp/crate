@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { Toaster } from "sonner";
+import { installFocusRingMotion } from "@crate/ui/lib/focus-ring-motion";
 import { LISTEN_APPEARANCE_SETTINGS_ENABLED } from "./app-shell/feature-flags";
 import { App } from "./App";
 import { I18nProvider } from "./i18n/I18nProvider";
@@ -23,6 +24,9 @@ import {
   subscribeThemeSkin,
 } from "@crate/ui/lib/theme-skin";
 import "./index.css";
+
+const disposeFocusRingMotion = installFocusRingMotion();
+import.meta.hot?.dispose(disposeFocusRingMotion);
 
 async function disableDevServiceWorker() {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;

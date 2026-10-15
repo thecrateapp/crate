@@ -140,7 +140,7 @@ export const GenreTile = memo(function GenreTile({
         type="button"
         onClick={onOpen}
         className={cn(
-          "flex size-full flex-col justify-between text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-action/60",
+          "flex size-full flex-col justify-between text-left crate-focus-inset",
           room
             ? "min-h-36 gap-5 rounded-panel p-4"
             : "min-h-[132px] gap-4 rounded-lg p-3",

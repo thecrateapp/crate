@@ -177,7 +177,7 @@ export function UpcomingShowCollapsedView({
         type="button"
         aria-expanded={false}
         onClick={onToggle}
-        className="flex h-full min-w-0 flex-1 items-center rounded-l-panel text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
+        className="flex h-full min-w-0 flex-1 items-center rounded-l-panel text-left crate-focus-inset"
       >
         <CollapsedShowArtwork artistImageUrl={artistImageUrl} />
         <CollapsedShowDetails item={item} attending={attending} />

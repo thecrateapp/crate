@@ -225,7 +225,7 @@ export function FollowHeartButton({
       aria-busy={loading || undefined}
       disabled={disabled || loading}
       className={cn(
-        "relative inline-flex items-center justify-center gap-1.5 outline-none transition-[color,filter,transform,box-shadow] focus-visible:shadow-focus disabled:opacity-50",
+        "relative inline-flex items-center justify-center gap-1.5 transition-[color,filter,transform,box-shadow] disabled:opacity-50",
         className,
         isActive
           ? "text-accent-action drop-shadow-accent-action"

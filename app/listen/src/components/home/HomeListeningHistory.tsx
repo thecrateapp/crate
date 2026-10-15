@@ -108,7 +108,7 @@ function ListeningHistoryCard({
     <button
       type="button"
       onClick={() => onOpen(item)}
-      className="group w-[min(42vw,13rem)] shrink-0 touch-manipulation text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-canvas lg:w-56"
+      className="group w-[min(42vw,13rem)] shrink-0 touch-manipulation text-left lg:w-56"
     >
       <EditorialPlaylistArtwork
         title={historyLabel(item, t, locale)}

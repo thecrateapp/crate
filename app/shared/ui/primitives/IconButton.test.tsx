@@ -57,7 +57,11 @@ describe("IconButton", () => {
       </IconButton>,
     );
     const button = screen.getByRole("button");
-    expect(button).toHaveClass("size-10", "focus-visible:shadow-focus");
+    expect(button).toHaveClass("size-10");
+    expect(button).not.toHaveClass(
+      "outline-none",
+      "focus-visible:shadow-focus",
+    );
     expect(button).toHaveAttribute("data-size", "md");
   });
 

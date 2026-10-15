@@ -310,7 +310,7 @@ linear(0, 1))`, and no final state may depend on an animation running.
 - [ ] **Accessibility.**
   - The figure `aria-label` is a sentence built from the real numbers.
   - Every SVG, canvas or WebGL layer has an HTML equivalent.
-  - Keyboard path and visible `accent-action-hi` focus ring.
+  - Keyboard path and visible `focus-ring` marker, with the shared on/off motion (DS §1.9.5).
   - A `forced-colors` pass.
   - State is never conveyed by colour alone.
 - [ ] **Visual baselines.** Re-record them intentionally whenever a Listen screen or an Admin
@@ -329,7 +329,7 @@ The original four commits established the visual baseline; subsequent commits im
 of Phase 0. They are history, not a current progress counter. The handover records completion and
 QA separately. Documents are tracked, the internal clone exists and Bricolage is in place.
 
-**Current order:** Checkpoints 1A and 1B are approved. Review GenrePill with percentages in the persistent mockup before the next infrastructure block; Smart Mix and Phase 0 gates remain separate.
+**Current order:** 1A/1B are approved/pushed; GenrePill 1C is visually approved and committed as `e60e6f50`. Checkpoint 1D is provisionally accepted to keep moving; further focus-fade visual polishing is deferred. Smart Mix and Phase 0 gates remain separate.
 Then wait for Diego. Checkpoint 0 remains open: visual baselines 0.11 and runtime qualification
 0.15 are pending; production measurement 0.14 is needed before the wheel and requires assignment.
 No exception authorises 1.0 or the rest of Phase 1 before review; Admin captures still precede 1.0.
@@ -953,6 +953,23 @@ native/runtime qualification remain separate gates.
 Task 1.7's first Admin adoption waits for 1.0; Task 0.11's Admin captures still precede 1.0. Theme
 runtime removal 1.13 remains later. The production measurement 0.14 can wait until the wheel.
 
+### Checkpoint 1C — GenrePill with percentages, before the next infrastructure block
+
+Diego approved 1B and authorised its commit/push; it is published as `c28a97e0`. Prioritise Task 1.6a
+and show the retained percentage-bearing GenrePill at <http://127.0.0.1:5186/#genre-pill>.
+Preserve its data, provenance and actions; the local visual proposal needs review before proceeding.
+Diego approved the GenrePill visual treatment on 2026-10-15. This task uses the existing shared component and is independent of Smart Mix. Task 1.7 still waits
+for Admin 1.0 and its capture prerequisites; this review does not close Phase 0.
+
+### Checkpoint 1D — Global keyboard focus and text selection
+
+After Diego approved GenrePill 1C, continue with Task 1.1 independently of Smart Mix. Inventory
+legacy focus shadows, migrate to the shared flush search-style ring and preserve inset offsets. Extend the
+same mockup at `#foco` with keyboard, field, CTA, row and selection examples. Test before changes
+and record local/browser/appearance results separately from pending CI/device QA. Stop for Diego's
+review. Diego explicitly authorised publication of 1C/1D on 2026-10-15; the focus remains provisional.
+Continue Task 0.11 before Admin 1.0 → InstrumentPanel 1.7.
+
 Only primitives and helpers that both apps import directly in the same change.
 
 - `export-usage-policy.test.ts` only proves that one app imports a module, so the both-apps rule is
@@ -989,15 +1006,42 @@ Commit: `fix(ui): keep Admin cards visible on the v3 canvas`.
 
 ### Task 1.1: Global focus and selection rules
 
+**Status:** implemented locally at Checkpoint 1D after Diego approved GenrePill 1C. The persistent
+mockup is at <http://127.0.0.1:5186/#foco>. Diego accepted the current state provisionally to keep
+moving; further focus-fade visual polishing is deferred, without final visual parity approval.
+Actual checks and pending QA are recorded in the handover. Diego explicitly authorised this
+checkpoint's commit/push on 2026-10-15; further visual polishing remains deferred.
+
 **Files:**
 
 - Modify: `app/shared/ui/tokens/interactive.css`:
-  - `:focus-visible` 2 px `accent-action-hi` outline, offset 3 px (4 px on CTAs, −2 px inset on
-    edge-to-edge rows);
-  - `::selection` accent background with canvas text.
-- Modify: every `focus-visible:shadow-focus` call site. Inventory first with
-  `grep -rln "focus-visible:shadow-focus" app/`.
-- Test: appearance harness (`APPEARANCE`) plus a new assertion in `app/shared/ui/design-token-policy.test.ts` that no `focus-visible:shadow-focus` remains
+  - `:focus-visible` 2 px `focus-ring` outline, offset 0 on controls and CTAs (−2 px inset on
+    edge-to-edge rows), matching the existing Listen search ring as requested by Diego on 2026-10-15;
+  - `::selection` `accent-action` background with `surface-canvas` text;
+  - system `Highlight` outline in forced colours, retaining browser adjustments.
+- Add: `app/shared/ui/lib/focus-ring-motion.ts` and behavioural tests. Reproduce the existing
+  Listen search's 500 ms `cubic-bezier(0.22, 1.18, 0.36, 1)` on/off animation, without a delay:
+  fade and expand an additive focus shadow, contract it on blur, and reverse from its rendered
+  subpixel shadow. Do not animate outline width: its integer rounding breaks the smooth fade.
+  Suppress the static outline only during motion and restore it on completion/cancellation.
+  Install once in Listen, Admin, Desktop and both preview/appearance harness entries, with
+  disposal for hot reload. Preserve existing hover/press transitions and shadows; skip/cancel
+  motion for system/Crate reduced motion and forced colours. Keep static CSS as fallback, including SVG controls and missing additive animation support.
+- Modify: every local focus shadow/ring call site, including `focus-within`. Inventory first with
+  `rg 'focus(-visible|-within)?:(shadow|ring)' app/`. Also retire old recipe focus declarations
+  and provisional 1B/1C outlines; preserve selection, status and validation rings. Keep inset
+  exceptions explicit, including the clipped Listen TopBar search input and trigger.
+- Remove the redundant `--focus-shadow` semantic alias while retaining the inline `--shadow-focus`
+  bridge and `--focus-ring` runtime token. Bind the root ring alias directly to its stable
+  foundation value so portals outside an appearance scope do not lose their colour when an
+  unused Tailwind inline bridge is discarded. Lower definition ceilings by one; do not raise budgets.
+- Modify the appearance harness and persistent preview so local CSS cannot mask the shared focus
+  rules. Keyboard/pointer, text-selection, forced-colours and geometry checks use real styles.
+- Test: appearance harness (`APPEARANCE`), real TopBar search in desktop/mobile and open/closed
+  states, plus a policy assertion that no local focus shadow/ring remains in shared or app sources.
+  Temporal browser tests sample initial/intermediate/final entry and settled-focus exit, compare
+  the original native search transition, and exercise reversal, inset geometry and preference
+  changes. Settled screenshots alone do not verify the requested on/off effect.
 
 **Steps:**
 
@@ -1139,6 +1183,31 @@ scale effect is off under OS and Crate reduced-motion preferences, even while pr
 2. Implement.
 3. Verify: `VT-UI primitives/CrateBadge.test.tsx`, `VT-LISTEN src/radius-policy.test.ts src/badge-policy.test.ts`, `GATES`, `VISUAL` (chips change; review).
 4. Commit: `feat(ui): give chips a 32 px target and an action variant`.
+
+### Task 1.6a: Preserve GenrePill percentages and align its chip treatment
+
+**Status:** visual treatment approved by Diego at Checkpoint 1C on 2026-10-15; implementation
+committed as `e60e6f50` and publication authorised. He authorised continuing with global focus/selection (1.1) at Checkpoint 1D. This is an explicit completion of the existing DS §2.2 "chip look" entry, not replacement
+of the genre component or migration of its data.
+
+**Files:**
+
+- Modify `app/shared/ui/domain/genres/GenrePill.tsx` and its test: rounded-full mono label,
+  tracking-chip, tabular accent-hi percentage, 32px/44px targets and independent navigation/removal
+  controls. Preserve the item API, source tooltip, row ordering/max and `onSelect` object identity.
+- Preserve `resolveGenrePercent`: explicit percent first, otherwise rounded share × 100, no weight
+  fallback, no percentage when missing, no renormalisation. Keep 0% and 100% visible.
+- Modify only the genre recipe in `app/shared/ui/tokens/recipes.css`; CrateBadge keeps its own
+  surface. Internal interactive controls also carry the Listen radius exemption slot.
+- Extend `tools/design-system-preview/` at `#genre-pill` with real GenrePill/GenrePillRow instances,
+  percentage and missing-data examples, selection/removal and long names. Preserve approved 1A/1B.
+- Lower `scripts/design-system/drift-budget.json` when obsolete arbitrary percentage styling drops;
+  do not add tokens or increase ceilings.
+
+**Steps:** tests first; implement the visual treatment without changing profiles or callers;
+run the shared suite, relevant app suites/policies, typechecks, lint, builds, gates, bundle budgets
+and the local preview browser checks. Record actual results in the handover. Stop at Checkpoint 1C
+for Diego to review the percentage-bearing component. Its commit/push was authorised on 2026-10-15.
 
 ### Task 1.7: `InstrumentPanel` with first adopters in both apps
 
@@ -5065,9 +5134,9 @@ know in advance.
 
 ## Order and checkpoints
 
-1. Checkpoint 1A (1.2–1.4) is approved for commit/push, including the persistent preview.
-   Checkpoint 1B (1.5–1.6) is also approved for commit/push on 2026-10-15. Before the next
-   infrastructure block, show GenrePill with percentages in the same persistent mockup for review.
+1. Checkpoints 1A (1.2–1.4) and 1B (1.5–1.6), including the persistent preview, were approved and
+   published on 2026-10-15. GenrePill with percentages (1.6a / 1C) is approved and committed as `e60e6f50`.
+   Task 1.1 / 1D is provisionally accepted at `#foco`, with visual polish deferred; Diego authorised commit/push of 1C/1D on 2026-10-15.
    Serialise overlapping token/cn/budget edits; future batches still stop for review.
 2. Complete/review the applicable open Phase 0 gates when assigned. 0.11 precedes Admin 1.0;
    0.15 qualifies desktop or records the approved fallback; 0.14 waits only until the wheel.

@@ -22,7 +22,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
         <div className="mx-auto flex h-16 w-full max-w-content items-center justify-between gap-4 px-4 sm:px-6">
           <Link
             to="/"
-            className="flex items-center gap-2.5 rounded-md text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            className="flex items-center gap-2.5 rounded-md text-text-primary"
           >
             <CrateLogo title="Crate" className="size-8" />
             <span className="text-lg font-black tracking-eyebrow">CRATE</span>

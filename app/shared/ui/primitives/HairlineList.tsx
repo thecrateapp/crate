@@ -107,6 +107,7 @@ export function HairlineRow({
   return (
     <li
       {...props}
+      data-slot="hairline-row"
       data-muted={muted || undefined}
       data-active={active || undefined}
       className={cn(
@@ -126,11 +127,7 @@ export function HairlineRow({
       />
       {child
         ? cloneElement(child, {
-            className: cn(
-              layout,
-              "w-full focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-action-hi",
-              child.props.className,
-            ),
+            className: cn(layout, "w-full", child.props.className),
             children: content,
           })
         : content}

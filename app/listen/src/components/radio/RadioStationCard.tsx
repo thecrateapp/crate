@@ -101,7 +101,7 @@ export const RadioStationCard = memo(function RadioStationCard({
         })}
         disabled={disabled}
         onClick={onPlay}
-        className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 disabled:cursor-not-allowed"
+        className="block w-full text-left crate-focus-inset disabled:cursor-not-allowed"
       >
         {artworkUrl ? (
           <CrateImage

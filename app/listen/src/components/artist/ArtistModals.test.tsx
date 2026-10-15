@@ -190,8 +190,8 @@ describe("artist mobile modals", () => {
     expect(panel).toContainElement(hardcore);
     expect(panel).toContainElement(metalcore);
     expect(screen.queryByRole("button", { name: /noise/i })).toBeNull();
-    expect(hardcore).toHaveClass("rounded-md");
-    expect(hardcore).not.toHaveClass("rounded-full", "bg-white/8");
+    expect(hardcore).toHaveClass("rounded-full");
+    expect(hardcore).not.toHaveClass("bg-white/8");
     expect(header).toHaveClass("border-b-0", "bg-transparent");
     expect(header).not.toHaveClass("backdrop-blur-xl");
     expect(close).toHaveClass("hover:text-accent-action");

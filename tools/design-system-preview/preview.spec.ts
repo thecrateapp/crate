@@ -1,4 +1,15 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
+
+async function settleFocusRing(target: Locator) {
+  await target.evaluate(async (element) => {
+    await Promise.all(
+      element
+        .getAnimations()
+        .filter((animation) => animation.id === "crate-focus-ring")
+        .map((animation) => animation.finished.catch(() => undefined)),
+    );
+  });
+}
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/#filas-y-chips");
@@ -103,6 +114,145 @@ for (const source of ["crate", "system"] as const) {
   });
 }
 
+test("keeps GenrePill percentages and opens the selected genre", async ({
+  page,
+}) => {
+  await page.goto("/#genre-pill");
+  const profile = page.getByRole("group", {
+    name: "Perfil de género del artista",
+  });
+  await expect(
+    profile.getByRole("button", { name: "shoegaze 61%", exact: true }),
+  ).toBeVisible();
+  await profile
+    .getByRole("button", { name: "dream pop 27%", exact: true })
+    .click();
+  await expect(page.locator(".genre-selection")).toContainText("Dream pop");
+  await expect(profile.getByRole("button").first()).not.toHaveAttribute(
+    "aria-pressed",
+  );
+});
+
+test("removes a genre independently without renormalising the remaining percentages", async ({
+  page,
+}) => {
+  await page.goto("/#genre-pill");
+  const editor = page.getByRole("group", { name: "Etiquetas editables" });
+  await editor
+    .getByRole("button", { name: "Quitar shoegaze", exact: true })
+    .click();
+  await expect(editor.getByText("61%")).toHaveCount(0);
+  await expect(editor.getByText("27%")).toBeVisible();
+  await expect(editor.getByText("12%")).toBeVisible();
+  await page.getByRole("button", { name: "Restaurar etiquetas" }).click();
+  await expect(editor.getByText("61%")).toBeVisible();
+});
+
+test("keeps optional zero and full percentages distinct from a missing value", async ({
+  page,
+}) => {
+  const optional = page.getByRole("group", { name: "Porcentajes opcionales" });
+  await expect(optional.getByText("post-rock", { exact: true })).toBeVisible();
+  await expect(optional.getByText("0%", { exact: true })).toBeVisible();
+  await expect(optional.getByText("100%", { exact: true })).toBeVisible();
+  const style = await page
+    .locator(".genre-context .genre-pill")
+    .first()
+    .evaluate((element) => ({
+      font: getComputedStyle(element).fontFamily,
+      size: getComputedStyle(element).fontSize,
+      minHeight: getComputedStyle(element).minHeight,
+    }));
+  expect(style.font).toContain("JetBrains Mono");
+  expect(style.size).toBe("11px");
+  expect(style.minHeight).toBe("32px");
+});
+
+test("uses the global outline for standard controls, CTAs and edge-to-edge rows", async ({
+  page,
+}) => {
+  await page.goto("/#foco");
+  await page.keyboard.press("Tab");
+  for (const [name, offset] of [
+    ["Añadir a la cola", "0px"],
+    ["Reproducir ahora", "0px"],
+    ["01 Abrir canción 4:11", "-2px"],
+  ]) {
+    const control = page.getByRole("button", { name, exact: true });
+    const before = await control.boundingBox();
+    await control.focus();
+    await settleFocusRing(control);
+    await expect(control).toHaveCSS("outline-color", "rgb(6, 182, 212)");
+    const style = await control.evaluate((element) => ({
+      visible: element.matches(":focus-visible"),
+      width: getComputedStyle(element).outlineWidth,
+      offset: getComputedStyle(element).outlineOffset,
+      style: getComputedStyle(element).outlineStyle,
+      color: getComputedStyle(element).outlineColor,
+    }));
+    expect(style).toEqual({
+      visible: true,
+      width: "2px",
+      offset,
+      style: "solid",
+      color: "rgb(6, 182, 212)",
+    });
+    expect((await control.boundingBox())?.width).toBe(before?.width);
+    expect((await control.boundingBox())?.height).toBe(before?.height);
+  }
+});
+
+test("keeps the real Select menu's keyboard outline inside each option", async ({
+  page,
+}) => {
+  await page.goto("/#foco");
+  await page.keyboard.press("Tab");
+  const trigger = page.getByRole("combobox", { name: "Género de ejemplo" });
+  await trigger.focus();
+  await page.keyboard.press("ArrowDown");
+  const option = page.getByRole("option", { name: "Ambient", exact: true });
+  await expect(option).toBeVisible();
+  await option.focus();
+  await settleFocusRing(option);
+  await expect(option).toHaveCSS("outline-offset", "-2px");
+  await expect(option).toHaveCSS("outline-width", "2px");
+  await page.keyboard.press("Escape");
+});
+
+test("keeps pointer clicks separate from keyboard focus and uses Crate text selection", async ({
+  page,
+}) => {
+  await page.goto("/#foco");
+  const control = page.getByRole("button", {
+    name: "Añadir a la cola",
+    exact: true,
+  });
+  await control.click();
+  expect(
+    await control.evaluate((element) => element.matches(":focus-visible")),
+  ).toBe(false);
+  const colours = await page
+    .locator(".selection-example")
+    .evaluate((element) => {
+      const probe = document.createElement("span");
+      probe.style.color = "var(--accent-action)";
+      probe.style.backgroundColor = "var(--surface-canvas)";
+      document.body.append(probe);
+      const expectedBackground = getComputedStyle(probe).color;
+      const expectedForeground = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      const selection = getComputedStyle(element, "::selection");
+      return {
+        background: selection.backgroundColor,
+        foreground: selection.color,
+        expectedBackground,
+        expectedForeground,
+      };
+    });
+  expect(colours.background).toBe(colours.expectedBackground);
+  expect(colours.foreground).toBe(colours.expectedForeground);
+});
+
 test.describe("touch layout", () => {
   test.use({
     viewport: { width: 390, height: 844 },
@@ -114,7 +264,9 @@ test.describe("touch layout", () => {
     page,
   }) => {
     const sizes = await page
-      .locator("#filas-y-chips button, #filas-y-chips .rows-preview a")
+      .locator(
+        "#filas-y-chips button, #filas-y-chips .rows-preview a, #genre-pill button.genre-pill, #genre-pill .genre-pill button",
+      )
       .evaluateAll((elements) =>
         elements.map((element) => element.getBoundingClientRect().height),
       );

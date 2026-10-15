@@ -153,7 +153,7 @@ export function TrackRowLeadingControl({
               compact ? "size-10" : "size-12",
             )
           : "flex w-10 shrink-0 justify-center rounded-full border-0 bg-transparent p-0 text-center text-inherit",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/45 disabled:cursor-not-allowed",
+        "disabled:cursor-not-allowed",
       )}
       aria-label={playControlLabel}
       title={playControlLabel}

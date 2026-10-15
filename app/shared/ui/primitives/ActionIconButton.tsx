@@ -54,7 +54,7 @@ export const ActionIconButton = forwardRef<
       type={type}
       disabled={disabled}
       className={cn(
-        "flex items-center justify-center rounded-full outline-none transition-[color,filter,transform,box-shadow] hover:-translate-y-px focus-visible:shadow-focus [&_svg:not([class*='size-'])]:size-[18px]",
+        "flex items-center justify-center rounded-full transition-[color,filter,transform,box-shadow] hover:-translate-y-px [&_svg:not([class*='size-'])]:size-[18px]",
         actionVariantClassName(variant),
         actionToneClassName(active ? "primary" : tone, disabled),
         active && "animate-crate-icon-active-pulse",
@@ -90,7 +90,7 @@ export function ActionIconLink({
       href={href || "#"}
       aria-disabled={disabled || !href}
       className={cn(
-        "flex items-center justify-center rounded-full outline-none transition-[color,filter,transform,box-shadow] hover:-translate-y-px focus-visible:shadow-focus [&_svg:not([class*='size-'])]:size-[18px]",
+        "flex items-center justify-center rounded-full transition-[color,filter,transform,box-shadow] hover:-translate-y-px [&_svg:not([class*='size-'])]:size-[18px]",
         actionVariantClassName(variant),
         actionToneClassName(active ? "primary" : tone, disabled || !href),
         active && "animate-crate-icon-active-pulse",

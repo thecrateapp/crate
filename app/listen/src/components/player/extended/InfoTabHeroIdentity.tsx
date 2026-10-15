@@ -69,7 +69,7 @@ export function InfoTabHeroIdentity({
             type="button"
             aria-label={t("player.info.openArtist", { name: artistName })}
             onClick={openArtist}
-            className="min-w-0 rounded-full border border-border-quiet bg-surface-quiet-subtle px-3 py-1 text-text-primary transition-colors hover:bg-surface-quiet focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/50"
+            className="min-w-0 rounded-full border border-border-quiet bg-surface-quiet-subtle px-3 py-1 text-text-primary transition-colors hover:bg-surface-quiet"
           >
             <span className="block truncate">{artistName}</span>
           </button>
@@ -82,7 +82,7 @@ export function InfoTabHeroIdentity({
             type="button"
             aria-label={t("player.info.openAlbum", { name: albumName })}
             onClick={openAlbum}
-            className="min-w-0 rounded-full border border-border-quiet bg-surface-quiet-subtle px-3 py-1 text-text-secondary transition-colors hover:bg-surface-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/50"
+            className="min-w-0 rounded-full border border-border-quiet bg-surface-quiet-subtle px-3 py-1 text-text-secondary transition-colors hover:bg-surface-quiet hover:text-text-primary"
           >
             <span className="block truncate">{albumName}</span>
           </button>

@@ -254,7 +254,7 @@ describe("HomeTasteHero", () => {
     expect(screen.getByText("Featured Artist")).toBeInTheDocument();
     expect(screen.queryByText("Just landed")).toBeNull();
     expect(screen.queryByText("Recommended")).toBeNull();
-    expect(screen.getByTitle("Hardcore")).toHaveClass("rounded-md");
+    expect(screen.getByTitle("Hardcore")).toHaveClass("rounded-full");
     expect(screen.getByText("hardcore")).toBeInTheDocument();
     expect(screen.getByText("mathcore")).toBeInTheDocument();
     expect(screen.queryByText("metalcore")).toBeNull();

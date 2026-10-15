@@ -6,6 +6,7 @@ import { useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { HashRouter } from "react-router";
 import { Toaster } from "sonner";
+import { installFocusRingMotion } from "@crate/ui/lib/focus-ring-motion";
 
 import { App } from "@/App";
 import { LISTEN_APPEARANCE_SETTINGS_ENABLED } from "@/app-shell/feature-flags";
@@ -25,6 +26,9 @@ import {
 
 import { initTauriRuntime, startTauriOAuthRuntime } from "./lib/tauri-init";
 import { LinuxWindowTitlebar } from "./components/LinuxWindowTitlebar";
+
+const disposeFocusRingMotion = installFocusRingMotion();
+import.meta.hot?.dispose(disposeFocusRingMotion);
 
 const hasLinuxWindowTitlebar =
   isTauriRuntime &&

@@ -255,7 +255,7 @@ function TopBarSearchControls({
     <div
       data-state={searchOpen ? "open" : "closed"}
       className={cn(
-        "relative overflow-visible rounded-xl focus-within:shadow-focus transition-[background-color,border-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
+        "relative overflow-visible rounded-xl transition-[background-color,border-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
         isDesktop
           ? searchOpen
             ? "border border-text-primary/8 bg-surface-canvas/68 shadow-glass-hover"
@@ -277,7 +277,7 @@ function TopBarSearchControls({
             focusInputSoon();
           }}
           className={cn(
-            "absolute left-0 top-0 z-10 flex h-12 touch-manipulation items-center rounded-xl border-0 bg-transparent shadow-none backdrop-blur-0 transition-[color,transform,opacity,width,padding] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none md:h-11 md:w-11 md:justify-center md:px-0",
+            "crate-focus-inset absolute left-0 top-0 z-10 flex h-12 touch-manipulation items-center rounded-xl border-0 bg-transparent shadow-none backdrop-blur-0 transition-[color,transform,opacity,width,padding] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none md:h-11 md:w-11 md:justify-center md:px-0",
             searchOpen
               ? "w-12 justify-center px-0 text-text-primary/42"
               : "w-full justify-start gap-2 px-4 text-text-primary/72 group-hover:scale-[1.03] group-hover:text-text-primary/88",
@@ -337,7 +337,7 @@ function TopBarSearchControls({
           onKeyDown={handlers.handleKeyDown}
           placeholder={t("search.placeholder")}
           className={cn(
-            "h-12 w-full rounded-xl border-0 bg-transparent pl-12 text-[16px] text-text-primary outline-none md:h-11 md:pl-11 md:text-body",
+            "crate-focus-inset h-12 w-full rounded-xl border-0 bg-transparent pl-12 text-[16px] text-text-primary outline-none md:h-11 md:pl-11 md:text-body",
             "transition-[opacity,transform,box-shadow,padding] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
             "placeholder:text-text-primary/40",
             searchOpen

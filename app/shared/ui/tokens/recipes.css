@@ -605,9 +605,7 @@
 }
 
 .jam-card-interactive:focus-visible {
-  outline: none;
   border-color: var(--jam-focus-border);
-  box-shadow: 0 0 0 2px var(--border-accent-soft);
 }
 
 .jam-hero-action {
@@ -713,8 +711,6 @@
 .jam-input:focus,
 .jam-select-trigger:focus {
   border-color: var(--border-accent-focus);
-  box-shadow: var(--focus-shadow);
-  outline: none;
 }
 
 .jam-tag-input {
@@ -1282,8 +1278,6 @@
     transparent
   );
   border-color: var(--_radio-seed-input-focus-border);
-  box-shadow: var(--focus-shadow);
-  outline: none;
 }
 
 .radio-seed-spinner {
@@ -2061,14 +2055,10 @@ button.genre-pill:hover,
   .link-accent:focus-visible {
     border-radius: 2px;
     clip-path: none;
-    outline: 2px solid currentColor;
-    outline-offset: 2px;
   }
 
   .link-meta.link-inset:focus-visible,
   .link-accent.link-inset:focus-visible {
-    outline-color: transparent;
-    outline-offset: -2px;
     background: color-mix(in srgb, currentColor 14%, transparent);
     text-decoration: underline 2px currentColor;
     text-underline-offset: 2px;
@@ -2208,12 +2198,7 @@ button.genre-pill:hover,
   position: relative;
   height: 14rem;
   cursor: crosshair;
-  outline: none;
   border-radius: var(--radius-md);
-}
-
-.stats-signal-tape:focus-visible {
-  box-shadow: 0 0 0 2px var(--accent-action);
 }
 
 .stats-signal-svg {
@@ -2494,11 +2479,6 @@ button.genre-pill:hover,
   text-decoration: none;
 }
 
-.stats-decade:focus-visible {
-  outline: 2px solid var(--accent-action);
-  outline-offset: 2px;
-}
-
 .stats-decade-cover {
   position: absolute;
   inset: 0;
@@ -2657,7 +2637,6 @@ button.genre-pill:hover,
   flex-direction: column;
   background: #000;
   color: var(--text-primary);
-  outline: none;
 }
 
 .stats-digging-progress {

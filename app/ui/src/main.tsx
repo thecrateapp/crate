@@ -1,8 +1,12 @@
 import { createRoot } from "react-dom/client";
+import { installFocusRingMotion } from "@crate/ui/lib/focus-ring-motion";
 import "./index.css";
 import App from "./App";
 import { AppErrorBoundary } from "@crate/ui/primitives/AppErrorBoundary";
 import { captureRenderError, initSentry } from "./lib/sentry";
+
+const disposeFocusRingMotion = installFocusRingMotion();
+import.meta.hot?.dispose(disposeFocusRingMotion);
 
 initSentry();
 

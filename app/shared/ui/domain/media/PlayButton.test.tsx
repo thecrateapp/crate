@@ -14,10 +14,6 @@ describe("PlayButton", () => {
       "bg-accent-action",
       "shadow-action",
       "size-11",
-      "focus-visible:outline-solid",
-      "focus-visible:outline-2",
-      "focus-visible:outline-offset-2",
-      "focus-visible:outline-focus-ring",
     );
     expect(button).not.toHaveClass("focus-visible:shadow-focus");
     expect(button).toHaveAttribute("data-state", "idle");

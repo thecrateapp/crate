@@ -107,7 +107,7 @@ export const JamRoomCard = memo(function JamRoomCard({
             : t("jam.roomCard.joinAria", { name: listedRoom.name })
         }
         onClick={() => onJoin(listedRoom)}
-        className="jam-card-interactive block w-full rounded-xl p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="jam-card-interactive block w-full rounded-xl p-4 text-left"
       >
         <RoomCardHeader room={listedRoom} mode={mode} joining={joining} t={t} />
         <RoomCardMembers room={listedRoom} t={t} />

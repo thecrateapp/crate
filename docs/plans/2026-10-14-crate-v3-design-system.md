@@ -820,10 +820,26 @@ Task 1b.1, ceiling +2).
 
 #### 1.9.5 Global rules
 
-- `:focus-visible`: `outline: 2px solid var(--accent-action-hi); outline-offset: 3px` (4 px on
-  CTAs, `-2px` inset on edge-to-edge rows and tiles). `--focus-shadow` stops being the focus
-  indicator; components drop `focus-visible:shadow-focus`.
-- `::selection`: accent background, canvas text.
+- `:focus-visible`: `outline: 2px solid var(--focus-ring); outline-offset: 0` on controls and
+  CTAs, `-2px` inset on edge-to-edge rows, tiles and clipped controls. Diego requested the existing
+  Listen search ring on 2026-10-15: action cyan, 2px flush to the control, replacing the detached
+  bright 3px/4px proposal. Its colour and extent match `0 0 0 2px var(--focus-ring)` from the
+  search field; outline rendering preserves existing component shadows and state rings. Components drop local
+  focus rings/shadows and the provisional 1B/1C outline utilities. The redundant `--focus-shadow`
+  alias is removed; the legacy `--shadow-focus` bridge remains inline until runtime cleanup.
+  Forced colours retain a system `Highlight` outline with browser adjustments enabled.
+- Focus motion reproduces the Listen home search transition: 500 ms,
+  `cubic-bezier(0.22, 1.18, 0.36, 1)`, with no delay. Opacity and shadow spread grow from zero
+  to the settled 2px ring on focus and return to zero on blur, including after a long focus.
+  Interrupted transitions continue from the rendered shadow, preserving subpixel spread. Native
+  Web Animations add the focus shadow with `composite: add`, preserving component shadows and
+  hover/press transitions. The static outline is transparent only while that shadow animates and
+  resumes on completion. Animating outline width is unsuitable: pixel quantisation causes visible
+  steps, unlike the original Listen `box-shadow` fade. Install once in Listen, Admin and Desktop, plus preview/test entries. System/Crate
+  reduced motion and forced colours use the immediate static CSS marker; preference changes
+  cancel active animations. SVG controls and browsers without additive support retain static focus.
+  No motion dependency, React updates or per-frame JavaScript.
+- `::selection`: `accent-action` background, `surface-canvas` text.
 - `-webkit-font-smoothing: antialiased`; `color-scheme: dark` (already set).
 
 ---
@@ -880,7 +896,7 @@ rule; it is not moved, but a v3 change to it is tested in Listen only until Admi
 | `SectionHeader`, `EmptyState`, `MediaGrid`, `MediaRail` | `domain/lists/*`                  | Listen only                                  | 5.3, 5.5, 5.11                                                                                                                                                                  |
 | `PageHeader`                                            | `domain/navigation/PageHeader`    | Listen only                                  | 5.2                                                                                                                                                                             |
 | `LoadingState`                                          | `domain/states/LoadingState.tsx`  | Listen only (via `domain/states`)            | 5.11                                                                                                                                                                            |
-| `GenrePill`                                             | `domain/genres/GenrePill.tsx`     | both (2 / 13)                                | chip look; stays required by `genre-pill-policy`                                                                                                                                |
+| `GenrePill`                                             | `domain/genres/GenrePill.tsx`     | both (2 / 13)                                | chip look; retain percentage/profile contract and `genre-pill-policy`                                                                                                           |
 
 #### `MonoLabel`
 
@@ -986,6 +1002,30 @@ interface CratePillProps {
 - `badge-policy.test.ts` forbids `uppercase`, `tracking-*`, `text-accent-action` and `rounded-full`
   on `CratePill`/`CrateBadge` call sites; uppercase copy comes pre-cased from i18n or uses
   `MonoLabel`.
+
+#### `GenrePill` / `GenrePillRow` — retained percentage-bearing genre identity
+
+GenrePill stays in `@crate/ui/domain/genres/GenrePill`; it is not replaced with generic CratePill or
+CrateChip. The genre-pill policy and the existing imports/re-export continue to apply. Diego
+highlighted its percentages as a key v2 feature on 2026-10-15; Task 1.6a makes their preservation
+explicit and presents the v3 treatment at Checkpoint 1C before further infrastructure work.
+
+- Keep the name and percentage together. `percent` takes precedence; otherwise display
+  `Math.round(share * 100)`. Missing both means no percentage; 0 and 100 remain visible. `weight`
+  is not a percentage fallback. Do not normalise profiles or recompute remaining values on removal.
+- Keep source provenance in the tooltip, original row order, the `max` limit and the original item
+  passed to `onSelect`. The backend/profile data contract does not migrate in this visual task.
+- Align the existing component with v3 chips: rounded-full hairline, transparent canvas, 11px mono
+  `text-label`, `tracking-chip`, primary name and tabular accent-hi percentage separated by a small
+  hairline. Percentage emphasis is colour, not a nested bold badge. The name may truncate; the
+  percentage stays visible. Diego approved this visual treatment at Checkpoint 1C on 2026-10-15.
+- Keep static, clickable, removable and clickable+removable cases. Navigation is an ordinary
+  button without toggle semantics. Navigation/removal remain separate controls, preserve the
+  caller's localised `removeLabel` and do not nest buttons. Targets are at least 32px, 44px on
+  coarse pointers; internal buttons also carry `data-slot="chip"` for Listen's radius exemption.
+- Use the same real component in the persistent mockup, including profile, missing/0/100%, long
+  name, select and remove examples. Component and local browser checks cover the contract; Linux
+  CI captures and device qualification remain separate.
 
 ### 2.3 New shared primitives
 
@@ -3627,7 +3667,7 @@ Listen (`components/layout/*`):
 
 - Field: `MonoLabel` above (8 px gap); input 40 px tall (44 coarse), transparent on the canvas,
   `bg-input` (`--color-input`) on cards, `border-border-quiet`, `rounded-lg`, sans 15 `text-text-primary`,
-  placeholder `text-text-subtle`; focus outline accent hi plus border `accent-action-hi/40`; helper
+  placeholder `text-text-subtle`; flush focus outline per §1.9.5 plus border `accent-action-hi/40`; helper
   text mono 11.5 px `text-text-subtle`; error = `StatusDot warn` plus the message in
   `state-warning-text` with `aria-invalid` and `aria-describedby`, no red border; validate on blur;
   field errors never raise toasts.

@@ -104,7 +104,7 @@ describe("ItemActionMenuButton", () => {
     const button = screen.getByRole("button", { name: "More actions" });
     expect(button).toHaveAttribute("aria-haspopup", "menu");
     expect(button).not.toHaveAttribute("aria-expanded");
-    expect(button).toHaveClass("focus-visible:shadow-focus");
+    expect(button).not.toHaveClass("focus-visible:shadow-focus");
 
     rerender(
       <ItemActionMenuButton

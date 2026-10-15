@@ -128,7 +128,7 @@
   --border-quiet: var(--surface-quiet);
   --border-quiet-subtle: var(--surface-quiet-subtle);
   --border-interactive: var(--hover-border);
-  --focus-ring: var(--color-ring);
+  --focus-ring: var(--crate-token-color-ring);
   --accent-action: var(--color-primary);
   --accent-action-foreground: var(--color-primary-foreground);
   --accent-action-hi: var(--crate-token-color-primary-hi);
@@ -156,7 +156,6 @@
   --font-mono-stack: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --action-shadow: 0 14px 28px
     color-mix(in srgb, var(--accent-action) 22%, transparent);
-  --focus-shadow: 0 0 0 2px var(--focus-ring);
   --control-inset-shadow: inset 0 1px 0
     color-mix(in srgb, var(--text-primary) 4%, transparent);
   --icon-control-shadow: 0 8px 24px
@@ -300,7 +299,7 @@
     color-mix(in srgb, var(--accent-action) 24%, transparent);
   --shadow-action-solid-hover: 0 0 24px
     color-mix(in srgb, var(--accent-action) 34%, transparent);
-  --shadow-focus: var(--focus-shadow);
+  --shadow-focus: 0 0 0 2px var(--focus-ring);
   --shadow-control-inset: var(--control-inset-shadow);
   --shadow-icon-control: var(--icon-control-shadow);
   --shadow-chrome: var(--chrome-shadow);

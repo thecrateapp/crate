@@ -390,7 +390,7 @@ export const EqBands = memo(function EqBands({
               aria-valuemax={EQ_CHART_GAIN_MAX}
               aria-disabled={interactive ? undefined : true}
               className={cn(
-                "relative h-full rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-accent-action-hi",
+                "relative h-full rounded-sm",
                 interactive && "cursor-ns-resize",
               )}
               onPointerDown={(event) => onPointerDown(index, event)}

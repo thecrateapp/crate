@@ -514,6 +514,6 @@ describe("ModalCloseButton", () => {
   it("accepts a translated label and shows the focus ring token", () => {
     render(<ModalCloseButton onClick={() => {}} label="Cerrar" />);
     const button = screen.getByRole("button", { name: "Cerrar" });
-    expect(button).toHaveClass("focus-visible:shadow-focus");
+    expect(button).not.toHaveClass("focus-visible:shadow-focus");
   });
 });

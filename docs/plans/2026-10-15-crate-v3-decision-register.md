@@ -146,3 +146,47 @@ Cabinet Grotesk files (units per em 1000 in both):
   leading.
 - **Figures.** Bricolage has `tnum` (and `pnum`, `frac`); Cabinet had none. `tabular-nums` now
   applies to display numerals, closing [D31].
+
+## GenrePill implementation clarification — 2026-10-15
+
+Diego requested the new percentage-bearing GenrePill preview before further infrastructure work.
+The existing DS §2.2 decision is retention with a chip restyle, not replacement by CratePill or
+removal of percentages. Task 1.6a preserves explicit percent / rounded share, missing/0/100%,
+source provenance, row order and open/remove behavior. No weight fallback or renormalisation is
+introduced. Diego approved the v3 visual treatment at Checkpoint 1C on 2026-10-15. The code remains local until a separate commit/push go-ahead.
+
+## Focus-ring refinement — 2026-10-15
+
+After reviewing Checkpoint 1D, Diego requested the same focus effect as the current Listen home
+search. This supersedes the initial bright accent-hi outline separated by 3px/4px: use the existing
+`focus-ring` action cyan, 2px flush to controls and CTAs (offset 0), with -2px inset on clipped
+rows/menus. The existing search recipe is `0 0 0 2px var(--focus-ring)`; the shared outline matches
+its colour and extent while preserving component shadows and selection/validation rings. Keep
+keyboard/pointer behaviour, forced-colour Highlight, text selection and the single Crate identity.
+The revised 1D mockup remains local for review, without automatic commit/push.
+
+Diego clarified that the Listen reference includes an **on/off animation**, not merely its
+settled appearance or a delay. The original `box-shadow` transition lasts 500 ms with
+`cubic-bezier(0.22, 1.18, 0.36, 1)`; both opacity and ring extent interpolate. Carry that motion
+into the shared focus indicator, including a full exit after prolonged focus and continuity when
+interrupted. Animating `outline-width` was rejected: its integer rounding produces visible steps.
+Use the original `box-shadow` rendering with native Web Animations and `composite: add` to preserve
+underlying component shadows and hover/press transition lists. Temporarily make the static outline
+transparent during motion and restore it on completion/cancellation. Reduced motion (OS or Crate) and forced colours retain the immediate CSS focus marker.
+Temporal tests must check intermediate frames in both directions against the original recipe.
+
+Direct inspection of <https://listen.lespedants.org/> confirms the desktop wrapper uses
+`focus-within:shadow-focus`, a `box-shadow` transition of 500 ms and the curve above in
+`TopBarSearchView.tsx`; removing focus reverses that same transition. The reference is the
+rendered production search as well as its source, not only a settled screenshot. Mid-animation
+spread and opacity must match the native shadow without a 1px rounding allowance.
+
+Diego subsequently accepted the current focus implementation **provisionally to keep moving**:
+“lo vamos a dejar así, por seguir avanzando, ya volveremos a ello”. Defer further visual
+polishing and retain the 1D specimen; this does not mean final visual parity approval or a new
+commit/push instruction.
+
+On 2026-10-15 Diego explicitly authorised commit and push of Checkpoints 1C and provisional 1D,
+then continuation with the next block. This supersedes the earlier local-only publication notes;
+it does not resolve the deferred focus polish or the Linux baseline/device QA gates. Checkpoint
+1C is `e60e6f50`. Continue 0.11 → Admin contrast 1.0 → InstrumentPanel 1.7 in that dependency order.

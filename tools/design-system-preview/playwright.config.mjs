@@ -3,7 +3,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: ".",
-  testMatch: "preview.spec.ts",
+  testMatch: "*.spec.ts",
   outputDir: "../../.artifacts/design-system-preview",
   reporter: "line",
   workers: 1,

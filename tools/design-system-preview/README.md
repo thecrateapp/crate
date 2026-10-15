@@ -49,3 +49,28 @@ PLAYWRIGHT_CHANNEL=chrome npm run design-system:preview:test
 The checks cover desktop/mobile layout, real typography, 44px touch targets, row selection,
 filter semantics and held-pointer reduced-motion behavior (both system and Crate preferences).
 They run without screenshots or backend access; they do not approve the Linux CI visual baselines.
+
+## GenrePill / Checkpoint 1C
+
+Open <http://127.0.0.1:5186/#genre-pill> to review the retained genre component with percentages.
+Uses the real GenrePill/GenrePillRow: artist profile, missing/0/100%, long names, selection and
+independent removal. Removing a label leaves the other percentages unchanged. The v3 visual
+treatment was approved by Diego on 2026-10-15; approved 1A/1B examples stay on the page.
+
+## Keyboard focus / Checkpoint 1D
+
+The next local review is <http://127.0.0.1:5186/#foco>. Use Tab / Shift+Tab to traverse standard,
+primary, field and row controls; selecting the example text exercises the shared selection colours.
+The mockup uses the same token/component focus rules as the apps. Following Diego's feedback,
+the ring now matches the existing Listen search: 2px action cyan flush to controls and CTAs,
+with an inset ring on clipped rows and menus. It animates on and off over 500 ms using the same
+curve as the real search: fade plus expansion/contraction, without a delay. Rapid refocus reverses
+from the current state. Reduced motion (system/Crate) and forced colours keep static focus.
+Existing component shadows and hover/press transitions stay intact. Browser checks cover
+initial/intermediate/final frames, exit after settled focus, interruption and preference changes,
+alongside keyboard/pointer behaviour, offsets, real Select options, selection and touch targets.
+Local verification and the pending visual/CI/device reviews are tracked in the handover.
+
+Diego accepted the current 1D implementation provisionally to keep moving on 2026-10-15.
+Further visual polishing of the focus fade is deferred; this is not final visual approval of
+parity with Listen. Keep this specimen and revisit it in a later pass.

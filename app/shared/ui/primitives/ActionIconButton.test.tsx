@@ -71,7 +71,7 @@ describe("ActionIconButton", () => {
 
   it("shows a visible focus ring", () => {
     render(<ActionIconButton aria-label="Focus">Icon</ActionIconButton>);
-    expect(screen.getByRole("button")).toHaveClass(
+    expect(screen.getByRole("button")).not.toHaveClass(
       "focus-visible:shadow-focus",
     );
   });

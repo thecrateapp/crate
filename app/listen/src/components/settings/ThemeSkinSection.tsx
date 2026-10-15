@@ -40,7 +40,7 @@ const SECONDARY_ACTION_CLASS_NAME =
   "h-auto border border-border-quiet/20 px-3 py-2 text-xs font-semibold text-text-secondary hover:bg-surface-control";
 
 const selectionButtonClass = (selected: boolean) =>
-  `rounded-lg border px-3 py-3 text-left transition-colors focus-within:ring-2 focus-within:ring-focus-ring/50 ${
+  `rounded-lg border px-3 py-3 text-left transition-colors ${
     selected
       ? "border-accent-action/50 bg-accent-action/15 text-accent-action"
       : "border-border-quiet/10 bg-text-primary/[0.03] text-text-primary/70 hover:bg-text-primary/[0.06]"

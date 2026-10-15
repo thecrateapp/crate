@@ -478,7 +478,7 @@ describe("ContextMenu", () => {
     );
 
     expect(screen.getByRole("menuitem", { name: /Play now/i })).toHaveClass(
-      "focus-visible:shadow-focus",
+      "crate-focus-inset",
     );
   });
 

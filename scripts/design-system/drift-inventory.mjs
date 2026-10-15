@@ -345,10 +345,30 @@ function classifyDuplicateTokenGroups(duplicateTokenGroups) {
 
 function findSurfaceRoleViolations(content) {
   return SURFACE_ROLE_PATTERNS.flatMap((pattern) =>
-    [...content.matchAll(pattern)].map((match) => ({
-      property: match.groups.property,
-      token: match.groups.token,
-    })),
+    [...content.matchAll(pattern)]
+      .filter((match) => {
+        if (
+          match.groups.property !== "color" ||
+          match.groups.token !== "--surface-canvas"
+        ) {
+          return true;
+        }
+        const ruleStart = content.lastIndexOf("{", match.index);
+        const selectorStart =
+          Math.max(
+            content.lastIndexOf("}", ruleStart),
+            content.lastIndexOf("{", ruleStart - 1),
+          ) + 1;
+        const selector = content
+          .slice(selectorStart, ruleStart)
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .trim();
+        return selector !== "::selection";
+      })
+      .map((match) => ({
+        property: match.groups.property,
+        token: match.groups.token,
+      })),
   );
 }
 

@@ -243,7 +243,7 @@ export const EntityCard = memo(function EntityCard({
         disabled={disabled}
         current={selected}
         className={cn(
-          "group block w-full rounded-xl text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:hover:bg-transparent",
+          "group block w-full rounded-xl text-left transition-colors disabled:cursor-not-allowed disabled:hover:bg-transparent",
           centered
             ? "p-0"
             : "p-[var(--content-card-padding)] hover:bg-text-primary/5",

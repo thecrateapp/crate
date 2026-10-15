@@ -94,17 +94,11 @@ describe("SegmentedControl", () => {
     expect(selected).toHaveClass("bg-accent-action/12", "h-7");
   });
 
-  it("draws an offset 2px focus ring that stays visible on the selected pill", () => {
+  it("uses the global outline without hiding focus on the selected pill", () => {
     render(<Harness />);
     for (const tab of screen.getAllByRole("tab")) {
-      expect(tab).toHaveClass(
-        "outline-none",
-        "focus-visible:outline-solid",
-        "focus-visible:outline-2",
-        "focus-visible:outline-offset-2",
-        "focus-visible:outline-focus-ring",
-      );
-      expect(tab).not.toHaveClass("focus-visible:shadow-focus");
+      expect(tab).toHaveClass("rounded-full");
+      expect(tab).not.toHaveClass("outline-none");
     }
   });
 

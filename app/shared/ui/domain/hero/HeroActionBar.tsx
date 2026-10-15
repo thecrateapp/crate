@@ -18,13 +18,13 @@ export const HERO_PRIMARY_ACTIONS_GROUP_CLASS =
   "grid grid-cols-2 gap-3 md:flex md:shrink-0 md:items-center md:gap-3";
 
 export const HERO_PRIMARY_ACTION_CLASS =
-  "flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-accent-action px-5 text-sm font-semibold text-accent-action-foreground shadow-action-solid outline-none transition-[background-color,box-shadow] hover:bg-accent-action/90 hover:shadow-action-solid-hover focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-45 md:px-7 md:text-body";
+  "flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-accent-action px-5 text-sm font-semibold text-accent-action-foreground shadow-action-solid transition-[background-color,box-shadow] hover:bg-accent-action/90 hover:shadow-action-solid-hover disabled:cursor-not-allowed disabled:opacity-45 md:px-7 md:text-body";
 
 export const HERO_NEUTRAL_ACTION_CLASS =
-  "flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-text-primary/[0.08] px-5 text-sm font-semibold text-text-primary shadow-control-inset outline-none transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-accent-action hover:drop-shadow-accent-action focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-45 md:w-auto md:px-7";
+  "flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-text-primary/[0.08] px-5 text-sm font-semibold text-text-primary shadow-control-inset transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-accent-action hover:drop-shadow-accent-action disabled:cursor-not-allowed disabled:opacity-45 md:w-auto md:px-7";
 
 export const HERO_SECONDARY_ACTION_CLASS =
-  "flex min-h-14 min-w-14 shrink-0 touch-manipulation flex-col items-center justify-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-text-primary/62 outline-none transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
+  "flex min-h-14 min-w-14 shrink-0 touch-manipulation flex-col items-center justify-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
 
 export const HERO_SECONDARY_ACTION_ACTIVE_CLASS =
   "text-accent-action drop-shadow-accent-action";
@@ -131,7 +131,7 @@ function HeroActionMenuControl({
         data-testid="hero-mobile-menu-trigger"
         onClick={controller.openFromTrigger}
         onContextMenu={controller.handleContextMenu}
-        className="flex size-11 touch-manipulation items-center justify-center rounded-full text-text-primary/72 outline-none transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover focus-visible:shadow-focus"
+        className="flex size-11 touch-manipulation items-center justify-center rounded-full text-text-primary/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover"
       >
         <MoreHorizontal
           size={CRATE_ICON_SIZE.navMobile}

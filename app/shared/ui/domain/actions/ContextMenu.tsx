@@ -91,8 +91,7 @@ export function shouldRenderDesktopContextMenu(
 }
 
 const DEFAULT_SURFACE_CLASS_NAME = "listen-glass-panel";
-const MENU_ITEM_FOCUS_CLASS_NAME =
-  "focus-visible:shadow-focus focus-visible:outline-none";
+const MENU_ITEM_FOCUS_CLASS_NAME = "crate-focus-inset";
 const MENU_ITEM_SELECTOR = '[role="menuitem"]:not([disabled])';
 
 function syncClampedLabelTitle(element: HTMLElement, label: string) {

@@ -382,7 +382,7 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
             onFocus={handleFocus}
             onKeyDown={handleKeyDown}
             placeholder="Search library…"
-            className="h-12 w-full rounded-md border border-white/8 bg-black/25 pl-11 pr-11 text-[15px] text-white outline-none transition-[background-color,border-color,box-shadow] placeholder:text-white/40 focus:border-cyan-400/25 focus:bg-black/40 focus:shadow-[0_0_0_1px_rgba(34,211,238,0.08)]"
+            className="h-12 w-full rounded-md border border-white/8 bg-black/25 pl-11 pr-11 text-[15px] text-white transition-[background-color,border-color,box-shadow] placeholder:text-white/40 focus:border-cyan-400/25 focus:bg-black/40"
           />
         </div>
 

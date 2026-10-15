@@ -370,7 +370,7 @@ function TaxonomyRelationField({
               }
               if (event.key === "Escape") setFocused(false);
             }}
-            className="w-full bg-transparent px-1 py-1 font-mono text-xs text-white/70 outline-none placeholder:text-white/25"
+            className="w-full bg-transparent px-1 py-1 font-mono text-xs text-white/70 placeholder:text-white/25"
             placeholder="Search taxonomy genres..."
           />
           {focused && suggestions.length > 0 ? (
@@ -978,7 +978,7 @@ function TaxonomyNodeEditorialEditor({
                       aspect={2}
                       onUploaded={refreshCover}
                       label="Edit cover"
-                      className="absolute inset-0 z-10 flex items-end justify-center gap-1.5 bg-black/0 p-3 text-xs font-semibold text-white/0 outline-none transition hover:bg-black/35 hover:text-white/85 focus-visible:bg-black/35 focus-visible:text-cyan-100 focus-visible:ring-2 focus-visible:ring-cyan-300/40"
+                      className="absolute inset-0 z-10 flex items-end justify-center gap-1.5 bg-black/0 p-3 text-xs font-semibold text-white/0 transition hover:bg-black/35 hover:text-white/85 focus-visible:bg-black/35 focus-visible:text-cyan-100"
                     />
                   ) : null}
                 </div>
@@ -995,7 +995,7 @@ function TaxonomyNodeEditorialEditor({
                       setDescriptionDraft(event.target.value)
                     }
                     rows={5}
-                    className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/75 outline-none transition focus:border-cyan-400/40"
+                    className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/75 transition focus:border-cyan-400/40"
                     placeholder="Short editorial description for this genre."
                   />
                 </label>

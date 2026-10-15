@@ -8,8 +8,8 @@
     "directShadcnImports": 96
   },
   "semanticTokens": {
-    "definitions": 139,
-    "foundationDefinitions": 96,
+    "definitions": 138,
+    "foundationDefinitions": 95,
     "domainDefinitions": 32,
     "duplicateDefinitions": 3,
     "actionableDuplicateDefinitions": 0,

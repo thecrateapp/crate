@@ -53,7 +53,10 @@ describe("runtime token bridge", () => {
       /\.link-meta\.link-inset:focus-visible,\s*\.link-accent\.link-inset:focus-visible\s*\{(?<rules>[^}]*)\}/s,
     )?.groups?.rules;
 
-    expect(inset).toMatch(/outline-offset:\s*-2px/);
+    expect(readTokenFile("interactive.css")).toMatch(
+      /\.link-inset:focus-visible[^}]*\{[^}]*outline-offset:\s*-2px/,
+    );
+    expect(inset).not.toMatch(/outline-color:\s*transparent/);
     expect(inset).toMatch(/text-decoration:\s*underline/);
   });
 
@@ -108,14 +111,14 @@ describe("runtime token bridge", () => {
     expect(typography).toContain("--text-counter--line-height: 1");
   });
 
-  it("renders the focus token as a visible 2px ring on the focus colour", () => {
+  it("keeps the legacy focus utility bridge without a redundant semantic alias", () => {
     const semantic = readTokenFile("semantic.css");
 
     expect(semantic).toMatch(
-      /--focus-shadow:\s*0 0 0 2px var\(--focus-ring\);/,
+      /--shadow-focus:\s*0 0 0 2px var\(--focus-ring\);/,
     );
-    expect(semantic).toContain("--shadow-focus: var(--focus-shadow);");
-    expect(semantic).toContain("--focus-ring: var(--color-ring);");
+    expect(semantic).not.toContain("--focus-shadow:");
+    expect(semantic).toContain("--focus-ring: var(--crate-token-color-ring);");
   });
 });
 

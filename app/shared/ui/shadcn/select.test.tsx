@@ -42,6 +42,15 @@ describe("Select", () => {
     expect(dialog?.contains(content)).toBe(false);
   });
 
+  it("keeps the keyboard outline inside each portalled option", () => {
+    render(<ModalSelect />);
+
+    for (const item of screen.getAllByRole("option")) {
+      expect(item).toHaveClass("crate-focus-inset");
+      expect(item).not.toHaveClass("outline-hidden");
+    }
+  });
+
   it("dismisses only the select when Escape is pressed inside a modal", () => {
     const onClose = vi.fn();
     render(<ModalSelect onClose={onClose} />);

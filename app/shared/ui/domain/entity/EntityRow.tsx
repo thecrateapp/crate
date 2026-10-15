@@ -145,7 +145,7 @@ export const EntityRow = memo(function EntityRow({
         disabled={disabled}
         current={active}
         className={cn(
-          "flex min-w-0 flex-1 items-center rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed",
+          "flex min-w-0 flex-1 items-center rounded-md text-left disabled:cursor-not-allowed",
           compact ? "gap-2" : "gap-[var(--content-row-gap)]",
           classNames?.action,
         )}

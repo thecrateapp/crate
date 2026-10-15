@@ -71,7 +71,7 @@ export function PlaylistIdentitySection({
         />
         <button
           type="button"
-          className="inline-flex w-full items-center justify-center gap-1 rounded-full bg-text-primary/5 px-2 py-1.5 text-center text-xs font-medium leading-4 text-text-primary outline-none transition-colors hover:bg-text-primary/10 focus-visible:shadow-focus"
+          className="inline-flex w-full items-center justify-center gap-1 rounded-full bg-text-primary/5 px-2 py-1.5 text-center text-xs font-medium leading-4 text-text-primary transition-colors hover:bg-text-primary/10"
           onClick={() => fileInputRef.current?.click()}
         >
           <Upload size={CRATE_ICON_SIZE.micro} className="shrink-0" />
@@ -197,7 +197,7 @@ export function PlaylistIdentitySection({
               type="button"
               aria-pressed={isCollaborative}
               className={cn(
-                "rounded-full px-3 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring",
+                "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
                 isCollaborative
                   ? "bg-accent-action text-accent-action-foreground"
                   : "bg-text-primary/5 text-text-muted",

@@ -212,14 +212,18 @@ describe("TopBarSearch", () => {
     });
   });
 
-  it("shows a token focus ring around the search shell", () => {
+  it("leaves keyboard focus to the shared outline without a second shell shadow", () => {
     renderWithListenProviders(<TopBarSearch />);
 
     const searchButton = screen.getByRole("button", { name: "Search" });
 
-    expect(searchButton.closest("div[data-state]")).toHaveClass(
+    expect(searchButton.closest("div[data-state]")).not.toHaveClass(
       "focus-within:shadow-focus",
     );
+    expect(searchButton).toHaveClass("crate-focus-inset");
+    expect(
+      screen.getByPlaceholderText("Search artists, albums, tracks..."),
+    ).toHaveClass("crate-focus-inset");
   });
 
   it("collapses when focus tabs away with an empty query", async () => {

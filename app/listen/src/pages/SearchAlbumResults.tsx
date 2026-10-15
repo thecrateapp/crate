@@ -40,7 +40,7 @@ export function SearchAlbumResults({ albums }: { albums: SearchAlbum[] }) {
                 artistName: album.artist,
                 albumName: album.name,
               })}
-              className="group w-full min-w-0 snap-start cursor-pointer rounded-xl p-2 text-left transition-colors hover:bg-text-primary/5 focus-visible:rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              className="group w-full min-w-0 snap-start cursor-pointer rounded-xl p-2 text-left transition-colors hover:bg-text-primary/5 focus-visible:rounded-xl"
             >
               <div className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-text-primary/5">
                 {album.has_cover ? (

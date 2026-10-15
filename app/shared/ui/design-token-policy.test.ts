@@ -14,6 +14,8 @@ const ORGANIC_BLOB_RADIUS = "rounded-[45%_55%_49%_51%/53%_47%_56%_44%]";
 const ICON_IMPORT =
   /import\s*\{([^}]*)\}\s*from\s*["'](?:@crate\/ui\/icons|(?:\.\.?\/)+icons)(?:\/[^"']+)?["']/g;
 const DYNAMIC_ICON = /^(?:[A-Z]\w*)?Icon$/;
+const LOCAL_FOCUS_DECORATION =
+  /\bfocus(?:-visible|-within)?:(?:ring|shadow)(?:-|\b)/;
 
 const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
   "domain/ArtistHeroPresentation.tsx": {
@@ -115,6 +117,18 @@ function literalIconSizes(source: string): string[] {
 }
 
 describe("@crate/ui design token policy", () => {
+  it("uses the global keyboard outline instead of the legacy focus shadow in shared and app sources", () => {
+    const appRoot = resolve(SOURCE_ROOT, "../..");
+    const findings = productionSourceFiles(appRoot).flatMap((path) => {
+      const source = readFileSync(path, "utf8");
+      return LOCAL_FOCUS_DECORATION.test(source)
+        ? [relative(appRoot, path)]
+        : [];
+    });
+
+    expect(findings).toEqual([]);
+  }, 15_000);
+
   it("reads literal icon sizes past arrow functions and nested JSX props", () => {
     const source = [
       'import { Heart, Star } from "@crate/ui/icons";',

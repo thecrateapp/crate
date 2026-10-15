@@ -2,12 +2,29 @@ import "@crate/ui/tokens/index.css";
 import "./harness.css";
 import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { installFocusRingMotion } from "@crate/ui/lib/focus-ring-motion";
 import {
   ArtistHeroFrame,
   type ArtistHeroArtworkBounds,
 } from "@crate/ui/domain/ArtistHeroFrame";
 import { ArtistHeroPresentation } from "@crate/ui/domain/ArtistHeroPresentation";
 import { CrateLogo } from "@crate/ui/domain/brand/CrateLogo";
+import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
+import { PlayButton } from "@crate/ui/domain/media/PlayButton";
+import { Checkbox } from "@crate/ui/primitives/Checkbox";
+import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
+import { IconButton } from "@crate/ui/primitives/IconButton";
+import { RadioGroup, RadioGroupItem } from "@crate/ui/primitives/RadioGroup";
+import { Switch } from "@crate/ui/primitives/Switch";
+import { Button } from "@crate/ui/shadcn/button";
+import { Input } from "@crate/ui/shadcn/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@crate/ui/shadcn/select";
 import { CONTENT_DENSITY_METRICS } from "@crate/ui/lib/content-density";
 import {
   applyAppearanceToRoot,
@@ -34,6 +51,9 @@ const defaultPreferences: AppearancePreferencesV2 = {
   accessibility: { motion: "system" },
 };
 
+const disposeFocusRingMotion = installFocusRingMotion();
+import.meta.hot?.dispose(disposeFocusRingMotion);
+
 let activePreferences = readPreferences();
 let draftPreferences = clonePreferences(activePreferences);
 let primaryCleanup: (() => void) | undefined;
@@ -41,6 +61,7 @@ let secondaryCleanup: (() => void) | undefined;
 let mediaCleanup: (() => void) | undefined;
 let logoRoot: Root | undefined;
 let heroRoot: Root | undefined;
+let focusRoot: Root | undefined;
 let heroArtworkMode: "clear" | "dark-extend" = "clear";
 
 function clonePreferences(
@@ -83,6 +104,8 @@ function render(): void {
   logoRoot = undefined;
   heroRoot?.unmount();
   heroRoot = undefined;
+  focusRoot?.unmount();
+  focusRoot = undefined;
   const root = document.querySelector<HTMLDivElement>("#app")!;
   root.innerHTML = `
     <section class="harness-shell" aria-label="Appearance contract harness">
@@ -170,6 +193,18 @@ function render(): void {
           <div data-testid="portal-target" class="portal-target">
             <span data-testid="portal-content">Portal content remains in the primary scope.</span>
           </div>
+      <section aria-label="Keyboard focus contract" class="scope">
+        <h2>Keyboard focus</h2>
+        <div data-testid="focus-components"></div>
+        <button type="button" data-testid="focus-utility" class="outline-none focus-visible:outline-none">Layered utility</button>
+        <button type="button" data-testid="focus-menu" role="menuitem" class="crate-focus-inset">Menu row</button>
+        <button type="button" data-testid="focus-jam" class="jam-card-interactive">Jam card</button>
+        <input aria-label="Jam input" data-testid="focus-jam-input" class="jam-input" />
+        <input aria-label="Radio input" data-testid="focus-radio-input" class="radio-seed-input" />
+        <button type="button" data-testid="focus-signal" class="stats-signal-tape">Stats signal</button>
+        <a href="#focus" data-testid="focus-link" class="link-meta link-inset">Truncating link</a>
+        <p data-testid="selection-text">Selected Crate text</p>
+      </section>
         </section>
         <section data-testid="secondary-scope" class="scope scope-secondary">
           <p class="scope-label">Secondary scope</p>
@@ -179,8 +214,87 @@ function render(): void {
           </article>
         </section>
       </div>
+
     </section>
   `;
+
+  focusRoot = createRoot(root.querySelector("[data-testid=focus-components]")!);
+  focusRoot.render(
+    createElement(
+      "div",
+      { className: "focus-controls" },
+      createElement(Button, { "data-testid": "focus-cta" }, "Primary action"),
+      createElement(
+        Button,
+        { variant: "outline", "data-testid": "focus-default" },
+        "Secondary action",
+      ),
+      createElement(
+        IconButton,
+        { label: "Focus icon", "data-testid": "focus-icon" },
+        "Icon",
+      ),
+      createElement(PlayButton, { "data-testid": "focus-play" }),
+      createElement(Switch, {
+        "aria-label": "Focus switch",
+        "data-testid": "focus-switch",
+      }),
+      createElement(Checkbox, {
+        "aria-label": "Focus checkbox",
+        "data-testid": "focus-checkbox",
+      }),
+      createElement(
+        RadioGroup,
+        { "aria-label": "Focus quality", defaultValue: "high" },
+        createElement(RadioGroupItem, {
+          value: "high",
+          "aria-label": "High",
+          "data-testid": "focus-radio",
+        }),
+      ),
+      createElement(Input, {
+        "aria-label": "Focus input",
+        "data-testid": "focus-input",
+      }),
+      createElement(
+        Select,
+        { defaultValue: "albums" },
+        createElement(
+          SelectTrigger,
+          {
+            "aria-label": "Focus collection",
+            "data-testid": "focus-select-trigger",
+          },
+          createElement(SelectValue),
+        ),
+        createElement(
+          SelectContent,
+          null,
+          createElement(SelectItem, { value: "albums" }, "Albums"),
+          createElement(SelectItem, { value: "artists" }, "Artists"),
+        ),
+      ),
+      createElement(
+        HairlineList,
+        { label: "Focus tracks" },
+        createElement(
+          HairlineRow,
+          { asChild: true },
+          createElement(
+            "button",
+            { type: "button", "data-testid": "focus-row" },
+            "Track row",
+          ),
+        ),
+      ),
+      createElement(GenrePill, {
+        item: { name: "Post-rock", percent: 64 },
+        onClick() {},
+        onRemove() {},
+        removeLabel: "Remove focus genre",
+      }),
+    ),
+  );
 
   bindControls();
   applyScopes();

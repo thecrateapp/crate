@@ -380,7 +380,7 @@ function ShareAction({
       onClick={onClick}
       className={cn(
         "group flex w-full items-center gap-3 rounded-lg border border-border-quiet bg-surface-canvas/20 px-3 py-3 text-left transition",
-        "hover:border-text-primary/20 hover:bg-text-primary/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        "hover:border-text-primary/20 hover:bg-text-primary/[0.06]",
         disabled &&
           "cursor-not-allowed opacity-45 hover:border-border-quiet hover:bg-surface-canvas/20",
         busy && "opacity-100",

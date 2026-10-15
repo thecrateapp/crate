@@ -123,11 +123,7 @@ export const CratePill = memo(function CratePill({
         aria-pressed={variant === "toggle" ? active : undefined}
         data-slot="chip"
         data-tone={tone}
-        className={cn(
-          classes,
-          "crate-pill focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-accent-action-hi",
-          className,
-        )}
+        className={cn(classes, "crate-pill", className)}
       >
         {Icon && <Icon size={CRATE_ICON_SIZE.micro} />}
         {children}

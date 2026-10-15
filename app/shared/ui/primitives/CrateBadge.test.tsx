@@ -119,14 +119,9 @@ describe("CratePill", () => {
     },
   );
 
-  it("keeps a visible keyboard outline while the global focus recipe is pending", async () => {
+  it("keeps action pills reachable with Tab", async () => {
     render(<CratePill variant="action">Resume</CratePill>);
     const button = screen.getByRole("button");
-    expect(button).toHaveClass(
-      "focus-visible:outline-2",
-      "focus-visible:outline-accent-action-hi",
-    );
-    expect(button).not.toHaveClass("focus-visible:shadow-focus");
     await userEvent.tab();
     expect(button).toHaveFocus();
   });

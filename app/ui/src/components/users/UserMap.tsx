@@ -186,7 +186,7 @@ function UserDetails({
       {onInspectUser ? (
         <button
           type="button"
-          className="w-full rounded-md border border-white/12 bg-white/6 px-3 py-2 text-xs font-medium text-white/80 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          className="w-full rounded-md border border-white/12 bg-white/6 px-3 py-2 text-xs font-medium text-white/80 transition hover:bg-white/10 hover:text-white"
           onClick={() => onInspectUser(user)}
         >
           Inspect user
@@ -305,7 +305,7 @@ export function UserMap({
               <button
                 type="button"
                 aria-label="Close user map details"
-                className="rounded-md p-1 text-white/45 transition hover:bg-white/8 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                className="rounded-md p-1 text-white/45 transition hover:bg-white/8 hover:text-white"
                 onClick={() => setSelectedGroupKey(null)}
               >
                 <X size={16} />
@@ -318,7 +318,7 @@ export function UserMap({
                   <button
                     key={user.id}
                     type="button"
-                    className={`flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-left text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
+                    className={`flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-left text-xs transition ${
                       user.id === selectedUser.id
                         ? "border-primary/35 bg-primary/10 text-white"
                         : "border-white/8 bg-black/15 text-white/65 hover:bg-white/6"
