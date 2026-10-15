@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -262,6 +263,20 @@ def test_cast_receiver_build_and_frontend_gates_are_wired_in_ci() -> None:
     assert "npm run --workspace=app/cast-receiver build" in frontend
     assert react_doctor.count('"app/cast-receiver/**"') == 2
     assert "app/cast-receiver" in react_doctor
+
+
+def test_frontend_ci_enforces_initial_js_budgets_for_both_apps() -> None:
+    frontend = (ROOT / ".github/workflows/test-frontend.yml").read_text()
+    admin_package = json.loads((ROOT / "app/ui/package.json").read_text())
+
+    for workspace in ("app/listen", "app/ui"):
+        build = f"npm run --workspace={workspace} build"
+        check = f"npm run --workspace={workspace} check:bundle"
+        assert check in frontend
+        assert frontend.index(build) < frontend.index(check)
+    assert admin_package["scripts"]["check:bundle"] == (
+        "node scripts/check-bundle-budget.mjs dist"
+    )
 
 
 def test_image_rollback_restores_only_the_services_changed_by_the_release() -> None:

@@ -142,7 +142,9 @@ jobs:
           VITE_SENTRY_DSN: ${{ vars.SENTRY_ADMIN_DSN }}
           VITE_SENTRY_ENVIRONMENT: production
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
-        run: npm run --workspace=app/ui build
+        run: |
+          npm run --workspace=app/ui build
+          npm run --workspace=app/ui check:bundle
 
       - name: Type check listen app
         run: npm run --workspace=app/listen typecheck
@@ -176,7 +178,9 @@ jobs:
           VITE_SENTRY_DSN: ${{ vars.SENTRY_LISTEN_DSN }}
           VITE_SENTRY_ENVIRONMENT: production
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
-        run: npm run --workspace=app/listen build
+        run: |
+          npm run --workspace=app/listen build
+          npm run --workspace=app/listen check:bundle
 
       - name: Type check desktop app
         run: npm run --workspace=app/listen-desktop typecheck
