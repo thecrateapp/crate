@@ -25,7 +25,7 @@ src/index.css              Imports Poppins, @crate/ui tokens, Tailwind; @source 
 - Every route must be gated: `CapabilityRoute anyOf={[...]}` in `App.tsx`, and the matching `navItems` entry in `Sidebar.tsx` must declare the same `capabilities`.
 - Pages are named exports (`export function Tasks()`); `App.tsx` maps them with `lazy(() => import(...).then(m => ({ default: m.X })))`.
 - Surface is glass (`index.html`). Do not set `data-surface="solid"` on admin subtrees and do not hardcode card backgrounds; use token classes (`bg-card`, `border-border`, `text-foreground`).
-- Charts: Nivo only (`@nivo/*` already in package.json, bundled into the `charts-vendor` chunk by `vite.config.ts`). recharts is not installed in app/ui; do not add it.
+- Charts: Statistical charts (bar, line, pie, scatter, heatmap, radar) use Nivo with the app's token-resolved theme. Instruments (EQ curve, genre wheel, readouts, rails, lanes, gauges, maps, mood map, heatmap band, ticket, crossfade strip, orbit, topology) are hand-built SVG, HTML/CSS, Canvas 2D or WebGL2, following `docs/plans/2026-10-14-crate-v3-design-system.md` §3.5. No new chart libraries; recharts stays out. `@nivo/*` is already in package.json, bundled into the `charts-vendor` chunk by `vite.config.ts`; recharts is not installed in app/ui.
 - Icons: `lucide-react` is the admin convention. Toasts: `toast` from `sonner`.
 - No emojis in UI text.
 

@@ -41,6 +41,7 @@ web/artist-hero-contract.ts  Artist hero composition contract types (versioned)
 - Use tokens, not raw values. `design-token-policy.test.ts` budgets arbitrary `rounded-[..]`, `z-[..]`, `shadow-[..]`, `text-[..px]`, `tracking-[..]` per file, and icon sizes must come from `CRATE_ICON_SIZE`.
 - Surfaces: `[data-surface="solid"]` (also the `:root` default, listen) and `[data-surface="glass"]` (admin sets it on `<html>`). Components must read `--color-card`, `--surface-*` etc. and work under both; never branch on app identity. `lib/appearance-resolver.ts` may set `data-surface` at runtime.
 - Peer deps only (react 19, react-router 7, radix-ui, sonner, cva, clsx, tailwind-merge, @solar-icons/react-perf). Do not add runtime dependencies without updating `package.json` peers and the `external` list in `tsup.config.ts`.
+- Charts: Statistical charts (bar, line, pie, scatter, heatmap, radar) use Nivo with the app's token-resolved theme. Instruments (EQ curve, genre wheel, readouts, rails, lanes, gauges, maps, mood map, heatmap band, ticket, crossfade strip, orbit, topology) are hand-built SVG, HTML/CSS, Canvas 2D or WebGL2, following `docs/plans/2026-10-14-crate-v3-design-system.md` §3.5. No new chart libraries; recharts stays out.
 - No emojis in UI text.
 
 ## How apps import

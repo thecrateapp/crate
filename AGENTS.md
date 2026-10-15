@@ -66,7 +66,11 @@ crate-redis / redis-durable (Redis 7)            → cache, broker, invalidation
 - A component goes into `@crate/ui` only when both admin and Listen use it.
 - Keep `app/ui` and `app/listen` as separate apps. Their conventions differ: admin uses `sonner`
   and `lucide-react`; Listen uses `notify` from `@crate/ui/lib/notify` and `@crate/ui/icons`.
-- Charts use Nivo. recharts is not a dependency.
+- Charts: Statistical charts (bar, line, pie, scatter, heatmap, radar) use Nivo with the app's
+  token-resolved theme. Instruments (EQ curve, genre wheel, readouts, rails, lanes, gauges, maps,
+  mood map, heatmap band, ticket, crossfade strip, orbit, topology) are hand-built SVG, HTML/CSS,
+  Canvas 2D or WebGL2, following `docs/plans/2026-10-14-crate-v3-design-system.md` §3.5. No new
+  chart libraries; recharts stays out.
 
 ## Testing policy
 
