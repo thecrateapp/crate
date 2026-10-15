@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CrossfadeTransition } from "@/contexts/player-context";
@@ -411,64 +411,94 @@ export function useNativePlaybackEventBridge({
     [applyNativeState],
   );
 
+  const onNativePosition = useEffectEvent(
+    (event: Parameters<typeof applyNativePosition>[0]) =>
+      applyNativePosition(event),
+  );
+  const onNativeState = useEffectEvent(
+    (event: Parameters<typeof applyNativeState>[0]) => applyNativeState(event),
+  );
+  const onNativeTrackChange = useEffectEvent(
+    (event: Parameters<typeof applyNativeTrackChange>[0]) =>
+      applyNativeTrackChange(event),
+  );
+  const onNativeEvent = useEffectEvent(
+    (...args: Parameters<typeof handleNativeEvent>) =>
+      handleNativeEvent(...args),
+  );
+  const onReconcile = useEffectEvent(
+    (...args: Parameters<typeof reconcileNativePlayback>) =>
+      reconcileNativePlayback(...args),
+  );
+  const onRecoverBuffering = useEffectEvent(
+    (...args: Parameters<typeof recoverNativeBuffering>) =>
+      recoverNativeBuffering(...args),
+  );
+  const onClearBufferingWatchdog = useEffectEvent(() =>
+    clearNativeBufferingWatchdog(),
+  );
+
   useEffect(() => {
     if (!shouldUseAndroidNativePlayer()) return;
     let disposed = false;
     const resumeAuthorizationCoordinator =
-      createNativeResumeAuthorizationCoordinator(recoverNativeBuffering);
+      createNativeResumeAuthorizationCoordinator(
+        (...args: Parameters<typeof recoverNativeBuffering>) =>
+          onRecoverBuffering(...args),
+      );
     resumeAuthorizationCoordinatorRef.current = resumeAuthorizationCoordinator;
     const subscription = subscribeNativePlayerEvents(androidNativeEngine, {
       positionChanged: (event) => {
         if (disposed) return;
-        applyNativePosition(event);
+        onNativePosition(event);
       },
       playEventCheckpoint: (event) => {
         if (disposed) return;
-        applyNativePosition(event);
+        onNativePosition(event);
       },
       stateChanged: (event) => {
         if (disposed) return;
-        applyNativeState(event);
+        onNativeState(event);
       },
       trackChanged: (event) => {
         if (disposed) return;
-        applyNativeTrackChange(event);
+        onNativeTrackChange(event);
       },
       transitionStarted: (event) => {
         if (disposed) return;
-        handleNativeEvent("transitionStarted", event);
+        onNativeEvent("transitionStarted", event);
       },
       transitionProgress: (event) => {
         if (disposed) return;
-        handleNativeEvent("transitionProgress", event);
+        onNativeEvent("transitionProgress", event);
       },
       transitionEnded: (event) => {
         if (disposed) return;
-        handleNativeEvent("transitionEnded", event);
+        onNativeEvent("transitionEnded", event);
       },
       transitionCancelled: (event) => {
         if (disposed) return;
-        handleNativeEvent("transitionCancelled", event);
+        onNativeEvent("transitionCancelled", event);
       },
       bufferingChanged: (event) => {
         if (disposed) return;
-        handleNativeEvent("bufferingChanged", event);
+        onNativeEvent("bufferingChanged", event);
       },
       nearQueueEnd: (event) => {
         if (disposed) return;
-        handleNativeEvent("nearQueueEnd", event);
+        onNativeEvent("nearQueueEnd", event);
       },
       queueEnded: (event) => {
         if (disposed) return;
-        handleNativeEvent("queueEnded", event);
+        onNativeEvent("queueEnded", event);
       },
       resumeAuthorizationRequired: (event) => {
         if (disposed) return;
-        handleNativeEvent("resumeAuthorizationRequired", event);
+        onNativeEvent("resumeAuthorizationRequired", event);
       },
       error: (event) => {
         if (disposed) return;
-        handleNativeEvent("error", event);
+        onNativeEvent("error", event);
       },
     });
 
@@ -486,28 +516,28 @@ export function useNativePlaybackEventBridge({
           .then((events) => {
             if (disposed) return;
             for (const event of events) {
-              handleNativeEvent(event.event, event.payload);
+              onNativeEvent(event.event, event.payload);
             }
           })
           .catch(() => {});
       })
       .then(() => {
         if (disposed) return;
-        reconcileNativePlayback();
+        onReconcile();
       })
       .catch((error) => {
         console.error("[native-player] failed to attach listeners:", error);
       });
 
     const onNativeResume = () => {
-      reconcileNativePlayback({
+      onReconcile({
         rotateIndexChange: true,
         passiveLifecycle: true,
       });
     };
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        reconcileNativePlayback({
+        onReconcile({
           rotateIndexChange: true,
           passiveLifecycle: true,
         });
@@ -527,16 +557,8 @@ export function useNativePlaybackEventBridge({
       }
       window.removeEventListener("crate:app-resumed", onNativeResume);
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      clearNativeBufferingWatchdog();
+      onClearBufferingWatchdog();
       subscription.dispose();
     };
-  }, [
-    applyNativePosition,
-    applyNativeState,
-    applyNativeTrackChange,
-    clearNativeBufferingWatchdog,
-    handleNativeEvent,
-    reconcileNativePlayback,
-    recoverNativeBuffering,
-  ]);
+  }, []);
 }
