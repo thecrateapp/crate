@@ -294,6 +294,22 @@ Settings de Android nativo muestra activar/desactivar Smart Mix, duración máxi
 
 La MediaSession/facade no cambia de identidad al intercambiar decks. La notificación, lockscreen, Bluetooth, Android Auto, focus/duck, llamadas y EQ conservan semántica. El checkpoint persiste cola, pista/posición y preferencia, nunca un fade a medias que se reproduce tras process death; restaurar carga una sola pista y regenera planes. La telemetría distingue buffer/plan/timing/cancelación, está acotada y no registra paths/tickets.
 
+### 5.6 Continuación en segundo plano
+
+Con la pantalla apagada, la WebView se congela a los ~60 s (medido en Xiaomi 13 el 2026-10-16: la consola deja de emitir a los 59 s del bloqueo mientras el servicio nativo sigue mezclando). Desde ese momento no corren ni el replan de `trackChanged` ni el relleno de radio/infinite (`use-playback-radio-refill.ts`). La ventana de 32 edges cubre unas dos horas de una cola estática; radio e infinite se quedan sin cola. El servicio nativo tiene que poder continuar solo.
+
+**Endpoint único.** `POST /api/playback/continuation` recibe `{continuationId, afterTrackEntityUid, recentEntityUids, limit, plannerVersion, edges?}` y devuelve en una respuesta los tracks nuevos ya en forma de `NativeTrack` (stream con ticket de media del alcance del track), los planes de los edges nuevos (incluido último-de-cola → primero nuevo) y si la fuente puede seguir. Con `edges` y sin `afterTrackEntityUid` funciona en modo solo planes para colas estáticas más largas que la ventana. Reutiliza el planner y su caché por par; un batch de 32 es el límite existente.
+
+**Descriptor en el servidor.** Al cargar una cola de radio, infinite o playlist, Listen registra el descriptor (tipo de radio y semilla, sesión shaped, playlist de origen e identidad del usuario) y recibe un `continuationId`. El servidor resuelve las variantes de radio; el nativo no las conoce ni serializa `playSource`. El descriptor caduca con el token y no guarda paths ni URLs.
+
+**Credencial acotada.** Listen pide un token de continuación ligado al `sid` de la sesión, con TTL 12 h y alcance limitado a ese endpoint y a los tickets de stream que emite. Vive en memoria del servicio nativo, nunca en disco ni en logs; revocar o cerrar la sesión lo invalida. Listen lo renueva al cargar cola y al volver a primer plano. El refresh token sigue siendo exclusivo de Listen: no hay dos runtimes rotándolo. Si caduca con la pantalla apagada, el nativo deja de pedir y la cola termina sin error.
+
+**Propiedad.** El nativo usa el ciclo de vida de la Activity (`onStop`/`onStart`), no un aviso del JS congelado. En primer plano Listen planifica y rellena como hasta ahora. En segundo plano, el servicio pide continuación en el cambio de pista cuando quedan ≤3 tracks o <3 edges planificados; una petición activa, backoff acotado, nada offline ni con Smart Mix desactivado.
+
+**Reconciliación.** El nativo añade con la misma `revision` y una secuencia de append propia. Al volver a primer plano, Listen pide la cola desde su última secuencia conocida y la adopta antes de tocar la cola; cualquier edición del usuario (insert, remove, reorder, reemplazo) gana y descarta appends pendientes. Play events y now-playing siguen saliendo del checkpoint nativo, sin duplicados.
+
+**iOS.** R5 reutiliza endpoint, descriptor y token; solo cambian el disparador y la reconciliación del lado Swift.
+
 ## 6. VirtualDJ: Online Source, Assistant y Crate Automix
 
 ### 6.1 Lo que permiten el SDK y el host

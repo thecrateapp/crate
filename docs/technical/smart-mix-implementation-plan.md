@@ -43,13 +43,13 @@ Una suite omitida, un build no ejecutado o un gate de host pendiente se registra
 
 Cada release se cierra con su propio gate y se puede desplegar detrás de flags sin esperar a las siguientes. Un gate fallido mantiene abierta solo esa release.
 
-| Release                                        | Paquetes                                                                                                                          | Gate de cierre                                                                                                                                                                                         |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| R1 — Smart Mix correcto en Android adaptive    | C00, P01 (versiones, contratos y migraciones), SM01–SM05, SM06 (claves de caché, elegibilidad antes del límite, R15–R17), A01–A05 | Suites automáticas verdes; R01–R06 y R15–R17 con regresión; reanálisis v2 en curso con status correcto; adaptive sin clipping ni underrun en un dispositivo de referencia (subconjunto de A06)         |
-| R2 — VirtualDJ A (fuente local) en macOS arm64 | VH01, P02 (incluida UI de tokens en Listen), P03 (routing prod/home/dev y flags), P04, P05, V01–V04                               | Conectar, buscar, navegar carpetas, cargar, seek y revocar en VirtualDJ Pro real macOS arm64; paquete instalable sin origen por defecto                                                                |
-| R3 — VirtualDJ B, Crate Automix y plataformas  | V05, V06, SM07, V09 (filtros DJ y CI nativo), V10 (Windows x64 y macOS Intel)                                                     | Compatibles y metadata Crate visibles; Crate Automix alimenta la cola nativa sin enviar comandos de mezcla; paquetes de las tres plataformas; benchmarks de SM07 registrados                           |
-| R4 — Android avanzado y release conjunta       | A06 (matriz completa), A07, A08, X01–X04                                                                                          | Gates de §7 del diseño para beatmatch y bass; soak y rollback                                                                                                                                          |
-| R5 — Smart Mix en iOS                          | I01–I06                                                                                                                           | Paridad adaptive con R1 en un iPhone de referencia: transiciones planificadas, segundo plano y pantalla bloqueada, interrupciones y cambios de ruta sin cortes; sin clipping ni underrun en la captura |
+| Release                                        | Paquetes                                                                                                                                   | Gate de cierre                                                                                                                                                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R1 — Smart Mix correcto en Android adaptive    | C00, P01 (versiones, contratos y migraciones), SM01–SM05, SM06 (claves de caché, elegibilidad antes del límite, R15–R17), A01–A05, A09–A10 | Suites automáticas verdes; R01–R06 y R15–R17 con regresión; reanálisis v2 en curso con status correcto; adaptive sin clipping ni underrun en un dispositivo de referencia (subconjunto de A06)         |
+| R2 — VirtualDJ A (fuente local) en macOS arm64 | VH01, P02 (incluida UI de tokens en Listen), P03 (routing prod/home/dev y flags), P04, P05, V01–V04                                        | Conectar, buscar, navegar carpetas, cargar, seek y revocar en VirtualDJ Pro real macOS arm64; paquete instalable sin origen por defecto                                                                |
+| R3 — VirtualDJ B, Crate Automix y plataformas  | V05, V06, SM07, V09 (filtros DJ y CI nativo), V10 (Windows x64 y macOS Intel)                                                              | Compatibles y metadata Crate visibles; Crate Automix alimenta la cola nativa sin enviar comandos de mezcla; paquetes de las tres plataformas; benchmarks de SM07 registrados                           |
+| R4 — Android avanzado y release conjunta       | A06 (matriz completa), A07, A08, X01–X04                                                                                                   | Gates de §7 del diseño para beatmatch y bass; soak y rollback                                                                                                                                          |
+| R5 — Smart Mix en iOS                          | I01–I06                                                                                                                                    | Paridad adaptive con R1 en un iPhone de referencia: transiciones planificadas, segundo plano y pantalla bloqueada, interrupciones y cambios de ruta sin cortes; sin clipping ni underrun en la captura |
 
 **Backlog fuera de R1–R4.** Entra en una release solo editando esta tabla con una decisión explícita: P06 y V07 (radio como fuente de Crate Automix y presencia; los cues privados se retiran para VDJ porque VDJ ya persiste cues por pista online; la corrección de scope de play events sigue en P02 y su cliente nativo en V06), V08 (caché de audio cifrada, offline y prefetch, solo si VH01 confirma rutas locales en `GetStreamUrl`), OAuth integrado del SDK, recorrido federado de SM06, wrapper de compatibilidad v1 sin consumidor distribuido demostrado, y paridad PAT en el readplane de Go.
 
@@ -90,6 +90,7 @@ Los paquetes P02–P05 entregan primero contratos e implementación backend veri
 | R25 | VDJ persiste la URL de cover y analiza las pistas con su propio grid/key                                           | V03, V05, V06             |
 | R26 | Cambiar el nombre del plugin dejó huérfanas sus entradas en `database.xml`                                         | V02, V10                  |
 | R27 | Android aplica la ganancia del plan como constante durante el fade y salta a unidad al terminar (escalón de ~3 dB) | A03                       |
+| R28 | Con la pantalla apagada la WebView se congela: sin replan ni relleno de radio/infinite                             | A09–A10                   |
 
 ## 2. Preparación y verificación comunes
 
@@ -454,6 +455,28 @@ En este bloque, `JAVA` abrevia `app/listen/android/app/src/main/java/app/cratemu
 
 **DoD:** bass es una opción entregada y probada, sin clipping ni regresión de fase/EQ; no basta parsear el campo o dejarlo permanentemente oculto.
 
+### A09 — Continuación nativa: descriptor, token y planes en segundo plano
+
+**Depende de:** A01–A04, SM06. **Modificar:** `app/crate/api/smart_mix.py`, `app/crate/api/schemas/smart_mix.py`, auth de sesión para el token acotado, `JAVA/CrateNativePlaybackService.java`, `NativeQueueState.java`, `app/listen/src/contexts/player-engine-adapter.ts`, `android-native-engine.ts` y tests. **Crear:** `JAVA/NativeContinuationClient.java`, `JAVA/NativeContinuationPolicy.java` con sus tests unitarios y `app/tests/test_playback_continuation.py`.
+
+1. RED servidor: registro de descriptor y token ligado a `sid`; token caducado, revocado, de otro usuario o fuera de alcance → 401/403; modo solo planes devuelve los mismos planes que `/transition-plans` para los mismos edges; sin N+1 y sin paths/URLs persistidos.
+2. RED nativo: la política pide solo en segundo plano, con ≤3 edges planificados, una vez por pista, con backoff y nunca offline ni con Smart Mix desactivado; un 401 detiene la continuación sin reintentar en bucle.
+3. Implementar endpoint en modo solo planes, token de 12 h y emisión/renovación desde Listen al cargar cola y al volver a primer plano. Token solo en memoria del servicio y redactado en logs.
+4. GREEN: pytest del endpoint, tests unitarios Java y tests de Listen afectados. En dispositivo: cola estática de más de 33 tracks con pantalla apagada; los edges posteriores a la ventana llegan con `cueMs` del servidor.
+
+**DoD:** con la WebView congelada el servicio mantiene planes de servidor para la cola estática completa; credencial de mínimo privilegio revocable con la sesión.
+
+### A10 — Continuación nativa: relleno de radio/infinite y reconciliación
+
+**Depende de:** A09. **Modificar:** endpoint y descriptor de A09 (variantes de `fetchRadioContinuation` y `fetchInfiniteContinuation`), `NativeQueueState.java`, `CrateNativePlaybackService.java`, `app/listen/src/contexts/use-playback-radio-refill.ts`, `use-playback-continuation.ts`, el bridge de eventos nativos y tests.
+
+1. RED servidor: cada variante (artist, track, album, playlist, home-playlist, sesión shaped, infinite) devuelve tracks sin repetir `recentEntityUids`, con tickets de stream de alcance exacto y planes del edge de unión.
+2. RED nativo/Listen: append con la misma revision y secuencia; al volver a primer plano Listen adopta exactamente los appends; una edición del usuario descarta appends pendientes; sin doble relleno cuando Listen y el servicio coinciden en primer plano; play events sin duplicados.
+3. Implementar append nativo, evento de append y lectura de cola desde secuencia; mover el relleno al nativo solo en segundo plano.
+4. GREEN: suites afectadas. En dispositivo: radio y infinite durante 30 min con la pantalla apagada, la cola crece y las transiciones usan planes del servidor; al desbloquear, la UI muestra la cola real.
+
+**DoD:** radio e infinite siguen con la pantalla apagada con la misma calidad de transición que en primer plano y sin divergencia de cola.
+
 ## 5b. iOS — I01 a I06 (R5)
 
 **Empieza tras cerrar R1.** El contrato entre Listen y el reproductor nativo (`setQueue`, `setTransitionPlans`, eventos `transition*`/`trackChanged`, checkpoint) ya probado en Android se reutiliza tal cual; servidor, análisis, planner y la planificación de Listen no cambian. Hoy iOS reproduce en la WebView (HTML5) y solo tiene plugins nativos de media session, Cast, sesión segura y offline.
@@ -461,7 +484,7 @@ En este bloque, `JAVA` abrevia `app/listen/android/app/src/main/java/app/cratemu
 **Decisión de motor:** `AVAudioEngine` con dos `AVAudioPlayerNode` y mezclador, no dos `AVPlayer`. Cuesta más (alimentación desde caché/descarga en lugar de streaming HTTP directo), pero es el único camino que sirve después para beatmatch (`AVAudioUnitTimePitch`, programación al sample) y bass handoff (`AVAudioUnitEQ` por deck) sin reescribir.
 
 - **I01 — Plugin `CrateNativePlayback` en Swift** con el mismo contrato que Android y un `iosNativeEngine` en Listen detrás de `PlaybackEngine`; sesión de audio `.playback` y vida en segundo plano.
-- **I02 — Alimentación de decks:** descarga progresiva a caché de la pista activa y la siguiente reutilizando el almacenamiento offline; tickets de media y renovación.
+- **I02 — Alimentación de decks:** descarga progresiva a caché de la pista activa y la siguiente reutilizando el almacenamiento offline; tickets de media y renovación. La continuación en segundo plano reutiliza endpoint, descriptor y token de A09–A10.
 - **I03 — Mezcla:** envelope equal-power con staging ≤0 dB, disparo por cue con margen de buffer, máquina de estados y cancelación ante salto, error o fin de cola; misma telemetría QoE.
 - **I04 — Ciclo de vida:** checkpoint de cola y planes, Now Playing y mandos remotos, interrupciones (llamadas, Siri) y cambios de ruta (auriculares, Bluetooth, AirPlay).
 - **I05 — Pruebas:** XCTest del envelope, trigger y estado; harness equivalente a `drive.mjs` vía Safari Web Inspector; acceso al backend local por HTTPS con certificado de confianza o producción con flags (no hay `adb reverse`).
