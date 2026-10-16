@@ -176,12 +176,27 @@ quota or native filesystem storage retains the byte readout; an unknown runtime 
 capacity. Missing values use a labelled group with a described reading; valid meters expose
 bounded range values and retain the actual reading in text.
 
-1G is published with reviewed Linux images and green comparison CI. 1H is local for visual review;
-publication and Linux capture/diff review await approval. Preserve earlier checkpoint examples.
+1G is published with reviewed Linux images and green comparison CI. 1H is published as `6a5b3366`, with 35 reviewed Linux PNGs/provenance in `ef5e7f52`;
+comparison/full frontend CI passes in run `38869556811`. Preserve earlier checkpoint examples.
 
 
 1H local verification passes: 31 cumulative preview checks, including desktop/mobile/forced
-colors, and real app browser checks (Admin17, Listen40 with four existing skips). The full frontend
+colors, and real app browser checks (Admin 17, Listen 40 with four existing skips). The full frontend
 unit/type/lint/build gates pass; see the handover for counts and unchanged bundle ceilings.
 On this host, run full workspace unit suites sequentially with `--maxWorkers=2` and browser suites
 with one worker; concurrent unrestricted runs saturated the machine. The mockup remains at :5186.
+
+
+## Readout / Checkpoint 1I
+
+Open <http://127.0.0.1:5186/#readout>. The actual primitive reserves 32ch while preview/confirm/reset
+buttons distinguish visible text from its committed announcement. A second specimen has no
+automatic announcement. All data is fictional; previous checkpoint examples remain.
+
+The 33 cumulative browser checks include desktop/mobile width measurements, stable live markup
+before confirmation and no horizontal overflow. `checkpoint-1i.png` attachments are advisory.
+Listen adopts the EQ header and Admin the synchronization line; committed external modes also
+end a pending manual preview. All 3,937 frontend unit tests, types/lints/builds/gates and bundle
+budgets pass; spec/quality reviews approve. Full results are in the handover.
+Diego approved 1I on 2026-10-16 and authorised publication/Linux captures and ProgressHairline 1.10.
+Publication and canonical capture QA are in progress; preserve this specimen at the next checkpoint.

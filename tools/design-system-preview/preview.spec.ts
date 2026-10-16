@@ -862,3 +862,133 @@ test("keeps meter tracks, fills and limits visible in forced colors", async ({
       .locator(".crate-meter-limit"),
   ).toHaveCSS("background-color", systemColors.canvasText);
 });
+
+async function expectReadoutCheckpoint(page: Page, info: TestInfo) {
+  await page.goto("/#readout");
+  await page.evaluate(() => document.fonts.ready);
+  const checkpoint = page.locator("#readout");
+  await expect(
+    checkpoint.getByRole("heading", {
+      level: 2,
+      name: "Una lectura estable, un anuncio al confirmar.",
+      exact: true,
+    }),
+  ).toBeVisible();
+
+  const example = checkpoint.locator('[data-readout-example="interactive"]');
+  const visible = example.locator(".crate-readout");
+  const announcement = example.getByRole("status");
+  await expect(visible).toHaveCount(1);
+  await expect(visible).toHaveAttribute("aria-hidden", "true");
+  await expect(visible).toHaveText("Genre · Shoegaze");
+  await expect(visible).toHaveCSS("font-size", "11.5px");
+  await expect(announcement).toHaveCount(1);
+  await expect(announcement).toHaveAttribute("aria-live", "polite");
+  await expect(announcement).toHaveAttribute("aria-atomic", "true");
+  await expect(announcement).toHaveText("Genre · Shoegaze");
+
+  const initialGeometry = await visible.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const context = document.createElement("canvas").getContext("2d");
+    if (!context) throw new Error("Expected a 2D font measurement context");
+    context.font = `${style.fontSize} ${style.fontFamily}`;
+    return {
+      width: element.getBoundingClientRect().width,
+      expectedReservedWidth: context.measureText("0").width * 32,
+      minHeight: parseFloat(style.minHeight),
+      fontFamily: style.fontFamily,
+    };
+  });
+  expect(initialGeometry.fontFamily).toMatch(/mono/i);
+  expect(initialGeometry.minHeight).toBeGreaterThanOrEqual(16);
+  expect(
+    Math.abs(initialGeometry.width - initialGeometry.expectedReservedWidth),
+  ).toBeLessThanOrEqual(1);
+  const initialAnnouncementMarkup = await announcement.evaluate(
+    (element) => element.outerHTML,
+  );
+
+  const preview = checkpoint.getByRole("button", {
+    name: "Previsualizar Ambient",
+    exact: true,
+  });
+  await preview.hover();
+  await expect(announcement).toHaveText("Genre · Shoegaze");
+  await preview.click();
+  await expect(visible).toHaveText("Genre · Ambient");
+  await expect(announcement).toHaveText("Genre · Shoegaze");
+  expect(await announcement.evaluate((element) => element.outerHTML)).toBe(
+    initialAnnouncementMarkup,
+  );
+  expect(
+    Math.abs(
+      (await visible.evaluate(
+        (element) => element.getBoundingClientRect().width,
+      )) - initialGeometry.width,
+    ),
+  ).toBeLessThanOrEqual(0.5);
+
+  await checkpoint
+    .getByRole("button", { name: "Confirmar lectura", exact: true })
+    .click();
+  await expect(visible).toHaveText("Genre · Ambient");
+  await expect(announcement).toHaveText("Genre · Ambient");
+  await checkpoint
+    .getByRole("button", { name: "Restablecer lectura", exact: true })
+    .click();
+  await expect(visible).toHaveText("Genre · Shoegaze");
+  await expect(announcement).toHaveText("Genre · Shoegaze");
+  expect(
+    Math.abs(
+      (await visible.evaluate(
+        (element) => element.getBoundingClientRect().width,
+      )) - initialGeometry.width,
+    ),
+  ).toBeLessThanOrEqual(0.5);
+
+  const visualOnly = checkpoint
+    .locator(".crate-readout")
+    .filter({ hasText: "Solo lectura visual" });
+  await expect(visualOnly).toBeVisible();
+  await expect(visualOnly).toHaveAttribute("aria-hidden", "true");
+  const announcements = checkpoint.getByRole("status");
+  await expect(announcements).toHaveCount(2);
+  await expect(announcements.nth(1)).toHaveText("");
+  await expect(announcements.nth(1)).toHaveAttribute("aria-live", "polite");
+  await expect(announcements.nth(1)).toHaveAttribute("aria-atomic", "true");
+  expect(
+    await checkpoint.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
+
+  const screenshot = info.outputPath("checkpoint-1i.png");
+  await checkpoint.screenshot({ path: screenshot, animations: "disabled" });
+  await info.attach("Checkpoint 1I", {
+    path: screenshot,
+    contentType: "image/png",
+  });
+}
+
+test("keeps the readout checkpoint stable and announcements committed", async ({
+  page,
+}, info) => {
+  await expectReadoutCheckpoint(page, info);
+});
+
+test.describe("readout touch layout", () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+
+  test("keeps the readout usable at 390px without horizontal overflow", async ({
+    page,
+  }, info) => {
+    await expectReadoutCheckpoint(page, info);
+  });
+});

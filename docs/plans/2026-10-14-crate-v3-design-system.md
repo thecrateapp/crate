@@ -1128,6 +1128,10 @@ interface ReadoutProps {
   scrambles and hover previews never reflow.
 - Hover previews update the visible line only; the announcement changes on commit (click, Enter,
   stream state change).
+- The visible span is `aria-hidden`; its separate, persistent sr-only status region is polite
+  and atomic, and stays empty when no announcement is supplied. Callers own commit timing.
+- Reserve enough characters for the expected preview/committed strings. The minimum is capped
+  by the container width; longer text can wrap rather than overflow a narrow screen.
 
 #### `ProgressHairline`
 

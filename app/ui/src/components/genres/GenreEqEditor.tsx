@@ -9,6 +9,7 @@ import { EqBands } from "@crate/ui/domain/player/EqBands";
 import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
+import { Readout } from "@crate/ui/primitives/Readout";
 import { useLLMAvailable } from "@/hooks/use-llm";
 
 const EQ_BAND_COUNT = 10;
@@ -67,6 +68,7 @@ export function GenreEqEditor({
   }, [seeded]);
 
   const dirty = !arraysEqual(gains, seeded);
+  const syncStatus = dirty ? "Unsaved changes" : "In sync with database";
   const hasOwnPreset = initialGains !== null;
   const inherited = !hasOwnPreset && initialResolved?.source === "inherited";
 
@@ -171,9 +173,9 @@ export function GenreEqEditor({
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-        <div className="text-label text-text-subtle">
-          {dirty ? "Unsaved changes" : "In sync with database"}
-        </div>
+        <Readout announcement={syncStatus} minWidthCh={24}>
+          {syncStatus}
+        </Readout>
         <div className="flex flex-wrap gap-2">
           {llmAvailable && (
             <AIButton

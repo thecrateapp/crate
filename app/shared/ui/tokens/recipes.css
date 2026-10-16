@@ -3001,6 +3001,15 @@ button.genre-pill:hover,
   min-width: 0;
 }
 
+.crate-readout {
+  display: inline-block;
+  min-width: min(var(--readout-min-width, 12ch), 100%);
+  max-width: 100%;
+  min-height: 1.4em;
+  overflow-wrap: anywhere;
+  vertical-align: baseline;
+}
+
 .crate-meter > :first-child {
   max-width: 24ch;
   overflow-wrap: anywhere;

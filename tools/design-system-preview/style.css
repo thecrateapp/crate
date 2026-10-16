@@ -9,6 +9,7 @@
 @source "../../app/shared/ui/primitives/StatNumber.tsx";
 @source "../../app/shared/ui/primitives/InstrumentPanel.tsx";
 @source "../../app/shared/ui/primitives/Meter.tsx";
+@source "../../app/shared/ui/primitives/Readout.tsx";
 @source "../../app/shared/ui/primitives/Switch.tsx";
 @source "../../app/listen/src/components/settings/SettingsPrimitives.tsx";
 @source "../../app/shared/ui/primitives/HairlineList.tsx";
@@ -788,6 +789,12 @@ footer p {
 .meter-preview-rows {
   display: grid;
   gap: 28px;
+}
+.readout-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
 }
 .admin-audio-target a,
 .admin-audio-target img {

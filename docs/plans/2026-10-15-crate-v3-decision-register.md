@@ -279,15 +279,31 @@ Real browser QA found a 0px track in the five-column Admin tile; use a full-widt
 Offline. Preserve 1G's 33 Linux PNGs and manifest until 1H publication/recording is approved.
 
 1H local verification and spec/quality reviews pass: 3,927 frontend unit tests, 31 preview checks,
-Admin17 and Listen40 browser checks (four existing Listen skips), types/lints/builds/gates within
-unchanged ceilings. Keep local workspace suites sequential with maxWorkers2 after unrestricted
+Admin 17 and Listen 40 browser checks (four existing Listen skips), types/lints/builds/gates within
+unchanged ceilings. Keep local workspace suites sequential with `--maxWorkers=2` after unrestricted
 parallel runs saturated the host. This result stops for Diego's visual review; 1H stays unpublished.
 
 On 2026-10-16 Diego approved Checkpoint 1H, explicitly authorising commit/push, Linux CI captures
-and continuation to Readout (Task1.9). This supersedes the local-only publication notes above.
+and continuation to Readout (Task 1.9). This supersedes the local-only publication notes above.
 Keep the persistent mockup and stop at the next visual checkpoint; no merge/release/deploy is implied.
 
 1H is published as `6a5b3366`. Linux run `38869057068` passes; reviewed artifact `12032298795`
 has verified SHA256 `9ddb9de0b2cf3beb5dda5d125cc609dffecb13fe1b840f22071e7028b3f57a12`.
-35 PNGs: 32 identical, System changed and two new Offline scenes. Import the original manifest;
-comparison CI is the next gate.
+35 PNGs: 32 identical, System changed and two new Offline scenes. The original manifest and all
+images are published in `ef5e7f52`; comparison/full frontend CI `38869556811` passes. This closes
+the 1H publication/capture checkpoint.
+
+
+Checkpoint 1I implements Task 1.9 locally. Readout separates aria-hidden preview text from a
+persistent polite/atomic sr-only announcement and reserves width through a CSS variable/ref.
+Listen announces committed EQ modes, not transient manual input; committed external mode changes
+cancel a pending preview so its flag cannot suppress later announcements. Admin uses its existing
+commit-only dirty/synced status. A real editor browser test checks local commit/reset without writes.
+Preview 33, Admin 18 and Listen 40 browser checks pass; spec/quality reviews approve. All 3,937
+frontend unit tests and types/lints/builds/gates pass within unchanged bundle ceilings. Visual
+review and publication/Linux QA remain gates. Preserve the 35 reviewed Linux PNGs from 1H and
+stop before 1.10.
+
+On 2026-10-16 Diego approved Checkpoint 1I and explicitly authorised commit/push, canonical Linux
+CI captures and continuation to ProgressHairline (Task 1.10). This supersedes the local-only
+publication notes above. Keep the persistent mockup and stop at the next visual checkpoint.

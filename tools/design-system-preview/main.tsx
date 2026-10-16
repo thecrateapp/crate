@@ -22,6 +22,7 @@ import {
 import { StatNumber } from "@crate/ui/primitives/StatNumber";
 import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { Meter } from "@crate/ui/primitives/Meter";
+import { Readout } from "@crate/ui/primitives/Readout";
 import {
   Section,
   ToggleRow,
@@ -88,6 +89,8 @@ const artistGenreProfile: GenreProfileItem[] = [
 ];
 
 function App() {
+  const [readoutPreview, setReadoutPreview] = useState("Genre · Shoegaze");
+  const [readoutCommitted, setReadoutCommitted] = useState("Genre · Shoegaze");
   const [meterOver, setMeterOver] = useState(false);
   const [panelLive, setPanelLive] = useState(true);
   const [normalization, setNormalization] = useState(false);
@@ -124,7 +127,7 @@ function App() {
           crate<span className="version">v3</span>
         </a>
         <MonoLabel
-          meta={["Checkpoint 1H", "Meter"]}
+          meta={["Checkpoint 1I", "Readout"]}
           className="masthead-meta"
         />
         <a className="jump" href="#primitivas">
@@ -896,7 +899,7 @@ function App() {
         <div className="specimen-heading">
           <div>
             <MonoLabel size="eyebrow" accent="09">
-              Checkpoint 1H · En revisión
+              Checkpoint 1H · Aprobado
             </MonoLabel>
             <h2>Medir capacidad sin ocultar los límites.</h2>
           </div>
@@ -904,7 +907,7 @@ function App() {
         <p className="admin-baseline-note">
           Pistas disponibles, capacidad y límite. El aviso incluye texto; una
           lectura ausente se distingue de cero. Datos ficticios para revisar
-          Meter. Capturas Linux de este checkpoint pendientes.
+          Meter. Capturas Linux de 1H revisadas.
         </p>
         <div className="instrument-preview-grid">
           <InstrumentPanel
@@ -960,6 +963,79 @@ function App() {
           </InstrumentPanel>
         </div>
       </section>
+      <section
+        id="readout"
+        className="admin-baseline-feature"
+        aria-label="Checkpoint 1I, Readout"
+      >
+        <div className="specimen-heading">
+          <div>
+            <MonoLabel size="eyebrow" accent="10">
+              Checkpoint 1I · En revisión
+            </MonoLabel>
+            <h2>Una lectura estable, un anuncio al confirmar.</h2>
+          </div>
+        </div>
+        <p className="admin-baseline-note">
+          La vista previa conserva espacio para la lectura y mantiene el último
+          anuncio confirmado. Datos ficticios para revisar el componente.
+          Capturas Linux de este checkpoint pendientes.
+        </p>
+        <div className="instrument-preview-grid">
+          <InstrumentPanel
+            as="section"
+            headingLevel={3}
+            label={{ children: "Origen del EQ" }}
+          >
+            <div data-readout-example="interactive">
+              <Readout minWidthCh={32} announcement={readoutCommitted}>
+                {readoutPreview}
+              </Readout>
+            </div>
+            <div className="readout-preview-actions">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setReadoutPreview("Genre · Ambient")}
+              >
+                Previsualizar Ambient
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setReadoutCommitted(readoutPreview)}
+              >
+                Confirmar lectura
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setReadoutPreview("Genre · Shoegaze");
+                  setReadoutCommitted("Genre · Shoegaze");
+                }}
+              >
+                Restablecer lectura
+              </Button>
+            </div>
+            <div className="mt-5">
+              <MonoLabel>Último anuncio confirmado</MonoLabel>
+              <p className="admin-baseline-note mt-2">{readoutCommitted}</p>
+            </div>
+          </InstrumentPanel>
+          <InstrumentPanel
+            as="section"
+            headingLevel={3}
+            label={{ children: "Lectura informativa" }}
+          >
+            <Readout>Solo lectura visual</Readout>
+            <p className="admin-baseline-note mt-5">
+              Variante sin anuncio automático. Usa la misma tipografía y reserva
+              de espacio.
+            </p>
+          </InstrumentPanel>
+        </div>
+      </section>
       <footer>
         <MonoLabel
           meta={[
@@ -968,7 +1044,8 @@ function App() {
             "1E publicado",
             "1F publicado",
             "1G publicado",
-            "1H en revisión",
+            "1H publicado",
+            "1I en revisión",
           ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>

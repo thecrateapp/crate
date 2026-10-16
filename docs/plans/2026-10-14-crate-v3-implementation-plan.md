@@ -338,7 +338,8 @@ polishing is deferred. Diego approved publication of 1E, its Linux capture run a
 Task 0.11 is complete: 31 reviewed Linux PNGs and green comparison/full frontend CI on `cf477986`
 (run `38808354069`). Task 1.0 is published at Checkpoint 1F (`6e793ebd`, Linux images `82f14594`); capture review,
 comparison/full frontend CI (`38860652793`) and the local route walkthrough are complete.
-InstrumentPanel 1.7 is approved and published as `473604f7` at Checkpoint 1G. Smart Mix and Phase 0
+InstrumentPanel 1.7 is published at 1G (`473604f7`); Meter 1.8 at 1H (`6a5b3366`, Linux images
+`ef5e7f52`). Readout 1.9 is the current local checkpoint. Smart Mix and Phase 0
 gates remain separate: runtime qualification 0.15 and device QA are pending; production measurement
 0.14 is needed before the wheel and requires assignment.
 
@@ -1316,15 +1317,17 @@ in run `38864631250`; comparison/full frontend CI passes in `38865107324` on `c4
 
 ### Task 1.8: `Meter` with first adopters
 
-**Local status / Checkpoint 1H:** primitive and both adopters implemented locally, with the
+**Published status / Checkpoint 1H:** primitive and both adopters implemented, with the
 persistent specimen at <http://127.0.0.1:5186/#meters>. Valid samples use a bounded ARIA meter;
 missing/invalid ranges use a described group (DS §2.3). Web storage uses profile bytes/quota;
 native filesystems and unavailable estimates retain counts/bytes without a quota meter.
 Real browser QA reproduced a collapsed track in Admin's five-column tile; both adopters now
-use full-width meter rows, tested at desktop/mobile widths. All local gates and spec/quality reviews pass (Shared753/Admin257/Listen2867/Desktop50 unit;
-Admin17/Listen40 browser, preview31). Final results and unchanged budgets are in the handover.
+use full-width meter rows, tested at desktop/mobile widths. All local gates and spec/quality reviews
+pass (Shared 753 / Admin 257 / Listen 2,867 / Desktop 50 unit; Admin 17 / Listen 40 browser,
+preview 31). Final results and unchanged budgets are in the handover.
 Diego approved 1H on 2026-10-16 and authorised its publication/Linux captures and continuation
-to Readout 1.9. Canonical image review and comparison CI remain pending.
+to Readout 1.9. Published `6a5b3366`; 35 Linux images/provenance `ef5e7f52` are reviewed.
+Comparison/full frontend CI passes in run `38869556811`.
 
 **Files:**
 
@@ -1350,6 +1353,15 @@ to Readout 1.9. Canonical image review and comparison CI remain pending.
 
 ### Task 1.9: `Readout` with first adopters
 
+**Local status / Checkpoint 1I:** shared primitive and both real EQ adopters implemented; mockup
+<http://127.0.0.1:5186/#readout> retains the earlier checkpoints. Visible previews leave the stable
+sr-only status untouched until commit. Interrupted manual previews yield to committed external
+mode changes. Shared 4 / Listen 9 / Admin 7 focused tests and preview 33 / Admin 18 / Listen 40 browser checks
+pass; spec/quality reviews approve. All 3,937 frontend unit tests, types/lints/builds/gates and bundle
+budgets pass; full results are recorded in the handover.
+Diego approved 1I on 2026-10-16 and authorised commit/push, Linux CI captures and continuation to
+ProgressHairline 1.10. Publication and canonical capture QA are in progress.
+
 **Files:**
 
 - Create: `app/shared/ui/primitives/Readout.tsx`, test `Readout.test.tsx`
@@ -1358,6 +1370,8 @@ to Readout 1.9. Canonical image review and comparison CI remain pending.
 - Modify (Listen): `app/listen/src/components/player/EqualizerPanelSections.tsx` (header trail line)
 - Modify (Admin): `app/ui/src/components/genres/GenreEqEditor.tsx` (status line)
 - Test: `EqualizerPanel.test.tsx`, `GenreEqEditor.test.tsx`
+- Test: `tests/admin-e2e/readout.spec.ts` opens the real genre editor, checks local commit/reset
+  announcements with no API writes, and adds a focused capture for the next Linux review.
 
 **Steps:** failing tests check that a visible-only change does not change the announcement node and
 that the reserved width is set. Then implement and run the tests, `GATES` and `VISUAL` (EQ panel).

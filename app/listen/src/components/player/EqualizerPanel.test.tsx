@@ -1,5 +1,6 @@
-import { screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useReducer } from "react";
+import { act, fireEvent, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EqualizerPanel } from "@/components/player/EqualizerPanel";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -38,10 +39,26 @@ function makeEqualizerState(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function renderRefreshablePanel() {
+  let refresh = () => {};
+  function RuntimePanel() {
+    const [, rerender] = useReducer((revision: number) => revision + 1, 0);
+    refresh = rerender;
+    return <EqualizerPanel />;
+  }
+  const result = renderWithListenProviders(<RuntimePanel />);
+  return { ...result, refresh: () => act(() => refresh()) };
+}
+
 describe("EqualizerPanel", () => {
   beforeEach(() => {
     equalizerMock.useEqualizer.mockReset();
     equalizerMock.useEqualizer.mockReturnValue(makeEqualizerState());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete document.documentElement.dataset.crateMotion;
   });
 
   it("uses semantic tokens throughout the manual panel", () => {
@@ -116,10 +133,15 @@ describe("EqualizerPanel", () => {
 
     renderWithListenProviders(<EqualizerPanel />);
 
-    expect(screen.getAllByText("Custom")).toHaveLength(1);
-    expect(
-      screen.getByRole("heading", { name: /Equalizer/ }),
-    ).toHaveTextContent(/Equalizer.*Custom/);
+    const heading = screen.getByRole("heading", { name: /Equalizer/ });
+    const visible = heading.querySelector(".crate-readout");
+    const live = screen.getByRole("status");
+    expect(visible).toHaveAttribute("aria-hidden", "true");
+    expect(visible).toHaveTextContent(/^Custom$/);
+    expect(heading).toContainElement(live);
+    expect(visible).not.toContainElement(live);
+    expect(live).toHaveClass("sr-only");
+    expect(live).toHaveTextContent(/^Custom$/);
   });
 
   it("translates the preset chips and the header preset name", () => {
@@ -136,5 +158,121 @@ describe("EqualizerPanel", () => {
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
       /Realce de graves/,
     );
+    expect(screen.getByRole("status")).toHaveTextContent(/^Realce de graves$/);
   });
+
+  it("previews a manual edit without announcing it until the band commits", () => {
+    document.documentElement.dataset.crateMotion = "reduced";
+    let frame: FrameRequestCallback | undefined;
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      vi.fn((callback: FrameRequestCallback) => {
+        frame = callback;
+        return 1;
+      }),
+    );
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    const state = makeEqualizerState();
+    equalizerMock.useEqualizer.mockReturnValue(state);
+    const { refresh } = renderRefreshablePanel();
+    const live = screen.getByRole("status");
+    const slider = screen.getAllByRole("slider")[4]!;
+    expect(live).toHaveTextContent(/^Flat$/);
+
+    fireEvent.keyDown(slider, { key: "PageUp" });
+    act(() => frame?.(16));
+    expect(state.updateBand).toHaveBeenCalledWith(4, 3);
+    expect(state.commitBand).not.toHaveBeenCalled();
+    equalizerMock.useEqualizer.mockReturnValue({
+      ...state,
+      preset: "custom",
+      gains: state.gains.map((gain, index) => (index === 4 ? 3 : gain)),
+    });
+    refresh();
+
+    expect(
+      screen.getByRole("heading", { level: 2 }).querySelector(".crate-readout"),
+    ).toHaveTextContent(/^Custom$/);
+    expect(screen.getByRole("status")).toBe(live);
+    expect(live).toHaveTextContent(/^Flat$/);
+
+    fireEvent.blur(slider);
+    expect(state.commitBand).toHaveBeenCalledWith(4, 3);
+    expect(live).toHaveTextContent(/^Custom$/);
+  });
+
+  it("announces committed preset and externally resolved mode changes", () => {
+    const state = makeEqualizerState();
+    equalizerMock.useEqualizer.mockReturnValue(state);
+    const { refresh } = renderRefreshablePanel();
+    const live = screen.getByRole("status");
+
+    fireEvent.click(screen.getByRole("button", { name: "Punk" }));
+    expect(state.applyPreset).toHaveBeenCalledWith("punk");
+    equalizerMock.useEqualizer.mockReturnValue({ ...state, preset: "punk" });
+    refresh();
+    expect(live).toHaveTextContent(/^Punk$/);
+
+    equalizerMock.useEqualizer.mockReturnValue({ ...state, smart: true });
+    refresh();
+    expect(screen.getByRole("status")).toBe(live);
+    expect(live).toHaveTextContent(/^Smart curve$/);
+  });
+
+  it.each([
+    { resolved: { smart: true }, announcement: "Smart curve" },
+    { resolved: { preset: "punk" }, announcement: "Punk" },
+  ])(
+    "announces $announcement when an external change supersedes a manual preview",
+    ({ resolved, announcement }) => {
+      document.documentElement.dataset.crateMotion = "reduced";
+      let frame: FrameRequestCallback | undefined;
+      vi.stubGlobal(
+        "requestAnimationFrame",
+        vi.fn((callback: FrameRequestCallback) => {
+          frame = callback;
+          return 1;
+        }),
+      );
+      vi.stubGlobal("cancelAnimationFrame", vi.fn());
+      const state = makeEqualizerState();
+      equalizerMock.useEqualizer.mockReturnValue(state);
+      const { refresh } = renderRefreshablePanel();
+      const live = screen.getByRole("status");
+      const slider = screen.getAllByRole("slider")[4]!;
+      fireEvent.keyDown(slider, { key: "PageUp" });
+      act(() => frame?.(16));
+      const preview = {
+        ...state,
+        preset: "custom",
+        gains: state.gains.map((gain, index) => (index === 4 ? 3 : gain)),
+      };
+      equalizerMock.useEqualizer.mockReturnValue(preview);
+      refresh();
+      expect(
+        screen
+          .getByRole("heading", { level: 2 })
+          .querySelector(".crate-readout"),
+      ).toHaveTextContent(/^Custom$/);
+      expect(live).toHaveTextContent(/^Flat$/);
+      expect(state.commitBand).not.toHaveBeenCalled();
+
+      equalizerMock.useEqualizer.mockReturnValue({ ...preview, ...resolved });
+      refresh();
+      expect(screen.getByRole("status")).toBe(live);
+      expect(live).toHaveTextContent(announcement);
+      expect(state.commitBand).not.toHaveBeenCalled();
+
+      equalizerMock.useEqualizer.mockReturnValue(preview);
+      refresh();
+      expect(live).toHaveTextContent(/^Custom$/);
+
+      equalizerMock.useEqualizer.mockReturnValue({
+        ...preview,
+        adaptive: true,
+      });
+      refresh();
+      expect(live).toHaveTextContent(/^Adaptive active$/);
+    },
+  );
 });
