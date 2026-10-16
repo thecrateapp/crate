@@ -148,6 +148,7 @@ def test_completeness_chunk_uses_cached_musicbrainz_data(monkeypatch):
         lambda _names: {"First Artist": {"first album"}},
     )
     monkeypatch.setattr(enrichment, "emit_progress", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(enrichment, "is_cancelled", lambda _task_id: False)
 
     result = enrichment._handle_compute_completeness(
         "chunk-1", {"artists": [artist], "_chunk": True}, {}

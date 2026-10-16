@@ -1016,6 +1016,9 @@ sync generator when its async iterator was closed after a chunk. The remote stre
 that adapter with an async generator that explicitly closes the sync body; the selected
 streaming file passed 12 cases. This is outside editorial logic but closes the upstream
 context/client promptly on disconnect.
+The next backend run found a completeness chunk test with a synthetic task ID and no `tasks`
+table in its minimal fixture. Its cancellation lookup is now stubbed at the worker boundary;
+the selected completeness file passed 10 cases.
 
 The phase-6 focused selection passed **37 PostgreSQL-backed cases** across the editorial plan,
 MCP, migration, rule, refinement and override files. These cover migration/bootstrap, exact creation,
