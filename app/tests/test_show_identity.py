@@ -274,3 +274,123 @@ def test_closed_candidate_rejects_invented_or_invalid_values(changes):
 
     with pytest.raises(ValidationError):
         candidate(**changes)
+
+
+def test_country_names_without_codes_do_not_merge_different_countries(pg_db):
+    first = put(candidate(country_code=None, country="France", city="Saint-Denis"))
+    second = put(candidate(country_code=None, country="Reunion", city="Saint-Denis"))
+    assert first["show_id"] != second["show_id"]
+
+
+def test_explicit_lineup_correction_removes_wrong_support_and_survives_sync(pg_db):
+    first = put(candidate(lineup=["Wrong support"]))
+    corrected = put(
+        candidate(
+            existing_show_id=first["show_id"],
+            expected_revision=first["revision"],
+            lineup=["Right support"],
+        )
+    )
+    assert row(first["show_id"])["lineup"] == ["Primary Band", "Right support"]
+    put(candidate(lineup=["Wrong support"]), "ticketmaster", "lineup-source")
+    assert row(corrected["show_id"])["lineup"] == ["Primary Band", "Right support"]
+
+
+def test_repeated_consolidations_flatten_old_id_redirects(pg_db):
+    from crate.db.repositories.show_consolidation import consolidate_shows
+
+    first = put(candidate(local_time="18:00"))
+    second = put(candidate(local_time="19:00"))
+    third = put(candidate(local_time="20:00"))
+    merged = consolidate_shows(
+        first["show_id"],
+        [second["show_id"]],
+        {
+            str(first["show_id"]): first["revision"],
+            str(second["show_id"]): second["revision"],
+        },
+    )
+    consolidate_shows(
+        third["show_id"],
+        [first["show_id"]],
+        {
+            str(third["show_id"]): third["revision"],
+            str(first["show_id"]): merged["revision"],
+        },
+    )
+    assert row(second["show_id"])["merged_into_id"] == third["show_id"]
+
+
+def test_shared_show_readers_never_expose_private_field_evidence(pg_db):
+    from crate.db.queries.shows_upcoming_queries import (
+        get_upcoming_shows,
+        get_all_shows,
+    )
+
+    put(candidate(evidence="PRIVATE FLYER TEXT", source_ref="private-upload:opaque"))
+    for read in (get_upcoming_shows, get_all_shows):
+        shows = read()
+        assert shows and "field_provenance" not in shows[0]
+        assert "PRIVATE FLYER TEXT" not in str(shows)
+
+
+def test_provider_reschedule_unarchives_an_expired_identity(pg_db):
+    from crate.db.tx import transaction_scope
+
+    original = put(candidate(date="2020-03-02"), "ticketmaster", "rescheduled")
+    with transaction_scope() as session:
+        session.execute(
+            text("UPDATE shows SET archived_at=NOW() WHERE id=:id"),
+            {"id": original["show_id"]},
+        )
+    changed = put(
+        candidate(date="2027-03-02", status="rescheduled"),
+        "ticketmaster",
+        "rescheduled",
+    )
+    assert changed["show_id"] == original["show_id"]
+    assert row(changed["show_id"])["archived_at"] is None
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "http://#",
+        "https://user:secret@example.test/tickets",
+        "http://example.test:invalid/path",
+    ],
+)
+def test_show_urls_require_a_real_host_and_no_embedded_credentials(value):
+    from crate.api.schemas.show_imports import ShowCandidate
+
+    with pytest.raises(ValueError):
+        ShowCandidate(item_id="one", url=value)
+
+
+def test_provider_rechecks_a_row_consolidated_between_match_and_lock(
+    pg_db, monkeypatch
+):
+    from crate.db.repositories import show_identities as identities
+    from crate.db.repositories.show_consolidation import consolidate_shows
+
+    first = put(candidate(local_time="18:00"), "ticketmaster", "first-source")
+    second = put(candidate(local_time="21:00"), "ticketmaster", "second-source")
+    real = identities._match
+
+    def stale_match(current, selected, source):
+        matched = real(current, selected, source)
+        consolidate_shows(
+            first["show_id"],
+            [second["show_id"]],
+            {
+                str(first["show_id"]): first["revision"],
+                str(second["show_id"]): second["revision"],
+            },
+        )
+        return matched
+
+    monkeypatch.setattr(identities, "_match", stale_match)
+    result = put(candidate(local_time="21:00"), "ticketmaster", "second-source")
+    assert result["status"] == "conflict"
+    assert row(second["show_id"])["identity_key"] is None
+    assert row(second["show_id"])["merged_into_id"] == first["show_id"]

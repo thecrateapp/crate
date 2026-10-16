@@ -89,7 +89,11 @@ def test_curator_prepares_reviews_and_saves_manual_show_without_llm(editor_clien
     finish(applied.json()["job_id"])
     result = client.get(f"/api/show-imports/jobs/{applied.json()['job_id']}").json()
     assert result["result"]["execution"]["items"][0]["status"] == "created"
-    assert result["result"]["execution"]["items"][0]["show_id"] > 0
+    show_id = result["result"]["execution"]["items"][0]["show_id"]
+    saved = client.get(f"/api/show-imports/shows/{show_id}")
+    assert saved.status_code == 200
+    assert saved.json()["artist_name"] == "External Band"
+    assert client.get("/api/show-imports/shows/999999").status_code == 404
 
 
 @pytest.mark.parametrize("mutation", ["no_cookie", "bearer", "cross_origin", "role"])
@@ -123,4 +127,45 @@ def test_manual_correction_requires_a_fresh_exact_preview(editor_client):
             "/api/show-imports/plans", json={**body(), "free_dispatch": True}
         ).status_code
         == 422
+    )
+
+
+def test_private_source_upload_extraction_and_availability_use_curator_cookie(
+    editor_client,
+):
+    from pathlib import Path
+    from crate.worker_handlers.show_imports import handle_show_extraction
+
+    client, _ = editor_client
+    status = client.get("/api/show-imports/availability")
+    assert status.status_code == 200
+    assert "ollama_url" not in status.json()
+    image = (Path(__file__).parent / "fixtures/shows/flyer.png").read_bytes()
+    upload = client.post(
+        "/api/show-imports/uploads", files={"file": ("flyer.png", image, "image/png")}
+    )
+    assert upload.status_code == 201, upload.text
+    assert "content" not in upload.json()
+    queued = client.post(
+        "/api/show-imports/extractions",
+        json={
+            "mode": "ocr",
+            "upload_ids": [upload.json()["upload_id"]],
+            "idempotency_key": "ocr",
+        },
+    )
+    assert queued.status_code == 202, queued.text
+    start_task(queued.json()["job_id"])
+    handle_show_extraction(queued.json()["job_id"], {}, {})
+    job = client.get("/api/show-imports/jobs/" + queued.json()["job_id"]).json()
+    assert job["result"]["draft"]["candidates"][0]["date"] == "2027-03-02"
+    assert (
+        client.get("/api/show-imports/drafts").json()["items"][0]["job_id"]
+        == queued.json()["job_id"]
+    )
+    assert (
+        client.get(
+            "/api/show-imports/drafts/" + job["result"]["execution"]["draft_id"]
+        ).json()["result"]["candidates"][0]["date"]
+        == "2027-03-02"
     )

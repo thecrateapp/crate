@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 from crate.agent_access import AgentPrincipal
 from crate.agent_diagnostics import DiagnosticError
-from crate.agent_operation_catalog import operation_grant
+from crate.agent_operation_catalog import operation_grant, public_operation_result
 from crate.db.repositories import agent_requests as requests
 from crate.db.repositories.agent_plans import (
     _document,
@@ -360,7 +360,10 @@ def finish_operation(task_id: str, result: dict, *, session=None) -> dict:
             "agent.operation.finished",
             job_id=task_id,
             plan_id=job["payload"].get("plan_id"),
-            result=result,
+            result=public_operation_result(result)
+            if job["payload"].get("domain_operation")
+            in {"shows_import", "shows_extract"}
+            else result,
         )
         return result
 

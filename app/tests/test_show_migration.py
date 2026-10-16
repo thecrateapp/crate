@@ -85,3 +85,35 @@ def test_shared_plan_rollback_removes_internal_proofs_and_restores_previous_gran
         ).scalar_one()
         assert "curation.shows" not in check
         migration.upgrade()
+
+
+def test_private_extraction_migration_can_rollback_without_changing_shows(
+    pg_db, monkeypatch
+):
+    migration = import_module(
+        "crate.db.migrations.versions.119_private_show_extraction"
+    )
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "INSERT INTO shows(artist_name,date,created_at,updated_at) VALUES('Retained','2027-03-02',NOW(),NOW())"
+            )
+        )
+
+        class Executor:
+            def execute(self, statement):
+                return session.execute(text(statement))
+
+        monkeypatch.setattr(migration, "op", Executor())
+        migration.downgrade()
+        assert session.execute(text("SELECT count(*) FROM shows")).scalar_one() == 1
+        assert (
+            session.execute(text("SELECT to_regclass('show_image_uploads')")).scalar()
+            is None
+        )
+        migration.upgrade()
+        migration.upgrade()
+        assert (
+            session.execute(text("SELECT to_regclass('show_image_uploads')")).scalar()
+            == "show_image_uploads"
+        )

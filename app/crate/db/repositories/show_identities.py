@@ -6,7 +6,7 @@ from difflib import SequenceMatcher
 
 from sqlalchemy import text
 
-from crate.db.domain_events import append_domain_event
+from crate.db.repositories.show_invalidation import invalidate_show_views
 from crate.db.repositories.show_consolidation import consolidate_shows
 from crate.db.tx import optional_scope, read_scope
 
@@ -95,6 +95,10 @@ def _rows(current, candidate, source):
 
 def _match(current, candidate, source) -> dict:
     rows, exact = _rows(current, candidate, source)
+    return _match_rows(candidate, rows, exact)
+
+
+def _match_rows(candidate, rows, exact) -> dict:
     if exact:
         if not rows:
             return {
@@ -129,6 +133,16 @@ def _match(current, candidate, source) -> dict:
             for value in (candidate.get("country_code"), row.get("country_code"))
         ]
         if all(countries) and countries[0] != countries[1]:
+            continue
+        country_names = [
+            normalize(candidate.get("country")),
+            normalize(row.get("country")),
+        ]
+        if (
+            not all(countries)
+            and all(country_names)
+            and country_names[0] != country_names[1]
+        ):
             continue
         same_venue = normalize(candidate.get("venue")) == normalize(row.get("venue"))
         same_city = normalize(candidate.get("city")) == normalize(row.get("city"))
@@ -188,7 +202,77 @@ def preview_show(candidate: dict, source: dict, *, session=None) -> dict:
         return read(current)
 
 
-def upsert_canonical_show(candidate: dict, source: dict, *, session=None) -> dict:
+def match_show_candidates(
+    candidates: list[dict], *, expected_ids=(), lock=False, session=None
+) -> dict:
+    """One indexed batch lookup for a bounded manual/MCP selection."""
+    if not 1 <= len(candidates) <= 50:
+        raise ValueError("Choose 1 to 50 show candidates")
+
+    def read(current):
+        keys = [
+            {
+                "artist": normalize(candidate.get("artist_name")),
+                "date": candidate.get("date"),
+            }
+            for candidate in candidates
+        ]
+        ids = list(
+            set(expected_ids)
+            | {
+                candidate["existing_show_id"]
+                for candidate in candidates
+                if candidate.get("existing_show_id")
+            }
+        )
+        statement = """WITH wanted AS (SELECT * FROM jsonb_to_recordset(CAST(:keys AS jsonb)) AS w(artist text,date date))
+            SELECT s.* FROM shows s WHERE s.id=ANY(:ids)
+            OR s.id IN (SELECT merged_into_id FROM shows WHERE id=ANY(:ids))
+            OR (s.merged_into_id IS NULL AND EXISTS(SELECT 1 FROM wanted w WHERE s.date=w.date
+                AND lower(regexp_replace(btrim(s.artist_name),'\\s+',' ','g'))=w.artist)) ORDER BY s.id"""
+        if lock:
+            statement += " FOR UPDATE OF s"
+        rows = [
+            dict(row)
+            for row in current.execute(
+                text(statement), {"keys": json.dumps(keys, default=str), "ids": ids}
+            ).mappings()
+        ]
+        indexed = {row["id"]: row for row in rows}
+        results = {}
+        for candidate in candidates:
+            selected = candidate.get("existing_show_id")
+            if selected:
+                row = indexed.get(selected)
+                row = (
+                    indexed.get(row["merged_into_id"])
+                    if row and row["merged_into_id"]
+                    else row
+                )
+                matches = [row] if row else []
+            else:
+                matches = [
+                    row
+                    for row in rows
+                    if row["merged_into_id"] is None
+                    and identity_base(row) == identity_base(candidate)
+                ]
+            results[candidate["item_id"]] = _match_rows(
+                candidate, matches, bool(selected)
+            )
+        return results
+
+    if session is not None:
+        return read(session)
+    if lock:
+        raise ValueError("Locked batch matching requires the caller transaction")
+    with read_scope() as current:
+        return read(current)
+
+
+def upsert_canonical_show(
+    candidate: dict, source: dict, *, session=None, _matched=None
+) -> dict:
     if not candidate.get("artist_name") or not candidate.get("date"):
         return {
             "status": "invalid",
@@ -203,12 +287,16 @@ def upsert_canonical_show(candidate: dict, source: dict, *, session=None) -> dic
                 text("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))"),
                 {"key": key},
             )
-        match = _match(current, candidate, source)
+        if _matched is not None and session is None:
+            raise ValueError(
+                "A prepared match requires the caller's locked transaction"
+            )
+        match = _matched if _matched is not None else _match(current, candidate, source)
         if match["status"] in {"conflict", "invalid"}:
             return match
         existing = match.get("show")
         manual = source["provider"] in {"manual", "mcp"}
-        if existing:
+        if existing and _matched is None:
             current.execute(
                 text("SELECT id FROM shows WHERE id=:id FOR UPDATE"),
                 {"id": existing["id"]},
@@ -229,6 +317,12 @@ def upsert_canonical_show(candidate: dict, source: dict, *, session=None) -> dic
                     "matches": [existing["id"]],
                     "reason": "Show revision changed",
                 }
+        if existing and existing.get("merged_into_id") is not None:
+            return {
+                "status": "conflict",
+                "matches": [existing["merged_into_id"]],
+                "reason": "Show was consolidated while waiting for its write lock; retry the canonical alias",
+            }
         values = {key: (existing or {}).get(key) for key in _FIELDS}
         provenance = dict((existing or {}).get("field_provenance") or {})
         for key in _FIELDS:
@@ -253,19 +347,30 @@ def upsert_canonical_show(candidate: dict, source: dict, *, session=None) -> dic
                 "actor": source["actor"],
                 "evidence": candidate.get("evidence"),
                 "source_ref": candidate.get("source_ref"),
+                "extractor": candidate.get("extractor"),
+                "extractor_model": candidate.get("extractor_model"),
             }
-        lineup = [
-            values["artist_name"],
-            *((existing or {}).get("lineup") or []),
-            *(candidate.get("lineup") or []),
-        ]
+        if manual and "lineup" in candidate:
+            lineup = [values["artist_name"], *(candidate.get("lineup") or [])]
+        elif provenance.get("lineup", {}).get("provider") in {"manual", "mcp"}:
+            lineup = [values["artist_name"], *(values.get("lineup") or [])]
+        else:
+            lineup = [
+                values["artist_name"],
+                *((existing or {}).get("lineup") or []),
+                *(candidate.get("lineup") or []),
+            ]
         values["lineup"] = list(dict.fromkeys(name for name in lineup if name))
         values["status"] = values.get("status") or "scheduled"
         values["identity_key"] = identity_key(values)
-        collision = current.execute(
-            text("SELECT id FROM shows WHERE identity_key=:key AND id<>:id"),
-            {"key": values["identity_key"], "id": (existing or {}).get("id", 0)},
-        ).scalar_one_or_none()
+        collision = (
+            None
+            if _matched is not None
+            else current.execute(
+                text("SELECT id FROM shows WHERE identity_key=:key AND id<>:id"),
+                {"key": values["identity_key"], "id": (existing or {}).get("id", 0)},
+            ).scalar_one_or_none()
+        )
         if collision:
             return {
                 "status": "conflict",
@@ -281,7 +386,7 @@ def upsert_canonical_show(candidate: dict, source: dict, *, session=None) -> dic
         if existing:
             values["id"] = existing["id"]
             assignments = ",".join(f"{key}={expressions[key]}" for key in fields)
-            sql = f"UPDATE shows SET {assignments},updated_at=NOW() WHERE id=:id RETURNING id,revision"
+            sql = f"UPDATE shows SET {assignments},archived_at=CASE WHEN CAST(:date AS date)>=CURRENT_DATE THEN NULL ELSE archived_at END,updated_at=NOW() WHERE id=:id RETURNING id,revision"
         else:
             if manual and not values["identity_key"]:
                 return {
@@ -297,17 +402,19 @@ def upsert_canonical_show(candidate: dict, source: dict, *, session=None) -> dic
                 source["provider"] + ":"
             ):
                 legacy_id = source["provider"] + ":" + legacy_id
-            current.execute(
+            updated_revision = current.execute(
                 text(
-                    "UPDATE shows SET external_id=:external WHERE id=:id AND external_id IS NULL"
+                    "UPDATE shows SET external_id=:external WHERE id=:id AND external_id IS NULL RETURNING revision"
                 ),
                 {"external": legacy_id, "id": show_id},
-            )
+            ).scalar_one_or_none()
+            if updated_revision is not None:
+                stored["revision"] = updated_revision
         evidence = {"source": source, "candidate": candidate}
         encoded = json.dumps(evidence, sort_keys=True, default=str)
-        current.execute(
+        source_added = current.execute(
             text("""INSERT INTO show_sources(show_id,fingerprint,provider,actor,evidence)
-            VALUES (:id,:hash,:provider,:actor,CAST(:evidence AS jsonb)) ON CONFLICT DO NOTHING"""),
+            VALUES (:id,:hash,:provider,:actor,CAST(:evidence AS jsonb)) ON CONFLICT DO NOTHING RETURNING id"""),
             {
                 "id": show_id,
                 "hash": hashlib.sha256(encoded.encode()).hexdigest(),
@@ -315,31 +422,30 @@ def upsert_canonical_show(candidate: dict, source: dict, *, session=None) -> dic
                 "actor": source["actor"],
                 "evidence": encoded,
             },
-        )
+        ).scalar_one_or_none()
         if source.get("event_id"):
             current.execute(
                 text("""INSERT INTO show_source_aliases(provider,event_id,show_id,evidence)
                 VALUES (:provider,:event_id,:id,CAST(:evidence AS jsonb)) ON CONFLICT DO NOTHING"""),
                 {**source, "id": show_id, "evidence": encoded},
             )
-        for scope in ("shows", "upcoming", "home"):
-            append_domain_event(
-                "ui.invalidate",
-                {"scope": scope},
-                scope="ui.invalidate",
-                subject_key=scope,
+        if _matched is None:
+            invalidate_show_views(
+                [
+                    values["artist_name"],
+                    *values["lineup"],
+                    *((existing or {}).get("lineup") or []),
+                ],
                 session=current,
             )
         return {
             "status": "linked_source"
-            if existing and source.get("event_id")
+            if existing and source_added is not None
             else "already_exists"
             if existing
             else "created",
             "show_id": show_id,
-            "revision": current.execute(
-                text("SELECT revision FROM shows WHERE id=:id"), {"id": show_id}
-            ).scalar_one(),
+            "revision": stored["revision"],
         }
 
 
@@ -350,4 +456,5 @@ __all__ = [
     "preview_show",
     "upsert_canonical_show",
     "consolidate_shows",
+    "match_show_candidates",
 ]

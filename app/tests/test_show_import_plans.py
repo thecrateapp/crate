@@ -159,7 +159,8 @@ def test_two_editors_recheck_new_identity_without_creating_duplicate_rows(show_w
         first_result["execution"]["items"][0]["show_id"]
         == other_result["execution"]["items"][0]["show_id"]
     )
-    assert other_result["execution"]["items"][0]["status"] == "already_exists"
+    assert other_result["execution"]["items"][0]["status"] == "linked_source"
+    assert scalar("SELECT count(*) FROM show_sources") == 2
     assert scalar("SELECT count(*) FROM shows") == 1
 
 
@@ -205,17 +206,31 @@ def test_unresolved_draft_can_be_reviewed_but_cannot_be_accepted_for_apply(show_
     assert plan["executable"] is False
     assert plan["issues"][0]["missing"] == ["date"]
     with pytest.raises(DiagnosticError) as error:
-        operations.apply_operation(show_world["principal"], "shows_import", plan["plan_id"], plan["plan_version"], "invalid-apply")
+        operations.apply_operation(
+            show_world["principal"],
+            "shows_import",
+            plan["plan_id"],
+            plan["plan_version"],
+            "invalid-apply",
+        )
     assert error.value.code == "NOT_EXECUTABLE"
     assert scalar("SELECT count(*) FROM shows") == 0
 
 
-def test_atomic_result_is_durable_even_if_outer_worker_completion_is_interrupted(show_world, monkeypatch):
+def test_atomic_result_is_durable_even_if_outer_worker_completion_is_interrupted(
+    show_world, monkeypatch
+):
     from crate.db.repositories import agent_operation_jobs as jobs
     from crate.db.repositories.show_imports import read_show_job
 
     _, plan = prepare(show_world)
-    accepted = operations.apply_operation(show_world["principal"], "shows_import", plan["plan_id"], plan["plan_version"], "apply")["data"]
+    accepted = operations.apply_operation(
+        show_world["principal"],
+        "shows_import",
+        plan["plan_id"],
+        plan["plan_version"],
+        "apply",
+    )["data"]
     original = jobs.finish_operation
 
     def lost_outer_completion(*args, **kwargs):
@@ -230,3 +245,244 @@ def test_atomic_result_is_durable_even_if_outer_worker_completion_is_interrupted
     assert durable["status"] == "completed"
     assert durable["result"]["execution"]["items"][0]["show_id"] > 0
     assert scalar("SELECT count(*) FROM shows") == 1
+
+
+def test_tour_preview_batches_artist_and_show_lookups(pg_db):
+    from datetime import date, timedelta
+    from sqlalchemy import event
+    from crate.db.engine import get_engine
+    from crate.db.repositories.show_imports import compile_show_import
+
+    queries = []
+
+    def observe(_conn, _cursor, statement, _params, _context, _many):
+        if "FROM shows" in statement or "FROM library_artists" in statement:
+            queries.append(statement)
+
+    engine = get_engine()
+    event.listen(engine, "before_cursor_execute", observe)
+    try:
+        selected = [
+            {
+                **items()[0],
+                "item_id": f"date-{index}",
+                "date": str(date(2027, 3, 1) + timedelta(days=index)),
+            }
+            for index in range(50)
+        ]
+        compiled = compile_show_import(
+            selected, {"provider": "manual", "actor": "test"}
+        )
+    finally:
+        event.remove(engine, "before_cursor_execute", observe)
+    assert compiled["executable"] is True
+    assert len(compiled["items"]) == 50
+    assert len(queries) == 2
+
+
+@pytest.mark.parametrize(
+    ("times", "executable"),
+    [([None, None], False), ([None, "20:00"], False), (["18:00", "21:00"], True)],
+)
+def test_selection_resolves_its_own_duplicate_or_uncertain_sessions(
+    show_world, times, executable
+):
+    _, plan = prepare(
+        show_world,
+        candidates=[
+            {**items(local_time=time)[0], "item_id": f"date-{index}"}
+            for index, time in enumerate(times)
+        ],
+    )
+    assert plan["executable"] is executable
+    if not executable:
+        assert any(issue["status"] == "conflict" for issue in plan["issues"])
+
+
+def test_show_consolidation_requires_exact_plan_and_human_approval(show_world):
+    from crate.db.repositories.show_identities import upsert_canonical_show
+    from crate.db.repositories.agent_plans import get_plan
+    from tests.test_agent_plan_approvals import decide
+
+    original = upsert_canonical_show(
+        items(local_time="18:00")[0], {"provider": "manual", "actor": "test"}
+    )
+    duplicate = upsert_canonical_show(
+        items(local_time="21:00")[0], {"provider": "manual", "actor": "test"}
+    )
+    selection = {
+        "canonical_show_id": original["show_id"],
+        "duplicate_show_ids": [duplicate["show_id"]],
+        "revisions": {
+            str(original["show_id"]): original["revision"],
+            str(duplicate["show_id"]): duplicate["revision"],
+        },
+    }
+    accepted = operations.prepare_operation(
+        show_world["principal"],
+        "shows_import",
+        {"consolidation": selection},
+        "merge-preview",
+    )["data"]
+    result = execute(accepted)
+    assert result["execution"]["status"] == "prepared", result
+    plan = result["plan"]
+    assert plan["approval_required"] is True
+    with pytest.raises(DiagnosticError) as refused:
+        operations.apply_operation(
+            show_world["principal"],
+            "shows_import",
+            plan["plan_id"],
+            plan["plan_version"],
+            "merge-apply",
+        )
+    assert refused.value.code == "APPROVAL_REQUIRED"
+    stored = get_plan(plan["plan_id"])
+    reviewer = create_user("show-reviewer@example.test", role="admin")
+    from uuid import uuid4
+    from crate.db.repositories.auth_sessions import create_session
+
+    reviewer["session_id"] = str(uuid4())
+    create_session(
+        reviewer["session_id"],
+        reviewer["id"],
+        datetime.now(UTC) + timedelta(days=1),
+        app_id="admin-web",
+    )
+    decide(reviewer, stored)
+    job = operations.apply_operation(
+        show_world["principal"],
+        "shows_import",
+        plan["plan_id"],
+        plan["plan_version"],
+        "merge-apply",
+    )["data"]
+    applied = execute(job)
+    assert applied["verification"]["status"] == "passed", applied
+    assert applied["execution"]["items"][0]["show_id"] == original["show_id"]
+
+
+def test_fifty_date_apply_uses_batched_reads_and_one_invalidation_set(
+    show_world, monkeypatch
+):
+    import json
+    from time import perf_counter
+    from datetime import date
+    from sqlalchemy import event
+    from crate.db.engine import get_engine
+
+    monkeypatch.setattr("crate.metrics.record_later", lambda *args, **kwargs: None)
+    statements = []
+
+    def read_count(conn, cursor, statement, parameters, context, executemany):
+        if (
+            statement.lstrip().upper().startswith(("SELECT", "WITH"))
+            and "pg_advisory" not in statement
+        ):
+            statements.append(statement)
+
+    engine = get_engine()
+
+    def measured(count, month):
+        candidates = [
+            {
+                **items()[0],
+                "item_id": f"tour-{month}-{index}",
+                "date": (date(2027, month, 1) + timedelta(days=index)).isoformat(),
+            }
+            for index in range(count)
+        ]
+        _, plan = prepare(show_world, candidates=candidates, key=f"preview-{month}")
+        statements.clear()
+        event.listen(engine, "before_cursor_execute", read_count)
+        started = perf_counter()
+        try:
+            _, result = apply(show_world, plan, key=f"save-{month}")
+        finally:
+            event.remove(engine, "before_cursor_execute", read_count)
+        assert result["verification"]["status"] == "passed", result
+        assert len(result["execution"]["items"]) == count
+        return {
+            "selected_shows": count,
+            "read_statements": len(statements),
+            "elapsed_seconds": round(perf_counter() - started, 3),
+        }
+
+    baseline = measured(1, 6)
+    before = scalar(
+        "SELECT count(*) FROM domain_event_outbox WHERE event_type='ui.invalidate' AND payload_json->>'source'='show_write'"
+    )
+    batch = measured(50, 1)
+    assert batch["read_statements"] <= baseline["read_statements"] + 2
+    after = scalar(
+        "SELECT count(*) FROM domain_event_outbox WHERE event_type='ui.invalidate' AND payload_json->>'source'='show_write'"
+    )
+    assert after - before == 3
+    print(
+        json.dumps({"single": baseline, "batch": batch, "batch_invalidation_events": 3})
+    )
+
+
+def test_exact_artist_resolution_normalizes_internal_whitespace_in_one_batch(pg_db):
+    from crate.db.repositories.show_imports import compile_show_import
+
+    pg_db.upsert_artist({"name": "AC  DC"})
+    compiled = compile_show_import(
+        items(artist_name="AC DC"), {"provider": "manual", "actor": "human"}
+    )
+    assert compiled["items"][0]["candidate"]["artist_name"] == "AC  DC"
+    assert compiled["executable"]
+
+
+def test_show_write_failure_rolls_back_batch_and_reports_each_item_privately(
+    show_world, monkeypatch
+):
+    from crate.db.repositories import show_identities
+
+    original = show_identities.upsert_canonical_show
+    calls = 0
+
+    def failing(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("PRIVATE DATABASE PARAMS")
+        return original(*args, **kwargs)
+
+    _, plan = prepare(
+        show_world,
+        candidates=[*items(), {**items(date="2027-03-04")[0], "item_id": "second"}],
+    )
+    monkeypatch.setattr(show_identities, "upsert_canonical_show", failing)
+    _, result = apply(show_world, plan)
+    assert scalar("SELECT count(*) FROM shows") == 0
+    assert len(result["execution"]["items"]) == 2
+    assert {row["status"] for row in result["execution"]["items"]} == {"failed"}
+    assert "PRIVATE DATABASE PARAMS" not in str(result)
+
+
+def test_ambiguous_artist_names_offer_uids_and_explicit_uid_resolves_selection(pg_db):
+    from crate.db.repositories.show_imports import compile_show_import
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "INSERT INTO library_artists(name,entity_uid) VALUES('Band',gen_random_uuid()),('BAND',gen_random_uuid())"
+            )
+        )
+    unresolved = compile_show_import(
+        items(artist_name="band"), {"provider": "manual", "actor": "human"}
+    )
+    assert unresolved["executable"] is False
+    matches = next(
+        issue["artist_matches"]
+        for issue in unresolved["issues"]
+        if issue.get("artist_matches")
+    )
+    assert len(matches) == 2
+    selected = compile_show_import(
+        items(artist_name="band", artist_uid=matches[0]["artist_uid"]),
+        {"provider": "manual", "actor": "human"},
+    )
+    assert selected["executable"] is True
+    assert selected["items"][0]["candidate"]["artist_name"] == matches[0]["name"]

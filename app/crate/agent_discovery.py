@@ -10,6 +10,13 @@ from crate.db.repositories.agent_plans import get_owned_plan
 from crate.health_check import ARTIST_SCOPED_CHECKS
 
 _LIMITS = {
+    "search_shows": {"rows": 50, "offset": 10000},
+    "preview_shows_import": {
+        "shows": 50,
+        "consolidation_ids": 10,
+        "server_extraction": False,
+    },
+    "apply_shows_import": {"plans": 1, "exact_version": True},
     "get_operation_catalog": {"checks": 17},
     "get_plan": {
         "plans": 1,

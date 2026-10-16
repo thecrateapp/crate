@@ -37,6 +37,7 @@ RESOURCE_GOVERNED_TASK_TYPES = frozenset(
         "health_check",
         "quality_check",
         "agent_maintenance",
+        "show_extract",
         "library_pipeline",
         "library_sync",
         "materialize_artwork_variants",

@@ -3,6 +3,9 @@
 
 from crate.api.schemas.show_imports import (
     ShowCandidate,
+    ShowConsolidationInput,
+    ShowExtractionInput,
+    ShowExtractionRequest,
     ShowImportSelection,
     ShowPlanApplyInput,
     ShowAcceptedJob,
@@ -426,6 +429,9 @@ from crate.api.schemas.utility import (
 
 __all__ = [
     "ShowCandidate",
+    "ShowConsolidationInput",
+    "ShowExtractionInput",
+    "ShowExtractionRequest",
     "ShowImportSelection",
     "ShowPlanApplyInput",
     "ShowAcceptedJob",

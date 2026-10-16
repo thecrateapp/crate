@@ -1,5 +1,9 @@
 """Idempotent schema bootstrap for fresh installs and bridge upgrades."""
 
+from crate.db.schema_sections.show_extraction_v119 import (
+    create_show_extraction_v119_schema,
+)
+
 from crate.db.schema_sections import (
     create_acquisition_schema,
     create_activity_schema,
@@ -74,3 +78,4 @@ def create_schema(cur):
     create_editorial_v116_schema(cur)
     create_shows_v117_schema(cur)
     create_show_plans_v118_schema(cur)
+    create_show_extraction_v119_schema(cur)

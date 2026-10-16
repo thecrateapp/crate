@@ -9,7 +9,13 @@ import anyio
 import mcp.types as types
 from pydantic import ValidationError
 
-from crate import agent_diagnostics, agent_discovery, agent_maintenance, agent_editorial
+from crate import (
+    agent_diagnostics,
+    agent_discovery,
+    agent_maintenance,
+    agent_editorial,
+    agent_shows,
+)
 from crate.agent_access import actions_enabled, authorization_context
 from crate.agent_diagnostics import DiagnosticError
 from crate.db.audit import log_audit
@@ -58,7 +64,14 @@ from crate.mcp.editorial_schemas import (
     EditorialPublication,
 )
 
+from crate.mcp.show_schemas import ShowsSearch, ShowsPrepare, ShowsApply
+
 CATALOG = {
+    "search_shows": (
+        ShowsSearch,
+        "curation.shows.read",
+        "Search bounded canonical shows and lineup without extraction or publication.",
+    ),
     "editorial_playlists_list": (
         EditorialList,
         "editorial.read",
@@ -157,6 +170,16 @@ CATALOG = {
 }
 
 ACTION_CATALOG = {
+    "preview_shows_import": (
+        ShowsPrepare,
+        "curation.shows.write",
+        "Prepare an exact private selection of at most 50 structured shows. Client extracts sources; server never invokes OCR or LLM.",
+    ),
+    "apply_shows_import": (
+        ShowsApply,
+        "curation.shows.write",
+        "Apply an owned exact show plan/version with current authority, approval and durable replay.",
+    ),
     "editorial_plan_prepare": (
         EditorialPrepare,
         "editorial.prepare",
@@ -394,6 +417,7 @@ async def list_tools(context, params):
                         destructive_hint=name
                         in {
                             "apply_repairs",
+                            "apply_shows_import",
                             "run_library_sync",
                             "run_metadata_rehydrate",
                         },
@@ -411,7 +435,9 @@ def _execute(principal, name, arguments, trace_id):
         with admission(principal.id):
             if name in ACTION_CATALOG:
                 module = (
-                    agent_editorial
+                    agent_shows
+                    if name in {"preview_shows_import", "apply_shows_import"}
+                    else agent_editorial
                     if name.startswith("editorial_")
                     else agent_operations
                     if hasattr(agent_operations, name)
@@ -422,6 +448,8 @@ def _execute(principal, name, arguments, trace_id):
                 )
                 action_finished = True
                 return result
+            if name == "search_shows":
+                return agent_shows.search_shows(principal, **arguments)
             artist_uid = arguments.get("artist_uid")
             if artist_uid:
                 try:
@@ -509,6 +537,8 @@ async def _call_tool(context, params):
         try:
             validated = model.model_validate(params.arguments or {})
             arguments = validated.model_dump()
+            if isinstance(validated, ShowsPrepare):
+                arguments = validated.model_dump(mode="json", exclude_unset=True)
             if isinstance(validated, RuntimeUpdatePreview):
                 arguments["patch"] = validated.patch.model_dump(
                     exclude_none=True, exclude_unset=True

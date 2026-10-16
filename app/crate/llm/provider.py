@@ -95,19 +95,29 @@ def _get_model() -> str:
 # ── Direct Ollama API (no litellm dependency needed) ────────────
 
 
-def _ollama_chat(model: str, messages: list[dict], json_mode: bool = False) -> str:
+def _ollama_chat(
+    model: str,
+    messages: list[dict],
+    json_mode: bool = False,
+    *,
+    timeout_seconds: float | None = None,
+    max_tokens: int | None = None,
+    ollama_url: str | None = None,
+) -> str:
     """Call Ollama HTTP API directly. No extra dependencies."""
-    url = f"{_get_ollama_url()}/api/chat"
+    url = f"{(ollama_url or _get_ollama_url()).rstrip('/')}/api/chat"
     body: dict = {
-        "model": model.removeprefix("ollama/"),
+        "model": model.removeprefix("ollama/").removeprefix("ollama_chat/"),
         "messages": messages,
         "stream": False,
     }
     if json_mode:
         body["format"] = "json"
 
+    if max_tokens is not None:
+        body["options"] = {"num_predict": max_tokens}
     try:
-        resp = requests.post(url, json=body, timeout=300)
+        resp = requests.post(url, json=body, timeout=timeout_seconds or 300)
         resp.raise_for_status()
         data = resp.json()
         return data.get("message", {}).get("content", "")
@@ -121,7 +131,14 @@ def _ollama_chat(model: str, messages: list[dict], json_mode: bool = False) -> s
         raise RuntimeError(f"Ollama error: {e}")
 
 
-def _litellm_chat(model: str, messages: list[dict], json_mode: bool = False) -> str:
+def _litellm_chat(
+    model: str,
+    messages: list[dict],
+    json_mode: bool = False,
+    *,
+    timeout_seconds: float | None = None,
+    max_tokens: int | None = None,
+) -> str:
     """Call any provider via litellm (if installed)."""
     try:
         import litellm
@@ -129,6 +146,10 @@ def _litellm_chat(model: str, messages: list[dict], json_mode: bool = False) -> 
         litellm.set_verbose = False
 
         kwargs: dict = {"model": model, "messages": messages}
+        if timeout_seconds is not None:
+            kwargs.update(timeout=timeout_seconds, num_retries=0)
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
         if json_mode:
             kwargs["response_format"] = {"type": "json_object"}
         # Set Ollama base URL if using ollama provider
@@ -143,7 +164,14 @@ def _litellm_chat(model: str, messages: list[dict], json_mode: bool = False) -> 
         )
 
 
-def _gemini_chat(model: str, messages: list[dict], json_mode: bool = False) -> str:
+def _gemini_chat(
+    model: str,
+    messages: list[dict],
+    json_mode: bool = False,
+    *,
+    timeout_seconds: float | None = None,
+    max_tokens: int | None = None,
+) -> str:
     """Call Google Gemini API directly."""
     api_key = get_provider_api_key("gemini")
     if not api_key:
@@ -164,8 +192,12 @@ def _gemini_chat(model: str, messages: list[dict], json_mode: bool = False) -> s
     if json_mode:
         body["generationConfig"] = {"responseMimeType": "application/json"}
 
+    if max_tokens is not None:
+        body.setdefault("generationConfig", {})["maxOutputTokens"] = max_tokens
     try:
-        resp = requests.post(url, json=body, params={"key": api_key}, timeout=60)
+        resp = requests.post(
+            url, json=body, params={"key": api_key}, timeout=timeout_seconds or 60
+        )
         resp.raise_for_status()
         data = resp.json()
         candidates = data.get("candidates", [])
@@ -178,13 +210,35 @@ def _gemini_chat(model: str, messages: list[dict], json_mode: bool = False) -> s
         raise RuntimeError(f"Gemini error: {e}")
 
 
-def _chat(model: str, messages: list[dict], json_mode: bool = False) -> str:
+def _chat(
+    model: str,
+    messages: list[dict],
+    json_mode: bool = False,
+    *,
+    timeout_seconds: float | None = None,
+    max_tokens: int | None = None,
+    ollama_url: str | None = None,
+) -> str:
     """Route to the appropriate backend."""
+    options = {
+        key: value
+        for key, value in {
+            "timeout_seconds": timeout_seconds,
+            "max_tokens": max_tokens,
+        }.items()
+        if value is not None
+    }
     if model.startswith("ollama/") or model.startswith("ollama_chat/"):
-        return _ollama_chat(model, messages, json_mode)
+        return _ollama_chat(
+            model,
+            messages,
+            json_mode,
+            **options,
+            ollama_url=ollama_url,
+        )
     if model.startswith("gemini/"):
-        return _gemini_chat(model, messages, json_mode)
-    return _litellm_chat(model, messages, json_mode)
+        return _gemini_chat(model, messages, json_mode, **options)
+    return _litellm_chat(model, messages, json_mode, **options)
 
 
 # ── Public API ──────────────────────────────────────────────────
@@ -207,6 +261,10 @@ def ask_structured(
     *,
     system: str = "",
     model: str | None = None,
+    timeout_seconds: float | None = None,
+    max_tokens: int | None = None,
+    private_response: bool = False,
+    ollama_url: str | None = None,
 ) -> T:
     """Ask an LLM and parse the response into a Pydantic model.
 
@@ -230,7 +288,21 @@ def ask_structured(
         {"role": "user", "content": prompt},
     ]
 
-    raw = _chat(m, messages, json_mode=True)
+    options = {
+        key: value
+        for key, value in {
+            "timeout_seconds": timeout_seconds,
+            "max_tokens": max_tokens,
+        }.items()
+        if value is not None
+    }
+    raw = _chat(
+        m,
+        messages,
+        json_mode=True,
+        **options,
+        ollama_url=ollama_url,
+    )
 
     # Parse the response
     try:
@@ -258,6 +330,12 @@ def ask_structured(
                     return response_model.model_validate(flat)
             raise
     except (json.JSONDecodeError, Exception) as e:
+        if private_response:
+            log.warning(
+                "Private structured LLM response failed validation (%s)",
+                response_model.__name__,
+            )
+            raise ValueError("LLM returned invalid structured data") from None
         log.warning(
             "Failed to parse LLM response as %s: %s\nRaw: %s",
             response_model.__name__,
@@ -275,11 +353,25 @@ def ask_image_structured(
     media_type: str,
     system: str = "",
     model: str | None = None,
+    timeout_seconds: float | None = None,
+    max_tokens: int | None = None,
+    private_response: bool = False,
+    ollama_url: str | None = None,
 ) -> T:
     """Ask a vision-capable provider for structured image analysis."""
     if not image or not media_type.startswith("image/"):
         raise ValueError("A valid image payload is required")
     selected_model = model or _get_model()
+    options = {
+        key: value
+        for key, value in {
+            "timeout_seconds": timeout_seconds,
+            "max_tokens": max_tokens,
+        }.items()
+        if value is not None
+    }
+    if selected_model.startswith(("ollama/", "ollama_chat/")) and ollama_url:
+        options["ollama_url"] = ollama_url
     schema = json.dumps(response_model.model_json_schema(), indent=2)
     instruction = (f"{system}\n\n" if system else "") + (
         f"Respond with ONLY a valid JSON object matching this schema:\n{schema}"
@@ -307,9 +399,11 @@ def ask_image_structured(
             ],
             "generationConfig": {"responseMimeType": "application/json"},
         }
+        if max_tokens is not None:
+            body["generationConfig"]["maxOutputTokens"] = max_tokens
         try:
             response = requests.post(
-                url, json=body, params={"key": api_key}, timeout=90
+                url, json=body, params={"key": api_key}, timeout=timeout_seconds or 90
             )
             response.raise_for_status()
             parts = response.json()["candidates"][0]["content"]["parts"]
@@ -324,6 +418,7 @@ def ask_image_structured(
                 {"role": "user", "content": prompt, "images": [encoded]},
             ],
             json_mode=True,
+            **options,
         )
     else:
         raw = _litellm_chat(
@@ -342,6 +437,7 @@ def ask_image_structured(
                 },
             ],
             json_mode=True,
+            **options,
         )
 
     cleaned = raw.strip()
@@ -352,4 +448,6 @@ def ask_image_structured(
     try:
         return response_model.model_validate(json.loads(cleaned.strip()))
     except (json.JSONDecodeError, ValueError) as exc:
+        if private_response:
+            raise ValueError("LLM returned invalid structured data") from None
         raise ValueError(f"LLM returned invalid JSON: {exc}") from exc

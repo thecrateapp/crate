@@ -642,3 +642,44 @@ describe("AgentPlanReview", () => {
     );
   });
 });
+
+it.each([
+  ["shows_import", "curation.shows.write", "show", "show-a"],
+  ["job_cancel", "ops.tasks.manage", "task", "job-a"],
+  ["runtime_update", "ops.runtime.manage", "runtime", "instance"],
+  ["editorial_change", "curation.playlists.write", "playlist", "42"],
+])(
+  "approves complete %s plans using the correct domain capability",
+  async (operation, capability, kind, name) => {
+    const user = userEvent.setup();
+    const target = { entity_type: kind, name };
+    const item = plan({
+      operation,
+      risk: "high",
+      targets: [target],
+      changes: [
+        {
+          targets: [target],
+          field: "selection",
+          before: { id: 1 },
+          after: { id: 2 },
+        },
+      ],
+    });
+    apiMock.mockResolvedValue(item);
+    renderReview(["agents.plans.review", "agents.plans.approve", capability]);
+    await screen.findByRole("table", { name: "Complete proposed changes" });
+    await user.click(screen.getByRole("checkbox"));
+    expect(
+      screen.getByRole("button", { name: "Approve exact plan" }),
+    ).toBeEnabled();
+    await user.click(
+      screen.getByRole("button", { name: "Approve exact plan" }),
+    );
+    expect(apiMock).toHaveBeenCalledWith(
+      base + "/plan-one/approve",
+      "POST",
+      exactDecision(item),
+    );
+  },
+);

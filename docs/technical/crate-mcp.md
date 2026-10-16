@@ -269,17 +269,17 @@ the audit does not fabricate a human `user_id` or persist supplied tokens.
 Tool discovery is filtered by grants. Every call also checks its required grant independently.
 Input schemas reject unknown arguments; filters are limited to the supported fields and enums.
 
-| Tool                    | Required grant                                                                                | Inputs and result                                                                                                                                                                |
-| ----------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `get_instance_status`   | `ops.status.read`                                                                             | No arguments. Returns cached library totals and persisted worker/analysis evidence, each with its own source timestamps.                                                         |
-| `list_library_issues`   | `library.health.read`                                                                         | Optional `check_type`, `severity`, `artist_uid`, `limit`, `cursor`. Returns a bounded materialized sample of local issues and last check observations.                           |
-| `inspect_artist`        | `library.health.read`                                                                         | Exactly one of `artist_uid` or `name`; optional `limit`. Returns identity resolution, persisted checks and issues. Ambiguous names require the agent to choose a UID explicitly. |
-| `list_jobs`             | `ops.jobs.read`                                                                               | Optional `states`, allowlisted `types`, `limit`, `cursor`. Returns sanitized task history.                                                                                       |
-| `get_job`               | `ops.jobs.read`                                                                               | `job_id`. Returns the safe fields of one task without raw parameters or results.                                                                                                 |
-| `read_diagnostics`      | `ops.logs.read` for `worker_logs`; `ops.status.read` for `worker_status` or `analysis_status` | Required `source`; optional `limit`. `worker_logs` also accepts `task_id`, `since` and `until`.                                                                                  |
+| Tool                    | Required grant                                                                                | Inputs and result                                                                                                                                                                                                          |
+| ----------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_instance_status`   | `ops.status.read`                                                                             | No arguments. Returns cached library totals and persisted worker/analysis evidence, each with its own source timestamps.                                                                                                   |
+| `list_library_issues`   | `library.health.read`                                                                         | Optional `check_type`, `severity`, `artist_uid`, `limit`, `cursor`. Returns a bounded materialized sample of local issues and last check observations.                                                                     |
+| `inspect_artist`        | `library.health.read`                                                                         | Exactly one of `artist_uid` or `name`; optional `limit`. Returns identity resolution, persisted checks and issues. Ambiguous names require the agent to choose a UID explicitly.                                           |
+| `list_jobs`             | `ops.jobs.read`                                                                               | Optional `states`, allowlisted `types`, `limit`, `cursor`. Returns sanitized task history.                                                                                                                                 |
+| `get_job`               | `ops.jobs.read`                                                                               | `job_id`. Returns the safe fields of one task without raw parameters or results.                                                                                                                                           |
+| `read_diagnostics`      | `ops.logs.read` for `worker_logs`; `ops.status.read` for `worker_status` or `analysis_status` | Required `source`; optional `limit`. `worker_logs` also accepts `task_id`, `since` and `until`.                                                                                                                            |
 | `get_operation_catalog` | Any granted scope                                                                             | No arguments. Returns contract version, schema fingerprints, enabled/denied/disabled/unavailable status, worker readiness evidence, limits and support for all 17 repair checks. Discovery grants no additional authority. |
-| `get_plan`              | The stored plan's operation grant                                                             | One `plan_id`. Reads a plan belonging to this principal and exact delegated authorization context, including accepted scopes. Current credentials and grants are rechecked.      |
-| `get_library_quality`   | `library.health.read`                                                                         | Optional enumerated `category`, `limit` (1–100) and version-bound `cursor`. Reads worker-produced quality evidence and snapshot age/invalidation metadata. No scan or refresh.   |
+| `get_plan`              | The stored plan's operation grant                                                             | One `plan_id`. Reads a plan belonging to this principal and exact delegated authorization context, including accepted scopes. Current credentials and grants are rechecked.                                                |
+| `get_library_quality`   | `library.health.read`                                                                         | Optional enumerated `category`, `limit` (1–100) and version-bound `cursor`. Reads worker-produced quality evidence and snapshot age/invalidation metadata. No scan or refresh.                                             |
 
 ## Original directed actions (phase 2 compatibility)
 
@@ -1052,3 +1052,140 @@ document budget. Candidate availability is based on indexed local library identi
 prove that the audio file remains present until a playback attempt. No production flags were
 enabled and no external client or provider was validated in production. The six skill briefs used
 fixtures rather than a connected production agent. Cover upload remains an Admin operation.
+
+## Phase 8 — canonical shows and private extraction (Linux implementation)
+
+Phase 8 extends the existing `shows` table and the shared operation engine. Admin and MCP
+prepare/apply `shows_import`; provider syncs use the same identity repository. Migrations
+117–119 are additive to the published 109–116 history. No library entity is created for an
+external artist and no `/music` write is performed by an API request.
+
+### Identity, authority and exact effects
+
+A show represents one performance/date/venue/session with a primary artist and full lineup.
+Provider aliases are unique `(provider,event_id)` pairs. Strong semantic matches keep the ID;
+fuzzy/ambiguous matches block publication until an editor selects an existing ID/revision or
+changes/excludes the row. Known different sessions stay separate during matching. Artist
+UIDs/names are resolved in a batch. Unknown times and coordinates remain null; doors and IANA
+timezone are independent fields, with no automatic timezone inferred for Spain.
+
+Field provenance includes actor/source/evidence and extractor/model when supplied by an owned
+extraction draft. Manual corrections, including removal of a wrong support act, survive provider
+sync. Provider aliases preserve identity on cancellation/rescheduling; expired shows are archived,
+and a provider reschedule can make the same ID upcoming again. Shared readers omit private field
+evidence, include lineup artists and omit consolidated rows. Unknown coordinates stay visible in
+lists and are excluded by distance filters; no distance is invented.
+
+Human Admin plans have an internal user-owned principal/proof that cannot be issued or managed
+as a remote credential. Cookie session and origin are checked in the API. Workers check current
+user status/capabilities at each stage/effect. Admin works with MCP disabled; remote actions retain
+the existing MCP gates and service/delegated authorization. Internal human contexts cannot run
+non-show operations. Review/approval uses the existing Agent Plans page and exact hashes.
+
+Selected writes, revision rechecks, private per-item results and common job completion commit
+in one transaction. A conflict rolls back the selection; an unexpected write failure reports every
+selected item as failed without exposing DB parameters. Same actor/key/payload replays the same
+job/result after restart; another payload conflicts. Competing writers recheck identity and add
+source evidence. Explicit consolidation is a high-risk plan with mandatory human approval and
+exact revisions: it transfers attendance/reminders/aliases, retains archived source rows and
+flattens old ID redirects. It never runs as an automatic backfill.
+
+Outbox invalidations cover shows, upcoming, home and affected library artists. The relay dispatches
+committed show invalidations to live caches; the projector refreshes snapshots. No HTTP handler
+rebuilds a snapshot. A batch emits one set of invalidations. Finite `shows.import.*` counters contain
+only candidate/outcome counts, without actors, source text, URLs or arbitrary metric labels.
+
+### Admin and worker extraction
+
+`Add show` in Shows and Upcoming opens the same capability-gated editor. Manual entry has no
+LLM dependency. Assisted import accepts uploaded/pasted static images, pasted text or one public
+URL. Every candidate is editable in the review table; shared tour corrections affect only selected
+rows. Excluded dates remain pending. Changing any selected content invalidates the preview.
+Results retain canonical links and saved-row locks; a network-uncertain request retries its exact
+key. Owned private drafts can be resumed, including pending/failed jobs and staged image references.
+A stop request is distinct from the worker's actual acknowledgement.
+
+Extraction is a closed `extract_shows` command using the existing acceptance ledger, agent jobs,
+`tasks`, Dramatiq actor, maintenance pool and resource governor. There is no second job engine.
+Full sources/results remain in owned private stores; shared task results and show-domain audits
+contain only bounded outcome evidence. Images live as private PostgreSQL blobs outside `/music`,
+with opaque actor-owned references and expiry. Old raw extraction evidence is denied immediately
+at expiry and pruned by bounded staging/service cleanup; accepted-request identity is retained.
+
+| Limit             | Implemented bound                                                                                                                       |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Attachments       | 3 static PNG/JPEG/WebP, 8 MiB each, 20 MP each                                                                                          |
+| Private staging   | 24 MiB per editor, 24-hour source TTL; identical active bytes reuse their reference                                                     |
+| Vision canvas     | One bounded composite, at most 20 MP                                                                                                    |
+| OCR               | Tesseract 5, `eng+spa`, PSM 6, one CPU thread; 30 s / 25 CPU s / 512 MiB per child                                                      |
+| Extraction task   | Maintenance pool, 180 s, no automatic retry; ten accepted jobs/editor/15 minutes                                                        |
+| Model call        | Explicit vision, text, or OCR→text; one call, 45 s request timeout, 16K output tokens, no provider fallback                             |
+| Public URL fetch  | Shared pinned resolver in an isolated worker child, 45 s wall deadline / 256 MiB; DNS/response stalls are killed before acknowledgement |
+| Draft             | 200 candidate proposals, 60K text; truncation/coverage reported                                                                         |
+| Exact publication | 50 selected shows, complete plan limited to 40K bytes                                                                                   |
+
+Local OCR never reads/calls an LLM or needs a key/network. It preserves recognized text and proposes
+only full ISO dates deterministically; artist/venue/city and uncertain dates require correction.
+Coverage stays incomplete until a human compares the source; neither an OCR score nor a model's
+claim certifies concert correctness or that every tour date was interpreted. Split selections persist
+outcomes by item in the private draft without losing unselected dates. Model failure preserves
+recognized text for manual correction and does not make another paid call.
+
+Configuration, connectivity and model vision support are exposed separately to curators by the
+narrow show API. Worker readiness is checked explicitly without a billable model request. A key
+alone is not a connectivity/vision probe. Model and endpoint configuration are bound to the
+configuration fingerprint reviewed by the user; changes before acceptance/execution stop the
+call, preserving the draft. The selected Ollama endpoint is frozen for the actual call. Ollama uses model capabilities; an unavailable registry
+leaves other vision support unknown. Manual/OCR paths remain usable independently.
+
+URL evidence uses the existing pinned-public-address resolver/fetcher from artist bio research,
+with validated redirects, byte/time bounds and no cookies/private login. Actual fetched text is
+used. Login, blocked, unreadable or unsupported content produces a screenshot/text fallback;
+a URL string is never represented as an image the model viewed.
+
+### MCP contract 1.1.0
+
+The distributable catalog now contains **52 tools and 30 scopes**. Additive show tools:
+
+- `search_shows`: bounded canonical/lineup lookup, `curation.shows.read` → human `library.view`.
+- `preview_shows_import`: structured candidates or an explicit consolidation, `curation.shows.write`.
+- `apply_shows_import`: only exact plan ID/version/key, the same write grant and current approval.
+
+Grant `ops.jobs.read` to clients that monitor preparation/application with `get_job`. Use owned
+`get_plan` for the complete approved diff and paginated canonical outcomes. Server OCR/LLM is
+never invoked by MCP; the remote agent performs extraction itself and submits structured evidence.
+The skill continues to provide editorial judgement; server grants, exact selection and approvals
+remain authoritative.
+
+Example: a remote client reads a tour flyer, sends N structured candidates (split into selections
+of at most 50 and within the plan byte budget), monitors the preparation job, reviews every row via
+`get_plan`, then applies its exact version. Replaying the apply key returns the same job and IDs.
+An 18:00 and a 21:00 session create distinct shows; a third candidate with unknown time returns
+both as a conflict. The client must resolve/exclude it before a new executable plan is prepared.
+
+### Evidence and limitations of this cut
+
+Focused real-PostgreSQL tests cover both provider/manual orders, concurrent writers/integrations,
+restart replay, rollback, current ownership/role checks, private evidence, source TTL, cancellation
+acknowledgement, split tours, attendance/reminders and exact approval. SDK transport exercises the
+new tool workflow; Admin tests cover manual/assisted review, pending rows, canonical links, uncertain
+retry, both entry pages and the shared operational approval page. The final suite/review gate is
+recorded in the plan when it has actually run.
+
+The [CPU OCR evaluation](crate-show-ocr-evaluation.json) compares PSM 3/6/11 on five original CC0
+synthetic sources, including artistic/illegible text. Tesseract **5.5.0** recovered all three clean tour
+dates in about 0.16 s with about 53 MiB RSS; artistic/illegible samples recovered no full-year dates.
+These fixtures do not establish accuracy on real private flyers. The worker image installs Debian
+`tesseract-ocr`, `tesseract-ocr-eng`, `tesseract-ocr-spa`; no installation occurs in a request and no
+Python OCR wrapper, paid OCR service or GPU is needed. See the official [quality guidance](https://tesseract-ocr.github.io/tessdoc/ImproveQuality.html),
+[CLI reference](https://tesseract-ocr.github.io/tessdoc/Command-Line-Usage.html) and
+[Apache 2.0 engine source/license](https://github.com/tesseract-ocr/tesseract).
+
+The [PostgreSQL batch measurement](crate-show-import-load.json) observed 71 fixed reads for both
+one and 50 selected dates (excluding advisory coordination), about 0.035/0.083 s, and three global
+invalidation events for the batch. This is isolated test evidence, not a production latency claim.
+
+Default tests use simulated providers. A real configured model smoke is opt-in only, against the
+synthetic tour fixture and a disposable test DB: `cd app` followed by `CRATE_TEST_SHOW_LLM_SMOKE=1 ../.venv/bin/python -m pytest tests/test_show_extraction.py::test_configured_show_vision_smoke_opt_in -q`. Supply a test provider
+configuration/credentials explicitly. This smoke has not been run for this cut. No production
+migration, merge, deployment, real paid model request or flag activation was performed.

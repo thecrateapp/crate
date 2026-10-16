@@ -92,9 +92,23 @@ def read_show_job(principal, job_id: str, *, session=None) -> dict:
             not job
             or job["principal_id"] != principal.id
             or job["authorization_context"] != authorization_context(principal)
-            or job["payload"].get("domain_operation") != "shows_import"
+            or job["payload"].get("domain_operation")
+            not in {"shows_import", "shows_extract"}
         ):
             raise DiagnosticError("NOT_FOUND", "Owned show job was not found")
+        if (
+            job["operation"] == "extract_shows"
+            and not current.execute(
+                text(
+                    "SELECT 1 FROM show_extraction_drafts WHERE task_id=:id AND expires_at>NOW()"
+                ),
+                {"id": job_id},
+            ).first()
+        ):
+            raise DiagnosticError(
+                "RESULT_EXPIRED",
+                "Private extraction evidence expired; the durable request ledger is retained",
+            )
         return {"job_id": job_id, "status": job["status"], "result": job["result"]}
 
     if session is not None:

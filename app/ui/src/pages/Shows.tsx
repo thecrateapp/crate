@@ -16,6 +16,8 @@ import {
   Filter,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { useSearchParams } from "react-router";
+import { AddShowButton } from "@/components/shows/AddShowButton";
 
 // Fix Leaflet default marker icon
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)
@@ -40,6 +42,9 @@ function stringArray(value: unknown): string[] {
 }
 
 export function Shows() {
+  const [params] = useSearchParams();
+  const focusedId = params.get("show_id");
+  const [refresh, setRefresh] = useState(0);
   const [events, setEvents] = useState<ShowEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [done, setDone] = useState(false);
@@ -81,9 +86,18 @@ export function Shows() {
           "/api/shows/cached?limit=200",
         );
         if (cancelled) return;
-        const mapped: ShowEvent[] = (data.events || []).map(
+        const records = data.events || [];
+        if (focusedId && /^\d+$/.test(focusedId)) {
+          const focused = await api<Record<string, unknown>>(
+            `/api/show-imports/shows/${focusedId}`,
+          );
+          if (cancelled) return;
+          if (!records.some((record) => String(record.id) === focusedId))
+            records.unshift(focused);
+        }
+        const mapped: ShowEvent[] = records.map(
           (e: Record<string, unknown>) => ({
-            id: stringValue(e.external_id ?? e.id),
+            id: stringValue(e.id ?? e.external_id),
             name: stringValue(e.artist_name),
             date: stringValue(e.date),
             local_date: stringValue(e.date).slice(0, 10),
@@ -103,8 +117,8 @@ export function Shows() {
                 : [],
             price_range: null,
             status: stringValue(e.status) || "onsale",
-            latitude: e.latitude ? String(e.latitude) : undefined,
-            longitude: e.longitude ? String(e.longitude) : undefined,
+            latitude: e.latitude != null ? String(e.latitude) : undefined,
+            longitude: e.longitude != null ? String(e.longitude) : undefined,
             artist_name: (e.artist_name as string) || "",
             artist_id:
               typeof e.artist_id === "number" ? e.artist_id : undefined,
@@ -118,6 +132,12 @@ export function Shows() {
           }),
         );
         setEvents(mapped);
+        if (focusedId) {
+          setSelectedShow(
+            mapped.find((record) => record.id === focusedId) ?? null,
+          );
+          setViewMode("list");
+        }
       } catch {
         /* network error */
       }
@@ -131,7 +151,7 @@ export function Shows() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refresh, focusedId]);
 
   const eventsByDate = useMemo(() => {
     const map: Record<string, ShowEvent[]> = {};
@@ -145,11 +165,10 @@ export function Shows() {
   // Apply genre filter
   const filteredEvents = useMemo(() => {
     if (!genreFilter) return events;
-    return events.filter(
-      (e) =>
-        e.artist_genres?.some((g) =>
-          g.toLowerCase().includes(genreFilter.toLowerCase()),
-        ),
+    return events.filter((e) =>
+      e.artist_genres?.some((g) =>
+        g.toLowerCase().includes(genreFilter.toLowerCase()),
+      ),
     );
   }, [events, genreFilter]);
 
@@ -210,6 +229,7 @@ export function Shows() {
     >
       {!isMap && <h1 className="text-2xl font-bold">Upcoming Shows</h1>}
       <div className="flex items-center gap-2">
+        <AddShowButton onSaved={() => setRefresh((value) => value + 1)} />
         {loading && (
           <span
             className={`text-xs flex items-center gap-1.5 px-2 py-1 rounded ${

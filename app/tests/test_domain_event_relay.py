@@ -59,3 +59,48 @@ def test_relay_passes_stable_event_uid_to_idempotent_publisher(monkeypatch):
     relay.relay_domain_events(limit=1, worker_id="relay-b")
 
     assert published == [event]
+
+
+def test_show_commit_invalidations_reach_live_caches_before_outbox_ack(monkeypatch):
+    import crate.domain_event_relay as relay
+    from crate.api import cache_events
+
+    order = []
+    event = {
+        "event_uid": "show",
+        "event_type": "ui.invalidate",
+        "payload_json": {"scope": "artist:Band", "source": "show_write"},
+        "attempts": 0,
+    }
+    monkeypatch.setattr(relay, "claim_outbox_events", lambda *args, **kwargs: [event])
+    monkeypatch.setattr(relay, "publish_outbox_event", lambda value: ("1-0", 1))
+    monkeypatch.setattr(
+        cache_events,
+        "broadcast_committed_invalidation",
+        lambda *scopes: order.append(scopes),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        relay, "mark_outbox_delivered", lambda *args, **kwargs: order.append("ack")
+    )
+    relay.relay_domain_events()
+    assert order == [("artist:Band",), "ack"]
+
+
+def test_committed_cache_dispatch_does_not_persist_a_second_outbox(monkeypatch):
+    from types import SimpleNamespace
+    from crate.api import cache_events
+
+    calls = []
+    monkeypatch.setattr(
+        cache_events,
+        "_get_invalidation_dispatcher",
+        lambda: SimpleNamespace(submit=calls.append),
+    )
+    monkeypatch.setattr(
+        cache_events,
+        "_persist_invalidation_events",
+        lambda *args: (_ for _ in ()).throw(AssertionError("Already committed")),
+    )
+    cache_events.broadcast_committed_invalidation("shows", "shows", "artist:Band")
+    assert calls == [("shows", "artist:Band")]

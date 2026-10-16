@@ -322,7 +322,7 @@ def decide_plan(
         policy = (
             current.execute(
                 text(
-                    "SELECT enabled, grants, policy_revision, require_approval FROM agent_principals WHERE id = :id FOR SHARE"
+                    "SELECT enabled, grants, policy_revision, require_approval, kind, human_owner_user_id FROM agent_principals WHERE id = :id FOR SHARE"
                 ),
                 {"id": plan["principal_id"]},
             )
@@ -363,7 +363,19 @@ def decide_plan(
         if plan["state"] != "awaiting_approval":
             raise DiagnosticError("STATE_CONFLICT", "Plan is not awaiting human review")
         context = plan["authorization_context"]
-        if context:
+        if context.get("human_actor_id") is not None:
+            from crate.db.repositories.show_editor_access import authorize_show_editor
+
+            owner = AgentPrincipal(
+                str(plan["principal_id"]),
+                "",
+                "Admin show editor",
+                frozenset(plan["required_grants"]),
+                actor_user_id=context.get("actor_user_id"),
+                human_actor_id=context["human_actor_id"],
+            )
+            authorize_show_editor(current, owner, policy, plan["required_grants"])
+        elif context:
             from crate.db.repositories.mcp_oauth import delegated_authorization_grants
 
             grants = delegated_authorization_grants(

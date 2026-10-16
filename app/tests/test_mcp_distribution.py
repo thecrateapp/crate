@@ -60,7 +60,7 @@ def test_protocol_negotiation_preserves_contract_version_and_rejects_unknown_rev
                 },
             )
             assert accepted.status_code == 200, accepted.text
-            assert accepted.json()["result"]["serverInfo"]["version"] == "1.0.0"
+            assert accepted.json()["result"]["serverInfo"]["version"] == "1.1.0"
             assert accepted.json()["result"]["protocolVersion"] == "2025-11-25"
 
     asyncio.run(run())
@@ -71,7 +71,7 @@ def test_distribution_contains_every_tool_schema_and_no_private_configuration():
 
     artifact = export_contract()
     definitions = {row["name"]: row for row in artifact["tools"]}
-    assert len(definitions) == 49
+    assert len(definitions) == 52
     assert (
         definitions["editorial_plan_prepare"]["input_schema"]["additionalProperties"]
         is False
@@ -109,14 +109,14 @@ def test_catalog_versions_schemas_and_explains_missing_worker(monkeypatch):
     )
     principal = AgentPrincipal("a", "c", "Agent", frozenset({"library.health.run"}))
     catalog = get_operation_catalog(principal)["data"]
-    assert catalog["contract"]["version"] == "1.0.0"
+    assert catalog["contract"]["version"] == "1.1.0"
     assert catalog["contract"]["protocol_versions"]
     operations = {row["name"]: row for row in catalog["operations"]}
     health = operations["run_health_check"]
     assert health["status"] == "unavailable"
     assert health["readiness"]["missing"] == ["fresh_worker_evidence"]
     assert len(health["input_schema_sha256"]) == 64
-    assert health["contract_version"] == "1.0.0"
+    assert health["contract_version"] == "1.1.0"
     assert operations["get_instance_status"]["status"] == "denied"
 
 

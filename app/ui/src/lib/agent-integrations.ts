@@ -102,6 +102,7 @@ export interface AgentPlan extends AgentPlanSummary {
     artist_uid?: string;
     entity_uid?: string;
     entity_type?: string;
+    label?: string;
     name?: string;
     scope?: string;
   }[];
@@ -112,6 +113,7 @@ export interface AgentPlan extends AgentPlanSummary {
   conflicts?: Record<string, unknown>[];
   executable?: boolean;
   authorization_context: {
+    human_actor_id?: number;
     actor_user_id?: number;
     client_id?: string;
     authorization_id?: string;

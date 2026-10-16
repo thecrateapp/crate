@@ -137,6 +137,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "library_pipeline": TaskPoolConfig("maintenance", 2, 7200, 0),
     "health_check": TaskPoolConfig("maintenance", 2, 1500, 0),
     "quality_check": TaskPoolConfig("maintenance", 2, 1800, 0),
+    "show_extract": TaskPoolConfig("maintenance", 2, 180, 0),
     "agent_maintenance": TaskPoolConfig("maintenance", 2, 1800, 0),
     "agent_control": TaskPoolConfig("fast", 0, 60, 0),
     "repair": TaskPoolConfig("maintenance", 2, 3600, 0),

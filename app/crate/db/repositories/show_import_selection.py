@@ -1,5 +1,6 @@
 """Atomic show selections consumed by the shared immutable operation engine."""
 
+import json
 from pydantic import ValidationError
 from sqlalchemy import text
 
@@ -29,6 +30,7 @@ def compile_show_import(candidates: list[dict], source: dict, *, session=None) -
         raise DiagnosticError("INVALID_ARGUMENT", "Candidate item IDs must be unique")
 
     def read(current):
+        _validate_draft_sources(current, selected, source)
         uids = [
             candidate["artist_uid"]
             for candidate in selected
@@ -40,13 +42,52 @@ def compile_show_import(candidates: list[dict], source: dict, *, session=None) -
         artists = (
             current.execute(
                 text("""SELECT entity_uid::text,name FROM library_artists
-            WHERE entity_uid=ANY(CAST(:uids AS uuid[])) OR lower(btrim(name))=ANY(:names)"""),
+            WHERE entity_uid=ANY(CAST(:uids AS uuid[])) OR lower(regexp_replace(btrim(name), '\\s+', ' ', 'g'))=ANY(:names)"""),
                 {"uids": uids, "names": names},
             )
             .mappings()
             .all()
         )
+        for candidate in selected:
+            if candidate.get("artist_uid"):
+                matches = [
+                    artist
+                    for artist in artists
+                    if artist["entity_uid"] == candidate["artist_uid"]
+                ]
+            else:
+                matches = [
+                    artist
+                    for artist in artists
+                    if identities.normalize(artist["name"])
+                    == identities.normalize(candidate.get("artist_name"))
+                ]
+            if len(matches) == 1:
+                candidate["artist_name"] = matches[0]["name"]
+        batch_matches = identities.match_show_candidates(selected, session=current)
         items, issues = [], []
+        repeated = {}
+        for index, candidate in enumerate(selected):
+            for prior in selected[:index]:
+                if identities.identity_base(candidate) != identities.identity_base(
+                    prior
+                ):
+                    continue
+                comparison = identities._match_rows(
+                    candidate, [{**prior, "id": prior["item_id"]}], False
+                )
+                if comparison["status"] in {"conflict", "already_exists"}:
+                    repeated.setdefault(candidate["item_id"], prior["item_id"])
+                    repeated.setdefault(prior["item_id"], candidate["item_id"])
+        issues.extend(
+            {
+                "item_id": key,
+                "status": "conflict",
+                "related_item_id": other,
+                "reason": "Selected rows may describe the same session; resolve or exclude one",
+            }
+            for key, other in repeated.items()
+        )
         for candidate in selected:
             artist_matches = (
                 [
@@ -70,6 +111,11 @@ def compile_show_import(candidates: list[dict], source: dict, *, session=None) -
                         "item_id": candidate["item_id"],
                         "status": "invalid",
                         "reason": "Artist identity is ambiguous or unavailable",
+                        "artist_matches": [
+                            {"artist_uid": artist["entity_uid"], "name": artist["name"]}
+                            for artist in artist_matches[:10]
+                        ],
+                        "more_artist_matches": len(artist_matches) > 10,
                     }
                 )
             elif artist_matches:
@@ -87,7 +133,7 @@ def compile_show_import(candidates: list[dict], source: dict, *, session=None) -
                         "missing": missing,
                     }
                 )
-            match = identities.preview_show(candidate, source, session=current)
+            match = batch_matches[candidate["item_id"]]
             if match["status"] == "conflict":
                 issues.append({"item_id": candidate["item_id"], **match})
             before = match.get("show")
@@ -194,10 +240,23 @@ def apply_exact_show_import(execution: dict, task_id: str, *, session=None) -> d
                     text("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))"),
                     {"key": key},
                 )
+            _validate_draft_sources(
+                current, [item["candidate"] for item in items], source
+            )
             outcomes = []
+            matches = identities.match_show_candidates(
+                [item["candidate"] for item in items],
+                expected_ids=[
+                    item["expected_show_id"]
+                    for item in items
+                    if item["expected_show_id"]
+                ],
+                lock=True,
+                session=current,
+            )
             for item in items:
                 candidate = item["candidate"]
-                matched = identities.preview_show(candidate, source, session=current)
+                matched = matches[candidate["item_id"]]
                 row = matched.get("show")
                 if matched["status"] == "conflict":
                     raise _SelectionConflict("Event identity became ambiguous")
@@ -213,31 +272,33 @@ def apply_exact_show_import(execution: dict, task_id: str, *, session=None) -> d
                         raise _SelectionConflict(
                             "A concurrently created show has different fields; review it"
                         )
-                    outcome = {
-                        "status": "already_exists",
-                        "show_id": row["id"],
-                        "revision": row["revision"],
-                    }
-                else:
-                    if row:
-                        candidate = {
-                            **candidate,
-                            "existing_show_id": row["id"],
-                            "expected_revision": row["revision"],
-                        }
-                    outcome = identities.upsert_canonical_show(
-                        candidate, source, session=current
-                    )
-                    if outcome["status"] in {"conflict", "invalid"}:
-                        raise _SelectionConflict(
-                            "Show selection is no longer applicable"
-                        )
+                outcome = identities.upsert_canonical_show(
+                    candidate, source, session=current, _matched=matched
+                )
+                if outcome["status"] in {"conflict", "invalid"}:
+                    raise _SelectionConflict("Show selection is no longer applicable")
                 outcomes.append({"item_id": candidate["item_id"], **outcome})
             result = {
                 "execution": {"status": "completed", "items": outcomes},
                 "verification": {"status": "passed"},
                 "projection": {"status": "pending"},
             }
+            from crate.db.repositories.show_invalidation import invalidate_show_views
+
+            invalidate_show_views(
+                [
+                    name
+                    for item in items
+                    for name in [
+                        item["candidate"].get("artist_name"),
+                        *(item["candidate"].get("lineup") or []),
+                        *(item["before"].get("lineup") or []),
+                    ]
+                    if name
+                ],
+                session=current,
+            )
+            _remember_draft_outcomes(current, items, outcomes)
             # Shows and durable result commit together. Outer engine completion is a replay.
             return finish_operation(task_id, result, session=current)
     except _SelectionConflict as error:
@@ -258,5 +319,95 @@ def apply_exact_show_import(execution: dict, task_id: str, *, session=None) -> d
             "verification": {"status": "not_required"},
         }
 
+    except DiagnosticError:
+        raise
+    except Exception as error:
+        return {
+            "execution": {
+                "status": "failed",
+                "error_code": "SHOW_WRITE_FAILED",
+                "error": "The selected batch was not committed. Keep the draft and review or retry.",
+                "failure_class": type(error).__name__,
+                "items": [
+                    {
+                        "item_id": item["candidate"]["item_id"],
+                        "status": "failed",
+                        "code": "BATCH_NOT_APPLIED",
+                    }
+                    for item in items
+                ],
+            },
+            "verification": {"status": "not_required"},
+            "projection": {"status": "not_required"},
+        }
+
 
 __all__ = ["compile_show_import", "apply_exact_show_import"]
+
+
+def _validate_draft_sources(current, candidates, source):
+    ids = list(
+        {row["source_draft_id"] for row in candidates if row.get("source_draft_id")}
+    )
+    if not ids:
+        return
+    if source["provider"] != "manual" or not source.get("actor_user_id"):
+        raise DiagnosticError(
+            "FORBIDDEN",
+            "Only the owning Admin editor can select a private extraction draft",
+        )
+    drafts = (
+        current.execute(
+            text(
+                "SELECT id::text,result FROM show_extraction_drafts WHERE id=ANY(CAST(:ids AS uuid[])) AND actor_user_id=:actor AND expires_at>NOW()"
+            ),
+            {"ids": ids, "actor": source["actor_user_id"]},
+        )
+        .mappings()
+        .all()
+    )
+    evidence_by_id = {row["id"]: row["result"] or {} for row in drafts}
+    allowed = {
+        row["id"]: {
+            candidate["item_id"]
+            for candidate in (row["result"] or {}).get("candidates", [])
+        }
+        for row in drafts
+    }
+    if any(
+        row.get("source_draft_id")
+        and row["item_id"] not in allowed.get(row["source_draft_id"], set())
+        for row in candidates
+    ):
+        raise DiagnosticError(
+            "NOT_FOUND", "An owned draft candidate is missing or expired"
+        )
+    for candidate in candidates:
+        if candidate.get("source_draft_id"):
+            evidence = evidence_by_id[candidate["source_draft_id"]]
+            candidate["extractor"] = evidence.get("extractor")
+            candidate["extractor_model"] = evidence.get("model")
+
+
+def _remember_draft_outcomes(current, items, outcomes):
+    groups = {}
+    result_by_id = {row["item_id"]: row for row in outcomes}
+    for item in items:
+        candidate = item["candidate"]
+        draft_id = candidate.get("source_draft_id")
+        if not draft_id:
+            continue
+        group = groups.setdefault(
+            draft_id, {"id": draft_id, "publication": {}, "candidates": {}}
+        )
+        group["publication"][candidate["item_id"]] = result_by_id[candidate["item_id"]]
+        group["candidates"][candidate["item_id"]] = candidate
+    if not groups:
+        return
+    current.execute(
+        text("""WITH incoming AS (SELECT * FROM jsonb_to_recordset(CAST(:data AS jsonb)) AS x(id text,publication jsonb,candidates jsonb))
+      UPDATE show_extraction_drafts d SET result=jsonb_set(jsonb_set(d.result,'{publication}',coalesce(d.result->'publication','{}'::jsonb)||i.publication),'{candidates}',
+        (SELECT jsonb_agg(coalesce(i.candidates->(e->>'item_id'),e)) FROM jsonb_array_elements(d.result->'candidates') e))
+      FROM incoming i WHERE d.id=CAST(i.id AS uuid)"""),
+        {"data": json.dumps(list(groups.values()))},
+    )

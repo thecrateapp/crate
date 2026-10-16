@@ -131,6 +131,13 @@ def broadcast_invalidation(*scopes: str):
     _get_invalidation_dispatcher().submit(normalized)
 
 
+def broadcast_committed_invalidation(*scopes: str) -> None:
+    """Deliver an already committed outbox invalidation without creating another event."""
+    normalized = tuple(dict.fromkeys(scope for scope in scopes if scope))
+    if normalized:
+        _get_invalidation_dispatcher().submit(normalized)
+
+
 def wait_for_cache_invalidation(*, timeout: float = 2.0) -> bool:
     """Wait until this process has applied queued cache invalidations."""
     dispatcher = _invalidation_dispatcher

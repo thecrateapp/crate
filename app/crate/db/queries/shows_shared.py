@@ -114,6 +114,11 @@ def dedupe_show_rows(shows: list[dict]) -> list[dict]:
     location_to_indexes: dict[str, list[int]] = {}
 
     for show in shows:
+        show = {
+            key: value
+            for key, value in show.items()
+            if key not in {"field_provenance", "identity_key"}
+        }
         location_key = _show_location_key(show)
         existing_index = next(
             (

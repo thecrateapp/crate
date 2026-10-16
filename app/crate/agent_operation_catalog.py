@@ -54,6 +54,8 @@ def public_operation_result(result: dict) -> dict:
 
 
 _OUTCOME_IDENTITIES = (
+    "item_id",
+    "show_id",
     "entity_type",
     "entity_uid",
     "artist_uid",
@@ -66,6 +68,7 @@ _OUTCOME_IDENTITIES = (
     "pipeline",
 )
 _OUTCOME_FIELDS = _OUTCOME_IDENTITIES + (
+    "revision",
     "status",
     "code",
     "error_code",

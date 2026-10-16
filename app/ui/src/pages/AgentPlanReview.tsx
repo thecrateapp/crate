@@ -20,6 +20,13 @@ import type {
 
 const base = "/api/admin/agent-plans";
 const operationCapabilities: Record<string, string> = {
+  shows_import: "curation.shows.write",
+  editorial_change: "curation.playlists.write",
+  job_retry: "ops.tasks.manage",
+  job_cancel: "ops.tasks.manage",
+  schedule_run: "ops.tasks.manage",
+  schedule_update: "ops.tasks.manage",
+  runtime_update: "ops.runtime.manage",
   repair_photo_flag: "library.repair.run",
   health_check: "library.repair.run",
   quality_check: "library.repair.run",
@@ -31,12 +38,27 @@ const operationCapabilities: Record<string, string> = {
   metadata_export: "library.metadata.write",
   metadata_rehydrate: "library.metadata.write",
 };
-const targetIdentity = (target: AgentPlan["targets"][number]) =>
-  target.entity_uid ??
-  target.artist_uid ??
-  (target.entity_type === "library" && target.scope === "global"
-    ? "library:global"
-    : null);
+const targetIdentity = (target: {
+  entity_uid?: unknown;
+  artist_uid?: unknown;
+  entity_type?: unknown;
+  name?: unknown;
+  scope?: unknown;
+}) => {
+  const uid = target.entity_uid ?? target.artist_uid;
+  if (typeof uid === "string" && uid) return uid;
+  if (target.entity_type === "library" && target.scope === "global")
+    return "library:global";
+  if (
+    ["show", "playlist", "task", "schedule", "runtime"].includes(
+      String(target.entity_type),
+    ) &&
+    typeof target.name === "string" &&
+    target.name
+  )
+    return `${target.entity_type}:${target.name}`;
+  return null;
+};
 const valueText = (value: unknown) => JSON.stringify(value, null, 2) ?? "—";
 
 export function AgentPlanReview() {
@@ -98,6 +120,8 @@ function PlanReviewPage({ planId }: { planId?: string }) {
     item.changes.every((change) => {
       const uid = change.entity_uid ?? change.artist_uid;
       if (typeof uid === "string") return identities.includes(uid);
+      const exactIdentity = targetIdentity(change);
+      if (exactIdentity) return identities.includes(exactIdentity);
       if (Array.isArray(change.targets) && change.targets.length > 0)
         return change.targets.every(
           (target) =>
@@ -231,9 +255,11 @@ function PlanReviewPage({ planId }: { planId?: string }) {
               </p>
               <p className="text-sm text-muted-foreground">
                 Integration {item.principal_id}
-                {item.authorization_context.actor_user_id
-                  ? ` · Delegated by user ${item.authorization_context.actor_user_id}`
-                  : " · Service integration"}
+                {item.authorization_context.human_actor_id
+                  ? ` · Admin user ${item.authorization_context.human_actor_id}`
+                  : item.authorization_context.actor_user_id
+                    ? ` · Delegated by user ${item.authorization_context.actor_user_id}`
+                    : " · Service integration"}
                 {item.authorization_context.client_id
                   ? ` · Client ${item.authorization_context.client_id}`
                   : ""}
@@ -252,11 +278,15 @@ function PlanReviewPage({ planId }: { planId?: string }) {
                   </thead>
                   <tbody>
                     {item.changes.map((change, index) => {
-                      const uid = String(
-                        change.entity_uid ??
-                          change.artist_uid ??
-                          "library:global",
-                      );
+                      const nested = Array.isArray(change.targets)
+                        ? change.targets[0]
+                        : null;
+                      const uid =
+                        targetIdentity(change) ??
+                        (nested && typeof nested === "object"
+                          ? targetIdentity(nested)
+                          : null) ??
+                        "library:global";
                       const target = item.targets.find(
                         (entry) => targetIdentity(entry) === uid,
                       );
@@ -267,7 +297,7 @@ function PlanReviewPage({ planId }: { planId?: string }) {
                           className="border-b border-border"
                         >
                           <td className="py-3">
-                            <p>{target?.name ?? uid}</p>
+                            <p>{target?.label ?? target?.name ?? uid}</p>
                             <code className="text-xs text-muted-foreground">
                               {uid}
                             </code>

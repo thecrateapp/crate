@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from crate.db.domain_events import append_domain_event
+from crate.db.repositories.show_invalidation import invalidate_show_views
 from crate.db.tx import optional_scope
 
 
@@ -75,7 +75,7 @@ def consolidate_shows(
         )
         current.execute(
             text("""UPDATE shows SET merged_into_id=:canonical,archived_at=NOW(),identity_key=NULL,updated_at=NOW()
-            WHERE id=ANY(:duplicates)"""),
+            WHERE id=ANY(:duplicates) OR merged_into_id=ANY(:duplicates)"""),
             params,
         )
         lineup = list(
@@ -91,14 +91,7 @@ def consolidate_shows(
             ),
             {**params, "lineup": lineup},
         ).scalar_one()
-        for scope in ("shows", "upcoming", "home"):
-            append_domain_event(
-                "ui.invalidate",
-                {"scope": scope},
-                scope="ui.invalidate",
-                subject_key=scope,
-                session=current,
-            )
+        invalidate_show_views(lineup, session=current)
         return {
             "status": "completed",
             "show_id": canonical_id,

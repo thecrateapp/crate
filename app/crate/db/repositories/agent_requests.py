@@ -19,6 +19,7 @@ from crate.health_issue_text import describe_health_issue
 
 _ACTIVE = ("pending", "running", "delegated", "completing")
 _SCOPES = {
+    "extract_shows": "curation.shows.write",
     "run_health_check": "library.health.run",
     "apply_repairs": "library.repair.photo_flag",
 }
@@ -202,7 +203,7 @@ def _summary(row, replayed=False):
             "This request was accepted previously; its job result has expired",
         )
     result = row["result"]
-    if row["operation"] in {"prepare_operation", "apply_operation"}:
+    if row["operation"] in {"prepare_operation", "apply_operation", "extract_shows"}:
         from crate.agent_operation_catalog import operation_result_summary
 
         result = operation_result_summary(
@@ -349,7 +350,9 @@ def _accept(
             retry_after=5,
         )
     task_type = (
-        "agent_control"
+        "show_extract"
+        if operation == "extract_shows"
+        else "agent_control"
         if payload.get("domain_operation") == "job_cancel"
         else "agent_maintenance"
         if operation in {"prepare_operation", "apply_operation"}
@@ -676,7 +679,9 @@ def _execution_job(current, task_id):
             "STATE_CONFLICT", "Agent job has not been claimed for execution"
         )
     expected = (
-        "agent_control"
+        "show_extract"
+        if job["operation"] == "extract_shows"
+        else "agent_control"
         if job["payload"].get("domain_operation") == "job_cancel"
         else "agent_maintenance"
         if job["operation"] in {"prepare_operation", "apply_operation"}
@@ -767,7 +772,7 @@ def _store_result(current, job, result, status):
         {"result": json.dumps(result, default=str), "id": job["task_id"]},
     )
     task_result = result
-    if job["operation"] in {"prepare_operation", "apply_operation"}:
+    if job["operation"] in {"prepare_operation", "apply_operation", "extract_shows"}:
         from crate.agent_operation_catalog import public_operation_result
 
         task_result = public_operation_result(result)

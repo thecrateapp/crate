@@ -515,6 +515,7 @@ def compile_operation(
         "changes": [
             {
                 "field": "playlist",
+                "targets": [{"entity_type": "playlist", "name": target_name}],
                 "kind": kind,
                 "name": name,
                 "track_count": len(selection)

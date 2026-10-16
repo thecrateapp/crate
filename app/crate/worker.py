@@ -234,6 +234,9 @@ def _run_periodic_cleanup(config: dict | None = None) -> None:
     )
     from crate.db.worker_logs import cleanup_old_logs
 
+    from crate.db.repositories.show_extraction_jobs import cleanup_expired_show_sources
+
+    cleanup_expired_show_sources()
     cleanup_old_events(max_age_hours=48)
     cleanup_old_tasks(max_age_days=7)
     cleanup_expired_sessions(max_age_days=3, stale_age_days=30)
@@ -681,6 +684,11 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "crate.worker_handlers.quality",
         "QUALITY_TASK_HANDLERS",
         ("quality_check",),
+    ),
+    (
+        "crate.worker_handlers.show_imports",
+        "SHOW_IMPORT_TASK_HANDLERS",
+        ("show_extract",),
     ),
     (
         "crate.worker_handlers.agent_library",

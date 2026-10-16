@@ -130,7 +130,14 @@ def get_all_shows(limit: int = 500) -> list[dict]:
             .mappings()
             .all()
         )
-    return [dict(row) for row in rows]
+    return [
+        {
+            key: value
+            for key, value in row.items()
+            if key not in {"field_provenance", "identity_key"}
+        }
+        for row in rows
+    ]
 
 
 def get_upcoming_show_counts() -> dict:

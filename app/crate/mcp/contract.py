@@ -7,7 +7,7 @@ from functools import lru_cache
 
 from mcp_types.version import HANDSHAKE_PROTOCOL_VERSIONS, MODERN_PROTOCOL_VERSIONS
 
-CONTRACT_VERSION = "1.0.0"
+CONTRACT_VERSION = "1.1.0"
 
 
 def contract_metadata() -> dict:
