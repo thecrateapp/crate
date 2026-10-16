@@ -44,6 +44,7 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "health_check": TaskTypeInfo("Health Check", "library"),
     "quality_check": TaskTypeInfo("Library Quality Check", "library"),
     "agent_maintenance": TaskTypeInfo("Agent Library Maintenance", "library"),
+    "agent_control": TaskTypeInfo("Agent Job Control", "library"),
     "fix_issues": TaskTypeInfo("Fix Health Issues", "library"),
     "repair": TaskTypeInfo("Library Repair", "library"),
     "prepare_library_repairs": TaskTypeInfo("Prepare Library Repairs", "library"),

@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, RootModel
+from pydantic import BaseModel, ConfigDict, Field, RootModel, StrictInt
 
 from crate.api.schemas.common import (
     OkResponse,
@@ -11,6 +11,7 @@ from crate.api.schemas.common import (
     TaskEnqueueResponse,
 )
 from crate.api.schemas.analytics import ActivityLiveResponse
+from crate.api.schemas.settings import ScheduleIntervalsRequest
 
 
 class TaskResponse(BaseModel):
@@ -45,13 +46,20 @@ class WorkerStatusResponse(BaseModel):
 
 
 class WorkerSlotsRequest(BaseModel):
-    slots: int | None = None
-    min_slots: int | None = None
+    model_config = ConfigDict(extra="forbid")
+
+    slots: StrictInt | None = Field(default=None, ge=1, le=64)
+    min_slots: StrictInt | None = Field(default=None, ge=1, le=64)
+    expected_revision: StrictInt | None = Field(default=None, ge=0)
 
 
 class WorkerSlotsResponse(BaseModel):
     max_slots: int
     min_slots: int
+    configured_revision: int | None = None
+    effective_revision: int | None = None
+    slot_semantics: str | None = None
+    process_resize: bool = False
 
 
 class WorkerRestartResponse(BaseModel):
@@ -68,18 +76,22 @@ class WorkerScheduleEntryResponse(BaseModel):
     interval_human: str
     last_run: datetime | str | None = None
     enabled: bool
+    revision: str | None = None
+    last_enqueued_at: datetime | str | None = None
+    last_succeeded_at: datetime | str | None = None
 
 
 class WorkerSchedulesResponse(RootModel[dict[str, WorkerScheduleEntryResponse]]):
     pass
 
 
-class WorkerSchedulesUpdateRequest(RootModel[dict[str, int | float]]):
+class WorkerSchedulesUpdateRequest(ScheduleIntervalsRequest):
     pass
 
 
 class WorkerSchedulesUpdateResponse(BaseModel):
     schedules: dict[str, int]
+    revision: str | None = None
 
 
 class TaskCleanByStatusResponse(BaseModel):
@@ -107,6 +119,8 @@ class TaskRetryResponse(BaseModel):
 class TaskCancelResponse(BaseModel):
     status: str
     id: str
+    cancellation_requested: bool = False
+    request_state: str | None = None
 
 
 class TaskConflictResponse(BaseModel):
@@ -135,6 +149,8 @@ class ScheduleRunResponse(BaseModel):
     task_type: str
     task_id: str | None = None
     status: str
+    reason: str | None = None
+    retry_after: int | None = None
 
 
 class TaskTypeCatalogEntry(BaseModel):

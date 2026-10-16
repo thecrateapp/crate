@@ -7,7 +7,30 @@ from crate.agent_operation_catalog import interrupted_operation_result
 from crate.db.tx import read_scope
 
 JOB_FIELDS = """id, type, status, pool, priority, created_at, updated_at,
-    started_at, heartbeat_at, retry_count, max_retries, parent_task_id"""
+    started_at, heartbeat_at, retry_count, max_retries, parent_task_id,
+    origin, actor_user_id, origin_principal_id, retry_of, retry_root, retry_depth,
+    schedule_name, cancellation_requested_at, cancellation_acknowledged_at"""
+
+
+def _effects_sql(alias):
+    fields = (
+        "effects",
+        "applied",
+        "remaining",
+        "processed",
+        "analytics_cache_updated",
+        "artists_scanned",
+        "scanned_tracks",
+        "updated",
+        "failed",
+    )
+    entries = []
+    for field in fields:
+        value = f"COALESCE({alias}.result_json->'execution'->'{field}',{alias}.result_json->'{field}')"
+        entries.append(
+            f"'{field}',CASE WHEN jsonb_typeof({value}) IN ('number','boolean') THEN {value} WHEN jsonb_typeof({value})='string' THEN to_jsonb(LEFT({value}#>>'{{}}',256)) END"
+        )
+    return "jsonb_strip_nulls(jsonb_build_object(" + ",".join(entries) + "))"
 
 
 def read_status_evidence(*, session: Session | None = None) -> dict:
@@ -88,6 +111,7 @@ def read_job(job_id: str, *, session: Session | None = None) -> dict | None:
             current.execute(
                 text(f"""
             SELECT {JOB_FIELDS}, worker_id, max_duration_sec,
+                   {_effects_sql("tasks")} AS partial_effects,
                    LEFT(error, 2048) AS error, LEFT(progress, 2048) AS progress,
                    LEFT(result_json ->> 'status', 80) AS result_status,
                    LEFT(result_json -> 'execution' ->> 'status', 80) AS execution_status,
@@ -102,7 +126,13 @@ def read_job(job_id: str, *, session: Session | None = None) -> dict | None:
                    (SELECT jsonb_build_object('operation', operation,
                               'effect_started', effect_started_at IS NOT NULL,
                               'unrecorded', result IS NULL)
-                    FROM agent_jobs WHERE task_id=tasks.id) AS agent_execution
+                    FROM agent_jobs WHERE task_id=tasks.id) AS agent_execution,
+                   (SELECT jsonb_agg(to_jsonb(c)) FROM (
+                      SELECT id,type,status,cancellation_requested_at,cancellation_acknowledged_at,
+                        {_effects_sql("child")} AS partial_effects,
+                        LEFT(result_json->'execution'->>'status',80) AS execution_status,
+                        LEFT(result_json->'verification'->>'status',80) AS verification_status
+                      FROM tasks child WHERE parent_task_id=tasks.id ORDER BY created_at,id LIMIT 101) c) AS children
             FROM tasks WHERE id = :id
         """),
                 {"id": job_id},
@@ -113,6 +143,10 @@ def read_job(job_id: str, *, session: Session | None = None) -> dict | None:
         if row is None:
             return None
         job = dict(row)
+        children = job.get("children") or []
+        job["children_truncated"] = len(children) > 100
+        job["children"] = children[:100]
+        job["cancellation_requested"] = job["cancellation_requested_at"] is not None
         evidence = job.pop("agent_execution")
         if evidence and evidence["unrecorded"]:
             result = interrupted_operation_result(
@@ -164,4 +198,49 @@ def read_worker_logs(
         return _impl(current)
 
 
-__all__ = ["read_job", "read_jobs", "read_status_evidence", "read_worker_logs"]
+__all__ = [
+    "read_job",
+    "read_jobs",
+    "read_status_evidence",
+    "read_worker_logs",
+    "read_audit_rows",
+]
+
+
+def read_audit_rows(*, since, until, task_id=None, before=None, limit=20, session=None):
+    def _read(current):
+        current.execute(text("SET LOCAL statement_timeout='5s'"))
+        clauses = ["timestamp>=:since", "timestamp<=:until"]
+        params = {"since": since, "until": until, "limit": min(max(limit, 1), 101)}
+        if task_id:
+            clauses.append("(task_id=:task OR details_json->>'job_id'=:task)")
+            params["task"] = task_id
+        if before:
+            if not isinstance(before, list) or len(before) != 2:
+                raise ValueError("Invalid audit cursor")
+            clauses.append(
+                "(timestamp,id)<(CAST(:before_time AS timestamptz),CAST(:before_id AS integer))"
+            )
+            params.update(before_time=before[0], before_id=before[1])
+        return [
+            dict(row)
+            for row in current.execute(
+                text(
+                    """SELECT id,timestamp,LEFT(action,128) AS action,
+            LEFT(target_type,128) AS target_type,LEFT(target_name,256) AS target_name,
+            user_id,task_id,
+            jsonb_build_object('principal_id',details_json->>'principal_id','actor_user_id',details_json->>'actor_user_id',
+              'job_id',details_json->>'job_id','plan_id',details_json->>'plan_id',
+              'tool',LEFT(details_json->>'tool',128),'event',LEFT(details_json->>'event',128)) AS details
+            FROM audit_log WHERE """
+                    + " AND ".join(clauses)
+                    + " ORDER BY timestamp DESC,id DESC LIMIT :limit"
+                ),
+                params,
+            ).mappings()
+        ]
+
+    if session is not None:
+        return _read(session)
+    with read_scope() as current:
+        return _read(current)

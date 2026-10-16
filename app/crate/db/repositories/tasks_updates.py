@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
+from crate.db.repositories.runtime_policy import admit_task_start
 from crate.db.repositories.tasks_mutation_shared import utc_now_iso
 from crate.db.repositories.tasks_shared import register_tasks_surface_signal
 from crate.db.tx import optional_scope
@@ -13,11 +14,24 @@ TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
 
 
 def start_task(
-    task_id: str, *, worker_id: str | None = None, session=None
+    task_id: str,
+    *,
+    worker_id: str | None = None,
+    session=None,
+    expected_policy_revision: int | None = None,
+    expected_policy_hash: str | None = None,
 ) -> dict | None:
     now = utc_now_iso()
     with optional_scope(session) as s:
         register_tasks_surface_signal(s)
+        if not admit_task_start(
+            s,
+            task_id,
+            worker_id,
+            expected_revision=expected_policy_revision,
+            expected_hash=expected_policy_hash,
+        ):
+            return None
         row = (
             s.execute(
                 text(
@@ -30,7 +44,7 @@ def start_task(
                     worker_id = :worker_id,
                     error = NULL
                 WHERE id = :id
-                  AND status = 'pending'
+                  AND status = 'pending' AND cancellation_requested_at IS NULL
                 RETURNING *
                 """
                 ),
@@ -91,7 +105,7 @@ def update_task(
         row = (
             s.execute(
                 text(
-                    f"UPDATE tasks SET {', '.join(fields)} WHERE id = :task_id RETURNING type"
+                    f"UPDATE tasks SET {', '.join(fields)} WHERE id = :task_id AND status NOT IN ('completed','failed','cancelled') RETURNING type"
                 ),
                 params,
             )
@@ -134,7 +148,7 @@ def fail_or_retry_task(task_id: str, error: str, *, session=None) -> str:
             s.execute(
                 text(
                     """
-                SELECT status, retry_count, max_retries, type
+                SELECT status, retry_count, max_retries, type, cancellation_requested_at
                 FROM tasks
                 WHERE id = :id
                 FOR UPDATE
@@ -159,7 +173,7 @@ def fail_or_retry_task(task_id: str, error: str, *, session=None) -> str:
 
         retry_count = int(row.get("retry_count") or 0)
         max_retries = int(row.get("max_retries") or 0)
-        if retry_count < max_retries:
+        if retry_count < max_retries and row["cancellation_requested_at"] is None:
             next_retry = retry_count + 1
             s.execute(
                 text(
@@ -193,7 +207,12 @@ def fail_or_retry_task(task_id: str, error: str, *, session=None) -> str:
                     updated_at = :now,
                     heartbeat_at = NULL,
                     worker_id = NULL,
-                    error = :error
+                    error = :error,
+                    result_json = CASE WHEN cancellation_requested_at IS NOT NULL
+                        THEN COALESCE(result_json,'{}'::jsonb) || jsonb_build_object(
+                            'execution',COALESCE(result_json->'execution','{}'::jsonb)||'{"status": "partial"}'::jsonb,
+                            'verification',COALESCE(result_json->'verification','{}'::jsonb)||'{"status": "manual_reconciliation_required"}'::jsonb)
+                        ELSE result_json END
                 WHERE id = :id
                 """
             ),

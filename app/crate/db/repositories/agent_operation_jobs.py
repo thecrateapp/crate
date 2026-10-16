@@ -42,17 +42,42 @@ def prepare_operation(
         "required_grants": [grant],
         "target_keys": [],
     }
+    control = operation in {"job_retry", "job_cancel"}
+    request_hash = (
+        requests._hash({"domain_operation": operation, "parameters": parameters})
+        if control
+        else requests._hash(payload)
+    )
     key = requests._key(idempotency_key)
     with optional_scope(session) as current:
         requests._authorize(current, principal, {grant})
         requests._lock_principal(current, principal.id)
         replay = requests._replay(
-            current, principal, "prepare_operation", key, requests._hash(payload)
+            current, principal, "prepare_operation", key, request_hash
         )
         if replay:
+            accepted = requests._job(current, replay["job_id"])
+            if accepted is None:
+                raise DiagnosticError(
+                    "RESULT_EXPIRED", "Previously accepted job has expired"
+                )
+            requests._authorize(current, principal, accepted["required_grants"])
             return replay
+        if control:
+            from crate.db.repositories.agent_task_control import inspect_control
+
+            payload["required_grants"] = inspect_control(
+                principal, operation, parameters, session=current
+            )["required_grants"]
+            requests._authorize(current, principal, payload["required_grants"])
         return requests._accept(
-            current, principal, "prepare_operation", payload, key, trace_id=trace_id
+            current,
+            principal,
+            "prepare_operation",
+            payload,
+            key,
+            request_hash=request_hash,
+            trace_id=trace_id,
         )
 
 

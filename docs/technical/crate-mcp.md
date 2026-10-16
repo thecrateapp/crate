@@ -8,6 +8,13 @@ order: 170
 verified: 2026-10-16
 sources:
   [
+    app/crate/agent_operations.py,
+    app/crate/agent_instance_operations.py,
+    app/crate/agent_runtime.py,
+    app/crate/runtime_policy_contract.py,
+    app/crate/db/repositories/task_control.py,
+    app/crate/db/repositories/agent_task_control.py,
+    app/crate/db/repositories/runtime_policy.py,
     app/crate/mcp/server.py,
     app/crate/mcp/auth.py,
     app/crate/mcp/oauth.py,
@@ -63,8 +70,9 @@ sources:
 Crate exposes an optional MCP endpoint for remote agents to inspect and maintain the local library.
 OAuth/service credentials, integration management and exact human approval share one persisted
 plan/job engine. Phase 4 extends it with selected checks, quality, repairs, metadata, enrichment,
-analysis, indexed-album sync and metadata portability. Instance operations and editorial playlists
-remain later phases. Deployment and action flags remain disabled by default.
+analysis, indexed-album sync and metadata portability. Phase 5 adds scoped instance operations,
+schedules and revisioned runtime policy. Editorial playlists, final rollout and assisted shows remain
+later phases. Deployment and action flags remain disabled by default.
 
 ## Connection and deployment
 
@@ -80,7 +88,7 @@ producer. Existing migrations must be applied before issuing credentials. Keepin
 disabled leaves the endpoint unavailable and does not start its health snapshot producer.
 Actions additionally require `CRATE_MCP_ACTIONS_ENABLED=true` in the API and maintenance worker.
 Both flags default to false; granting an action scope alone does not enable actions.
-Apply migrations through 114 before using the phase 4 catalog. Migration 114 extends the existing
+Apply migrations through 115 before using the current catalog. Migration 114 extends the existing
 plan/job tables and adds private artifacts and DSP generation/claim provenance; it does not create
 a second agent execution engine.
 
@@ -813,3 +821,105 @@ HTTP compiler/filesystem/DSP calls**.
 Evidence: [measurement JSON](../testing/measurements/crate-mcp-phase4-library-load-2026-10-16.json).
 Reproduce the focused benchmark from `app/` with
 `../.venv/bin/python -m pytest tests/test_mcp_library_performance.py -q`.
+
+## Phase 5 instance operations — 2026-10-16
+
+Phase 5 adds 12 tools (40 total) and eight explicitly provisioned grants (24 total).
+Migrations through **115** are required. Both MCP flags still default to false; no deployment
+or production activation is included.
+
+| Tools                                               | Required grant                         | Contract                                                                                                               |
+| --------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `read_audit`                                        | `ops.audit.read`                       | Sanitized, bounded, cursor-paginated audit evidence; at most 24 hours. No arbitrary details or credentials.            |
+| `list_schedules`                                    | `ops.schedules.read`                   | Pure reads of 16 known schedules, revision, last enqueue and last success, with operation-specific readiness.          |
+| `get_runtime_policy`                                | `ops.runtime.read`                     | Configured policy, consumer observations and effective revision are distinct.                                          |
+| `preview_job_retry` / `apply_job_retry`             | `ops.jobs.retry` plus original grants  | Exact source, reviewed task variant, three-retry lineage budget, one active retry, no parameter cloning.               |
+| `preview_job_cancel` / `apply_job_cancel`           | `ops.jobs.cancel` plus original grants | Cooperative cancellation of reviewed pending/running/delegated work; never finalizing work.                            |
+| `run_schedule`                                      | `ops.schedules.run`                    | Prepare an exact plan, then apply its approved ID/version. Governor, enabled state, windows and dedup remain in force. |
+| `preview_schedule_update` / `apply_schedule_update` | `ops.schedules.write`                  | Known schedule, interval 0–2,678,400 seconds and expected revision. No arbitrary cron/settings.                        |
+| `preview_runtime_update` / `apply_runtime_update`   | `ops.runtime.write`                    | Closed typed policy, expected revision, coherent limits and IANA time zones. Human approval is mandatory.              |
+
+Job control defaults to the same integration and exact delegated authorization context.
+Controlling reviewed Admin/scheduler work additionally requires explicit `scope=instance` and
+`ops.jobs.manage_instance`. That grant does not allow access to another integration's jobs or
+replace the original operation grants. Historical tasks with unknown provenance are not attributed
+speculatively to Admin or the scheduler.
+
+The reviewed retry variants are `compute_analytics` with no parameters and `quality_check` with
+exactly `scope=global`. The server reconstructs those inputs. Directed phase-2 health retry and
+pending cancellation remain supported by the original `retry_job` / `cancel_job` tools. Repairs,
+delegated children and work with uncertain cancellation effects require reconciliation or a new
+domain plan. The expanded cancellation catalog also includes directed health checks, popularity
+work and shared agent maintenance. The initially runnable MCP schedule is `compute_analytics`;
+other schedule entries explicitly report their missing reviewed execution contract. Their typed
+intervals remain manageable.
+
+A running cancellation persists `cancellation_requested_at` while the task remains running.
+Workers check the signal and current retained authority, preserve partial effects and acknowledge
+only when execution returns. Delegated requests propagate to children; parents wait for running
+children, skip finalizers and acknowledge from the leaves upward. Pending descendants never start.
+Completion races preserve the terminal winner. Exceptions, timeouts and lost heartbeats after a
+request produce failed work requiring reconciliation, without claiming a confirmed stop or retrying
+automatically. `get_job` exposes bounded provenance, retry ancestry, children, requests/acks and a
+closed partial-effects projection; full agent execution evidence stays in the owned plan/result.
+
+Cancellation preparation/application uses the closed `agent_control` task on the fast queue
+(60-second timeout, no automatic retry). One global control command can run independently of normal
+work admission limits, so a full work limit cannot prevent a cancellation request. The handler
+accepts only `job_cancel`; it cannot run a library operation through that reserved slot. Normal
+agent work retains the existing per-integration active-job budget, with a separate bounded
+cancellation command. Library target reservations do not block unrelated runtime/control targets.
+
+Runtime limits apply to **new task starts** across the actual Dramatiq pools. They do not resize
+OS processes or kill running work. The claim transaction checks the exact revision/hash used by
+resource admission; a policy change defers the claim. Each consumer records the policy actually
+used. `effective_revision` stays null until all required current consumer observations match;
+idle pools can legitimately leave adoption pending. Reading a policy or sending a heartbeat never
+acknowledges it. Missing listener evidence blocks downloads when its corresponding limit is enabled.
+
+Admin schedules, worker limits and download settings use the same repositories, CAS and validation.
+Legacy interval maps remain accepted. Worker `slots` / `max_workers` now describe real concurrency
+admission; pool caps are clamped when lowering the total. Unsupported `min_slots>1` returns 422
+because Dramatiq provides no minimum-process autoscaling control. Admin shows configured concurrency
+separately from observed process capacity and displays cancellation requests without premature success.
+`read_diagnostics(source=metric_series)` exposes seven enumerated persisted series, at most 100 minute
+buckets and 100 returned samples. Missing samples are unavailable evidence, never zero/healthy data.
+
+Rollback 115 fences pending/active phase-5 agent work before dropping retained authorization fields,
+disables integrations whose grants are no longer supported and preserves the shipped phase-4 data.
+Stop workers before schema downgrade and reconcile any effects of previously active work.
+
+### Phase 5 validation
+
+Independent specification and quality/security reviews passed after regression fixes for task
+lifecycle races, replay after source changes, agent-worker cancellation acknowledgements, the exact
+quality retry variant and unavailable download telemetry. Focused PostgreSQL-backed tests and official
+MCP SDK calls exercise original/instance authority, revoked scopes, closed inputs, human approval,
+concurrent claims/retries, cancellation effects/children, CAS, pure reads and real policy adoption.
+
+Reproduce relevant selections from the repository root (sequentially when using a shared test database):
+
+```bash
+cd app
+../.venv/bin/python -m pytest tests/test_task_cooperative_cancellation.py tests/test_task_control_actor.py tests/test_mcp_operations.py -q
+../.venv/bin/python -m pytest tests/test_agent_runtime_policy.py tests/test_agent_runtime_admin_api.py -q
+../.venv/bin/python -m pytest tests/test_scheduler.py tests/test_resource_governor.py tests/test_global_catalog_scheduler.py -q
+../.venv/bin/python -m pytest tests/test_agent_instance_migration.py tests/test_agent_library_migration.py tests/test_agent_access_migration.py -q
+../.venv/bin/python -m pytest tests/test_task_runtime_contract.py tests/test_task_queue_routing.py tests/test_tasks_api.py -q
+```
+
+Admin's changed Tasks/permission-label contracts, API/schema/runtime boundaries, Ruff, Pyright,
+changed-file ESLint/type checks and the medium/high-confidence Bandit gate are part of this cut's
+verification. Complete suites remain reserved for the end of feature development, as requested.
+The previous phase-4 commit `7af26ed5` completed all CI jobs; its persistent review has no security
+finding and only a conditional import-order suggestion already covered by green Ruff/CI checks.
+The new commit's CI and persistent review must be checked before beginning the next phase.
+
+Validation selections at this cut: **274 distinct phase-5 cases**, **73 transport/discovery/recording
+contracts**, **20 migration/rollback and schedule compatibility cases**, **77 legacy task/runtime
+and routing cases** (two additive-response fixtures were updated and rechecked), **135 API/schema
+and DB-boundary cases**, **8 task-surface/hash cases** and **9 Admin UI cases**. The shared engine
+selection also preserves phase-2/4 workflows. These sets overlap; do not add their counts. Pyright
+reported zero errors; the local environment retained a pre-existing `requests` source-resolution
+warning in Admin metrics. The OpenAPI selection also emits existing duplicate Operation ID warnings.
+No complete backend/frontend suite was run for this cut.

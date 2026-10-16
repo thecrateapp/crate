@@ -116,7 +116,10 @@ def test_enabled_actions_publish_closed_schemas_and_accurate_effect_hints(
         async with app.router.lifespan_context(app), _client(app, token) as session:
             client, initialization = session
             tools = (await client.list_tools()).tools
-            assert {tool.name for tool in tools} == READ_NAMES | ACTION_NAMES
+            assert {tool.name for tool in tools} == READ_NAMES | ACTION_NAMES | {
+                "preview_job_retry",
+                "apply_job_retry",
+            }
             for tool in tools:
                 assert tool.input_schema["additionalProperties"] is False
                 assert tool.output_schema["additionalProperties"] is False
@@ -174,7 +177,16 @@ def test_actions_are_disabled_by_default_even_with_action_grants(
             frozenset({"library.repair.photo_flag"}),
             {"preview_repairs", "apply_repairs", "get_operation_catalog", "get_plan"},
         ),
-        (frozenset({"ops.jobs.retry"}), {"retry_job", "get_operation_catalog"}),
+        (
+            frozenset({"ops.jobs.retry"}),
+            {
+                "retry_job",
+                "preview_job_retry",
+                "apply_job_retry",
+                "get_operation_catalog",
+                "get_plan",
+            },
+        ),
         (
             frozenset({"ops.jobs.cancel_pending"}),
             {"cancel_job", "get_operation_catalog"},

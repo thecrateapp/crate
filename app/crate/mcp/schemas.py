@@ -345,7 +345,20 @@ class JobRetryInput(JobInput):
 
 
 class DiagnosticsInput(ClosedInput):
-    source: Literal["worker_logs", "worker_status", "analysis_status"]
+    source: Literal["worker_logs", "worker_status", "analysis_status", "metric_series"]
+    series: (
+        Literal[
+            "worker.queue.wait",
+            "worker.task.duration",
+            "worker.queue.depth",
+            "worker.queue.running",
+            "worker.resource.defer_seconds",
+            "worker.resource.load_ratio",
+            "worker.resource.memory_available_percent",
+        ]
+        | None
+    ) = None
+    minutes: Annotated[int, Field(strict=True, ge=1, le=100)] = 60
     task_id: Identifier | None = None
     since: datetime | None = None
     until: datetime | None = None
@@ -353,6 +366,12 @@ class DiagnosticsInput(ClosedInput):
 
     @model_validator(mode="after")
     def validate_source_filters(self):
+        if (self.source == "metric_series") != bool(self.series):
+            raise ValueError(
+                "An enumerated metric series is required only for metric_series"
+            )
+        if self.source != "metric_series" and "minutes" in self.model_fields_set:
+            raise ValueError("Minute windows apply only to metrics")
         if self.source != "worker_logs" and any((self.task_id, self.since, self.until)):
             raise ValueError("Time and task filters apply only to worker_logs")
         for value in (self.since, self.until):

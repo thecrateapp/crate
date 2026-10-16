@@ -11,6 +11,9 @@ from crate.db.schema_sections import (
 from crate.db.schema_sections.agent_access_v109 import create_agent_access_v109_schema
 from crate.db.schema_sections.agent_admin_v113 import create_agent_admin_v113_schema
 from crate.db.schema_sections.agent_library_v114 import create_agent_library_v114_schema
+from crate.db.schema_sections.agent_operations_v115 import (
+    create_agent_operations_v115_schema,
+)
 from crate.db.schema_sections.agent_commands_v111 import (
     create_agent_commands_v111_schema,
 )
@@ -36,6 +39,7 @@ def create_schema(cur):
     create_agent_admin_v113_schema(cur)
     create_library_schema(cur)
     create_agent_library_v114_schema(cur)
+    create_agent_operations_v115_schema(cur)
     cur.execute(
         """
         DELETE FROM stream_variants sv

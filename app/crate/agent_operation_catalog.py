@@ -6,6 +6,11 @@ from collections import Counter
 from uuid import UUID
 
 OPERATIONS = {
+    "job_retry": ("ops.jobs.retry", "ops.tasks.manage"),
+    "job_cancel": ("ops.jobs.cancel", "ops.tasks.manage"),
+    "schedule_run": ("ops.schedules.run", "ops.tasks.manage"),
+    "schedule_update": ("ops.schedules.write", "ops.tasks.manage"),
+    "runtime_update": ("ops.runtime.write", "ops.runtime.manage"),
     "health_check": ("library.health.run", "library.repair.run"),
     "quality_check": ("library.quality.run", "library.repair.run"),
     "repairs": ("library.repair.run", "library.repair.run"),
@@ -76,6 +81,13 @@ _OUTCOME_FIELDS = _OUTCOME_IDENTITIES + (
     "expires_in_seconds",
     "published",
     "scanned_tracks",
+    "task_id",
+    "retry_of",
+    "request_state",
+    "configured_revision",
+    "effective_revision",
+    "reason",
+    "cancellation_requested",
 )
 
 
@@ -161,6 +173,8 @@ def operation_result_summary(result: dict | None, *, plan_id=None, job_id=None):
         "include_audio",
         "checks",
         "failed_checks",
+        "configured_revision",
+        "effective_revision",
     ):
         if key in execution:
             summary["execution"][key] = execution[key]

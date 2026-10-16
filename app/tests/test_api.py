@@ -1591,21 +1591,13 @@ class TestWorkerAPI:
             assert data["running"] == 1
             assert data["pending"] == 1
 
-    def test_worker_schedules(self, test_app):
-        mock_schedules = {
-            "library_sync": 1800,
-            "enrich_artists": 86400,
-        }
-        with (
-            patch("crate.api.tasks.get_schedules", return_value=mock_schedules),
-            patch("crate.api.tasks.get_setting", return_value=None),
-        ):
-            resp = test_app.get("/api/worker/schedules")
-            assert resp.status_code == 200
-            data = resp.json()
-            assert "library_sync" in data
-            assert data["library_sync"]["interval_seconds"] == 1800
-            assert data["library_sync"]["enabled"] is True
+    def test_worker_schedules(self, pg_db, test_app):
+        resp = test_app.get("/api/worker/schedules")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "library_pipeline" in data
+        assert data["library_pipeline"]["interval_seconds"] == 86400
+        assert data["library_pipeline"]["enabled"] is True
 
 
 class TestTasksAPI:

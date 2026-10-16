@@ -19,7 +19,25 @@ from tests.test_mcp_actions import action_transport as action_transport  # noqa:
 from tests.test_mcp_oauth_integration import _code, _exchange
 from tests.test_mcp_oauth_integration import oauth_env as oauth_env  # noqa: PLC0414 — pytest fixture registration.
 
-NEW_READS = {"get_operation_catalog", "get_plan", "get_library_quality"}
+NEW_READS = {
+    "get_operation_catalog",
+    "get_plan",
+    "get_library_quality",
+    "read_audit",
+    "list_schedules",
+    "get_runtime_policy",
+}
+INSTANCE_ACTIONS = {
+    "preview_job_retry",
+    "apply_job_retry",
+    "preview_job_cancel",
+    "apply_job_cancel",
+    "run_schedule",
+    "preview_schedule_update",
+    "apply_schedule_update",
+    "preview_runtime_update",
+    "apply_runtime_update",
+}
 PLAN_ID = "a3df9dca-dca2-42f0-b35b-dbf5ddf1c89f"
 
 
@@ -37,6 +55,17 @@ PLAN_ID = "a3df9dca-dca2-42f0-b35b-dbf5ddf1c89f"
             {"get_operation_catalog", "get_plan"},
         ),
         (frozenset({"library.health.run"}), {"get_operation_catalog", "get_plan"}),
+        (frozenset({"ops.audit.read"}), {"get_operation_catalog", "read_audit"}),
+        (
+            frozenset({"ops.schedules.read"}),
+            {"get_operation_catalog", "list_schedules"},
+        ),
+        (
+            frozenset({"ops.runtime.read"}),
+            {"get_operation_catalog", "get_runtime_policy"},
+        ),
+        (frozenset({"ops.jobs.cancel"}), {"get_operation_catalog", "get_plan"}),
+        (frozenset({"ops.runtime.write"}), {"get_operation_catalog", "get_plan"}),
     ],
 )
 def test_new_reads_have_independent_discovery_and_call_authorization(
@@ -49,7 +78,12 @@ def test_new_reads_have_independent_discovery_and_call_authorization(
     operations = {}
     for name in NEW_READS:
         operation = Mock(side_effect=AssertionError("Denied call reached service"))
-        monkeypatch.setattr(f"crate.agent_discovery.{name}", operation)
+        module = {
+            "read_audit": "agent_diagnostics",
+            "list_schedules": "agent_operations",
+            "get_runtime_policy": "agent_operations",
+        }.get(name, "agent_discovery")
+        monkeypatch.setattr(f"crate.{module}.{name}", operation)
         operations[name] = operation
 
     async def run():
@@ -94,6 +128,7 @@ def test_operation_catalog_describes_real_tools_and_only_supported_repairs(
                 name for name, item in operations.items() if item["status"] == "enabled"
             } == advertised
             assert NEW_READS <= operations.keys()
+            assert INSTANCE_ACTIONS <= operations.keys()
             assert operations["run_quality_check"]["status"] == (
                 "disabled" if enabled == "false" else "denied"
             )
@@ -136,6 +171,16 @@ def test_operation_catalog_distinguishes_missing_grants_from_disabled_actions(
             ]
             assert operations["get_library_quality"]["limits"]["page_size"] == 100
             assert operations["apply_repairs"]["status"] == "denied"
+            assert operations["get_runtime_policy"]["required_grants"] == [
+                "ops.runtime.read"
+            ]
+            assert operations["list_schedules"]["required_grants"] == [
+                "ops.schedules.read"
+            ]
+            assert operations["read_audit"]["required_grants"] == ["ops.audit.read"]
+            assert operations["preview_job_cancel"]["required_grants"] == [
+                "ops.jobs.cancel"
+            ]
             assert (
                 operations["read_diagnostics"]["grants_by_source"]["worker_logs"]
                 == "ops.logs.read"

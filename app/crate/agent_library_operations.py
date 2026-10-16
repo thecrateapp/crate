@@ -10,6 +10,11 @@ from crate.db.queries.agent_operation_targets import operation_target_keys
 from crate.db.repositories import agent_operation_jobs as jobs
 
 _ADAPTERS = {
+    "job_retry": "crate.agent_instance_operations",
+    "job_cancel": "crate.agent_instance_operations",
+    "schedule_run": "crate.agent_instance_operations",
+    "schedule_update": "crate.agent_runtime",
+    "runtime_update": "crate.agent_runtime",
     "health_check": "crate.agent_health",
     "quality_check": "crate.agent_health",
     "repairs": "crate.agent_repairs",
@@ -114,7 +119,14 @@ def execute_operation_job(task_id: str, config: dict) -> dict:
                     "CANCELLED", "Operation cancellation was requested"
                 )
             compiled = adapter.compile_operation(
-                operation, job["payload"]["parameters"], config
+                operation,
+                job["payload"]["parameters"],
+                config,
+                **(
+                    {"principal": jobs.requests._principal_for_job(job)}
+                    if operation in {"job_retry", "job_cancel", "schedule_run"}
+                    else {}
+                ),
             )
             compiled["execution"]["target_keys"] = operation_target_keys(
                 compiled["document"]["targets"]

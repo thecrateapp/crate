@@ -4,6 +4,7 @@ import asyncio
 import json
 import socket
 from contextlib import asynccontextmanager, nullcontext
+from dataclasses import replace
 from unittest.mock import AsyncMock, Mock
 
 import httpx2
@@ -26,6 +27,11 @@ TOOL_NAMES = {
     "list_jobs",
     "get_job",
     "read_diagnostics",
+}
+INSTANCE_READS = {
+    "read_audit": ("ops.audit.read", "agent_diagnostics"),
+    "list_schedules": ("ops.schedules.read", "agent_operations"),
+    "get_runtime_policy": ("ops.runtime.read", "agent_operations"),
 }
 
 
@@ -137,6 +143,53 @@ def test_discovery_filters_each_request_and_call_still_enforces_scope(transport_
                 assert "FORBIDDEN" in json.dumps(result.model_dump(mode="json"))
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("name", INSTANCE_READS)
+def test_instance_reads_require_their_exact_grant_and_return_audited_evidence(
+    transport_app, diagnostic_boundary, monkeypatch, name
+):
+    app, tokens, principals = transport_app
+    admission, audit = diagnostic_boundary
+    grant, module = INSTANCE_READS[name]
+    principal = replace(principals[tokens["all"]], grants=frozenset({grant}))
+    principals[tokens["all"]] = principal
+    payload = {
+        "schema_version": "1",
+        "availability": "available",
+        "source": "fixture",
+        "observed_at": "2026-10-16T00:00:00Z",
+        "data": {"tool": name},
+    }
+    read = Mock(return_value=payload)
+    monkeypatch.setattr(f"crate.{module}.{name}", read)
+
+    async def run():
+        async with (
+            app.router.lifespan_context(app),
+            _client(app, tokens["all"]) as client,
+        ):
+            listed = (await client.list_tools()).tools
+            assert {tool.name for tool in listed} & INSTANCE_READS.keys() == {name}
+            tool = next(tool for tool in listed if tool.name == name)
+            assert tool.input_schema["additionalProperties"] is False
+            assert tool.annotations.read_only_hint is True
+            assert tool.annotations.destructive_hint is False
+            for denied in INSTANCE_READS.keys() - {name}:
+                result = await client.call_tool(denied, {})
+                assert result.is_error is True
+                assert result.structured_content["error"]["code"] == "FORBIDDEN"
+            admission.assert_not_called()
+            result = await client.call_tool(name, {})
+            assert result.is_error is False
+            assert result.structured_content == payload
+
+    asyncio.run(run())
+    read.assert_called_once()
+    admission.assert_called_once_with(principal.id)
+    audit.assert_called_once()
+    assert audit.call_args.kwargs["details"]["tool"] == name
+    assert audit.call_args.kwargs["details"]["principal_id"] == principal.id
 
 
 @pytest.mark.parametrize(

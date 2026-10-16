@@ -22,7 +22,18 @@ ACTION_GRANTS = frozenset(
     }
 )
 ACTION_GRANTS = ACTION_GRANTS | frozenset(value[0] for value in OPERATIONS.values())
-ALLOWED_GRANTS = PILOT_GRANTS | ACTION_GRANTS
+ALLOWED_GRANTS = (
+    PILOT_GRANTS
+    | ACTION_GRANTS
+    | frozenset(
+        {
+            "ops.audit.read",
+            "ops.jobs.manage_instance",
+            "ops.schedules.read",
+            "ops.runtime.read",
+        }
+    )
+)
 SCOPE_CAPABILITIES = {
     "library.health.read": "library.view",
     "library.health.run": "library.repair.run",
@@ -32,6 +43,10 @@ SCOPE_CAPABILITIES = {
     "ops.jobs.retry": "ops.tasks.manage",
     "ops.jobs.cancel_pending": "ops.tasks.manage",
     "ops.logs.read": "ops.logs.view",
+    "ops.audit.read": "audit.view",
+    "ops.jobs.manage_instance": "ops.tasks.manage",
+    "ops.schedules.read": "ops.tasks.manage",
+    "ops.runtime.read": "ops.runtime.manage",
 }
 SCOPE_CAPABILITIES.update(
     {grant: capability for grant, capability in OPERATIONS.values()}

@@ -6,7 +6,7 @@ from importlib import import_module
 
 from crate.db.cache_store import set_cache
 from crate.db.init_db import init_db
-from crate.db.queries.tasks import get_task, get_task_activity_snapshot
+from crate.db.queries.tasks import get_task_activity_snapshot
 from crate.db.repositories.tasks import (
     cleanup_zombie_tasks,
     redispatch_stale_pending_tasks,
@@ -50,11 +50,9 @@ def _configured_worker_slots(config: dict) -> int:
 
 
 def _is_cancelled(task_id: str) -> bool:
-    try:
-        task = get_task(task_id)
-        return task is not None and task.get("status") == "cancelled"
-    except Exception:
-        return False
+    from crate.worker_handlers import is_cancelled
+
+    return is_cancelled(task_id)
 
 
 def run_worker(config: dict):
@@ -687,7 +685,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "crate.worker_handlers.agent_library",
         "AGENT_LIBRARY_TASK_HANDLERS",
-        ("agent_maintenance",),
+        ("agent_maintenance", "agent_control"),
     ),
     (
         "crate.worker_handlers.management",

@@ -144,6 +144,7 @@ class ActivitySystemsResponse(BaseModel):
 
 
 class ActivityLiveResponse(BaseModel):
+    admission_policy: dict[str, Any] | None = None
     engine: str | None = None
     running_tasks: list[RunningTaskResponse] = Field(default_factory=list)
     pending_tasks: list[RunningTaskResponse] = Field(default_factory=list)

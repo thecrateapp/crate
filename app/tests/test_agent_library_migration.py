@@ -6,7 +6,6 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
 
-from crate.agent_access import ALLOWED_GRANTS
 from crate.db.schema_bootstrap import create_schema
 from crate.db.schema_sections.agent_library_v114 import create_agent_library_v114_schema
 
@@ -14,6 +13,25 @@ from tests.agent_command_fixtures import observed_plan
 from tests.test_agent_access_migration import RecordingExecutor
 
 pytest_plugins = ["tests.agent_command_fixtures"]
+
+LIBRARY_V114_GRANTS = {
+    "library.health.read",
+    "ops.status.read",
+    "ops.jobs.read",
+    "ops.logs.read",
+    "library.health.run",
+    "library.repair.photo_flag",
+    "ops.jobs.retry",
+    "ops.jobs.cancel_pending",
+    "library.quality.run",
+    "library.repair.run",
+    "library.metadata.write",
+    "library.enrichment.run",
+    "library.analysis.run",
+    "library.sync.run",
+    "library.metadata.export",
+    "library.metadata.rehydrate",
+}
 
 
 def test_library_migration_and_bootstrap_use_identical_frozen_ddl(monkeypatch):
@@ -43,7 +61,9 @@ def test_library_migration_and_bootstrap_use_identical_frozen_ddl(monkeypatch):
     create_agent_library_v114_schema(frozen)
     assert frozen.statements == before
     assert "future.scope" not in " ".join(frozen.statements)
-    assert all(f"'{scope}'" in " ".join(frozen.statements) for scope in ALLOWED_GRANTS)
+    assert all(
+        f"'{scope}'" in " ".join(frozen.statements) for scope in LIBRARY_V114_GRANTS
+    )
 
 
 def test_library_migration_rollback_preserves_legacy_photo_plans_and_removes_new_jobs(
@@ -84,11 +104,16 @@ def test_library_migration_rollback_preserves_legacy_photo_plans_and_removes_new
     migration = import_module(
         "crate.db.migrations.versions.114_agent_library_operations"
     )
+    instance_migration = import_module(
+        "crate.db.migrations.versions.115_agent_instance_operations"
+    )
 
     with get_engine().connect() as connection:
         context = MigrationContext.configure(connection)
         monkeypatch.setattr(migration, "op", Operations(context))
+        monkeypatch.setattr(instance_migration, "op", Operations(context))
         with context.begin_transaction():
+            instance_migration.downgrade()
             migration.downgrade()
         assert (
             connection.execute(
@@ -173,6 +198,7 @@ def test_library_migration_rollback_preserves_legacy_photo_plans_and_removes_new
         for _ in range(2):
             with context.begin_transaction():
                 migration.upgrade()
+                instance_migration.upgrade()
         assert (
             connection.execute(
                 text("SELECT to_regclass('agent_artifacts')")

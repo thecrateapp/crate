@@ -1,6 +1,6 @@
 """Contract tests for the Tasks API router."""
 
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import pytest
 
@@ -348,7 +348,14 @@ class TestCancelTask:
         }
         with (
             patch("crate.api.tasks.get_task", return_value=mock_task),
-            patch("crate.api.tasks.update_task") as mock_update,
+            patch(
+                "crate.db.repositories.task_control.request_cancellation",
+                return_value={
+                    "status": "cancelled",
+                    "cancellation_requested": True,
+                    "request_state": "cancelled",
+                },
+            ) as mock_cancel,
             patch("crate.api.tasks.cancel_media_worker_job"),
         ):
             resp = test_app.post("/api/tasks/t1/cancel")
@@ -357,7 +364,9 @@ class TestCancelTask:
         data = resp.json()
         assert data["status"] == "cancelled"
         assert data["id"] == "t1"
-        mock_update.assert_called_once_with("t1", status="cancelled")
+        assert data["cancellation_requested"] is True
+        assert data["request_state"] == "cancelled"
+        mock_cancel.assert_called_once_with("t1", actor_user_id=1)
 
     def test_cancels_running_task(self, test_app):
         mock_task = {
@@ -373,13 +382,22 @@ class TestCancelTask:
         }
         with (
             patch("crate.api.tasks.get_task", return_value=mock_task),
-            patch("crate.api.tasks.update_task") as mock_update,
+            patch(
+                "crate.db.repositories.task_control.request_cancellation",
+                return_value={
+                    "status": "running",
+                    "cancellation_requested": True,
+                    "request_state": "requested",
+                },
+            ) as mock_cancel,
             patch("crate.api.tasks.cancel_media_worker_job"),
         ):
             resp = test_app.post("/api/tasks/t2/cancel")
 
         assert resp.status_code == 200
-        mock_update.assert_called_once_with("t2", status="cancelled")
+        assert resp.json()["status"] == "running"
+        assert resp.json()["request_state"] == "requested"
+        mock_cancel.assert_called_once_with("t2", actor_user_id=1)
 
     def test_rejects_completed_task(self, test_app):
         mock_task = {
@@ -395,13 +413,15 @@ class TestCancelTask:
         }
         with (
             patch("crate.api.tasks.get_task", return_value=mock_task),
-            patch("crate.api.tasks.update_task") as mock_update,
+            patch(
+                "crate.db.repositories.task_control.request_cancellation"
+            ) as mock_cancel,
         ):
             resp = test_app.post("/api/tasks/t3/cancel")
 
         assert resp.status_code == 400
         assert "Cannot cancel" in resp.json()["error"]
-        mock_update.assert_not_called()
+        mock_cancel.assert_not_called()
 
     def test_rejects_cancelled_task(self, test_app):
         mock_task = {
@@ -417,23 +437,27 @@ class TestCancelTask:
         }
         with (
             patch("crate.api.tasks.get_task", return_value=mock_task),
-            patch("crate.api.tasks.update_task") as mock_update,
+            patch(
+                "crate.db.repositories.task_control.request_cancellation"
+            ) as mock_cancel,
         ):
             resp = test_app.post("/api/tasks/t4/cancel")
 
         assert resp.status_code == 400
-        mock_update.assert_not_called()
+        mock_cancel.assert_not_called()
 
     def test_task_not_found(self, test_app):
         with (
             patch("crate.api.tasks.get_task", return_value=None),
-            patch("crate.api.tasks.update_task") as mock_update,
+            patch(
+                "crate.db.repositories.task_control.request_cancellation"
+            ) as mock_cancel,
         ):
             resp = test_app.post("/api/tasks/nonexistent/cancel")
 
         assert resp.status_code == 404
         assert resp.json()["error"] == "Task not found"
-        mock_update.assert_not_called()
+        mock_cancel.assert_not_called()
 
     def test_requires_admin(self, test_app):
         with patch(
@@ -622,7 +646,13 @@ class TestTaskRetry:
         data = resp.json()
         assert data["task_id"] == "t-retry"
         assert data["original_id"] == "t-fail"
-        mock_create.assert_called_once_with("scan", {"only": "naming"})
+        mock_create.assert_called_once_with(
+            "scan",
+            {"only": "naming"},
+            origin="admin",
+            actor_user_id=1,
+            retry_of="t-fail",
+        )
 
     def test_retry_with_string_params(self, test_app):
         mock_task = {
@@ -643,7 +673,13 @@ class TestTaskRetry:
             resp = test_app.post("/api/tasks/retry", json={"task_id": "t-fail"})
 
         assert resp.status_code == 200
-        mock_create.assert_called_once_with("enrich", {"artist": "Tool"})
+        mock_create.assert_called_once_with(
+            "enrich",
+            {"artist": "Tool"},
+            origin="admin",
+            actor_user_id=1,
+            retry_of="t-fail",
+        )
 
     def test_retry_no_task_id(self, test_app):
         resp = test_app.post("/api/tasks/retry", json={"task_id": ""})
@@ -674,26 +710,30 @@ class TestWorkerCancelAll:
         pending = [{"id": "p1", "type": "sync"}, {"id": "p2", "type": "import"}]
         with (
             patch("crate.api.tasks.list_tasks", side_effect=[running, pending]),
-            patch("crate.api.tasks.update_task") as mock_update,
+            patch(
+                "crate.db.repositories.task_control.request_cancellation"
+            ) as mock_cancel,
             patch("crate.api.tasks.cancel_media_worker_job") as mock_cancel_job,
         ):
             resp = test_app.post("/api/worker/cancel-all")
 
         assert resp.status_code == 200
         assert resp.json()["cancelled"] == 3
-        assert mock_update.call_count == 3
+        assert mock_cancel.call_args_list == [call("r1"), call("p1"), call("p2")]
         assert mock_cancel_job.call_count == 3
 
     def test_cancel_all_none(self, test_app):
         with (
             patch("crate.api.tasks.list_tasks", return_value=[]),
-            patch("crate.api.tasks.update_task") as mock_update,
+            patch(
+                "crate.db.repositories.task_control.request_cancellation"
+            ) as mock_cancel,
         ):
             resp = test_app.post("/api/worker/cancel-all")
 
         assert resp.status_code == 200
         assert resp.json()["cancelled"] == 0
-        mock_update.assert_not_called()
+        mock_cancel.assert_not_called()
 
     def test_cancel_all_requires_admin(self, test_app):
         with patch(
@@ -706,45 +746,45 @@ class TestWorkerCancelAll:
 class TestWorkerSlots:
     """POST /api/worker/slots — update worker slot limits."""
 
-    def test_set_slots(self, test_app):
-        with (
-            patch("crate.api.tasks.get_setting", return_value=None),
-            patch("crate.api.tasks.set_setting") as mock_set_setting,
-        ):
-            resp = test_app.post("/api/worker/slots", json={"slots": 5, "min_slots": 3})
+    def test_set_slots(self, pg_db, test_app):
+        from crate.db.repositories.runtime_policy import read_runtime_policy_state
+
+        resp = test_app.post("/api/worker/slots", json={"slots": 5})
 
         assert resp.status_code == 200
         data = resp.json()
         assert data["max_slots"] == 5
-        assert data["min_slots"] == 2
-        assert mock_set_setting.call_count == 2
+        assert data["min_slots"] == 1
+        assert read_runtime_policy_state()["policy"]["max_running"] == 5
 
     def test_set_slots_out_of_range(self, test_app):
         resp = test_app.post("/api/worker/slots", json={"slots": 0})
 
-        assert resp.status_code == 400
-        assert "1-10" in resp.json()["error"]
+        assert resp.status_code == 422
 
     def test_set_slots_too_high(self, test_app):
-        resp = test_app.post("/api/worker/slots", json={"slots": 11})
+        resp = test_app.post("/api/worker/slots", json={"slots": 65})
 
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
     def test_set_min_slots_out_of_range(self, test_app):
         resp = test_app.post("/api/worker/slots", json={"min_slots": 100})
 
-        assert resp.status_code == 400
+        assert resp.status_code == 422
 
-    def test_set_slots_returns_defaults_when_not_set(self, test_app):
-        with (
-            patch("crate.api.tasks.get_setting", return_value=None),
-            patch("crate.api.tasks.set_setting"),
-        ):
-            resp = test_app.post("/api/worker/slots", json={})
+    def test_set_slots_returns_defaults_when_not_set(self, pg_db, test_app):
+        from crate.db.repositories.runtime_policy import read_runtime_policy_state
+
+        state = read_runtime_policy_state()
+        resp = test_app.post("/api/worker/slots", json={})
 
         assert resp.status_code == 200
-        assert resp.json()["max_slots"] == 5
-        assert resp.json()["min_slots"] == 2
+        assert resp.json()["max_slots"] == state["policy"]["max_running"]
+        assert resp.json()["min_slots"] == 1
+        assert (
+            read_runtime_policy_state()["configured_revision"]
+            == state["configured_revision"]
+        )
 
     def test_set_slots_requires_admin(self, test_app):
         with patch(
@@ -782,49 +822,42 @@ class TestWorkerRestart:
 class TestWorkerSchedules:
     """GET /api/worker/schedules, POST /api/worker/schedules."""
 
-    def test_get_schedules(self, test_app):
-        schedules = {"library_sync": 1800, "enrich_artists": 86400}
-        with (
-            patch("crate.api.tasks.get_schedules", return_value=schedules),
-            patch("crate.api.tasks.get_setting", return_value=None),
-        ):
-            resp = test_app.get("/api/worker/schedules")
+    def test_get_schedules(self, pg_db, test_app):
+        resp = test_app.get("/api/worker/schedules")
 
         assert resp.status_code == 200
         data = resp.json()
-        assert "library_sync" in data
-        assert data["library_sync"]["interval_seconds"] == 1800
-        assert data["library_sync"]["enabled"] is True
+        assert "library_pipeline" in data
+        assert data["library_pipeline"]["interval_seconds"] == 86400
+        assert data["library_pipeline"]["enabled"] is True
 
-    def test_get_schedules_disabled(self, test_app):
-        schedules = {"old_job": 0}
-        with (
-            patch("crate.api.tasks.get_schedules", return_value=schedules),
-            patch("crate.api.tasks.get_setting", return_value=None),
-        ):
-            resp = test_app.get("/api/worker/schedules")
+    def test_get_schedules_disabled(self, pg_db, test_app):
+        from crate.db.repositories.runtime_policy import (
+            read_schedules_state,
+            update_schedules,
+        )
+
+        update_schedules(
+            {"compute_analytics": 0},
+            expected_revision=read_schedules_state()["revision"],
+        )
+        resp = test_app.get("/api/worker/schedules")
 
         assert resp.status_code == 200
-        assert resp.json()["old_job"]["enabled"] is False
-        assert resp.json()["old_job"]["interval_human"] == "disabled"
+        assert resp.json()["compute_analytics"]["enabled"] is False
+        assert resp.json()["compute_analytics"]["interval_human"] == "disabled"
 
-    def test_update_schedules(self, test_app):
-        current = {"library_sync": 1800, "enrich_artists": 86400}
-        with (
-            patch("crate.api.tasks.get_schedules", return_value=current),
-            patch("crate.api.tasks.set_schedules") as mock_set,
-        ):
-            resp = test_app.post(
-                "/api/worker/schedules",
-                json={"library_sync": 3600, "new_task": 7200},
-            )
+    def test_update_schedules(self, pg_db, test_app):
+        resp = test_app.post(
+            "/api/worker/schedules",
+            json={"library_pipeline": 3600, "sync_shows": 7200},
+        )
 
         assert resp.status_code == 200
         data = resp.json()
-        assert data["schedules"]["library_sync"] == 3600
-        assert data["schedules"]["new_task"] == 7200
+        assert data["schedules"]["library_pipeline"] == 3600
+        assert data["schedules"]["sync_shows"] == 7200
         assert data["schedules"]["enrich_artists"] == 86400
-        mock_set.assert_called_once()
 
     def test_update_schedules_requires_admin(self, test_app):
         with patch(
@@ -903,15 +936,8 @@ class TestTaskCatalogAndScheduleRun:
         assert action["body"] == {"limit": 1000}
         assert action["task_label"] == "Lyrics Sync"
 
-    def test_schedules_include_catalog_labels(self, test_app):
-        with (
-            patch(
-                "crate.api.tasks.get_schedules",
-                return_value={"repair_duplicate_tracks": 43200},
-            ),
-            patch("crate.api.tasks.get_setting", return_value=None),
-        ):
-            resp = test_app.get("/api/worker/schedules")
+    def test_schedules_include_catalog_labels(self, pg_db, test_app):
+        resp = test_app.get("/api/worker/schedules")
 
         assert resp.json()["repair_duplicate_tracks"]["label"] == (
             "Duplicate Track Cleanup"
@@ -923,11 +949,8 @@ class TestTaskCatalogAndScheduleRun:
     def test_run_schedule_now(self, test_app, task_id, status):
         with (
             patch(
-                "crate.api.tasks.get_schedules",
-                return_value={"repair_duplicate_tracks": 43200},
-            ),
-            patch(
-                "crate.api.tasks.enqueue_scheduled_task", return_value=task_id
+                "crate.api.tasks.guarded_run_schedule",
+                return_value={"task_id": task_id, "status": status},
             ) as enqueue,
         ):
             resp = test_app.post("/api/worker/schedules/repair_duplicate_tracks/run")
@@ -937,13 +960,16 @@ class TestTaskCatalogAndScheduleRun:
             "task_type": "repair_duplicate_tracks",
             "task_id": task_id,
             "status": status,
+            "reason": None,
+            "retry_after": None,
         }
-        enqueue.assert_called_once_with("repair_duplicate_tracks")
+        assert enqueue.call_args.args == ("repair_duplicate_tracks",)
+        assert enqueue.call_args.kwargs["origin"] == "admin"
+        assert enqueue.call_args.kwargs["actor_user_id"] == 1
 
     def test_run_schedule_now_rejects_unknown_schedules(self, test_app):
         with (
-            patch("crate.api.tasks.get_schedules", return_value={}),
-            patch("crate.api.tasks.enqueue_scheduled_task") as enqueue,
+            patch("crate.api.tasks.guarded_run_schedule") as enqueue,
         ):
             resp = test_app.post("/api/worker/schedules/wipe_library/run")
 

@@ -22,7 +22,11 @@ _LIMITS = {
     "get_library_quality": {"page_size": 100},
     "list_jobs": {"page_size": 100},
     "get_job": {"jobs": 1},
-    "read_diagnostics": {"page_size": 100},
+    "read_diagnostics": {
+        "page_size": 100,
+        "metric_window_minutes": 100,
+        "series": "enumerated",
+    },
     "get_analysis_status": {"tracks": 200, "pipelines": 2},
     "run_health_check": {
         "scopes": ["artist", "global"],
@@ -56,6 +60,39 @@ _LIMITS = {
         "tracks_per_album": 100,
         "audio_tags": False,
         "computed_analysis_import": False,
+    },
+    "read_audit": {"page_size": 100, "window_hours": 24, "raw_details": False},
+    "list_schedules": {"schedules": 16, "writes_defaults": False},
+    "get_runtime_policy": {"pools": 5, "configured_and_effective_separate": True},
+    "preview_job_retry": {
+        "default_scope": "own",
+        "instance_grant": "ops.jobs.manage_instance",
+        "retries": 3,
+        "parameter_cloning": False,
+    },
+    "preview_job_cancel": {
+        "default_scope": "own",
+        "instance_grant": "ops.jobs.manage_instance",
+        "descendants": 200,
+        "max_depth": 16,
+        "request_is_stop": False,
+    },
+    "run_schedule": {
+        "reviewed_schedules": ["compute_analytics"],
+        "approval": "mandatory",
+        "governor": True,
+        "dedup": True,
+    },
+    "preview_schedule_update": {
+        "schedules": 16,
+        "maximum_interval_seconds": 2678400,
+        "expected_revision": True,
+    },
+    "preview_runtime_update": {
+        "pools": 5,
+        "max_running": 64,
+        "expected_revision": True,
+        "approval": "mandatory",
     },
     "retry_job": {"own_jobs_only": True, "operation": "run_health_check", "retries": 3},
     "cancel_job": {"own_jobs_only": True, "states": ["pending"]},
@@ -122,6 +159,7 @@ def get_operation_catalog(principal: AgentPrincipal) -> dict:
                             "worker_logs": "ops.logs.read",
                             "worker_status": "ops.status.read",
                             "analysis_status": "ops.status.read",
+                            "metric_series": "ops.status.read",
                         }
                     }
                     if name == "read_diagnostics"

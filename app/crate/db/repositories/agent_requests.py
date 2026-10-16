@@ -289,13 +289,18 @@ def _accept(
         SELECT j.task_id, j.principal_id::text AS principal_id, j.operation, j.payload_hash, j.authorization_context
         FROM agent_jobs j JOIN tasks t ON t.id = j.task_id
         WHERE t.status = ANY(:active) AND
-          (j.target_keys && CAST(:targets AS text[]) OR 'library:global'=ANY(j.target_keys)
-           OR (:global_target AND cardinality(j.target_keys)>0))
+          (j.target_keys && CAST(:targets AS text[])
+           OR (:library_target AND 'library:global'=ANY(j.target_keys))
+           OR (:global_target AND EXISTS(SELECT 1 FROM unnest(j.target_keys) k WHERE k~'^(artist|album|track|library):')))
         LIMIT 1
     """),
             {
                 "targets": target_keys,
                 "global_target": "library:global" in target_keys,
+                "library_target": any(
+                    key.split(":", 1)[0] in {"artist", "album", "track", "library"}
+                    for key in target_keys
+                ),
                 "active": list(_ACTIVE),
             },
         )
@@ -324,9 +329,14 @@ def _accept(
     if current.execute(
         text("""
         SELECT 1 FROM agent_jobs j JOIN tasks t ON t.id = j.task_id
-        WHERE j.principal_id = :principal_id AND t.status = ANY(:active) LIMIT 1
+        WHERE j.principal_id = :principal_id AND t.status = ANY(:active)
+        AND (:control = FALSE OR j.payload->>'domain_operation'='job_cancel') LIMIT 1
     """),
-        {"principal_id": principal.id, "active": list(_ACTIVE)},
+        {
+            "principal_id": principal.id,
+            "active": list(_ACTIVE),
+            "control": payload.get("domain_operation") == "job_cancel",
+        },
     ).first():
         raise DiagnosticError(
             "LIMIT_EXCEEDED",
@@ -334,7 +344,9 @@ def _accept(
             retry_after=5,
         )
     task_type = (
-        "agent_maintenance"
+        "agent_control"
+        if payload.get("domain_operation") == "job_cancel"
+        else "agent_maintenance"
         if operation in {"prepare_operation", "apply_operation"}
         else "health_check"
         if operation == "run_health_check"
@@ -377,6 +389,18 @@ def _accept(
             "trace_id": str(trace_id)[:128] if trace_id else None,
             "authorization_context": json.dumps(authorization_context(principal)),
         },
+    )
+    from crate.db.repositories.task_control import record_task_provenance
+    from crate.db.repositories.agent_task_control import principal_context
+
+    record_task_provenance(
+        task_id,
+        origin="agent",
+        actor_user_id=principal.actor_user_id,
+        agent_context=principal_context(principal),
+        required_grants=grants,
+        retry_of=retry_of,
+        session=current,
     )
     _remember_request(current, principal, request_operation, key, request_hash, task_id)
     _audit(
@@ -646,7 +670,9 @@ def _execution_job(current, task_id):
             "STATE_CONFLICT", "Agent job has not been claimed for execution"
         )
     expected = (
-        "agent_maintenance"
+        "agent_control"
+        if job["payload"].get("domain_operation") == "job_cancel"
+        else "agent_maintenance"
         if job["operation"] in {"prepare_operation", "apply_operation"}
         else "health_check"
         if job["operation"] == "run_health_check"
@@ -709,7 +735,22 @@ def _observation(value, artist_uid):
 
 
 def _store_result(current, job, result, status):
-    result["status"] = status
+    task_state = (
+        current.execute(
+            text(
+                "SELECT status,cancellation_requested_at FROM tasks WHERE id=:id FOR UPDATE"
+            ),
+            {"id": job["task_id"]},
+        )
+        .mappings()
+        .one()
+    )
+    acknowledge_on_return = (
+        task_state["cancellation_requested_at"] is not None
+        and task_state["status"] in {"running", "delegated"}
+        and status in {"completed", "failed", "cancelled"}
+    )
+    result["status"] = "cancelled" if acknowledge_on_return else status
     if status == "failed":
         result["error_code"] = result["execution"].get("error_code")
         result["error"] = result["execution"].get("error")
@@ -724,7 +765,12 @@ def _store_result(current, job, result, status):
         from crate.agent_operation_catalog import public_operation_result
 
         task_result = public_operation_result(result)
-    update_task(job["task_id"], status=status, result=task_result, session=current)
+    update_task(
+        job["task_id"],
+        status=None if acknowledge_on_return else status,
+        result=task_result,
+        session=current,
+    )
     if job["operation"] == "apply_repairs" or (
         job["operation"] == "apply_operation" and job["payload"].get("plan_id")
     ):

@@ -17,7 +17,12 @@ def operation_target_keys(targets: list[dict], *, session=None) -> list[str]:
             or target.get("album_uid")
             or target.get("track_uid")
         )
-        if target.get("scope") == "global" or kind == "library":
+        if kind in {"task", "schedule", "runtime"}:
+            name = target.get("name")
+            if not isinstance(name, str) or not name or len(name) > 128:
+                raise ValueError("Invalid operational target")
+            keys.add(f"{kind}:{name}")
+        elif target.get("scope") == "global" or kind == "library":
             keys.add("library:global")
         elif uid:
             kind = kind or (
@@ -41,6 +46,8 @@ def operation_target_keys(targets: list[dict], *, session=None) -> list[str]:
         ).scalars()
         return sorted(keys | set(rows))
 
+    if not (artists or albums or tracks):
+        return sorted(keys)
     if session is not None:
         return _read(session)
     with read_scope() as current:

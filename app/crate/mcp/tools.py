@@ -37,7 +37,32 @@ from crate.mcp.schemas import (
     QualityRunInput,
 )
 
+from crate import agent_operations
+from crate.mcp.operation_schemas import (
+    JobControlPreview,
+    JobControlApply,
+    ScheduleRun,
+    ScheduleUpdatePreview,
+    RuntimeUpdatePreview,
+    AuditInput,
+)
+
 CATALOG = {
+    "read_audit": (
+        AuditInput,
+        "ops.audit.read",
+        "Read bounded, sanitized audit evidence. Details never expose credentials or arbitrary stored payloads.",
+    ),
+    "list_schedules": (
+        InstanceInput,
+        "ops.schedules.read",
+        "Read schedule intervals, revisions, last enqueue and last success separately; each entry declares run readiness.",
+    ),
+    "get_runtime_policy": (
+        InstanceInput,
+        "ops.runtime.read",
+        "Read configured runtime policy and actual consumer adoption separately. Idle consumers can leave adoption pending.",
+    ),
     "get_operation_catalog": (
         InstanceInput,
         None,
@@ -91,6 +116,51 @@ CATALOG = {
 }
 
 ACTION_CATALOG = {
+    "preview_job_retry": (
+        JobControlPreview,
+        "ops.jobs.retry",
+        "Prepare an exact retry of reviewed maintenance. Own authorization by default; Admin/scheduler tasks require instance scope, instance grant and original domain grants. Never clone arbitrary params or partially applied repairs.",
+    ),
+    "preview_job_cancel": (
+        JobControlPreview,
+        "ops.jobs.cancel",
+        "Prepare cooperative cancellation of cataloged pending/running/delegated work. Keeps running until a worker confirms; finalizing work cannot be cancelled.",
+    ),
+    "apply_job_retry": (
+        JobControlApply,
+        "ops.jobs.retry",
+        "Apply the approved retry plan/version, rechecking source, original authority and bounded lineage.",
+    ),
+    "apply_job_cancel": (
+        JobControlApply,
+        "ops.jobs.cancel",
+        "Apply the approved cancellation plan/version. Request acceptance is distinct from confirmed stop; inspect the target job.",
+    ),
+    "run_schedule": (
+        ScheduleRun,
+        "ops.schedules.run",
+        "Prepare or apply an exact scheduler run. Human approval, governor, windows, enabled state and dedup remain mandatory. Only reviewed schedule variants can execute.",
+    ),
+    "preview_schedule_update": (
+        ScheduleUpdatePreview,
+        "ops.schedules.write",
+        "Prepare a closed schedule interval update with expected revision.",
+    ),
+    "apply_schedule_update": (
+        JobControlApply,
+        "ops.schedules.write",
+        "Apply an approved exact schedule update using compare-and-swap.",
+    ),
+    "preview_runtime_update": (
+        RuntimeUpdatePreview,
+        "ops.runtime.write",
+        "Prepare a typed runtime policy update with revision, pool limits and IANA windows.",
+    ),
+    "apply_runtime_update": (
+        JobControlApply,
+        "ops.runtime.write",
+        "Apply an approved runtime revision. Configuration persistence does not prove workers adopted it.",
+    ),
     "run_health_check": (
         HealthCheckInput,
         "library.health.run",
@@ -274,7 +344,12 @@ def _execute(principal, name, arguments, trace_id):
     try:
         with admission(principal.id):
             if name in ACTION_CATALOG:
-                result = getattr(agent_maintenance, name)(
+                module = (
+                    agent_operations
+                    if hasattr(agent_operations, name)
+                    else agent_maintenance
+                )
+                result = getattr(module, name)(
                     principal, **arguments, trace_id=trace_id
                 )
                 action_finished = True
@@ -309,6 +384,8 @@ def _execute(principal, name, arguments, trace_id):
                 return getattr(agent_diagnostics, name)(
                     **arguments, principal=principal
                 )
+            if name in {"list_schedules", "get_runtime_policy"}:
+                return getattr(agent_operations, name)(**arguments)
             return getattr(agent_diagnostics, name)(**arguments)
     except DiagnosticError:
         if action_finished:
@@ -362,6 +439,10 @@ async def call_tool(context, params):
         try:
             validated = model.model_validate(params.arguments or {})
             arguments = validated.model_dump()
+            if isinstance(validated, RuntimeUpdatePreview):
+                arguments["patch"] = validated.patch.model_dump(
+                    exclude_none=True, exclude_unset=True
+                )
             if isinstance(validated, MetadataPreviewInput):
                 arguments["patch"] = validated.patch.model_dump(exclude_unset=True)
         except ValidationError:
