@@ -1473,6 +1473,8 @@ Verification passes, including the corrected stale local-copy policy, four typec
 builds/budgets, design gates and preview 39 / Admin 21 / Listen 42 browser cases. Exact full-suite
 and focused-rerun results are in the handover. Diego approved 1L on 2026-10-16 and authorised
 commit/push, Linux captures and continuation to theme runtime retirement 1.13. Keep the next checkpoint.
+Published `2c90a6f2`; recording `38883592145` passes with all 43 PNGs byte-identical to the reviewed
+1K references. The original manifest is imported; comparison CI is pending.
 
 **Files:**
 

@@ -23,7 +23,9 @@ plan; the status table separates local implementation from pending QA.
   imported from run `38876594597` in `3f470ec6`; comparison/full frontend CI passes in
   `38877216337`. Shared toasts 1K is published as `7b46021d`; 43 Linux images/original manifest
   are reviewed/imported from run `38880022435` in `181ca4d4`. Comparison/full frontend CI passes in
-  `38880774591`. Rebase/PR/release remain gated.
+  `38880774591`. Cleanup 1L is published as `2c90a6f2`; Linux recording `38883592145` passes
+  with all 43 PNGs byte-identical. The original manifest is imported; comparison CI follows.
+  Rebase/PR/release remain gated.
 
 ## Sources of truth, in reading order
 
@@ -167,7 +169,7 @@ is a token-based chart configuration, not a selectable product skin.
 | 1.9 / Checkpoint 1I | Published `a80f396b` + reviewed Linux images/provenance `dd71eb72`; recording `38871597394` and comparison/full frontend CI `38872274120` pass. |
 | 1.10 / Checkpoint 1J | Published `0660fbd2` + reviewed Linux images/provenance `3f470ec6`; recording `38876594597` and comparison/full frontend CI `38877216337` pass. |
 | 1.11 / Checkpoint 1K | Published `7b46021d`; 43 Linux images/provenance `181ca4d4` from `38880022435` (40 unchanged, three new toast scenes). Comparison/full frontend CI `38880774591` passes. |
-| 1.12 / Checkpoint 1L | Approved by Diego; commit/push and Linux captures authorised. Local verification and spec/quality reviews pass. |
+| 1.12 / Checkpoint 1L | Published `2c90a6f2`; recording `38883592145` passes with all 43 PNGs byte-identical. Reviewed original manifest imported; comparison CI pending. |
 | 1b | Not started; respect applicable gates and the next review checkpoint. |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -666,7 +668,7 @@ offset. The `notify` API, per-call duration/icon overrides, messages and actions
 ## Checkpoint 1L — Unused shared component cleanup (Task 1.12)
 
 Diego approved 1L on 2026-10-16 and authorised commit/push, canonical Linux captures and continuation
-to theme runtime retirement 1.13. Publication/capture references follow as they complete.
+to theme runtime retirement 1.13. Published as `2c90a6f2`; capture references follow below.
 
 - Import/re-export/manifest review found zero production consumers for shared OpsPageHero,
   OpsPanel, OpsStatTile and ShowCard. They and their two exclusive test files are removed (nine
@@ -698,5 +700,8 @@ to theme runtime retirement 1.13. Publication/capture references follow as they 
   204,904 B / 307,200; no ceiling increased.
 - Spec/quality reviews approve. The 43 reviewed Linux PNGs and original manifest remain unchanged
   by this cleanup.
-- Remaining gates: authorised publication and Linux capture/review/comparison. Theme runtime
-  retirement 1.13 is now assigned; review its integration prerequisites and keep the next checkpoint.
+- Canonical Linux recording passes in <https://github.com/thecrateapp/crate/actions/runs/38883592145>,
+  source `2c90a6f2`, Playwright 1.63.0-noble / Linux x64. Artifact `12038349206` SHA256
+  `602c29a1e4de41fa8e48ade0da41907b497623c5b2ad2a6d679a8360d279e8b4` matches the downloaded ZIP.
+  All 43 PNGs are byte-identical to the reviewed 1K references; the original manifest is imported.
+- Remaining gate: comparison CI. Theme runtime retirement 1.13 is assigned; keep its next checkpoint.

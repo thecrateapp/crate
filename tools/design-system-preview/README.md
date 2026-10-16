@@ -269,3 +269,5 @@ pass. Preview 39 / Admin 21 / Listen 42 browser checks, types/lints/builds/budge
 pass. Unit verification and its focused stale-policy rerun are recorded precisely in the handover.
 The 43 reviewed Linux PNGs/manifest stay unchanged. Diego approved 1L on 2026-10-16 and authorised
 commit/push, Linux captures and continuation to Task 1.13. Preserve this specimen.
+Published `2c90a6f2`; Linux recording `38883592145` confirms all 43 PNGs byte-identical to 1K.
+The original manifest is imported; comparison CI is pending.

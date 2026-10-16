@@ -1,5 +1,5 @@
 {
-  "commit": "7b46021d75d5b584e45d1bde1d4bb364b9420c87",
+  "commit": "2c90a6f21b8e12657dc191d44d51fd5651255e36",
   "image": "mcr.microsoft.com/playwright:v1.63.0-noble",
   "platform": "linux",
   "arch": "x64"

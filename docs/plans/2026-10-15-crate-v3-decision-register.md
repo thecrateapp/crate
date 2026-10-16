@@ -391,3 +391,8 @@ no ceiling increased. Clean generated shared output contains none of the retired
 On 2026-10-16 Diego approved Checkpoint 1L and explicitly authorised commit/push, canonical Linux
 captures and continuation to theme runtime retirement (Task 1.13). This supersedes the local-only
 approval notes above. Keep the persistent mockup and stop at the next review checkpoint.
+
+1L is published as `2c90a6f2`. Linux recording `38883592145` passes; artifact `12038349206`
+has verified SHA256 `602c29a1e4de41fa8e48ade0da41907b497623c5b2ad2a6d679a8360d279e8b4`.
+All 43 PNGs are byte-identical to the reviewed 1K references; the original manifest is imported.
+Comparison CI is the next gate.
