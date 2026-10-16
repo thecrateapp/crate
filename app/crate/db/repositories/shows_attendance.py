@@ -11,7 +11,7 @@ def _rowcount(result: object) -> int:
     return int(getattr(result, "rowcount", 0) or 0)
 
 
-def _canonical_id(session, show_id):
+def _canonical_id(session, show_id: int) -> int | None:
     # Hold redirect topology stable through the relation mutation. Consolidation
     # takes the exclusive counterpart before any show row locks.
     session.execute(
@@ -28,8 +28,8 @@ def _canonical_id(session, show_id):
 def attend_show(user_id: int, show_id: int) -> bool:
     now = datetime.now(timezone.utc).isoformat()
     with transaction_scope() as session:
-        show_id = _canonical_id(session, show_id)
-        if show_id is None:
+        canonical_id = _canonical_id(session, show_id)
+        if canonical_id is None:
             return False
         result = session.execute(
             text(
@@ -39,21 +39,21 @@ def attend_show(user_id: int, show_id: int) -> bool:
                 ON CONFLICT DO NOTHING
                 """
             ),
-            {"user_id": user_id, "show_id": show_id, "now": now},
+            {"user_id": user_id, "show_id": canonical_id, "now": now},
         )
     return bool(_rowcount(result))
 
 
 def unattend_show(user_id: int, show_id: int) -> bool:
     with transaction_scope() as session:
-        show_id = _canonical_id(session, show_id)
-        if show_id is None:
+        canonical_id = _canonical_id(session, show_id)
+        if canonical_id is None:
             return False
         result = session.execute(
             text(
                 "DELETE FROM user_show_attendance WHERE user_id = :user_id AND show_id = :show_id"
             ),
-            {"user_id": user_id, "show_id": show_id},
+            {"user_id": user_id, "show_id": canonical_id},
         )
     return bool(_rowcount(result))
 
@@ -61,8 +61,8 @@ def unattend_show(user_id: int, show_id: int) -> bool:
 def create_show_reminder(user_id: int, show_id: int, reminder_type: str) -> bool:
     now = datetime.now(timezone.utc).isoformat()
     with transaction_scope() as session:
-        show_id = _canonical_id(session, show_id)
-        if show_id is None:
+        canonical_id = _canonical_id(session, show_id)
+        if canonical_id is None:
             return False
         result = session.execute(
             text(
@@ -74,7 +74,7 @@ def create_show_reminder(user_id: int, show_id: int, reminder_type: str) -> bool
             ),
             {
                 "user_id": user_id,
-                "show_id": show_id,
+                "show_id": canonical_id,
                 "reminder_type": reminder_type,
                 "now": now,
             },
