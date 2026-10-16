@@ -453,7 +453,9 @@ def test_daemon_fences_results_with_claim_source_and_actual_signature(
         ),
     )
     monkeypatch.setattr(
-        daemon.time, "sleep", lambda _seconds: (_ for _ in ()).throw(_StopDaemon())
+        daemon,
+        "time",
+        SimpleNamespace(sleep=lambda _seconds: (_ for _ in ()).throw(_StopDaemon())),
     )
     if pipeline == "analysis":
         result = {"bpm": 122.0, "_components": ["librosa"]}

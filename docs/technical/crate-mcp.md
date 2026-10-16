@@ -1005,6 +1005,11 @@ selected files passed 93 cases. This does not establish a complete backend-suite
 Another shard exposed a revoked agent command whose actor precheck raised before persisting the
 private failure result. The actor now records that failure without running the handler; 14 focused
 actor cases and the Admin cancellation contract passed with PostgreSQL.
+The next backend shard exposed a system-playlist batching fixture that omitted the new
+`editorial_revision` and `generation_epoch` fields. Both fixture rows now match the ORM output;
+the exact batching case passed. The persistent review at that commit also identified a test
+patch of the process-global `time.sleep`; the daemon test now replaces only the daemon's `time`
+reference, and all four parameterized cases passed. CI is being rerun for this correction.
 
 The phase-6 focused selection passed **37 PostgreSQL-backed cases** across the editorial plan,
 MCP, migration, rule, refinement and override files. These cover migration/bootstrap, exact creation,
