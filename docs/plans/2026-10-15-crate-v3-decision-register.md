@@ -286,3 +286,8 @@ parallel runs saturated the host. This result stops for Diego's visual review; 1
 On 2026-10-16 Diego approved Checkpoint 1H, explicitly authorising commit/push, Linux CI captures
 and continuation to Readout (Task1.9). This supersedes the local-only publication notes above.
 Keep the persistent mockup and stop at the next visual checkpoint; no merge/release/deploy is implied.
+
+1H is published as `6a5b3366`. Linux run `38869057068` passes; reviewed artifact `12032298795`
+has verified SHA256 `9ddb9de0b2cf3beb5dda5d125cc609dffecb13fe1b840f22071e7028b3f57a12`.
+35 PNGs: 32 identical, System changed and two new Offline scenes. Import the original manifest;
+comparison CI is the next gate.

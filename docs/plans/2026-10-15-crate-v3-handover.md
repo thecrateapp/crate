@@ -450,7 +450,7 @@ stream subscriptions are added. Header/content changes use the existing snapshot
 ## Checkpoint 1H — Meter (Task 1.8)
 
 Diego approved the visual checkpoint on 2026-10-16 and authorised commit/push, canonical Linux
-captures and continuation to Readout (Task 1.9). Publication/capture results follow below.
+captures and continuation to Readout (Task 1.9). Published as `6a5b3366b7f6e3e3da67d687103d2828ef96215c`.
 The shared props-only primitive uses MonoLabel, a quiet track and accent fill, a limit tick and
 1–4px tracks. Its fill exposes `valueRef` and writes `--v` through the DOM ref per sample; no
 animation loop, timers or React state per frame. Fixed styling stays in CSS; the drift ceiling
@@ -490,7 +490,10 @@ is unchanged. Over-limit readings retain the real value in text and add `over ·
   qualify any gate. The complete successful rerun executes workspaces sequentially with
   `--maxWorkers=2`. Keep that local limit; run browser suites with one worker and avoid launching
   several unrestricted workspace suites together. No stale test processes remain.
-- Plans, handover and the persistent preview are current. Visual review/publication approval
-  are complete. Remaining gates: canonical Linux captures/diff review and comparison CI.
+- Canonical Linux recording passes in <https://github.com/thecrateapp/crate/actions/runs/38869057068>,
+  source `6a5b3366`, Playwright 1.63.0-noble / Linux x64. Artifact `12032298795` SHA256
+  `9ddb9de0b2cf3beb5dda5d125cc609dffecb13fe1b840f22071e7028b3f57a12` matches the downloaded ZIP.
+  Review covers one changed System image and two new Offline images; the other 32 are identical.
+  Import all 35 PNGs and the original manifest. Comparison CI against these images is pending.
 - Readout 1.9 is the next authorised visual checkpoint. TrackReadout 3.9b, global Admin icon retirement,
   theme runtime retirement and the deferred 1D focus polish retain their planned tasks.
