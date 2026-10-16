@@ -19,10 +19,11 @@ from crate.db.jobs.analysis_shared import (
     pipeline_name_for_state_column,
     validate_state_column,
 )
+from crate.db.jobs.analysis_generations import accepted_claim_ids, record_signatures
 from crate.db.tx import transaction_scope
 
 
-def mark_done(track_id: int, state_column: str) -> None:
+def mark_done(track_id: int, state_column: str, *, claim: dict | None = None) -> None:
     # col is validated against ALLOWED_STATE_COLUMNS whitelist.
     col = validate_state_column(state_column)
     now = datetime.now(timezone.utc).isoformat()
@@ -33,6 +34,13 @@ def mark_done(track_id: int, state_column: str) -> None:
         extra_set = ", bliss_computed_at = :now"
     pipeline = pipeline_name_for_state_column(col)
     with transaction_scope() as session:
+        if track_id not in accepted_claim_ids(
+            session,
+            track_ids=[track_id],
+            pipeline=pipeline,
+            claims={track_id: claim} if claim is not None else None,
+        ):
+            return
         session.execute(
             text(f"UPDATE library_tracks SET {col} = 'done'{extra_set} WHERE id = :id"),
             {"now": now, "id": track_id},
@@ -50,12 +58,23 @@ def mark_done(track_id: int, state_column: str) -> None:
 
 
 def mark_failed(
-    track_id: int, state_column: str, error_message: str | None = None
+    track_id: int,
+    state_column: str,
+    error_message: str | None = None,
+    *,
+    claim: dict | None = None,
 ) -> None:
     # col is validated against ALLOWED_STATE_COLUMNS whitelist.
     col = validate_state_column(state_column)
     pipeline = pipeline_name_for_state_column(col)
     with transaction_scope() as session:
+        if track_id not in accepted_claim_ids(
+            session,
+            track_ids=[track_id],
+            pipeline=pipeline,
+            claims={track_id: claim} if claim is not None else None,
+        ):
+            return
         session.execute(
             text(f"UPDATE library_tracks SET {col} = 'failed' WHERE id = :id"),
             {"id": track_id},
@@ -87,6 +106,7 @@ def mark_failed(
                     state = 'failed',
                     claimed_by = NULL,
                     claimed_at = NULL,
+                    claim_token = NULL,
                     last_error = COALESCE(:last_error, track_processing_state.last_error),
                     updated_at = NOW()
                 """
@@ -107,11 +127,26 @@ def mark_failed(
         )
 
 
-def store_bliss_vector(track_id: int, vector: list[float]) -> None:
-    store_bliss_vectors({track_id: vector})
+def store_bliss_vector(
+    track_id: int,
+    vector: list[float],
+    *,
+    claim: dict | None = None,
+    signature: str | None = None,
+) -> None:
+    store_bliss_vectors(
+        {track_id: vector},
+        claims={track_id: claim} if claim is not None else None,
+        signatures={track_id: signature} if signature is not None else None,
+    )
 
 
-def store_bliss_vectors(vectors_by_track_id: dict[int, list[float]]) -> None:
+def store_bliss_vectors(
+    vectors_by_track_id: dict[int, list[float]],
+    *,
+    claims: dict[int, dict] | None = None,
+    signatures: dict[int, str] | None = None,
+) -> None:
     if not vectors_by_track_id:
         return
 
@@ -129,6 +164,15 @@ def store_bliss_vectors(vectors_by_track_id: dict[int, list[float]]) -> None:
         return
 
     with transaction_scope() as session:
+        accepted = accepted_claim_ids(
+            session,
+            track_ids=[row["track_id"] for row in rows],
+            pipeline="bliss",
+            claims=claims,
+        )
+        rows = [row for row in rows if row["track_id"] in accepted]
+        if not rows:
+            return
         rows_json = json.dumps(rows, default=str)
         session.execute(
             text(
@@ -180,6 +224,13 @@ def store_bliss_vectors(vectors_by_track_id: dict[int, list[float]]) -> None:
             pipeline="bliss",
             completed_at=now,
         )
+        record_signatures(
+            session,
+            pipeline="bliss",
+            signatures={
+                tid: sig for tid, sig in (signatures or {}).items() if tid in accepted
+            },
+        )
         for row in rows:
             append_pipeline_event(
                 session, pipeline="bliss", track_id=row["track_id"], state="done"
@@ -190,11 +241,27 @@ def store_bliss_vectors(vectors_by_track_id: dict[int, list[float]]) -> None:
         mark_ops_snapshot_dirty(session)
 
 
-def store_analysis_result(track_id: int, path: str, result: dict) -> None:
-    store_analysis_results([(track_id, path, result)])
+def store_analysis_result(
+    track_id: int,
+    path: str,
+    result: dict,
+    *,
+    claim: dict | None = None,
+    signature: str | None = None,
+) -> None:
+    store_analysis_results(
+        [(track_id, path, result)],
+        claims={track_id: claim} if claim is not None else None,
+        signatures={track_id: signature} if signature is not None else None,
+    )
 
 
-def store_analysis_results(results: list[tuple[int, str, dict]]) -> None:
+def store_analysis_results(
+    results: list[tuple[int, str, dict]],
+    *,
+    claims: dict[int, dict] | None = None,
+    signatures: dict[int, str] | None = None,
+) -> None:
     if not results:
         return
 
@@ -220,6 +287,15 @@ def store_analysis_results(results: list[tuple[int, str, dict]]) -> None:
         )
 
     with transaction_scope() as session:
+        accepted = accepted_claim_ids(
+            session,
+            track_ids=[row["track_id"] for row in rows],
+            pipeline="analysis",
+            claims=claims,
+        )
+        rows = [row for row in rows if row["track_id"] in accepted]
+        if not rows:
+            return
         rows_json = json.dumps(rows, default=str)
         session.execute(
             text(
@@ -348,6 +424,13 @@ def store_analysis_results(results: list[tuple[int, str, dict]]) -> None:
             track_ids=[row["track_id"] for row in rows],
             pipeline="analysis",
             completed_at=now,
+        )
+        record_signatures(
+            session,
+            pipeline="analysis",
+            signatures={
+                tid: sig for tid, sig in (signatures or {}).items() if tid in accepted
+            },
         )
         for row in rows:
             append_pipeline_event(

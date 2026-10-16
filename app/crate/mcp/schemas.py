@@ -24,6 +24,15 @@ class InstanceInput(ClosedInput):
     pass
 
 
+class QualityInput(ClosedInput):
+    category: (
+        Literal["corrupt", "low_bitrate", "lossy_with_lossless", "mixed_format_albums"]
+        | None
+    ) = None
+    limit: Limit = 50
+    cursor: Cursor | None = None
+
+
 class IssuesInput(ClosedInput):
     check_type: Annotated[str, Field(min_length=1, max_length=80)] | None = None
     severity: Literal["low", "medium", "high", "critical"] | None = None
@@ -79,20 +88,256 @@ EntityUID = Annotated[
 IdempotencyKey = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")]
 
 
+class PlanInput(ClosedInput):
+    plan_id: EntityUID
+    limit: Limit = 50
+    cursor: Cursor | None = None
+
+
 class HealthCheckInput(ClosedInput):
-    artist_uid: EntityUID
+    artist_uid: EntityUID | None = None
     check_type: Literal["has_photo_desync"] = "has_photo_desync"
     idempotency_key: IdempotencyKey
+    scope: Literal["artist", "global"] | None = None
+    check_types: Annotated[list[str], Field(min_length=1, max_length=17)] | None = None
+    plan_id: EntityUID | None = None
+    plan_version: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")] | None = None
+
+    @model_validator(mode="after")
+    def validate_selection(self):
+        if self.plan_id:
+            if (
+                not self.plan_version
+                or self.scope
+                or self.check_types
+                or self.artist_uid
+            ):
+                raise ValueError("Apply requires only the plan and version")
+        elif self.plan_version:
+            raise ValueError("A plan ID is required")
+        elif self.scope or self.check_types is not None:
+            if self.scope not in {"artist", "global"} or not self.check_types:
+                raise ValueError("An explicit scope and checks are required")
+            if (self.scope == "artist") != bool(self.artist_uid):
+                raise ValueError("Artist scope requires an artist UID")
+            if len(set(self.check_types)) != len(self.check_types) or any(
+                c not in REPAIR_CATALOG_BY_CHECK for c in self.check_types
+            ):
+                raise ValueError("Unknown or duplicate checks")
+        elif not self.artist_uid:
+            raise ValueError("An artist UID is required")
+        return self
 
 
 class RepairPreviewInput(ClosedInput):
-    issue_id: Annotated[int, Field(strict=True, gt=0)]
+    issue_id: Annotated[int, Field(strict=True, gt=0)] | None = None
+    issue_ids: (
+        Annotated[
+            list[Annotated[int, Field(strict=True, gt=0)]],
+            Field(min_length=1, max_length=20),
+        ]
+        | None
+    ) = None
+    idempotency_key: IdempotencyKey | None = None
+
+    @model_validator(mode="after")
+    def validate_selection(self):
+        if self.issue_ids is not None:
+            if (
+                self.issue_id is not None
+                or not self.idempotency_key
+                or len(set(self.issue_ids)) != len(self.issue_ids)
+            ):
+                raise ValueError(
+                    "Exact unique issue IDs and an idempotency key are required"
+                )
+        elif self.issue_id is None or self.idempotency_key is not None:
+            raise ValueError("A single directed issue ID is required")
+        return self
 
 
 class RepairApplyInput(ClosedInput):
     plan_id: EntityUID
     plan_version: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
     idempotency_key: IdempotencyKey
+
+
+class QualityRunInput(ClosedInput):
+    idempotency_key: IdempotencyKey
+    scope: Literal["global"] | None = None
+    plan_id: EntityUID | None = None
+    plan_version: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")] | None = None
+
+    @model_validator(mode="after")
+    def validate_stage(self):
+        if self.plan_id:
+            if not self.plan_version or self.scope:
+                raise ValueError("Apply requires only the plan and version")
+        elif self.plan_version or self.scope != "global":
+            raise ValueError("An explicit global scope is required")
+        return self
+
+
+class MetadataPatch(ClosedInput):
+    bio: Annotated[str, Field(max_length=50000)] | None = None
+    tags: (
+        Annotated[
+            list[Annotated[str, Field(min_length=1, max_length=200)]],
+            Field(max_length=100),
+        ]
+        | None
+    ) = None
+    genres: (
+        Annotated[
+            list[Annotated[str, Field(min_length=1, max_length=200)]],
+            Field(max_length=100),
+        ]
+        | None
+    ) = None
+    urls: (
+        Annotated[
+            dict[str, Annotated[str, Field(max_length=4096)]], Field(max_length=30)
+        ]
+        | None
+    ) = None
+    mbid: Annotated[str, Field(max_length=4096)] | None = None
+    country: Annotated[str, Field(max_length=4096)] | None = None
+    area: Annotated[str, Field(max_length=4096)] | None = None
+    formed: Annotated[str, Field(max_length=4096)] | None = None
+    ended: Annotated[str, Field(max_length=4096)] | None = None
+    artist_type: Annotated[str, Field(max_length=4096)] | None = None
+    bandcamp_url: Annotated[str, Field(max_length=4096)] | None = None
+    title: Annotated[str, Field(max_length=4096)] | None = None
+    artist: Annotated[str, Field(max_length=4096)] | None = None
+    albumartist: Annotated[str, Field(max_length=4096)] | None = None
+    album: Annotated[str, Field(max_length=4096)] | None = None
+    date: Annotated[str, Field(max_length=4096)] | None = None
+    genre: Annotated[str, Field(max_length=4096)] | None = None
+    tracknumber: Annotated[str, Field(max_length=4096)] | None = None
+    discnumber: Annotated[str, Field(max_length=4096)] | None = None
+
+
+class MetadataPreviewInput(ClosedInput):
+    entity_type: Literal["artist", "album", "track"]
+    entity_uid: EntityUID
+    patch: MetadataPatch
+    idempotency_key: IdempotencyKey
+
+    @model_validator(mode="after")
+    def validate_patch(self):
+        from crate.agent_metadata import _patch
+
+        _patch(self.entity_type, self.patch.model_dump(exclude_unset=True))
+        return self
+
+
+class AnalysisPlanInput(ClosedInput):
+    track_uids: Annotated[list[EntityUID], Field(min_length=1, max_length=200)]
+    pipelines: Annotated[
+        list[Literal["analysis", "bliss"]], Field(min_length=1, max_length=2)
+    ] = ["analysis", "bliss"]
+    mode: Literal["pending", "refresh"] = "pending"
+    idempotency_key: IdempotencyKey
+
+    @model_validator(mode="after")
+    def validate_unique(self):
+        if len(set(self.track_uids)) != len(self.track_uids) or len(
+            set(self.pipelines)
+        ) != len(self.pipelines):
+            raise ValueError("Duplicate targets or pipelines")
+        return self
+
+
+class EnrichmentPlanInput(ClosedInput):
+    artist_uids: Annotated[list[EntityUID], Field(min_length=1, max_length=20)]
+    providers: Annotated[
+        list[Literal["lastfm", "spotify", "musicbrainz", "discogs", "setlist"]],
+        Field(min_length=1, max_length=5),
+    ]
+    facets: Annotated[
+        list[
+            Literal[
+                "biography",
+                "tags",
+                "genres",
+                "identity",
+                "urls",
+                "members",
+                "popularity",
+                "similar_artists",
+                "setlists",
+            ]
+        ],
+        Field(min_length=1, max_length=9),
+    ]
+    mode: Literal["missing", "refresh"] = "missing"
+    idempotency_key: IdempotencyKey
+
+    @model_validator(mode="after")
+    def validate_unique(self):
+        if any(
+            len(set(values)) != len(values)
+            for values in (self.artist_uids, self.providers, self.facets)
+        ):
+            raise ValueError("Duplicate targets, providers or facets")
+        return self
+
+
+class AnalysisStatusInput(ClosedInput):
+    track_uids: (
+        Annotated[list[EntityUID], Field(min_length=1, max_length=200)] | None
+    ) = None
+    plan_id: EntityUID | None = None
+    limit: Limit = 50
+    cursor: Cursor | None = None
+
+    @model_validator(mode="after")
+    def validate_selection(self):
+        if bool(self.track_uids) == bool(self.plan_id):
+            raise ValueError("Choose track UIDs or an owned plan")
+        if self.track_uids and len(set(self.track_uids)) != len(self.track_uids):
+            raise ValueError("Duplicate tracks")
+        return self
+
+
+class LibrarySyncPlanInput(ClosedInput):
+    scope: Literal["album", "artist", "global"]
+    entity_uid: EntityUID | None = None
+    limit: Limit = 100
+    idempotency_key: IdempotencyKey
+
+    @model_validator(mode="after")
+    def validate_scope(self):
+        if (self.scope == "global") == bool(self.entity_uid):
+            raise ValueError("Only album and artist scopes require an entity UID")
+        if self.scope == "global" and "limit" not in self.model_fields_set:
+            raise ValueError("Global sync requires an explicit album limit")
+        return self
+
+
+class MetadataExportPlanInput(ClosedInput):
+    album_uids: Annotated[list[EntityUID], Field(min_length=1, max_length=20)]
+    destination_preset: Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
+    idempotency_key: IdempotencyKey
+
+    @model_validator(mode="after")
+    def validate_unique(self):
+        if len(set(self.album_uids)) != len(self.album_uids):
+            raise ValueError("Duplicate albums")
+        return self
+
+
+class MetadataRehydratePlanInput(ClosedInput):
+    album_uids: Annotated[list[EntityUID], Field(min_length=1, max_length=20)]
+    source_preset: Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
+    conflict_policy: Literal["fill_missing", "replace_unlocked"] = "fill_missing"
+    idempotency_key: IdempotencyKey
+
+    @model_validator(mode="after")
+    def validate_unique(self):
+        if len(set(self.album_uids)) != len(self.album_uids):
+            raise ValueError("Duplicate albums")
+        return self
 
 
 class JobRetryInput(JobInput):

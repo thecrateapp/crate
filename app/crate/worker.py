@@ -680,9 +680,20 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ),
     ),
     (
+        "crate.worker_handlers.quality",
+        "QUALITY_TASK_HANDLERS",
+        ("quality_check",),
+    ),
+    (
+        "crate.worker_handlers.agent_library",
+        "AGENT_LIBRARY_TASK_HANDLERS",
+        ("agent_maintenance",),
+    ),
+    (
         "crate.worker_handlers.management",
         "MANAGEMENT_TASK_HANDLERS",
         (
+            "prepare_library_repairs",
             "health_check",
             "repair",
             "repair_duplicate_tracks",

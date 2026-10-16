@@ -110,6 +110,14 @@ def test_action_grants_are_explicit_and_do_not_expand_existing_diagnostic_grants
         "library.repair.photo_flag",
         "ops.jobs.retry",
         "ops.jobs.cancel_pending",
+        "library.quality.run",
+        "library.repair.run",
+        "library.metadata.write",
+        "library.enrichment.run",
+        "library.analysis.run",
+        "library.sync.run",
+        "library.metadata.export",
+        "library.metadata.rehydrate",
     }
     assert not ACTION_GRANTS & PILOT_GRANTS
     assert ALLOWED_GRANTS == PILOT_GRANTS | ACTION_GRANTS

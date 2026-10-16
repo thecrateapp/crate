@@ -27,13 +27,38 @@ def _result(data: dict) -> dict:
 def run_health_check(
     principal: AgentPrincipal,
     *,
-    artist_uid: str,
+    artist_uid: str | None = None,
     idempotency_key: str,
     check_type: str = "has_photo_desync",
     trace_id: str | None = None,
+    scope: str | None = None,
+    check_types: list[str] | None = None,
+    plan_id: str | None = None,
+    plan_version: str | None = None,
 ) -> dict:
     _require(principal, "library.health.run")
-    if check_type != "has_photo_desync":
+    if plan_id or scope or check_types is not None:
+        from crate.agent_library_operations import apply_operation, prepare_operation
+
+        if plan_id:
+            if not plan_version:
+                raise DiagnosticError("INVALID_ARGUMENT", "A plan version is required")
+            return apply_operation(
+                principal,
+                "health_check",
+                plan_id,
+                plan_version,
+                idempotency_key,
+                trace_id=trace_id,
+            )
+        return prepare_operation(
+            principal,
+            "health_check",
+            {"scope": scope, "artist_uid": artist_uid, "check_types": check_types},
+            idempotency_key,
+            trace_id=trace_id,
+        )
+    if check_type != "has_photo_desync" or not artist_uid:
         raise DiagnosticError("INVALID_ARGUMENT", "Only has_photo_desync is enabled")
     return _result(
         agent_requests.accept_health_check(
@@ -43,9 +68,29 @@ def run_health_check(
 
 
 def preview_repairs(
-    principal: AgentPrincipal, *, issue_id: int, trace_id: str | None = None
+    principal: AgentPrincipal,
+    *,
+    issue_id: int | None = None,
+    issue_ids: list[int] | None = None,
+    idempotency_key: str | None = None,
+    trace_id: str | None = None,
 ) -> dict:
+    if issue_ids is not None:
+        from crate.agent_library_operations import prepare_operation
+
+        if not idempotency_key:
+            raise DiagnosticError("INVALID_ARGUMENT", "An idempotency key is required")
+
+        return prepare_operation(
+            principal,
+            "repairs",
+            {"issue_ids": issue_ids},
+            idempotency_key,
+            trace_id=trace_id,
+        )
     _require(principal, "library.repair.photo_flag")
+    if issue_id is None:
+        raise DiagnosticError("INVALID_ARGUMENT", "An issue ID is required")
     return _result(
         agent_repair_plans.preview_repair(principal, issue_id, trace_id=trace_id)
     )
@@ -59,6 +104,20 @@ def apply_repairs(
     idempotency_key: str,
     trace_id: str | None = None,
 ) -> dict:
+    if "library.repair.run" in principal.grants:
+        from crate.db.repositories.agent_plans import get_owned_plan
+        from crate.agent_library_operations import apply_operation
+
+        plan = get_owned_plan(principal, plan_id)
+        if plan["operation"] == "repairs":
+            return apply_operation(
+                principal,
+                "repairs",
+                plan_id,
+                plan_version,
+                idempotency_key,
+                trace_id=trace_id,
+            )
     _require(principal, "library.repair.photo_flag")
     return _result(
         agent_requests.accept_apply(
@@ -140,7 +199,135 @@ def _verify_photo(task_id, config, artist_uid):
     return agent_requests.record_photo_verification(task_id, observation)
 
 
+def _prepare(principal, operation, idempotency_key, trace_id, **parameters):
+    from crate.agent_library_operations import prepare_operation
+
+    return prepare_operation(
+        principal, operation, parameters, idempotency_key, trace_id=trace_id
+    )
+
+
+def _apply(principal, operation, plan_id, plan_version, idempotency_key, trace_id):
+    from crate.agent_library_operations import apply_operation
+
+    return apply_operation(
+        principal, operation, plan_id, plan_version, idempotency_key, trace_id=trace_id
+    )
+
+
+def run_quality_check(
+    principal,
+    *,
+    idempotency_key,
+    scope=None,
+    plan_id=None,
+    plan_version=None,
+    trace_id=None,
+):
+    return (
+        _apply(
+            principal, "quality_check", plan_id, plan_version, idempotency_key, trace_id
+        )
+        if plan_id
+        else _prepare(
+            principal, "quality_check", idempotency_key, trace_id, scope=scope
+        )
+    )
+
+
+def preview_metadata_update(principal, *, idempotency_key, trace_id=None, **parameters):
+    return _prepare(
+        principal, "metadata_update", idempotency_key, trace_id, **parameters
+    )
+
+
+def apply_metadata_update(
+    principal, *, plan_id, plan_version, idempotency_key, trace_id=None
+):
+    return _apply(
+        principal, "metadata_update", plan_id, plan_version, idempotency_key, trace_id
+    )
+
+
+def plan_enrichment(principal, *, idempotency_key, trace_id=None, **parameters):
+    return _prepare(principal, "enrichment", idempotency_key, trace_id, **parameters)
+
+
+def run_enrichment(principal, *, plan_id, plan_version, idempotency_key, trace_id=None):
+    return _apply(
+        principal, "enrichment", plan_id, plan_version, idempotency_key, trace_id
+    )
+
+
+def plan_analysis(principal, *, idempotency_key, trace_id=None, **parameters):
+    return _prepare(principal, "analysis", idempotency_key, trace_id, **parameters)
+
+
+def run_analysis(principal, *, plan_id, plan_version, idempotency_key, trace_id=None):
+    return _apply(
+        principal, "analysis", plan_id, plan_version, idempotency_key, trace_id
+    )
+
+
+def plan_library_sync(principal, *, idempotency_key, trace_id=None, **parameters):
+    return _prepare(principal, "library_sync", idempotency_key, trace_id, **parameters)
+
+
+def run_library_sync(
+    principal, *, plan_id, plan_version, idempotency_key, trace_id=None
+):
+    return _apply(
+        principal, "library_sync", plan_id, plan_version, idempotency_key, trace_id
+    )
+
+
+def plan_metadata_export(principal, *, idempotency_key, trace_id=None, **parameters):
+    return _prepare(
+        principal, "metadata_export", idempotency_key, trace_id, **parameters
+    )
+
+
+def run_metadata_export(
+    principal, *, plan_id, plan_version, idempotency_key, trace_id=None
+):
+    return _apply(
+        principal, "metadata_export", plan_id, plan_version, idempotency_key, trace_id
+    )
+
+
+def plan_metadata_rehydrate(principal, *, idempotency_key, trace_id=None, **parameters):
+    return _prepare(
+        principal, "metadata_rehydrate", idempotency_key, trace_id, **parameters
+    )
+
+
+def run_metadata_rehydrate(
+    principal, *, plan_id, plan_version, idempotency_key, trace_id=None
+):
+    return _apply(
+        principal,
+        "metadata_rehydrate",
+        plan_id,
+        plan_version,
+        idempotency_key,
+        trace_id,
+    )
+
+
 __all__ = [
+    "run_quality_check",
+    "preview_metadata_update",
+    "apply_metadata_update",
+    "plan_enrichment",
+    "run_enrichment",
+    "plan_analysis",
+    "run_analysis",
+    "plan_library_sync",
+    "run_library_sync",
+    "plan_metadata_export",
+    "run_metadata_export",
+    "plan_metadata_rehydrate",
+    "run_metadata_rehydrate",
     "apply_repairs",
     "cancel_job",
     "execute_agent_job",

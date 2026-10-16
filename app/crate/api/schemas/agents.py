@@ -4,6 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from crate.agent_access import ALLOWED_GRANTS
+
 
 class AgentCollectionResponse(BaseModel):
     items: list[dict[str, Any]]
@@ -16,7 +18,7 @@ class ClosedBody(BaseModel):
 
 class IntegrationCreate(ClosedBody):
     name: str = Field(min_length=1, max_length=120)
-    grants: list[str] = Field(min_length=1, max_length=8)
+    grants: list[str] = Field(min_length=1, max_length=len(ALLOWED_GRANTS))
     expires_in_days: int = Field(default=90, strict=True, ge=1, le=365)
     require_approval: bool = False
 
@@ -24,7 +26,9 @@ class IntegrationCreate(ClosedBody):
 class IntegrationUpdate(ClosedBody):
     expected_policy_revision: int = Field(strict=True, ge=1)
     enabled: bool | None = None
-    grants: list[str] | None = Field(default=None, min_length=1, max_length=8)
+    grants: list[str] | None = Field(
+        default=None, min_length=1, max_length=len(ALLOWED_GRANTS)
+    )
     require_approval: bool | None = None
 
 
@@ -44,14 +48,16 @@ class OAuthClientCreate(ClosedBody):
     client_id: str = Field(min_length=1, max_length=2048)
     name: str = Field(min_length=1, max_length=120)
     redirect_uris: list[str] = Field(min_length=1, max_length=20)
-    scopes: list[str] = Field(min_length=1, max_length=8)
+    scopes: list[str] = Field(min_length=1, max_length=len(ALLOWED_GRANTS))
     metadata_url: str | None = Field(default=None, max_length=2048)
 
 
 class OAuthClientUpdate(ClosedBody):
     client_id: str = Field(min_length=1, max_length=2048)
     enabled: bool | None = None
-    scopes: list[str] | None = Field(default=None, min_length=1, max_length=8)
+    scopes: list[str] | None = Field(
+        default=None, min_length=1, max_length=len(ALLOWED_GRANTS)
+    )
 
 
 class PlanDecision(ClosedBody):

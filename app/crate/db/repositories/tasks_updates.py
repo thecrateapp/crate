@@ -5,6 +5,7 @@ from sqlalchemy import text
 from crate.db.repositories.tasks_mutation_shared import utc_now_iso
 from crate.db.repositories.tasks_shared import register_tasks_surface_signal
 from crate.db.tx import optional_scope
+from crate.quality_task_policy import QUALITY_MUTATING_TASK_TYPES
 
 
 ACTIVE_STATUSES = {"running", "delegated", "completing"}
@@ -38,6 +39,10 @@ def start_task(
             .mappings()
             .first()
         )
+        if row is not None and row["type"] in QUALITY_MUTATING_TASK_TYPES:
+            from crate.db.analytics_quality_surface import mark_quality_report_stale
+
+            mark_quality_report_stale(session=s)
     return dict(row) if row else None
 
 
@@ -83,9 +88,24 @@ def update_task(
     # SQL_SAFE: fields are built internally from hardcoded column names; values use SQL params.
     with optional_scope(session) as s:
         register_tasks_surface_signal_fn(s)
-        s.execute(
-            text(f"UPDATE tasks SET {', '.join(fields)} WHERE id = :task_id"), params
+        row = (
+            s.execute(
+                text(
+                    f"UPDATE tasks SET {', '.join(fields)} WHERE id = :task_id RETURNING type"
+                ),
+                params,
+            )
+            .mappings()
+            .first()
         )
+        if (
+            status is not None
+            and row is not None
+            and row["type"] in QUALITY_MUTATING_TASK_TYPES
+        ):
+            from crate.db.analytics_quality_surface import mark_quality_report_stale
+
+            mark_quality_report_stale(session=s)
 
 
 def heartbeat_task(task_id: str, *, session=None):
@@ -114,7 +134,7 @@ def fail_or_retry_task(task_id: str, error: str, *, session=None) -> str:
             s.execute(
                 text(
                     """
-                SELECT status, retry_count, max_retries
+                SELECT status, retry_count, max_retries, type
                 FROM tasks
                 WHERE id = :id
                 FOR UPDATE
@@ -131,6 +151,11 @@ def fail_or_retry_task(task_id: str, error: str, *, session=None) -> str:
         status = str(row.get("status") or "")
         if status in TERMINAL_STATUSES:
             return status
+
+        if row["type"] in QUALITY_MUTATING_TASK_TYPES:
+            from crate.db.analytics_quality_surface import mark_quality_report_stale
+
+            mark_quality_report_stale(session=s)
 
         retry_count = int(row.get("retry_count") or 0)
         max_retries = int(row.get("max_retries") or 0)

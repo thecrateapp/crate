@@ -3,6 +3,7 @@
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from crate.agent_operation_catalog import interrupted_operation_result
 from crate.db.tx import read_scope
 
 JOB_FIELDS = """id, type, status, pool, priority, created_at, updated_at,
@@ -97,7 +98,11 @@ def read_job(job_id: str, *, session: Session | None = None) -> dict | None:
                    LEFT(result_json -> 'execution' ->> 'plan_id', 128) AS plan_id,
                    LEFT(result_json -> 'execution' ->> 'artist_uid', 128) AS artist_uid,
                    LEFT(COALESCE(result_json -> 'execution' ->> 'error_code',
-                                 result_json ->> 'error_code'), 80) AS error_code
+                                 result_json ->> 'error_code'), 80) AS error_code,
+                   (SELECT jsonb_build_object('operation', operation,
+                              'effect_started', effect_started_at IS NOT NULL,
+                              'unrecorded', result IS NULL)
+                    FROM agent_jobs WHERE task_id=tasks.id) AS agent_execution
             FROM tasks WHERE id = :id
         """),
                 {"id": job_id},
@@ -105,7 +110,22 @@ def read_job(job_id: str, *, session: Session | None = None) -> dict | None:
             .mappings()
             .first()
         )
-        return dict(row) if row else None
+        if row is None:
+            return None
+        job = dict(row)
+        evidence = job.pop("agent_execution")
+        if evidence and evidence["unrecorded"]:
+            result = interrupted_operation_result(
+                evidence["operation"],
+                job["status"],
+                True if evidence["effect_started"] else None,
+                None,
+            )
+            if result is not None:
+                job["execution_status"] = result["execution"]["status"]
+                job["verification_status"] = result["verification"]["status"]
+                job["error_code"] = result["execution"]["error_code"]
+        return job
 
     if session is not None:
         return _impl(session)

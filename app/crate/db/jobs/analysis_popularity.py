@@ -89,95 +89,53 @@ def requeue_tracks(
     such as ``analysis_state = 'pending'``.  It is not derived from
     user input and therefore does not use SQL parameter binding.
     """
+    filters = requeue_filter_clauses(
+        track_id=track_id,
+        album_id=album_id,
+        artist=artist,
+        album_name=album_name,
+        scope=scope,
+    )
+    params = requeue_filter_params(track_id, album_id, artist, album_name)
+    requested = sorted(set(pipelines or []))
+    if set(requested) - {"analysis", "bliss"}:
+        raise ValueError("Unsupported analysis pipeline")
     with transaction_scope() as session:
-        if track_id:
-            result = session.execute(
-                text(f"UPDATE library_tracks SET {set_clause} WHERE id = :id"),
-                {"id": track_id},
-            )
-        elif album_id:
-            result = session.execute(
-                text(
-                    f"UPDATE library_tracks SET {set_clause} WHERE album_id = :album_id"
-                ),
-                {"album_id": album_id},
-            )
-        elif artist and album_name:
-            result = session.execute(
-                text(
-                    f"UPDATE library_tracks SET {set_clause} WHERE album_id IN "
-                    "(SELECT id FROM library_albums WHERE artist = :artist AND name = :album_name)"
-                ),
-                {"artist": artist, "album_name": album_name},
-            )
-        elif artist:
-            result = session.execute(
-                text(
-                    f"UPDATE library_tracks SET {set_clause} WHERE album_id IN "
-                    "(SELECT id FROM library_albums WHERE artist = :artist)"
-                ),
-                {"artist": artist},
-            )
-        elif scope == "all":
-            result = session.execute(text(f"UPDATE library_tracks SET {set_clause}"))
-        else:
+        ids = list(
+            session.execute(
+                text(f"SELECT id FROM library_tracks WHERE {filters} ORDER BY id"),
+                params,
+            ).scalars()
+        )
+        if not ids:
             return 0
-
-        changed = _rowcount(result)
-        if changed and pipelines:
-            filters = requeue_filter_clauses(
-                track_id=track_id,
-                album_id=album_id,
-                artist=artist,
-                album_name=album_name,
-                scope=scope,
+        if requested:
+            session.execute(
+                text(
+                    "INSERT INTO track_processing_state(track_id,pipeline,state) SELECT t.id,p.pipeline,'pending' FROM library_tracks t CROSS JOIN unnest(CAST(:pipelines AS text[])) p(pipeline) WHERE t.id=ANY(:ids) ON CONFLICT(track_id,pipeline) DO NOTHING"
+                ),
+                {"ids": ids, "pipelines": requested},
             )
-            for pipeline in pipelines:
-                session.execute(
-                    text(
-                        f"""
-                        INSERT INTO track_processing_state (
-                            track_id,
-                            pipeline,
-                            state,
-                            claimed_by,
-                            claimed_at,
-                            attempts,
-                            last_error,
-                            updated_at,
-                            completed_at
-                        )
-                        SELECT
-                            id,
-                            :pipeline,
-                            'pending',
-                            NULL,
-                            NULL,
-                            0,
-                            NULL,
-                            NOW(),
-                            NULL
-                        FROM library_tracks
-                        WHERE {filters}
-                        ON CONFLICT (track_id, pipeline) DO UPDATE SET
-                            state = 'pending',
-                            claimed_by = NULL,
-                            claimed_at = NULL,
-                            last_error = NULL,
-                            updated_at = NOW(),
-                            completed_at = NULL
-                        """
-                    ),
-                    {
-                        "pipeline": pipeline,
-                        **requeue_filter_params(track_id, album_id, artist, album_name),
-                    },
-                )
-                append_pipeline_event(
-                    session, pipeline=pipeline, track_id=track_id, state="pending"
-                )
-            mark_ops_snapshot_dirty(session)
-        return changed
+            from crate.db.jobs.analysis_generations import lock_processing_rows
+
+            lock_processing_rows(session, ids, requested)
+            session.execute(
+                text(
+                    "UPDATE track_processing_state SET state='pending',generation=generation+1,claim_token=NULL,pipeline_signature=NULL,claimed_by=NULL,claimed_at=NULL,last_error=NULL,completed_at=NULL,updated_at=NOW() WHERE track_id=ANY(:ids) AND pipeline=ANY(:pipelines)"
+                ),
+                {"ids": ids, "pipelines": requested},
+            )
+        # SQL_SAFE: set_clause is an internal closed assignment list from the worker.
+        result = session.execute(
+            text(f"UPDATE library_tracks SET {set_clause} WHERE id=ANY(:ids)"),
+            {"ids": ids},
+        )
+        for pipeline in requested:
+            append_pipeline_event(
+                session, pipeline=pipeline, track_id=track_id, state="pending"
+            )
+        mark_ops_snapshot_dirty(session)
+        return _rowcount(result)
 
 
 __all__ = [

@@ -19,6 +19,25 @@ import type {
 } from "@/lib/agent-integrations";
 
 const base = "/api/admin/agent-plans";
+const operationCapabilities: Record<string, string> = {
+  repair_photo_flag: "library.repair.run",
+  health_check: "library.repair.run",
+  quality_check: "library.repair.run",
+  repairs: "library.repair.run",
+  metadata_update: "library.metadata.write",
+  enrichment: "library.metadata.write",
+  analysis: "library.metadata.write",
+  library_sync: "library.metadata.write",
+  metadata_export: "library.metadata.write",
+  metadata_rehydrate: "library.metadata.write",
+};
+const targetIdentity = (target: AgentPlan["targets"][number]) =>
+  target.entity_uid ??
+  target.artist_uid ??
+  (target.entity_type === "library" && target.scope === "global"
+    ? "library:global"
+    : null);
+const valueText = (value: unknown) => JSON.stringify(value, null, 2) ?? "—";
 
 export function AgentPlanReview() {
   const { planId } = useParams();
@@ -28,10 +47,8 @@ export function AgentPlanReview() {
 function PlanReviewPage({ planId }: { planId?: string }) {
   const { hasCapability } = useAuth();
   const canReview =
-    hasCapability("agents.plans.review") && hasCapability("library.repair.run");
-  const canApprove =
-    hasCapability("agents.plans.approve") &&
-    hasCapability("library.repair.run");
+    hasCapability("agents.plans.review") &&
+    Object.values(operationCapabilities).some(hasCapability);
   const [cursor, setCursor] = useState<string | null>(null);
   const list = useApi<AgentCollection<AgentPlanSummary>>(
     !planId && canReview
@@ -47,6 +64,14 @@ function PlanReviewPage({ planId }: { planId?: string }) {
   const [conflict, setConflict] = useState<string | null>(null);
   const [reviewedIdentity, setReviewedIdentity] = useState<string | null>(null);
   const item = plan.data;
+  const domainCapability = item
+    ? operationCapabilities[item.operation]
+    : undefined;
+  const canDecide =
+    hasCapability("agents.plans.approve") &&
+    !!domainCapability &&
+    hasCapability(domainCapability);
+  const canApprove = canDecide && item?.executable !== false;
   const expiry = item ? new Date(item.expires_at).getTime() : Number.NaN;
   const expired = !Number.isFinite(expiry) || expiry <= Date.now();
   const reviewIdentity = item
@@ -60,26 +85,35 @@ function PlanReviewPage({ planId }: { planId?: string }) {
     : null;
   const reviewed =
     reviewIdentity !== null && reviewedIdentity === reviewIdentity;
+  const identities = item?.targets.map(targetIdentity) ?? [];
   const complete =
     !!item &&
     !item.truncated &&
     item.target_count > 0 &&
     item.returned_count === item.target_count &&
     item.targets.length === item.target_count &&
-    item.changes.length === item.target_count &&
-    new Set(item.targets.map((target) => target.artist_uid)).size ===
-      item.target_count &&
-    new Set(item.changes.map((change) => change.artist_uid)).size ===
-      item.target_count &&
-    item.changes.every((change) =>
-      item.targets.some((target) => target.artist_uid === change.artist_uid),
-    );
+    identities.every(Boolean) &&
+    new Set(identities).size === item.target_count &&
+    item.changes.length > 0 &&
+    item.changes.every((change) => {
+      const uid = change.entity_uid ?? change.artist_uid;
+      if (typeof uid === "string") return identities.includes(uid);
+      if (Array.isArray(change.targets) && change.targets.length > 0)
+        return change.targets.every(
+          (target) =>
+            target &&
+            typeof target === "object" &&
+            identities.includes(targetIdentity(target)),
+        );
+      return change.scope === "global" && identities.includes("library:global");
+    });
 
   async function decide(decision: "approve" | "reject") {
     if (
       !item ||
       busy ||
-      !canApprove ||
+      !canDecide ||
+      (decision === "approve" && !canApprove) ||
       !complete ||
       expired ||
       conflict ||
@@ -181,7 +215,9 @@ function PlanReviewPage({ planId }: { planId?: string }) {
           <Card>
             <CardHeader>
               <CardTitle className="flex flex-wrap items-center gap-3 text-base">
-                Update artist photo flag
+                {item.operation === "repair_photo_flag"
+                  ? "Update artist photo flag"
+                  : item.operation.replace(/_/g, " ")}
                 <Badge variant="secondary">
                   {item.state.replace(/_/g, " ")}
                 </Badge>
@@ -190,7 +226,7 @@ function PlanReviewPage({ planId }: { planId?: string }) {
             </CardHeader>
             <CardContent className="space-y-4">
               <p>
-                {item.target_count} artist · Expires{" "}
+                {item.target_count} targets · Expires{" "}
                 {new Date(item.expires_at).toLocaleString()}
               </p>
               <p className="text-sm text-muted-foreground">
@@ -209,51 +245,101 @@ function PlanReviewPage({ planId }: { planId?: string }) {
                   </caption>
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="py-2">Artist</th>
+                      <th className="py-2">Target</th>
                       <th>Before</th>
                       <th>After</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {item.changes.map((change) => (
-                      <tr
-                        key={change.artist_uid}
-                        className="border-b border-border"
-                      >
-                        <td className="py-3">
-                          <p>
-                            {item.targets.find(
-                              (target) =>
-                                target.artist_uid === change.artist_uid,
-                            )?.name ?? change.artist_uid}
-                          </p>
-                          <code className="text-xs text-muted-foreground">
-                            {change.artist_uid}
-                          </code>
-                        </td>
-                        <td>{change.before ? "Photo present" : "No photo"}</td>
-                        <td>{change.after ? "Photo present" : "No photo"}</td>
-                      </tr>
-                    ))}
+                    {item.changes.map((change, index) => {
+                      const uid = String(
+                        change.entity_uid ??
+                          change.artist_uid ??
+                          "library:global",
+                      );
+                      const target = item.targets.find(
+                        (entry) => targetIdentity(entry) === uid,
+                      );
+                      const legacy = item.operation === "repair_photo_flag";
+                      return (
+                        <tr
+                          key={`${uid}/${index}`}
+                          className="border-b border-border"
+                        >
+                          <td className="py-3">
+                            <p>{target?.name ?? uid}</p>
+                            <code className="text-xs text-muted-foreground">
+                              {uid}
+                            </code>
+                            <p>
+                              {String(
+                                change.field ??
+                                  change.action ??
+                                  change.pipeline ??
+                                  "operation",
+                              )}
+                            </p>
+                          </td>
+                          <td>
+                            <pre className="whitespace-pre-wrap break-words">
+                              {legacy
+                                ? change.before
+                                  ? "Photo present"
+                                  : "No photo"
+                                : valueText(change.before)}
+                            </pre>
+                          </td>
+                          <td>
+                            <pre className="whitespace-pre-wrap break-words">
+                              {legacy
+                                ? change.after
+                                  ? "Photo present"
+                                  : "No photo"
+                                : valueText(
+                                    Object.prototype.hasOwnProperty.call(
+                                      change,
+                                      "after",
+                                    )
+                                      ? change.after
+                                      : change,
+                                  )}
+                            </pre>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-              <p className="text-sm">
-                {item.impact.filesystem_writes
-                  ? "Changes library files."
-                  : "Updates the database flag. Image files remain intact."}{" "}
-                {item.impact.notifications
-                  ? "Sends notifications."
-                  : "Does not send notifications."}
-              </p>
+              {item.operation === "repair_photo_flag" ? (
+                <p className="text-sm">
+                  Updates the database flag. Image files remain intact. Does not
+                  send notifications.
+                </p>
+              ) : null}
+              <details open>
+                <summary>Complete targets, effects and source versions</summary>
+                <pre className="mt-2 max-w-full overflow-x-auto whitespace-pre-wrap break-words text-xs">
+                  {valueText({
+                    targets: item.targets,
+                    impact: item.impact,
+                    source_versions: item.source_versions,
+                    conflicts: item.conflicts,
+                  })}
+                </pre>
+              </details>
               <p className="text-sm text-muted-foreground">
                 {item.reversibility}
               </p>
               <p className="text-sm text-muted-foreground">
-                Evidence observed{" "}
-                {new Date(item.source_versions.observed_at).toLocaleString()} ·
                 Policy revision {item.policy_revision}
               </p>
+              {item.executable === false ? (
+                <p role="alert">
+                  This plan contains manual or diagnostic items and cannot be
+                  executed.
+                </p>
+              ) : null}
               {item.job_id ? (
                 <Link
                   className="text-sm underline"
@@ -290,7 +376,7 @@ function PlanReviewPage({ planId }: { planId?: string }) {
               </Button>
             </div>
           ) : null}
-          {item.state === "awaiting_approval" && canApprove ? (
+          {item.state === "awaiting_approval" && canDecide ? (
             <div className="space-y-3">
               <label className="flex items-center gap-2 text-sm">
                 <input
@@ -302,13 +388,18 @@ function PlanReviewPage({ planId }: { planId?: string }) {
                     )
                   }
                 />
-                I reviewed all {item.target_count} proposed changes and their
+                I reviewed all {item.changes.length} proposed changes and their
                 effects.
               </label>
               <div className="flex gap-2">
                 <Button
                   disabled={
-                    busy || expired || !complete || !reviewed || !!conflict
+                    busy ||
+                    !canApprove ||
+                    expired ||
+                    !complete ||
+                    !reviewed ||
+                    !!conflict
                   }
                   onClick={() => void decide("approve")}
                 >

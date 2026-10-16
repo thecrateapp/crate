@@ -17,6 +17,9 @@ from starlette.routing import Route
 
 BASE_URL = "http://localhost:8585"
 TOOL_NAMES = {
+    "get_operation_catalog",
+    "get_library_quality",
+    "get_analysis_status",
     "get_instance_status",
     "list_library_issues",
     "inspect_artist",
@@ -111,6 +114,9 @@ def test_discovery_filters_each_request_and_call_still_enforces_scope(transport_
             async with _client(app, tokens["library"]) as client:
                 listed = await client.list_tools()
                 assert {tool.name for tool in listed.tools} == {
+                    "get_operation_catalog",
+                    "get_library_quality",
+                    "get_analysis_status",
                     "list_library_issues",
                     "inspect_artist",
                 }
@@ -120,6 +126,7 @@ def test_discovery_filters_each_request_and_call_still_enforces_scope(transport_
             async with _client(app, tokens["ops"]) as client:
                 listed = await client.list_tools()
                 assert {tool.name for tool in listed.tools} == {
+                    "get_operation_catalog",
                     "get_instance_status",
                     "read_diagnostics",
                 }
@@ -241,6 +248,10 @@ def test_exact_endpoint_has_no_redirect_and_bounded_request_body(transport_app):
         ("list_jobs", {"states": ["failed"]}),
         ("get_job", {"job_id": "job-1"}),
         ("read_diagnostics", {"source": "worker_logs", "task_id": "job-1"}),
+        (
+            "get_analysis_status",
+            {"track_uids": ["10000000-0000-0000-0000-000000000001"]},
+        ),
     ],
 )
 def test_each_tool_returns_structured_evidence_and_audits_machine_identity(
@@ -256,7 +267,8 @@ def test_each_tool_returns_structured_evidence_and_audits_machine_identity(
         "data": {"tool": tool},
     }
     read = Mock(return_value=payload)
-    monkeypatch.setattr(f"crate.agent_diagnostics.{tool}", read)
+    module = "agent_discovery" if tool == "get_analysis_status" else "agent_diagnostics"
+    monkeypatch.setattr(f"crate.{module}.{tool}", read)
 
     async def run():
         async with (

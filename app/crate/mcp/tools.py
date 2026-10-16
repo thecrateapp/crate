@@ -5,10 +5,10 @@ from functools import partial
 from uuid import UUID
 
 import anyio
-from mcp import types
+import mcp.types as types
 from pydantic import ValidationError
 
-from crate import agent_diagnostics, agent_maintenance
+from crate import agent_diagnostics, agent_discovery, agent_maintenance
 from crate.agent_access import actions_enabled, authorization_context
 from crate.agent_diagnostics import DiagnosticError
 from crate.db.audit import log_audit
@@ -23,11 +23,41 @@ from crate.mcp.schemas import (
     JobInput,
     JobRetryInput,
     JobsInput,
+    PlanInput,
+    QualityInput,
     RepairApplyInput,
     RepairPreviewInput,
+    AnalysisPlanInput,
+    AnalysisStatusInput,
+    EnrichmentPlanInput,
+    LibrarySyncPlanInput,
+    MetadataExportPlanInput,
+    MetadataRehydratePlanInput,
+    MetadataPreviewInput,
+    QualityRunInput,
 )
 
 CATALOG = {
+    "get_operation_catalog": (
+        InstanceInput,
+        None,
+        "Discover implemented operations, current integration grants, limits and exact repair support. Catalog entries confer no authority.",
+    ),
+    "get_plan": (
+        PlanInput,
+        None,
+        "Read your integration's exact persisted plan, sources, policy and execution. A new delegated authorization cannot read an older authorization's plans.",
+    ),
+    "get_analysis_status": (
+        AnalysisStatusInput,
+        "library.health.read",
+        "Read exact DSP generations and implementation/source version evidence for bounded track UIDs or your owned analysis plan. Requeue acceptance does not mean analysis completed.",
+    ),
+    "get_library_quality": (
+        QualityInput,
+        "library.health.read",
+        "Read bounded worker-produced quality evidence with age and invalidation state. Metadata and filename heuristics do not prove corrupt audio or acoustic identity. No scan or refresh.",
+    ),
     "get_instance_status": (
         InstanceInput,
         "ops.status.read",
@@ -64,17 +94,17 @@ ACTION_CATALOG = {
     "run_health_check": (
         HealthCheckInput,
         "library.health.run",
-        "Queue has_photo_desync for exactly one local artist UID. Persists fresh evidence; does not repair. Reuse the idempotency key for retries.",
+        "Prepare a worker-produced exact check plan with explicit artist/global scope and selected checks; apply with plan_id/version after any human approval. Legacy single-artist photo checks remain supported. No repair.",
     ),
     "preview_repairs": (
         RepairPreviewInput,
-        "library.repair.photo_flag",
-        "Persist an exact single-artist has_photo flag plan from a directed observation no older than 15 minutes. No scan, image change or job. EVIDENCE_STALE requires run_health_check first.",
+        None,
+        "Prepare an exact persisted plan from canonical issue_ids, never client-supplied actions. Manual variants explain why they cannot execute. Legacy issue_id supports directed photo-flag evidence.",
     ),
     "apply_repairs": (
         RepairApplyInput,
-        "library.repair.photo_flag",
-        "Queue your exact unexpired photo-flag plan/version. Worker revalidates identity and filesystem, applies one DB flag and verifies. No image writes. Reuse the idempotency key for retries.",
+        None,
+        "Apply an owned exact repair plan/version. Revalidates current authority, approval and source preconditions; partial effects require reconciliation. No arbitrary task dispatch.",
     ),
     "retry_job": (
         JobRetryInput,
@@ -87,6 +117,76 @@ ACTION_CATALOG = {
         "Cancel only your integration's pending directed check or photo repair. Atomic with worker claim; running/terminal jobs cannot be cancelled. Repeating a successful cancellation is safe.",
     ),
 }
+
+ACTION_CATALOG.update(
+    {
+        "run_quality_check": (
+            QualityRunInput,
+            "library.quality.run",
+            "Prepare an explicit global metadata-quality scan plan, or apply its approved ID/version. Produces the cached quality surface in a worker; does not prove audio corruption.",
+        ),
+        "preview_metadata_update": (
+            MetadataPreviewInput,
+            "library.metadata.write",
+            "Prepare exact artist/album/track metadata changes by UID, with source fingerprints, provenance and field locks. Album tag edits affect all declared tracks.",
+        ),
+        "apply_metadata_update": (
+            RepairApplyInput,
+            "library.metadata.write",
+            "Apply an exact owned metadata plan. Worker rechecks files and DB state, records manual field locks and verifies actual tags/rows.",
+        ),
+        "plan_enrichment": (
+            EnrichmentPlanInput,
+            "library.enrichment.run",
+            "Plan enumerated provider/facet calls for exact artist UIDs, limits, overwrite policy and protected manual fields. Provider credentials remain in Crate.",
+        ),
+        "run_enrichment": (
+            RepairApplyInput,
+            "library.enrichment.run",
+            "Run an owned enrichment plan with declared providers/facets. Reports provider failures and partial results separately; never resets photos or enrichment implicitly.",
+        ),
+        "plan_analysis": (
+            AnalysisPlanInput,
+            "library.analysis.run",
+            "Plan exact track/pipeline generations, audio-read cost and refresh effects. No DSP runs in HTTP.",
+        ),
+        "run_analysis": (
+            RepairApplyInput,
+            "library.analysis.run",
+            "Requeue only approved track/pipeline generations. Use get_analysis_status for completion and source/implementation evidence; old results cannot overwrite newer generations.",
+        ),
+        "plan_library_sync": (
+            LibrarySyncPlanInput,
+            "library.sync.run",
+            "Plan exact indexed albums by album/artist UID or explicit global scope. Rejects over-limit selections; does not discover new album directories or resync an artist implicitly.",
+        ),
+        "run_library_sync": (
+            RepairApplyInput,
+            "library.sync.run",
+            "Apply frozen per-album scan payloads with stable UIDs, declared summary/artwork effects and concurrent-source checks.",
+        ),
+        "plan_metadata_export": (
+            MetadataExportPlanInput,
+            "library.metadata.export",
+            "Plan metadata/sidecar export for exact album UIDs into a configured destination preset. No audio export. Result artifacts require owner authorization.",
+        ),
+        "run_metadata_export": (
+            RepairApplyInput,
+            "library.metadata.export",
+            "Execute an owned metadata export plan, without overwriting existing exports; return authorized artifact references.",
+        ),
+        "plan_metadata_rehydrate": (
+            MetadataRehydratePlanInput,
+            "library.metadata.rehydrate",
+            "Plan exact metadata imports from a configured source preset, per-field conflicts and protected manual values. No database restore or arbitrary filesystem path.",
+        ),
+        "run_metadata_rehydrate": (
+            RepairApplyInput,
+            "library.metadata.rehydrate",
+            "Apply an owned metadata import plan against frozen sidecar and database versions, respecting field locks and reporting verification.",
+        ),
+    }
+)
 
 
 def _catalog():
@@ -103,7 +203,7 @@ def _scope(name, arguments):
             if arguments.get("source") == "worker_logs"
             else "ops.status.read"
         )
-    return _catalog()[name][1]
+    return (CATALOG | ACTION_CATALOG)[name][1]
 
 
 def _principal(context):
@@ -114,16 +214,39 @@ def _principal(context):
     return principal
 
 
+def _allowed(principal, name, arguments=None):
+    if name == "get_operation_catalog":
+        return bool(principal.grants)
+    if name == "read_diagnostics" and arguments is None:
+        return bool(principal.grants & {"ops.status.read", "ops.logs.read"})
+    if name == "get_plan":
+        from crate.agent_operation_catalog import OPERATIONS
+
+        return bool(
+            principal.grants
+            & (
+                {"library.repair.photo_flag"}
+                | {entry[0] for entry in OPERATIONS.values()}
+            )
+        )
+    if name in {"preview_repairs", "apply_repairs"}:
+        if name == "preview_repairs" and arguments is not None:
+            return (
+                "library.repair.run"
+                if arguments.get("issue_ids") is not None
+                else "library.repair.photo_flag"
+            ) in principal.grants
+        return bool(
+            principal.grants & {"library.repair.photo_flag", "library.repair.run"}
+        )
+    return _scope(name, arguments or {}) in principal.grants
+
+
 async def list_tools(context, params):
     principal = _principal(context)
     result = []
     for name, (model, grant, description) in _catalog().items():
-        allowed = (
-            grant in principal.grants
-            if grant
-            else bool(principal.grants & {"ops.status.read", "ops.logs.read"})
-        )
-        if allowed:
+        if _allowed(principal, name):
             result.append(
                 types.Tool(
                     name=name,
@@ -132,7 +255,12 @@ async def list_tools(context, params):
                     output_schema=DiagnosticOutput.model_json_schema(),
                     annotations=types.ToolAnnotations(
                         read_only_hint=name not in ACTION_CATALOG,
-                        destructive_hint=False,
+                        destructive_hint=name
+                        in {
+                            "apply_repairs",
+                            "run_library_sync",
+                            "run_metadata_rehydrate",
+                        },
                         idempotent_hint=name != "preview_repairs",
                         open_world_hint=False,
                     ),
@@ -173,6 +301,10 @@ def _execute(principal, name, arguments, trace_id):
                     **({"artist_uid": artist_uid} if artist_uid else {}),
                 },
             )
+            if name in {"get_operation_catalog", "get_plan", "get_analysis_status"}:
+                return getattr(agent_discovery, name)(principal, **arguments)
+            if name == "get_library_quality":
+                return agent_discovery.get_library_quality(**arguments)
             if name in {"inspect_artist", "list_library_issues"}:
                 return getattr(agent_diagnostics, name)(
                     **arguments, principal=principal
@@ -228,12 +360,15 @@ async def call_tool(context, params):
             )
         model = _catalog()[params.name][0]
         try:
-            arguments = model.model_validate(params.arguments or {}).model_dump()
+            validated = model.model_validate(params.arguments or {})
+            arguments = validated.model_dump()
+            if isinstance(validated, MetadataPreviewInput):
+                arguments["patch"] = validated.patch.model_dump(exclude_unset=True)
         except ValidationError:
             raise DiagnosticError(
                 "INVALID_ARGUMENT", "Arguments do not match the closed tool schema"
             ) from None
-        if _scope(params.name, arguments) not in principal.grants:
+        if not _allowed(principal, params.name, arguments):
             raise DiagnosticError(
                 "FORBIDDEN", "Integration is not permitted to perform this operation"
             )

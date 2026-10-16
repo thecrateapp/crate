@@ -1,7 +1,15 @@
 export const permissionLabels: Record<string, string> = {
   "library.health.read": "Inspect library health",
-  "library.health.run": "Check an artist's photo",
+  "library.health.run": "Run selected library health checks",
   "library.repair.photo_flag": "Update an artist's photo flag",
+  "library.quality.run": "Refresh library quality evidence",
+  "library.repair.run": "Apply reviewed library repairs",
+  "library.metadata.write": "Edit library metadata",
+  "library.enrichment.run": "Enrich selected library metadata",
+  "library.analysis.run": "Schedule track analysis",
+  "library.sync.run": "Synchronize selected library albums",
+  "library.metadata.export": "Export library metadata",
+  "library.metadata.rehydrate": "Import portable metadata",
   "ops.status.read": "Read instance status",
   "ops.jobs.read": "Read job history",
   "ops.jobs.retry": "Retry owned health checks",
@@ -68,6 +76,7 @@ export interface AgentPlanSummary {
   state: string;
   expires_at: string;
   approval_required: boolean;
+  operation?: string;
 }
 
 export interface AgentPlan extends AgentPlanSummary {
@@ -81,20 +90,19 @@ export interface AgentPlan extends AgentPlanSummary {
   target_count: number;
   returned_count: number;
   truncated: boolean;
-  targets: { artist_uid: string; name: string }[];
-  changes: {
-    artist_uid: string;
-    field: string;
-    before: boolean;
-    after: boolean;
+  targets: {
+    artist_uid?: string;
+    entity_uid?: string;
+    entity_type?: string;
+    name?: string;
+    scope?: string;
   }[];
-  impact: {
-    artist_count: number;
-    filesystem_writes: boolean;
-    notifications: boolean;
-  };
+  changes: Record<string, unknown>[];
+  impact: Record<string, unknown>;
   reversibility: string;
-  source_versions: { observation_id: string; observed_at: string };
+  source_versions: Record<string, unknown>;
+  conflicts?: Record<string, unknown>[];
+  executable?: boolean;
   authorization_context: {
     actor_user_id?: number;
     client_id?: string;

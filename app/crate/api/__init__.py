@@ -261,6 +261,15 @@ def create_app() -> FastAPI:
 
         _, app.state.mcp_manager, mcp_app = create_mcp_server()
         app.router.routes.append(Route("/mcp", endpoint=mcp_app))
+        from crate.mcp.artifacts import ArtifactDownload
+
+        app.router.routes.append(
+            Route(
+                "/mcp/artifacts/{artifact_id:uuid}",
+                endpoint=ArtifactDownload(),
+                methods=["GET"],
+            )
+        )
 
     from crate.subsonic.errors import OpenSubsonicError
     from crate.subsonic.protocol import render_response

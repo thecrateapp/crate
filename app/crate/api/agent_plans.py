@@ -12,6 +12,7 @@ from crate.api.agent_integrations import (
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES
 from crate.api.schemas import AgentCollectionResponse, PlanDecision
 from crate.db.repositories import agent_plans as store
+from crate.agent_operation_catalog import OPERATIONS
 
 router = APIRouter(
     prefix="/api/admin/agent-plans",
@@ -22,10 +23,7 @@ router = APIRouter(
 
 def _reviewer(request, capability="agents.plans.review"):
     actor = require_agent_admin_session(request, capability)
-    if (
-        "library.repair.run" not in actor["capabilities"]
-        or "agents.plans.review" not in actor["capabilities"]
-    ):
+    if "agents.plans.review" not in actor["capabilities"]:
         raise HTTPException(403, "Plan domain permission is required")
     return actor
 
@@ -43,9 +41,19 @@ def plans(
     limit: int = Query(20, ge=1, le=100),
     cursor: UUID | None = None,
 ):
-    _reviewer(request)
+    actor = _reviewer(request)
+    operations = [
+        operation
+        for operation, (_grant, capability) in OPERATIONS.items()
+        if capability in actor["capabilities"]
+    ]
+    if "library.repair.run" in actor["capabilities"]:
+        operations.append("repair_photo_flag")
     rows = store.list_plans(
-        state=state, limit=limit + 1, before=str(cursor) if cursor else None
+        state=state,
+        limit=limit + 1,
+        before=str(cursor) if cursor else None,
+        operations=operations,
     )
     return {
         "items": rows[:limit],
@@ -61,8 +69,12 @@ def plans(
     summary="Read the full exact plan, sources, impact and approval identity",
 )
 def plan(request: Request, plan_id: UUID):
-    _reviewer(request)
-    return invoke(store.get_plan, str(plan_id))
+    actor = _reviewer(request)
+    document = invoke(store.get_plan, str(plan_id))
+    capability = OPERATIONS.get(document["operation"], (None, "library.repair.run"))[1]
+    if capability not in actor["capabilities"]:
+        raise HTTPException(403, "Plan domain permission is required")
+    return document
 
 
 @router.post(

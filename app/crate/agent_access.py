@@ -7,6 +7,8 @@ import secrets
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from crate.agent_operation_catalog import OPERATIONS
+
 TOKEN_PREFIX = "crate_mcp_"
 PILOT_GRANTS = frozenset(
     {"library.health.read", "ops.status.read", "ops.jobs.read", "ops.logs.read"}
@@ -19,6 +21,7 @@ ACTION_GRANTS = frozenset(
         "ops.jobs.cancel_pending",
     }
 )
+ACTION_GRANTS = ACTION_GRANTS | frozenset(value[0] for value in OPERATIONS.values())
 ALLOWED_GRANTS = PILOT_GRANTS | ACTION_GRANTS
 SCOPE_CAPABILITIES = {
     "library.health.read": "library.view",
@@ -30,6 +33,9 @@ SCOPE_CAPABILITIES = {
     "ops.jobs.cancel_pending": "ops.tasks.manage",
     "ops.logs.read": "ops.logs.view",
 }
+SCOPE_CAPABILITIES.update(
+    {grant: capability for grant, capability in OPERATIONS.values()}
+)
 _TOKEN_PATTERN = re.compile(r"crate_mcp_[A-Za-z0-9_-]{43}\Z")
 
 

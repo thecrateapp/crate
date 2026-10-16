@@ -58,6 +58,7 @@ def test_commands_downgrade_preserves_identity_disables_removed_scopes_and_reupg
     migration = import_module("crate.db.migrations.versions.111_agent_commands")
     oauth = import_module("crate.db.migrations.versions.112_mcp_oauth")
     admin = import_module("crate.db.migrations.versions.113_agent_admin")
+    library = import_module("crate.db.migrations.versions.114_agent_library_operations")
     with transaction_scope() as session:
         session.execute(
             text("""
@@ -68,8 +69,11 @@ def test_commands_downgrade_preserves_identity_disables_removed_scopes_and_reupg
         """)
         )
     with get_engine().connect() as connection:
-        context = migration_context(connection, monkeypatch, [migration, oauth, admin])
+        context = migration_context(
+            connection, monkeypatch, [migration, oauth, admin, library]
+        )
         with context.begin_transaction():
+            library.downgrade()
             admin.downgrade()
             oauth.downgrade()
             migration.downgrade()
@@ -97,6 +101,7 @@ def test_commands_downgrade_preserves_identity_disables_removed_scopes_and_reupg
             migration.upgrade()
             oauth.upgrade()
             admin.upgrade()
+            library.upgrade()
         assert (
             connection.execute(
                 text("SELECT to_regclass('agent_requests')")

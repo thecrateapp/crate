@@ -1,9 +1,9 @@
 # Crate MCP — Feature Implementation Plan
 
 > **For agents:** REQUIRED SUB-SKILL: Use viterbit:executing-plans to implement this plan task-by-task.
-> **Estado: plan aprobado por Diego el 2026-10-16. Fases 0 y 1 entregadas en PR #292; fases 2 y 3 preparadas para revisión en la PR #292 tras autorización de Diego. Implementación en feat/crate_mcp. Despliegue y activación pendientes.**
+> **Estado: plan aprobado por Diego el 2026-10-16. Fases 0–3 publicadas en PR #292, commit 08bff534 y correcciones adicionales de CI f2f2d2f5, tras autorización de Diego. Fase 4 completada y validada localmente, con revisiones de conformidad y calidad aprobadas. Añadida fase 8 de shows para revisión por solicitud de Diego, sin implementar todavía. Implementación en feat/crate_mcp. Despliegue y activación pendientes.**
 
-**Goal:** Entregar el MCP remoto completo de Crate para diagnóstico, mantenimiento de biblioteca, operaciones y creación de playlists editoriales, con permisos, planes revisables, auditoría, gestión en Admin y una skill editorial distribuible. El piloto es el primer incremento de la feature.
+**Goal:** Entregar el MCP remoto completo de Crate para diagnóstico, mantenimiento de biblioteca, operaciones y creación de playlists editoriales, con permisos, planes revisables, auditoría, gestión en Admin y una skill editorial distribuible. Incluye el alta manual/asistida de shows añadida como fase 8. El piloto es el primer incremento de la feature.
 
 **Architecture:** Adaptador MCP dentro de crate-api, con identidad de integración y autorización explícita por herramienta. Reutiliza consultas, proyecciones y operaciones de Crate; el trabajo largo se ejecuta en los workers actuales. Las lecturas del MCP no construyen snapshots ni lanzan mantenimiento.
 
@@ -11,9 +11,11 @@
 
 **Entrega fases 0/1 (2026-10-16):** implementadas en [PR #292](https://github.com/thecrateapp/crate/pull/292). SDK oficial 2.3.0, credenciales dedicadas, seis herramientas, migraciones 109/110, diagnóstico sin mutaciones funcionales y productor health acotado. Evidencia y reproducción en [guía MCP](../technical/crate-mcp.md#validation-record--2026-10-16). El endpoint permanece desactivado por defecto.
 
-**Fase 2 (2026-10-16):** implementada y validada para revisión tras “siguiente fase”: comprobación dirigida, planes persistidos de un único flag, ejecución/verificación y retry/cancel acotados. Migración 111; gate adicional `CRATE_MCP_ACTIONS_ENABLED=false` por defecto. 866 casos backend verificados, PostgreSQL/Redis reales y recorrido SDK por HTTP local; [evidencia](../technical/crate-mcp.md#phase-2-validation--2026-10-16). Limitación explícita: un crash tras el cambio puede dejar verificación pendiente sin recuperación automática del actor terminal. Las fases 4–7 siguen pendientes.
+**Fase 2 (2026-10-16):** implementada y validada para revisión tras “siguiente fase”: comprobación dirigida, planes persistidos de un único flag, ejecución/verificación y retry/cancel acotados. Migración 111; gate adicional `CRATE_MCP_ACTIONS_ENABLED=false` por defecto. 866 casos backend verificados, PostgreSQL/Redis reales y recorrido SDK por HTTP local; [evidencia](../technical/crate-mcp.md#phase-2-validation--2026-10-16). Limitación explícita: un crash tras el cambio puede dejar verificación pendiente sin recuperación automática del actor terminal. Fase 4 en progreso; fases 5–7 pendientes.
 
 **Fase 3 (2026-10-16):** conexión OAuth con Authlib 1.9.1/SDK MCP 2.3.0, consent y gestión/revocación de conexiones propias; Admin para credenciales, clientes, grants y actividad; aprobación humana exacta ligada a política/delegación, con reserva transaccional. Migraciones 112/113 y configuración API/workers desactivada por defecto. Gate real sobre PostgreSQL/Redis con MCP Python SDK y Authlib por TCP, sin afirmar compatibilidad de Codex CLI ni del proxy público. Revisión de conformidad y calidad aprobadas; tres carreras reproducidas y corregidas con regresiones concurrentes. [Evidencia](../technical/crate-mcp.md#phase-3-validation--2026-10-16). Entrega de fases 2/3 en la PR #292; activación en producción pendiente.
+
+**Fase 4 (2026-10-16, completada y validada localmente):** catálogo de 17 checks con 11 variantes automáticas condicionadas y seis manuales; motor común de planes/jobs con aprobación obligatoria por riesgo/alcance global; selección canónica y preparación asíncrona compartida con Admin; metadata/enrichment, generaciones DSP, sync de álbumes indexados, calidad desde snapshot y exportación/rehydrate mediante presets con artifacts autorizados. Migración 114, revisión completa por dominio y resultados separados de aceptación/verificación. Las regresiones de identidad de sync, tamaños tras editar tags y reconciliación tras timeout/zombie están corregidas. El contrato compacto de resultados y su paginación preservan el diff completo y la evidencia privada; los casos de bio/setlists extensos, replay, ownership y cursores obsoletos están probados por SDK. Conformidad y calidad/seguridad aprobadas sin P1/P2 pendientes; validación acotada y medición de carga sintética con PostgreSQL/Redis reales documentadas. Fases 5–8 pendientes. [Guía de fase 4](../technical/crate-mcp.md#phase-4-library-maintenance--2026-10-16); el [primer bloque](../technical/crate-mcp.md#phase-4-foundation-checkpoint--2026-10-16) se conserva como evidencia histórica.
 
 **Fecha:** 2026-10-15. **Rama:** feat/crate_mcp. **Base:** origin/main, 2451aa7537d15f7790edca565fb64367982e7b2a.
 **Worktree:** /Users/diego/.codex/worktrees/crate-mcp/musicdock.
@@ -44,6 +46,7 @@ También propongo acotar la primera escritura a la coherencia del flag has_photo
 | 5. Operaciones completas | Jobs catalogados, schedules, límites y política de ejecución | Acciones sobre tareas propias y de instancia según grants; carreras y efectos comprobados |
 | 6. Editorial y skill | Planificar, revisar, crear/editar y publicar playlists estáticas/smart | Selección exacta, reglas y overrides preservados; skill validada con encargos reales |
 | 7. Cierre de producto | Evaluaciones, documentación, distribución y rollout | Catálogo v1 completo, pruebas de integración, compatibilidad y recuperación verificadas |
+| 8. Shows manuales y asistidos | Alta desde Admin y MCP, visión y OCR local gratuito | Todas las fechas revisables, dedupe durable y uso sin LLM |
 
 Se revisan los resultados de fase 1 antes de habilitar herramientas de acción. Cada operación permanece desactivada hasta pasar su validación. Las fases 4, 5 y 6 pueden avanzar en paralelo tras los contratos comunes de 2 y 3; la editorial no necesita esperar a completar todas las reparaciones. El orden refleja dependencias, no exige un único PR por fase.
 
@@ -58,6 +61,7 @@ flowchart LR
   E --> H[7. Validación y distribución]
   F --> H
   G --> H
+  H --> I[8. Shows manuales y asistidos]
 ```
 
 El módulo OAuth de 3.1 puede adelantarse tras 0 si el primer cliente lo exige; el gráfico representa el resto de dependencias de producto.
@@ -390,14 +394,108 @@ Medir p95/p99 y carga API/DB/worker con y sin MCP a igual dataset y concurrencia
 
 Rollout por capacidades: diagnóstico → primera acción → permisos/Admin/OAuth → dominios completos. Cerrar grants corta llamadas nuevas; workers revalidan acciones pendientes. Las operaciones en curso exponen lo aplicado y la política de cancelación real. Un fallo de MCP no debe bloquear login, streaming ni el uso normal de Admin.
 
-Entregables finales: módulos/SDK, migraciones, Admin, catálogo v1, documentación técnica, bundle de skill y evidencias de compatibilidad/evaluación. No declarar la feature completa cuando solo termina el piloto. Tampoco dejar una fase como “futuro” sin entregable: 3–7 forman parte de esta propuesta de implementación.
+**Fase 8 — creación manual y asistida de shows en Admin y MCP**
 
-**Criterio global de terminado:** todos los grupos del catálogo v1 implementados y probados; OAuth remoto en dos clientes; gestión de integraciones/aprobaciones en Admin; workflows completos verificables; skill editorial distribuible y evaluada; rollout y apagado comprobados. No hace falta exponer funciones excluidas expresamente, como shell, wipe o administración de infraestructura.
+Ampliación solicitada por Diego el 2026-10-16 para esta misma rama/PR. Esta es la última fase funcional del plan; se conservan las fases 0–7 y su orden. Se incorpora para revisión, sin implementar ahora el alta de shows. La entrega global no se considera completa hasta superar también este gate.
+
+**Resultado esperado.** En Admin, “Add show” permite introducir un concierto manualmente o importar un flyer, una captura o un enlace de Instagram/evento mediante el LLM configurado o mediante OCR local gratuito, utilizable sin ningún LLM. Un cartel de gira produce todas sus fechas como shows individuales revisables. Desde MCP, el agente cliente realiza la lectura/extracción y envía el lote estructurado; Crate valida, deduplica y persiste con las mismas reglas que Admin. Repetir una solicitud o importar el mismo concierto desde otra fuente no crea otro show.
+
+**Hechos que condicionan el diseño.**
+
+- El modelo actual está en `app/crate/db/schema_sections/acquisition.py`: `shows` tiene artista, fecha local obligatoria, hora opcional, recinto/localización, enlaces, imagen, lineup, precio y estado. Attendance/reminders referencian `shows.id`. Se preservan este formato y esos IDs; no se crea un catálogo alternativo de eventos para MCP.
+- `app/crate/db/repositories/shows_ticketmaster_upserts.py` hace upsert por `external_id` global. Sin ID solo busca filas sin ID externo por artista/fecha/venue y después inserta; no garantiza exclusión concurrente ni dedupe manual↔proveedor. Un sync puede sobrescribir todos los campos de una fila existente.
+- `app/crate/db/queries/shows_shared.py` deduplica respuestas, no filas persistidas. El filtrado por artista no cubre todo el lineup. Ticketmaster puede reescribir el artista principal al procesar el mismo event ID para varios artistas.
+- Admin todavía no tiene un alta manual completa: `Upcoming.tsx` solo ofrece sincronización y `Shows.tsx` consume lecturas. Ya existe la capacidad humana `curation.shows.write`.
+- `app/crate/llm/provider.py` ya ofrece `ask_structured` y `ask_image_structured`; se reutilizan. Tener API key/conectividad en `llm_status` no demuestra soporte de visión ni acceso al contenido de una URL. No existe un importador de Instagram.
+
+**Decisión de arquitectura.** Se recomienda ampliar aditivamente `shows` con identidad/procedencia y un servicio compartido de preparar/aplicar importaciones. Un formulario que llamase al upsert actual sería más pequeño, pero dejaría las carreras y el cruce manual↔Ticketmaster sin resolver. Un subsistema independiente de eventos obligaría a duplicar lecturas, asistencia y recordatorios. La extracción con LLM u OCR es una ayuda para producir candidatos; las decisiones de identidad y escritura se validan de forma determinista en Crate.
+
+**Tarea 8.1. Contrato canónico y procedencia de shows.**
+
+Crear un esquema cerrado de candidato/borrador y resultado por item, compatible con las respuestas actuales de shows. Un registro representa una función/fecha/recinto, con artista principal y lineup completo; no se crea una fila por cada banda del cartel. Resolver artistas existentes por UID o coincidencia inequívoca en batch. Conservar nombres de artistas externos válidos sin crear entidades de biblioteca automáticamente.
+
+Campos: artista/lineup, fecha local `YYYY-MM-DD`, hora opcional validada, timezone IANA cuando esté disponible, recinto, ciudad/región/país, dirección/coordenadas válidas si se conocen, enlace del evento/tickets, imagen, precio y estado enumerado con adaptadores de las fuentes actuales. Distinguir hora de puertas de hora del concierto. Una fecha sin año inequívoco permanece como borrador; no publicar una fecha inventada ni usar `00:00` para una hora desconocida. No asignar `Europe/Madrid` automáticamente a toda España: Canarias y cambios de horario deben quedar bien representados. No fabricar coordenadas con el LLM.
+
+Guardar procedencia por fuente y campo, actor humano/integración, evidencia de origen y versión del extractor/modelo cuando proceda; las correcciones manuales quedan protegidas ante syncs posteriores. Datos ausentes de un proveedor no borran los elegidos manualmente. Definir estados y regla de actualización para cambios de fecha/recinto/cancelación conservando el show canónico. Archivo/retención preserva identidad e idempotencia; el cleanup actual de shows de más de 30 días no debe borrar sin criterio esta evidencia ni recrear el mismo evento después.
+
+Crear propuestos: `app/crate/api/schemas/show_imports.py`, `app/crate/show_imports.py`, `app/crate/db/repositories/show_imports.py` y `app/crate/db/repositories/show_identities.py`. Extender el esquema mediante la migración que corresponda al implementar esta fase, bootstrap/ORM y sus pruebas; no fijar ahora un número ni reescribir migraciones publicadas.
+
+**Tarea 8.2. Dedupe e idempotencia transaccionales compartidos.**
+
+Identidad estable de evento y aliases únicos `(provider, provider_event_id)` para que Ticketmaster, Setlist.fm, entradas manuales y MCP puedan apuntar al mismo show. La URL o el hash del flyer identifican una fuente/importación, no un concierto: un flyer puede contener una gira y el mismo show puede aparecer en capturas distintas. No incluir todo el lineup en una clave rígida: un cambio de telonero no crea otra función.
+
+Normalizar artista/recinto/localización/fecha y sesión con reglas conservadoras. Coincidencia fuerte e inequívoca → conservar el ID y añadir procedencia; probable/ambigua → conflicto revisable, sin insertar ni fusionar silenciosamente. No deduplicar solo por artista+fecha ni por recinto+fecha. Dos funciones con horas conocidas diferentes permanecen separadas. Hora desconocida con varias funciones posibles requiere resolución explícita. Los matches aproximados ayudan a revisar; el LLM no decide un merge ni impone unicidad.
+
+Ledger durable por actor/integración + `idempotency_key` + hash del payload: misma clave/mismo contenido devuelve los mismos IDs/resultados, incluso tras reinicio; misma clave/contenido diferente devuelve conflicto. Con otra clave o fuente, la identidad semántica sigue evitando duplicados. Todos los escritores, incluidos syncs de proveedores, usan el mismo servicio de identidad, índices únicos y bloqueo/recheck transaccional al aplicar. Preparar no reserva una verdad que pueda ignorar inserciones concurrentes.
+
+Backfill conservador de aliases y claves sin merges fuzzy globales. Si hay duplicados ya existentes, preparar una consolidación explícita que transfiera attendance/reminders con sus restricciones únicas y conserve el ID canónico; no borrar relaciones como efecto lateral del despliegue. Probar los dos órdenes manual→Ticketmaster y Ticketmaster→manual, dos integraciones simultáneas y alta manual simultánea con sync.
+
+Para un lote seleccionado válido y acotado, preferir una transacción única. La extracción/revisión puede contener candidatos inválidos o ambiguos, pero el plan aplicable contiene solo la selección explícita ya resuelta. Si se divide una gira en varios lotes, persistir resultados por item y mostrar lo creado/existente/pendiente; un reintento no repite los éxitos. Distinguir `created`, `already_exists`, `linked_source`, `conflict`, `invalid` y `failed`.
+
+**Tarea 8.3. Interfaz Admin “Add show”, sin dependencia del LLM.**
+
+Añadir una entrada visible desde Shows y Upcoming, protegida por `curation.shows.write`, que abra el mismo editor con dos modos: formulario manual e importación asistida. El formulario manual siempre permite crear, revisar y corregir un show aunque el LLM esté apagado, inaccesible o no soporte visión. Usar auth por cookies, `useApi`/`api`, componentes y notificaciones de Admin existentes.
+
+Flujo manual: introducir campos → ver validaciones/coincidencias → revisar el show exacto → guardar. Flujo asistido: subir/pegar imagen o pegar URL → job de extracción → tabla editable de todos los candidatos → resolver datos dudosos/duplicados → seleccionar fechas → plan exacto → guardar selección. Mostrar fuente y campos sin evidencia, permitir cambios por fila y valores compartidos de la gira sin rellenar datos ambiguos silenciosamente. Se puede excluir una fila, pero el resumen conserva las pendientes; un tour no se reduce al primer resultado.
+
+Mostrar progreso, errores recuperables y resultado por fila, con enlaces al show canónico. Un fallo parcial no produce un toast genérico de éxito ni vacía el borrador. Una corrección tras el preview invalida su versión y exige preparar el nuevo contenido. El refresco visible deriva de invalidación tras commit, no de reconstruir snapshots dentro de la petición.
+
+Crear propuestos: `app/ui/src/components/shows/AddShowDialog.tsx`, `app/ui/src/components/shows/ShowImportReview.tsx` y sus tests. Modificar `app/ui/src/pages/Shows.tsx`, `app/ui/src/pages/Upcoming.tsx` y los endpoints de la familia de shows en `app/crate/api/user.py` o un router específico `app/crate/api/show_imports.py`; registrar la ruta y sus contratos OpenAPI. Mantener los lectores y permisos actuales.
+
+**Tarea 8.4. Extracción con visión y OCR local gratuito.**
+
+Decisión confirmada por Diego: ofrecer ambas vías, visión con el LLM configurado y OCR local gratuito que funcione sin ningún LLM ni API key. El editor permite elegir la vía disponible y reintentar con otra conservando el borrador; no cambia silenciosamente de proveedor, envía adjuntos a un servicio de pago ni hace dos extracciones de pago por defecto.
+
+Visión: reutilizar configuración/proveedor existente y salidas Pydantic estructuradas. Exponer por separado configuración, conectividad y soporte visual del modelo seleccionado. Los curadores pueden consultar disponibilidad sin obtener administración global del LLM ni secretos. Un modelo solo de texto puede estructurar opcionalmente el texto reconocido por OCR o pegado; no es requisito para utilizar OCR.
+
+OCR: ejecutar reconocimiento local en CPU en un worker, con preprocesado acotado y paquetes de idiomas explícitos. Evaluar Tesseract como primera opción: es un motor OCR local bajo Apache 2.0; su documentación describe la sensibilidad al preprocesado y la segmentación ([manual oficial](https://tesseract-ocr.github.io/tessdoc/), [calidad de reconocimiento](https://tesseract-ocr.github.io/tessdoc/ImproveQuality.html)). Antes de fijar versión/wrapper, comparar legibilidad, tiempo y memoria sobre fixtures representativas de flyers, incluyendo tipografía artística. Registrar binario/dependencias/idiomas/licencias en la imagen del worker y readiness independiente del LLM; ninguna instalación se hace desde una petición. Evitar añadir un servicio OCR de pago o requerir GPU.
+
+Sin LLM, mostrar texto reconocido editable y proponer únicamente campos/fechas detectables mediante reglas deterministas conservadoras. Texto no estructurable sigue siendo útil como ayuda al formulario; no afirmar que todas las bandas o fechas se han interpretado. Conservar la evidencia junto a cada candidato y señalar campos dudosos, texto ilegible y cobertura incompleta. Los scores del OCR no son probabilidades de que el concierto sea correcto. Corregir y completar manualmente siempre es posible; datos obligatorios no resueltos bloquean guardar esa fila. No prometer precisión en carteles artísticos ni publicar una interpretación inventada.
+
+Staging privado de imágenes fuera de `/music`, referencias opacas ligadas al actor, expiración y límites de tamaño/tipo/píxeles. OCR, extracción y llamadas externas solo en worker, con registry/pool/timeout/governor, límites de CPU/memoria/tiempo, presupuesto y resultados persistidos. Soportar uno o varios adjuntos dentro de límites explícitos; procesar todas las fechas visibles de un tour y conservar relación candidato→fuente/evidencia. Respetar cuotas/cancelación entre llamadas. Texto, imágenes y páginas son datos no confiables, no instrucciones para otras herramientas.
+
+Para URLs públicas, recuperar contenido real con límites y protección de destinos/redirects, reutilizando el patrón de `app/crate/artist_bio_research.py` mediante un helper pequeño compartido. Instagram es un origen admisible, pero no se promete acceso universal: si no se obtiene contenido legible, conservar el enlace y pedir captura, texto o archivo desde el mismo editor. No enviar solamente una URL a un modelo y afirmar que se leyó; no requerir cookies de Instagram ni credenciales del usuario para sortear restricciones.
+
+Definir presupuestos de adjuntos, tokens, páginas y candidatos. La escritura conserva el presupuesto de targets/bytes del motor común; comenzar con hasta 50 shows por lote aplicable, sujeto también a ese presupuesto. Si una gira supera el límite, conservar el borrador completo y proponer división explícita en lotes. Una respuesta truncada o cobertura incompleta se marca como tal y bloquea la publicación de “todas las fechas”; no tratarla como extracción completa. Ningún candidato se publica automáticamente durante la extracción.
+
+Crear propuestos: `app/crate/show_ocr.py`, `app/crate/show_extraction.py`, `app/crate/llm/prompts/show_extraction.py` y `app/crate/worker_handlers/show_imports.py`. Extender `app/crate/llm/provider.py` solo donde falte capacidad común; registrar tarea/actor/governor y sumar pruebas de disponibilidad/capacidad/permisos en `app/crate/api/admin_metrics.py`. No crear un segundo proveedor LLM específico de shows.
+
+**Tarea 8.5. Contrato MCP de alta estructurada.**
+
+Herramientas propuestas: `search_shows`, `preview_shows_import` y `apply_shows_import`, reutilizando `get_plan`/`get_job`. Lectura con grant `curation.shows.read`; preparación/escritura con `curation.shows.write`, subordinado a la capacidad humana existente del mismo nombre para concesión/revisión. Enumerar scopes nuevos en catálogo, consentimiento, Admin y la migración correspondiente. El agente remoto obtiene/interpreta flyer, captura o enlaces con sus propias capacidades y envía candidatos estructurados + referencias de procedencia. Crate no vuelve a invocar su LLM ni OCR, no exige ninguno de ellos configurado y no recibe una orden arbitraria de navegar/extraer para esta vía.
+
+`preview_shows_import` valida el lote, resuelve artistas y coincidencias, persiste un plan exacto con nuevos/existentes/conflictos, cambios de procedencia, efectos y límites. `apply_shows_import` recibe únicamente plan ID/versión/key, aplica las mismas reglas de Admin y devuelve IDs estables/resultados verificables. Un dato inventado o no validable no adquiere autoridad porque lo envíe un agente.
+
+Extender el motor común, sin otro motor de jobs/aprobación/idempotencia. Incorporar targets de show y claves semánticas nuevas todavía sin fila; no simularlos como artistas de biblioteca ni reservar toda la biblioteca para una importación de conciertos. Cada llamada y efecto revalida concesión, ownership y política actuales. Las decisiones dudosas/merges necesitan un plan explícito; no ampliar automáticamente un plan de creación a sobrescritura o consolidación. No incluir envío de mensajes externos, publicación social ni compra de entradas.
+
+Crear propuesto `app/crate/agent_shows.py`; extender `app/crate/mcp/schemas.py`, `app/crate/mcp/tools.py`, catálogo/grants y resolución de targets. Documentar un ejemplo de tour flyer→N candidatos del agente→preview→apply→mismos IDs en replay, además de un ejemplo con conflicto de dos sesiones.
+
+**Tarea 8.6. Lecturas, sincronización y preservación de datos.**
+
+Las vistas globales mantienen una fila por show; un concierto es visible por cualquiera de los artistas relevantes del lineup en las vistas por artista/seguimiento. Corregir la iteración de Ticketmaster para no sustituir el artista principal con el último artista consultado. Proteger campos manuales y mantener source aliases al completar datos de proveedores.
+
+Attendance, reminders, tarjetas, calendario, mapas y Listen consumen el formato actual y los IDs canónicos. Las coordenadas desconocidas siguen siendo desconocidas: mostrar el show creado en Admin y explicar cuándo un filtro por radio no puede ubicarlo; no afirmar una distancia inventada ni cambiar silenciosamente filtros del usuario. Invalidar `shows`, `upcoming`, artistas afectados y snapshots de home tras commit mediante outbox/projector. Registrar provenance/actor/resultados saneados y métricas de candidatos/creados/existentes/conflictos sin guardar secretos ni el contenido íntegro de URLs/adjuntos en logs compartidos.
+
+Modificar los repositorios/lectores bajo `app/crate/db/repositories/shows*` y `app/crate/db/queries/shows*`, `app/crate/db/queries/user.py`, `app/crate/worker_handlers/integrations.py`, `app/crate/db/repositories/shows_maintenance.py` y superficies de invalidación. No ejecutar una resincronización global ni reconstrucción inline de snapshots como efecto de añadir un show.
+
+**Tarea 8.7. Validación y gate de la última fase.**
+
+Primero pruebas de contrato/DB que reproduzcan las carreras y el dedupe actual insuficiente; después servicio común y migración; luego formulario manual; extracción asíncrona; integración MCP/proveedores; regresiones y carga. Cada corte incluye tests de comportamiento y revisión antes del siguiente, sin mezclar despliegue con implementación.
+
+Crear propuestos `app/tests/test_show_identity.py`, `app/tests/test_show_import_plans.py`, `app/tests/test_show_extraction.py` y `app/tests/test_mcp_shows.py`; extender `test_shows_shared.py`, `test_shows_queries.py`, `test_integrations_handler.py`, `test_ticketmaster.py`, `test_llm_provider.py`, `test_home_upcoming.py`, permisos/OpenAPI y migraciones. Admin: Vitest/Testing Library para `AddShowDialog`/`ShowImportReview`, tests de Shows/Upcoming y regresiones de tarjetas/Listen. PostgreSQL real para concurrencia/ledger/aliases/attendance/reminders; fixtures de flyer, captura, gira, tipografía artística/ilegible y respuestas/enlaces inaccesibles para extracción. Probar OCR real sin LLM/API key ni conectividad externa, OCR→LLM de texto opcional, visión directa, dependencia/idioma ausente, timeout/cancelación y corrección manual; medir tiempo/memoria en CPU y no hacer aserciones irreales de reconocimiento perfecto. Proveedores simulados para la suite determinista y smoke opt-in con el LLM configurado, nunca producción por defecto.
+
+**Gate fase 8:** crear un show a mano desde Admin sin LLM; importar flyer mediante OCR local sin LLM y completar sus campos dudosos; importar con visión y con OCR→LLM de texto opcional; procesar una fecha y gira conservando todas sus fechas o señalando las pendientes; revisar/corregir campos ambiguos; URL de Instagram/evento accesible y fallback honesto cuando no lo sea; crear el mismo evento desde Admin/MCP/Ticketmaster en ambos órdenes y con dos escritores concurrentes sin filas duplicadas; replay/reinicio con mismos IDs; dos sesiones distintas no fusionadas; futuras sincronizaciones preservan correcciones manuales, lineup, attendance/reminders e identidad. Ningún borrador se publica antes de confirmar. Lotes divididos/conflictivos muestran todos sus resultados sin repetir los creados. El flujo MCP funciona sin LLM servidor y el formato final sigue siendo compatible con Admin/Listen.
+
+Entregables finales: módulos/SDK, migraciones, Admin, catálogo v1, documentación técnica, bundle de skill, alta manual/asistida de shows en Admin/MCP y evidencias de compatibilidad/evaluación. No declarar la feature completa cuando solo termina el piloto. Tampoco dejar una fase como “futuro” sin entregable: 3–8 forman parte de esta propuesta de implementación.
+
+**Criterio global de terminado:** todos los grupos del catálogo v1 implementados y probados; OAuth remoto en dos clientes; gestión de integraciones/aprobaciones en Admin; workflows completos verificables; skill editorial distribuible y evaluada; alta manual/asistida de shows con dedupe durable; rollout y apagado comprobados. No hace falta exponer funciones excluidas expresamente, como shell, wipe o administración de infraestructura.
 
 
 **Verificación y entrega de cada corte**
 
-Aplicar tests de comportamiento antes del cambio, comprobar su fallo esperado, implementar el mínimo, ejecutar la suite del corte y revisar el diff. Un commit por cambio coherente, sin atribución de herramientas. Los tests de migración y concurrencia deben ejecutarse con PostgreSQL real mediante pg_db; un skip no satisface esos gates. Los tests nuevos nombrados arriba son archivos propuestos, todavía inexistentes.
+Aplicar tests de comportamiento antes del cambio, comprobar su fallo esperado, implementar el mínimo, ejecutar la suite del corte y revisar el diff. Un commit por cambio coherente, sin atribución de herramientas. Los tests de migración y concurrencia deben ejecutarse con PostgreSQL real mediante pg_db; un skip no satisface esos gates. Los archivos de test indicados para las fases pendientes son propuestas; los de las fases entregadas se mantienen como referencias de implementación.
+
+**Regla de validación indicada por Diego (2026-10-16):** durante el desarrollo ejecutar únicamente suites acotadas al cambio y sus regresiones directas. Reservar las suites completas para el final del desarrollo; no volver a lanzarlas en cada ajuste o revisión.
 
 Comandos de referencia para la ejecución futura, desde /Users/diego/.codex/worktrees/crate-mcp/musicdock/app, usando el virtualenv del checkout principal si el worktree todavía no tiene uno:
 
@@ -433,4 +531,4 @@ El despliegue futuro sigue el flujo SHA/manifiesto de Crate. Activar primero dia
 
 El SDK permite montar su app ASGI en FastAPI y exige integrar su lifecycle en el host: [guía oficial de montaje](https://py.sdk.modelcontextprotocol.io/run/asgi/). Los transportes y la autorización HTTP se describen en [MCP transports](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports) y [MCP authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization). El Bearer privado solo delimita la primera entrega; OAuth y su interoperabilidad se implementan en fase 3.
 
-**Revisiones:** alcance v1 y fases 0–3 autorizados. Este documento conserva el plan de la feature completa; no declara implementadas las fases 4–7. Revisar cada entrega y su evidencia antes de ampliar capacidades o activar en producción.
+**Revisiones:** alcance v1 y fases 0–3 autorizados. Este documento conserva el plan de la feature completa; no declara implementadas las fases pendientes. La fase 8 de shows está incorporada para revisión y no se implementa en este corte. Revisar cada entrega y su evidencia antes de ampliar capacidades o activar en producción.

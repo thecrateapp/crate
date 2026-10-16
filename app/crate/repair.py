@@ -12,6 +12,7 @@ from crate.artist_lifecycle import (
 )
 from crate.artist_photo import PhotoObservationError, observe_artist_photo
 from crate.audio import audio_format_rank, read_tags
+from crate.repair_selection import select_repair_items
 from crate.db.audit import log_audit
 from crate.db.jobs.artist_photo import apply_admin_artist_photo
 from crate.db.jobs.repair import (
@@ -261,6 +262,7 @@ class LibraryRepair:
                 "requires_confirmation": item.get("requires_confirmation"),
                 "executable": item.get("executable"),
                 "details": item.get("details"),
+                "source": item.get("issue"),
             }
             for item in items
         ]
@@ -336,8 +338,20 @@ class LibraryRepair:
         progress_callback=None,
         event_callback=None,
         global_only: bool = False,
+        expected_plan_version: str | None = None,
+        plan_item_ids: list[str] | None = None,
+        confirm_risky: bool = False,
     ) -> dict:
         issues = report.get("issues", [])
+        if expected_plan_version is not None or plan_item_ids is not None:
+            preview = self.preview(report, auto_only=auto_only, global_only=global_only)
+            selected = select_repair_items(
+                preview,
+                plan_item_ids or [],
+                expected_version=expected_plan_version,
+                confirm_risky=confirm_risky or dry_run,
+            )
+            issues = [item["issue"] for item in selected]
         actions = []
         item_results: list[dict] = []
         resolved_ids: list[int] = []

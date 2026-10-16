@@ -61,6 +61,7 @@ def test_agent_schema_real_downgrade_upgrade_and_idempotency(pg_db, monkeypatch)
             "111_agent_commands",
             "112_mcp_oauth",
             "113_agent_admin",
+            "114_agent_library_operations",
         )
     ]
     migration = migrations[0]

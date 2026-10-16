@@ -5,14 +5,39 @@ from uuid import UUID
 
 from sqlalchemy import text
 
-from crate.agent_access import authorization_context
+from crate.agent_access import AgentPrincipal, authorization_context
 from crate.agent_diagnostics import DiagnosticError, _safe
+from crate.agent_operation_catalog import interrupted_operation_result
 from crate.db.repositories.agent_human_sessions import require_agent_human_capabilities
 from crate.db.repositories.agent_requests import _hash
 from crate.db.tx import optional_scope, read_scope
 
 
 def _document(row):
+    if row.get("document") is not None:
+        content = {
+            **row["document"],
+            "authorization_context": row["authorization_context"],
+            "policy_revision": row["policy_revision"],
+            "approval_required": row["approval_required"],
+            "expires_at": row["expires_at"].isoformat(),
+        }
+        count = len(content["targets"])
+        return {
+            **content,
+            "plan_id": row["id"],
+            "principal_id": str(row["principal_id"]),
+            "plan_version": row["version"],
+            "content_hash": _hash(content),
+            "authorization_context_hash": _hash(row["authorization_context"]),
+            "state": row["state"],
+            "created_at": row["created_at"].isoformat(),
+            "job_id": row["task_id"],
+            "target_count": count,
+            "returned_count": count,
+            "truncated": False,
+            "result": row["result"],
+        }
     observation = row["observation"]
     content = {
         "operation": "repair_photo_flag",
@@ -70,8 +95,11 @@ def _get(current, plan_id, *, lock=False):
             text(
                 """
         SELECT p.*, p.id::text AS id, p.artist_uid::text AS artist_uid, o.observation,
-               p.expires_at > NOW() AS unexpired
-        FROM agent_repair_plans p JOIN agent_photo_observations o ON o.id = p.observation_id
+               p.expires_at > NOW() AS unexpired,
+               j.operation AS job_operation, j.effect_started_at, t.status AS task_status
+        FROM agent_repair_plans p LEFT JOIN agent_photo_observations o ON o.id = p.observation_id
+        LEFT JOIN agent_jobs j ON j.task_id = p.task_id
+        LEFT JOIN tasks t ON t.id = j.task_id
         WHERE p.id = :id
     """
                 + (" FOR UPDATE OF p" if lock else "")
@@ -83,35 +111,102 @@ def _get(current, plan_id, *, lock=False):
     )
     if row is None:
         raise DiagnosticError("NOT_FOUND", "Plan was not found")
-    return dict(row)
+    plan = dict(row)
+    if plan["result"] is None:
+        result = interrupted_operation_result(
+            plan["job_operation"], plan["task_status"], plan["effect_started_at"], None
+        )
+        if result is not None:
+            plan["result"] = result
+            plan["state"] = result["execution"]["status"]
+    return plan
 
 
 def get_plan(plan_id: str, *, session=None) -> dict:
+    def _read(current):
+        row = _get(current, plan_id)
+        document = _document(row)
+        return (
+            json.loads(json.dumps(document, default=str, allow_nan=False))
+            if row.get("document") is not None
+            else {key: _safe(value) for key, value in document.items()}
+        )
+
     if session is not None:
-        return {
-            key: _safe(value)
-            for key, value in _document(_get(session, plan_id)).items()
-        }
+        return _read(session)
     with read_scope() as current:
+        return _read(current)
+
+
+def get_owned_plan(principal: AgentPrincipal, plan_id: str, *, session=None) -> dict:
+    from crate.db.repositories.agent_requests import _authorize
+
+    def _read(current):
+        row = _get(current, plan_id)
+        if str(row["principal_id"]) != principal.id or row[
+            "authorization_context"
+        ] != authorization_context(principal):
+            raise DiagnosticError("NOT_FOUND", "Owned plan was not found")
+        _authorize(current, principal, set(row["required_grants"]))
+        return get_plan(row["id"], session=current)
+
+    if session is not None:
+        return _read(session)
+    with read_scope() as current:
+        return _read(current)
+
+
+def get_owned_analysis_references(
+    principal: AgentPrincipal, plan_id: str, *, session=None
+) -> dict:
+    def _read(current):
+        document = get_owned_plan(principal, plan_id, session=current)
+        if document["operation"] != "analysis":
+            raise DiagnosticError("INVALID_ARGUMENT", "An analysis plan is required")
+        row = _get(current, plan_id)
         return {
-            key: _safe(value)
-            for key, value in _document(_get(current, plan_id)).items()
+            "state": row["state"],
+            "references": row["execution_data"]["references"],
         }
 
+    if session is not None:
+        return _read(session)
+    with read_scope() as current:
+        return _read(current)
 
-def list_plans(*, state=None, limit=20, before=None, session=None) -> list[dict]:
+
+def list_plans(
+    *, state=None, limit=20, before=None, operations=None, session=None
+) -> list[dict]:
     def _read(current):
         return [
             dict(row)
             for row in current.execute(
                 text("""
+            WITH visible AS (
+                SELECT p.id, p.principal_id, p.artist_uid, p.version, p.operation,
+                       p.approval_required, p.created_at, p.expires_at, p.task_id,
+                       CASE WHEN p.result IS NULL AND j.operation='apply_operation'
+                                      AND t.status IN ('failed','cancelled','completed')
+                            THEN CASE WHEN j.effect_started_at IS NOT NULL THEN 'partial'
+                                      WHEN t.status='cancelled' THEN 'cancelled' ELSE 'failed' END
+                            ELSE p.state END AS state
+                FROM agent_repair_plans p LEFT JOIN agent_jobs j ON j.task_id=p.task_id
+                LEFT JOIN tasks t ON t.id=j.task_id
+            )
             SELECT id::text AS plan_id, principal_id::text, artist_uid::text, version AS plan_version,
-                   state, approval_required, created_at, expires_at, task_id AS job_id
-            FROM agent_repair_plans WHERE (:state IS NULL OR state = :state)
+                   state, operation, approval_required, created_at, expires_at, task_id AS job_id
+            FROM visible WHERE (:state IS NULL OR state = :state)
+              AND (:operations IS NULL OR operation=ANY(CAST(:operations AS text[])))
               AND (:before IS NULL OR id < CAST(:before AS uuid))
             ORDER BY id DESC LIMIT :limit
         """),
-                {"state": state, "before": before, "limit": min(max(limit, 1), 101)},
+                {
+                    "state": state,
+                    "before": before,
+                    "operations": operations,
+                    "limit": min(max(limit, 1), 101),
+                },
             ).mappings()
         ]
 
@@ -138,10 +233,9 @@ def validate_plan_authorization(current, plan, principal, *, worker=False, job_i
         raise DiagnosticError(
             "FORBIDDEN", "Plan belongs to a different integration authorization"
         )
-    if (
-        plan["policy_revision"] != policy["policy_revision"]
-        or plan["approval_required"] != policy["require_approval"]
-    ):
+    if plan["policy_revision"] != policy["policy_revision"] or plan[
+        "approval_required"
+    ] != (policy["require_approval"] or plan.get("mandatory_approval", False)):
         raise DiagnosticError(
             "PLAN_STALE", "Integration policy changed; prepare a new plan"
         )
@@ -205,12 +299,26 @@ def decide_plan(
         raise DiagnosticError("INVALID_ARGUMENT", "Unsupported human decision")
     with optional_scope(session) as current:
         require_agent_human_capabilities(
+            actor, {"agents.plans.approve", "agents.plans.review"}, session=current
+        )
+        initial = _get(current, plan_id)
+        from crate.agent_operation_catalog import OPERATIONS
+
+        capability = OPERATIONS.get(initial["operation"], (None, "library.repair.run"))[
+            1
+        ]
+        require_agent_human_capabilities(
             actor,
-            {"agents.plans.approve", "agents.plans.review", "library.repair.run"},
+            {"agents.plans.approve", "agents.plans.review", capability},
             session=current,
         )
         plan = _get(current, plan_id, lock=True)
         document = _document(plan)
+        if decision == "approved" and document.get("executable") is False:
+            raise DiagnosticError(
+                "NOT_EXECUTABLE",
+                "Manual plans can be rejected but cannot authorize execution",
+            )
         policy = (
             current.execute(
                 text(
@@ -224,7 +332,7 @@ def decide_plan(
         if (
             not plan["unexpired"]
             or not policy["enabled"]
-            or "library.repair.photo_flag" not in policy["grants"]
+            or not set(plan["required_grants"]) <= set(policy["grants"])
             or policy["policy_revision"] != policy_revision
             or plan["policy_revision"] != policy_revision
             or not plan["approval_required"]
@@ -267,7 +375,7 @@ def decide_plan(
                 session=current,
                 worker=True,
             )
-            if "library.repair.photo_flag" not in grants:
+            if not set(plan["required_grants"]) <= grants:
                 raise DiagnosticError(
                     "FORBIDDEN", "The delegated operation is no longer authorized"
                 )
@@ -321,6 +429,7 @@ def decide_plan(
 __all__ = [
     "decide_plan",
     "get_plan",
+    "get_owned_plan",
     "list_plans",
     "reserve_plan_approval",
     "validate_plan_authorization",

@@ -101,7 +101,24 @@ def test_remote_check_preview_apply_and_verify(
                         assert not result.is_error, result.structured_content
                         return result.structured_content["data"]
 
-                    assert len((await client.list_tools()).tools) == 11
+                    tools = (await client.list_tools()).tools
+                    assert len({tool.name for tool in tools}) == len(tools)
+                    assert {
+                        "get_operation_catalog",
+                        "get_plan",
+                        "get_library_quality",
+                        "get_instance_status",
+                        "list_library_issues",
+                        "inspect_artist",
+                        "list_jobs",
+                        "get_job",
+                        "read_diagnostics",
+                        "run_health_check",
+                        "preview_repairs",
+                        "apply_repairs",
+                        "retry_job",
+                        "cancel_job",
+                    } <= {tool.name for tool in tools}
                     check_args = {
                         "artist_uid": ARTIST_UID,
                         "idempotency_key": "check-1",

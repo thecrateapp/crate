@@ -357,7 +357,12 @@ def test_review_http_requires_plan_and_domain_capabilities(
     with TestClient(app, base_url="https://api.example.test") as client:
         client.cookies.set("crate_session", human_token(human_actor))
         client.headers["Origin"] = ORIGIN
-        assert client.get("/api/admin/agent-plans").status_code == 403
+        collection = client.get("/api/admin/agent-plans")
+        if "agents.plans.review" in granted:
+            assert collection.status_code == 200
+            assert collection.json() == {"items": [], "next_cursor": None}
+        else:
+            assert collection.status_code == 403
         assert (
             client.get(f"/api/admin/agent-plans/{plan['plan_id']}").status_code == 403
         )

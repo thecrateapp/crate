@@ -103,11 +103,14 @@ class LibraryHealthCheck:
         progress_callback=None,
         persist: bool = True,
     ) -> dict:
-        selected = [
-            check_type
-            for check_type in sorted({str(value) for value in check_types})
-            if check_type in REPAIR_CATALOG_BY_CHECK
-        ]
+        requested = {str(value) for value in check_types}
+        unsupported = requested - set(ARTIST_SCOPED_CHECKS)
+        if unsupported:
+            raise ValueError(
+                "Artist-scoped checks are not supported: "
+                + ", ".join(sorted(unsupported))
+            )
+        selected = sorted(requested)
         artists = [str(value).strip() for value in artist_names if str(value).strip()]
         start = time.monotonic()
         issues: list[dict] = []
@@ -262,6 +265,8 @@ class LibraryHealthCheck:
         start = time.monotonic()
         issues = []
         checks = [(entry, getattr(self, entry.scanner_method)) for entry in entries]
+        completed_checks = []
+        failed_checks = []
 
         for i, (entry, check_fn) in enumerate(checks):
             if progress_callback:
@@ -271,8 +276,10 @@ class LibraryHealthCheck:
             try:
                 found = [self._normalize_issue(entry, issue) for issue in check_fn()]
                 issues.extend(found)
+                completed_checks.append(entry)
             except Exception:
                 log.exception("Health check '%s' failed", entry.check_type)
+                failed_checks.append(entry.check_type)
 
         duration_ms = int((time.monotonic() - start) * 1000)
         summary = {}
@@ -281,12 +288,14 @@ class LibraryHealthCheck:
             summary[key] = summary.get(key, 0) + 1
 
         if persist:
-            self._persist_issues(issues, [entry for entry, _ in checks], duration_ms)
+            self._persist_issues(issues, completed_checks, duration_ms)
 
         return {
             "issues": issues,
             "summary": summary,
             "check_count": len(checks),
+            "completed_checks": [entry.check_type for entry in completed_checks],
+            "failed_checks": failed_checks,
             "scanned_at": datetime.now(timezone.utc).isoformat(),
             "duration_ms": duration_ms,
         }

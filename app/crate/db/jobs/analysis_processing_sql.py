@@ -83,6 +83,7 @@ def complete_processing_state(
             SET state = 'done',
                 claimed_by = NULL,
                 claimed_at = NULL,
+                claim_token = NULL,
                 last_error = NULL,
                 completed_at = :completed_at,
                 updated_at = :completed_at
@@ -106,6 +107,7 @@ def complete_processing_states(
             SET state = 'done',
                 claimed_by = NULL,
                 claimed_at = NULL,
+                claim_token = NULL,
                 last_error = NULL,
                 completed_at = :completed_at,
                 updated_at = :completed_at
@@ -253,15 +255,16 @@ def claim_batch_sql(state_column: str) -> str:
             SET state = 'analyzing',
                 claimed_by = :claimed_by,
                 claimed_at = :claimed_at,
+                claim_token = gen_random_uuid(),
                 attempts = ps.attempts + 1,
                 last_error = NULL,
                 updated_at = :claimed_at
             FROM batch
             WHERE ps.track_id = batch.track_id
               AND ps.pipeline = :pipeline
-            RETURNING ps.track_id
+            RETURNING ps.track_id, ps.generation, ps.claim_token
         )
-        SELECT lt.id, lt.path, lt.title, lt.artist, lt.album
+        SELECT lt.id, lt.path, lt.title, lt.artist, lt.album, claimed.generation, claimed.claim_token
         FROM claimed
         JOIN library_tracks lt ON lt.id = claimed.track_id
     """

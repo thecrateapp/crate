@@ -138,6 +138,10 @@ def _handle_health_check(task_id: str, params: dict, config: dict) -> dict:
 
 
 def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
+    if params.get("preparation_task_id"):
+        from crate.admin_repairs import apply_admin_repairs
+
+        return apply_admin_repairs(task_id, params, config)
     if params.get("agent_command"):
         from crate.agent_maintenance import execute_agent_job
 
@@ -152,7 +156,26 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
     auto_only = params.get("auto_only", True)
     specific_issues = params.get("issues")
 
-    if specific_issues:
+    if specific_issues is not None:
+        if not specific_issues:
+            return {
+                "status": "skipped",
+                "actions": [],
+                "item_results": [],
+                "reason": "empty_selection",
+            }
+        if params.get("plan_version") is not None or "plan_item_ids" in params:
+            from crate.db.queries.repair_plans import get_open_repair_issues
+
+            try:
+                specific_issues = get_open_repair_issues(
+                    [issue["id"] for issue in specific_issues]
+                )
+            except (ValueError, KeyError, TypeError):
+                return {
+                    "status": "conflict",
+                    "error": "Repair sources changed; prepare a new plan",
+                }
         report = {"issues": specific_issues}
     else:
         # Pull directly from the persisted health_issues table so each issue
@@ -171,16 +194,25 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
             report_issues.append(issue)
         report = {"issues": report_issues}
 
-    affected_artists = set()
+    versioned_selection = (
+        params.get("plan_version") is not None or "plan_item_ids" in params
+    )
+    issue_artists = {}
+    report_artists = set()
     for issue in report.get("issues", []):
         details = issue.get("details") or issue.get("details_json") or {}
         artist = details.get("artist") or details.get("db_artist") or ""
         if artist:
-            affected_artists.add(artist)
+            issue_artists[issue.get("id")] = artist
+            report_artists.add(artist)
+
+    affected_artists = set() if versioned_selection else report_artists
+    marked_artists = set()
 
     if not dry_run:
         for artist in affected_artists:
             _mark_processing(artist)
+            marked_artists.add(artist)
 
     try:
         p_repair = TaskProgress(phase="repair", phase_count=1)
@@ -217,6 +249,13 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
                 "unsupported",
             }:
                 return
+            if versioned_selection:
+                artist = issue_artists.get(payload.get("issue_id"))
+                if artist:
+                    affected_artists.add(artist)
+                    if artist not in marked_artists:
+                        _mark_processing(artist)
+                        marked_artists.add(artist)
             append_domain_event(
                 f"library.repair.item.{outcome}",
                 {
@@ -233,16 +272,37 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
             )
 
         repairer = LibraryRepair(config)
-        result = repairer.repair(
-            report,
-            dry_run=dry_run,
-            auto_only=auto_only,
-            task_id=task_id,
-            progress_callback=_repair_progress,
-            event_callback=_repair_event,
-        )
+        selection = {}
+        if params.get("plan_version") is not None or "plan_item_ids" in params:
+            selection = {
+                "expected_plan_version": params.get("plan_version"),
+                "plan_item_ids": params.get("plan_item_ids") or [],
+                "confirm_risky": bool(params.get("confirm_risky")),
+            }
+        try:
+            result = repairer.repair(
+                report,
+                dry_run=dry_run,
+                auto_only=auto_only,
+                task_id=task_id,
+                progress_callback=_repair_progress,
+                event_callback=_repair_event,
+                **selection,
+            )
+        except ValueError as error:
+            from crate.repair_selection import RepairSelectionError
+
+            if not isinstance(error, RepairSelectionError):
+                raise
+            return {"status": "conflict", "error": str(error), "code": error.code}
 
         action_count = len(result.get("actions", []))
+        if versioned_selection:
+            affected_artists.update(
+                issue_artists[item["issue_id"]]
+                for item in result.get("item_results", [])
+                if item.get("issue_id") in issue_artists
+            )
         resolved_ids = result.get("resolved_ids", [])
         repair_summary = result.get("summary") or {}
         applied_check_types = sorted(
@@ -540,7 +600,7 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
         return result
     finally:
         if not dry_run:
-            for artist in affected_artists:
+            for artist in marked_artists:
                 _unmark_processing(artist)
 
 
@@ -2784,7 +2844,14 @@ def _handle_draft_i18n_translation(task_id: str, params: dict, config: dict) -> 
     }
 
 
+def _handle_prepare_library_repairs(task_id: str, params: dict, config: dict) -> dict:
+    from crate.admin_repairs import prepare_admin_repairs
+
+    return prepare_admin_repairs(task_id, params, config)
+
+
 MANAGEMENT_TASK_HANDLERS: dict[str, TaskHandler] = {
+    "prepare_library_repairs": _handle_prepare_library_repairs,
     "health_check": _handle_health_check,
     "repair": _handle_repair,
     "repair_duplicate_tracks": _handle_repair_duplicate_tracks,

@@ -42,6 +42,10 @@ ACTION_CASES = [
 ACTION_NAMES = {case[0] for case in ACTION_CASES}
 ACTION_GRANTS = frozenset(case[1] for case in ACTION_CASES)
 READ_NAMES = {
+    "get_operation_catalog",
+    "get_plan",
+    "get_library_quality",
+    "get_analysis_status",
     "get_instance_status",
     "list_library_issues",
     "inspect_artist",
@@ -118,7 +122,9 @@ def test_enabled_actions_publish_closed_schemas_and_accurate_effect_hints(
                 assert tool.output_schema["additionalProperties"] is False
                 if tool.name in ACTION_NAMES:
                     assert tool.annotations.read_only_hint is False
-                    assert tool.annotations.destructive_hint is False
+                    assert tool.annotations.destructive_hint is (
+                        tool.name == "apply_repairs"
+                    )
                     assert tool.annotations.open_world_hint is False
                     assert tool.annotations.idempotent_hint is (
                         tool.name != "preview_repairs"
@@ -158,15 +164,21 @@ def test_actions_are_disabled_by_default_even_with_action_grants(
 @pytest.mark.parametrize(
     "grants,expected",
     [
-        (PILOT_GRANTS, READ_NAMES),
+        (PILOT_GRANTS, READ_NAMES - {"get_plan"}),
         (frozenset(), set()),
-        (frozenset({"library.health.run"}), {"run_health_check"}),
+        (
+            frozenset({"library.health.run"}),
+            {"run_health_check", "get_operation_catalog", "get_plan"},
+        ),
         (
             frozenset({"library.repair.photo_flag"}),
-            {"preview_repairs", "apply_repairs"},
+            {"preview_repairs", "apply_repairs", "get_operation_catalog", "get_plan"},
         ),
-        (frozenset({"ops.jobs.retry"}), {"retry_job"}),
-        (frozenset({"ops.jobs.cancel_pending"}), {"cancel_job"}),
+        (frozenset({"ops.jobs.retry"}), {"retry_job", "get_operation_catalog"}),
+        (
+            frozenset({"ops.jobs.cancel_pending"}),
+            {"cancel_job", "get_operation_catalog"},
+        ),
     ],
 )
 def test_discovery_and_direct_calls_respect_independent_action_grants(

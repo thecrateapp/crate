@@ -256,13 +256,13 @@ def _decode(value, filters):
         ) from None
 
 
-def _rows(rows, limit):
+def _rows(rows, limit, *, byte_budget=40000):
     selected = []
     size = 0
     for row in rows[:limit]:
         safe = _safe(row)
         cost = len(json.dumps(safe, ensure_ascii=False).encode())
-        if size + cost > 40000:
+        if size + cost > byte_budget:
             if not selected:
                 raise DiagnosticError(
                     "RESPONSE_TOO_LARGE",

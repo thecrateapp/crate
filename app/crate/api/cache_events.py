@@ -82,6 +82,7 @@ _invalidation_subscriber = None
 
 _PROJECTOR_RELEVANT_INVALIDATION_SCOPES = frozenset(
     {
+        "*",
         "home",
         "library",
         "global_catalog",

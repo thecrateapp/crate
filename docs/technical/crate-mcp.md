@@ -26,6 +26,24 @@ sources:
     app/crate/agent_credentials_cli.py,
     app/crate/agent_diagnostics.py,
     app/crate/agent_maintenance.py,
+    app/crate/agent_discovery.py,
+    app/crate/agent_operation_catalog.py,
+    app/crate/agent_library_operations.py,
+    app/crate/agent_metadata.py,
+    app/crate/agent_enrichment.py,
+    app/crate/agent_analysis.py,
+    app/crate/agent_sync.py,
+    app/crate/agent_portability.py,
+    app/crate/admin_repairs.py,
+    app/crate/db/repositories/agent_operation_jobs.py,
+    app/crate/db/migrations/versions/114_agent_library_operations.py,
+    app/crate/agent_quality.py,
+    app/crate/repair_selection.py,
+    app/crate/quality.py,
+    app/crate/quality_task_policy.py,
+    app/crate/portable_metadata.py,
+    app/crate/worker_handlers/quality.py,
+    app/crate/db/analytics_quality_surface.py,
     app/crate/artist_photo.py,
     app/crate/db/repositories/agent_requests.py,
     app/crate/db/repositories/agent_repair_plans.py,
@@ -42,11 +60,11 @@ sources:
 
 # Crate MCP
 
-Crate exposes an optional MCP endpoint for remote agents to inspect the local library,
-persisted worker status, job history and bounded logs. Phases 0–3 provide six read tools,
-five independently enabled maintenance tools, OAuth connections, integration management in Admin
-and exact human approval when policy requires it. The first repair only updates one artist's
-`has_photo` database flag. Broader maintenance and editorial playlists remain later phases.
+Crate exposes an optional MCP endpoint for remote agents to inspect and maintain the local library.
+OAuth/service credentials, integration management and exact human approval share one persisted
+plan/job engine. Phase 4 extends it with selected checks, quality, repairs, metadata, enrichment,
+analysis, indexed-album sync and metadata portability. Instance operations and editorial playlists
+remain later phases. Deployment and action flags remain disabled by default.
 
 ## Connection and deployment
 
@@ -62,7 +80,9 @@ producer. Existing migrations must be applied before issuing credentials. Keepin
 disabled leaves the endpoint unavailable and does not start its health snapshot producer.
 Actions additionally require `CRATE_MCP_ACTIONS_ENABLED=true` in the API and maintenance worker.
 Both flags default to false; granting an action scope alone does not enable actions.
-Apply migrations through 113 before using OAuth, integration management or plan approvals.
+Apply migrations through 114 before using the phase 4 catalog. Migration 114 extends the existing
+plan/job tables and adds private artifacts and DSP generation/claim provenance; it does not create
+a second agent execution engine.
 
 | Setting                             | Default                                                        | Purpose                                                                                                                       |
 | ----------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -232,16 +252,19 @@ the audit does not fabricate a human `user_id` or persist supplied tokens.
 Tool discovery is filtered by grants. Every call also checks its required grant independently.
 Input schemas reject unknown arguments; filters are limited to the supported fields and enums.
 
-| Tool                  | Required grant                                                                                | Inputs and result                                                                                                                                                                |
-| --------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `get_instance_status` | `ops.status.read`                                                                             | No arguments. Returns cached library totals and persisted worker/analysis evidence, each with its own source timestamps.                                                         |
-| `list_library_issues` | `library.health.read`                                                                         | Optional `check_type`, `severity`, `artist_uid`, `limit`, `cursor`. Returns a bounded materialized sample of local issues and last check observations.                           |
-| `inspect_artist`      | `library.health.read`                                                                         | Exactly one of `artist_uid` or `name`; optional `limit`. Returns identity resolution, persisted checks and issues. Ambiguous names require the agent to choose a UID explicitly. |
-| `list_jobs`           | `ops.jobs.read`                                                                               | Optional `states`, allowlisted `types`, `limit`, `cursor`. Returns sanitized task history.                                                                                       |
-| `get_job`             | `ops.jobs.read`                                                                               | `job_id`. Returns the safe fields of one task without raw parameters or results.                                                                                                 |
-| `read_diagnostics`    | `ops.logs.read` for `worker_logs`; `ops.status.read` for `worker_status` or `analysis_status` | Required `source`; optional `limit`. `worker_logs` also accepts `task_id`, `since` and `until`.                                                                                  |
+| Tool                    | Required grant                                                                                | Inputs and result                                                                                                                                                                |
+| ----------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_instance_status`   | `ops.status.read`                                                                             | No arguments. Returns cached library totals and persisted worker/analysis evidence, each with its own source timestamps.                                                         |
+| `list_library_issues`   | `library.health.read`                                                                         | Optional `check_type`, `severity`, `artist_uid`, `limit`, `cursor`. Returns a bounded materialized sample of local issues and last check observations.                           |
+| `inspect_artist`        | `library.health.read`                                                                         | Exactly one of `artist_uid` or `name`; optional `limit`. Returns identity resolution, persisted checks and issues. Ambiguous names require the agent to choose a UID explicitly. |
+| `list_jobs`             | `ops.jobs.read`                                                                               | Optional `states`, allowlisted `types`, `limit`, `cursor`. Returns sanitized task history.                                                                                       |
+| `get_job`               | `ops.jobs.read`                                                                               | `job_id`. Returns the safe fields of one task without raw parameters or results.                                                                                                 |
+| `read_diagnostics`      | `ops.logs.read` for `worker_logs`; `ops.status.read` for `worker_status` or `analysis_status` | Required `source`; optional `limit`. `worker_logs` also accepts `task_id`, `since` and `until`.                                                                                  |
+| `get_operation_catalog` | Any granted scope                                                                             | No arguments. Lists implemented tools with enabled/denied/disabled status, limits and the execution readiness of all 17 repair checks. Discovery grants no additional authority. |
+| `get_plan`              | The stored plan's operation grant                                                             | One `plan_id`. Reads a plan belonging to this principal and exact delegated authorization context, including accepted scopes. Current credentials and grants are rechecked.      |
+| `get_library_quality`   | `library.health.read`                                                                         | Optional enumerated `category`, `limit` (1–100) and version-bound `cursor`. Reads worker-produced quality evidence and snapshot age/invalidation metadata. No scan or refresh.   |
 
-## Bounded actions (phase 2)
+## Original directed actions (phase 2 compatibility)
 
 The action catalog is hidden and direct calls are denied while the action flag is disabled.
 All inputs are closed schemas. An integration can have one active maintenance job. Concurrent
@@ -254,7 +277,7 @@ learning the other integration's job ID.
 | `preview_repairs`  | `library.repair.photo_flag`               | One `issue_id` from this integration's recent directed check. Persists an immutable single-change plan and returns `plan_id`, `plan_version`, `before`, `after` and expiry. No filesystem access or enqueue in the request. |
 | `apply_repairs`    | `library.repair.photo_flag`               | Exact `plan_id`, `plan_version`, `idempotency_key`. The worker reobserves the filesystem, checks identity and preconditions, updates one database flag and observes again. It never downloads or writes an image.           |
 | `retry_job`        | `ops.jobs.retry` and `library.health.run` | Own failed directed health check only, with server-recovered parameters and `idempotency_key`. Maximum three retry jobs per original check. Permanent authorization/identity failures and repairs cannot be retried.        |
-| `cancel_job`       | `ops.jobs.cancel_pending`                 | Own pending directed check or photo repair only. Cancellation and the worker's claim have one winner. Repeating cancellation returns the existing result; running or finished jobs return `STATE_CONFLICT`.                 |
+| `cancel_job`       | `ops.jobs.cancel_pending`                 | Own pending maintenance job only. Cancellation and the worker's claim have one winner. Repeating cancellation returns the existing result; running or finished jobs return `STATE_CONFLICT`.                                |
 
 Use `get_job` with `ops.jobs.read` to follow acceptance, execution, verification and projection.
 After the directed check finishes, its job exposes the `issue_id` needed by `preview_repairs`.
@@ -514,3 +537,279 @@ The automatic missing-security-evidence comment is contradicted by the successfu
 The bot also reports missing Checks write permission; granting that GitHub App permission is an
 installation-owner operation and is independent of the code corrections. New regression tests in
 `test_agent_review_regressions.py` reproduced 12 failing cases before the fixes and pass afterward.
+
+### Published phases 2–3 and subsequent CI review
+
+Commit [`08bff534`](https://github.com/thecrateapp/crate/commit/08bff534ee24921f32e21b57067c248170b71e8b)
+publishes phases 2–3 and the preceding review corrections in
+[PR #292](https://github.com/thecrateapp/crate/pull/292). Its
+[backend/security workflow](https://github.com/thecrateapp/crate/actions/runs/38876810318)
+passed all eight shards, coverage, quality and the changed-Python security scan. The
+[frontend workflow](https://github.com/thecrateapp/crate/actions/runs/38876810334)
+passed tests and appearance checks; React Doctor and the OpenSubsonic smoke check also passed.
+
+The updated persistent review was checked again after that push. Follow-up commit
+[`f2f2d2f5`](https://github.com/thecrateapp/crate/commit/f2f2d2f5beaf69cad39a23fc966d7412c205953c)
+is also published in PR #292 and covers these supported findings:
+
+- Redact structured credential values by normalized dictionary key, including nested access/refresh
+  tokens, client secrets and authorization headers. Keep nonsecret credential IDs and accepted scopes.
+- Return a typed `RESPONSE_TOO_LARGE` for a first evidence item exceeding the 40 KiB page budget.
+  Do not return an empty page with the same next cursor, or bypass the response budget.
+- Normalize issue artist UUIDs before reading the snapshot; reject malformed identities before DB access.
+- Reject nonstring OAuth access tokens before parsing and escape opaque consent/nonce values in
+  both human forms. They are generated by Crate; escaping also keeps their HTML-data contract explicit.
+- Return an already terminal job's durable result after plan retention, rechecking live authority and
+  the exact stored authorization context. Pending/running jobs still require the current plan and
+  policy. Worker redelivery of a persisted result does not load a potentially purged plan first.
+- Remove the stray bootstrap import separator.
+
+The proposed authorization-ID-only comparison was not adopted: canonical JSON preserves the full
+context, and accepted-scope changes must not weaken plan ownership or replay isolation. Missing
+accepted scopes are not converted into broader fallback authority. The proposed generic OAuth error
+replacement and extra Admin UUID checks were not needed: caught diagnostic errors carry deliberate
+public messages, and the HTTP boundary already types the Admin cursor/identifiers as UUIDs. React
+Doctor's array-lookup warning concerns at most eight scope checkboxes; it has no material cost here.
+The missing-security-evidence bot comment still conflicts with the successful scanner job.
+
+Before publishing phase 4, the latest [persistent review on `f2f2d2f5`](https://github.com/thecrateapp/crate/pull/292#issuecomment-6209653602)
+was checked again. Task IDs are `TEXT` in both `tasks` and `agent_jobs`, and Crate creates short
+non-UUID task IDs; requiring `_uuid(job_id)` would reject valid retry/cancel requests. Authorization
+keeps its transaction-local five-second statement and two-second lock limits deliberately. They
+bound individual SQL statements/lock waits, not elapsed filesystem/provider work. Generic phase 4
+execution records failed or uncertain effects separately, including terminal timeout/zombie cases
+where the actor never returned. The legacy directed-photo recovery limitation remains explicit.
+
+## Phase 4 foundation checkpoint — 2026-10-16 (historical)
+
+This is a local review checkpoint within phase 4, not completion of its gate. It adds no broad MCP
+write wrapper and requires no migration after 113. The complete feature plan retains metadata,
+enrichment, analysis, sync, portability and editorial work.
+
+The operation catalog distinguishes actual MCP support from legacy automatic repair labels.
+All 17 checks have an explicit readiness/reason. `has_photo_desync` retains its directed, versioned
+execution contract. Other checks remain unavailable through MCP while their merge choices, cascade
+deletes, file manifests, provider artifacts, preconditions and postconditions are made exact.
+
+Admin's selected-repair contract now resolves persisted open issue IDs rather than trusting supplied
+issue details. Execution requires the complete plan version plus unique selected item IDs. Risk and
+batch restrictions apply only to the selection. The worker reloads canonical sources and validates
+the full version before marking or applying selected items; an explicit empty issue list performs
+no action. The artist dialog sends the full source set with selected IDs, so choosing a subset does
+not change the reviewed version. Unsupported artist-scoped health checks fail before persisting or
+resolving issues. Legacy internal explicitly global repairs remain separate calls.
+
+`GET /api/quality` now reads persisted evidence only. Its default response returns summary counts
+and empty evidence arrays; use `category=corrupt|low_bitrate|lossy_with_lossless|mixed_format_albums`,
+`limit` and `cursor` for a bounded page. This changes the former synchronous full-report contract;
+no current Admin caller was found. A missing or invalidated report is unavailable, expired evidence
+is historical, and cursors cannot silently cross versions.
+
+An authorized human can explicitly request `POST /api/quality/refresh` with `{"scope":"global"}`
+and capability `library.repair.run`. The request queues a deduplicated `quality_check` on the
+maintenance queue with a 1,800-second limit, zero automatic retries and resource-governor deferral.
+The response is `{task_id, deduplicated}`; an existing job gives `task_id: null` and
+`deduplicated: true`. No quality scan runs inside the request. The MCP `run_quality_check` action
+is still pending the common global-operation approval contract.
+
+Quality results report their method and coverage. Unreadable metadata or suspicious duration is
+not confirmed corrupt audio. Low bitrate is a threshold heuristic, and matching normalized album
+names does not establish identical editions or masters. Lossless ALAC is recognized. Scans inspect
+supported nested album layouts, reject unsafe paths and cooperate with cancellation.
+
+Publication uses a snapshot version/invalidation compare-and-set. Crate-managed mutation task
+claims and lifecycle transitions invalidate in the same transaction; durable library/artist/album
+cache invalidations also participate. Active mutators prevent scanning/publishing a fresh report or
+serving it as current. Invalidation versions increase monotonically, including within one transaction.
+This describes evidence observed by Crate, not an atomic snapshot of arbitrary external filesystem
+changes. Untracked external changes require the watcher or an explicit refresh; `built_at` remains
+the observation time.
+
+Portable metadata validates roots and relative references, including symlink ancestors, regular-file
+checks, sidecar schema, finite values and a 16 MiB/10,000-track bound. Exports reject existing
+destinations and preserve their bytes. Metadata-only export continues to require explicit
+`include_audio=False` at the operation boundary. These shared safeguards do not create an MCP
+portability contract: server presets, exact rehydrate conflicts/field locks, authorized artifacts and
+partial-effect handling remain pending. Existing legacy handlers are not exposed as MCP shortcuts.
+
+Remaining phase 4 work: common plans for the additional operations and mandatory risk/global
+approvals; exact contracts for other enabled repair variants; metadata patches with provenance and
+locks; scoped provider/facet enrichment; DSP generation/result attribution; honest sync scope; and
+authorized export/rehydrate artifacts. The phase 4 gate remains open until those contracts and their
+tests are complete.
+
+Checkpoint validation: the integrated backend selection passed **859 tests** against real
+PostgreSQL, covering MCP transport/OAuth, replay, selected repairs, quality, portability, runtime,
+cache invalidation, database boundaries and OpenAPI/security. The final multidisc correction then
+passed **109 quality/snapshot tests**, including an independent **14-case scanner** run. Admin
+passed **267 tests in 71 files**, ESLint and the production build. Changed Python files passed
+Ruff/format and Pyright; the medium/high Bandit scan reported zero findings or errors across
+33 production files. Documentation passed seven tests, integrity checks for 42 canonical documents
+and its build. Deployment flags remain disabled.
+
+Independent specification and final security/quality reviews approved this checkpoint with no
+outstanding P1/P2 findings. The final reviewer independently ran 119 quality/portability/read tests.
+This approval applies to the foundation checkpoint; the complete phase 4 gate is still pending.
+
+## Phase 4 library maintenance — 2026-10-16
+
+All additional writes follow `prepare → get_job → get_plan → human approval when required →
+apply → get_job`. Preparation itself is a maintenance worker job: metadata reads, hashes and
+scans do not execute in an MCP HTTP request. Reuse the preparation idempotency key while waiting;
+use a separate stable key for application. `run_health_check` and `run_quality_check` use the same
+name for both stages: preparation supplies explicit scope/checks; application supplies only
+`plan_id`, `plan_version` and `idempotency_key`.
+
+Every complete public plan must fit **40,000 serialized bytes** and **500 declared targets**;
+over-budget plans fail as a whole, without truncating the reviewed change list. Operation limits
+below are additional ceilings, not a guarantee that their maximum combination fits the review
+budget. Plans retain private execution manifests separately from their exact public document.
+`get_plan` preserves complete metadata values, including URLs and explicit nulls; it never returns
+private provider credentials or execution paths. Sanitized job/log diagnostics remain bounded.
+
+Generic operation replays return a compact result with execution/verification status and an owned
+plan/result reference. MCP `get_plan` keeps the complete approved diff and exposes result outcomes
+through bounded, version-bound pages using `limit`/`cursor`. Outcome records identify the affected
+entity, provider/facet and verification without repeating large before/after values. Full results
+remain in the private plan/job stores and authorized Admin review; evidence hashes and result paths
+identify those values. A large biography or setlist response must not make the plan or its replay
+unreadable. Analysis generation details remain available through paginated `get_analysis_status`.
+Follow `next_cursor` with the same plan ID to inspect all outcome records; restart when evidence
+changes. Outcome counts include provider/facet and verification records, rather than representing
+a count of unique library entities. `content_hash` continues to identify the complete approved
+diff; `result_hash` identifies the full private result.
+
+| Operation and tools                                              | Grant                                                                  | Contract and limits                                                                                                                                                                                                                                                                                                                                                                                           |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Selected health: `run_health_check`                              | `library.health.run`                                                   | Explicit artist UID or global scope and 1–17 unique selected checks. Only four scanners support artist scope; the catalog lists them. Failed scanners preserve older open issues and do not claim successful coverage.                                                                                                                                                                                        |
+| Quality: `get_library_quality`, `run_quality_check`              | `library.health.read`, `library.quality.run`                           | Snapshot-only reads; explicit globally approved refresh in a worker. Metadata/filename heuristics are not acoustic identity or proof of corrupt audio.                                                                                                                                                                                                                                                        |
+| Repairs: `preview_repairs`, `apply_repairs`                      | `library.repair.run`                                                   | 1–20 unique canonical open issue IDs, exact source/target manifests, conditional automatic variants and explicit manual reasons. Directed photo compatibility retains its narrower `library.repair.photo_flag` grant.                                                                                                                                                                                         |
+| Metadata: `preview_metadata_update`, `apply_metadata_update`     | `library.metadata.write`                                               | One artist/album/track UID and a closed field patch. Album tag edits affect up to 100 declared indexed tracks. File fingerprints, DB CAS, provenance, manual field locks and post-read verification.                                                                                                                                                                                                          |
+| Enrichment: `plan_enrichment`, `run_enrichment`                  | `library.enrichment.run`                                               | 1–20 artist UIDs; enumerated Last.fm, Spotify, MusicBrainz, Discogs and Setlist providers; nine enumerated facets; `missing` or `refresh`. Up to 100 logical provider fetches; providers can use several bounded HTTP calls. Protected manual data survives refresh. Provider failures/no data are reported per item. No implicit photos, reset, discography or top-track requests.                           |
+| Analysis: `plan_analysis`, `run_analysis`, `get_analysis_status` | `library.analysis.run`; status additionally uses `library.health.read` | 1–200 unique track UIDs and `analysis`/`bliss` pipelines. Planning declares audio-read bytes and pending/refresh effects. Requeue is not DSP completion. Status can follow exact owned-plan generations and reports implementation/backend/source evidence or unknown.                                                                                                                                        |
+| Sync: `plan_library_sync`, `run_library_sync`                    | `library.sync.run`                                                     | Album/artist UID or explicitly limited global set, at most 100 indexed albums. No silent truncation or discovery of new album directories. Frozen scanner payloads preserve entity UIDs and field locks; exact removals, artist summary updates and optional artwork-materialization jobs are declared.                                                                                                       |
+| Export: `plan_metadata_export`, `run_metadata_export`            | `library.metadata.export`                                              | 1–20 album UIDs, at most 100 tracks per album, configured destination preset. Isolated metadata JSON sidecars and a private ZIP artifact, with no audio or artwork export. Both total uncompressed metadata and the archive are bounded to 16 MiB. No overwrite.                                                                                                                                              |
+| Import: `plan_metadata_rehydrate`, `run_metadata_rehydrate`      | `library.metadata.rehydrate`                                           | Exact local album/track UIDs from a configured source preset. `fill_missing` or `replace_unlocked`; field-level before/after/conflicts, source SHA-256 and DB CAS. Imports enumerated album/track metadata only, preserving manual locks and recording `portable_import` provenance. Audio tags, computed DSP/bliss results, filesystem paths, artist identities and infrastructure backups are not imported. |
+
+High-risk/destructive and global plans **always** require an independent human approval, even when
+an integration policy allows bounded actions without approval. Current credentials, delegated grant,
+actor capabilities, accepted scopes, policy revision, immutable plan version and reserved approval
+are checked again before effects. Human review requires `agents.plans.review`/`agents.plans.approve`
+and the operation's domain capability. A metadata reviewer does not need the repair capability.
+The Admin reviewer displays complete targets, values, effects, sources and conflicts; incomplete,
+manual-only or expired plans cannot be approved for execution.
+
+Admission reserves overlapping entity/artist keys, with global operations conflicting with all
+library effects. Each integration has at most one active maintenance job. A durable effect marker
+prevents a second delivery from repeating a potentially started filesystem/provider operation.
+If a timeout or lost worker heartbeat terminates the runtime before its result was recorded,
+`get_plan`, the Admin plan list, `get_job` and idempotent application replay derive explicit
+partial/manual reconciliation evidence from the durable effect marker and terminal task status.
+This requires no second delivery or writes during a read. The runtime task remains failed; the
+plan reports uncertain effects. A failure before that marker reports no started effects instead.
+Recorded results take precedence. Prepare a new plan from current state instead of assuming
+rollback or repeating effects. Pending cancellation is supported. Cooperative
+checkpoints do not imply the broader running-cancellation and retry controls planned for phase 5.
+
+DSP stores generation, claim token and actual pipeline signature. Result commits compare the
+claimed generation/token and source identity; a reset or replaced source fences old deliveries.
+Signatures record implementation/runtime/backend/model/binary evidence where available. A legacy
+result without that evidence remains unknown. `get_analysis_status(plan_id=...)` follows only that
+plan's generations, including after an interrupted response; changed generations are superseded,
+missing tracks are terminal not-found, and source/signature mismatch is verification failure.
+It reports recorded computation evidence, not a new live filesystem scan during HTTP.
+
+### Repair readiness and effects
+
+`get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,
+effects, limits, cancellation/retry policy, reversibility and verification.
+
+| Checks                                                                                                              | Automatic variant                                                                      | Risk/effects                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `has_photo_desync`                                                                                                  | Exact UID, fresh filesystem evidence and DB CAS                                        | Recomputes a database flag; no image writes.                                                                                         |
+| `fk_orphan_albums`, `fk_orphan_tracks`                                                                              | Frozen orphan membership; unique canonical reassignment or exact deletion              | Destructive deletion can remove declared dependent relationships; mandatory human approval.                                          |
+| `stale_artists`, `stale_albums`, `stale_tracks`, `zombie_artists`                                                   | Current absence/empty-membership evidence plus complete bounded DB/dependent manifests | Destructive database cleanup; no undeclared filesystem cleanup.                                                                      |
+| `tag_mismatch`                                                                                                      | Reread approved file tags and CAS of exact indexed track metadata                      | Declared DB changes and protected manual choices; no implicit artist resync.                                                         |
+| `duplicate_albums`                                                                                                  | Indexed stable-UID copies with a frozen keep/drop choice                               | Reversible DB quarantine; audio is preserved. Legacy folder-merging variants remain manual.                                          |
+| `duplicate_tracks`, `shadow_quality_tracks`                                                                         | Verified indexed copies, frozen keep/drop choices and file fingerprints                | Exact audio quarantine and DB/reference effects; no irreversible audio unlink. Partial moves are reported.                           |
+| `duplicate_folders`, `canonical_mismatch`, `artist_layout_fix`, `unindexed_files`, `folder_naming`, `missing_cover` | Manual/diagnostic contracts                                                            | Collision/identity/layout decisions or staged, verified artwork are required. No automatic MCP wrapper around legacy broad handlers. |
+
+A selection containing any manual variant cannot partially execute its other items: prepare a new
+exact automatic selection. Whole-library repair is not inferred from an empty selection. Admin's
+versioned selected-repair path uses the same compiled domain contract and worker effects as MCP.
+Admin prepares the selection asynchronously and keeps its compiled manifest in a private,
+actor-owned, expiring store; shared task/SSE results contain only a minimal summary. Applying
+requires the preparation ID, complete version and exact selected IDs, with current authority
+checked again in the worker. Metadata tag writes refresh affected album and canonical artist
+size totals in their transaction, excluding quarantined albums from the artist total.
+Internal explicitly global legacy jobs retain their separate existing policy and are not exposed
+as generic MCP dispatch.
+
+### Metadata presets and authorized artifacts
+
+Configure server-owned presets in `app/config.yaml`; the default is an empty map. Create the root
+directories with permissions for the maintenance worker. API and worker need the same shared path
+for artifact downloads; `/data` is already shared by the standard Compose services.
+
+```yaml
+agent_metadata_presets:
+  editorial_export:
+    root: /data/agent-metadata/exports
+    export: true
+    rehydrate: false
+  reviewed_import:
+    root: /data/agent-metadata/imports
+    export: false
+    rehydrate: true
+```
+
+Preset IDs, purposes and configured/unavailable evidence are discoverable by appropriately granted
+integrations; paths remain server-side and filesystem readiness is checked in the worker. Export
+roots must be separate from `/music`. An export creates an isolated UUID directory with
+`<album_uid>/.crate/album.json` files and `metadata.zip`. A source preset points at the root containing
+those album UID directories; it may reference a reviewed prior export directory. The import plan
+resolves conflicts before applying; full DB restore and importing computed analysis are separate
+operations, not implied by rehydration.
+
+The result contains an opaque `artifact_id`, SHA-256, byte size, filename, expiry and
+`download_path=/mcp/artifacts/<uuid>`. Download requires the same exact principal/authorization
+context and a current `library.metadata.export` grant, plus the dedicated unmixed Bearer credential.
+The route shares MCP Host/Origin allowlisting, rejects human cookies/query/Remote-User fallbacks,
+checks completion/expiry and verifies a bounded regular file's digest. An artifact expires after
+24 hours. Expiry revokes access; it is not automatic disk cleanup, so operators must apply their
+existing storage retention policy to export directories.
+
+### Phase 4 validation
+
+Phase 4 tasks 4.1–4.3 are implemented and locally validated against PostgreSQL, real filesystem
+fixtures and SDK HTTP. Independent specification and final quality/security reviews approved the
+completed changes with no outstanding P1/P2 findings. Deployment remains disabled;
+validation does not claim a live public-proxy rollout or external-provider production exercise.
+
+Closing regressions were run as focused selections: **84 shared engine/diagnostic tests**, including
+timeout and lost-heartbeat outcomes; **103 migration/access/workflow tests**; **68 sync and legacy
+write tests** plus the final rollback race; **40 metadata tests** with real FLAC tag growth; and
+**217 selected-repair/Admin tests**. A separate four-case migration selection verified rollback,
+preservation of legacy jobs and repeated upgrade after the final SQL cleanup. Counts overlap and
+must not be added together. Admin's changed reviewer, repair dialog and task-wait flows passed
+**37 tests**. Ruff, Pyright, changed Admin ESLint/type checks, Admin/docs builds and documentation
+integrity checks passed. A medium/high-confidence Bandit scan found no reportable issues.
+
+Ten focused transport regressions cover a complete 35 KB biography diff after execution, a real
+adapter result with more than 400 KB of setlists, stable application replay and all **1,020 outcome
+records** across bounded pages. Full plan/job/audit evidence remains unchanged. Five additional
+owned-plan/authority SDK callers passed after the contract change. Database/runtime boundaries
+passed **96 tests**. Complete suites are reserved for the end of development, as requested.
+
+The synthetic load fixture uses **900 artists, 4,800 albums, 48,000 tracks and 96,000 pipeline
+rows**, real PostgreSQL/Redis and the official MCP SDK over local TCP. Its twelve samples per read
+recorded p95 **30.1 ms** for quality, **133.9 ms** for analysis status and **69.5 ms** for an exact
+plan. These are local measurements, not latency assertions or a production SLO. Pagination returned
+all **400 analysis states in 20 pages**, with a largest structured page of **40,738 bytes** and
+version-bound cursor invalidation. Two concurrent worker preparations were durable and replayed
+without duplicate dispatch. Instrumentation observed **zero HTTP library aggregates and zero
+HTTP compiler/filesystem/DSP calls**.
+
+Evidence: [measurement JSON](../testing/measurements/crate-mcp-phase4-library-load-2026-10-16.json).
+Reproduce the focused benchmark from `app/` with
+`../.venv/bin/python -m pytest tests/test_mcp_library_performance.py -q`.

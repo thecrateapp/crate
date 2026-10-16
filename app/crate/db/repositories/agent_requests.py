@@ -179,7 +179,15 @@ def _job(current, job_id, *, lock=False):
         .mappings()
         .first()
     )
-    return dict(row) if row else None
+    if row is None:
+        return None
+    from crate.agent_operation_catalog import interrupted_operation_result
+
+    job = dict(row)
+    job["result"] = interrupted_operation_result(
+        job["operation"], job["status"], job.get("effect_started_at"), job["result"]
+    )
+    return job
 
 
 def _summary(row, replayed=False):
@@ -188,6 +196,13 @@ def _summary(row, replayed=False):
             "RESULT_EXPIRED",
             "This request was accepted previously; its job result has expired",
         )
+    result = row["result"]
+    if row["operation"] in {"prepare_operation", "apply_operation"}:
+        from crate.agent_operation_catalog import operation_result_summary
+
+        result = operation_result_summary(
+            result, plan_id=row["payload"].get("plan_id"), job_id=row["task_id"]
+        )
     return {
         "job_id": row["task_id"],
         "status": row["status"],
@@ -195,7 +210,7 @@ def _summary(row, replayed=False):
         "artist_uid": row["artist_uid"],
         "replayed": replayed,
         "retry_of": row["retry_of"],
-        "result": row["result"],
+        "result": result,
     }
 
 
@@ -260,19 +275,29 @@ def _accept(
     request_operation = request_operation or operation
     payload_hash = _hash(payload)
     request_hash = request_hash or payload_hash
+    target_keys = payload.get("target_keys") or (
+        ["artist:" + payload["artist_uid"]] if payload.get("artist_uid") else []
+    )
     current.execute(
-        text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
-        {"key": "agent:artist:" + payload["artist_uid"]},
+        text(
+            "SELECT pg_advisory_xact_lock(hashtextextended('agent:library-admission',0))"
+        )
     )
     active = (
         current.execute(
             text("""
         SELECT j.task_id, j.principal_id::text AS principal_id, j.operation, j.payload_hash, j.authorization_context
         FROM agent_jobs j JOIN tasks t ON t.id = j.task_id
-        WHERE j.artist_uid = :artist_uid AND t.status = ANY(:active)
+        WHERE t.status = ANY(:active) AND
+          (j.target_keys && CAST(:targets AS text[]) OR 'library:global'=ANY(j.target_keys)
+           OR (:global_target AND cardinality(j.target_keys)>0))
         LIMIT 1
     """),
-            {"artist_uid": payload["artist_uid"], "active": list(_ACTIVE)},
+            {
+                "targets": target_keys,
+                "global_target": "library:global" in target_keys,
+                "active": list(_ACTIVE),
+            },
         )
         .mappings()
         .first()
@@ -308,30 +333,41 @@ def _accept(
             "This integration already has an active maintenance job",
             retry_after=5,
         )
-    task_type = "health_check" if operation == "run_health_check" else "repair"
+    task_type = (
+        "agent_maintenance"
+        if operation in {"prepare_operation", "apply_operation"}
+        else "health_check"
+        if operation == "run_health_check"
+        else "repair"
+    )
     task_id = create_task(
         task_type,
-        {"agent_command": True, "artist_uid": payload["artist_uid"]},
+        {"agent_command": True, "artist_uid": payload.get("artist_uid")},
         session=current,
     )
     # Retries require an explicit, separately authorized command; the actor cannot auto retry.
     current.execute(
         text("UPDATE tasks SET max_retries = 0 WHERE id = :id"), {"id": task_id}
     )
-    grants = [_SCOPES[operation]] + (["ops.jobs.retry"] if retry_of else [])
+    grants = (
+        payload["required_grants"]
+        if operation in {"prepare_operation", "apply_operation"}
+        else [_SCOPES[operation]] + (["ops.jobs.retry"] if retry_of else [])
+    )
     current.execute(
         text("""
         INSERT INTO agent_jobs (task_id, principal_id, credential_id, operation, artist_uid, payload,
-            payload_hash, required_grants, retry_of, retry_root, retry_depth, trace_id, authorization_context)
+            payload_hash, required_grants, retry_of, retry_root, retry_depth, trace_id, authorization_context, target_keys)
         VALUES (:task_id, :principal_id, :credential_id, :operation, :artist_uid, CAST(:payload AS jsonb),
-            :payload_hash, :grants, :retry_of, :retry_root, :retry_depth, :trace_id, CAST(:authorization_context AS jsonb))
+            :payload_hash, :grants, :retry_of, :retry_root, :retry_depth, :trace_id, CAST(:authorization_context AS jsonb), :target_keys)
     """),
         {
             "task_id": task_id,
             "principal_id": principal.id,
             "credential_id": principal.credential_id,
             "operation": operation,
-            "artist_uid": payload["artist_uid"],
+            "artist_uid": payload.get("artist_uid"),
+            "target_keys": target_keys,
             "payload": json.dumps(payload),
             "payload_hash": payload_hash,
             "grants": grants,
@@ -348,7 +384,7 @@ def _accept(
         principal,
         "agent.command.accepted",
         job_id=task_id,
-        artist_uid=payload["artist_uid"],
+        artist_uid=payload.get("artist_uid"),
         plan_id=payload.get("plan_id"),
         trace_id=trace_id,
     )
@@ -389,7 +425,7 @@ def _plan(current, principal_id, plan_id, *, lock=False):
                 """
         SELECT p.*, p.id::text AS id, p.artist_uid::text AS artist_uid,
                o.observation, p.expires_at > NOW() AS unexpired
-        FROM agent_repair_plans p JOIN agent_photo_observations o ON o.id = p.observation_id
+        FROM agent_repair_plans p LEFT JOIN agent_photo_observations o ON o.id = p.observation_id
         WHERE p.id = :id AND p.principal_id = :principal_id
     """
                 + suffix
@@ -429,6 +465,10 @@ def accept_apply(
         if replay and replay["status"] in {"completed", "failed", "cancelled"}:
             return replay
         plan = _plan(current, principal.id, plan_id, lock=True)
+        if plan.get("operation", "repair_photo_flag") != "repair_photo_flag":
+            raise DiagnosticError(
+                "FORBIDDEN", "This plan requires its library operation grant"
+            )
         validate_plan_authorization(current, plan, principal, job_id=plan["task_id"])
         if replay:
             return replay
@@ -491,8 +531,7 @@ def retry_job(
         if (
             job is None
             or job["principal_id"] != principal.id
-            or (job.get("authorization_context") or {}).get("authorization_id")
-            != principal.authorization_id
+            or job.get("authorization_context") != authorization_context(principal)
         ):
             raise DiagnosticError("NOT_FOUND", "Owned agent job was not found")
         if job["operation"] != "run_health_check":
@@ -606,7 +645,13 @@ def _execution_job(current, task_id):
         raise DiagnosticError(
             "STATE_CONFLICT", "Agent job has not been claimed for execution"
         )
-    expected = "health_check" if job["operation"] == "run_health_check" else "repair"
+    expected = (
+        "agent_maintenance"
+        if job["operation"] in {"prepare_operation", "apply_operation"}
+        else "health_check"
+        if job["operation"] == "run_health_check"
+        else "repair"
+    )
     if job["task_type"] != expected:
         raise DiagnosticError(
             "STATE_CONFLICT", "Agent job type does not match its command"
@@ -674,13 +719,22 @@ def _store_result(current, job, result, status):
         ),
         {"result": json.dumps(result, default=str), "id": job["task_id"]},
     )
-    update_task(job["task_id"], status=status, result=result, session=current)
-    if job["operation"] == "apply_repairs":
+    task_result = result
+    if job["operation"] in {"prepare_operation", "apply_operation"}:
+        from crate.agent_operation_catalog import public_operation_result
+
+        task_result = public_operation_result(result)
+    update_task(job["task_id"], status=status, result=task_result, session=current)
+    if job["operation"] == "apply_repairs" or (
+        job["operation"] == "apply_operation" and job["payload"].get("plan_id")
+    ):
         execution = result["execution"]["status"]
         state = (
-            "applied" if execution in ("applied", "already_satisfied") else execution
+            "applied"
+            if execution in ("applied", "already_satisfied", "completed", "requeued")
+            else execution
         )
-        if state not in ("applied", "conflict", "failed", "cancelled"):
+        if state not in ("applied", "partial", "conflict", "failed", "cancelled"):
             state = "failed"
         current.execute(
             text(
