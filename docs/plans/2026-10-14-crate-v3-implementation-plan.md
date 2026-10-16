@@ -338,7 +338,7 @@ polishing is deferred. Diego approved publication of 1E, its Linux capture run a
 Task 0.11 is complete: 31 reviewed Linux PNGs and green comparison/full frontend CI on `cf477986`
 (run `38808354069`). Task 1.0 is published at Checkpoint 1F (`6e793ebd`, Linux images `82f14594`); capture review,
 comparison/full frontend CI (`38860652793`) and the local route walkthrough are complete.
-InstrumentPanel 1.7 is implemented locally at Checkpoint 1G and stops for visual review. Smart Mix and Phase 0
+InstrumentPanel 1.7 is approved and published as `473604f7` at Checkpoint 1G. Smart Mix and Phase 0
 gates remain separate: runtime qualification 0.15 and device QA are pending; production measurement
 0.14 is needed before the wheel and requires assignment.
 
@@ -1010,7 +1010,8 @@ and spacing. Shared 744, Admin 252, Listen 2,854 and Desktop 50 unit tests pass;
 Listen skips remain. Preview 28, Admin browser 15 and Listen smoke 34 / four skips pass; spec and
 quality reviews pass. Details and budgets are in the handover. Diego approved the corrected visual
 checkpoint on 2026-10-16 and authorised publication, Linux capture/review and continuation to Meter
-1.8. Canonical capture/diff and comparison CI remain to be completed.
+1.8. Canonical Linux capture/diff review passes in run `38864631250` (26 unchanged, seven expected
+changes); comparison CI against the imported images is pending.
 
 Only primitives and helpers that both apps import directly in the same change.
 
@@ -1283,7 +1284,8 @@ sections with only a top rule at desktop/mobile widths. The primitive leaves blo
 parent; a real Admin browser regression verifies the 24px gap before Metric Streams. Actual checks
 are in the handover.
 Diego approved the corrected checkpoint on 2026-10-16 and authorised commit/push, canonical Linux
-capture/review and continuation to 1.8. Capture/diff review and comparison CI remain pending.
+capture/review and continuation to 1.8. Published as `473604f7`; Linux capture/diff review passes
+in run `38864631250`. Comparison CI remains pending.
 
 **Files:**
 

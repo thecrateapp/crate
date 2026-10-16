@@ -123,7 +123,7 @@ upload. They check actual rendered borders against the quiet token.
 
 The 1F canonical Linux review and comparison CI are complete, along with the local route
 walkthrough recorded in the handover. The optional local comparison images remain advisory.
-The current InstrumentPanel 1G checkpoint below awaits its own visual review and publication.
+InstrumentPanel 1G below is approved and published as `473604f7`; its Linux captures are reviewed.
 
 ### Audio Profile target clarified — 2026-10-16
 
@@ -159,5 +159,5 @@ the title baseline. Desktop/mobile checks compare rule-to-heading offsets; both 
 The cumulative browser suite has 28 checks. Two cases attach advisory `checkpoint-1g.png` images
 under the ignored `.artifacts/design-system-preview/` output (desktop and 390px); they are not
 canonical baselines. 1F is published with 33 reviewed Linux PNGs and green comparison CI in run
-`38860652793`. Its local before/after gallery remains explicitly local. 1G publication and Linux
-capture/diff review await the next visual checkpoint; preserve all earlier specimens.
+`38860652793`. Its local before/after gallery remains explicitly local. 1G is published as `473604f7`; its 33 Linux images from run `38864631250` are reviewed (seven
+expected changes, 26 byte-identical). Comparison CI is pending. Preserve all earlier specimens.

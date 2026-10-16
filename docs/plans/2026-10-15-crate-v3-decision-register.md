@@ -263,3 +263,8 @@ On 2026-10-16 Diego approved Checkpoint 1G with the corrected spacing and explic
 commit/push, Linux CI captures and continuation to Meter (Task 1.8). Keep extending the persistent
 mockup and stop at the next visual checkpoint for review. This supersedes the local-only approval
 notes above without authorising a merge, release or deployment.
+
+Checkpoint 1G is published as `473604f7`. Linux recording `38864631250` passes; artifact
+`12030469443` has verified SHA256 `d351c4876b8b862e3949a848ba866e41cfb14597b1b4f8d4d1ee82f5442a3d45`.
+Manual review covers the seven changed images (System and six Settings); the other 26 are
+byte-identical. Import the original manifest and all 33 PNGs; comparison CI remains separate.

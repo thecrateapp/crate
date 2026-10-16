@@ -14,7 +14,8 @@ plan; the status table separates local implementation from pending QA.
   approval on 2026-10-15. Checkpoint 1E is published as `552a31f1`, its search-fixture fix as
   `c7e9e961`, and reviewed Linux baselines as `cf477986`; full comparison CI passes.
   Checkpoint 1F is published as `6e793ebd`, with reviewed Linux images in `82f14594`;
-  comparison and full frontend CI pass in run `38860652793`. InstrumentPanel 1G is a local review diff. Rebase/PR/release remain gated.
+  comparison and full frontend CI pass in run `38860652793`. InstrumentPanel 1G is published as `473604f7`, with reviewed Linux captures from run
+  `38864631250`; comparison CI is pending. Rebase/PR/release remain gated.
 
 ## Sources of truth, in reading order
 
@@ -40,7 +41,7 @@ authorised its commit/push. Before the next infrastructure block, he requested a
 retained GenrePill with percentages in the persistent mockup. That preview is Task 1.6a / **Checkpoint 1C**, visually approved by Diego on 2026-10-15. It is committed as `e60e6f50`; approval does not authorise migration of genre data or Smart Mix logic. **Task 1.1 global
 focus/selection is published as `d881a728` at Checkpoint 1D**, provisionally accepted to continue;
 further visual polishing is deferred. Admin 1.0 and its capture/route prerequisites are now
-complete; InstrumentPanel 1.7 is the current local review checkpoint.
+complete; InstrumentPanel 1.7 is approved and published. Meter 1.8 is the next authorised checkpoint.
 Theme runtime retirement 1.13 remains outside this batch.
 
 The persistent component/visual mockup lives in `tools/design-system-preview/` and runs with
@@ -61,7 +62,8 @@ Task 0.11 is complete: canonical Linux capture, image review and comparison CI p
 Checkpoint 0 remains open for 0.15 runtime qualification and relevant device reviews; 0.14
 production measurement may wait until the wheel and needs assignment. Admin contrast 1.0 is
 published at Checkpoint 1F with reviewed Linux images, green comparison CI and the local route
-walkthrough recorded below. InstrumentPanel 1.7 is implemented locally at Checkpoint 1G for review.
+walkthrough recorded below. InstrumentPanel 1.7 is published at Checkpoint 1G; its Linux capture
+review passes and comparison CI is next.
 
 ## Admin visual direction — 2026-10-16
 
@@ -396,7 +398,8 @@ capture/comparison and route-walk prerequisites are complete; the isolated 1.7 a
 ## Checkpoint 1G — InstrumentPanel (Task 1.7)
 
 Diego approved the corrected visual checkpoint on 2026-10-16 and authorised its commit/push,
-canonical Linux captures and continuation to Meter 1.8. Publication/capture results follow below.
+canonical Linux captures and continuation to Meter 1.8. The implementation is published as
+`473604f7046bd72a53e41a77a87d54e54e73e730`.
 The shared primitive implements the DS §2.3 props-only contract: figure/section, optional real-data
 summary, named heading fallback, h2/h3 MonoLabel, technical metadata and an isolated polite status
 slot, optional top rule and an inline-size container. No fill, side borders, motion, fetching or
@@ -430,7 +433,13 @@ stream subscriptions are added. Header/content changes use the existing snapshot
   boundaries pass. Initial JS gzip: Admin 515,404 B / 532,480 ceiling; Listen 204,757 B / 307,200.
 - Spec and code-quality reviews have no remaining actionable findings. No drift/bundle ceiling
   increased. The 33 committed Linux PNGs and provenance manifest are unchanged by the local 1G diff.
-- Remaining gates: canonical Linux captures/diff review for Resources and the affected Settings
-  screens, followed by comparison CI. Visual review and publication approval are complete.
+- Canonical Linux recording passes in run <https://github.com/thecrateapp/crate/actions/runs/38864631250>.
+  Artifact `12030469443` SHA256 `d351c4876b8b862e3949a848ba866e41cfb14597b1b4f8d4d1ee82f5442a3d45`
+  matches the downloaded archive. Its manifest pins `473604f7`, Playwright 1.63.0-noble, Linux x64.
+  All 33 PNGs are retained: 26 byte-identical; the seven reviewed changes are System Resources
+  and six existing Settings captures (the legacy appearance matrix awaits retirement in 1.13).
+  Images show the expected top rules/open sections, retained controls and 24px Admin panel gap.
+- Remaining gate: comparison CI against the imported images. Visual review and publication
+  approval are complete.
   Local smoke images are advisory only. Meter 1.8 is the next authorised checkpoint. TrackReadout and global Admin
   icon retirement retain their planned tasks; 1D focus polishing stays deferred.
