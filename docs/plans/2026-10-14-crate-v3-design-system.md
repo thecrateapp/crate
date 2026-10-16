@@ -3778,6 +3778,11 @@ Listen (`components/layout/*`):
 - Admin task toasts carry the task id in mono and "Open task →" (`/tasks?task=`).
 - Listen keeps `notify` and its `toast-policy`.
 
+Task 1.11 supplies the shared presentation/duration configuration and removes `richColors`.
+It preserves existing caller copy and payloads. Context-specific MonoLabel type words, task-id
+links and inline-first feedback remain pending consumer migration; the config alone does not
+complete this section. Do not add a generic untranslated type prefix to localized Listen messages.
+
 ### 5.11 Empty, loading, error, stale, warming, offline
 
 Reserve the real geometry; never a spinner inside an instrument; never a dashed box with a big icon.

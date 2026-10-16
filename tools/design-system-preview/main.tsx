@@ -24,6 +24,8 @@ import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { Meter } from "@crate/ui/primitives/Meter";
 import { Readout } from "@crate/ui/primitives/Readout";
 import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
+import { toasterConfig } from "@crate/ui/lib/toaster-config";
+import { toast, Toaster } from "sonner";
 import {
   Section,
   ToggleRow,
@@ -103,6 +105,8 @@ function App() {
   const [motion, setMotion] = useState(true);
   const [importProgress, setImportProgress] = useState(0.5);
   const [preparingAudio, setPreparingAudio] = useState(true);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastAction, setToastAction] = useState("");
   const [above, setAbove] = useState(false);
   const [selected, setSelected] = useState(0);
   const [genres, setGenres] = useState(["Jazz", "Ambient"]);
@@ -123,6 +127,60 @@ function App() {
     document.documentElement.dataset.crateMotion = next ? "full" : "reduced";
     setMotion(next);
   }
+  function showToastExample(kind: "success" | "info" | "error") {
+    toast.dismiss("checkpoint-toast-secondary");
+    setToastVisible(true);
+    setToastAction("");
+    const options = {
+      id: "checkpoint-toast",
+      toasterId: "checkpoint-toasts",
+      duration: Infinity,
+      action: undefined,
+    };
+    if (kind === "success") {
+      toast.success("Guardado en tu colección", {
+        ...options,
+        description: "12 canciones añadidas.",
+      });
+    } else if (kind === "info") {
+      toast.info("Análisis en cola", {
+        ...options,
+        description: "12 álbumes pendientes de procesar.",
+      });
+    } else {
+      toast.error("No se ha podido completar la tarea", {
+        ...options,
+        description: "El servidor no está disponible.",
+        action: {
+          label: "Reintentar",
+          onClick: (event) => {
+            event.preventDefault();
+            setToastAction("Reintento solicitado");
+          },
+        },
+      });
+    }
+  }
+  function showToastStack() {
+    setToastVisible(true);
+    setToastAction("");
+    const options = {
+      toasterId: "checkpoint-toasts",
+      duration: Infinity,
+      action: undefined,
+    };
+    toast.error("No se ha podido completar el análisis de tu colección", {
+      ...options,
+      id: "checkpoint-toast",
+      description:
+        "El servidor no está disponible. Puedes reintentar la operación más tarde.",
+    });
+    toast.info("Análisis en cola", {
+      ...options,
+      id: "checkpoint-toast-secondary",
+      description: undefined,
+    });
+  }
   return (
     <main>
       <header className="masthead">
@@ -130,7 +188,7 @@ function App() {
           crate<span className="version">v3</span>
         </a>
         <MonoLabel
-          meta={["Checkpoint 1J", "ProgressHairline"]}
+          meta={["Checkpoint 1K", "Toasts"]}
           className="masthead-meta"
         />
         <a className="jump" href="#primitivas">
@@ -1047,7 +1105,7 @@ function App() {
         <div className="specimen-heading">
           <div>
             <MonoLabel size="eyebrow" accent="11">
-              Checkpoint 1J · En revisión
+              Checkpoint 1J · Aprobado
             </MonoLabel>
             <h2>El progreso, en una línea.</h2>
           </div>
@@ -1055,7 +1113,7 @@ function App() {
         <p className="admin-baseline-note">
           Avance confirmado y preparación sin porcentaje conocido. La animación
           se detiene fuera de pantalla y respeta movimiento reducido. Datos
-          ficticios para revisar la primitiva. Capturas Linux de 1J pendientes.
+          ficticios para revisar la primitiva. Capturas Linux de 1J revisadas.
         </p>
         <div className="instrument-preview-grid">
           <InstrumentPanel
@@ -1131,6 +1189,101 @@ function App() {
           </InstrumentPanel>
         </div>
       </section>
+      <section
+        id="toasts"
+        className="admin-baseline-feature"
+        aria-label="Checkpoint 1K, Toasts"
+      >
+        <div className="specimen-heading">
+          <div>
+            <MonoLabel size="eyebrow" accent="12">
+              Checkpoint 1K · Aprobado
+            </MonoLabel>
+            <h2>Un mismo lenguaje para cada aviso.</h2>
+          </div>
+        </div>
+        <p className="admin-baseline-note">
+          Avisos reales con la configuración compartida de Admin y Listen. Datos
+          ficticios y acciones locales. En las apps duran 4 segundos por
+          defecto; aquí permanecen visibles para revisarlos. Capturas Linux de
+          1K pendientes.
+        </p>
+        <div className="instrument-preview-grid">
+          <InstrumentPanel
+            as="section"
+            headingLevel={3}
+            label={{ children: "Prueba un aviso" }}
+          >
+            <div className="readout-preview-actions">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => showToastExample("success")}
+              >
+                Mostrar guardado
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => showToastExample("info")}
+              >
+                Mostrar cola
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => showToastExample("error")}
+              >
+                Mostrar error
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  toast.dismiss("checkpoint-toast");
+                  toast.dismiss("checkpoint-toast-secondary");
+                  setToastVisible(false);
+                  setToastAction("");
+                }}
+              >
+                Limpiar avisos
+              </Button>
+              <Button type="button" variant="outline" onClick={showToastStack}>
+                Probar pila
+              </Button>
+            </div>
+            <p className="admin-baseline-note mt-5">
+              La información que pertenece a un control se mantiene en ese
+              control. El toast acompaña resultados que siguen siendo relevantes
+              después de abandonarlo.
+            </p>
+            {toastAction ? (
+              <p className="admin-baseline-note mt-5">{toastAction}</p>
+            ) : null}
+          </InstrumentPanel>
+          <InstrumentPanel
+            as="section"
+            headingLevel={3}
+            label={{ children: "Vista previa" }}
+          >
+            <div className="toast-preview-stage">
+              {!toastVisible ? (
+                <p className="admin-baseline-note">
+                  Elige un aviso para probar su presentación.
+                </p>
+              ) : null}
+              <Toaster
+                {...toasterConfig}
+                id="checkpoint-toasts"
+                className="crate-toaster toast-preview-toaster"
+                position="bottom-center"
+                theme="dark"
+                containerAriaLabel="Avisos de ejemplo"
+              />
+            </div>
+          </InstrumentPanel>
+        </div>
+      </section>
       <footer>
         <MonoLabel
           meta={[
@@ -1141,7 +1294,8 @@ function App() {
             "1G publicado",
             "1H publicado",
             "1I publicado",
-            "1J en revisión",
+            "1J publicado",
+            "1K aprobado",
           ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>

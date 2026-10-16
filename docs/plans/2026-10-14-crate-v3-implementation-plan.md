@@ -340,7 +340,8 @@ Task 0.11 is complete: 31 reviewed Linux PNGs and green comparison/full frontend
 comparison/full frontend CI (`38860652793`) and the local route walkthrough are complete.
 InstrumentPanel 1.7 is published at 1G (`473604f7`); Meter 1.8 at 1H (`6a5b3366`, Linux images
 `ef5e7f52`). Readout 1.9 is published (`a80f396b`, Linux images `dd71eb72`);
-ProgressHairline 1.10 is the current local checkpoint. Smart Mix and Phase 0
+ProgressHairline 1.10 is published (`0660fbd2`, Linux images `3f470ec6`);
+shared toaster configuration 1.11 is the current local checkpoint. Smart Mix and Phase 0
 gates remain separate: runtime qualification 0.15 and device QA are pending; production measurement
 0.14 is needed before the wheel and requires assignment.
 
@@ -1394,7 +1395,8 @@ pass, along with all 3,962 unit tests and preview 35 / Admin 20 / Listen 42 brow
 Spec/quality reviews and all type/lint/build/bundle/tooling gates pass; results are in the handover.
 Diego approved 1J on 2026-10-16 and authorised commit/push, Linux CI captures and continuation to
 the shared toaster configuration (Task 1.11). Published `0660fbd2`; Linux run `38876594597` passes
-with 40 reviewed PNGs (35 unchanged, Tasks changed, four new progress scenes). Comparison CI pending.
+with 40 reviewed PNGs (35 unchanged, Tasks changed, four new progress scenes), imported in `3f470ec6`.
+Comparison/full frontend CI passes in run `38877216337`.
 
 **Files:**
 
@@ -1420,11 +1422,31 @@ with 40 reviewed PNGs (35 unchanged, Tasks changed, four new progress scenes). C
 
 ### Task 1.11: Shared toaster config (PD12 / [D10])
 
+**Local status / Checkpoint 1K:** one typed config is mounted by Admin and Listen, retaining
+their positions, Listen's theme/native-mode synchronization and its mobile bottom-chrome offset.
+The base duration remains 4000ms; per-call overrides and `notify` stay intact. Shared object-card
+recipes supply 380px maximum width, 12/16px padding, 14px messages, mono 11.5px muted descriptions
+and ghost actions, without default icons or `richColors`. Mockup <http://127.0.0.1:5186/#toasts>
+uses an actual scoped Sonner instance, manual fictional examples and local-only retry; indefinite
+duration and embedded positioning are preview-only. All 3,971 units and preview 37 / Admin 21 /
+Listen 42 browser checks pass, alongside types/lints/builds/budgets/tooling gates. Spec/quality
+reviews approve; full evidence is in the handover. Diego approved 1K on 2026-10-16 and authorised
+commit/push, Linux CI captures and continuation to cleanup Task 1.12. Keep its next review checkpoint.
+
+**Remaining DS §5.10 consumer checklist:** contextual MonoLabel type words, task-id/Open task links
+and inline-first feedback are pending the screen migrations. Preserve caller semantics/i18n rather
+than inserting generic global labels. Task 1.11 completes configuration only, not all of §5.10.
+
 **Files:**
 
 - Create: `app/shared/ui/lib/toaster-config.ts`, test `toaster-config.test.ts` (class names and durations; no `richColors`)
 - Modify: `app/ui/src/App.tsx:466`, `app/listen/src/main.tsx:71` (mount `Toaster` with the config)
 - Modify: `app/listen/src/toast-policy.test.ts` (or the Listen toast policy file) to forbid `richColors`
+- Modify: `app/shared/ui/tokens/recipes.css` (shared styles, including a stronger muted-description
+  selector than Sonner's late-injected dark rule, collapsed-stack hiding and visible keyboard focus)
+- Test: `tests/admin-e2e/toaster.spec.ts` (real local genre save) and
+  `tests/listen-visual/upload-progress.spec.ts` (real local Upload outcome); three focused toast
+  captures join the next approved Linux run. The persistent preview adds desktop/390px checks.
 
 **Steps:**
 

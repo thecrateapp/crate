@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { Toaster } from "sonner";
+import { toasterConfig } from "@crate/ui/lib/toaster-config";
 import { installFocusRingMotion } from "@crate/ui/lib/focus-ring-motion";
 import { LISTEN_APPEARANCE_SETTINGS_ENABLED } from "./app-shell/feature-flags";
 import { App } from "./App";
@@ -73,9 +74,9 @@ function ThemeAwareToaster() {
 
   return (
     <Toaster
+      {...toasterConfig}
       theme={resolvedMode}
       position="bottom-center"
-      richColors
       mobileOffset={{
         bottom: "calc(var(--listen-mobile-bottom-chrome-height) + 0.75rem)",
       }}

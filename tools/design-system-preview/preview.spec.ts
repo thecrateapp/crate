@@ -1148,3 +1148,226 @@ test.describe("progress hairline touch layout", () => {
     await expectProgressHairlineCheckpoint(page, info);
   });
 });
+
+async function expectToasterCheckpoint(page: Page, info: TestInfo) {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/#toasts");
+  await page.evaluate(() => document.fonts.ready);
+  const checkpoint = page.locator("#toasts");
+  await expect(checkpoint).toHaveAccessibleName("Checkpoint 1K, Toasts");
+  await expect(checkpoint.locator("[data-sonner-toast]")).toHaveCount(0);
+  const writes: string[] = [];
+  page.on("request", (request) => {
+    if (/\/api\//.test(request.url()) && request.method() !== "GET") {
+      writes.push(`${request.method()} ${request.url()}`);
+    }
+  });
+
+  await checkpoint
+    .getByRole("button", { name: "Mostrar guardado", exact: true })
+    .click();
+  const toaster = checkpoint.locator(".toast-preview-toaster");
+  const toast = toaster.locator(".crate-toast[data-sonner-toast]");
+  await expect(toast).toHaveCount(1);
+  await expect(toast).toHaveAttribute("data-mounted", "true");
+  await expect(toast).toHaveAttribute("data-type", "success");
+  await expect(toast).not.toHaveAttribute("data-rich-colors", "true");
+  await expect(toast).toHaveAttribute("data-styled", "false");
+  await expect(toast.locator(".crate-toast-title")).toHaveText(
+    "Guardado en tu colección",
+  );
+  await expect(toast.locator(".crate-toast-description")).toHaveText(
+    "12 canciones añadidas.",
+  );
+  await expect(toast.locator("[data-icon]")).toHaveCount(0);
+  await expect(toast.locator(".crate-toast-title")).toHaveCSS(
+    "font-size",
+    "14px",
+  );
+  await expect(toast.locator(".crate-toast-title")).toHaveCSS(
+    "font-family",
+    /sans-serif/,
+  );
+  await expect(toast.locator(".crate-toast-description")).toHaveCSS(
+    "font-size",
+    "11.5px",
+  );
+  await expect(toast.locator(".crate-toast-description")).toHaveCSS(
+    "font-family",
+    /mono/i,
+  );
+  for (const [side, value] of [
+    ["top", "12px"],
+    ["bottom", "12px"],
+    ["left", "16px"],
+    ["right", "16px"],
+  ]) {
+    await expect(toast).toHaveCSS(`padding-${side}`, value);
+  }
+  await expect(toast).toHaveCSS("border-top-width", "1px");
+  await expect(toast).toHaveCSS("border-radius", "14px");
+  await toaster.evaluate((element) => {
+    element.setAttribute("data-sonner-theme", "dark");
+  });
+  // Sonner may inject this unlayered rule after the app CSS in production.
+  await page.addStyleTag({
+    content: `
+      [data-sonner-toaster][data-sonner-theme="dark"] [data-description] {
+        color: rgb(232, 232, 232);
+      }
+    `,
+  });
+  const descriptionColors = await toast
+    .locator(".crate-toast-description")
+    .evaluate((element) => {
+      const probe = document.createElement("span");
+      probe.style.color = "var(--text-muted)";
+      element.append(probe);
+      const expected = getComputedStyle(probe).color;
+      probe.remove();
+      return { actual: getComputedStyle(element).color, expected };
+    });
+  expect(descriptionColors.actual).toBe(descriptionColors.expected);
+
+  await checkpoint
+    .getByRole("button", { name: "Mostrar cola", exact: true })
+    .click();
+  await expect(toast).toHaveCount(1);
+  await expect(toast).toHaveAttribute("data-type", "info");
+  await expect(toast.locator(".crate-toast-title")).toHaveText(
+    "Análisis en cola",
+  );
+  await expect(toast.locator(".crate-toast-description")).toHaveText(
+    "12 álbumes pendientes de procesar.",
+  );
+  await checkpoint
+    .getByRole("button", { name: "Mostrar error", exact: true })
+    .click();
+  await expect(toast).toHaveCount(1);
+  await expect(toast).toHaveAttribute("data-type", "error");
+  await expect(toast.locator(".crate-toast-title")).toHaveText(
+    "No se ha podido completar la tarea",
+  );
+  await expect(toast.locator(".crate-toast-description")).toHaveText(
+    "El servidor no está disponible.",
+  );
+  await expect(toast.locator("[data-icon]")).toHaveCount(0);
+  const retry = toast.getByRole("button", { name: "Reintentar", exact: true });
+  await expect(retry).toHaveClass(/crate-toast-action/);
+  await expect(retry).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  const bounds = await toast.boundingBox();
+  const stage = await checkpoint.locator(".toast-preview-stage").boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(stage).not.toBeNull();
+  expect(bounds!.width).toBeLessThanOrEqual(380);
+  expect(bounds!.x).toBeGreaterThanOrEqual(stage!.x - 1);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(
+    stage!.x + stage!.width + 1,
+  );
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
+  const screenshot = info.outputPath("checkpoint-1k.png");
+  await checkpoint.screenshot({ path: screenshot, animations: "disabled" });
+  await info.attach("Checkpoint 1K", {
+    path: screenshot,
+    contentType: "image/png",
+  });
+
+  await retry.click();
+  await expect(
+    checkpoint.getByText("Reintento solicitado", { exact: true }),
+  ).toBeVisible();
+  await checkpoint
+    .getByRole("button", { name: "Mostrar guardado", exact: true })
+    .click();
+  await expect(toast).toHaveAttribute("data-type", "success");
+  await checkpoint
+    .getByRole("button", { name: "Limpiar avisos", exact: true })
+    .click();
+  await expect(checkpoint.locator("[data-sonner-toast]")).toHaveCount(0);
+  await checkpoint
+    .getByRole("button", { name: "Probar pila", exact: true })
+    .click();
+  const stack = toaster.locator(".crate-toast[data-sonner-toast]");
+  const rear = toaster.locator('.crate-toast[data-front="false"]');
+  const front = toaster.locator('.crate-toast[data-front="true"]');
+  await expect(stack).toHaveCount(2);
+  await expect(front).toHaveAttribute("data-mounted", "true");
+  await expect(rear).toHaveAttribute("data-mounted", "true");
+  await page.mouse.move(0, 0);
+  await expect(rear).toHaveAttribute("data-expanded", "false");
+  expect
+    .soft(
+      await rear
+        .locator(".crate-toast-content")
+        .evaluate((element) => getComputedStyle(element).opacity),
+      "Collapsed rear toast content stays hidden behind the front card",
+    )
+    .toBe("0");
+  await front.hover();
+  await expect(rear).toHaveAttribute("data-expanded", "true");
+  await expect(rear.locator(".crate-toast-content")).toHaveCSS("opacity", "1");
+  await page.mouse.move(0, 0);
+  await expect(rear).toHaveAttribute("data-expanded", "false");
+  expect
+    .soft(
+      await rear
+        .locator(".crate-toast-content")
+        .evaluate((element) => getComputedStyle(element).opacity),
+      "Leaving the stack hides the rear content again",
+    )
+    .toBe("0");
+
+  await page.addStyleTag({
+    content: "[data-sonner-toast] { outline: 0; }",
+  });
+  await page.keyboard.press("Alt+t");
+  await expect(toaster).toBeFocused();
+  await expect(rear).toHaveAttribute("data-expanded", "true");
+  await page.keyboard.press("Tab");
+  await expect(front).toBeFocused();
+  const focusOutline = await front.evaluate((element) => {
+    const probe = document.createElement("span");
+    probe.style.color = "var(--focus-ring)";
+    element.append(probe);
+    const expectedColor = getComputedStyle(probe).color;
+    probe.remove();
+    const style = getComputedStyle(element);
+    return {
+      width: style.outlineWidth,
+      style: style.outlineStyle,
+      color: style.outlineColor,
+      expectedColor,
+    };
+  });
+  expect
+    .soft(focusOutline, "Keyboard toast focus survives Sonner's late reset")
+    .toMatchObject({
+      width: "2px",
+      style: "solid",
+      color: focusOutline.expectedColor,
+    });
+  await checkpoint
+    .getByRole("button", { name: "Limpiar avisos", exact: true })
+    .click();
+  await expect(checkpoint.locator("[data-sonner-toast]")).toHaveCount(0);
+  expect(writes, "The toast checkpoint uses local state only").toEqual([]);
+}
+
+test("presents the shared toast styles and actions without API writes", async ({
+  page,
+}, info) => {
+  await expectToasterCheckpoint(page, info);
+});
+
+test.describe("toast touch layout", () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  test("keeps toasts inside their stage at 390px", async ({ page }, info) => {
+    await expectToasterCheckpoint(page, info);
+  });
+});

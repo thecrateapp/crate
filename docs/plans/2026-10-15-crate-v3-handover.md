@@ -20,7 +20,8 @@ plan; the status table separates local implementation from pending QA.
   `38869556811`. Readout 1I is published as `a80f396b`; its 36 Linux images are reviewed and
   imported from run `38871597394` in `dd71eb72`; comparison/full frontend CI passes in
   `38872274120`. ProgressHairline 1J is published as `0660fbd2`, with 40 reviewed Linux images
-  imported from run `38876594597`; comparison CI is pending. Rebase/PR/release remain gated.
+  imported from run `38876594597` in `3f470ec6`; comparison/full frontend CI passes in
+  `38877216337`. Rebase/PR/release remain gated.
 
 ## Sources of truth, in reading order
 
@@ -46,20 +47,22 @@ authorised its commit/push. Before the next infrastructure block, he requested a
 retained GenrePill with percentages in the persistent mockup. That preview is Task 1.6a / **Checkpoint 1C**, visually approved by Diego on 2026-10-15. It is committed as `e60e6f50`; approval does not authorise migration of genre data or Smart Mix logic. **Task 1.1 global
 focus/selection is published as `d881a728` at Checkpoint 1D**, provisionally accepted to continue;
 further visual polishing is deferred. Admin 1.0 and its capture/route prerequisites are now
-complete; InstrumentPanel 1.7, Meter 1.8 and Readout 1.9 are approved/published.
-ProgressHairline 1.10 is the current local review checkpoint.
+complete; InstrumentPanel 1.7, Meter 1.8, Readout 1.9 and ProgressHairline 1.10 are approved/published.
+Diego approved shared toaster configuration 1.11 / Checkpoint 1K on 2026-10-16 and authorised
+commit/push, canonical Linux captures and continuation to unused shared component cleanup 1.12.
 Theme runtime retirement 1.13 remains outside this batch.
 
 The persistent component/visual mockup lives in `tools/design-system-preview/` and runs with
 `npm run design-system:preview` at <http://127.0.0.1:5186/#primitivas>. Extend the same page at
 every checkpoint with real components, preserving the approved examples. This is local review
 material, not the committed CI screenshot source. The current checkpoint is
-<http://127.0.0.1:5186/#progreso>: known and indeterminate progress with both line thicknesses.
+<http://127.0.0.1:5186/#toasts>: actual toasts with shared styling, manual examples and local retry.
+ProgressHairline remains at `#progreso` with known/indeterminate progress and both line thicknesses.
 Readout remains at `#readout` with its separate preview and committed announcement.
 Meter remains at `#meters` with its approved capacity/limit/missing-data examples.
 InstrumentPanel remains at `#paneles` with its approved spacing and live status. The approved row/chip/GenrePill specimens and earlier references remain on the page.
 
-`PLAYWRIGHT_CHANNEL=chrome npm run design-system:preview:test` passes 35 cumulative local browser
+`PLAYWRIGHT_CHANNEL=chrome npm run design-system:preview:test` passes 37 cumulative local browser
 checks, including percentage-bearing GenrePill, keyboard focus, real Select options, 44px touch
 targets and held-pointer reduced motion. The appearance harness passes 26 Chrome checks, including
 the real Listen search in desktop/mobile and open/closed states. These local Chrome runs do not
@@ -72,7 +75,7 @@ production measurement may wait until the wheel and needs assignment. Admin cont
 published at Checkpoint 1F with reviewed Linux images, green comparison CI and the local route
 walkthrough recorded below. InstrumentPanel 1.7 is published at Checkpoint 1G; its Linux capture
 review and full comparison CI pass. Meter 1.8 is published at 1H and Readout 1.9 at 1I;
-ProgressHairline 1.10 is the local Checkpoint 1J awaiting visual review.
+ProgressHairline 1.10 is published at 1J; shared toaster configuration 1.11 is the local 1K review.
 
 ## Admin visual direction — 2026-10-16
 
@@ -157,8 +160,9 @@ is a token-based chart configuration, not a selectable product skin.
 | 1.7 / Checkpoint 1G | Published `473604f7` + reviewed Linux images/provenance in `c44b31f3`; recording 38864631250 and full comparison/frontend CI 38865107324 pass. |
 | 1.8 / Checkpoint 1H | Published `6a5b3366` + reviewed Linux images/provenance `ef5e7f52`; recording `38869057068` and comparison/full frontend CI `38869556811` pass. |
 | 1.9 / Checkpoint 1I | Published `a80f396b` + reviewed Linux images/provenance `dd71eb72`; recording `38871597394` and comparison/full frontend CI `38872274120` pass. |
-| 1.10 / Checkpoint 1J | Approved/published `0660fbd2`; 40 Linux images reviewed/imported from `38876594597`. Full local verification passes; comparison CI pending. |
-| 1.10–1.12, 1b | Not started; respect applicable gates and the next review checkpoint. |
+| 1.10 / Checkpoint 1J | Published `0660fbd2` + reviewed Linux images/provenance `3f470ec6`; recording `38876594597` and comparison/full frontend CI `38877216337` pass. |
+| 1.11 / Checkpoint 1K | Approved by Diego; commit/push and Linux captures authorised. Full local verification and spec/quality reviews pass; Linux capture/review/comparison pending. |
+| 1.12, 1b | Not started; respect applicable gates and the next review checkpoint. |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -455,7 +459,7 @@ stream subscriptions are added. Header/content changes use the existing snapshot
   source `c44b31f3`: appearance 26, Listen 34 / four skips, Admin 15; unit/types/lint/builds/budgets
   and design gates pass. This closes the 1G publication/capture checkpoint.
   Local smoke images are advisory only. Meter 1.8 and Readout 1.9 are approved/published;
-  ProgressHairline 1.10 is the current local review checkpoint. TrackReadout and global Admin
+  ProgressHairline 1.10 is published; shared toaster configuration 1.11 is the current local review. TrackReadout and global Admin
   icon retirement retain their planned tasks; 1D focus polishing stays deferred.
 
 
@@ -605,5 +609,45 @@ and the shared OS/Crate/document motion gate permits it; otherwise it is static.
   `716889696d8d273628c6dd5878e4c5df8fe36b358a8bc5b2cf32ef556291225a` matches the downloaded ZIP.
   All 40 PNGs/original manifest are imported: 35 byte-identical; Tasks changes from the old thick
   progress bar to the hairline, and four focused Tasks/Upload desktop/mobile scenes are new.
-- Remaining gate: comparison CI. The shared toaster
-  configuration (Task 1.11) is the next authorised visual checkpoint.
+- Comparison/full frontend CI passes in <https://github.com/thecrateapp/crate/actions/runs/38877216337>,
+  source `3f470ec6`. This closes the 1J publication/capture checkpoint. The shared toaster
+  configuration (Task 1.11) is the current authorised visual checkpoint.
+
+## Checkpoint 1K — Shared toaster configuration (Task 1.11)
+
+Diego approved 1K on 2026-10-16 and authorised commit/push, canonical Linux captures and continuation
+to Task 1.12. Publication/capture references are recorded below as they complete.
+One typed `toasterConfig` supplies Sonner classes, its existing 4000ms default duration and no
+default icons. Both app mounts remove `richColors`. Admin keeps dark/bottom-right; Listen keeps
+its runtime colour/native synchronization, bottom-center placement and mobile bottom-chrome
+offset. The `notify` API, per-call duration/icon overrides, messages and actions are preserved.
+
+- Shared recipes supply an object card/hairline/panel radius, 380px maximum width, 12/16px padding,
+  sans 14px messages, muted mono 11.5px descriptions and ghost actions. A late-injected Sonner
+  dark-description rule reproduced the wrong RGB value; the stronger scoped selector passes the
+  regression on desktop/390px. No application identity branches or dependency changes.
+- This task is configuration only. DS §5.10 contextual MonoLabel type words, task-id/Open task
+  links and inline-first feedback remain pending consumer migration. Do not mark the whole recipe
+  complete or add generic untranslated prefixes to localized Listen messages.
+- <http://127.0.0.1:5186/#toasts> mounts actual Sonner with a scoped id, manual fictional
+  saved/queued/error examples, local retry and a two-toast stack. Clearing dismisses both bounded
+  IDs. Indefinite duration and embedded positioning are preview-only; old specimens remain visible.
+  Its screenshots are advisory.
+- Real Admin browser QA saves a fixture genre EQ; Listen queues a local-stub Upload. They check
+  shared styles, absence of default icons and preserved placement/safe offsets. Three new focused
+  toast captures join the next Linux recording after approval; the 40 reviewed 1J PNGs stay intact.
+- Four config tests and seven cross-app policy cases pass; full units pass Shared 772 / Admin 268 /
+  Listen 2,881 / Desktop 50 (3,971 passing; four existing Listen skips). Four typechecks and both
+  app lints pass. Preview 37, Admin 21 and Listen 42 browser checks pass, with four existing Listen
+  skips. The final focused Admin/Listen runs pass after correcting the test's expected unchanged
+  Upload message. Browser checks run with one worker; unit suites run serially with maxWorkers=2.
+- Quality review reproduced two missing behaviours after opting out of Sonner styling: rear-toast
+  content stayed visible in a collapsed stack, and its focused card lost the keyboard indicator.
+  Both regressions failed before the scoped CSS fixes and now pass on desktop/390px; a real Admin
+  toast also retains a 2px token-coloured outline against Sonner's late outline reset. Spec/quality
+  reviews approve with no remaining findings.
+- Shared/Admin/Listen/preview builds, 49 tooling tests, 15 drift budgets and layer boundaries pass
+  (zero violations across 144 source files). Initial JS gzip is Admin 514,933 B / 532,480 and
+  Listen 204,904 B / 307,200; no ceiling increased. The 40 canonical PNGs/manifest remain unchanged.
+- Remaining gates: authorised publication, Linux capture/diff review and comparison CI. Task 1.12
+  is the next authorised checkpoint; preserve the reviewed mockup and stop again for review.

@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { api } from "@/lib/api";
 import { Toaster } from "sonner";
+import { toasterConfig } from "@crate/ui/lib/toaster-config";
 import { TooltipProvider } from "@crate/ui/shadcn/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { LLMStatusProvider } from "@/hooks/use-llm";
@@ -463,7 +464,7 @@ export default function App() {
             </Routes>
           </Suspense>
         </TooltipProvider>
-        <Toaster theme="dark" position="bottom-right" richColors />
+        <Toaster {...toasterConfig} theme="dark" position="bottom-right" />
       </AuthProvider>
     </BrowserRouter>
   );

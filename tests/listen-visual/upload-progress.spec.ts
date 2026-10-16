@@ -111,6 +111,52 @@ test("shows pending direct uploads without inventing byte progress and queues th
     if (uploads.length > 0) await finished;
   }
   await expect(page.getByText("Upload queued", { exact: true })).toBeVisible();
+  const toaster = page.locator(".crate-toaster[data-sonner-toaster]");
+  const toast = toaster.locator(".crate-toast[data-sonner-toast]");
+  await expect(toaster).toHaveAttribute("data-x-position", "center");
+  await expect(toaster).toHaveAttribute("data-y-position", "bottom");
+  await expect(toast).toHaveAttribute("data-mounted", "true");
+  await expect(toast).toHaveAttribute("data-type", "success");
+  await expect(toast).not.toHaveAttribute("data-rich-colors", "true");
+  await expect(toast).toHaveAttribute("data-styled", "false");
+  await expect(toast.locator(".crate-toast-title")).toHaveText(
+    "Upload queued. Crate is importing your music in the background.",
+  );
+  await expect(toast.locator(".crate-toast-title")).toHaveCSS(
+    "font-size",
+    "14px",
+  );
+  await expect(toast.locator(".crate-toast-title")).toHaveCSS(
+    "font-family",
+    /sans-serif/,
+  );
+  await expect(toast.locator("[data-icon]")).toHaveCount(0);
+  const toastBounds = await toast.boundingBox();
+  expect(toastBounds).not.toBeNull();
+  expect(toastBounds!.width).toBeLessThanOrEqual(380);
+  expect(toastBounds!.x).toBeGreaterThanOrEqual(0);
+  expect(toastBounds!.x + toastBounds!.width).toBeLessThanOrEqual(
+    page.viewportSize()!.width,
+  );
+  if (info.project.name === "mobile") {
+    const dock = page.locator(".listen-mobile-dock-glass");
+    await expect(dock).toBeVisible();
+    const dockBounds = await dock.boundingBox();
+    expect(dockBounds).not.toBeNull();
+    expect(toastBounds!.y + toastBounds!.height).toBeLessThanOrEqual(
+      dockBounds!.y,
+    );
+  }
+  const toastName = "upload-queued-toast-default-dark.png";
+  if (process.env.CRATE_VISUAL_SMOKE === "1") {
+    await toast.screenshot({
+      path: info.outputPath(toastName),
+      animations: "disabled",
+      caret: "hide",
+    });
+  } else {
+    await expect(toast).toHaveScreenshot(toastName);
+  }
   await expect(
     page.getByText("Task `visual-upload` is processing 2 files.", {
       exact: true,

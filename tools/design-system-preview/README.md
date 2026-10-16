@@ -225,4 +225,29 @@ full results are in the handover. Capture the pending file queue rather than the
 to keep fixed mobile chrome outside the focused progress image.
 Diego approved 1J on 2026-10-16 and authorised publication/Linux captures and shared toasts 1.11.
 Published `0660fbd2`; 40 Linux images from run `38876594597` are reviewed/imported (35 unchanged,
-Tasks changed, four new progress scenes). Comparison CI is pending; preserve this specimen.
+Tasks changed, four new progress scenes), published in `3f470ec6`. Comparison/full frontend CI
+passes in run `38877216337`; preserve this specimen.
+
+## Shared toasts / Checkpoint 1K
+
+Open <http://127.0.0.1:5186/#toasts>. Actual Sonner uses the shared app config inside a locally
+positioned stage. Saved, queued and failed examples are manual, use fictional copy and perform
+no API requests; retry changes local feedback. These review examples persist until cleared;
+production keeps the existing four-second default and per-call overrides.
+`Probar pila` adds two examples so collapsed/expanded content can be reviewed; `Limpiar avisos`
+dismisses both. Keyboard focus stays visible on cards and actions.
+
+The shared card has a quiet border, panel radius, 380px maximum width, 12/16px padding, sans 14px
+message and muted mono 11.5px description. Actions are ghost chips and default icons are absent.
+Both real app mounts consume it without richColors, preserving positions and Listen's theme,
+native-mode synchronization and mobile offset. `notify` remains Listen's API.
+
+DS §5.10's contextual MonoLabel type words, task links and inline-first feedback remain pending
+screen migrations. This is the configuration checkpoint. Browser checks cover the showcase at
+desktop/390px and real Admin-save/Listen-Upload outcomes, including late Sonner colour/focus resets
+and collapsed-stack visibility. All 3,971 units, 37 cumulative preview checks, Admin 21 and Listen
+42 browser checks pass (four existing Listen skips); type/lint/build/budget/tooling gates and
+spec/quality reviews pass.
+Advisory PNGs are not canonical baselines; three toast scenes join the next approved Linux run.
+Diego approved 1K on 2026-10-16 and authorised commit/push, Linux captures and cleanup Task 1.12.
+Final verification and review results live in the handover. Preserve this specimen.

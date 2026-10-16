@@ -338,4 +338,27 @@ local-only publication notes above. Keep the persistent mockup and stop at the n
 1J is published as `0660fbd2`. Linux recording `38876594597` passes; artifact `12035801498`
 has verified SHA256 `716889696d8d273628c6dd5878e4c5df8fe36b358a8bc5b2cf32ef556291225a`.
 Review covers one changed Tasks page and four new Tasks/Upload progress scenes; 35 images are
-byte-identical. Import all 40 PNGs and the original manifest. Comparison CI is the next gate.
+byte-identical. All 40 PNGs and the original manifest are published in `3f470ec6`;
+comparison/full frontend CI `38877216337` passes. This closes the 1J publication/capture checkpoint.
+
+Checkpoint 1K implements shared toaster configuration (Task 1.11) locally. Admin and Listen use
+one typed presentation/duration config, remove richColors and retain their placement, existing
+4000ms lifetime, caller overrides and Listen's runtime/native/mobile-offset behaviour. No notify
+API or operation payload changes. The mockup uses actual scoped Sonner with fictional manual
+examples; only its local review toasts stay open indefinitely. DS §5.10 contextual type words,
+task links and inline-first consumer feedback remain pending; this checkpoint does not claim the
+whole section complete. Preserve the 40 reviewed Linux PNGs from 1J and stop before Task 1.12.
+
+1K verification passes: 3,971 frontend units (four existing Listen skips), preview 37 / Admin 21 /
+Listen 42 browser checks, four typechecks, both lints, all shared/app/preview builds, 49 tooling
+tests, 15 drift budgets and layer boundaries across 144 source files. Initial JS gzip is Admin
+514,933 B / 532,480 and Listen 204,904 B / 307,200; no ceiling increased. Spec/quality reviews
+approve. Browser regressions reproduced Sonner's late dark-description override, rear content
+remaining visible in collapsed stacks and missing keyboard focus after unstyled mode. Scoped
+selectors now preserve muted descriptions, collapsed/expanded content and a 2px focus outline;
+desktop/390px and real Admin focus checks pass. Diego's visual approval/publication and subsequent
+Linux capture/review/comparison remain gates; 1K is local and the 40 canonical images stay intact.
+
+On 2026-10-16 Diego approved Checkpoint 1K and explicitly authorised commit/push, canonical Linux
+captures and continuation to unused shared component cleanup (Task 1.12). This supersedes the
+local-only approval notes above. Keep the persistent mockup and stop at the next review checkpoint.
