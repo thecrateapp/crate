@@ -682,6 +682,9 @@ def test_check_new_releases_skips_recently_checked_artists(monkeypatch):
 def test_check_new_releases_force_ignores_recent_cursor(monkeypatch):
     checked_at = datetime.now(timezone.utc)
     marked: list[str] = []
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.is_cancelled", lambda _task_id: False
+    )
 
     monkeypatch.setattr(
         "crate.worker_handlers.acquisition.get_library_artists",
@@ -1106,6 +1109,9 @@ def test_library_upload_skips_duplicate_albums_in_same_upload(monkeypatch, tmp_p
     )
     monkeypatch.setattr("crate.worker_handlers.acquisition.start_scan", lambda: None)
 
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.is_cancelled", lambda _task_id: False
+    )
     result = _handle_library_upload(
         "task-upload-duplicates",
         {"staging_dir": str(staging_dir), "uploader_user_id": 1},
