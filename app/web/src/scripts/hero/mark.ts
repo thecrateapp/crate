@@ -56,13 +56,13 @@ export function initHero(): () => void {
     const mobile = isMobile();
     const count = mobile ? 12000 : 40000;
     const { positions: cloud } = cloudPositions(count, clusterCenters(16, 1.1));
-    const markWidth = mobile ? 1.15 : 1.25;
+    const markWidth = mobile ? 0.805 : 0.875;
     const mark = await sampleImage("/icons/logo.svg", count, {
       width: markWidth,
       depth: 0.03,
     });
     if (disposed || !canvas || !copy) return;
-    const lift = mobile ? 0.55 : 0.62;
+    const lift = mobile ? 0.367 : 0.42;
     for (let i = 0; i < count; i++) mark[i * 3 + 1] += lift;
     const center: Vec3 = [0, lift, 0];
     let settledAt = -1;
