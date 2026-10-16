@@ -208,17 +208,21 @@ describe("production asset protocol policy", () => {
 });
 
 describe("desktop appearance bootstrap", () => {
-  it("uses the release appearance gate and renders a mode-aware toaster", () => {
+  it("initializes the fixed Crate identity and functional UI preferences", () => {
     const source = readFileSync(
       new URL("../main.tsx", import.meta.url),
       "utf8",
     );
+    const toaster = source.match(/<Toaster[\s\S]*?\/>/)?.[0];
 
-    expect(source).toContain(
-      "ignoreStoredPreferences: !LISTEN_APPEARANCE_SETTINGS_ENABLED",
+    expect(source).toContain("applyCrateIdentity(");
+    expect(source).toContain("initializeUiPreferences(");
+    expect(toaster).toContain("{...toasterConfig}");
+    expect(toaster).toContain('theme="dark"');
+    expect(toaster).toContain('position="bottom-center"');
+    expect(source).not.toMatch(
+      /theme-skin|LISTEN_APPEARANCE_SETTINGS_ENABLED|ThemeAwareToaster|subscribeThemeSkin|richColors/,
     );
-    expect(source).toContain("<ThemeAwareToaster />");
-    expect(source).not.toContain('<Toaster theme="dark"');
   });
 
   it("waits for secure session and OAuth migration before enabling auth or rendering", () => {

@@ -1,4 +1,4 @@
-import type { ContentDensity } from "./appearance-types";
+import type { ContentDensity } from "./interface-preferences";
 
 export interface ContentDensityMetrics {
   cardGap: string;

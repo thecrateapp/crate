@@ -1,5 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { installFocusRingMotion } from "@crate/ui/lib/focus-ring-motion";
+import { applyCrateIdentity } from "@crate/ui/lib/crate-identity";
+import { initializeUiPreferences } from "@crate/ui/lib/interface-preferences";
 import "./index.css";
 import App from "./App";
 import { AppErrorBoundary } from "@crate/ui/primitives/AppErrorBoundary";
@@ -7,6 +9,9 @@ import { captureRenderError, initSentry } from "./lib/sentry";
 
 const disposeFocusRingMotion = installFocusRingMotion();
 import.meta.hot?.dispose(disposeFocusRingMotion);
+applyCrateIdentity();
+const disposePreferences = initializeUiPreferences();
+import.meta.hot?.dispose(disposePreferences);
 
 initSentry();
 

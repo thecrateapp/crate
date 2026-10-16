@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MutableRefObject } from "react";
 
 import type { MusicVisualizer } from "./MusicVisualizer";
-import { applyThemeSkin } from "@crate/ui/lib/theme-skin";
+import { setUiPreferences } from "@crate/ui/lib/interface-preferences";
 
 const { useTrackVisualizerProfileMock } = vi.hoisted(() => ({
   useTrackVisualizerProfileMock: vi.fn(),
@@ -84,7 +84,7 @@ describe("useVisualizerConfig", () => {
     expect(vizRef.current!.setMode).toHaveBeenCalledTimes(1);
   });
 
-  it("re-reads semantic colors when the appearance changes without remounting", () => {
+  it("reads semantic colors independently of functional preferences", () => {
     let accent = "color(srgb 0.1 0.2 0.3)";
     vi.spyOn(window, "getComputedStyle").mockReturnValue({
       get color() {
@@ -110,17 +110,18 @@ describe("useVisualizerConfig", () => {
 
     accent = "color(srgb 0.8 0.1 0.2)";
     act(() => {
-      applyThemeSkin("light", "crateRed", {
-        root: document.documentElement,
-        storage: undefined,
+      setUiPreferences({
+        density: "compact",
+        motion: "reduced",
+        effects: "off",
       });
     });
 
     expect(vizRef.current!.color1).toEqual(
       expect.arrayContaining([
-        expect.closeTo(0.8),
         expect.closeTo(0.1),
         expect.closeTo(0.2),
+        expect.closeTo(0.3),
       ]),
     );
   });

@@ -33,7 +33,7 @@ const UNUSED_EXPORT_ALLOWLIST: Record<string, string> = {
   "domain/user/UserMenu":
     "Shared account menu; listen renders its own TopBarUserMenu.",
   "lib/color-contrast":
-    "Contrast helper consumed by the appearance registry and resolver.",
+    "Pure contrast helpers used to verify the fixed identity's accessible colours.",
   "lib/use-sheet-drag": "Drag engine shared by AppModal and MobileActionSheet.",
   "primitives/RadioGroup":
     "Phase 1 form primitive, also consumed by the shadcn dropdown menu.",

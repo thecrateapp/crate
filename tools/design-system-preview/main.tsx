@@ -1,6 +1,12 @@
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { installFocusRingMotion } from "@crate/ui/lib/focus-ring-motion";
+import { applyCrateIdentity } from "@crate/ui/lib/crate-identity";
+import {
+  DEFAULT_UI_PREFERENCES,
+  migrateUiPreferences,
+  type UiPreferences,
+} from "@crate/ui/lib/interface-preferences";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
@@ -31,8 +37,10 @@ import {
   ToggleRow,
 } from "../../app/listen/src/components/settings/SettingsPrimitives";
 import adminTrackReadoutReference from "./references/admin-track-readout.png";
+import { InterfacePreferencesControls } from "../../app/listen/src/components/settings/InterfacePreferencesSection";
 import "./style.css";
 
+applyCrateIdentity();
 const disposeFocusRingMotion = installFocusRingMotion();
 import.meta.hot?.dispose(disposeFocusRingMotion);
 
@@ -92,6 +100,38 @@ const artistGenreProfile: GenreProfileItem[] = [
 ];
 
 function App() {
+  const [samplePreferences, setSamplePreferences] = useState<UiPreferences>(
+    DEFAULT_UI_PREFERENCES,
+  );
+  const [sampleMigrated, setSampleMigrated] = useState(false);
+
+  function loadLegacySample() {
+    const memory = new Map<string, string>([
+      [
+        "crate.listen.appearance.v2",
+        JSON.stringify({
+          version: 2,
+          mode: "light",
+          preset: "crateRed",
+          overrides: { accent: "violet", material: "glass", effects: "off" },
+          presentation: { density: "compact" },
+          accessibility: { motion: "reduced" },
+        }),
+      ],
+    ]);
+    setSamplePreferences(
+      migrateUiPreferences({
+        getItem: (key) => memory.get(key) ?? null,
+        setItem: (key, value) => {
+          memory.set(key, value);
+        },
+        removeItem: (key) => {
+          memory.delete(key);
+        },
+      }),
+    );
+    setSampleMigrated(true);
+  }
   const [readoutPreview, setReadoutPreview] = useState("Genre · Shoegaze");
   const [readoutCommitted, setReadoutCommitted] = useState("Genre · Shoegaze");
   const [meterOver, setMeterOver] = useState(false);
@@ -188,7 +228,7 @@ function App() {
           crate<span className="version">v3</span>
         </a>
         <MonoLabel
-          meta={["Checkpoint 1L", "Limpieza"]}
+          meta={["Checkpoint 1M", "Identidad"]}
           className="masthead-meta"
         />
         <a className="jump" href="#primitivas">
@@ -1340,6 +1380,76 @@ function App() {
           </InstrumentPanel>
         </div>
       </section>
+      <section
+        id="identidad"
+        className="admin-baseline-feature"
+        aria-label="Checkpoint 1M, Identidad de Crate"
+      >
+        <div className="specimen-heading">
+          <div>
+            <MonoLabel size="eyebrow" accent="14">
+              Checkpoint 1M · Aprobado
+            </MonoLabel>
+            <h2>Una sola identidad. Tus preferencias se conservan.</h2>
+          </div>
+        </div>
+        <p className="admin-baseline-note">
+          Listen y Admin comparten los mismos colores, tipografías, superficies,
+          primitivas e interacciones. Cada app conserva los componentes de su
+          dominio.
+        </p>
+        <div className="instrument-preview-grid">
+          <InstrumentPanel
+            as="section"
+            headingLevel={3}
+            label={{ children: "Una base para las dos apps" }}
+          >
+            <div className="instrument-preview-values">
+              <StatNumber value="1" label="Identidad de Crate" size="md" />
+              <StatNumber value="2" label="Apps, mismas primitivas" size="md" />
+            </div>
+            <GenrePillRow items={artistGenreProfile} className="mt-6" />
+            <p className="admin-baseline-note mt-5">
+              Las preferencias antiguas se convierten en ajustes de movimiento,
+              efectos y densidad. La identidad visual permanece igual.
+            </p>
+            <div className="readout-preview-actions">
+              <Button variant="outline" onClick={loadLegacySample}>
+                Cargar preferencias antiguas
+              </Button>
+            </div>
+            <p role="status" className="admin-baseline-note mt-5">
+              {sampleMigrated
+                ? "Muestra migrada: movimiento reducido, efectos desactivados y densidad compacta."
+                : "Prueba una migración con datos ficticios."}
+            </p>
+          </InstrumentPanel>
+          <div role="region" aria-label="Preferencias de la muestra">
+            <InterfacePreferencesControls
+              preferences={samplePreferences}
+              onChange={(patch) =>
+                setSamplePreferences((current) => ({ ...current, ...patch }))
+              }
+              labels={{
+                title: "Tus preferencias",
+                description: "Estos controles solo cambian la muestra.",
+                motionLabel: "Movimiento",
+                effectsLabel: "Efectos",
+                densityLabel: "Densidad del contenido",
+                values: {
+                  system: "Seguir al sistema",
+                  reduced: "Reducir movimiento",
+                  off: "Desactivados",
+                  subtle: "Sutiles",
+                  expressive: "Expresivos",
+                  comfortable: "Cómoda",
+                  compact: "Compacta",
+                },
+              }}
+            />
+          </div>
+        </div>
+      </section>
       <footer>
         <MonoLabel
           meta={[
@@ -1352,7 +1462,8 @@ function App() {
             "1I publicado",
             "1J publicado",
             "1K publicado",
-            "1L aprobado",
+            "1L publicado",
+            "1M aprobado",
           ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>

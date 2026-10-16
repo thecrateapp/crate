@@ -1,24 +1,24 @@
-import type { MotionPreference } from "@crate/ui/lib/appearance-types";
+import {
+  getUiPreferences,
+  setUiPreferences,
+  subscribeUiPreferences,
+  type MotionPreference,
+} from "@crate/ui/lib/interface-preferences";
 import {
   isMotionBlocked as isDomMotionBlocked,
   subscribeToMotionAvailability as subscribeToDomMotionAvailability,
 } from "@crate/ui/lib/motion-gate";
 
-const motionListeners = new Set<() => void>();
-let motionPreference: MotionPreference = "system";
-
 export function getMotionPreference(): MotionPreference {
-  return motionPreference;
+  return getUiPreferences().motion;
 }
 
 export function setMotionPreference(preference: MotionPreference): void {
-  if (motionPreference === preference) return;
-  motionPreference = preference;
-  motionListeners.forEach((listener) => listener());
+  setUiPreferences({ motion: preference });
 }
 
 export function isMotionBlocked(
-  preference: MotionPreference = motionPreference,
+  preference: MotionPreference = getMotionPreference(),
 ): boolean {
   return preference === "reduced" || isDomMotionBlocked();
 }
@@ -26,11 +26,17 @@ export function isMotionBlocked(
 export function subscribeToMotionAvailability(
   onChange: () => void,
 ): () => void {
-  motionListeners.add(onChange);
+  let previous = getMotionPreference();
+  const unsubscribePreferences = subscribeUiPreferences(() => {
+    const next = getMotionPreference();
+    if (previous === next) return;
+    previous = next;
+    onChange();
+  });
   const unsubscribeDom = subscribeToDomMotionAvailability(onChange);
 
   return () => {
-    motionListeners.delete(onChange);
+    unsubscribePreferences();
     unsubscribeDom();
   };
 }

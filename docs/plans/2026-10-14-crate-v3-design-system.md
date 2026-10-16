@@ -5,7 +5,7 @@ Status: specification and current design target, revised 2026-10-15. Canonical c
 Registry and harness paths below remain transitional until Task 1.13; later consumers use its
 single-identity equivalents without recreating retired exports.
 Historical reports retain their original measurements; they do not certify current test results.
-The single Crate v3 identity is approved; full legacy runtime removal is planned in Task 1.13.
+The single Crate v3 identity is approved; legacy runtime removal is under local review in Task 1.13 / Checkpoint 1M.
 
 Visual source of truth: the new site only, `app/web` at the approved git reference:
 
@@ -319,7 +319,13 @@ accent, solid surfaces, radii and type roles specified here. No themes, skins, v
 accent/material/radius/typography overrides remain in the target. GTK and album palettes do not
 retint the product chrome. Artwork and data-derived visualizer palettes remain content, not a second product identity.
 
-This is an approved target, not completed runtime work. Plan Task 1.13 inventories all consumers,
+Diego reconfirmed on 2026-10-16: Listen and Admin share the same identity, tokens, primitives,
+component recipes and interaction rules. App-specific general styling is not a supported extension;
+only domain components, data and workflows differ. Legacy duplicates are transitional and must
+converge through block 1b and each page migration, without adding another local variant.
+Cross-app reviews and the drift/export gates enforce this rule.
+
+Task 1.13 / Checkpoint 1M is under local review. It inventories all consumers,
 removes editors/runtime/subscriptions/variant CSS, migrates saved preferences and compatibility
 payloads, and replaces the old test matrix. Keep the current token registry/generator until that
 task migrates its consumers; semantic design tokens and chart configurations remain.
@@ -4084,9 +4090,11 @@ Smart Mix merges first, then the approved v3 rebase and website integration. Lis
 and docs ship together at the existing P0 major boundary; Foundation is internal, and the integration
 branch remains until the major. P1/P2 and coverage follow later unless expressly reprioritised.
 
-Only 1.2–1.4 are authorised in pre-merge Checkpoint 1A, followed by review. Checkpoint 0 stays open;
+The initial pre-merge assignment covered 1.2–1.4 / Checkpoint 1A, followed by review. Later
+approvals/assignments through 1M are recorded in the handover. Checkpoint 0 stays open;
 CI-only Admin captures still precede 1.0, and 0.14 may wait until the wheel. Full single-identity
-runtime retirement is planned Task 1.13, outside the current batch. Shared token/cn/budget changes
+runtime retirement is now implemented locally as assigned Task 1.13 / Checkpoint 1M, pending review.
+Shared token/cn/budget changes
 are serialised; the integrator owns status updates. Critical `[MAIN]` fixes remain separately
 assigned and observed. No commits, push, PRs, deployment or production access without approval.
 

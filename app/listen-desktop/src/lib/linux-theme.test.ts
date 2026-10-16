@@ -44,7 +44,7 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe("Linux desktop theme refresh", () => {
+describe("Linux desktop window preferences", () => {
   it("coalesces focus and visibility refreshes while one query is pending", async () => {
     let resolveSnapshot!: (snapshot: ThemeSnapshot) => void;
     const invoke = vi.fn(
@@ -61,32 +61,58 @@ describe("Linux desktop theme refresh", () => {
     fakeDocument.dispatchEvent(new Event("visibilitychange"));
 
     expect(invoke).toHaveBeenCalledTimes(1);
-    resolveSnapshot({ scheme: "dark", source: ["portal"] });
+    expect(invoke).toHaveBeenCalledWith("linux_desktop_theme_snapshot");
+    resolveSnapshot({ windowButtonLayout: "close,minimize:maximize" });
     await Promise.resolve();
 
-    expect(root.dataset.crateLinuxScheme).toBe("dark");
+    expect(root.dataset.crateLinuxWindowButtonLayout).toBe(
+      "close,minimize:maximize",
+    );
   });
 
-  it("keeps cached fields when a later snapshot is partial", async () => {
+  it.each(["dark", "light"])(
+    "ignores all GTK visual preferences in a %s snapshot",
+    async (scheme) => {
+      const invoke = vi.fn().mockResolvedValue({
+        scheme,
+        accent: "#9141ac",
+        gtkTheme: "Adwaita-dark",
+        iconTheme: "Adwaita",
+        cursorTheme: "Breeze",
+        fontName: "Inter 10",
+        textScale: 1.25,
+        windowButtonLayout: "close:minimize,maximize",
+        source: ["portal", "gsettings"],
+      });
+      const { root, styleValues } = installLinuxDom(invoke);
+      const { initLinuxDesktopTheme } = await import("./linux-theme");
+
+      initLinuxDesktopTheme();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(root.dataset).toEqual({
+        crateLinuxWindowButtonLayout: "close:minimize,maximize",
+      });
+      expect([...styleValues]).toEqual([]);
+    },
+  );
+
+  it("keeps cached button placement when a later snapshot is partial", async () => {
     vi.useFakeTimers();
     const invoke = vi
       .fn<() => Promise<ThemeSnapshot | null>>()
-      .mockResolvedValueOnce({
-        scheme: "dark",
-        accent: "#9141ac",
-        fontName: "Inter 10",
-        source: ["portal", "gsettings"],
-      })
-      .mockResolvedValueOnce({ scheme: "light", source: ["portal"] });
+      .mockResolvedValueOnce({ windowButtonLayout: "close:minimize,maximize" })
+      .mockResolvedValueOnce({ scheme: "light", accent: "#9141ac" });
     const { fakeWindow, root, styleValues } = installLinuxDom(invoke);
     const { initLinuxDesktopTheme } = await import("./linux-theme");
 
     initLinuxDesktopTheme();
     await Promise.resolve();
     await Promise.resolve();
-    expect(root.dataset.crateLinuxScheme).toBe("dark");
-    expect(styleValues.get("--crate-linux-accent")).toBe("#9141ac");
-    expect(styleValues.get("--crate-linux-font-family")).toContain("Inter");
+    expect(root.dataset.crateLinuxWindowButtonLayout).toBe(
+      "close:minimize,maximize",
+    );
 
     fakeWindow.dispatchEvent(new Event("focus"));
     expect(invoke).toHaveBeenCalledTimes(1);
@@ -96,31 +122,36 @@ describe("Linux desktop theme refresh", () => {
     await Promise.resolve();
 
     expect(invoke).toHaveBeenCalledTimes(2);
-    expect(root.dataset.crateLinuxScheme).toBe("light");
-    expect(styleValues.get("--crate-linux-accent")).toBe("#9141ac");
-    expect(styleValues.get("--crate-linux-font-family")).toContain("Inter");
+    expect(root.dataset).toEqual({
+      crateLinuxWindowButtonLayout: "close:minimize,maximize",
+    });
+    expect([...styleValues]).toEqual([]);
   });
 
-  it("keeps the last valid theme when the native bridge rejects", async () => {
+  it("keeps the last valid button placement when the native bridge rejects", async () => {
     vi.useFakeTimers();
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const invoke = vi
       .fn<() => Promise<ThemeSnapshot | null>>()
-      .mockResolvedValueOnce({ scheme: "dark", source: ["portal"] })
+      .mockResolvedValueOnce({ windowButtonLayout: ":minimize,maximize,close" })
       .mockRejectedValueOnce(new Error("portal unavailable"));
     const { fakeWindow, root } = installLinuxDom(invoke);
     const { initLinuxDesktopTheme } = await import("./linux-theme");
 
     initLinuxDesktopTheme();
     await Promise.resolve();
-    expect(root.dataset.crateLinuxScheme).toBe("dark");
+    expect(root.dataset.crateLinuxWindowButtonLayout).toBe(
+      ":minimize,maximize,close",
+    );
 
     await vi.advanceTimersByTimeAsync(1_001);
     fakeWindow.dispatchEvent(new Event("focus"));
     await Promise.resolve();
 
     expect(invoke).toHaveBeenCalledTimes(2);
-    expect(root.dataset.crateLinuxScheme).toBe("dark");
+    expect(root.dataset.crateLinuxWindowButtonLayout).toBe(
+      ":minimize,maximize,close",
+    );
     expect(console.warn).toHaveBeenCalledTimes(1);
   });
 });

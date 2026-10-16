@@ -8,7 +8,7 @@ Scope: `app/shared/ui/` (npm workspace `@crate/ui`) and `app/shared/web/` (plain
 | ---------------------- | ------------------------------------------------------------------------------------------------------------- |
 | `app/listen`           | `@crate/ui` heavily (~360 files), `shared/web/{api,use-api,utils,library-routes,sentry,artist-hero-contract}` |
 | `app/ui` (admin)       | `@crate/ui` (~100 files), `shared/web/{api,use-api,utils,library-routes,sentry}`                              |
-| `app/listen-desktop`   | `@crate/ui/lib/theme-skin` and listen code it pulls in; tsconfig includes `../shared/web/**`                  |
+| `app/listen-desktop`   | shared identity/preferences and Listen code it pulls in; tsconfig includes `../shared/web/**`                  |
 | `app/site`, `app/docs` | `shared/web/sentry` only                                                                                      |
 | `app/cast-receiver`    | none of these (only `@crate/cast-protocol`)                                                                   |
 
@@ -17,11 +17,11 @@ Find real usage with `git grep -n "@crate/ui/<path>" -- app/ui/src app/listen/sr
 ## Directory map
 
 ```
-ui/tokens/        CSS tokens: index.css (entry), surfaces.css (solid|glass), themes.css, semantic, colors, radius, z-index, typography, animations, recipes
-ui/lib/           Hooks + utils: cn, use-breakpoint (useIsDesktop), use-dismissible-layer, use-sheet-drag, appearance-resolver/registry, theme-skin, notify, offline
+ui/tokens/        CSS tokens: index.css (entry), surfaces.css (fixed solid), themes.css (one generated identity), semantic, colors, radius, z-index, typography, animations, recipes
+ui/lib/           Hooks + utils: cn, use-breakpoint (useIsDesktop), use-dismissible-layer, use-sheet-drag, crate-identity, interface-preferences, appearance-token-registry, notify, offline
 ui/icons/         Icon catalogue (Solar icons wrapped as CrateIcon, CRATE_ICON_SIZE scale); import from "@crate/ui/icons"
 ui/shadcn/        19 curated shadcn/Radix components (button, dialog, select, sheet, table, tooltip, ...)
-ui/primitives/    App-level building blocks: AppModal, AppPopover, ActionIconButton, CrateBadge, IconButton, ThemeScope, VtNavLink, ...
+ui/primitives/    App-level building blocks: AppModal, AppPopover, ActionIconButton, CrateBadge, IconButton, VtNavLink, ...
 ui/composites/    Composed blocks: ConfirmDialog, AdminSelect, Card/Grid/TableSkeleton
 ui/domain/        Music-domain UI: actions, auth, brand, entity, filters, genres, hero, lists, media, navigation, player, playlists, shows, states, stats, user
 ui/*.test.ts      Package policy tests (export-usage-policy, design-token-policy)
@@ -39,7 +39,11 @@ web/artist-hero-contract.ts  Artist hero composition contract types (versioned)
 - Domain components take data and callbacks via props (`onPlay`, `onClose`, `onToggle`, ...). Do not read app contexts (auth, player, router state, i18n) or call app API clients inside `@crate/ui`; apps inject behavior through thin wrappers (see `app/ui/src/components/auth/OAuthButtons.tsx`).
 - `shared/web` factories stay framework-injected: `createUseApi` receives React hooks and an `api` function; `createApiClient` receives callbacks. Do not hardcode app behavior (redirects, token storage, Sentry init) here.
 - Use tokens, not raw values. `design-token-policy.test.ts` budgets arbitrary `rounded-[..]`, `z-[..]`, `shadow-[..]`, `text-[..px]`, `tracking-[..]` per file, and icon sizes must come from `CRATE_ICON_SIZE`.
-- Surfaces: `[data-surface="solid"]` (also the `:root` default, listen) and `[data-surface="glass"]` (admin sets it on `<html>`). Components must read `--color-card`, `--surface-*` etc. and work under both; never branch on app identity. `lib/appearance-resolver.ts` may set `data-surface` at runtime.
+- Listen and Admin share one V3 identity, tokens, primitives, recipes and interaction rules.
+  Surfaces are fixed solid; read `--color-card` / `--surface-*`, never branch on app identity.
+  `lib/crate-identity.ts` removes legacy visual overrides at startup; functional motion/effects/
+  density live in `lib/interface-preferences.ts`. No selectable skins/modes or app-specific
+  foundational styling. Domain components/workflows may differ; migrate legacy local duplicates.
 - Peer deps only (react 19, react-router 7, radix-ui, sonner, cva, clsx, tailwind-merge, @solar-icons/react-perf). Do not add runtime dependencies without updating `package.json` peers and the `external` list in `tsup.config.ts`.
 - Charts: Statistical charts (bar, line, pie, scatter, heatmap, radar) use Nivo with the app's token-resolved theme. Instruments (EQ curve, genre wheel, readouts, rails, lanes, gauges, maps, mood map, heatmap band, ticket, crossfade strip, orbit, topology) are hand-built SVG, HTML/CSS, Canvas 2D or WebGL2, following `docs/plans/2026-10-14-crate-v3-design-system.md` §3.5. No new chart libraries; recharts stays out.
 - No emojis in UI text.
@@ -79,7 +83,7 @@ npm run --workspace=app/listen-desktop typecheck
 ## Pitfalls and breaking changes
 
 - Renaming or removing a prop, export, token or CSS variable breaks listen, admin and listen-desktop at once. Grep all consumers first and say so explicitly in the PR; prefer additive changes plus a follow-up removal.
-- Changing a token value in `tokens/` changes both surfaces in both apps. Check solid and glass.
+- Changing a token value in `tokens/` changes both apps. Check Listen and Admin together on the fixed V3 surfaces.
 - `library-routes.ts` builds URLs the backend and readplane serve; changing a path shape is a cross-stack change.
 - `api.ts` in-flight GET dedupe and abort semantics are relied on by both `useApi` instances; keep behavior stable.
 - Admin still keeps local duplicates of composites/primitives (`app/ui/src/components/ui/`); consolidate instead of adding a third copy. Show cards and Ops surfaces remain app-local; the unused shared copies were removed in Task 1.12. Shared `domain/shows/show-types.ts` remains consumed by Admin.

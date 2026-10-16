@@ -78,12 +78,16 @@ describe("Settings", () => {
     ).toBeInTheDocument();
   });
 
-  it("does not show the appearance settings while the feature is disabled", () => {
+  it("exposes functional interface preferences without a theme selector", () => {
     renderWithListenProviders(<Settings />, { locale: "en" });
 
     expect(
+      screen.getByRole("region", { name: "Interface" }),
+    ).toBeInTheDocument();
+    expect(
       screen.queryByRole("heading", { name: "Appearance" }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText("Crate Red")).not.toBeInTheDocument();
   });
 
   it("keeps the real playback controls inside a named instrument section", () => {

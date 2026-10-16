@@ -24,7 +24,7 @@ plan; the status table separates local implementation from pending QA.
   `38877216337`. Shared toasts 1K is published as `7b46021d`; 43 Linux images/original manifest
   are reviewed/imported from run `38880022435` in `181ca4d4`. Comparison/full frontend CI passes in
   `38880774591`. Cleanup 1L is published as `2c90a6f2`; Linux recording `38883592145` passes
-  with all 43 PNGs byte-identical. The original manifest is imported; comparison CI follows.
+  with all 43 PNGs byte-identical. The original manifest is imported in `bf1fa793`; comparison/full CI passes in `38885478542`.
   Rebase/PR/release remain gated.
 
 ## Sources of truth, in reading order
@@ -61,7 +61,8 @@ The persistent component/visual mockup lives in `tools/design-system-preview/` a
 `npm run design-system:preview` at <http://127.0.0.1:5186/#primitivas>. Extend the same page at
 every checkpoint with real components, preserving the approved examples. This is local review
 material, not the committed CI screenshot source. The current checkpoint is
-<http://127.0.0.1:5186/#limpieza>: an inventory of the four retired unused components, rendered with
+<http://127.0.0.1:5186/#identidad>: the fixed identity with real functional preference controls
+and a fictional, memory-only legacy migration. Cleanup remains at `#limpieza`, rendered with
 current shared primitives. Approved toasts remain at `#toasts` with manual examples and local retry.
 ProgressHairline remains at `#progreso` with known/indeterminate progress and both line thicknesses.
 Readout remains at `#readout` with its separate preview and committed announcement.
@@ -107,9 +108,15 @@ confirmed that TrackReadout will be addressed when its planned task arrives.
 Crate v3 is the only approved visual identity across Listen, Admin, site and docs. The entire
 selectable theme/skin system, visual modes, accents, material/radius/typography overrides and
 album-driven chrome tint are retired as a target. Artwork/data-derived visualizer palettes remain
-content. This is **not yet implemented** in the runtime.
+content. Runtime retirement is verified locally and approved by Diego at Checkpoint 1M.
 
-Planned Task 1.13 inventories consumers/persistence/transport, migrates legacy preferences, removes
+Listen and Admin use the same tokens, primitives, recipes and interaction rules. Only domain
+components/data/workflows differ; app-specific general styling must not survive V3. Legacy
+duplicates are transitional and converge in block 1b/page migrations. Check both apps together
+and enforce drift/export gates at each relevant checkpoint. This clarification was confirmed
+by Diego on 2026-10-16.
+
+Task 1.13 inventories consumers/persistence/transport, migrates legacy preferences, removes
 the runtime/editor/variant CSS/subscribers and obsolete fixtures, and checks older-peer compatibility.
 It preserves semantic design tokens, reduced motion, OS accessibility, effects safety and functional
 preferences. Keep the current token registry/generation until that task migrates its consumers.
@@ -169,12 +176,12 @@ is a token-based chart configuration, not a selectable product skin.
 | 1.9 / Checkpoint 1I | Published `a80f396b` + reviewed Linux images/provenance `dd71eb72`; recording `38871597394` and comparison/full frontend CI `38872274120` pass. |
 | 1.10 / Checkpoint 1J | Published `0660fbd2` + reviewed Linux images/provenance `3f470ec6`; recording `38876594597` and comparison/full frontend CI `38877216337` pass. |
 | 1.11 / Checkpoint 1K | Published `7b46021d`; 43 Linux images/provenance `181ca4d4` from `38880022435` (40 unchanged, three new toast scenes). Comparison/full frontend CI `38880774591` passes. |
-| 1.12 / Checkpoint 1L | Published `2c90a6f2`; recording `38883592145` passes with all 43 PNGs byte-identical. Reviewed original manifest imported; comparison CI pending. |
+| 1.12 / Checkpoint 1L | Published `2c90a6f2`; recording `38883592145` passes with all 43 PNGs byte-identical. Original manifest imported in `bf1fa793`; comparison/full CI passes in `38885478542`. |
 | 1b | Not started; respect applicable gates and the next review checkpoint. |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
-| 1.13 runtime theme retirement | Assigned by Diego after approving 1L; inventory/integration prerequisite review begins before implementation. Required for the joint major. |
+| 1.13 / Checkpoint 1M | Verified locally; spec/quality approved. One shared identity, safe preference migration and Cast/native compatibility. Chromium 41 / WebKit 41 / preview 41 / Admin 21 pass; Listen 43 + mobile Smart EQ replay 1 pass (four existing skips). Approved by Diego on 2026-10-16; publication and Linux recording in progress. |
 | Phases 2–7                                                   | Pending; reconcile Smart Mix overlap after rebase before marking tasks complete                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ## Integration and release order
@@ -705,3 +712,103 @@ to theme runtime retirement 1.13. Published as `2c90a6f2`; capture references fo
   `602c29a1e4de41fa8e48ade0da41907b497623c5b2ad2a6d679a8360d279e8b4` matches the downloaded ZIP.
   All 43 PNGs are byte-identical to the reviewed 1K references; the original manifest is imported.
 - Remaining gate: comparison CI. Theme runtime retirement 1.13 is assigned; keep its next checkpoint.
+
+
+## Checkpoint 1M — One shared identity (Task 1.13, local review)
+
+Diego assigned this task after approving 1L and reconfirmed that Listen/Admin share the same
+identity, design system, primitives and interactions; only domain components/workflows differ.
+The shared/app/platform inventories find no technical dependency on Smart Mix merging.
+Proceed on the current branch without rebase. At inventory time `origin/main` was `2451aa75`,
+Smart Mix `f037bcf1` remained unmerged, and website HEAD was `08500b2c` (reference pin remains
+`258bbaee`). The earlier integrated-baseline prerequisite is relaxed for this assigned task only.
+Audit/reconcile new Smart Mix settings after integration; integration order and release gates stand.
+
+- Fixed solid tokens and one CSS output replace skin/mode/accent/material/radius/font overrides.
+  Listen/Admin/Desktop initialise the same shared identity and functional preference store.
+  Settings retain only motion, effects and density; reduced OS motion always wins. Artwork and
+  visualizer palettes remain content. Admin HeroComposition no longer mounts a ThemeScope.
+- `crate.interface-preferences.v1` stores version/density/motion/effects. Valid new data wins.
+  Legacy v2 density, reduced motion and effects migrate before removing the four inventoried
+  keys: `crate.listen.appearance.v2`, `crate.listen.theme-skin`,
+  `crate.listen.theme-skin.backup.v1`, `crate.listen.appearance.corrupt-backup`.
+  Failed destination writes preserve sources; future versions are not overwritten/cleaned.
+  Locale, player, visualizer and unrelated keys remain intact.
+- Cast keeps contract v1 and accepts older peer values. New senders use default/dark/dark
+  constants plus real reduced motion; the receiver uses the fixed TV-safe Crate palette.
+  No Pydantic/public wire schema change. Capacitor status bar and Sonner use the fixed identity.
+- Linux reads only GNOME window-button placement with a bounded 200 ms query; other desktops
+  use native fallback. GTK scheme/accent/font/icon/cursor subscriptions are retired. Native
+  control geometry, transparency, window configuration and IPC command name remain.
+- `#identidad` uses actual Settings controls and the real migration function against isolated
+  memory. No API/localStorage writes. All approved specimens remain available.
+- Local verification and independent spec/quality reviews pass as detailed below. Native devices
+  and new canonical Linux captures remain separate QA gates. Preserve all 43 previous PNGs
+  and their manifest until publication approval; 10 retired variant captures will then be
+  removed explicitly and the single-identity set recorded in Linux CI.
+
+Stop for Diego's visual review. No commit/push of 1M, rebase, PR or release is authorised yet.
+
+
+### Joint-major release note (draft, not released)
+
+Listen and Admin now share the fixed Crate V3 identity and design system. Theme, skin, color-mode,
+accent, material, radius and font selectors retire. Returning users keep motion, effects and
+content-density preferences through an automatic local migration; OS reduced motion and unrelated
+settings remain respected. Desktop no longer adopts GTK colors/fonts; native window-button
+placement remains supported. Older Cast peers remain compatible. This note ships only with the
+approved joint major after integration and device QA.
+
+
+### 1L publication gate — complete
+
+Capture/provenance commit `bf1fa793` is pushed. Full Frontend Tests and Linux visual comparison
+pass in [38885478542](https://github.com/thecrateapp/crate/actions/runs/38885478542). Production
+remains `2c90a6f2`; all 43 PNGs are byte-identical to 1K and the original manifest points at
+that production commit. New 1M source remains uncommitted and does not alter those references.
+
+
+### 1M local verification — 2026-10-16
+
+- Shared full 746, Admin full 268, Desktop full 52, Cast receiver full 66 and Cast protocol
+  full 20 pass. Listen full: 2,884 pass / four existing skips and one stale raw-input budget
+  failure (the removed editor accounts for 10→8 inputs). Lowering that measured budget gives
+  seven green focused policy/theme-color cases. Thus all current behaviour cases are covered;
+  do not describe the earlier full Listen invocation as green. Suites run serially with two
+  workers; seven Rust collector cases pass against the actual module in a temporary macOS harness.
+- Appearance Chromium 41 pass; full WebKit 41 pass after test portability fixes. Five changed
+  focus cases also pass in Chromium. Preview 41 pass; two final desktop/390px identity cases pass
+  with complete advisory section images. Admin browser 21 pass. Listen browser: 43 pass / four
+  existing skips; one mobile Smart EQ case was interrupted by a source-edit HMR reload and
+  passes on an isolated replay with stable source. No assertion was disabled for that failure.
+- WebKit was initially absent and then installed for the pinned Playwright version. Its first
+  run exposed two legacy test assumptions: macOS Tab omits buttons while Alt+Tab includes them;
+  forced colors work but `forced-color-adjust` is unsupported. An isolated browser probe confirmed
+  both. Tests now use Alt+Tab only on WebKit/macOS and condition only the unsupported-property
+  assertion on CSS support. Highlight, solid 2px outlines, focus order and clipping checks remain
+  mandatory, with zero new skips and no change to the deferred 1D visual polish. Independent
+  quality review approves the portability adjustment.
+- Six workspace typechecks, three app lints, seven-locale i18n/metadata checks, generated token
+  sync, Rust format (edition 2021), 49 tooling tests, all 15 drift metrics and shared layer policy
+  pass (zero violations, 138 source files). Direct shadcn imports drop 96→95; lower that ceiling.
+- Shared clean build, Admin/Listen/Cast receiver and preview builds pass. A clean shared output
+  contains none of ThemeScope/appearance-types/appearance-resolver/theme-skin or the 1L removals.
+  Initial JS gzip: Admin 516,837 B / 532,480 (+1,905 B from 1L), Listen 200,050 B / 307,200
+  (−4,854 B); Cast receiver 71,083 B / 153,600. No ceiling increased.
+- Separate independent specification and quality reviews find no material defects. All five
+  canonical plan documents and scoped guidance record the shared identity/no app-level drift rule.
+  Advisory images live at `tools/design-system-preview/.artifacts/checkpoint-1m-{desktop,mobile}.png`.
+  All 43 canonical Linux PNGs and their original manifest remain unchanged from `bf1fa793`.
+
+Next: Diego reviews `#identidad`. Publish 1M and retire/re-record the ten old variant PNGs only
+after his approval. Hardware QA (Capacitor/status bars, Tauri/Linux buttons and Cast peers),
+integration reconciliation and joint-major release gates remain open.
+
+
+## 1M publication authorisation — 2026-10-16
+
+Diego approved Checkpoint 1M and explicitly authorised commit/push, canonical Linux captures
+and continuation with the next plan block (Task 1b.1). This supersedes the local-only review
+stops above for 1M. Keep all later checkpoint publication gates. The ten obsolete skin/light PNGs
+are removed explicitly now; 33 single-identity references will be re-recorded and reviewed in
+the pinned Linux CI image. Rebase, PR, deployment and joint release remain separately gated.

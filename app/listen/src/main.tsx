@@ -1,15 +1,12 @@
-import { useEffect, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { Toaster } from "sonner";
 import { toasterConfig } from "@crate/ui/lib/toaster-config";
 import { installFocusRingMotion } from "@crate/ui/lib/focus-ring-motion";
-import { LISTEN_APPEARANCE_SETTINGS_ENABLED } from "./app-shell/feature-flags";
 import { App } from "./App";
 import { I18nProvider } from "./i18n/I18nProvider";
 import { startMediaAccessTicketRefresh } from "./lib/api";
 import { initCapacitor } from "./lib/capacitor";
-import { applyNativeColorMode } from "./lib/capacitor-init";
 import {
   isOfflineMediaCacheName,
   primeOfflineRuntimeProfile,
@@ -19,11 +16,8 @@ import { initRuntimeSentry, reportRuntimeError } from "./lib/runtime-sentry";
 import { bootstrapNativeSessionStore } from "./lib/server-store";
 import { renderSecureSessionError } from "./lib/secure-session-error";
 import { syncThemeColor } from "./lib/theme-color";
-import {
-  getAppliedThemeSkin,
-  initializeThemeSkin,
-  subscribeThemeSkin,
-} from "@crate/ui/lib/theme-skin";
+import { applyCrateIdentity } from "@crate/ui/lib/crate-identity";
+import { initializeUiPreferences } from "@crate/ui/lib/interface-preferences";
 import "./index.css";
 
 const disposeFocusRingMotion = installFocusRingMotion();
@@ -60,22 +54,11 @@ async function disableDevServiceWorker() {
 
 const isCapacitorBuild = import.meta.env.MODE === "capacitor";
 
-function ThemeAwareToaster() {
-  const resolvedMode = useSyncExternalStore(
-    subscribeThemeSkin,
-    () => getAppliedThemeSkin().resolvedMode,
-    () => "dark" as const,
-  );
-
-  useEffect(() => {
-    syncThemeColor(document.documentElement, resolvedMode);
-    void applyNativeColorMode(resolvedMode);
-  }, [resolvedMode]);
-
+function ListenToaster() {
   return (
     <Toaster
       {...toasterConfig}
-      theme={resolvedMode}
+      theme="dark"
       position="bottom-center"
       mobileOffset={{
         bottom: "calc(var(--listen-mobile-bottom-chrome-height) + 0.75rem)",
@@ -97,7 +80,7 @@ function renderApp(): void {
       <I18nProvider>
         <App />
       </I18nProvider>
-      <ThemeAwareToaster />
+      <ListenToaster />
     </BrowserRouter>,
   );
 }
@@ -115,10 +98,10 @@ async function bootstrap(): Promise<void> {
   }
 
   startMediaAccessTicketRefresh();
-  const appliedTheme = initializeThemeSkin({
-    ignoreStoredPreferences: !LISTEN_APPEARANCE_SETTINGS_ENABLED,
-  });
-  syncThemeColor(document.documentElement, appliedTheme.resolvedMode);
+  applyCrateIdentity();
+  const disposePreferences = initializeUiPreferences();
+  import.meta.hot?.dispose(disposePreferences);
+  syncThemeColor(document.documentElement);
   await initCapacitor();
   void primeOfflineRuntimeProfile().catch((error) => {
     void reportRuntimeError(error, "offline.profile.prime").catch(

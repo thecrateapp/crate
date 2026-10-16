@@ -45,6 +45,9 @@ smoke), `test-frontend.yml` (typecheck + vitest) and `test-native-tools.yml`
 Wry warns; validation docs record `cargo clippy --locked --all-targets ... -D warnings`
 as the local bar for first-party code.
 
+The shared Crate V3 identity is fixed. Linux host preferences affect GNOME window-button
+placement only (`linux_desktop_theme_snapshot`); do not reintroduce GTK palette/font overrides.
+
 ## Hard rules
 
 - Always go through `scripts/tauri-cli.mjs` (npm `tauri*` scripts or `make tauri-*`).

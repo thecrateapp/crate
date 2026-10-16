@@ -21,13 +21,10 @@ body {
   min-height: var(--listen-viewport-height);
 }
 
-html[data-crate-app="listen"] {
+html {
   color-scheme: dark;
 }
 
-html[data-crate-app="listen"][data-crate-mode="light"] {
-  color-scheme: light;
-}
 
 #root {
   min-height: var(--listen-viewport-height);
@@ -94,7 +91,7 @@ html[data-crate-app="listen"][data-crate-mode="light"] {
   }
 }
 
-/* Listen: solid surface by default (glass available via data-surface="glass") */
+/* Shared fixed Crate V3 surface. */
 
 body {
   overscroll-behavior: none;

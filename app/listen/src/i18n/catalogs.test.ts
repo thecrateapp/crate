@@ -30,6 +30,7 @@ const allCatalogs: Record<string, CatalogMessages> = {
   ...catalogs,
 };
 const fullyLocalizedPrefixes = [
+  "settings.interface.",
   "settings.connectDevices.",
   "settings.playback.",
   "settings.bandcamp.",
@@ -40,6 +41,9 @@ const fullyLocalizedPrefixes = [
   "settings.sleep.",
 ] as const;
 const completedSettingsEnglishFallbackAllowlist = new Set<string>([
+  // Interface and System are also the correct French and German terms.
+  "settings.interface.title",
+  "settings.interface.values.system",
   "settings.account.instagram",
   "settings.playback.crossfade",
   "settings.sleep.modes.15min",

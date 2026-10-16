@@ -3,7 +3,7 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Checkpoints 1A and 1B are approved for commit/push; preserve review stops for subsequent batches.
+> Diego's go-ahead. Published checkpoints through 1L are recorded in the handover; preserve the next 1M review stop.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -25,6 +25,10 @@ precomputed data.
   - Motion is data-driven: springs re-target from refs, one visibility-gated rAF per visual, and
     the final state renders under reduced motion.
 
+Listen and Admin share one visual identity: the same tokens, primitives, recipes and interaction
+rules. Differences are domain-specific components and workflows, never app-specific foundational
+styles. Existing local duplicates are transitional debt scheduled in block 1b/page migrations; do
+not add new variants. Every relevant checkpoint compares the two consumers and runs drift gates.
 Shared components live in `@crate/ui` only when both apps render them in the same change.
 
 **Tech Stack:**
@@ -213,7 +217,7 @@ Task 0.11 is complete with reviewed Linux baselines and green comparison CI at `
 Checkpoint 0 remains open for 0.14/0.15 and device reviews (0.14 may wait until the wheel).
 Diego approved Checkpoint 1A (1.2–1.4) on 2026-10-15 after reviewing the mockup and authorised
 commit/push of that batch and its persistent preview, published as `efe6cf2e` on `origin/feat/crate_v3`.
-Tasks 1.5–1.6 are implemented and approved at Checkpoint 1B; Diego authorised their commit/push. Runtime theme retirement (1.13) is planned, not implemented. Local full-suite results
+Tasks 1.5–1.6 are implemented and approved at Checkpoint 1B; Diego authorised their commit/push. Runtime theme retirement (1.13 / Checkpoint 1M) is implemented locally for review. Local full-suite results
 are in the handover; Linux baseline comparison and full frontend CI pass on 1E. Device/runtime
 QA and later tasks' own visual gates remain pending.
 
@@ -1474,7 +1478,8 @@ builds/budgets, design gates and preview 39 / Admin 21 / Listen 42 browser cases
 and focused-rerun results are in the handover. Diego approved 1L on 2026-10-16 and authorised
 commit/push, Linux captures and continuation to theme runtime retirement 1.13. Keep the next checkpoint.
 Published `2c90a6f2`; recording `38883592145` passes with all 43 PNGs byte-identical to the reviewed
-1K references. The original manifest is imported; comparison CI is pending.
+1K references. The original manifest is imported in `bf1fa793`; comparison/full CI passes
+in `38885478542`.
 
 **Files:**
 
@@ -1501,9 +1506,13 @@ Commit: `chore(ui): remove unused shared ops and show components`.
 
 ### Task 1.13: Retire the theme runtime and migrate visual preferences (PD53)
 
-**Status: planned, not implemented.** Outside Checkpoint 1A. Run only after Diego reviews that
-batch and assigns this task, using the integrated Smart Mix/site baseline. This is a deliberate
-behaviour change required for the joint major: Crate v3 is the sole visual identity.
+**Status: approved by Diego on 2026-10-16 — Checkpoint 1M; publication/CI recording in progress.** Diego assigned
+this task on 2026-10-16 after approving 1L. The consumer/transport/persistence inventories find
+no technical coupling to unmerged Smart Mix or the site; execute on the current v3 branch. This
+explicit assignment supersedes the earlier integrated-baseline scheduling prerequisite for 1.13
+only. Integration order, approved rebase and site pin remain unchanged. After integration, audit
+and reconcile any new Smart Mix settings before the joint major. This deliberate behaviour
+change fixes the same Crate v3 identity for Listen and Admin.
 
 **Inventory before editing:**
 
@@ -1546,6 +1555,16 @@ behaviour change required for the joint major: Crate v3 is the sole visual ident
 7. Run focused tests, `TOKENS-GEN`, `GATES`, `TYPES`, `LINT`, `I18N`, both bundle gates and the
    single-identity visual/device QA when assigned. Baselines remain CI-only and require review.
    Record behaviour migration in the release note; no public release before the joint major.
+
+**Local result:** fixed shared identity, independent functional preference migration, all consumer
+bootstrap/platform/Cast migrations and the memory-only `#identidad` mockup are implemented.
+Independent spec/quality reviews approve. Chromium 41, WebKit 41, preview 41 and Admin 21 browser
+checks pass. Listen’s 43 passing checks plus the isolated mobile Smart EQ replay cover all
+non-skipped cases; four existing skips remain. Full/focused unit invocation details, six types,
+three lints, i18n, Rust, builds, budgets and remaining device/Linux QA are recorded precisely in
+the handover. Raw input budget drops 10→8; direct shadcn imports 96→95. No ceiling increases.
+Diego approved **Checkpoint 1M** and authorised commit/push, Linux recording and Task 1b.1
+on 2026-10-16. Preserve the next review stop.
 
 **Proposed commit after approval:** `refactor(ui): retire visual themes for the Crate v3 identity`.
 

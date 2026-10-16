@@ -4,6 +4,10 @@ Scoped rules for the consumer listening app (`crate-listen`: web PWA + Capacitor
 
 `app/listen-desktop` (Tauri) aliases `@` to `app/listen/src` and reuses this code. Every change here also ships to desktop: run its typecheck and tests too.
 
+V3 shares one identity, tokens, primitives, recipes and interaction rules with the other app.
+Only domain components/workflows differ; do not add app-specific foundation variants. Bootstrap
+uses `@crate/ui/lib/crate-identity` and `@crate/ui/lib/interface-preferences`.
+
 ## Directory map (`src/`)
 
 ```

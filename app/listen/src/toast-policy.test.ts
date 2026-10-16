@@ -79,11 +79,12 @@ describe("Listen toast policy", () => {
     },
   );
 
-  it("preserves each app's placement and Listen's runtime colour and mobile offsets", () => {
+  it("shares the fixed identity while preserving placement and mobile offsets", () => {
     const listen = readFileSync(mounts[0][1], "utf8");
     const admin = readFileSync(mounts[1][1], "utf8");
 
-    expect(listen).toMatch(/theme=\{resolvedMode\}/);
+    expect(listen).toMatch(/theme="dark"/);
+    expect(listen).not.toContain("@crate/ui/lib/theme-skin");
     expect(listen).toMatch(/position="bottom-center"/);
     expect(listen).toMatch(/mobileOffset=\{/);
     expect(listen).toContain("var(--listen-mobile-bottom-chrome-height)");

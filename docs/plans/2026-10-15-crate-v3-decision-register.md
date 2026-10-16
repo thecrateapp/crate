@@ -395,4 +395,36 @@ approval notes above. Keep the persistent mockup and stop at the next review che
 1L is published as `2c90a6f2`. Linux recording `38883592145` passes; artifact `12038349206`
 has verified SHA256 `602c29a1e4de41fa8e48ade0da41907b497623c5b2ad2a6d679a8360d279e8b4`.
 All 43 PNGs are byte-identical to the reviewed 1K references; the original manifest is imported.
-Comparison CI is the next gate.
+Capture/provenance commit `bf1fa793` is pushed; comparison/full Frontend Tests pass in
+`38885478542`.
+
+
+On 2026-10-16 Diego explicitly reconfirmed PD53: Listen and Admin share one Crate identity,
+tokens, primitives, recipes and interaction rules. Only domain-specific components/data/workflows
+differ. Do not introduce app-level visual variants. Legacy local duplicates converge through
+block 1b and page migrations; cross-app checkpoints and drift/export gates enforce convergence.
+
+Task 1.13 / Checkpoint 1M is assigned and implemented locally, not published. Consumer inventories
+find no technical Smart Mix dependency, so the earlier integrated-baseline scheduling condition
+is relaxed for this task only. Preserve integration order/site pin, and reconcile any newly added
+Smart Mix settings after integration. Functional motion/effects/density migrate to
+`crate.interface-preferences.v1`; palette, material and typography choices retire. Keep Cast v1
+compatibility with fixed outgoing identity values and real reduced motion. Local verification and
+independent spec/quality reviews pass; Diego reviews the updated mockup before commit/push.
+
+
+1M remains uncommitted for visual review. Shared 746 / Admin 268 / Desktop 52 / receiver 66 /
+protocol 20 full suites pass. Listen full has 2,884 passing/four skipped and only the stale
+raw-input budget failure; its measured 10→8 correction passes seven focused policy/theme-color
+cases. Chromium 41, WebKit 41, preview 41 and Admin 21 pass. Listen browser 43 pass plus one
+interrupted mobile Smart EQ case passing on isolated replay; four existing skips remain.
+WebKit test portability preserves all outline/order/clipping assertions without new skips.
+Six types, three lints, i18n, Rust collector seven cases/format, builds, 49 tooling tests, token
+sync and drift/layer gates pass. Raw-input and direct-shadcn ceilings decrease; none increases.
+Exact invocations, bundle sizes and pending hardware/Linux capture QA are in the handover.
+
+
+Diego approved Checkpoint 1M on 2026-10-16 and authorised commit/push, canonical Linux captures
+and continuation with Task 1b.1. Retire the ten obsolete variant PNGs and record/review the
+33 remaining single-identity references in Linux CI. Preserve later review/publication stops.
+This supersedes earlier local-only 1M notes; rebase/PR/release remain gated.

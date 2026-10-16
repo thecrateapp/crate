@@ -1446,3 +1446,132 @@ test.describe("shared cleanup touch layout", () => {
     await expectSharedCleanupCheckpoint(page, info);
   });
 });
+
+async function expectCrateIdentityCheckpoint(page: Page, info: TestInfo) {
+  const writes: string[] = [];
+  page.on("request", (request) => {
+    if (
+      !["GET", "HEAD", "OPTIONS"].includes(request.method()) &&
+      new URL(request.url()).pathname.startsWith("/api/")
+    ) {
+      writes.push(`${request.method()} ${new URL(request.url()).pathname}`);
+    }
+  });
+  await page.goto("/#identidad");
+  await page.evaluate(() => document.fonts.ready);
+  const checkpoint = page.locator("section#identidad");
+  await expect(checkpoint).toHaveAccessibleName(
+    "Checkpoint 1M, Identidad de Crate",
+  );
+  await expect(
+    checkpoint.getByRole("heading", {
+      level: 2,
+      name: "Una sola identidad. Tus preferencias se conservan.",
+      exact: true,
+    }),
+  ).toBeVisible();
+  const preferences = checkpoint.getByRole("region", {
+    name: "Preferencias de la muestra",
+    exact: true,
+  });
+  await expect(preferences).toBeVisible();
+  await expect(preferences.getByRole("combobox")).toHaveCount(3);
+  await expect(preferences.locator("select")).toHaveCount(0);
+
+  const before = await checkpoint.evaluate((element) => {
+    const css = getComputedStyle(element);
+    return {
+      accent: css.getPropertyValue("--accent-action").trim(),
+      text: css.getPropertyValue("--text-primary").trim(),
+      surface: css.getPropertyValue("--surface-canvas").trim(),
+      storage: JSON.stringify(
+        Object.entries(localStorage).sort(([a], [b]) => a.localeCompare(b)),
+      ),
+    };
+  });
+  await checkpoint
+    .getByRole("button", { name: "Cargar preferencias antiguas", exact: true })
+    .click();
+  await expect(
+    preferences.getByRole("combobox", { name: "Movimiento", exact: true }),
+  ).toHaveText("Reducir movimiento");
+  await expect(
+    preferences.getByRole("combobox", { name: "Efectos", exact: true }),
+  ).toHaveText("Desactivados");
+  await expect(
+    preferences.getByRole("combobox", {
+      name: "Densidad del contenido",
+      exact: true,
+    }),
+  ).toHaveText("Compacta");
+  const after = await checkpoint.evaluate((element) => {
+    const css = getComputedStyle(element);
+    return {
+      accent: css.getPropertyValue("--accent-action").trim(),
+      text: css.getPropertyValue("--text-primary").trim(),
+      surface: css.getPropertyValue("--surface-canvas").trim(),
+      storage: JSON.stringify(
+        Object.entries(localStorage).sort(([a], [b]) => a.localeCompare(b)),
+      ),
+    };
+  });
+  expect(
+    after,
+    "Legacy demo settings preserve the common identity and use isolated memory",
+  ).toEqual(before);
+  expect(after.accent).toBe("#06b6d4");
+  expect(writes, "The identity checkpoint has no API mutations").toEqual([]);
+  expect(
+    await checkpoint.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
+  for (const name of ["Movimiento", "Efectos", "Densidad del contenido"]) {
+    const control = preferences.getByRole("combobox", { name, exact: true });
+    await control.scrollIntoViewIfNeeded();
+    await expect(control).toBeVisible();
+    const bounds = await control.boundingBox();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.width + bounds!.x).toBeLessThanOrEqual(
+      await page.evaluate(() => innerWidth),
+    );
+  }
+  // Fit the complete section only for the advisory image, after the touch-layout checks.
+  const viewport = page.viewportSize()!;
+  const sectionHeight = await checkpoint.evaluate((element) =>
+    Math.ceil(element.getBoundingClientRect().height),
+  );
+  await page.setViewportSize({
+    width: viewport.width,
+    height: Math.max(viewport.height, sectionHeight + 64),
+  });
+  await checkpoint.scrollIntoViewIfNeeded();
+  const screenshot = info.outputPath("checkpoint-1m.png");
+  await checkpoint.screenshot({ path: screenshot, animations: "disabled" });
+  await info.attach("Checkpoint 1M", {
+    path: screenshot,
+    contentType: "image/png",
+  });
+}
+
+test("presents one Crate identity and migrates sample preferences without external writes", async ({
+  page,
+}, info) => {
+  await expectCrateIdentityCheckpoint(page, info);
+});
+
+test.describe("fixed identity touch layout", () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  test("keeps identity and functional preferences readable at 390px", async ({
+    page,
+  }, info) => {
+    await expectCrateIdentityCheckpoint(page, info);
+  });
+});

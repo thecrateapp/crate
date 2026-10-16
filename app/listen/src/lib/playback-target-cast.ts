@@ -1,17 +1,15 @@
 import type { CastAppearance } from "@crate/cast-protocol";
-import { getAppliedThemeSkin } from "@crate/ui/lib/theme-skin";
 
 import { getCastSenderCapabilities, startCastSession } from "@/lib/cast-sender";
 import { isMotionBlocked } from "@/lib/motion-availability";
 import type { PlaybackTargetProvider } from "./playback-target-types";
 
 function castAppearance(): CastAppearance {
-  const appearance = getAppliedThemeSkin();
   return {
     contractVersion: 1,
-    skinId: appearance.skin,
-    preferredMode: appearance.mode,
-    resolvedMode: appearance.resolvedMode,
+    skinId: "default",
+    preferredMode: "dark",
+    resolvedMode: "dark",
     reducedMotion: isMotionBlocked(),
   };
 }

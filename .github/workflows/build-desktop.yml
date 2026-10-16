@@ -297,7 +297,6 @@ jobs:
           VITE_SENTRY_ENVIRONMENT: production
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
           VITE_CRATE_CONNECT_FEATURE_ENABLED: ${{ vars.CRATE_CONNECT_FEATURE_ENABLED || 'false' }}
-          VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: ${{ vars.LISTEN_APPEARANCE_SETTINGS_ENABLED || 'false' }}
         run: |
           version="$CRATE_DESKTOP_VERSION"
           make tauri-build-macos-testers \
@@ -318,7 +317,6 @@ jobs:
           VITE_SENTRY_ENVIRONMENT: production
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
           VITE_CRATE_CONNECT_FEATURE_ENABLED: ${{ vars.CRATE_CONNECT_FEATURE_ENABLED || 'false' }}
-          VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: ${{ vars.LISTEN_APPEARANCE_SETTINGS_ENABLED || 'false' }}
         run: |
           if [[ "$RUNNER_OS" == "Windows" && "$CRATE_DESKTOP_MSI_COMPATIBLE" != "true" ]]; then
             npm run --workspace=app/listen-desktop tauri:build:windows:nsis

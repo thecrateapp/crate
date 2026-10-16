@@ -69,7 +69,12 @@ for (const viewport of ["desktop", "mobile"] as const) {
     for (const open of [false, true]) {
       test(`keeps keyboard outlines visible in the ${
         open ? "open" : "closed"
-      } view`, async ({ page }) => {
+      } view`, async ({ page, browserName }) => {
+        // Safari on macOS uses Option+Tab to include buttons in keyboard navigation.
+        const nextControl =
+          browserName === "webkit" && process.platform === "darwin"
+            ? "Alt+Tab"
+            : "Tab";
         await page.emulateMedia({ reducedMotion: "reduce" });
         await page.goto(`/topbar-search.html?open=${open}`);
         const trigger = page.getByRole("button", {
@@ -83,15 +88,15 @@ for (const viewport of ["desktop", "mobile"] as const) {
         await expect(input).toHaveAttribute("tabindex", open ? "0" : "-1");
 
         await page.getByTestId("before-search").focus();
-        await page.keyboard.press("Tab");
+        await page.keyboard.press(nextControl);
         await expect(trigger).toBeFocused();
         await expectUnclippedInsetOutline(trigger);
 
-        await page.keyboard.press("Tab");
+        await page.keyboard.press(nextControl);
         if (open) {
           await expect(input).toBeFocused();
           await expectUnclippedInsetOutline(input);
-          await page.keyboard.press("Tab");
+          await page.keyboard.press(nextControl);
         }
         await expect(page.getByTestId("after-search")).toBeFocused();
       });

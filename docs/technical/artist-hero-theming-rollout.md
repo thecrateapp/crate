@@ -22,10 +22,10 @@ sources:
 # Artist hero theming rollout
 
 The hero is split into two contracts. `ArtistHeroFrame` and
-`ArtistHeroPresentation` own the shared themed presentation in Admin and
+`ArtistHeroPresentation` own the shared Crate V3 presentation in Admin and
 Listen. The artwork pipeline owns source capture, renderer output, immutable
-publication and delivery. A skin changes the frame tokens and overlay recipe;
-it never changes the editorial asset or silently crops pixels.
+publication and delivery. The fixed shared identity supplies frame tokens and the overlay recipe; it never changes
+the editorial asset or silently crops pixels.
 
 ## Frontend contract
 
@@ -35,10 +35,10 @@ it never changes the editorial asset or silently crops pixels.
   legacy source and `object-fill` only when explicit artwork bounds describe an
   extended composition.
 - Scrims use `--surface-app`; text, CTA, focus and genre badges use semantic
-  tokens from the active scope.
+  tokens from the shared fixed identity.
 - Admin `HeroCompositionCanvas` previews through the same frame and geometry
   contract as Listen. It does not write preferences, recipe state or sources
-  when the user only changes preview appearance.
+  while previewing; the retired ThemeScope is no longer mounted.
 - A profile without a compatible manifest remains visible through the explicit
   legacy fallback. It is never hidden because its photo contains dark pixels.
 

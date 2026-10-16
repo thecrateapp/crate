@@ -13,6 +13,7 @@
 @source "../../app/shared/ui/primitives/ProgressHairline.tsx";
 @source "../../app/shared/ui/primitives/Switch.tsx";
 @source "../../app/listen/src/components/settings/SettingsPrimitives.tsx";
+@source "../../app/listen/src/components/settings/InterfacePreferencesSection.tsx";
 @source "../../app/shared/ui/primitives/HairlineList.tsx";
 @source "../../app/shared/ui/primitives/CrateBadge.tsx";
 @source "../../app/shared/ui/domain/genres/GenrePill.tsx";

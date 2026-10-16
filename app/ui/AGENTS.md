@@ -2,6 +2,10 @@
 
 Scope: everything under `app/ui/`. Platform rules (DB, workers, deploy, testing policy) live in the root `AGENTS.md`; this file only adds admin-specific guidance. Shared UI rules live in `app/shared/AGENTS.md`.
 
+V3 shares one identity, tokens, primitives, recipes and interaction rules with the other app.
+Only domain components/workflows differ; do not add app-specific foundation variants. Bootstrap
+uses `@crate/ui/lib/crate-identity` and `@crate/ui/lib/interface-preferences`.
+
 ## Directory map
 
 ```
@@ -14,7 +18,7 @@ src/contexts/              AuthContext (cookie session + capabilities), OpsSnaps
 src/hooks/                 use-api, use-sse, use-task-events, use-task-poll, use-notifications, use-llm, use-keyboard
 src/lib/                   api.ts (client instance), library-routes.ts / utils.ts (wrap app/shared/web), tasks, sentry
 src/test/                  render-with-admin-providers.tsx (MemoryRouter + mocked AuthContext)
-index.html                 Sets data-surface="glass" on <html>
+index.html                 Shared fixed V3 identity; no material selector
 src/index.css              Imports Poppins, @crate/ui tokens, Tailwind; @source "../../shared/ui"
 ```
 
@@ -24,7 +28,8 @@ src/index.css              Imports Poppins, @crate/ui tokens, Tailwind; @source 
 - Auth is cookie-based (`/api/auth/me`, `/api/auth/heartbeat` with `app_id: "admin-web"`, `/api/auth/logout`). No bearer tokens, no localStorage tokens. Gate UI by capability via `useAuth().hasCapability(...)` / `hasAnyCapability(...)`, not by role name.
 - Every route must be gated: `CapabilityRoute anyOf={[...]}` in `App.tsx`, and the matching `navItems` entry in `Sidebar.tsx` must declare the same `capabilities`.
 - Pages are named exports (`export function Tasks()`); `App.tsx` maps them with `lazy(() => import(...).then(m => ({ default: m.X })))`.
-- Surface is glass (`index.html`). Do not set `data-surface="solid"` on admin subtrees and do not hardcode card backgrounds; use token classes (`bg-card`, `border-border`, `text-foreground`).
+- Surfaces share the fixed solid Crate V3 identity with Listen. Do not add material selectors or
+  hardcode card backgrounds; use shared token classes (`bg-card`, `border-border`, `text-foreground`).
 - Charts: Statistical charts (bar, line, pie, scatter, heatmap, radar) use Nivo with the app's token-resolved theme. Instruments (EQ curve, genre wheel, readouts, rails, lanes, gauges, maps, mood map, heatmap band, ticket, crossfade strip, orbit, topology) are hand-built SVG, HTML/CSS, Canvas 2D or WebGL2, following `docs/plans/2026-10-14-crate-v3-design-system.md` §3.5. No new chart libraries; recharts stays out. `@nivo/*` is already in package.json, bundled into the `charts-vendor` chunk by `vite.config.ts`; recharts is not installed in app/ui.
 - V3 target: almost all Admin icons are retired, including redundant icons beside labelled
   actions/navigation. Use text, numerals, rules and dots with state words. Only reviewed functional

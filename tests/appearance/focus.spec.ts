@@ -205,6 +205,10 @@ test.describe("global keyboard focus", () => {
     await expect(target).toHaveCSS("outline-color", highlight);
     await expect(target).toHaveCSS("outline-style", "solid");
     await expect(target).toHaveCSS("outline-width", "2px");
-    await expect(target).toHaveCSS("forced-color-adjust", "auto");
+    if (
+      await page.evaluate(() => CSS.supports("forced-color-adjust", "auto"))
+    ) {
+      await expect(target).toHaveCSS("forced-color-adjust", "auto");
+    }
   });
 });

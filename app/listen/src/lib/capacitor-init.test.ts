@@ -195,12 +195,32 @@ describe("Capacitor initialization", () => {
     window.removeEventListener("crate:oauth-provider-error", providerError);
   });
 
-  it("maps the resolved appearance mode to the native status bar", async () => {
-    const { applyNativeColorMode } = await import("./capacitor-init");
+  it("uses the fixed Crate status-bar style", async () => {
+    const { applyNativeStatusBarStyle } = await import("./capacitor-init");
 
-    await applyNativeColorMode("light");
+    await applyNativeStatusBarStyle();
 
-    expect(statusBarSetStyle).toHaveBeenCalledWith({ style: "light" });
+    expect(statusBarSetStyle).toHaveBeenCalledWith({ style: "dark" });
+  });
+
+  it("applies the same fixed status-bar style during native bootstrap", async () => {
+    const { initCapacitor } = await import("./capacitor-init");
+
+    await initCapacitor();
+
+    expect(statusBarSetStyle).toHaveBeenCalledWith({ style: "dark" });
+    expect(statusBarSetStyle).not.toHaveBeenCalledWith({ style: "light" });
+  });
+
+  it("does not load the status-bar plugin for a web runtime", async () => {
+    runtime.isNative = false;
+    runtime.platform = "web";
+    const { applyNativeStatusBarStyle } = await import("./capacitor-init");
+
+    await applyNativeStatusBarStyle();
+
+    expect(pluginImports.statusBar).toBe(0);
+    expect(statusBarSetStyle).not.toHaveBeenCalled();
   });
 
   it("does not load Capacitor plugins in Tauri", async () => {

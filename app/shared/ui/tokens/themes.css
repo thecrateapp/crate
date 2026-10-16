@@ -5,26 +5,11 @@
   --crate-token-color-background: #0a0a0f;
   --crate-token-color-foreground: #f1f5f9;
   --crate-token-color-muted-foreground: #999ca0;
-  --crate-token-scrollbar-thumb: #252535;
-  --crate-token-scrollbar-hover: #353545;
+  --crate-token-scrollbar-thumb: rgba(241, 245, 249, 0.1);
+  --crate-token-scrollbar-hover: rgba(241, 245, 249, 0.18);
   --crate-token-surface-app: #0a0a0f;
   --crate-token-surface-card-solid: #0d0e14;
   --crate-token-surface-card-foreground-solid: #f1f5f9;
-  --crate-token-surface-card-glass: rgba(13, 14, 20, 0.78);
-  --crate-token-surface-card-foreground-glass: #f1f5f9;
-  --crate-token-surface-secondary-glass: rgba(21, 22, 29, 0.88);
-  --crate-token-surface-secondary-foreground-glass: #f1f5f9;
-  --crate-token-surface-muted-glass: rgba(13, 14, 20, 0.72);
-  --crate-token-surface-accent-glass: rgba(241, 245, 249, 0.06);
-  --crate-token-surface-accent-foreground-glass: #f1f5f9;
-  --crate-token-surface-popover-glass: rgba(18, 18, 26, 0.95);
-  --crate-token-surface-popover-foreground-glass: #f1f5f9;
-  --crate-token-surface-border-glass: rgba(241, 245, 249, 0.1);
-  --crate-token-surface-input-glass: rgba(20, 20, 25, 0.72);
-  --crate-token-surface-panel-glass: #0c0c14;
-  --crate-token-surface-raised-glass: rgba(18, 18, 26, 0.92);
-  --crate-token-surface-modal-glass: rgba(16, 16, 24, 0.95);
-  --crate-token-surface-overlay-glass: rgba(18, 18, 26, 0.95);
   --crate-token-surface-secondary-solid: #15161d;
   --crate-token-surface-secondary-foreground-solid: #f1f5f9;
   --crate-token-surface-muted-solid: #0d0e14;
@@ -34,10 +19,10 @@
   --crate-token-surface-popover-foreground-solid: #f1f5f9;
   --crate-token-surface-border-solid: rgba(241, 245, 249, 0.1);
   --crate-token-surface-input-solid: #111218;
-  --crate-token-surface-overlay-solid: rgba(18, 18, 26, 0.95);
-  --crate-token-surface-panel-solid: #0c0c14;
+  --crate-token-surface-overlay-solid: #111218;
+  --crate-token-surface-panel-solid: #0d0e14;
   --crate-token-surface-raised-solid: #0f1016;
-  --crate-token-surface-modal-solid: rgba(16, 16, 24, 0.95);
+  --crate-token-surface-modal-solid: #111218;
   --crate-token-color-primary: #06b6d4;
   --crate-token-color-primary-foreground: #0a0a0f;
   --crate-token-color-primary-hi: #67e8f9;
@@ -52,10 +37,90 @@
   --crate-token-radius-md: 0.25rem;
   --crate-token-radius-lg: 0.375rem;
   --crate-token-radius-xl: 0.5rem;
+  --color-background: #0a0a0f;
+  --color-card: #0d0e14;
+  --color-card-foreground: #f1f5f9;
+  --color-secondary: #15161d;
+  --color-secondary-foreground: #f1f5f9;
+  --color-muted: #0d0e14;
+  --color-accent: #15161d;
+  --color-accent-foreground: #f1f5f9;
+  --color-popover: #111218;
+  --color-popover-foreground: #f1f5f9;
+  --color-border: rgba(241, 245, 249, 0.1);
+  --color-input: #111218;
+  --color-primary: #06b6d4;
+  --color-primary-foreground: #0a0a0f;
+  --color-foreground: #f1f5f9;
+  --color-muted-foreground: #999ca0;
+  --color-destructive: #ef4444;
+  --color-success: #22c55e;
+  --color-warning: #fbbf24;
+  --color-info: #3b82f6;
+  --color-ring: #06b6d4;
+  --surface-app: #0a0a0f;
+  --surface-panel: #0d0e14;
+  --surface-raised: #0f1016;
+  --surface-modal: #111218;
+  --surface-popover: #111218;
+  --surface-object: #0d0e14;
+  --scrollbar-thumb: rgba(241, 245, 249, 0.1);
+  --scrollbar-hover: rgba(241, 245, 249, 0.18);
+  --text-primary: #f1f5f9;
+  --text-muted: #999ca0;
+  --text-secondary: rgba(241, 245, 249, 0.78);
+  --text-subtle: #7e8084;
+  --text-faint: #4a4c52;
+  --border-subtle: rgba(241, 245, 249, 0.1);
+  --border-quiet: rgba(241, 245, 249, 0.1);
+  --border-quiet-subtle: rgba(241, 245, 249, 0.06);
+  --idle-border: rgba(241, 245, 249, 0.06);
+  --idle-bg: rgba(241, 245, 249, 0.02);
+  --idle-text: rgba(241, 245, 249, 0.62);
+  --idle-text-muted: rgba(241, 245, 249, 0.5);
+  --idle-text-subtle: rgba(241, 245, 249, 0.35);
+  --hover-border: rgba(241, 245, 249, 0.2);
+  --hover-bg: rgba(241, 245, 249, 0.05);
+  --hover-bg-strong: rgba(241, 245, 249, 0.1);
+  --surface-glass-shadow: rgba(0, 0, 0, 0.48);
+  --focus-ring: #06b6d4;
+  --accent-action: #06b6d4;
+  --accent-action-foreground: #0a0a0f;
+  --accent-action-hi: #67e8f9;
+  --accent-action-hi-foreground: #0a0a0f;
+  --state-danger: #ef4444;
+  --state-danger-foreground: #0a0a0f;
+  --state-success: #22c55e;
+  --state-warning: #fbbf24;
+  --state-info: #3b82f6;
+  --radius-sm: 0.125rem;
+  --radius-md: 0.25rem;
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.5rem;
+  --font-brand: Poppins;
+  --font-display-stack: "Bricolage Grotesque", Poppins, system-ui, sans-serif;
+  --font-mono-stack: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --brand-logo-start: #06b6d4;
+  --brand-logo-end: #06b6d4;
+  --accent-action-glow-soft: color-mix(in srgb, var(--accent-action) 8%, transparent);
+  --accent-action-glow-medium: color-mix(in srgb, var(--accent-action) 18%, transparent);
+  --accent-action-glow: color-mix(in srgb, var(--accent-action) 28%, transparent);
+  --accent-action-glow-strong: color-mix(in srgb, var(--accent-action) 34%, transparent);
+  --brand-logo-glow: color-mix(in srgb, var(--accent-action) 28%, transparent);
 }
 
-/* Runtime mode hooks. The active scope supplies explicit dark/light values. */
-[data-crate-app="listen"][data-crate-mode="dark"],
-[data-crate-app="listen"][data-crate-mode="light"] {
-  --state-danger-foreground: var(--surface-canvas);
+[data-crate-effects="off"] {
+  --accent-action-glow-soft: color-mix(in srgb, var(--accent-action) 0%, transparent);
+  --accent-action-glow-medium: color-mix(in srgb, var(--accent-action) 0%, transparent);
+  --accent-action-glow: color-mix(in srgb, var(--accent-action) 0%, transparent);
+  --accent-action-glow-strong: color-mix(in srgb, var(--accent-action) 0%, transparent);
+  --brand-logo-glow: color-mix(in srgb, var(--accent-action) 0%, transparent);
+}
+
+[data-crate-effects="expressive"] {
+  --accent-action-glow-soft: color-mix(in srgb, var(--accent-action) 14%, transparent);
+  --accent-action-glow-medium: color-mix(in srgb, var(--accent-action) 28%, transparent);
+  --accent-action-glow: color-mix(in srgb, var(--accent-action) 42%, transparent);
+  --accent-action-glow-strong: color-mix(in srgb, var(--accent-action) 54%, transparent);
+  --brand-logo-glow: color-mix(in srgb, var(--accent-action) 48%, transparent);
 }

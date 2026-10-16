@@ -5555,194 +5555,6 @@
     "sourceHash": "sha256:10c44e9e75aca2093ce388fc6d86712e6e7fd6c5fc0bc755483638335703b56b",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
-  "settings.appearance.accentLabel": {
-    "sourceHash": "sha256:ea47ef4998cc98a08f8314368d7be59b5b95ecf8570b32013205bdff47877bc1",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.actions.apply": {
-    "sourceHash": "sha256:f46d077e688d965a3906607015f3877b6c3eb8649ee927db7df70b0ac0275ffd",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.actions.cancel": {
-    "sourceHash": "sha256:a428f6a6e0d097a564a0bc905873ab449d938c06ceaae8d92db14391eb583dc5",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.actions.reset": {
-    "sourceHash": "sha256:253599a8da1e29aad33d16d6691cc8e3d3fe3492f4d810e779235f8c5a8b4126",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.densityLabel": {
-    "sourceHash": "sha256:d01f45f77f4de20444465ed49e436f371380adde3833ffbeecb6ae85ab138882",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.description": {
-    "sourceHash": "sha256:adce5424da5d61567801c63df57406e64926df0dd1eaf04aac9f5a9977950b15",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.effectsLabel": {
-    "sourceHash": "sha256:321e6fdbcd5d77cfa4530775e771a5eb8c311161868f9aee6ef947c5e7f7f9d1",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.materialLabel": {
-    "sourceHash": "sha256:ec90a6916d428ee9405595f154aadf02285f43ffd5524249252af7725b6be883",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.modeLabel": {
-    "sourceHash": "sha256:58c28cd2f67080a5bd142617d9ed8b8060dd01da80e63ea2939128b114b9a242",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.modes.dark": {
-    "sourceHash": "sha256:fc9c583fb2a02de6088235a9b008c403d3dc97215340ffa3385da8e83046c595",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.modes.light": {
-    "sourceHash": "sha256:969b17b72d3a7d22fcdb1b701cd4293533edf4cda5d438cdab2467057a10cfd7",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.modes.system": {
-    "sourceHash": "sha256:f2e0246d016ae2e996bb0891414ecd7b6002954a570ef4b8d8abf4cb3152beed",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.motionLabel": {
-    "sourceHash": "sha256:6c0e8fcb87d3ab441bce11e5d57b281f2e8ae388b5f98c986022ff545d574c9c",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.overridesLabel": {
-    "sourceHash": "sha256:b48dda5ee930868e717c67a9ddc774892741b46ff2653773c16ef913919d230c",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.overrideTheme": {
-    "sourceHash": "sha256:48e684529a4b754f2d624414923be4595fceb7049683e0935bc489d5d023ff78",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.previewDescription": {
-    "sourceHash": "sha256:3b5d233ce08af6d1c9a264016a4b339102c034cd5e7b3b6ca5974a6ae69a25d9",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.previewLabel": {
-    "sourceHash": "sha256:ccf41adcc53f9546b0d00f88ef7afee8b7803b3cde1cab1a4d2eb5bcd22a2d65",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.previewTitle": {
-    "sourceHash": "sha256:f05d18f3a18459123e802604573a15940f00d3504395e9978cc02a8646941d4c",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.radiusLabel": {
-    "sourceHash": "sha256:9cba95e1df333bde198bd22949e04ca48bd5b1f17d940027466ece2113d2f8e2",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.saveError": {
-    "sourceHash": "sha256:c3cb53e4af6526a2f661624601bcb00a286d25c0e1f3bb455a78683c7ef632df",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.skinLabel": {
-    "sourceHash": "sha256:dba89b9a2f2759fce69aee8a3cc57d85dcc7d0f5e07a83537ee8d6ff40401603",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.skinNames.crateRed": {
-    "sourceHash": "sha256:bd57f592c03d914b351564dcbc14300839458cd1416bcda6be7e8c8e417d04c6",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.skinNames.default": {
-    "sourceHash": "sha256:18906a1ea01c43c885b7f95c42c0fec2ec780f86ad1e812595ef33456703495d",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.skins.crateRed": {
-    "sourceHash": "sha256:e36f6a8cf7bb055fe32842552bc5ad25966a5bab2e649c24965bcb57ae978f96",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.skins.default": {
-    "sourceHash": "sha256:86755791ab825918eb3230dd644dd5de26b46266e932c4d4aa640048eade8c70",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.surfaceToneLabel": {
-    "sourceHash": "sha256:88c6fabef837d31da19fa5df867e14ee1ec4a182f5f2af878c6d93fc9ee0132b",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.systemPreference": {
-    "sourceHash": "sha256:b0ac0993971fbca99a0daf3e3879ffad56980f3280eb21bcaf625fbb4408dd74",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.title": {
-    "sourceHash": "sha256:126038381090084b06584b5a29fdbf034708e6d006f5408ad87ee5f436e8d5d8",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.typographyLabel": {
-    "sourceHash": "sha256:3a10a901e57cb6505b5dd3e2c251a3d6fc58f8700ec740c2bdc5527a133832ba",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.brand": {
-    "sourceHash": "sha256:0811f877e7b867cbcfca7d52c2cfe0f5eb615ac931bc7cab5e9af5e1fb5fef24",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.comfortable": {
-    "sourceHash": "sha256:a558bdd322909239d9d464f14c6834814df26e228538a8e4c2a9b80cdf3edb3d",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.compact": {
-    "sourceHash": "sha256:2279da6f1d401cc8f7746f24c30d4c1add4cf53205c77dfa88f33ddc9b228ea8",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.cyan": {
-    "sourceHash": "sha256:ae299ed1faecc22f2517398244bfdcdafa95ede13d9eff9c5af544ba383d332a",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.expressive": {
-    "sourceHash": "sha256:678d54dd919f3a41eed1233985e4836fd41e6f0519d0010cb4c8244f61082b60",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.glass": {
-    "sourceHash": "sha256:863fd86b2008110470ac2243b2157553341a7f20d7fbbd2271c8da991fcea5ee",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.neutral": {
-    "sourceHash": "sha256:e5c5ba1d3b469f3f21801fcae21e14fdc4ea56627ee0bf890abe606432d5b867",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.off": {
-    "sourceHash": "sha256:0d91c51c819af4ea69a1cfb5c22c298532ec7936b0518cb635fa4952f39085c6",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.red": {
-    "sourceHash": "sha256:b7fdac1ec28edb734438c435ea54417396fff93490bc08738d49a2fa3cf1a00d",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.reduced": {
-    "sourceHash": "sha256:27ee6ab4ae29efafe076c67146d7be7205e59e712fe98e4399daa1baa668dcaa",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.rounded": {
-    "sourceHash": "sha256:9afda608e9474c3876f84bc814fc65fcba6b3236bb59c53c8d6c8aa932b2a963",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.solid": {
-    "sourceHash": "sha256:a397bddd2cff1d485aa103d282650e3ff21246d5b5e10869a9d07c6d14d31245",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.subtle": {
-    "sourceHash": "sha256:3d078425c69f6e766d3cb8f803d7d2ac7036184f2e972a0f3b0d64df34f0b87a",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.system": {
-    "sourceHash": "sha256:9d9d842506fb54872370b369278fa1fac85be9809950c1484cbbdd7e74c48f57",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.theme": {
-    "sourceHash": "sha256:96523044050ad9eb092a92c53eea1b0d39f844f002b19d6addf770b41d35596c",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.tinted": {
-    "sourceHash": "sha256:cd57654300f993e46e64ad19073dbc64d3ed181e1012bf51c19a56ec97b03daa",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.violet": {
-    "sourceHash": "sha256:c1330f0eaf603f10cb52aaea69e8d1e020766d2f2cbd544ad04b0d4b2cf739bd",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
-  "settings.appearance.values.warm": {
-    "sourceHash": "sha256:3cc247590ff623c731e38ab87980491dd6fc006d1429d2656b772431c36af43b",
-    "reviewedAt": "2026-10-07T13:21:25.887Z"
-  },
   "settings.bandcamp.connectCookieHint": {
     "sourceHash": "sha256:2f163ed8f86959840bcb0b1dcfa1125f2a098ba2a1aac78fdaaabe1659f59993",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -5922,6 +5734,58 @@
   "settings.connectDevices.toasts.updateFailed": {
     "sourceHash": "sha256:f9d5ace371c155e30960ce669ab2048c2d4a3d81adc312235444baa6801d2767",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "settings.interface.densityLabel": {
+    "sourceHash": "sha256:a119666bb2bf6d84d0d46af6561e6812696395e4984ee88567c2d322927f3643",
+    "reviewedAt": "2026-10-16T10:11:28.723Z"
+  },
+  "settings.interface.description": {
+    "sourceHash": "sha256:777c1bdbd9f1277a7c32e3b4fad2a43429e9e85b86660e4e6e7af69decae9e49",
+    "reviewedAt": "2026-10-16T10:11:28.723Z"
+  },
+  "settings.interface.effectsLabel": {
+    "sourceHash": "sha256:b4ec079cad03ea212ce9fa1deb09109b8dcddcf6e149ca6f7c19ad61f6f18a3c",
+    "reviewedAt": "2026-10-16T10:11:28.723Z"
+  },
+  "settings.interface.motionLabel": {
+    "sourceHash": "sha256:ba71040086978d2c37038b0875b3a827b192f8a2468ecc9d46a71888ac959a3f",
+    "reviewedAt": "2026-10-16T10:11:28.723Z"
+  },
+  "settings.interface.saveError": {
+    "sourceHash": "sha256:e3310f236fc20abba6327e8970c689c32e8244709471657d220955bc0f935306",
+    "reviewedAt": "2026-10-16T10:11:28.723Z"
+  },
+  "settings.interface.title": {
+    "sourceHash": "sha256:4af2fe3fc54ec6cf5b3877659a8fd5b19de11f1196b9db271193b804103dfb6c",
+    "reviewedAt": "2026-10-16T10:11:28.723Z"
+  },
+  "settings.interface.values.comfortable": {
+    "sourceHash": "sha256:f873471ff53607fded673c5bcee937915dbd3aef43c8447308f4d0495d233485",
+    "reviewedAt": "2026-10-16T10:11:28.723Z"
+  },
+  "settings.interface.values.compact": {
+    "sourceHash": "sha256:cf6afb77906908eb5e1d720092c0ce56f188905f199615eb9ce0e2f021b601e2",
+    "reviewedAt": "2026-10-16T10:11:28.723Z"
+  },
+  "settings.interface.values.expressive": {
+    "sourceHash": "sha256:9e3d48b8684ab95053fadb3a4f583f30698de15b38fcadc123c26c144d1a7508",
+    "reviewedAt": "2026-10-16T10:11:28.723Z"
+  },
+  "settings.interface.values.off": {
+    "sourceHash": "sha256:9104d186ac1245053b08a7e26db8b6830d3e088dc2e7a0d15c8095d98a245342",
+    "reviewedAt": "2026-10-16T10:11:28.723Z"
+  },
+  "settings.interface.values.reduced": {
+    "sourceHash": "sha256:f8077e3987b626bfb308cfb6d09d166a1f9fe4a493d119e43081355a9343bb57",
+    "reviewedAt": "2026-10-16T10:11:28.723Z"
+  },
+  "settings.interface.values.subtle": {
+    "sourceHash": "sha256:0f308e5fa6d8c257dc4bf4407628ea1036a945881e9d768aff5d463df39cb8e7",
+    "reviewedAt": "2026-10-16T10:11:28.723Z"
+  },
+  "settings.interface.values.system": {
+    "sourceHash": "sha256:c36d545eb3fe0d4d5efe71a1f56f8d11c13a582eddd9b77db69f823161b7c3ae",
+    "reviewedAt": "2026-10-16T10:11:28.723Z"
   },
   "settings.language.auto": {
     "sourceHash": "sha256:f1cb4e8ff1d5a50f67cce9838c1ff61d53c7e2358e2779fca93f8ab1a14a315f",

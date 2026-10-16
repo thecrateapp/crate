@@ -1,7 +1,12 @@
 import { expect, test as base, type Route } from "@playwright/test";
 
 type AppearancePreset = "default" | "crateRed";
-type ColorMode = "dark" | "light";
+type ColorMode = "dark" | "light" | "system";
+interface FunctionalPreferences {
+  motion: "system" | "reduced";
+  density: "comfortable" | "compact";
+  effects: "off" | "subtle" | "expressive";
+}
 
 interface ListenVisualFixtures {
   failOnConsoleErrors: void;
@@ -12,6 +17,7 @@ interface ListenVisualFixtures {
       player?: boolean;
       smartEq?: boolean;
       preset?: AppearancePreset;
+      preferences?: Partial<FunctionalPreferences>;
     },
   ) => Promise<void>;
 }
@@ -825,14 +831,18 @@ async function fulfillApi(route: Route): Promise<void> {
   });
 }
 
-function appearancePreferences(mode: ColorMode, preset: AppearancePreset) {
+function appearancePreferences(
+  mode: ColorMode,
+  preset: AppearancePreset,
+  preferences: Partial<FunctionalPreferences> = {},
+) {
   return {
     version: 2,
     mode,
     preset,
-    overrides: {},
-    presentation: { density: "comfortable" },
-    accessibility: { motion: "reduced" },
+    overrides: { effects: preferences.effects ?? "subtle" },
+    presentation: { density: preferences.density ?? "comfortable" },
+    accessibility: { motion: preferences.motion ?? "reduced" },
   };
 }
 
@@ -910,14 +920,20 @@ export const test = base.extend<ListenVisualFixtures>({
       const preset = options.preset ?? "default";
       await page.addInitScript(
         ({ appearance, player, smartEq }) => {
+          if (sessionStorage.getItem("crate-visual-preferences-seeded")) return;
+          sessionStorage.setItem("crate-visual-preferences-seeded", "true");
           localStorage.clear();
           localStorage.setItem(
             "crate.listen.appearance.v2",
             JSON.stringify(appearance),
           );
-          localStorage.setItem("crate.listen.theme-skin", appearance.preset);
+          localStorage.setItem(
+            "crate.listen.theme-skin",
+            JSON.stringify({ mode: appearance.mode, skin: appearance.preset }),
+          );
           localStorage.setItem("crate-listen-sidebar-expanded", "true");
           localStorage.setItem("i18nextLng", "en");
+          localStorage.setItem("crate-listen-locale", "en");
           localStorage.setItem("listen-eq-smart", String(smartEq));
           localStorage.setItem("listen-eq-enabled", String(smartEq));
           if (player) {
@@ -928,7 +944,7 @@ export const test = base.extend<ListenVisualFixtures>({
           }
         },
         {
-          appearance: appearancePreferences(mode, preset),
+          appearance: appearancePreferences(mode, preset, options.preferences),
           player: options.player ? playerSnapshot() : null,
           smartEq: options.smartEq ?? false,
         },

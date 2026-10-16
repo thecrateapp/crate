@@ -1034,7 +1034,6 @@ services:
       dockerfile: listen/Dockerfile
       args:
         VITE_CRATE_CONNECT_FEATURE_ENABLED: ${CRATE_CONNECT_FEATURE_ENABLED:-false}
-        VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: ${LISTEN_APPEARANCE_SETTINGS_ENABLED:-false}
     container_name: crate-listen
     restart: unless-stopped
     depends_on:

@@ -64,6 +64,9 @@ crate-redis / redis-durable (Redis 7)            → cache, broker, invalidation
     `isPlaying`); use refs.
 - No emojis in UI text.
 - A component goes into `@crate/ui` only when both admin and Listen use it.
+- V3 uses one visual identity across Listen and Admin: the same tokens, primitives, recipes and
+  interaction rules. Only domain components/workflows differ. Do not add app-specific foundation
+  variants; converge legacy duplicates through the planned migrations.
 - Keep `app/ui` and `app/listen` as separate apps. Their conventions differ: admin uses `sonner`
   and `lucide-react`; Listen uses `notify` from `@crate/ui/lib/notify` and `@crate/ui/icons`.
 - Charts: Statistical charts (bar, line, pie, scatter, heatmap, radar) use Nivo with the app's

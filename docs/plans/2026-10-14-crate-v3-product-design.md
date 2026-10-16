@@ -155,7 +155,10 @@ checks and the iOS target. CI, screenshots and device QA remain separate and are
 
 Tasks 1.2–1.4 have local implementation/focused results reported under Checkpoint 1A; integration,
 full-suite status and Diego review remain pending in the handover.
-Runtime theme retirement (1.13) is planned, not implemented. Other instruments/backend contracts
+Runtime theme retirement (1.13 / Checkpoint 1M) is implemented locally for review. Listen and
+Admin share one identity, tokens, primitives, recipes and interaction rules; only domain
+components/data/workflows differ. Legacy duplicates converge through block 1b/page migrations.
+Other instruments/backend contracts
 remain pending unless the integrator records a verified result after the Smart Mix rebase.
 
 ### 2.3 Historical findings and remaining gates

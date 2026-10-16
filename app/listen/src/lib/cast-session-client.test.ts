@@ -57,9 +57,9 @@ describe("Cast session client", () => {
       }),
       appearance: {
         contract_version: 1,
-        skin_id: "crate-red",
-        preferred_mode: "system",
-        resolved_mode: "light",
+        skin_id: "default",
+        preferred_mode: "dark",
+        resolved_mode: "dark",
         reduced_motion: true,
       },
       current_index: 1,
@@ -77,6 +77,47 @@ describe("Cast session client", () => {
           track_entity_uid: "11111111-1111-1111-1111-111111111111",
         },
       ],
+    });
+  });
+
+  it.each([
+    ["default", "dark", false],
+    ["default", "light", true],
+    ["crateRed", "light", false],
+    ["crate-red", "dark", true],
+    ["unknown-future-skin", "light", true],
+  ] as const)(
+    "normalizes legacy %s/%s while preserving reduced motion %s",
+    (skinId, resolvedMode, reducedMotion) => {
+      const request = buildCastSessionRequest({
+        track: queue[0]!,
+        appearance: {
+          contractVersion: 1,
+          skinId,
+          preferredMode: "system",
+          resolvedMode,
+          reducedMotion,
+        },
+      });
+
+      expect(request.appearance).toEqual({
+        contract_version: 1,
+        skin_id: "default",
+        preferred_mode: "dark",
+        resolved_mode: "dark",
+        reduced_motion: reducedMotion,
+      });
+    },
+  );
+
+  it("uses the fixed compatibility shape when no appearance is supplied", () => {
+    expect(
+      buildCastSessionRequest({ track: queue[0]! }).appearance,
+    ).toMatchObject({
+      contract_version: 1,
+      skin_id: "default",
+      preferred_mode: "dark",
+      resolved_mode: "dark",
     });
   });
 

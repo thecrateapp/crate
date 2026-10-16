@@ -271,3 +271,26 @@ The 43 reviewed Linux PNGs/manifest stay unchanged. Diego approved 1L on 2026-10
 commit/push, Linux captures and continuation to Task 1.13. Preserve this specimen.
 Published `2c90a6f2`; Linux recording `38883592145` confirms all 43 PNGs byte-identical to 1K.
 The original manifest is imported; comparison CI is pending.
+
+
+## Shared identity / Checkpoint 1M (local review)
+
+Open <http://127.0.0.1:5186/#identidad>. Listen and Admin share the same identity and primitives;
+only domain components/workflows differ. The sample uses real Settings controls and the real
+functional preference migration against isolated memory. “Cargar preferencias antiguas” restores
+reduced motion, disabled effects and compact density without changing the palette or writing to
+localStorage/API. All previous approved specimens remain. 1M is uncommitted pending Diego's review.
+
+1L is published as `2c90a6f2`; its 43 Linux PNGs are byte-identical to 1K. The original manifest
+is imported in `bf1fa793`; comparison/full CI passes in `38885478542`.
+
+
+1M verification: 41 cumulative preview browser checks pass, plus final desktop/390px advisory
+section captures with actual controls. `checkpoint-1m-{desktop,mobile}.png` in ignored `.artifacts/`
+records the complete section. Appearance passes 41 Chromium and 41 WebKit cases; WebKit tests use
+macOS keyboard navigation and actual CSS capability checks without dropping outline assertions.
+Spec/quality reviews approve. Native device QA and new Linux production captures remain pending.
+
+
+Diego approved 1M on 2026-10-16 and authorised publication/Linux recording and continuation
+with Task 1b.1. The next overlay/menu checkpoint will extend the same preview.

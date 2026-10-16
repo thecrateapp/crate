@@ -5,10 +5,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HeroCompositionCanvas } from "./HeroCompositionCanvas";
 import type { HeroRecipe } from "./hero-composition-geometry";
-import {
-  DEFAULT_APPEARANCE_PREFERENCES,
-  resolveAppearance,
-} from "@crate/ui/lib/appearance-resolver";
 
 const transformerForceUpdate = vi.hoisted(() => vi.fn());
 
@@ -265,16 +261,8 @@ describe("HeroCompositionCanvas", () => {
     expect(screen.queryByText(/Fill preview/)).toBeNull();
   });
 
-  it("keeps the Konva artboard transparent inside its own appearance scope", async () => {
+  it("keeps the Konva artboard transparent without a separate visual identity", async () => {
     localStorage.setItem("crate.listen.appearance.v2", "unchanged");
-    const appearance = resolveAppearance(
-      {
-        ...DEFAULT_APPEARANCE_PREFERENCES,
-        mode: "light",
-        preset: "crateRed",
-      },
-      { prefersColorSchemeDark: false, prefersReducedMotion: false },
-    );
 
     const onRecipeChange = vi.fn();
     const { container, rerender } = render(
@@ -284,17 +272,16 @@ describe("HeroCompositionCanvas", () => {
         composition="mobile"
         aspect={4 / 5}
         recipe={initialRecipe}
-        appearance={appearance}
         onRecipeChange={onRecipeChange}
       />,
     );
 
     expect(await screen.findByTestId("konva-stage")).toBeInTheDocument();
-    const themeScope = screen.getByTestId("hero-composition-theme-scope");
-    expect(themeScope).toHaveAttribute("data-crate-skin", "crateRed");
-    expect(themeScope).toHaveAttribute("data-crate-mode", "light");
-    expect(themeScope).toHaveClass("min-w-0");
-    expect(themeScope).not.toHaveClass("contents");
+    const preview = screen.getByTestId("hero-composition-preview");
+    expect(preview).not.toHaveAttribute("data-crate-skin");
+    expect(preview).not.toHaveAttribute("data-crate-mode");
+    expect(preview).toHaveClass("min-w-0");
+    expect(preview).not.toHaveClass("contents");
     expect(screen.getByTestId("hero-composition-canvas")).toHaveClass(
       "bg-transparent",
     );
@@ -308,10 +295,6 @@ describe("HeroCompositionCanvas", () => {
         composition="mobile"
         aspect={4 / 5}
         recipe={initialRecipe}
-        appearance={resolveAppearance(
-          { ...DEFAULT_APPEARANCE_PREFERENCES, mode: "dark" },
-          { prefersColorSchemeDark: true, prefersReducedMotion: false },
-        )}
         onRecipeChange={onRecipeChange}
       />,
     );
