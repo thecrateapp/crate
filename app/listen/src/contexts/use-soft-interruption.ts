@@ -20,6 +20,9 @@ import { useSoftInterruptionEvents } from "./use-soft-interruption-events";
 
 const STREAM_STALL_GRACE_MS = 2500;
 const RECOVERY_RETRY_MS = 3000;
+const FAST_RECOVERY_ATTEMPTS = 3;
+const NATIVE_SLOW_RETRY_MS = 30_000;
+const NATIVE_SLOW_RETRY_WINDOW_MS = 5 * 60_000;
 const SOFT_PAUSE_FADE_MS = 220;
 export const BUFFERED_AHEAD_SAFE_SECONDS = 5;
 export const BUFFERED_AHEAD_CRITICAL_SECONDS = 1.5;
@@ -86,8 +89,10 @@ export function useSoftInterruption({
   const recoveryProbeInFlightRef = useRef(false);
   const recoveryFailuresRef = useRef(0);
   const interruptionStartedAtRef = useRef<number | null>(null);
+  const recoveryWindowStartedAtRef = useRef(0);
   // Forward-declared so callbacks can reach the latest implementation.
   const maybeResumeRef = useRef<() => Promise<void>>(async () => {});
+  const cancelSoftInterruptionRef = useRef<() => void>(() => {});
   const scheduleStallProtectionRef = useRef<() => void>(() => {});
 
   const hasSafeBufferedAhead = useCallback(
@@ -125,6 +130,7 @@ export function useSoftInterruption({
   const beginSoftInterruption = useCallback(
     (reason: "offline" | "stream") => {
       if (!currentTrackRef.current) return;
+      if (reason === "offline" && shouldUseAndroidNativePlayer()) return;
       // The audio is already in RAM — no network dependency. Interrupting
       // would pause a perfectly-playing track. Defensive guard so every
       // caller (offline event, error, stall timer) is consistent.
@@ -143,6 +149,7 @@ export function useSoftInterruption({
       shouldAutoResumeAfterInterruptionRef.current = true;
       onPlaybackStall?.();
       interruptionStartedAtRef.current = Date.now();
+      recoveryWindowStartedAtRef.current = Date.now();
       recoveryProbeInFlightRef.current = false;
       recoveryFailuresRef.current = 0;
       clearStallTimer();
@@ -267,29 +274,54 @@ export function useSoftInterruption({
     isPlayingRef,
   ]);
 
+  const rearmNativeRecovery = useCallback(() => {
+    if (!shouldUseAndroidNativePlayer()) return;
+    if (!softInterruptionReasonRef.current) return;
+    if (shouldAutoResumeAfterInterruptionRef.current) return;
+    shouldAutoResumeAfterInterruptionRef.current = true;
+    recoveryFailuresRef.current = 0;
+    recoveryWindowStartedAtRef.current = Date.now();
+  }, []);
+
   useLayoutEffect(() => {
+    cancelSoftInterruptionRef.current = cancelSoftInterruption;
     scheduleStallProtectionRef.current = scheduleStallProtection;
     maybeResumeRef.current = async () => {
       if (!shouldAutoResumeAfterInterruptionRef.current) return;
       if (!currentTrackRef.current || recoveryProbeInFlightRef.current) return;
       recoveryProbeInFlightRef.current = true;
       commitIsBuffering(true);
+      const nativePlayer = shouldUseAndroidNativePlayer();
       try {
-        const available = await probeTrackAvailability(currentTrackRef.current);
+        if (!(await isRuntimeOnline())) return;
+        const available = await probeTrackAvailability(
+          currentTrackRef.current,
+          { serverReachableOnly: nativePlayer },
+        );
         if (!available) {
           recoveryFailuresRef.current += 1;
           if (
             recoveryFailuresRef.current >= 2 &&
-            recoveryFailuresRef.current <= 3 &&
+            recoveryFailuresRef.current <= FAST_RECOVERY_ATTEMPTS &&
             recoverCurrentTrack
           ) {
             const refreshed = await recoverCurrentTrack();
             if (refreshed) {
               onPlaybackRecovered?.(recoveryFailuresRef.current);
+              if (nativePlayer) cancelSoftInterruptionRef.current();
               return;
             }
           }
-          if (recoveryFailuresRef.current > 3) {
+          if (
+            nativePlayer &&
+            recoveryFailuresRef.current > FAST_RECOVERY_ATTEMPTS &&
+            Date.now() - recoveryWindowStartedAtRef.current <
+              NATIVE_SLOW_RETRY_WINDOW_MS
+          ) {
+            scheduleRecoveryCheck(NATIVE_SLOW_RETRY_MS);
+            return;
+          }
+          if (recoveryFailuresRef.current > FAST_RECOVERY_ATTEMPTS) {
             shouldAutoResumeAfterInterruptionRef.current = false;
             bufferingIntentRef.current = false;
             commitIsPlaying(false);
@@ -303,8 +335,20 @@ export function useSoftInterruption({
           return;
         }
         bufferingIntentRef.current = true;
-        if (shouldUseAndroidNativePlayer()) {
-          await androidNativeEngine.play();
+        if (nativePlayer) {
+          let reloaded = true;
+          if (recoverCurrentTrack) {
+            reloaded = await recoverCurrentTrack();
+          } else {
+            await androidNativeEngine.play();
+          }
+          if (!reloaded) {
+            recoveryFailuresRef.current += 1;
+            scheduleRecoveryCheck();
+            return;
+          }
+          onPlaybackRecovered?.(recoveryFailuresRef.current);
+          cancelSoftInterruptionRef.current();
         } else {
           await gpFadeInAndPlay(SOFT_PAUSE_FADE_MS);
         }
@@ -326,6 +370,7 @@ export function useSoftInterruption({
     hasSafeBufferedAhead,
     isBufferingRef,
     isPlayingRef,
+    rearmNativeRecovery,
     scheduleRecoveryCheck,
     settleAfterAppLifecycle,
   });

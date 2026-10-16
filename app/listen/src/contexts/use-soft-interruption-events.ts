@@ -8,6 +8,7 @@ interface UseSoftInterruptionEventsOptions {
   hasSafeBufferedAhead: () => boolean;
   isBufferingRef: MutableRefObject<boolean>;
   isPlayingRef: MutableRefObject<boolean>;
+  rearmNativeRecovery: () => void;
   scheduleRecoveryCheck: (delay?: number) => void;
   settleAfterAppLifecycle: () => void;
 }
@@ -18,6 +19,7 @@ export function useSoftInterruptionEvents({
   hasSafeBufferedAhead,
   isBufferingRef,
   isPlayingRef,
+  rearmNativeRecovery,
   scheduleRecoveryCheck,
   settleAfterAppLifecycle,
 }: UseSoftInterruptionEventsOptions) {
@@ -34,6 +36,7 @@ export function useSoftInterruptionEvents({
     };
     const handleRestored = () => {
       if (!scheduleRecoveryCheck) return;
+      rearmNativeRecovery();
       scheduleRecoveryCheck(0);
     };
     const handleAppLifecycle = () => {
@@ -83,6 +86,7 @@ export function useSoftInterruptionEvents({
     hasSafeBufferedAhead,
     isBufferingRef,
     isPlayingRef,
+    rearmNativeRecovery,
     scheduleRecoveryCheck,
     settleAfterAppLifecycle,
   ]);

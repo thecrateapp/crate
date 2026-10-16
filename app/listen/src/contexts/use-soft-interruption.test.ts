@@ -26,14 +26,42 @@ vi.mock(import("@/lib/capacitor"), async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/android-native-engine", () => ({
+  shouldUseAndroidNativePlayer: vi.fn(() => false),
+  androidNativeEngine: {
+    pause: vi.fn(() => Promise.resolve()),
+    play: vi.fn(() => Promise.resolve()),
+  },
+}));
+
 import * as gaplessPlayer from "@/lib/gapless-player";
 import * as capacitor from "@/lib/capacitor";
-import { useSoftInterruption } from "./use-soft-interruption";
+import * as nativeEngine from "@/lib/android-native-engine";
+import {
+  PLAYBACK_NEEDS_USER_GESTURE_EVENT,
+  useSoftInterruption,
+} from "./use-soft-interruption";
 import type { MutableRefObject } from "react";
 import type { Track } from "./player-types";
 
 const mockFadeOutAndPause = vi.mocked(gaplessPlayer.fadeOutAndPause);
 const mockIsOnline = vi.mocked(capacitor.isOnline);
+const mockUseNativePlayer = vi.mocked(
+  nativeEngine.shouldUseAndroidNativePlayer,
+);
+const mockNativePause = vi.mocked(nativeEngine.androidNativeEngine.pause);
+
+function serverDown() {
+  global.fetch = vi.fn(() =>
+    Promise.resolve({ ok: false, status: 503, body: null } as Response),
+  ) as typeof fetch;
+}
+
+function serverUp() {
+  global.fetch = vi.fn(() =>
+    Promise.resolve({ ok: true, status: 206, body: null } as Response),
+  ) as typeof fetch;
+}
 const globalFetch = global.fetch;
 
 const TRACK: Track = { id: "t1", title: "Test", artist: "Artist" };
@@ -101,6 +129,7 @@ afterEach(() => {
   vi.clearAllMocks();
   vi.mocked(gaplessPlayer.isCurrentTrackFullyBuffered).mockReturnValue(false);
   vi.mocked(gaplessPlayer.getCurrentBufferedAheadSeconds).mockReturnValue(0);
+  mockUseNativePlayer.mockReturnValue(false);
 });
 
 describe("useSoftInterruption", () => {
@@ -450,5 +479,189 @@ describe("useSoftInterruption", () => {
 
     expect(global.fetch).toHaveBeenCalled();
     expect(gaplessPlayer.fadeInAndPlay).toHaveBeenCalled();
+  });
+
+  describe("with the Android native player", () => {
+    beforeEach(() => {
+      mockUseNativePlayer.mockReturnValue(true);
+    });
+
+    it("keeps native playback running on an offline event", () => {
+      const refs = createRefs({ isPlaying: true });
+      const { result } = renderHook(() => useSoftInterruption(refs));
+
+      act(() => {
+        window.dispatchEvent(new Event("offline"));
+      });
+
+      expect(mockNativePause).not.toHaveBeenCalled();
+      expect(refs.commitIsBuffering).not.toHaveBeenCalled();
+      expect(result.current.isSoftInterrupted()).toBe(false);
+    });
+
+    it("does not spend recovery attempts while the device is offline", async () => {
+      const recoverCurrentTrack = vi.fn(async () => true);
+      const onPlaybackRecovered = vi.fn();
+      mockIsOnline.mockResolvedValue(false);
+      const refs = createRefs({ recoverCurrentTrack, onPlaybackRecovered });
+      const { result } = renderHook(() => useSoftInterruption(refs));
+
+      act(() => {
+        result.current.beginSoftInterruption("stream");
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3_100);
+        window.dispatchEvent(new Event("offline"));
+        window.dispatchEvent(new Event("offline"));
+        await vi.advanceTimersByTimeAsync(20_000);
+      });
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(recoverCurrentTrack).not.toHaveBeenCalled();
+
+      mockIsOnline.mockResolvedValue(true);
+      serverUp();
+      await act(async () => {
+        window.dispatchEvent(new Event("online"));
+        await vi.advanceTimersByTimeAsync(10);
+      });
+
+      expect(recoverCurrentTrack).toHaveBeenCalledOnce();
+      expect(onPlaybackRecovered).toHaveBeenCalledWith(0);
+      expect(result.current.isSoftInterrupted()).toBe(false);
+    });
+
+    it("reloads the failed deck instead of resuming it when the server answers", async () => {
+      const recoverCurrentTrack = vi.fn(async () => true);
+      const refs = createRefs({ recoverCurrentTrack });
+      const { result } = renderHook(() => useSoftInterruption(refs));
+
+      act(() => {
+        result.current.beginSoftInterruption("stream");
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3_100);
+      });
+
+      expect(recoverCurrentTrack).toHaveBeenCalledOnce();
+      expect(nativeEngine.androidNativeEngine.play).not.toHaveBeenCalled();
+      expect(result.current.isSoftInterrupted()).toBe(false);
+    });
+
+    it("treats an unauthorized probe as a reachable server and reloads", async () => {
+      const recoverCurrentTrack = vi.fn(async () => true);
+      global.fetch = vi.fn(() =>
+        Promise.resolve({ ok: false, status: 401, body: null } as Response),
+      ) as typeof fetch;
+      const refs = createRefs({ recoverCurrentTrack });
+      const { result } = renderHook(() => useSoftInterruption(refs));
+
+      act(() => {
+        result.current.beginSoftInterruption("stream");
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3_100);
+      });
+
+      expect(recoverCurrentTrack).toHaveBeenCalledOnce();
+      expect(result.current.isSoftInterrupted()).toBe(false);
+    });
+
+    it("keeps retrying every 30s after the fast attempts while the server is down", async () => {
+      const recoverCurrentTrack = vi.fn(async () => false);
+      const gestureRequired = vi.fn();
+      window.addEventListener(
+        PLAYBACK_NEEDS_USER_GESTURE_EVENT,
+        gestureRequired,
+      );
+      serverDown();
+      const refs = createRefs({ recoverCurrentTrack });
+      const { result } = renderHook(() => useSoftInterruption(refs));
+
+      act(() => {
+        result.current.beginSoftInterruption("stream");
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(12_100);
+      });
+      expect(global.fetch).toHaveBeenCalledTimes(4);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(29_000);
+      });
+      expect(global.fetch).toHaveBeenCalledTimes(4);
+
+      recoverCurrentTrack.mockResolvedValue(true);
+      serverUp();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_100);
+      });
+
+      expect(recoverCurrentTrack).toHaveBeenCalledTimes(3);
+      expect(gestureRequired).not.toHaveBeenCalled();
+      expect(result.current.isSoftInterrupted()).toBe(false);
+      window.removeEventListener(
+        PLAYBACK_NEEDS_USER_GESTURE_EVENT,
+        gestureRequired,
+      );
+    });
+
+    it("gives up after five minutes and re-arms when the network returns", async () => {
+      const recoverCurrentTrack = vi.fn(async () => false);
+      const gestureRequired = vi.fn();
+      window.addEventListener(
+        PLAYBACK_NEEDS_USER_GESTURE_EVENT,
+        gestureRequired,
+      );
+      serverDown();
+      const refs = createRefs({ recoverCurrentTrack });
+      const { result } = renderHook(() => useSoftInterruption(refs));
+
+      act(() => {
+        result.current.beginSoftInterruption("stream");
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(6 * 60_000);
+      });
+      expect(gestureRequired).toHaveBeenCalledOnce();
+
+      recoverCurrentTrack.mockResolvedValue(true);
+      serverUp();
+      await act(async () => {
+        window.dispatchEvent(new CustomEvent("crate:network-restored"));
+        await vi.advanceTimersByTimeAsync(10);
+      });
+
+      expect(recoverCurrentTrack).toHaveBeenLastCalledWith();
+      expect(result.current.isSoftInterrupted()).toBe(false);
+      window.removeEventListener(
+        PLAYBACK_NEEDS_USER_GESTURE_EVENT,
+        gestureRequired,
+      );
+    });
+  });
+
+  it("asks for a gesture after the fast attempts on the web player", async () => {
+    const gestureRequired = vi.fn();
+    window.addEventListener(PLAYBACK_NEEDS_USER_GESTURE_EVENT, gestureRequired);
+    serverDown();
+    const refs = createRefs();
+    const { result } = renderHook(() => useSoftInterruption(refs));
+
+    act(() => {
+      result.current.beginSoftInterruption("stream");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(12_100);
+    });
+
+    expect(gestureRequired).toHaveBeenCalledOnce();
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(4);
+    window.removeEventListener(
+      PLAYBACK_NEEDS_USER_GESTURE_EVENT,
+      gestureRequired,
+    );
   });
 });
