@@ -164,7 +164,7 @@ describe("MobileActionSheet", () => {
     );
 
     const dialog = screen.getByRole("dialog");
-    const panel = dialog.querySelector(".listen-glass-panel") as HTMLElement;
+    const panel = dialog.querySelector(".crate-overlay-panel") as HTMLElement;
     const handle = panel.querySelector(
       "[data-mobile-sheet-drag-handle='true']",
     ) as HTMLElement;
@@ -217,7 +217,7 @@ describe("MobileActionSheet", () => {
 
     const panel = screen
       .getByRole("dialog")
-      .querySelector(".listen-glass-panel") as HTMLElement;
+      .querySelector(".crate-overlay-panel") as HTMLElement;
     vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
       bottom: 240,
       height: 200,
@@ -255,7 +255,7 @@ describe("MobileActionSheet", () => {
 
     const panel = screen
       .getByRole("dialog")
-      .querySelector(".listen-glass-panel") as HTMLElement;
+      .querySelector(".crate-overlay-panel") as HTMLElement;
     vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
       bottom: 240,
       height: 200,
@@ -268,13 +268,17 @@ describe("MobileActionSheet", () => {
       toJSON: () => {},
     });
 
+    expect(panel).toHaveClass("crate-overlay-enter");
+    expect(panel).toHaveAttribute("data-overlay-kind", "sheet");
+
     fireEvent.touchStart(screen.getByTestId("sheet-content"), {
       touches: [{ clientY: 80 }],
     });
     fireEvent.touchMove(panel, { touches: [{ clientY: 120 }] });
 
     expect(panel).toHaveStyle({ transform: "translateY(40px)" });
-    expect(panel).not.toHaveClass("animate-sheet-up");
+    expect(panel).not.toHaveClass("crate-overlay-enter");
+    expect(panel).not.toHaveAttribute("data-overlay-kind");
   });
 
   it("accepts a translated accessible label", () => {
@@ -289,7 +293,7 @@ describe("MobileActionSheet", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps the listen glass surface and adds consumer surface classes", () => {
+  it("keeps the shared overlay panel and adds consumer surface classes", () => {
     const panelRef = createRef<HTMLDivElement>();
     const { rerender } = render(
       <MobileActionSheet open onClose={vi.fn()} panelRef={panelRef}>
@@ -300,7 +304,7 @@ describe("MobileActionSheet", () => {
     expect(
       screen.getByRole("dialog", { name: "Action sheet" }),
     ).toBeInTheDocument();
-    expect(panelRef.current).toHaveClass("listen-glass-panel");
+    expect(panelRef.current).toHaveClass("crate-overlay-panel");
 
     rerender(
       <MobileActionSheet
@@ -314,7 +318,7 @@ describe("MobileActionSheet", () => {
     );
 
     expect(panelRef.current).toHaveClass("bg-surface-popover");
-    expect(panelRef.current).toHaveClass("listen-glass-panel");
+    expect(panelRef.current).toHaveClass("crate-overlay-panel");
   });
 
   it("snaps back when dragged less than half the sheet height", () => {

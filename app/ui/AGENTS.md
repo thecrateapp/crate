@@ -89,7 +89,7 @@ CI (`.github/workflows/test-frontend.yml`) runs lint, typecheck, test and build 
 
 ## Pitfalls
 
-- `src/components/ui/` still holds local copies of `AdminSelect`, `confirm-dialog`, `card-skeleton`, `grid-skeleton`, `table-skeleton`, `error-state`, `image-lightbox`, `star-rating`, `QrCodeImage`, while equivalents exist in `@crate/ui/composites/*` and `@crate/ui/primitives/*`. Check `@crate/ui` before adding another local variant; do not create a third copy.
+- `src/components/ui/` still holds local copies of `AdminSelect`, `card-skeleton`, `grid-skeleton`, `table-skeleton`, `error-state`, `image-lightbox`, `star-rating`, `QrCodeImage`, while equivalents exist in `@crate/ui/composites/*` and `@crate/ui/primitives/*`. Confirmations use `@crate/ui/composites/ConfirmDialog`; its local copy retired in Task 1b.1. Check `@crate/ui` before adding another local variant; do not create a third copy.
 - `src/components/shows/ShowCard.tsx` is Admin-local; the unused shared ShowCard was removed in Task 1.12. `@crate/ui/domain/shows/show-types` remains shared and used by Shows.
 - Large pages (`Tasks.tsx` ~2200 lines, `Download.tsx` ~2000, `Health.tsx` ~1200) own their own streams. Extract hooks rather than adding more effects inline.
 - Do not trigger heavy recomputation from the UI (aggregate counts, snapshot rebuilds). If data is missing, it belongs in a snapshot/projector change on the backend.

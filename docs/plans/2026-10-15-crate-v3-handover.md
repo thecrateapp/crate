@@ -1,7 +1,14 @@
 # Crate v3 handover
 
 Entry point for agents picking up Crate v3. Revised 2026-10-16. Read this file and the implementation
-plan; the status table separates local implementation from pending QA.
+plan; the status table separates implementation from pending QA.
+
+Current transfer: **1N–1P are complete in the checkpoint commit
+`feat(ui): unify v3 overlays, controls and field spacing`**. Diego authorised commit/push and
+continuation on Linux; this final publication record supersedes earlier local-only stops below.
+Next is **Task 1b.3 / checkpoint 1Q**. Start on Linux with
+[`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
+Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 
 ## Where the work lives
 
@@ -60,9 +67,12 @@ commit/push, canonical Linux captures and continuation to theme runtime retireme
 The persistent component/visual mockup lives in `tools/design-system-preview/` and runs with
 `npm run design-system:preview` at <http://127.0.0.1:5186/#primitivas>. Extend the same page at
 every checkpoint with real components, preserving the approved examples. This is local review
-material, not the committed CI screenshot source. The current checkpoint is
-<http://127.0.0.1:5186/#identidad>: the fixed identity with real functional preference controls
-and a fictional, memory-only legacy migration. Cleanup remains at `#limpieza`, rendered with
+material, not the committed CI screenshot source. The current publication cut retains
+<http://127.0.0.1:5186/#capas> (1N overlays),
+<http://127.0.0.1:5186/#formularios> (1O form foundations) and
+<http://127.0.0.1:5186/#seleccion> (1P short choices). The approved fixed identity remains
+at `#identidad`, with real functional preference controls and a fictional, memory-only legacy
+migration. Cleanup remains at `#limpieza`, rendered with
 current shared primitives. Approved toasts remain at `#toasts` with manual examples and local retry.
 ProgressHairline remains at `#progreso` with known/indeterminate progress and both line thicknesses.
 Readout remains at `#readout` with its separate preview and committed announcement.
@@ -83,7 +93,8 @@ published at Checkpoint 1F with reviewed Linux images, green comparison CI and t
 walkthrough recorded below. InstrumentPanel 1.7 is published at Checkpoint 1G; its Linux capture
 review and full comparison CI pass. Meter 1.8 is published at 1H and Readout 1.9 at 1I;
 ProgressHairline 1.10 is published at 1J; shared toaster configuration 1.11 is published at 1K.
-Unused shared component cleanup 1.12 is the current local review checkpoint.
+Cleanup 1.12 and theme retirement 1.13 are published. The current transfer closes 1b.1–1b.2
+through checkpoints 1N–1P; continue with 1b.3 / checkpoint 1Q.
 
 ## Admin visual direction — 2026-10-16
 
@@ -171,17 +182,18 @@ is a token-based chart configuration, not a selectable product skin.
 | Checkpoint 0                                                 | Open for remaining production/runtime/device gates; 0.11 Linux comparison is complete                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 1.2–1.4 / Checkpoint 1A                                      | Committed/pushed as `efe6cf2e`. At 1A: Shared 679, Admin 248, Listen 2,853 and Desktop 50 tests pass (Listen has 4 skipped); 66 focused primitive/CSS tests pass after the minified-fallback correction. Shared/Admin/Listen/Desktop typechecks, both app lints, package/app builds and 15 drift metrics pass without budget changes. Static spec/quality reviews found no actionable defects. Diego approved the mockup and authorised commit/push on 2026-10-15. CI/baselines/device QA remain pending                                                                                                                                                                                                                                                                                                                                         |
 | 1.0 / Checkpoint 1F                                          | Published `6e793ebd` + canonical images `82f14594`; 33 Linux PNGs reviewed (31 unchanged, two new), full comparison/frontend CI green in run 38860652793. Local route walkthrough completed with the pre-existing artist-alias defect and deep-state limits recorded below                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| 1.7 / Checkpoint 1G | Published `473604f7` + reviewed Linux images/provenance in `c44b31f3`; recording 38864631250 and full comparison/frontend CI 38865107324 pass. |
-| 1.8 / Checkpoint 1H | Published `6a5b3366` + reviewed Linux images/provenance `ef5e7f52`; recording `38869057068` and comparison/full frontend CI `38869556811` pass. |
-| 1.9 / Checkpoint 1I | Published `a80f396b` + reviewed Linux images/provenance `dd71eb72`; recording `38871597394` and comparison/full frontend CI `38872274120` pass. |
-| 1.10 / Checkpoint 1J | Published `0660fbd2` + reviewed Linux images/provenance `3f470ec6`; recording `38876594597` and comparison/full frontend CI `38877216337` pass. |
-| 1.11 / Checkpoint 1K | Published `7b46021d`; 43 Linux images/provenance `181ca4d4` from `38880022435` (40 unchanged, three new toast scenes). Comparison/full frontend CI `38880774591` passes. |
-| 1.12 / Checkpoint 1L | Published `2c90a6f2`; recording `38883592145` passes with all 43 PNGs byte-identical. Original manifest imported in `bf1fa793`; comparison/full CI passes in `38885478542`. |
-| 1b | Not started; respect applicable gates and the next review checkpoint. |
+| 1.7 / Checkpoint 1G                                          | Published `473604f7` + reviewed Linux images/provenance in `c44b31f3`; recording 38864631250 and full comparison/frontend CI 38865107324 pass.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 1.8 / Checkpoint 1H                                          | Published `6a5b3366` + reviewed Linux images/provenance `ef5e7f52`; recording `38869057068` and comparison/full frontend CI `38869556811` pass.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 1.9 / Checkpoint 1I                                          | Published `a80f396b` + reviewed Linux images/provenance `dd71eb72`; recording `38871597394` and comparison/full frontend CI `38872274120` pass.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 1.10 / Checkpoint 1J                                         | Published `0660fbd2` + reviewed Linux images/provenance `3f470ec6`; recording `38876594597` and comparison/full frontend CI `38877216337` pass.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 1.11 / Checkpoint 1K                                         | Published `7b46021d`; 43 Linux images/provenance `181ca4d4` from `38880022435` (40 unchanged, three new toast scenes). Comparison/full frontend CI `38880774591` passes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 1.12 / Checkpoint 1L                                         | Published `2c90a6f2`; recording `38883592145` passes with all 43 PNGs byte-identical. Original manifest imported in `bf1fa793`; comparison/full CI passes in `38885478542`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 1b.1 / Checkpoint 1N                                         | Complete in the combined 1N–1P publication cut authorised by Diego; shared overlays/menus, ConfirmDialog and one close recipe. Focused checks and SPEC/QUALITY pass; new canonical Linux recording/native QA pending.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 1b.2 / Checkpoints 1O–1P                                     | Complete in the combined publication cut: nine form foundations, 28 short selectors, caller review, Radio debounce and global 8 px field spacing. Focused checks and SPEC/QUALITY pass. Next: 1b.3 / 1Q; Linux continuation instructions are tracked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
-| 1.13 / Checkpoint 1M | Verified locally; spec/quality approved. One shared identity, safe preference migration and Cast/native compatibility. Chromium 41 / WebKit 41 / preview 41 / Admin 21 pass; Listen 43 + mobile Smart EQ replay 1 pass (four existing skips). Published `21873d24`; Linux recording `38888497469` passes. 33 PNGs reviewed, two Settings changes imported; comparison/full CI pending. |
+| 1.13 / Checkpoint 1M                                         | Verified locally; spec/quality approved. One shared identity, safe preference migration and Cast/native compatibility. Chromium 41 / WebKit 41 / preview 41 / Admin 21 pass; Listen 43 + mobile Smart EQ replay 1 pass (four existing skips). Published `21873d24`; Linux recording `38888497469` passes. 33 PNGs reviewed, two Settings changes imported in `297daaa1`; comparison/full CI `38889352392` passes.                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Phases 2–7                                                   | Pending; reconcile Smart Mix overlap after rebase before marking tasks complete                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ## Integration and release order
@@ -477,7 +489,6 @@ stream subscriptions are added. Header/content changes use the existing snapshot
   ProgressHairline 1.10 and shared toaster configuration 1.11 are published; cleanup 1.12 is the current local checkpoint. TrackReadout and global Admin
   icon retirement retain their planned tasks; 1D focus polishing stays deferred.
 
-
 ## Checkpoint 1H — Meter (Task 1.8)
 
 Diego approved the visual checkpoint on 2026-10-16 and authorised commit/push, canonical Linux
@@ -530,7 +541,6 @@ is unchanged. Over-limit readings retain the real value in text and add `over ·
   This closes the 1H publication/capture checkpoint.
 - Readout 1.9 is the next authorised visual checkpoint. TrackReadout 3.9b, global Admin icon retirement,
   theme runtime retirement and the deferred 1D focus polish retain their planned tasks.
-
 
 ## Checkpoint 1I — Readout (Task 1.9)
 
@@ -713,7 +723,6 @@ to theme runtime retirement 1.13. Published as `2c90a6f2`; capture references fo
   All 43 PNGs are byte-identical to the reviewed 1K references; the original manifest is imported.
 - Remaining gate: comparison CI. Theme runtime retirement 1.13 is assigned; keep its next checkpoint.
 
-
 ## Checkpoint 1M — One shared identity (Task 1.13, local review)
 
 Diego assigned this task after approving 1L and reconfirmed that Listen/Admin share the same
@@ -749,7 +758,6 @@ Audit/reconcile new Smart Mix settings after integration; integration order and 
 
 Stop for Diego's visual review. No commit/push of 1M, rebase, PR or release is authorised yet.
 
-
 ### Joint-major release note (draft, not released)
 
 Listen and Admin now share the fixed Crate V3 identity and design system. Theme, skin, color-mode,
@@ -759,14 +767,12 @@ settings remain respected. Desktop no longer adopts GTK colors/fonts; native win
 placement remains supported. Older Cast peers remain compatible. This note ships only with the
 approved joint major after integration and device QA.
 
-
 ### 1L publication gate — complete
 
 Capture/provenance commit `bf1fa793` is pushed. Full Frontend Tests and Linux visual comparison
 pass in [38885478542](https://github.com/thecrateapp/crate/actions/runs/38885478542). Production
 remains `2c90a6f2`; all 43 PNGs are byte-identical to 1K and the original manifest points at
 that production commit. New 1M source remains uncommitted and does not alter those references.
-
 
 ### 1M local verification — 2026-10-16
 
@@ -804,7 +810,6 @@ Next: Diego reviews `#identidad`. Publish 1M and retire/re-record the ten old va
 after his approval. Hardware QA (Capacitor/status bars, Tauri/Linux buttons and Cast peers),
 integration reconciliation and joint-major release gates remain open.
 
-
 ## 1M publication authorisation — 2026-10-16
 
 Diego approved Checkpoint 1M and explicitly authorised commit/push, canonical Linux captures
@@ -812,7 +817,6 @@ and continuation with the next plan block (Task 1b.1). This supersedes the local
 stops above for 1M. Keep all later checkpoint publication gates. The ten obsolete skin/light PNGs
 are removed explicitly now; 33 single-identity references will be re-recorded and reviewed in
 the pinned Linux CI image. Rebase, PR, deployment and joint release remain separately gated.
-
 
 ### Checkpoint 1M — publication and Linux capture verification
 
@@ -823,5 +827,236 @@ The original manifest identifies that production SHA, Linux x64 and the pinned P
 `v1.63.0-noble` image. Of 33 PNGs, 31 are byte-identical; only desktop/mobile Settings change
 to the approved three functional preferences. Both changed images are reviewed and imported.
 The ten obsolete skin/light captures were explicitly retired in the production commit.
-Comparison/full CI follows the capture import. Next assigned task: 1b.1 / Checkpoint 1N,
-shared overlays/menus and one ConfirmDialog; preserve its visual review/publication stop.
+Capture/provenance commit `297daaa1` is pushed. Full Frontend Tests and Linux visual comparison
+pass in [38889352392](https://github.com/thecrateapp/crate/actions/runs/38889352392).
+Next assigned task: 1b.1 / Checkpoint 1N, shared overlays/menus and one ConfirmDialog; preserve
+its visual review/publication stop.
+
+## Checkpoint 1N — Shared overlays (Task 1b.1, ready for visual review)
+
+The persistent mockup extends `#capas`: actual AppModal, nested ConfirmDialog, Sheet,
+DropdownMenu, Popover and Tooltip. Examples only change local sample state; no API or
+localStorage writes. Keep all earlier approved specimens.
+
+- Shared recipes implement DS §5.9: solid popover surface, 72% canvas scrim without blur,
+  14 px panel radius, Bricolage title/MonoLabel eyebrow, quiet footer, 36/44 px menu items,
+  neutral destructive entries and 400 ms tooltip delay. Custom modal widths and XL remain compatible.
+- Admin's local ConfirmDialog and test retire. Actual inventory is 15 consumer files / 20
+  instances; the old plan's 17 included implementation/barrel. All use the shared composite.
+  Existing Admin callbacks return void so worker enqueue/polling keeps the legacy close behavior.
+  Shared async confirmation remains guarded for Listen, including pending cancellation,
+  rejection, focus restoration, exact typed confirmation and stale completions after reopening.
+- WIPE/REBUILD require the exact word. All 20 Admin confirmations get a mono consequence line
+  using existing names/counts/sizes/destinations only. REBUILD includes health check, repair,
+  sync and enrichment; only WIPE promises that files remain on disk. No new reads/writes added.
+- Listen callers adopt the common eyebrow in seven locales. Localized domain consequence copy
+  remains explicit work for their page/domain migrations; do not claim all Listen consequences
+  are migrated. EQ glass remains reserved for Task 4.2. The broad Admin icon/status migrations
+  remain Tasks 1b.8/1b.6.
+- Diego's review corrections: one OverlayCloseButton base supplies the same 40 px control,
+  24 px icon, transparent hover and keyboard focus to AppModal, ConfirmDialog and Radix Dialog/Sheet.
+  Built-in closes are anchored to the panel's top-right corner,
+  inset 16 px, with title space reserved (also on mobile with the grabber). The sample input
+  uses existing FormField with 8 px label/control spacing. Eight legacy glass overrides and three
+  local scrims retire from Listen AppModal consumers; two local border-0 overrides also retire.
+  Full form restyling remains 1b.2.
+- Measured drift: arbitrary utilities 53→48; definitions 138→139 and foundation 95→96 for the
+  planned scrim token (utility aliases normalize to the same token). Direct shadcn imports
+  95→98: one existing Input import for typed confirmation and two imports of the new shared
+  OverlayCloseButton base from AppModal/ConfirmDialog. These are internal foundation consumers;
+  no app-local duplicate is added. The base is also composed by Radix Dialog/Sheet via asChild.
+
+Focused local verification and independent SPEC/QUALITY reviews pass as detailed below.
+Canonical 33 Linux PNGs and the original 1M manifest remain unchanged. Stop at Diego's review before committing/pushing 1N;
+new Linux recording follows that approval. Rebase, PR, deployment and release remain gated.
+
+### Development test policy — Diego, 2026-10-16
+
+During development run only suites scoped to changed behavior and affected consumers.
+Run full validation once after development or the phase is complete; do not repeat global
+suites during iteration. The two broad validation chains still active at this instruction
+were stopped (Listen full incomplete, Desktop not started; pending broad Admin browser also
+cancelled). Earlier completed results remain historical evidence, not a current full green run.
+Continue 1N with focused dialog/action/menu/consumer cases and two preview geometry cases.
+
+### 1N focused verification — 2026-10-16
+
+- Shared: 145 cases in the 11 affected overlay/action/runtime recipe files pass. Ten close
+  component/conditional-header cases pass again after correcting Testing Library query types;
+  these are a subset of the 145, not additional coverage counts.
+- Listen: 174 cases in 15 affected consumer files pass, plus all four component-policy cases
+  including the new guard against local modal glass/scrims (178 total). Admin: 55 cases in
+  12 affected consumers pass. No worker/API behavior is changed by consequence copy.
+- Preview: both desktop/390 px overlay cases pass on final production source. They cover
+  modal/confirmation/Sheet close size and transparent hover, corner geometry and title space,
+  long Sheet titles, label gap, keyboard/stacked focus, exact confirmation, pending/reset and
+  the absence of overflow or API/localStorage writes.
+- Admin browser: Command Palette and desktop WIPE/REBUILD pass. The first two mobile cases
+  stopped in the fixture before opening a dialog because it required a desktop sidebar. The
+  readiness assertion now matches Shell's real md breakpoint and exact visible navigation
+  control; the two mobile cases pass on scoped replay. No assertion was skipped or weakened.
+  Independent quality review approves that fixture adjustment.
+- Shared/Listen typechecks and Admin production compilation/build pass. ESLint passes on all
+  changed Admin (17) and Listen (31) TS/TSX files; locale metadata check reports zero errors or
+  warnings. Preview production build passes. Admin initial gzip JS is 515,428 B / 532,480
+  (−1,409 B versus published 1M). No bundle ceiling increased.
+- The focused repository drift-budget check passes all 15 metrics; layer boundaries have zero
+  violations across 139 source files. Updated ceilings reflect the measured 48 arbitrary
+  utilities, 139 definitions / 96 foundation definitions and 98 internal shadcn imports.
+- Advisory section/modal/confirmation/Sheet images are refreshed in the preview's ignored
+  `.artifacts/checkpoint-1n-*.png`; desktop/mobile dialogs and confirmation were inspected.
+  All 33 canonical Linux PNGs and their original manifest remain unchanged.
+
+Global suites remain for the single validation run at development/phase close under Diego's
+new test policy. Earlier completed global runs predate the latest review corrections; the
+interrupted Listen full run is not a green result. Native QA and 1N Linux recording remain
+pending. Diego reviews `#capas`; preserve its publication checkpoint. The later 1O section
+records the authorised local continuation without assuming approval to publish 1N.
+
+## Checkpoint 1O — Form foundations (Task 1b.2, local review)
+
+Diego asked to continue and to run the preview while he reviews. Continue local work without
+assuming publication approval for 1N. Its full review source, including new files, is saved
+in ignored `tools/design-system-preview/.artifacts/checkpoint-1n-source.patch` with SHA256
+`6567cdff369e250e817513d48f6cb35b735baac5ec29c3806ca05bf521b68749`. It can be staged separately
+when authorised. Neither checkpoint is committed/pushed yet.
+
+- 1O covers Input, Textarea, Select, Switch, Checkbox, SearchInput, FormField, SegmentedControl
+  and AdminSelect. Consolidate Admin's duplicate (35 usages / ten consumer files) into the
+  shared composite; restyling only shared would leave all actual Admin callers unchanged.
+- Preserve APIs, keyboard, indeterminate, refs, debounce and immediate clear. Validation remains
+  caller-owned, shown on blur in the preview. Use warning StatusDot and accessible error links,
+  never red field borders. Keep iOS's functional 16 px input font exception. The existing
+  `rounded-lg` token is already 6 px; no new radius token is needed.
+- RadioGroup remains physically tracked but unused. Leave implementation/test alone; correct
+  the allowlist's inaccurate claim that shadcn dropdown-menu consumes it (it uses Radix directly).
+- 1P follows with 28 fixed short selects (22 Admin, six effective Listen) and six SegmentedControl
+  caller reviews. Admin has two fixed large 15-option field selectors and 17 dynamic controls;
+  do not convert dynamic sources based on their current fixture length. The new-short-select
+  policy and DS Radio seed debounce remain explicit 1b.2 work. Keep tab semantics for panel
+  switchers until the Task 1b.3/page migration, rather than treating every group as a filter.
+- Preview: `#formularios`, real shared controls and local sample state only. Keep `#capas` and
+  earlier approved specimens. Only focused tests run during development; global validation
+  remains for development/phase close.
+
+The foundations use shared 40/44 px controls, existing 6 px field radius, MonoLabel with an
+8 px gap, mono helpers, warning-dot errors and common keyboard focus. Switch/Checkbox retain
+small visual geometry with 44 px coarse-pointer hit areas; inline margins reserve those areas
+without horizontal overflow. Explicit mono code fields keep their font. Typed ConfirmDialog
+confirmation now composes FormField so it cannot retain a separate label recipe.
+
+Both AdminSelect variants expose a stable accessible field name; empty-valued real options
+stay distinct from the clear sentinel. Search keeps the caret's Home/End behavior, selects
+the first filtered result on Enter, does nothing on an empty result, and ignores IME key
+events (including Safari keyCode 229) until composition ends. Counts preserve zero/string
+values as plain mono metadata. No API calls, validation ownership or persistence change.
+
+Independent SPEC and final QUALITY reviews pass. The responsive preview heading is stacked
+on mobile with a measured gap; controls and headings remain within their section. Advisory
+images use ignored `checkpoint-1o-{desktop,mobile}.png`. Canonical 33 Linux PNGs and the 1M
+manifest remain unchanged. New Linux recording follows publication approval; 1P is not started.
+
+### 1O focused verification — 2026-10-16
+
+- Shared: the initial 65-case batch across the 11 affected form/recipe/policy files passes.
+  The final selector/recipe/export subset covers 19 cases (13 AdminSelect, five CSS, one
+  export policy). Two cases timed out or inherited unfinished input during overlapping local
+  checks; only those two were replayed serially, passing on unchanged production source.
+  The 39-case ConfirmDialog/FormField/recipe subset also passes. These overlapping batches
+  are not additive coverage totals. IME tests reproduced the lost focus before the fix.
+- Listen: 24 focused cases across Login, SettingsPrimitives, CrateEditor, PlayerSurfaceModeSwitch,
+  VisualizerSettingsPanel and radius policy pass. The two player tests now assert the shared
+  chip/thumb contract rather than retired styling literals; their behavior assertions remain.
+- Admin: ten focused cases across Browse, Settings, Users, PlaylistEditor and the AdminSelect
+  re-export pass. Browse retains both filter-request assertions while querying the new
+  combobox/option semantics. Local jsdom polyfills are installed only if missing and restored.
+- Browser: the final 390 px touch case passes; the desktop case hit the 30 s deadline during
+  overlapping checks and passes in 8.7 s on serial replay. No timeout or assertion was relaxed.
+  They cover field geometry/surfaces, label gaps, blur validation, keyboard focus, selectors,
+  debounce/clear, hit areas, responsive heading and no overflow/API/localStorage writes.
+  The two 1N overlay cases also passed after the typed field adopted FormField.
+- Shared, Admin, Listen and Desktop typechecks pass. Scoped Shared/Listen and Admin ESLint,
+  preview production build, the one repository drift-budget case and layer boundaries pass.
+  Layer inventory remains 139 source files / zero violations. Direct shadcn imports are 99
+  (one additional internal Select composition); other ceilings are not raised. A foreground
+  role violation was fixed through the existing canvas-coloured `--text-on-contrast` alias.
+- Final desktop/mobile advisory section images are copied to the preview's ignored `.artifacts/`
+  and inspected. The 1N source snapshot checksum is unchanged. No commits, pushes, canonical
+  PNG/manifest changes, full suites or Linux recording were performed for 1O.
+
+Keep validation chains serial while Diego reviews the live preview; run only affected files
+or cases. Full validation remains the single run at development/phase close. Next step is
+Diego's review of the local checkpoints; preserve 1P as the next separate implementation block.
+
+## Checkpoints 1N–1P — final publication cut and Linux transfer, 2026-10-16
+
+Diego explicitly requested finishing the next cut through commit/push, then supplying a detailed
+prompt for a Linux Codex agent without a local branch/worktree. This authorises publication of
+the combined 1N–1P cut, including his global label-spacing correction, and supersedes the older
+local-only stops above. The checkpoint commit is identified by
+`feat(ui): unify v3 overlays, controls and field spacing`; use `git log` to resolve its SHA.
+The transfer prompt supplies the exact published SHA. Rebase, PR, deploy and release are not
+part of this authorisation. Keep later visual review stops.
+
+### 1P behavior and global form geometry
+
+- Task 1b.2 is complete. Migrate 28 fixed short choices to shared radio chips: 22 Admin and six
+  effective Listen controls. Preserve URL/filter values, genuine empty options, clear behavior,
+  disabled/fieldset states, rule value resets and Jam Auto DJ permanence. Keep 17 dynamic
+  selectors and two fixed 15-option field lists as Select; the new source policy checks both
+  apps with exact, reasoned dynamic exceptions, including wrapper callers and lexical aliases.
+- Review the six existing SegmentedControl callers. Filters and Player view modes are radios;
+  genuine Library/ExtendedPlayer panels retain tab semantics for the next task. Remove local
+  styling overrides and reserve 44 × 44 px coarse-pointer targets, including icon-only chips.
+- Stable rule-row identity fixes keyboard focus loss while changing an operator in PlaylistEditor
+  and Playlists. Regression cases reproduce the loss before the fix and verify two consecutive
+  arrow changes, value reset and the final request payload after it.
+- Radio seed search waits 300 ms, clears immediately below two characters, cancels queued work
+  on edits/seed selection/unmount and ignores obsolete responses. Existing dispatched requests
+  are not aborted; each completed search retains the two existing endpoints.
+- Diego requires one standard gap for every stacked label/control pair. `.crate-form-field`
+  owns an actual 8 px grid gap throughout Listen/Admin, including legacy auth, profile, metadata,
+  search, read-only values, sliders and chip groups. The final global sweep changes 35 production
+  files (20 Admin / 15 Listen) and removes seven local FormField gap overrides. Horizontal rows
+  preserve their layout with an 8 px vertical gap when wrapping. Section headings and result
+  lists retain their separate rhythm; two Setup heading margins were restored after review.
+- The persistent `#seleccion` sample uses actual CrateForm, Jam playback options and Player view
+  mode with isolated Spanish translations and sample state. It preserves `#formularios`, `#capas`
+  and all earlier checkpoints. No API or localStorage writes occur in these samples.
+
+### Final focused validation and limits
+
+All chains ran serially with one test/browser worker; no full suite or new CI workflow ran.
+Earlier 1N/1O records remain historical coverage; overlapping batches are not additive totals.
+
+- Shared: 22 cases / three affected recipe, FormField and SegmentedControl files pass after the
+  global spacing correction. Earlier 1P selector/policy/controller cases pass, including seven
+  short-select policy cases and 11 Radio controller cases.
+- Listen: 38 cases / 11 affected files pass: VisualizerSettingsPanel, AccountSectionForms,
+  InterfacePreferencesSection, SettingsPrimitives, ShowsLocationControls, TranslationOverlay,
+  Login, Paths, Radio, Register and the short-select policy.
+- Admin: 74 cases / 17 affected files pass: TrackTable, ArtistBioResearchDialog,
+  ArtistHeroArtworkEditor, ArtistMetadataEditor, GenreTaxonomyTree, Sidebar, Album, Artist,
+  Browse, Genres, I18nReview, Login, PlaylistEditor, Playlists, Settings, Tasks and Users.
+- Browser: six final cases pass at 1440/390 px: 1M identity, 1O forms and 1P selection in both
+  layouts. They measure 8 px label/control geometry for fields, searches and chip groups and
+  retain keyboard, validation, clear, coarse hit-target, overflow and no-external-write checks.
+  Ignored desktop/mobile advisory PNGs are refreshed; they are not canonical references.
+- Shared/Admin/Listen/Desktop typechecks, 100 scoped Shared/Listen and 34 scoped Admin ESLint
+  files, both app production builds/bundle gates and preview build pass. Listen i18n: six
+  locales, zero errors/warnings. Shared layers: 139 source files, zero violations. Drift checks
+  pass; ceilings tighten to 96 direct shadcn imports and 22 one-shot tokens, with none raised.
+- Admin initial JS: **526,386 B gzip / 532,480 B ceiling** (about 514 / 520 KiB), leaving only
+  6,094 B. Keep this small headroom visible during subsequent shared imports. Listen initial JS:
+  **200,232 B / 307,200 B**. Existing large-chunk warnings remain; both gates pass.
+- Independent final SPEC and QUALITY reviews pass, including the global spacing sweep and
+  restored Setup section spacing. No dependency/lockfile or canonical PNG/manifest changes.
+
+Canonical references remain the 33 PNGs and original 1M manifest from `297daaa1`; the green
+comparison `38889352392` is historical, not proof of current 1N–1P parity. New approved Linux CI
+recording/comparison and native QA remain pending. Never regenerate those references locally or
+fabricate provenance. Full validation remains the single run at development/phase close.
+
+Continue with **Task 1b.3 / checkpoint 1Q**, text tabs and app-local URL helpers. Bootstrap,
+reading order, preview, focused verification, site pin and future review boundaries are in
+[`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).

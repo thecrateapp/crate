@@ -20,7 +20,7 @@ import {
   OpsPanel,
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { Input } from "@crate/ui/shadcn/input";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { Button } from "@crate/ui/shadcn/button";
@@ -673,7 +673,13 @@ export function Stack() {
         description={`Restart ${restartTarget}? This interrupts the container and may briefly affect admin or listener traffic.`}
         confirmLabel="Restart"
         variant="destructive"
-        onConfirm={() => restartTarget && handleRestart(restartTarget)}
+        onConfirm={() => {
+          void (() => restartTarget && handleRestart(restartTarget))();
+        }}
+        eyebrow="Confirm action"
+        consequence={`${
+          restartTarget ?? "Service"
+        } · restarts the container · traffic may be interrupted`}
       />
     </div>
   );

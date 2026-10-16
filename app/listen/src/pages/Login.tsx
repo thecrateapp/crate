@@ -129,7 +129,6 @@ export function Login() {
 
         <FormField
           label={t("common.email")}
-          className="gap-1"
           labelClassName="font-normal text-text-primary/60"
         >
           <Input
@@ -144,7 +143,6 @@ export function Login() {
 
         <FormField
           label={t("common.password")}
-          className="gap-1"
           labelClassName="font-normal text-text-primary/60"
         >
           <Input

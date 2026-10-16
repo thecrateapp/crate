@@ -1,3 +1,4 @@
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import {
   useState,
   useEffect,
@@ -275,7 +276,7 @@ function FieldRow({
   children: ReactNode;
 }) {
   return (
-    <div className="grid gap-3 rounded-md border border-white/6 bg-black/15 p-3 md:grid-cols-[200px_minmax(0,1fr)] md:items-center">
+    <div className="grid gap-x-3 gap-y-2 rounded-md border border-white/6 bg-black/15 p-3 md:grid-cols-[200px_minmax(0,1fr)] md:items-center">
       <div className="space-y-1">
         <span className="text-sm text-muted-foreground">{label}</span>
         {hint && (
@@ -998,20 +999,19 @@ function SoulseekCard() {
           )}
         </FieldRow>
         <FieldRow label="Quality">
-          <AdminSelect
+          <SegmentedControl
+            as="radio"
+            label="Quality"
             value={quality}
-            onChange={(value) => {
+            onValueChange={(value) => {
               setQuality(value);
               void saveSoulseekSettings({ quality: value });
             }}
-            options={[
+            items={[
               { value: "flac", label: "FLAC only" },
               { value: "flac_320", label: "FLAC + MP3 320k" },
               { value: "any", label: "Any quality" },
             ]}
-            placeholder="Select quality"
-            allowClear={false}
-            triggerClassName="max-w-[240px]"
           />
         </FieldRow>
         <FieldRow label="Min bitrate">

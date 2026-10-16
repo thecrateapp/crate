@@ -28,7 +28,7 @@ export function LocationModePicker({
   const { t } = useTranslation();
 
   return (
-    <div className="space-y-3">
+    <div className="crate-form-field">
       <div className="text-sm font-medium text-text-primary">
         {t("settings.shows.location")}
       </div>
@@ -143,7 +143,7 @@ export function FixedCityPicker({
   const { t } = useTranslation();
 
   return (
-    <div className="space-y-2">
+    <div className="crate-form-field">
       <div className="flex items-center justify-between">
         <label htmlFor="settings-city" className="text-xs text-text-muted">
           {t("settings.shows.city")}
@@ -215,7 +215,7 @@ export function RadiusPicker({
   const { t } = useTranslation();
 
   return (
-    <div className="space-y-2">
+    <div className="crate-form-field">
       <div className="flex items-center justify-between">
         <div className="text-sm font-medium text-text-primary">
           {t("settings.shows.searchRadius")}

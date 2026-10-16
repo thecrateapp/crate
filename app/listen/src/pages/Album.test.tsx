@@ -581,7 +581,7 @@ describe("Album page", () => {
 
     const menu = await screen.findByRole("menu");
     expect(menu).toHaveClass(
-      "listen-glass-panel",
+      "crate-overlay-surface",
       "w-72",
       "z-app-context-menu",
     );

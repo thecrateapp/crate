@@ -14,6 +14,7 @@
   --surface-object: var(--crate-token-surface-card-solid);
   --surface-elevated: var(--surface-raised);
   --surface-overlay: var(--surface-modal);
+  --surface-scrim: color-mix(in srgb, var(--surface-canvas) 72%, transparent);
   --surface-chrome: color-mix(in srgb, var(--surface-canvas) 68%, transparent);
   --surface-glass-accent: color-mix(
     in srgb,
@@ -268,6 +269,8 @@
   --color-surface-container: var(--surface-container);
   --color-surface-elevated: var(--surface-elevated);
   --color-surface-overlay: var(--surface-overlay);
+  --color-surface-popover: var(--surface-popover);
+  --color-surface-scrim: var(--surface-scrim);
   --color-surface-chrome: var(--surface-chrome);
   --color-surface-canvas-overlay: var(--surface-canvas-overlay);
   --color-surface-quiet: var(--surface-quiet);

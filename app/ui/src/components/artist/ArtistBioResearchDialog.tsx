@@ -407,7 +407,10 @@ function ResearchResultContent({
 
       {activeTab === "edit" ? (
         <div className="space-y-4">
-          <label htmlFor="artist-bio-proposal" className="grid gap-2 text-sm">
+          <label
+            htmlFor="artist-bio-proposal"
+            className="crate-form-field text-sm"
+          >
             <span className="font-medium text-text-secondary-strong">
               Proposed biography
             </span>

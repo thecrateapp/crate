@@ -1,15 +1,9 @@
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { AlbumCard } from "@/components/album/AlbumCard";
 import { MissingAlbumCard } from "@/components/album/MissingAlbumCard";
 import { TidalAlbumCard } from "@/components/album/TidalAlbumCard";
 import type { ArtistAlbumSummary } from "@/components/artist/artistPageTypes";
 import { Button } from "@crate/ui/shadcn/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@crate/ui/shadcn/select";
 import { Disc3, Eye, EyeOff, Loader2 } from "lucide-react";
 
 interface MissingAlbum {
@@ -64,8 +58,8 @@ export function ArtistDiscographySection({
 }: ArtistDiscographySectionProps) {
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-4">
           <h2 className="text-lg font-semibold">{albums.length} Albums</h2>
           {missingAlbums.length > 0 && (
             <button
@@ -95,16 +89,17 @@ export function ArtistDiscographySection({
             </Button>
           )}
         </div>
-        <Select value={sort} onValueChange={onSortChange}>
-          <SelectTrigger className="w-[140px] bg-card border-border h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="name">Name</SelectItem>
-            <SelectItem value="year">Newest</SelectItem>
-            <SelectItem value="tracks">Most Tracks</SelectItem>
-          </SelectContent>
-        </Select>
+        <SegmentedControl
+          as="radio"
+          label="Sort albums"
+          value={sort}
+          onValueChange={onSortChange}
+          items={[
+            { value: "name", label: "Name" },
+            { value: "year", label: "Newest" },
+            { value: "tracks", label: "Most Tracks" },
+          ]}
+        />
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">

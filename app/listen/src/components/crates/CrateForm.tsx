@@ -1,3 +1,5 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { CRATE_ICON_SIZE, Users } from "@crate/ui/icons";
@@ -5,13 +7,6 @@ import { Checkbox } from "@crate/ui/primitives/Checkbox";
 import { FormField } from "@crate/ui/primitives/FormField";
 import { Input } from "@crate/ui/shadcn/input";
 import { Textarea } from "@crate/ui/shadcn/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@crate/ui/shadcn/select";
 
 import type { CrateSummary } from "@/pages/crates-types";
 
@@ -123,56 +118,40 @@ export function CrateForm({
         </FormField>
         <div className="grid gap-4 rounded-xl border border-border-quiet bg-text-primary/[0.025] p-4 sm:grid-cols-2">
           {isOwner ? (
-            <FormField className="gap-2" label={t("library.crates.visibility")}>
-              {(control) => (
-                <Select
-                  value={values.visibility}
-                  onValueChange={(value) =>
-                    onChange({
-                      visibility: value as CrateFormValues["visibility"],
-                    })
-                  }
-                >
-                  <SelectTrigger {...control} className="h-11 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="private">
-                      {t("library.crates.private")}
-                    </SelectItem>
-                    <SelectItem value="public">
-                      {t("library.crates.public")}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            </FormField>
-          ) : null}
-          <FormField className="gap-2" label={t("library.crates.ordering")}>
-            {(control) => (
-              <Select
-                value={values.ordering}
+            <div className="crate-form-field">
+              <MonoLabel as="span">{t("library.crates.visibility")}</MonoLabel>
+              <SegmentedControl
+                as="radio"
+                label={t("library.crates.visibility")}
+                value={values.visibility}
                 onValueChange={(value) =>
-                  onChange({ ordering: value as CrateOrdering })
+                  onChange({
+                    visibility: value as CrateFormValues["visibility"],
+                  })
                 }
-              >
-                <SelectTrigger {...control} className="h-11 w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">
-                    {t("library.crates.unordered")}
-                  </SelectItem>
-                  <SelectItem value="asc">
-                    {t("library.crates.ascending")}
-                  </SelectItem>
-                  <SelectItem value="desc">
-                    {t("library.crates.descending")}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          </FormField>
+                items={[
+                  { value: "private", label: t("library.crates.private") },
+                  { value: "public", label: t("library.crates.public") },
+                ]}
+              />
+            </div>
+          ) : null}
+          <div className="crate-form-field">
+            <MonoLabel as="span">{t("library.crates.ordering")}</MonoLabel>
+            <SegmentedControl
+              as="radio"
+              label={t("library.crates.ordering")}
+              value={values.ordering}
+              onValueChange={(value) =>
+                onChange({ ordering: value as CrateOrdering })
+              }
+              items={[
+                { value: "none", label: t("library.crates.unordered") },
+                { value: "asc", label: t("library.crates.ascending") },
+                { value: "desc", label: t("library.crates.descending") },
+              ]}
+            />
+          </div>
           <label className={TOGGLE_CLASS}>
             <Checkbox
               checked={values.loopEnabled}

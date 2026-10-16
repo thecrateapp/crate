@@ -1942,5 +1942,6 @@
   "actions.playlist.follow": "Jarraitu playlistari",
   "actions.playlist.unfollow": "Utzi playlistari jarraitzeari",
   "playlist.toasts.followed": "Orain {name} jarraitzen duzu.",
-  "playlist.toasts.unfollowed": "Jada ez duzu {name} jarraitzen."
+  "playlist.toasts.unfollowed": "Jada ez duzu {name} jarraitzen.",
+  "actions.confirmation.eyebrow": "Berrespena"
 }

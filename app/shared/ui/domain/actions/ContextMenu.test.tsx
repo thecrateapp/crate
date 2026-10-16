@@ -94,9 +94,8 @@ describe("ContextMenu", () => {
 
     const menu = screen.getByRole("menu");
     expect(menu).toHaveClass(
-      "listen-glass-panel",
+      "crate-overlay-surface",
       "w-72",
-      "rounded-2xl",
       "z-app-context-menu",
     );
     expect(screen.getByText("El Cielo")).toBeInTheDocument();
@@ -285,7 +284,7 @@ describe("ContextMenu", () => {
     );
 
     const dialog = screen.getByRole("dialog");
-    expect(dialog.querySelector(".listen-glass-panel")).toBeInTheDocument();
+    expect(dialog.querySelector(".crate-overlay-panel")).toBeInTheDocument();
     expect(screen.getByText("El Cielo")).toBeInTheDocument();
     expect(
       screen.getByRole("menuitem", { name: /Play now/i }),
@@ -653,7 +652,7 @@ describe("ContextMenu", () => {
     expect(parent).toHaveFocus();
   });
 
-  it("adds consumer surface classes on top of the glass panel", () => {
+  it("adds consumer surface classes on top of the shared overlay surface", () => {
     render(
       <ContextMenu
         items={[
@@ -676,13 +675,13 @@ describe("ContextMenu", () => {
 
     const [menu] = screen.getAllByRole("menu");
     expect(menu).toHaveClass("bg-surface-popover");
-    expect(menu).toHaveClass("listen-glass-panel");
+    expect(menu).toHaveClass("crate-overlay-surface");
     const submenu = screen.getByTestId("context-menu-submenu-playlist");
     expect(submenu).toHaveClass("bg-surface-popover");
-    expect(submenu).toHaveClass("listen-glass-panel");
+    expect(submenu).toHaveClass("crate-overlay-surface");
   });
 
-  it("keeps the listen glass surface on the submenu by default", () => {
+  it("keeps the shared overlay surface on the submenu by default", () => {
     render(
       <ContextMenu
         items={[
@@ -703,7 +702,7 @@ describe("ContextMenu", () => {
     );
 
     expect(screen.getByTestId("context-menu-submenu-playlist")).toHaveClass(
-      "listen-glass-panel",
+      "crate-overlay-surface",
     );
   });
 

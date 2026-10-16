@@ -433,13 +433,13 @@ export function Sidebar({ onNavigate }: SidebarProps) {
               {actualUser && previewableRolePresets.length > 0 ? (
                 <div
                   className={cn(
-                    "rounded-md border px-2 py-2",
+                    "crate-form-field rounded-md border px-2 py-2",
                     previewRole
                       ? "border-cyan-400/25 bg-cyan-400/10"
                       : "border-white/8 bg-black/15",
                   )}
                 >
-                  <div className="mb-1 flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
                       Preview as
                     </span>

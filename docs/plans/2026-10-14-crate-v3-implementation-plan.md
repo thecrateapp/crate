@@ -1605,12 +1605,23 @@ reviewed (Task 0.11), `TYPES`, `LINT`, `GATES`, one commit.
 
 **Files:**
 
-- Modify: `app/shared/ui/shadcn/{dialog,alert-dialog,sheet,popover,dropdown-menu,context-menu,tooltip}.tsx`, `app/shared/ui/primitives/{AppModal,AppPopover}.tsx`, `app/shared/ui/composites/ConfirmDialog.tsx`
+- Modify: `app/shared/ui/shadcn/{dialog,alert-dialog,sheet,popover,dropdown-menu,context-menu,tooltip,overlay-close-button}.tsx`, `app/shared/ui/primitives/{AppModal,AppPopover}.tsx`, `app/shared/ui/composites/ConfirmDialog.tsx`
 - Modify (Listen): `app/listen/src/components/actions/{ItemActionMenu,entity-menu}.tsx`
-- Modify (Admin): the 17 importers of `app/ui/src/components/ui/confirm-dialog.tsx` move to the shared `ConfirmDialog`; `app/ui/src/components/ui/{AppPopover,music-context-menu}.tsx`
+- Modify (Admin): the 15 actual consumers (20 instances; previous 17 included implementation/barrel) of `app/ui/src/components/ui/confirm-dialog.tsx` move to the shared `ConfirmDialog`; `app/ui/src/components/ui/{AppPopover,music-context-menu}.tsx`
 - Delete: `app/ui/src/components/ui/confirm-dialog.tsx` and its test
 - Test: the shared component tests (focus trap, Escape, `aria-modal`, destructive confirm uses the
   failed/destructive colour from PD10), `ItemActionMenu.test.tsx`, `ContextMenu.test.tsx`
+
+Status: **Checkpoint 1N ready for visual review; focused checks and SPEC/QUALITY pass**, preview `#capas`; stop for Diego's review
+before publication. Scope also includes shared actions `ContextMenu`/`MobileActionSheet` so
+their former glass recipe cannot survive through Listen's adapter. Preserve gesture behavior.
+All 20 Admin consequences use already available metadata; localized Listen consequence copy
+lands with domain/page migrations. Typed WIPE/REBUILD, async/stacked focus and close geometry
+are covered. Built-in close sits 16 px from top/right with title space reserved; sample labels
+use existing FormField with 8 px gap. All four overlay routes reuse OverlayCloseButton (40 px /
+24 px icon, transparent hover); legacy local glass/scrim overrides retire from AppModal callers.
+Form restyling remains 1b.2. During development run focused cases only; full validation runs once
+when development/the phase closes, per Diego's 2026-10-16 instruction.
 
 Commit: `feat(ui): restyle dialogs and menus and share one ConfirmDialog`.
 
@@ -1620,6 +1631,30 @@ Commit: `feat(ui): restyle dialogs and menus and share one ConfirmDialog`.
 
 Test: each primitive test (labels, `aria-invalid`, keyboard); a policy assertion that no new
 `<select>` with 7 options or fewer appears.
+
+Checkpoint split for review (2026-10-16): **1O** covers the nine used shared form
+components and consolidates Admin's local AdminSelect through the existing shared composite.
+Preserve all public props, keyboard, refs, debounce and clear behavior; RadioGroup has zero
+consumers and stays unchanged. `rounded-lg` is the existing 6 px token. Keep the functional
+iOS 16 px font exception. The preview extends `#formularios`; 1N remains unpublished and its
+review source is saved in ignored `.artifacts/checkpoint-1n-source.patch`.
+
+**1P** migrates the 28 fixed short selects (22 Admin, six effective Listen controls) and
+reviews six SegmentedControl callers, distinguishing panels/tabs from filters/radios. Preserve
+the 17 dynamic Admin option sources; fixed playlist field lists have 15 options and remain
+selects. The policy against new short selects lands with that migration, using the inventory
+rather than guessing cardinality from fixtures. Track the DS §5.6 Radio seed debounce here
+explicitly; Admin navigation SearchBar styling remains with its shell migration. Task 1b.2
+is not complete until these follow-up checks/migrations are addressed.
+
+Status: **Task 1b.2 complete in the 1N–1P publication cut.** The nine foundations, shared
+AdminSelect, 28 short-choice migrations, six caller reviews, AST policy and 300 ms Radio
+debounce are implemented. Search preserves IME/caret behavior; typed confirmation reuses
+FormField. Diego's latest correction standardizes every stacked label/control pair at 8 px
+through `.crate-form-field`, including existing forms in both apps. Focused verification,
+SPEC/QUALITY reviews and advisory captures are recorded in the handover. Diego authorised
+finishing this cut through commit/push and handing continuation to Linux. Next is Task 1b.3,
+checkpoint 1Q; do not run full suites during development iteration.
 
 Commit: `feat(ui): restyle form controls in the v3 language`.
 
@@ -5380,7 +5415,6 @@ know in advance.
 7. Full applicable Phase 7 QA and reviewed final screenshots/screencast precede the major. No
    checklist grants permission for commits, push, PRs, tags, deploys or production access.
 
-
 ### Checkpoint 1M — publication and Linux capture verification
 
 Published and pushed as `21873d24997ca53ca3218c891a8d70fae296cc78`. Linux recording
@@ -5390,5 +5424,7 @@ The original manifest identifies that production SHA, Linux x64 and the pinned P
 `v1.63.0-noble` image. Of 33 PNGs, 31 are byte-identical; only desktop/mobile Settings change
 to the approved three functional preferences. Both changed images are reviewed and imported.
 The ten obsolete skin/light captures were explicitly retired in the production commit.
-Comparison/full CI follows the capture import. Next assigned task: 1b.1 / Checkpoint 1N,
-shared overlays/menus and one ConfirmDialog; preserve its visual review/publication stop.
+Capture/provenance commit `297daaa1` is pushed. Full Frontend Tests and Linux visual comparison
+pass in [38889352392](https://github.com/thecrateapp/crate/actions/runs/38889352392).
+Next assigned task: 1b.1 / Checkpoint 1N, shared overlays/menus and one ConfirmDialog; preserve
+its visual review/publication stop.

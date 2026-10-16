@@ -1,4 +1,4 @@
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -32,23 +32,26 @@ afterEach(() => {
 });
 
 describe("InterfacePreferencesSection", () => {
-  it("offers only the three functional preferences through shared selects", () => {
+  it("offers only the three functional preferences through shared filter chips", () => {
     renderWithListenProviders(<InterfacePreferencesSection />, {
       locale: "en",
     });
 
-    expect(screen.getAllByRole("combobox")).toHaveLength(3);
-    expect(
-      screen.getByRole("combobox", { name: "Content density" }),
-    ).toHaveTextContent("Comfortable");
-    expect(screen.getByRole("combobox", { name: "Motion" })).toHaveTextContent(
-      "System",
-    );
-    expect(screen.getByRole("combobox", { name: "Effects" })).toHaveTextContent(
-      "Subtle",
-    );
+    expect(screen.getAllByRole("radiogroup")).toHaveLength(3);
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    for (const [label, selected] of [
+      ["Content density", "Comfortable"],
+      ["Motion", "System"],
+      ["Effects", "Subtle"],
+    ]) {
+      expect(
+        within(screen.getByRole("radiogroup", { name: label })).getByRole(
+          "radio",
+          { name: selected },
+        ),
+      ).toBeChecked();
+    }
     expect(document.querySelectorAll("select")).toHaveLength(0);
-    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /apply/i }),
     ).not.toBeInTheDocument();
@@ -60,14 +63,15 @@ describe("InterfacePreferencesSection", () => {
       locale: "en",
     });
     const setItem = vi.spyOn(localStorage, "setItem");
-    const density = screen.getByRole("combobox", { name: "Content density" });
+    const density = screen.getByRole("radiogroup", { name: "Content density" });
+    within(density).getByRole("radio", { name: "Comfortable" }).focus();
+    await user.keyboard("{End}");
 
-    density.focus();
-    await user.keyboard("{ArrowDown}");
-    await screen.findByRole("option", { name: "Compact" });
-    await user.keyboard("{End}{Enter}");
-
-    await waitFor(() => expect(density).toHaveTextContent("Compact"));
+    await waitFor(() =>
+      expect(
+        within(density).getByRole("radio", { name: "Compact" }),
+      ).toBeChecked(),
+    );
     expect(document.documentElement.dataset.crateDensity).toBe("compact");
     expect(getUiPreferences()).toEqual({
       version: 1,
@@ -90,14 +94,10 @@ describe("InterfacePreferencesSection", () => {
       locale: "en",
     });
 
-    await user.click(screen.getByRole("combobox", { name: "Motion" }));
-    await user.click(
-      await screen.findByRole("option", { name: "Reduce motion" }),
-    );
+    await user.click(screen.getByRole("radio", { name: "Reduce motion" }));
     expect(document.documentElement.dataset.crateMotion).toBe("reduced");
 
-    await user.click(screen.getByRole("combobox", { name: "Effects" }));
-    await user.click(await screen.findByRole("option", { name: "Off" }));
+    await user.click(screen.getByRole("radio", { name: "Off" }));
 
     expect(document.documentElement.dataset.crateEffects).toBe("off");
     expect(getUiPreferences()).toEqual({
@@ -131,23 +131,17 @@ describe("InterfacePreferencesSection", () => {
       locale: "en",
     });
 
-    await user.click(screen.getByRole("combobox", { name: "Motion" }));
-    await user.click(
-      await screen.findByRole("option", { name: "Reduce motion" }),
-    );
+    await user.click(screen.getByRole("radio", { name: "Reduce motion" }));
 
     const error = await screen.findByRole("alert");
     expect(error).not.toHaveTextContent("settings.interface.saveError");
     expect(error).not.toBeEmptyDOMElement();
     expect(localStorage.getItem(legacyKey)).toBe(legacy);
     expect(getUiPreferences().motion).toBe("reduced");
-    expect(screen.getByRole("combobox", { name: "Motion" })).toHaveTextContent(
-      "Reduce motion",
-    );
+    expect(screen.getByRole("radio", { name: "Reduce motion" })).toBeChecked();
 
     save.mockRestore();
-    await user.click(screen.getByRole("combobox", { name: "Effects" }));
-    await user.click(await screen.findByRole("option", { name: "Off" }));
+    await user.click(screen.getByRole("radio", { name: "Off" }));
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(

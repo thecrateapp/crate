@@ -212,8 +212,7 @@ export function ShareSheetHost() {
       onClose={close}
       ariaLabel={t("share.title", { kind: t(`share.kind.${payload.kind}`) })}
       maxWidthClassName="sm:max-w-[420px]"
-      panelClassName="listen-glass-panel overflow-hidden rounded-panel"
-      overlayClassName="bg-surface-canvas/58"
+      panelClassName="overflow-hidden rounded-panel"
       mobileSafeArea
     >
       <div className="relative overflow-hidden">

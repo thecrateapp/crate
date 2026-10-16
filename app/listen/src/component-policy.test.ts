@@ -143,3 +143,24 @@ describe("Listen component policy", () => {
     expect(copies.sort()).toEqual(Object.keys(LOCAL_COPY_ALLOWLIST).sort());
   }, 15_000);
 });
+
+describe("shared modal surface policy", () => {
+  it("does not override shared modal surfaces with the legacy glass recipe or a local scrim", () => {
+    const overrides: string[] = [];
+    for (const path of sourceFiles(SOURCE_ROOT, /\.tsx$/)) {
+      const source = readFileSync(path, "utf8");
+      for (const match of source.matchAll(/<AppModal(?=[\s/>])/g)) {
+        const attributes = tagAttributes(source, match.index);
+        if (
+          /\blisten-glass-panel\b/.test(attributes) ||
+          /\boverlayClassName\s*=\s*["'][^"']*\bbg-/.test(attributes)
+        ) {
+          overrides.push(
+            `${relative(SOURCE_ROOT, path)}:${lineOf(source, match.index)}`,
+          );
+        }
+      }
+    }
+    expect(overrides).toEqual([]);
+  });
+});

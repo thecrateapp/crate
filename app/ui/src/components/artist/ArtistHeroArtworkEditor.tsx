@@ -21,7 +21,7 @@ import {
 import { waitForTask } from "@/lib/tasks";
 import type { ArtistHeroCompositionView } from "../../../../shared/web/artist-hero-contract";
 
-import { ConfirmDialog } from "../ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 
 import { HeroCompositionCanvas } from "./HeroCompositionCanvas";
 import type { HeroRecipe } from "./hero-composition-geometry";
@@ -921,10 +921,16 @@ export function ArtistHeroArtworkEditor({
         confirmLabel="Delete composition"
         variant="destructive"
         onConfirm={() => {
-          const composition = deleteComposition;
-          setDeleteComposition(null);
-          if (composition) void deletePersistedComposition(composition);
+          void (() => {
+            const composition = deleteComposition;
+            setDeleteComposition(null);
+            if (composition) void deletePersistedComposition(composition);
+          })();
         }}
+        eyebrow="Confirm action"
+        consequence={`${
+          deleteComposition ?? ""
+        } hero · permanently removes saved composition and rendered artwork`}
       />
     </>
   );
@@ -944,8 +950,8 @@ function TreatmentSlider({
   onChange: (value: number) => void;
 }) {
   return (
-    <div>
-      <div className="mb-2 flex items-center justify-between gap-3">
+    <div className="crate-form-field">
+      <div className="flex items-center justify-between gap-3">
         <label htmlFor={id} className="text-xs font-medium text-foreground">
           {label}
         </label>

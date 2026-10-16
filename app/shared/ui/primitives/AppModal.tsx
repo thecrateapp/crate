@@ -10,9 +10,10 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { CRATE_ICON_SIZE, X } from "@crate/ui/icons";
+import { OverlayCloseButton } from "@crate/ui/shadcn/overlay-close-button";
 
 import { cn } from "@crate/ui/lib/cn";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useSheetDrag } from "@crate/ui/lib/use-sheet-drag";
 
 export type AppModalSize = "sm" | "md" | "lg" | "xl";
@@ -31,6 +32,7 @@ export interface AppModalProps {
   onClose: () => void;
   children?: ReactNode;
   title?: ReactNode;
+  eyebrow?: ReactNode;
   description?: ReactNode;
   size?: AppModalSize;
   role?: "dialog" | "alertdialog";
@@ -68,6 +70,7 @@ export function AppModal({
   onClose,
   children,
   title,
+  eyebrow,
   description,
   size,
   role = "dialog",
@@ -277,7 +280,7 @@ export function AppModal({
       aria-describedby={describedBy}
       tabIndex={-1}
       className={cn(
-        "z-app-modal fixed inset-0 m-0 flex h-full max-h-none w-full max-w-none items-end justify-center border-0 bg-surface-canvas/72 p-0 text-inherit backdrop-blur-md animate-fade-in sm:items-center sm:p-6",
+        "crate-overlay-scrim z-app-modal fixed inset-0 m-0 flex h-full max-h-none w-full max-w-none items-end justify-center border-0 p-0 text-inherit sm:items-center sm:p-6",
         overlayClassName,
       )}
     >
@@ -292,13 +295,14 @@ export function AppModal({
       <div
         ref={panelRef}
         data-app-modal-panel="true"
+        data-overlay-size={maxWidthClassName ? undefined : size ?? "lg"}
         tabIndex={-1}
         className={cn(
-          "bg-modal-surface relative z-10 w-full overflow-hidden overscroll-contain rounded-t-3xl border border-border-quiet shadow-2xl sm:rounded-3xl",
+          "crate-overlay-panel relative z-10 w-full overflow-hidden overscroll-contain",
           isDragClosing
             ? undefined
             : isEntering && !isDragging
-              ? "animate-sheet-up sm:animate-pop-in"
+              ? "crate-overlay-enter"
               : undefined,
           mobileSafeArea
             ? "max-h-[calc(var(--listen-viewport-height)-var(--listen-safe-top)-0.75rem)] pb-[var(--listen-safe-bottom)] sm:max-h-[92vh] sm:pb-0"
@@ -327,7 +331,7 @@ export function AppModal({
           )}
           {...dragHandleProps}
         >
-          <div className="w-10 h-1 rounded-full bg-text-primary/20" />
+          <div className="crate-overlay-grabber" />
         </div>
         {hasTitle ? (
           <ModalHeader
@@ -336,25 +340,30 @@ export function AppModal({
               headerClassName,
             )}
           >
-            <div className="min-w-0">
-              <h2
-                id={titleId}
-                className="text-lg font-semibold text-text-primary"
-              >
+            <div className="min-w-0 pr-12">
+              {eyebrow != null ? (
+                <MonoLabel size="eyebrow" className="mb-2">
+                  {eyebrow}
+                </MonoLabel>
+              ) : null}
+              <h2 id={titleId} className="crate-overlay-title">
                 {title}
               </h2>
               {hasDescription ? (
-                <p id={descriptionId} className="text-xs text-text-muted">
+                <p id={descriptionId} className="crate-overlay-body mt-2">
                   {description}
                 </p>
               ) : null}
             </div>
-            <ModalCloseButton
-              onClick={onClose}
-              disabled={closeDisabled}
-              label={closeLabel}
-            />
           </ModalHeader>
+        ) : null}
+        {hasTitle ? (
+          <ModalCloseButton
+            className="absolute top-4 right-4 z-20"
+            onClick={onClose}
+            disabled={closeDisabled}
+            label={closeLabel}
+          />
         ) : null}
         {children}
       </div>
@@ -372,7 +381,7 @@ export function ModalHeader({
     <div
       {...props}
       className={cn(
-        "sticky top-0 z-10 border-b border-border-quiet bg-modal-surface backdrop-blur-xl",
+        "sticky top-0 z-10 border-b border-border-quiet bg-surface-popover",
         className,
       )}
     >
@@ -389,7 +398,10 @@ export function ModalBody({
   return (
     <div
       {...props}
-      className={cn("overflow-y-auto overscroll-contain", className)}
+      className={cn(
+        "crate-overlay-body overflow-y-auto overscroll-contain",
+        className,
+      )}
     >
       {children}
     </div>
@@ -405,7 +417,7 @@ export function ModalFooter({
     <div
       {...props}
       className={cn(
-        "sticky bottom-0 z-10 border-t border-border-quiet bg-modal-surface backdrop-blur-xl",
+        "crate-overlay-footer sticky bottom-0 z-10 bg-surface-popover",
         className,
       )}
     >
@@ -428,17 +440,11 @@ export function ModalCloseButton({
   label = "Close",
 }: ModalCloseButtonProps) {
   return (
-    <button
-      type="button"
+    <OverlayCloseButton
       aria-label={label}
-      className={cn(
-        "flex size-10 items-center justify-center rounded-full text-text-primary/55 transition-[color,box-shadow] hover:text-text-primary focus-visible:text-text-primary disabled:pointer-events-none disabled:opacity-50",
-        className,
-      )}
+      className={className}
       onClick={onClick}
       disabled={disabled}
-    >
-      <X size={CRATE_ICON_SIZE.xl} />
-    </button>
+    />
   );
 }

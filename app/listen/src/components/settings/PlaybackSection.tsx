@@ -84,7 +84,7 @@ export function PlaybackSection() {
       title={t("settings.playback.title")}
       description={t("settings.playback.subtitle")}
     >
-      <div className="space-y-3">
+      <div className="crate-form-field">
         <div>
           <div className="text-sm font-medium text-text-primary">
             {t("settings.playback.streamQuality")}

@@ -97,7 +97,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
         <Search
           aria-hidden="true"
           size={CRATE_ICON_SIZE.sm}
-          className="pointer-events-none absolute top-1/2 left-3.5 z-10 -translate-y-1/2 text-text-muted"
+          className="pointer-events-none absolute top-1/2 left-3.5 z-10 -translate-y-1/2 text-text-subtle"
         />
         <Input
           ref={(node) => {
@@ -112,7 +112,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           disabled={disabled}
           className={cn(
             "pl-10 [&::-webkit-search-cancel-button]:appearance-none",
-            showClear && "pr-10",
+            showClear && "pr-11 pointer-coarse:pr-12",
             className,
           )}
           {...props}
@@ -123,7 +123,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             aria-label={clearLabel}
             title={clearLabel}
             onClick={handleClear}
-            className="absolute top-1/2 right-2 z-10 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-text-muted transition-colors hover:text-text-primary"
+            className="crate-form-search-clear absolute top-1/2 right-1 z-10 inline-flex -translate-y-1/2 items-center justify-center rounded-full text-text-subtle transition-colors hover:text-text-primary"
           >
             <X aria-hidden="true" size={CRATE_ICON_SIZE.sm} />
           </button>

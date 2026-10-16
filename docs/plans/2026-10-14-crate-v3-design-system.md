@@ -2,10 +2,11 @@
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
 `/Users/diego/Code/crate-v3`, branch `feat/crate_v3`. The handover owns implementation/QA status.
-Registry and harness paths below remain transitional until Task 1.13; later consumers use its
+Registry and harness references predating Task 1.13 are historical; current consumers use its
 single-identity equivalents without recreating retired exports.
 Historical reports retain their original measurements; they do not certify current test results.
-The single Crate v3 identity is approved; legacy runtime removal is under local review in Task 1.13 / Checkpoint 1M.
+The single Crate v3 identity is published through Task 1.13 / Checkpoint 1M (`21873d24`).
+Task 1b.1 / Checkpoint 1N is in local verification; later checkpoint publication remains gated.
 
 Visual source of truth: the new site only, `app/web` at the approved git reference:
 
@@ -808,7 +809,7 @@ ceilings are raised by exactly the number added (6.2). A token lands in the task
 consumer, with the registry and contrast tests in the same commit; `--surface-accent-active`
 therefore lands with the GenreWheel (plan Task 3.7, ceiling +1), and `--color-surface-popover` and
 `--surface-scrim` land with the overlay recipe together with the `--surface-popover` remap (plan
-Task 1b.1, ceiling +2).
+Task 1b.1; measured ceiling +1 because utility aliases normalize to one semantic token).
 
 | Token                                       | Value                                                                                                                                        | Utility                                                  | First consumer                                                     |
 | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------ |
@@ -968,10 +969,8 @@ interface StatNumberProps {
 #### `HairlineList` / `HairlineRow`
 
 ```ts
-interface HairlineRowProps extends Omit<
-  LiHTMLAttributes<HTMLLIElement>,
-  "children"
-> {
+interface HairlineRowProps
+  extends Omit<LiHTMLAttributes<HTMLLIElement>, "children"> {
   index?: number; // zero-padded mono index, 2.4ch to 3ch
   trailing?: ReactNode; // fixed-ch mono meta or a StatusDot
   muted?: boolean; // title in text-subtle
@@ -3709,6 +3708,21 @@ Listen (`components/layout/*`):
 
 ### 5.6 Forms
 
+**Global label spacing contract (Diego, 2026-10-16):** every stacked form label is exactly
+8 px above the component it labels, including fields, searches, read-only values, sliders and
+chip groups. Both apps use the shared `.crate-form-field` recipe: grid, 8 px gap, start-aligned
+content and zero minimum width. Do not substitute local `mb-*`, `mt-*`, `space-y-*` or smaller
+FormField gaps. Start alignment keeps the gap stable beside groups whose chips wrap. Preserve
+intentional horizontal label/control rows; when they wrap, their vertical gap is also 8 px.
+Section headings, result lists and lateral checkbox/switch labels retain their own layout.
+
+Implementation tracking (2026-10-16): the 1N–1P cut applies these foundations to the nine used
+shared controls and replaces Admin's duplicate AdminSelect. 1P migrates 28 short choices,
+reviews caller semantics, adds the policy and fixes Radio seed debounce. Global stacked
+label spacing is applied throughout both apps. Preview: `#formularios` and `#seleccion`.
+RadioGroup is unused and unchanged; Admin SearchBar's broader styling belongs to the shell
+migration. New canonical Linux recording and native QA remain separate from local checks.
+
 - Field: `MonoLabel` above (8 px gap); input 40 px tall (44 coarse), transparent on the canvas,
   `bg-input` (`--color-input`) on cards, `border-border-quiet`, `rounded-lg`, sans 15 `text-text-primary`,
   placeholder `text-text-subtle`; flush focus outline per §1.9.5 plus border `accent-action-hi/40`; helper
@@ -3761,6 +3775,11 @@ Listen (`components/layout/*`):
   Bricolage 700 title (1.4 to 1.6 rem, `-0.03em`); body `text-text-muted`, 60ch; footer with a top
   hairline, ghost cancel and CTA confirm on the right; widths 420, 560, 760 px; entrance `popIn` or
   `sheetUp` with longhand easing; 200 ms fade under reduced motion.
+- Built-in close: one `OverlayCloseButton` base shared by AppModal, ConfirmDialog and Radix
+  Dialog/Sheet. Native 40 px control, 24 px decorative icon, transparent background through hover,
+  foreground change on hover and the common keyboard focus. Absolute top-right of the panel,
+  16 px inset on each axis, with title space reserved. Mobile grabbers do not move the close into the title row. Labels sit above their
+  controls with 8 px spacing in the overlay specimens; full form recipes land in Task 1b.2.
 - Confirm dialog: one implementation (`@crate/ui/composites/ConfirmDialog`; Admin's local copy with
   15 consumers migrates, which makes the composite legitimately shared); a mono consequence line
   (`12 files · 1.4 GB · moves to Library Trash`); typed confirmation for wipe and rebuild.

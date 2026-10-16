@@ -325,10 +325,7 @@ describe("JamSession lobby (no roomId)", () => {
     renderWithListenProviders(<JamSession />);
 
     expect(document.querySelector("select")).not.toBeInTheDocument();
-    await userEvent.click(
-      screen.getByRole("combobox", { name: "Playback mode" }),
-    );
-    await userEvent.click(screen.getByRole("option", { name: "Auto DJ" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Auto DJ" }));
     const genreInput = screen.getByPlaceholderText("Search taxonomy genres…");
     await userEvent.type(genreInput, "post");
 

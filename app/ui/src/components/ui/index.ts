@@ -33,7 +33,7 @@ export { CratePill, CrateChip } from "@crate/ui/primitives/CrateBadge";
 export { AdminSelect, type AdminSelectOption } from "./AdminSelect";
 export { AIButton } from "./AIButton";
 export { CardSkeleton } from "./card-skeleton";
-export { ConfirmDialog } from "./confirm-dialog";
+export { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 export { ErrorState } from "./error-state";
 export { GridSkeleton } from "./grid-skeleton";
 export { ImageLightbox } from "./image-lightbox";

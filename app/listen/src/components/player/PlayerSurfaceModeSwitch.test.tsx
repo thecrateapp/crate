@@ -18,34 +18,27 @@ vi.mock("react-i18next", () => ({
 import { PlayerSurfaceModeSwitch } from "./PlayerSurfaceModeSwitch";
 
 describe("PlayerSurfaceModeSwitch", () => {
-  it("uses semantic tokens for boxed active and inactive modes", () => {
+  it("shares the chip recipe and exposes the selected player mode as a radio", () => {
     render(
       <PlayerSurfaceModeSwitch mode="cd" onChange={vi.fn()} variant="boxed" />,
     );
 
-    expect(screen.getByRole("tablist")).toHaveClass(
-      "border-border-subtle",
-      "bg-surface-chrome",
+    expect(
+      screen.getByRole("radiogroup", { name: "Player surface" }),
+    ).toHaveAttribute("data-slot", "segmented-control");
+    expect(screen.getByRole("radio", { name: "CD" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "CD" })).toHaveAttribute(
+      "data-state",
+      "active",
     );
-    expect(screen.getByRole("tab", { name: "CD" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    expect(screen.getByRole("tab", { name: "CD" })).toHaveClass(
-      "data-[state=active]:bg-accent-action/18",
-      "text-accent-action",
-    );
-    expect(screen.getByRole("tab", { name: "Cover" })).toHaveClass(
-      "data-[state=inactive]:text-text-muted",
-      "data-[state=inactive]:hover:bg-surface-control",
-      "data-[state=inactive]:hover:text-text-secondary",
-    );
-    expect(screen.getByRole("tab", { name: "Cover" }).className).not.toContain(
-      "white/",
-    );
+    expect(screen.getByRole("radio", { name: "Cover" })).not.toBeChecked();
+    for (const radio of screen.getAllByRole("radio")) {
+      expect(radio).toHaveClass("crate-form-chip");
+      expect(radio).toHaveAttribute("data-slot", "chip");
+    }
   });
 
-  it("notifies the selected mode when a tab is clicked", () => {
+  it("notifies the selected mode and preserves the visualizer capability gate", () => {
     const onChange = vi.fn<(mode: PlayerSurfaceMode) => void>();
 
     render(
@@ -56,11 +49,30 @@ describe("PlayerSurfaceModeSwitch", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "Cover" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Cover" }));
 
+    expect(onChange).toHaveBeenCalledOnce();
     expect(onChange).toHaveBeenCalledWith("cover");
     expect(
-      screen.queryByRole("tab", { name: "Visualizer" }),
+      screen.queryByRole("radio", { name: "Visualizer" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("changes the mode with arrow keys without submitting a surrounding form", () => {
+    const onChange = vi.fn<(mode: PlayerSurfaceMode) => void>();
+    const onSubmit = vi.fn();
+    render(
+      <form onSubmit={onSubmit}>
+        <PlayerSurfaceModeSwitch mode="cd" onChange={onChange} />
+      </form>,
+    );
+    const cd = screen.getByRole("radio", { name: "CD" });
+    cd.focus();
+
+    fireEvent.keyDown(cd, { key: "ArrowRight" });
+
+    expect(screen.getByRole("radio", { name: "Cover" })).toHaveFocus();
+    expect(onChange).toHaveBeenCalledWith("cover");
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });

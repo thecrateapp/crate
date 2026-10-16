@@ -59,7 +59,7 @@ describe("QueuePanel", () => {
     });
 
     const dialog = screen.getByRole("dialog");
-    const panel = dialog.querySelector(".listen-glass-panel");
+    const panel = dialog.querySelector(".crate-overlay-panel");
 
     expect(dialog).toHaveClass("z-app-modal");
     expect(panel).toHaveStyle({ bottom: "0px" });

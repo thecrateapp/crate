@@ -127,4 +127,28 @@ describe("SearchInput", () => {
     expect(ref.current).toBeInstanceOf(HTMLInputElement);
     expect(onChange).toHaveBeenCalledTimes(1);
   });
+
+  it("cancels a pending query when clear is pressed", () => {
+    vi.useFakeTimers();
+    const onDebouncedChange = vi.fn();
+    const onValueChange = vi.fn();
+    render(
+      <SearchInput
+        defaultValue="jazz"
+        debounceMs={200}
+        onDebouncedChange={onDebouncedChange}
+        onValueChange={onValueChange}
+      />,
+    );
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "ambient" } });
+    act(() => vi.advanceTimersByTime(100));
+    fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(input).toHaveValue("");
+    expect(input).toHaveFocus();
+    expect(onValueChange).toHaveBeenLastCalledWith("");
+    expect(onDebouncedChange).toHaveBeenCalledWith("");
+    act(() => vi.advanceTimersByTime(500));
+    expect(onDebouncedChange).toHaveBeenCalledOnce();
+  });
 });

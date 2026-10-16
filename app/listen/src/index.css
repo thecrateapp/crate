@@ -25,7 +25,6 @@ html {
   color-scheme: dark;
 }
 
-
 #root {
   min-height: var(--listen-viewport-height);
   background: var(--surface-canvas);
@@ -566,24 +565,7 @@ html[data-keyboard-open] select {
   border-radius: var(--radius-lg);
 }
 
-[data-slot="segmented-control"] {
-  border-radius: calc(var(--radius-lg) + 0.25rem);
-}
-
 /* ── Listen-only vendor overrides ── */
-
-/* Keep shared modal primitives within Listen's 12px large-surface contract. */
-.bg-modal-surface.rounded-t-3xl,
-.listen-glass-panel.fixed.inset-x-0.rounded-t-3xl {
-  border-top-left-radius: 12px !important;
-  border-top-right-radius: 12px !important;
-}
-
-@media (min-width: 640px) {
-  .bg-modal-surface.rounded-t-3xl {
-    border-radius: 12px !important;
-  }
-}
 
 /* Leaflet */
 .leaflet-popup-content-wrapper {

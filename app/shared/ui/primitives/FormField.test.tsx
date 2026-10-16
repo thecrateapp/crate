@@ -72,4 +72,79 @@ describe("FormField", () => {
       screen.getByRole("switch", { name: "Notifications" }),
     ).toBeInTheDocument();
   });
+
+  it("uses a warning status dot and preserves all error descriptions", () => {
+    const { container } = render(
+      <>
+        <p id="external-help">Imported metadata</p>
+        <FormField
+          id="release-title"
+          label="Title"
+          hint="Use the release title"
+          error="A title is required"
+        >
+          <Input id="legacy-title" aria-describedby="external-help" />
+        </FormField>
+      </>,
+    );
+    const input = screen.getByRole("textbox", { name: "Title" });
+    const error = screen.getByRole("alert");
+    expect(input).toHaveAttribute("id", "release-title");
+    expect(input).toHaveAttribute(
+      "aria-describedby",
+      "external-help release-title-hint release-title-error",
+    );
+    expect(input).toHaveAccessibleDescription(
+      "Imported metadata Use the release title A title is required",
+    );
+    expect(error).toHaveAttribute("id", "release-title-error");
+    expect(error.querySelector('[data-tone="warn"]')).toBeInTheDocument();
+    expect(error.querySelector(".crate-status-dot")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(error.textContent).toBe("A title is required");
+    expect(
+      Array.from(container.querySelectorAll("[class]"))
+        .map((node) => node.className)
+        .join(" "),
+    ).not.toMatch(/state-danger/);
+  });
+
+  it("keeps generated ids stable while hint and error appear and disappear", () => {
+    const { rerender } = render(
+      <FormField label="Name">
+        <Input />
+      </FormField>,
+    );
+    const input = screen.getByRole("textbox", { name: "Name" });
+    const id = input.id;
+    expect(id).not.toBe("");
+    rerender(
+      <FormField label="Name" hint="Full name" error="Required">
+        <Input />
+      </FormField>,
+    );
+    expect(input).toHaveAttribute("id", id);
+    expect(input).toHaveAttribute("aria-describedby", `${id}-hint ${id}-error`);
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    rerender(
+      <FormField label="Name" hint="Full name">
+        <Input />
+      </FormField>,
+    );
+    expect(input).toHaveAttribute("id", id);
+    expect(input).toHaveAttribute("aria-describedby", `${id}-hint`);
+    expect(input).not.toHaveAttribute("aria-invalid");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("preserves an existing invalid state when it has no field error", () => {
+    render(
+      <FormField label="Imported title">
+        <Input aria-invalid />
+      </FormField>,
+    );
+    expect(screen.getByRole("textbox")).toHaveAttribute("aria-invalid", "true");
+  });
 });

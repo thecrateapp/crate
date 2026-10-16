@@ -7,6 +7,8 @@ import {
 } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
 
 export interface FormFieldControlProps {
   id: string;
@@ -90,24 +92,28 @@ export function FormField({
     <div
       data-slot="form-field"
       data-invalid={showError || undefined}
-      className={cn("grid gap-1.5", className)}
+      className={cn("crate-form-field grid gap-2", className)}
     >
       {hasContent(label) ? (
         <label
           htmlFor={controlId}
           data-slot="form-field-label"
           className={cn(
-            "text-sm font-medium text-text-primary",
-            showError && "text-state-danger-text",
+            "font-mono text-label text-text-subtle",
             labelClassName,
           )}
         >
-          {label}
-          {required ? (
-            <span aria-hidden="true" className="ml-0.5 text-state-danger-text">
-              *
-            </span>
-          ) : null}
+          <MonoLabel as="span" className="text-inherit">
+            {label}
+            {required ? (
+              <span
+                aria-hidden="true"
+                className="ml-0.5 text-state-warning-text"
+              >
+                *
+              </span>
+            ) : null}
+          </MonoLabel>
         </label>
       ) : null}
       {renderedControl}
@@ -115,7 +121,7 @@ export function FormField({
         <p
           id={hintId}
           data-slot="form-field-hint"
-          className="text-xs text-text-muted"
+          className="crate-form-helper"
         >
           {hint}
         </p>
@@ -125,9 +131,10 @@ export function FormField({
           id={errorId}
           data-slot="form-field-error"
           role="alert"
-          className="text-xs text-state-danger-text"
+          className="crate-form-helper flex items-start gap-2"
         >
-          {error}
+          <StatusDot tone="warn" className="mt-1" />
+          <span>{error}</span>
         </p>
       ) : null}
     </div>

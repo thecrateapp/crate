@@ -158,8 +158,8 @@ export function EndpointPanel({
         </div>
       ) : null}
 
-      <div className="relative p-5">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-kicker text-accent-action/60">
+      <div className="crate-form-field relative p-5">
+        <div className="text-xs font-semibold uppercase tracking-kicker text-accent-action/60">
           <MapPin size={CRATE_ICON_SIZE.micro} className="mr-1 inline" />
           {label}
         </div>

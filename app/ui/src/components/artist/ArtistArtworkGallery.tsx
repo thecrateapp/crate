@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { waitForTask } from "@/lib/tasks";
 
 type ArtworkSlot = "avatar" | "background" | "hero_desktop" | "hero_mobile";
@@ -540,8 +540,14 @@ export function ArtistArtworkGallery({
         confirmLabel="Delete image"
         variant="destructive"
         onConfirm={() => {
-          if (assetToDelete) void deleteAsset(assetToDelete);
+          void (() => {
+            if (assetToDelete) void deleteAsset(assetToDelete);
+          })();
         }}
+        eyebrow="Confirm action"
+        consequence={`${
+          assetToDelete?.label ?? "Image"
+        } · removes the image from the artist gallery`}
       />
     </section>
   );

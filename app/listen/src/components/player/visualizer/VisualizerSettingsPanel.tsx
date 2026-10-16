@@ -149,9 +149,11 @@ export function VisualizerSettingsPanel({
       {SLIDERS.map(({ key, labelKey, min, max, step }) => (
         <div
           key={key}
-          className={`transition-opacity ${vizEnabled ? "" : "opacity-45"}`}
+          className={`crate-form-field transition-opacity ${
+            vizEnabled ? "" : "opacity-45"
+          }`}
         >
-          <div className="mb-1 flex justify-between text-xs">
+          <div className="flex justify-between text-xs">
             <span className="text-text-subtle">{t(labelKey)}</span>
             <div className="flex items-center gap-2 font-mono">
               {trackAdaptiveViz ? (

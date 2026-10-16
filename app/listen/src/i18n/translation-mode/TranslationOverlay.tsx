@@ -80,8 +80,8 @@ export function TranslationOverlay() {
             <Field label="English source" value={selectedTarget.sourceValue} />
             <Field label="Quality status" value="Not checked locally" />
 
-            <label className="block">
-              <span className="mb-1 block text-xs font-bold uppercase tracking-label text-text-primary/35">
+            <label className="crate-form-field">
+              <span className="block text-xs font-bold uppercase tracking-label text-text-primary/35">
                 Current value
               </span>
               <textarea
@@ -126,8 +126,8 @@ export function TranslationOverlay() {
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <div className="mb-1 text-xs font-bold uppercase tracking-label text-text-primary/35">
+    <div className="crate-form-field">
+      <div className="text-xs font-bold uppercase tracking-label text-text-primary/35">
         {label}
       </div>
       <div className="rounded-md border border-text-primary/8 bg-text-primary/[0.04] px-3 py-2 text-sm text-text-primary/80">

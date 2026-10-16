@@ -100,7 +100,7 @@ export function CrateCreateModal({
       closeLabel={t("common.close")}
       closeDisabled={submitting}
       headerClassName="bg-transparent"
-      panelClassName="listen-glass-panel flex flex-col border-border-quiet"
+      panelClassName="flex flex-col border-border-quiet"
       closeOnEscape={!submitting}
       closeOnOverlay={!submitting}
     >

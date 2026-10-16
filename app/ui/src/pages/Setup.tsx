@@ -199,8 +199,8 @@ export function Setup() {
                     url: "https://api.setlist.fm/docs/1.0/index.html",
                   },
                 ].map(({ key, label, desc, url }) => (
-                  <div key={key}>
-                    <div className="flex items-center gap-2 mb-1">
+                  <div key={key} className="crate-form-field">
+                    <div className="flex items-center gap-2">
                       <label
                         htmlFor={`setup-${key}`}
                         className="text-xs font-medium"

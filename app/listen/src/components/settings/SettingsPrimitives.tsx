@@ -44,7 +44,7 @@ export function RangeRow({
   onChange: (value: number) => void;
 }) {
   return (
-    <div className={`space-y-2 ${disabled ? "opacity-50" : ""}`}>
+    <div className={`crate-form-field ${disabled ? "opacity-50" : ""}`}>
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="text-sm font-medium text-text-primary">{label}</div>

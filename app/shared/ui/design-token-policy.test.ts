@@ -30,7 +30,6 @@ const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
 };
 
 const ICON_SIZE_BUDGET: Record<string, Record<string, number>> = {
-  "composites/AdminSelect.tsx": { "13": 1 },
   "primitives/ErrorState.tsx": { "32": 1 },
 };
 

@@ -1,3 +1,5 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import {
@@ -433,17 +435,24 @@ export function Logs() {
               className="pl-9"
             />
           </div>
-          <AdminSelect
-            value={level}
-            onChange={setLevel}
-            placeholder="All levels"
-            options={[
-              { value: "error", label: "Error" },
-              { value: "warn", label: "Warning" },
-              { value: "info", label: "Info" },
-              { value: "debug", label: "Debug" },
-            ]}
-          />
+          <div className="crate-form-field max-w-full">
+            <MonoLabel as="span" className="block">
+              Log level
+            </MonoLabel>
+            <SegmentedControl
+              as="radio"
+              label="Log level"
+              value={level}
+              onValueChange={setLevel}
+              items={[
+                { value: "", label: "All levels" },
+                { value: "error", label: "Error" },
+                { value: "warn", label: "Warning" },
+                { value: "info", label: "Info" },
+                { value: "debug", label: "Debug" },
+              ]}
+            />
+          </div>
           <AdminSelect
             value={category}
             onChange={setCategory}

@@ -33,7 +33,7 @@ describe("semantic surface shadows", () => {
     );
   });
 
-  it("uses the modal shadow token", () => {
+  it("uses the shared overlay recipe for modal content", () => {
     render(
       <Dialog open>
         <DialogContent>
@@ -44,10 +44,11 @@ describe("semantic surface shadows", () => {
       </Dialog>,
     );
 
-    expect(screen.getByRole("dialog")).toHaveClass("shadow-modal");
+    expect(screen.getByRole("dialog")).toHaveClass("crate-overlay-panel");
+    expect(screen.getByRole("dialog")).not.toHaveClass("shadow-modal");
   });
 
-  it("uses the sheet shadow token", () => {
+  it("uses the shared overlay recipe for sheet content", () => {
     render(
       <Sheet open>
         <SheetContent>
@@ -58,6 +59,7 @@ describe("semantic surface shadows", () => {
       </Sheet>,
     );
 
-    expect(screen.getByRole("dialog")).toHaveClass("shadow-sheet");
+    expect(screen.getByRole("dialog")).toHaveClass("crate-overlay-panel");
+    expect(screen.getByRole("dialog")).not.toHaveClass("shadow-sheet");
   });
 });

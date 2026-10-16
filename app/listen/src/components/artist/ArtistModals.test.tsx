@@ -44,8 +44,9 @@ describe("artist mobile modals", () => {
 
     const panel = screen
       .getByText("Probable Setlist")
-      .closest(".listen-glass-panel");
-    expect(panel).toBeInTheDocument();
+      .closest("[data-app-modal-panel]");
+    expect(panel).toHaveClass("crate-overlay-panel");
+    expect(panel).not.toHaveClass("listen-glass-panel");
     expect(panel).not.toHaveClass("fixed");
     expect(panel?.className).not.toContain(
       "listen-mobile-bottom-chrome-height",
@@ -81,8 +82,9 @@ describe("artist mobile modals", () => {
       />,
     );
 
-    const panel = screen.getByText("Kneecap").closest(".listen-glass-panel");
-    expect(panel).toBeInTheDocument();
+    const panel = screen.getByText("Kneecap").closest("[data-app-modal-panel]");
+    expect(panel).toHaveClass("crate-overlay-panel");
+    expect(panel).not.toHaveClass("listen-glass-panel");
     expect(panel).toHaveClass("sm:max-w-4xl", "max-w-4xl");
     expect(panel).not.toHaveClass("fixed");
     expect(panel?.className).not.toContain(
@@ -181,7 +183,9 @@ describe("artist mobile modals", () => {
       />,
     );
 
-    const panel = screen.getByText("Converge").closest(".listen-glass-panel");
+    const panel = screen
+      .getByText("Converge")
+      .closest("[data-app-modal-panel]");
     const header = screen.getByTestId("artist-bio-header");
     const hardcore = screen.getByRole("button", { name: /hardcore/i });
     const metalcore = screen.getByRole("button", { name: /metalcore/i });

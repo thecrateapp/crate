@@ -1,13 +1,7 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { CRATE_ICON_SIZE, Globe2, Lock } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
-
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@crate/ui/shadcn/select";
 
 import type { JamQueueMode } from "@/pages/jam-reducer";
 
@@ -24,31 +18,24 @@ export function PlaybackModeSelect({
   const { t } = useTranslation();
 
   return (
-    <label className="flex flex-col gap-2 text-sm text-text-primary">
-      <span className="text-xs uppercase tracking-wide text-text-muted">
-        {t("jam.lobby.playbackMode")}
-      </span>
-      <Select
+    <div className="crate-form-field">
+      <MonoLabel as="span">{t("jam.lobby.playbackMode")}</MonoLabel>
+      <SegmentedControl
+        as="radio"
+        label={t("jam.lobby.playbackMode")}
         value={roomQueueMode}
         onValueChange={(value) => {
           const nextMode = value as JamQueueMode;
           onRoomQueueModeChange(nextMode);
           if (nextMode === "auto_dj") setRoomPermanent(true);
         }}
-      >
-        <SelectTrigger
-          aria-label={t("jam.lobby.playbackMode")}
-          className="jam-select-trigger h-11 w-full px-4"
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="manual">{t("jam.room.djMode")}</SelectItem>
-          <SelectItem value="auto">{t("jam.room.autoMode")}</SelectItem>
-          <SelectItem value="auto_dj">{t("jam.room.autoDjMode")}</SelectItem>
-        </SelectContent>
-      </Select>
-    </label>
+        items={[
+          { value: "manual", label: t("jam.room.djMode") },
+          { value: "auto", label: t("jam.room.autoMode") },
+          { value: "auto_dj", label: t("jam.room.autoDjMode") },
+        ]}
+      />
+    </div>
   );
 }
 

@@ -270,7 +270,6 @@ Manual review covers the seven changed images (System and six Settings); the oth
 byte-identical. The original manifest/all 33 PNGs are published in `c44b31f3`; comparison and full
 frontend CI pass in run `38865107324`.
 
-
 Checkpoint 1H implements Task1.8 locally and stops for visual review. Meter keeps actual numeric
 text when its fill/ARIA range clamps; missing/invalid ranges are described groups, not incomplete
 ARIA meters. Native offline file bytes cannot be measured against browser quota; fall back to
@@ -292,7 +291,6 @@ has verified SHA256 `9ddb9de0b2cf3beb5dda5d125cc609dffecb13fe1b840f22071e7028b3f
 35 PNGs: 32 identical, System changed and two new Offline scenes. The original manifest and all
 images are published in `ef5e7f52`; comparison/full frontend CI `38869556811` passes. This closes
 the 1H publication/capture checkpoint.
-
 
 Checkpoint 1I implements Task 1.9 locally. Readout separates aria-hidden preview text from a
 persistent polite/atomic sr-only announcement and reserves width through a CSS variable/ref.
@@ -398,7 +396,6 @@ All 43 PNGs are byte-identical to the reviewed 1K references; the original manif
 Capture/provenance commit `bf1fa793` is pushed; comparison/full Frontend Tests pass in
 `38885478542`.
 
-
 On 2026-10-16 Diego explicitly reconfirmed PD53: Listen and Admin share one Crate identity,
 tokens, primitives, recipes and interaction rules. Only domain-specific components/data/workflows
 differ. Do not introduce app-level visual variants. Legacy local duplicates converge through
@@ -412,7 +409,6 @@ Smart Mix settings after integration. Functional motion/effects/density migrate 
 compatibility with fixed outgoing identity values and real reduced motion. Local verification and
 independent spec/quality reviews pass; Diego reviews the updated mockup before commit/push.
 
-
 1M remains uncommitted for visual review. Shared 746 / Admin 268 / Desktop 52 / receiver 66 /
 protocol 20 full suites pass. Listen full has 2,884 passing/four skipped and only the stale
 raw-input budget failure; its measured 10→8 correction passes seven focused policy/theme-color
@@ -423,12 +419,10 @@ Six types, three lints, i18n, Rust collector seven cases/format, builds, 49 tool
 sync and drift/layer gates pass. Raw-input and direct-shadcn ceilings decrease; none increases.
 Exact invocations, bundle sizes and pending hardware/Linux capture QA are in the handover.
 
-
 Diego approved Checkpoint 1M on 2026-10-16 and authorised commit/push, canonical Linux captures
 and continuation with Task 1b.1. Retire the ten obsolete variant PNGs and record/review the
 33 remaining single-identity references in Linux CI. Preserve later review/publication stops.
 This supersedes earlier local-only 1M notes; rebase/PR/release remain gated.
-
 
 ### Checkpoint 1M — publication and Linux capture verification
 
@@ -439,5 +433,61 @@ The original manifest identifies that production SHA, Linux x64 and the pinned P
 `v1.63.0-noble` image. Of 33 PNGs, 31 are byte-identical; only desktop/mobile Settings change
 to the approved three functional preferences. Both changed images are reviewed and imported.
 The ten obsolete skin/light captures were explicitly retired in the production commit.
-Comparison/full CI follows the capture import. Next assigned task: 1b.1 / Checkpoint 1N,
-shared overlays/menus and one ConfirmDialog; preserve its visual review/publication stop.
+Capture/provenance commit `297daaa1` is pushed. Full Frontend Tests and Linux visual comparison
+pass in [38889352392](https://github.com/thecrateapp/crate/actions/runs/38889352392).
+Next assigned task: 1b.1 / Checkpoint 1N, shared overlays/menus and one ConfirmDialog; preserve
+its visual review/publication stop.
+
+### Checkpoint 1N review corrections — 2026-10-16
+
+Diego requires the close in the panel's top-right corner with suitable margins, not inline
+with the title. One OverlayCloseButton now supplies all four overlay routes (AppModal,
+ConfirmDialog, Radix Dialog and Sheet): 40 px control, 24 px decorative icon, transparent
+hover and shared keyboard focus, inset 16 px. Title space is reserved only when the close
+is shown. The sample label/control gap is 8 px using the existing FormField; full form
+restyling remains 1b.2. Independent SPEC and QUALITY reviews pass; 1N publication still
+awaits Diego's visual review.
+
+Diego also establishes the development test policy: only tests scoped to changed behavior
+and affected consumers while developing; run full validation once when development or the
+phase closes. This overrides earlier instructions to rerun all suites after every shared edit.
+
+### Checkpoint 1O scope and review — 2026-10-16
+
+Continue locally with form foundations while Diego reviews the preview; continuation does
+not approve publication of 1N. Preserve its separate source patch and the review checkpoint.
+1O covers the nine used shared controls, AdminSelect consolidation and ConfirmDialog's typed
+field label. Keep APIs, caller-owned validation, refs, debounce/clear, keyboard/IME behavior
+and the functional iOS 16 px field exception. No new token is needed for the existing 6 px radius.
+
+Split 1P for the 28 fixed short selects (22 Admin, six effective Listen), six SegmentedControl
+caller reviews, new-short-select policy and Radio seed debounce. Dynamic option sources stay
+selects; do not infer their maximum cardinality from fixtures. Panel switchers keep tab
+semantics until their planned migration. RadioGroup has zero importers and is not restyled.
+SPEC and final QUALITY reviews pass for 1O; Diego's visual/publication review remains pending.
+
+### Global stacked label spacing — Diego, 2026-10-16
+
+"hay que definir una separacion estandar entra label e input, o lavel y componente que lleve
+debajo, y aplicarlar en todas partes"
+
+The standard is 8 px, matching DS §5.6 and the reviewed FormField sample. Apply it throughout
+Listen and Admin, including existing forms, searches, sliders, read-only values and chip
+groups. One shared `.crate-form-field` grid recipe owns that geometry; do not depend on child
+margins or per-app variants. Keep horizontal rows and use an 8 px vertical gap when they wrap.
+Section headings and result-list spacing are separate from a field's label/control pair.
+This correction is part of the current 1P publication cut, before commit/push and Linux handoff.
+
+### Checkpoints 1N–1P publication and Linux continuation — 2026-10-16
+
+Diego explicitly authorises finishing the next cut through commit/push and transferring the
+continuation to a Linux Codex agent without a local checkout. This supersedes earlier local-only
+1N/1O publication stops. The combined cut closes Task 1b.1 and Task 1b.2, including the global
+8 px label/control correction above. Independent final SPEC/QUALITY reviews and focused tests
+pass; no full suites or new CI workflow are run during iteration. Canonical 1N–1P Linux
+recording/comparison and native QA remain pending; preserve the 33 existing 1M references and
+original manifest. Rebase, PR, deploy and release remain outside this publication authorisation.
+
+The next task is 1b.3 / proposed checkpoint 1Q, with a review stop before later blocks or further
+publication. Follow the tracked Linux bootstrap in `2026-10-16-crate-v3-linux-handover.md`;
+use the existing `feat/crate_v3` remote branch and preserve the persistent component preview.

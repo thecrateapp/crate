@@ -87,7 +87,7 @@ export function CrateEditor({ crateId, onBack, onDeleted }: CrateEditorProps) {
         title={t("library.crates.title")}
         closeLabel={t("common.close")}
         headerClassName="bg-transparent"
-        panelClassName="listen-glass-panel flex flex-col border-border-quiet"
+        panelClassName="flex flex-col border-border-quiet"
       >
         <section className="flex min-h-0 flex-col">
           <ModalBody className="p-5">
@@ -297,7 +297,7 @@ function CrateEditorForm({
       closeLabel={t("common.close")}
       closeOnEscape={!deleteConfirmation}
       headerClassName="bg-transparent"
-      panelClassName="listen-glass-panel flex flex-col border-border-quiet"
+      panelClassName="flex flex-col border-border-quiet"
     >
       <section className="flex min-h-0 flex-col">
         <ModalBody className="space-y-5 p-5">
@@ -393,6 +393,7 @@ function CrateEditorForm({
                 {t("library.crates.delete")}
               </Button>
               <ConfirmDialog
+                eyebrow={t("actions.confirmation.eyebrow")}
                 open={deleteConfirmation}
                 tone="danger"
                 pending={deleting}

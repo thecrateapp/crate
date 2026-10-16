@@ -282,6 +282,7 @@ export function OpenSubsonicCredentialsSection() {
       )}
 
       <ConfirmDialog
+        eyebrow={t("actions.confirmation.eyebrow")}
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         onConfirm={confirmAction}

@@ -52,7 +52,7 @@ afterEach(() => {
 });
 
 describe("PlaylistCreateModal", () => {
-  it("uses the Listen glass panel surface", () => {
+  it("uses the shared modal panel surface", () => {
     render(
       <I18nProvider initialLocale="en">
         <PlaylistCreateModal
@@ -68,8 +68,11 @@ describe("PlaylistCreateModal", () => {
     expect(
       screen
         .getByRole("heading", { name: "Create playlist" })
-        .closest(".listen-glass-panel"),
-    ).toBeInTheDocument();
+        .closest("[data-app-modal-panel]"),
+    ).toHaveClass("crate-overlay-panel");
+    expect(
+      screen.getByRole("dialog").querySelector(".listen-glass-panel"),
+    ).toBeNull();
   });
 
   it("adds global catalog tracks to the submit payload", async () => {

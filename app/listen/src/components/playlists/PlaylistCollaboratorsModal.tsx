@@ -139,6 +139,7 @@ export function PlaylistCollaboratorsModal({
               {t("collaboration.leavePlaylist")}
             </Button>
             <ConfirmDialog
+              eyebrow={t("actions.confirmation.eyebrow")}
               open={leaveConfirmation}
               tone="danger"
               pending={leaving}

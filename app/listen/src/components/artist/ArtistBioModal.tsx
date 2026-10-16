@@ -83,8 +83,7 @@ export function ArtistBioModal({
       onClose={onClose}
       ariaLabel={artist.name}
       maxWidthClassName="sm:max-w-4xl"
-      overlayClassName="bg-surface-canvas-overlay"
-      panelClassName="listen-glass-panel flex min-h-0 w-full max-w-4xl flex-col overflow-hidden border-0 sm:max-h-[92vh]"
+      panelClassName="flex min-h-0 w-full max-w-4xl flex-col overflow-hidden sm:max-h-[92vh]"
       mobileSafeArea
     >
       <ArtistBioProfile

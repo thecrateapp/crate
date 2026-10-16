@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("react-router", () => ({
@@ -32,9 +33,11 @@ vi.mock("sonner", () => ({
 }));
 
 import { useApi } from "@/hooks/use-api";
+import { api } from "@/lib/api";
 import { PlaylistEditor } from "./PlaylistEditor";
 
 const mockUseApi = vi.mocked(useApi);
+const mockApi = vi.mocked(api);
 
 class MockEventSource {
   onmessage: ((event: MessageEvent) => void) | null = null;
@@ -129,5 +132,47 @@ describe("PlaylistEditor", () => {
     expect(
       screen.getByText(/Upload a clean image-only hero asset/i),
     ).toBeInTheDocument();
+  });
+
+  it("keeps operator focus across consecutive arrow changes and resets the rule value", async () => {
+    mockApi.mockResolvedValue({});
+    render(<PlaylistEditor />);
+    const genre = screen.getByRole("combobox", { name: "Select genre" });
+    expect(genre).toHaveTextContent("screamo");
+    const operator = () => screen.getByRole("radiogroup", { name: "Operator" });
+    await userEvent.click(
+      within(operator()).getByRole("radio", { name: "Contains" }),
+    );
+
+    await userEvent.keyboard("{ArrowRight}");
+    const notContains = within(operator()).getByRole("radio", {
+      name: "Not contains",
+    });
+    expect(notContains).toHaveAttribute("aria-checked", "true");
+    expect(notContains).toHaveFocus();
+    expect(
+      screen.getByRole("combobox", { name: "Select genre" }),
+    ).toHaveTextContent("Select genre");
+
+    await userEvent.keyboard("{ArrowRight}");
+    const equals = within(operator()).getByRole("radio", { name: "Equals" });
+    expect(equals).toHaveAttribute("aria-checked", "true");
+    expect(equals).toHaveFocus();
+    expect(
+      screen.getByRole("combobox", { name: "Select genre" }),
+    ).toHaveTextContent("Select genre");
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => {
+      expect(mockApi).toHaveBeenCalledWith(
+        "/api/admin/system-playlists/42",
+        "PUT",
+        expect.objectContaining({
+          smart_rules: expect.objectContaining({
+            rules: [{ field: "genre", op: "eq", value: "" }],
+          }),
+        }),
+      );
+    });
   });
 });

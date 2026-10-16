@@ -1,3 +1,6 @@
+import { cn } from "@crate/ui/lib/cn";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import {
   useCallback,
   useDeferredValue,
@@ -325,10 +328,8 @@ function Field({
   children: ReactNode;
 }) {
   return (
-    <div className={className}>
-      <span className="mb-1.5 block text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-        {label}
-      </span>
+    <div className={cn("crate-form-field", className)}>
+      <MonoLabel as="span">{label}</MonoLabel>
       {children}
     </div>
   );
@@ -1047,12 +1048,12 @@ export function PlaylistEditor() {
                   />
                 </Field>
                 <Field label="Category">
-                  <AdminSelect
+                  <SegmentedControl
+                    as="radio"
+                    label="Category"
                     value={category}
-                    onChange={setCategory}
-                    options={CATEGORY_OPTIONS}
-                    placeholder="None"
-                    triggerClassName="w-full max-w-none"
+                    onValueChange={setCategory}
+                    items={[{ value: "", label: "None" }, ...CATEGORY_OPTIONS]}
                   />
                 </Field>
                 <Field label="Featured rank">
@@ -1197,16 +1198,17 @@ export function PlaylistEditor() {
               <CardContent className="space-y-4">
                 <div className="grid gap-4 lg:grid-cols-[180px_120px_180px]">
                   <Field label="Match">
-                    <AdminSelect
+                    <SegmentedControl
+                      as="radio"
+                      label="Match"
                       value={match}
-                      onChange={(value) => setMatch(value as "all" | "any")}
-                      options={[
+                      onValueChange={(value) =>
+                        setMatch(value as "all" | "any")
+                      }
+                      items={[
                         { value: "all", label: "All rules" },
                         { value: "any", label: "Any rule" },
                       ]}
-                      allowClear={false}
-                      placeholder="Match"
-                      triggerClassName="w-full max-w-none"
                     />
                   </Field>
 
@@ -1223,13 +1225,12 @@ export function PlaylistEditor() {
                   </Field>
 
                   <Field label="Sort">
-                    <AdminSelect
+                    <SegmentedControl
+                      as="radio"
+                      label="Sort"
                       value={sort}
-                      onChange={setSort}
-                      options={SORT_OPTIONS}
-                      allowClear={false}
-                      placeholder="Sort"
-                      triggerClassName="w-full max-w-none"
+                      onValueChange={setSort}
+                      items={SORT_OPTIONS}
                     />
                   </Field>
                 </div>
@@ -1247,7 +1248,7 @@ export function PlaylistEditor() {
 
                     return (
                       <div
-                        key={`${rule.field}-${rule.op}-${String(rule.value)}`}
+                        key={index}
                         className="rounded-md border border-white/10 bg-black/10 p-3"
                       >
                         <div className="mb-3 flex items-center justify-between gap-3">
@@ -1282,15 +1283,14 @@ export function PlaylistEditor() {
                           </Field>
 
                           <Field label="Operator">
-                            <AdminSelect
+                            <SegmentedControl
+                              as="radio"
+                              label="Operator"
                               value={rule.op}
-                              onChange={(value) =>
+                              onValueChange={(value) =>
                                 updateRule(index, { op: value, value: "" })
                               }
-                              options={ops}
-                              allowClear={false}
-                              placeholder="Operator"
-                              triggerClassName="w-full max-w-none"
+                              items={ops}
                             />
                           </Field>
 
@@ -1563,22 +1563,20 @@ export function PlaylistEditor() {
                       className="border-white/10 bg-black/25 pl-9"
                     />
                   </div>
-                  <AdminSelect
+                  <SegmentedControl
+                    as="radio"
+                    label="Search scope"
                     value={trackSearchScope}
-                    onChange={(value) =>
+                    onValueChange={(value) =>
                       setTrackSearchScope(value as "rules" | "library")
                     }
-                    options={[
+                    items={[
                       {
                         value: "rules",
                         label: "Matching rules",
                       },
                       { value: "library", label: "Entire library" },
-                    ]}
-                    allowClear={false}
-                    disabled={!isSmart}
-                    placeholder="Search scope"
-                    triggerClassName="w-full max-w-none"
+                    ].map((item) => ({ ...item, disabled: !isSmart }))}
                   />
                 </div>
 

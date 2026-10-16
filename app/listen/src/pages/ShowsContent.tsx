@@ -104,7 +104,6 @@ function ShowsFilters({ page }: ShowsSectionProps) {
         value={page.filter}
         onValueChange={page.setFilter}
         className="flex-wrap gap-2 p-0"
-        itemClassName="h-auto border border-border-quiet px-4 py-2 font-normal text-text-muted hover:border-text-primary/20 data-[state=active]:border-accent-action/40 data-[state=active]:bg-accent-action/15 data-[state=active]:text-accent-action"
       />
       <div className="relative w-full md:w-[280px]">
         <SearchInput

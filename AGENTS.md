@@ -79,6 +79,10 @@ crate-redis / redis-durable (Redis 7)            → cache, broker, invalidation
 
 "If you touch it, you test it."
 
+- During development, run only tests scoped to changed behavior and affected consumers.
+- Run the full validation once at the end of development or the phase, after implementation
+  is stable. Do not repeat full suites during iteration (Diego, 2026-10-16).
+
 - Every refactor, feature or bugfix includes tests covering the changed behaviour.
 - Python: at least one `pytest` case per public function changed. Go: table-driven tests.
   TypeScript/React: Vitest + Testing Library.

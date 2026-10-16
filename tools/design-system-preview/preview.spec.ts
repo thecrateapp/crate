@@ -1475,8 +1475,43 @@ async function expectCrateIdentityCheckpoint(page: Page, info: TestInfo) {
     exact: true,
   });
   await expect(preferences).toBeVisible();
-  await expect(preferences.getByRole("combobox")).toHaveCount(3);
+  await expect(preferences.getByRole("radiogroup")).toHaveCount(3);
+  await expect(preferences.getByRole("combobox")).toHaveCount(0);
   await expect(preferences.locator("select")).toHaveCount(0);
+  const groups = [
+    {
+      label: "Movimiento",
+      initial: "Seguir al sistema",
+      last: "Reducir movimiento",
+      migrated: "Reducir movimiento",
+      options: ["Seguir al sistema", "Reducir movimiento"],
+    },
+    {
+      label: "Efectos",
+      initial: "Sutiles",
+      last: "Expresivos",
+      migrated: "Desactivados",
+      options: ["Desactivados", "Sutiles", "Expresivos"],
+    },
+    {
+      label: "Densidad del contenido",
+      initial: "Cómoda",
+      last: "Compacta",
+      migrated: "Compacta",
+      options: ["Cómoda", "Compacta"],
+    },
+  ];
+  for (const { label, initial, options } of groups) {
+    const group = preferences.getByRole("radiogroup", {
+      name: label,
+      exact: true,
+    });
+    await expect(group.getByRole("radio")).toHaveText(options);
+    await expect(
+      group.getByRole("radio", { name: initial, exact: true }),
+    ).toBeChecked();
+    await expect(group.getByRole("radio", { checked: true })).toHaveCount(1);
+  }
 
   const before = await checkpoint.evaluate((element) => {
     const css = getComputedStyle(element);
@@ -1489,21 +1524,36 @@ async function expectCrateIdentityCheckpoint(page: Page, info: TestInfo) {
       ),
     };
   });
+  for (const { label, initial, last } of groups) {
+    const group = preferences.getByRole("radiogroup", {
+      name: label,
+      exact: true,
+    });
+    const initialOption = group.getByRole("radio", {
+      name: initial,
+      exact: true,
+    });
+    const lastOption = group.getByRole("radio", { name: last, exact: true });
+    await initialOption.focus();
+    await initialOption.press("End");
+    await expect(lastOption).toBeFocused();
+    await expect(lastOption).toBeChecked();
+    await expect(initialOption).not.toBeChecked();
+    await expect(group.getByRole("radio", { checked: true })).toHaveCount(1);
+  }
   await checkpoint
     .getByRole("button", { name: "Cargar preferencias antiguas", exact: true })
     .click();
-  await expect(
-    preferences.getByRole("combobox", { name: "Movimiento", exact: true }),
-  ).toHaveText("Reducir movimiento");
-  await expect(
-    preferences.getByRole("combobox", { name: "Efectos", exact: true }),
-  ).toHaveText("Desactivados");
-  await expect(
-    preferences.getByRole("combobox", {
-      name: "Densidad del contenido",
+  for (const { label, migrated } of groups) {
+    const group = preferences.getByRole("radiogroup", {
+      name: label,
       exact: true,
-    }),
-  ).toHaveText("Compacta");
+    });
+    await expect(
+      group.getByRole("radio", { name: migrated, exact: true }),
+    ).toBeChecked();
+    await expect(group.getByRole("radio", { checked: true })).toHaveCount(1);
+  }
   const after = await checkpoint.evaluate((element) => {
     const css = getComputedStyle(element);
     return {
@@ -1529,8 +1579,11 @@ async function expectCrateIdentityCheckpoint(page: Page, info: TestInfo) {
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
-  for (const name of ["Movimiento", "Efectos", "Densidad del contenido"]) {
-    const control = preferences.getByRole("combobox", { name, exact: true });
+  for (const { label } of groups) {
+    const control = preferences.getByRole("radiogroup", {
+      name: label,
+      exact: true,
+    });
     await control.scrollIntoViewIfNeeded();
     await expect(control).toBeVisible();
     const bounds = await control.boundingBox();
@@ -1575,3 +1628,1214 @@ test.describe("fixed identity touch layout", () => {
     await expectCrateIdentityCheckpoint(page, info);
   });
 });
+
+async function expectFocusWithin(page: Page, layer: Locator) {
+  for (const key of ["Tab", "Tab", "Shift+Tab", "Shift+Tab", "Shift+Tab"]) {
+    await page.keyboard.press(key);
+    await expect
+      .poll(() =>
+        layer.evaluate((element) => element.contains(document.activeElement)),
+      )
+      .toBe(true);
+  }
+}
+
+async function expectLayerInsideViewport(page: Page, layer: Locator) {
+  const viewport = page.viewportSize()!;
+  const box = await layer.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(-1);
+  expect(box!.y).toBeGreaterThanOrEqual(-1);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width + 1);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height + 1);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(viewport.width);
+}
+
+async function expectSharedCloseButtonSize(close: Locator) {
+  const buttonBox = (await close.boundingBox())!;
+  const iconBox = (await close.locator("svg").boundingBox())!;
+  expect(buttonBox.width).toBe(40);
+  expect(buttonBox.height).toBe(40);
+  expect(iconBox.width).toBe(24);
+  expect(iconBox.height).toBe(24);
+  await expect(close).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(close).toHaveCSS("background-image", "none");
+  await expect(close).toHaveCSS("box-shadow", "none");
+  await close.hover();
+  await expect(close).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(close).toHaveCSS("background-image", "none");
+  await expect(close).toHaveCSS("box-shadow", "none");
+  await close.page().mouse.move(0, 0);
+}
+
+async function expectCloseInPanelCorner(
+  layer: Locator,
+  panel: Locator,
+  title: string,
+) {
+  const close = layer.getByRole("button", { name: "Cerrar", exact: true });
+  await expect(close).toBeVisible();
+  await expectSharedCloseButtonSize(close);
+  const panelBox = (await panel.boundingBox())!;
+  const closeBox = (await close.boundingBox())!;
+  const titleBox = (await layer
+    .getByRole("heading", { name: title, exact: true })
+    .boundingBox())!;
+  expect(Math.abs(closeBox.y - panelBox.y - 16)).toBeLessThanOrEqual(2);
+  expect(
+    Math.abs(panelBox.x + panelBox.width - closeBox.x - closeBox.width - 16),
+  ).toBeLessThanOrEqual(2);
+  if (
+    titleBox.y < closeBox.y + closeBox.height &&
+    titleBox.y + titleBox.height > closeBox.y
+  ) {
+    expect(titleBox.x + titleBox.width).toBeLessThanOrEqual(closeBox.x + 1);
+  }
+}
+
+async function expectSharedOverlaysCheckpoint(page: Page, info: TestInfo) {
+  const writes: string[] = [];
+  page.on("request", (request) => {
+    if (
+      !["GET", "HEAD", "OPTIONS"].includes(request.method()) &&
+      new URL(request.url()).pathname.startsWith("/api/")
+    ) {
+      writes.push(`${request.method()} ${new URL(request.url()).pathname}`);
+    }
+  });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/#capas");
+  await page.evaluate(() => document.fonts.ready);
+  const storageBefore = await page.evaluate(() =>
+    JSON.stringify(Object.entries(localStorage).sort()),
+  );
+  const checkpoint = page.locator("section#capas");
+  await expect(checkpoint).toHaveAccessibleName(
+    "Checkpoint 1N, Diálogos y menús",
+  );
+  await expect(
+    checkpoint.getByRole("heading", {
+      level: 2,
+      name: "Las mismas capas en las dos apps.",
+      exact: true,
+    }),
+  ).toBeVisible();
+
+  const openModal = checkpoint.getByRole("button", {
+    name: "Abrir diálogo",
+    exact: true,
+  });
+  await openModal.click();
+  const dialog = page.getByRole("dialog", {
+    name: "Editar biblioteca de muestra",
+    exact: true,
+  });
+  await expect(dialog).toBeVisible();
+  const panel = dialog.locator("[data-app-modal-panel]");
+  await expect(panel).toHaveCSS("background-color", "rgb(17, 18, 24)");
+  await expect(panel).toHaveCSS("border-top-left-radius", "14px");
+  const scrim = await dialog.evaluate((element) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 1;
+    const context = canvas.getContext("2d")!;
+    context.fillStyle = getComputedStyle(element).backgroundColor;
+    context.fillRect(0, 0, 1, 1);
+    return Array.from(context.getImageData(0, 0, 1, 1).data);
+  });
+  for (const [index, channel] of [10, 10, 15, 184].entries()) {
+    expect(Math.abs(scrim[index] - channel)).toBeLessThanOrEqual(1);
+  }
+  await expect(dialog).toHaveCSS("backdrop-filter", "none");
+  await expectLayerInsideViewport(page, panel);
+  await expectCloseInPanelCorner(dialog, panel, "Editar biblioteca de muestra");
+  await expectFocusWithin(page, dialog);
+  const libraryName = dialog.getByRole("textbox", {
+    name: "Nombre de la biblioteca",
+    exact: true,
+  });
+  const libraryLabel = dialog.getByText("Nombre de la biblioteca", {
+    exact: true,
+  });
+  const labelBox = (await libraryLabel.boundingBox())!;
+  const inputBox = (await libraryName.boundingBox())!;
+  expect(inputBox.y - labelBox.y - labelBox.height).toBeGreaterThanOrEqual(8);
+  await libraryName.fill("Biblioteca para revisar");
+  const nestedTrigger = dialog.getByRole("button", {
+    name: "Confirmación anidada",
+    exact: true,
+  });
+  await nestedTrigger.click();
+  const confirmation = page.getByRole("alertdialog", {
+    name: "Vaciar biblioteca de muestra",
+    exact: true,
+  });
+  await expect(confirmation).toBeVisible();
+  await expectFocusWithin(page, confirmation);
+  await page.keyboard.press("Escape");
+  await expect(confirmation).not.toBeVisible();
+  await expect(dialog).toBeVisible();
+  await expect(libraryName).toHaveValue("Biblioteca para revisar");
+  await expect(nestedTrigger).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
+  await expect(openModal).toBeFocused();
+
+  const openConfirmation = checkpoint.getByRole("button", {
+    name: "Abrir confirmación",
+    exact: true,
+  });
+  await openConfirmation.click();
+  await expect(confirmation).toBeVisible();
+  await expect(confirmation).toHaveAttribute("aria-describedby", /.+/);
+  await expect(
+    confirmation.getByText("12 archivos · 1,4 GB · Biblioteca de muestra", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  const confirmationPanel = confirmation.locator("[data-app-modal-panel]");
+  await expect(confirmationPanel).toHaveCSS(
+    "background-color",
+    "rgb(17, 18, 24)",
+  );
+  await expect(confirmationPanel).toHaveCSS("border-top-left-radius", "14px");
+  await expect(confirmationPanel).toHaveCSS("backdrop-filter", "none");
+  await expectLayerInsideViewport(page, confirmationPanel);
+  await expectCloseInPanelCorner(
+    confirmation,
+    confirmationPanel,
+    "Vaciar biblioteca de muestra",
+  );
+  const cancel = confirmation.getByRole("button", {
+    name: "Cancelar",
+    exact: true,
+  });
+  const confirm = confirmation.getByRole("button", {
+    name: "Vaciar muestra",
+    exact: true,
+  });
+  const typed = confirmation.getByRole("textbox", {
+    name: "Escribe VACIAR para confirmar",
+    exact: true,
+  });
+  await expect(cancel).toBeFocused();
+  await expect(confirm).toBeDisabled();
+  for (const invalid of ["vaciar", "VACIAR ", "VACIA"]) {
+    await typed.fill(invalid);
+    await expect(confirm).toBeDisabled();
+  }
+  await typed.fill("VACIAR");
+  await expect(confirm).toBeEnabled();
+  await cancel.click();
+  await expect(confirmation).not.toBeVisible();
+  await expect(openConfirmation).toBeFocused();
+  await openConfirmation.click();
+  await expect(typed).toHaveValue("");
+  await expect(confirm).toBeDisabled();
+  await typed.fill("VACIAR");
+
+  // Freeze only the pending sample operation, after mount/focus animations have settled.
+  await page.clock.install({ time: new Date("2026-10-16T12:00:00Z") });
+  await page.clock.pauseAt(new Date("2026-10-16T12:00:01Z"));
+  await confirm.click();
+  await expect(confirm).toHaveAttribute("aria-busy", "true");
+  await expect(confirm).toBeDisabled();
+  await expect(cancel).toBeDisabled();
+  await expect(
+    confirmation.getByRole("button", { name: "Cerrar", exact: true }),
+  ).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(confirmation).toBeVisible();
+  await page.mouse.click(4, 4);
+  await expect(confirmation).toBeVisible();
+  await page.clock.runFor(700);
+  await page.clock.resume();
+  await expect(confirmation).not.toBeVisible();
+  await expect(checkpoint.getByRole("status")).toHaveText(
+    "Acción de muestra confirmada.",
+  );
+  await expect(openConfirmation).toBeFocused();
+
+  const openSheet = checkpoint.getByRole("button", {
+    name: "Abrir panel lateral",
+    exact: true,
+  });
+  await openSheet.click();
+  const sheet = page.getByRole("dialog", {
+    name: "Preferencias de la muestra",
+    exact: true,
+  });
+  await expect(sheet).toBeVisible();
+  await expect(sheet).toHaveCSS("background-color", "rgb(17, 18, 24)");
+  await expect(sheet).toHaveCSS("backdrop-filter", "none");
+  await expectLayerInsideViewport(page, sheet);
+  await expectFocusWithin(page, sheet);
+  const sheetSurface = page.locator('[data-slot="sheet-content"]');
+  const sheetHeading = sheetSurface.locator('[data-slot="sheet-title"]');
+  await sheetHeading.evaluate((element) => {
+    element.textContent =
+      "Preferencias de la biblioteca compartida con un título largo que ocupa varias líneas";
+  });
+  const sheetClose = sheetSurface.getByRole("button", {
+    name: "Close",
+    exact: true,
+  });
+  await expectSharedCloseButtonSize(sheetClose);
+  const sheetBox = (await sheetSurface.boundingBox())!;
+  const sheetCloseBox = (await sheetClose.boundingBox())!;
+  const sheetHeadingBox = (await sheetHeading.boundingBox())!;
+  expect(Math.abs(sheetCloseBox.y - sheetBox.y - 16)).toBeLessThanOrEqual(2);
+  expect(
+    Math.abs(
+      sheetBox.x + sheetBox.width - sheetCloseBox.x - sheetCloseBox.width - 16,
+    ),
+  ).toBeLessThanOrEqual(2);
+  expect(sheetHeadingBox.x + sheetHeadingBox.width).toBeLessThanOrEqual(
+    sheetCloseBox.x,
+  );
+  expect(sheetHeadingBox.height).toBeGreaterThan(
+    await sheetHeading.evaluate((element) =>
+      parseFloat(getComputedStyle(element).lineHeight),
+    ),
+  );
+  await sheetHeading.evaluate((element) => {
+    element.textContent = "Preferencias de la muestra";
+  });
+  await page.keyboard.press("Escape");
+  await expect(sheet).not.toBeVisible();
+  await expect(openSheet).toBeFocused();
+
+  const openMenu = checkpoint.getByRole("button", {
+    name: "Abrir menú",
+    exact: true,
+  });
+  await openMenu.focus();
+  await page.keyboard.press("Enter");
+  const menu = page.getByRole("menu");
+  await expect(menu).toBeVisible();
+  await expect(menu).toHaveCSS("background-color", "rgb(17, 18, 24)");
+  await expect(menu).toHaveCSS("backdrop-filter", "none");
+  await expect(
+    menu.getByRole("menuitem", { name: "Actualizar vista", exact: true }),
+  ).toBeVisible();
+  const details = menu.getByRole("menuitemcheckbox", {
+    name: "Ver detalles",
+    exact: true,
+  });
+  await expect(details).toHaveAttribute("aria-checked", "false");
+  if (await page.evaluate(() => matchMedia("(pointer: coarse)").matches)) {
+    const row = await details.boundingBox();
+    expect(row!.height).toBeGreaterThanOrEqual(44);
+  }
+  await details.click();
+  await openMenu.click();
+  await expect(details).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("Escape");
+  await expect(menu).not.toBeVisible();
+  await expect(openMenu).toBeFocused();
+
+  const help = checkpoint.getByRole("button", {
+    name: "Ver ayuda",
+    exact: true,
+  });
+  await help.focus();
+  await expect(
+    page.getByRole("tooltip", {
+      name: "Las capas comparten identidad y teclado.",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("tooltip")).not.toBeVisible();
+
+  const openPopover = checkpoint.getByRole("button", {
+    name: "Abrir popover",
+    exact: true,
+  });
+  await openPopover.click();
+  const popover = page.getByRole("dialog", {
+    name: "Opciones de la muestra",
+    exact: true,
+  });
+  await expect(popover).toBeVisible();
+  await expect(popover).toHaveCSS("background-color", "rgb(17, 18, 24)");
+  await expect(popover).toHaveCSS("backdrop-filter", "none");
+  await expectLayerInsideViewport(page, popover);
+  await page.keyboard.press("Escape");
+  await expect(popover).not.toBeVisible();
+  await expect(openPopover).toBeFocused();
+
+  expect(writes, "The overlay checkpoint uses local state only").toEqual([]);
+  expect(
+    await page.evaluate(() =>
+      JSON.stringify(Object.entries(localStorage).sort()),
+    ),
+  ).toBe(storageBefore);
+  expect(
+    await checkpoint.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  const viewport = page.viewportSize()!;
+  const sectionHeight = await checkpoint.evaluate((element) =>
+    Math.ceil(element.getBoundingClientRect().height),
+  );
+  await page.setViewportSize({
+    width: viewport.width,
+    height: Math.max(viewport.height, sectionHeight + 64),
+  });
+  await checkpoint.scrollIntoViewIfNeeded();
+  const screenshot = info.outputPath("checkpoint-1n.png");
+  await checkpoint.screenshot({ path: screenshot, animations: "disabled" });
+  await info.attach("Checkpoint 1N", {
+    path: screenshot,
+    contentType: "image/png",
+  });
+}
+
+test("shares dialogs and menus with keyboard, typed and pending safeguards", async ({
+  page,
+}, info) => {
+  await expectSharedOverlaysCheckpoint(page, info);
+});
+
+test.describe("shared overlay touch layout", () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  test("keeps shared layers usable at 390px without overflow or API writes", async ({
+    page,
+  }, info) => {
+    await expectSharedOverlaysCheckpoint(page, info);
+  });
+});
+
+async function expectEightPixelFieldGap(label: Locator, control: Locator) {
+  const labelBox = await label.evaluate((element) => {
+    const label = element.closest('[data-slot="form-field-label"]') ?? element;
+    const { x, y, width, height } = label.getBoundingClientRect();
+    return { x, y, width, height };
+  });
+  const controlBox = (await control.boundingBox())!;
+  const gap = controlBox.y - labelBox.y - labelBox.height;
+  expect(
+    Math.abs(gap - 8),
+    `${(await label.textContent())?.trim()} has an 8px gap before its control`,
+  ).toBeLessThanOrEqual(0.5);
+}
+
+async function expectSharedFormsCheckpoint(
+  page: Page,
+  info: TestInfo,
+  touch: boolean,
+) {
+  const apiRequests: string[] = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (
+      ["fetch", "xhr"].includes(request.resourceType()) ||
+      /^\/(api|rest)(\/|$)/.test(path)
+    ) {
+      apiRequests.push(`${request.method()} ${path}`);
+    }
+  });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/#formularios");
+  await page.evaluate(() => document.fonts.ready);
+  const storageBefore = await page.evaluate(() => {
+    const writes: string[] = [];
+    Reflect.set(window, "__crateFormStorageWrites", writes);
+    for (const method of ["setItem", "removeItem", "clear"]) {
+      const original = Reflect.get(Storage.prototype, method) as (
+        ...args: string[]
+      ) => void;
+      Reflect.set(
+        Storage.prototype,
+        method,
+        function (this: Storage, ...args: string[]) {
+          if (this === localStorage) writes.push(method);
+          original.apply(this, args);
+        },
+      );
+    }
+    return JSON.stringify(Object.entries(localStorage).sort());
+  });
+  const checkpoint = page.getByRole("region", {
+    name: "Checkpoint 1O, Formularios",
+    exact: true,
+  });
+  const header = checkpoint.locator(".specimen-heading");
+  const title = header.getByRole("heading", {
+    level: 2,
+    name: "Formularios de una sola identidad.",
+    exact: true,
+  });
+  const introduction = header.getByText(
+    "Campos, estados y selección con las mismas recetas en Listen y Admin.",
+    { exact: true },
+  );
+  await expect(title).toBeVisible();
+  await expect(introduction).toBeVisible();
+  const sectionBox = (await checkpoint.boundingBox())!;
+  const titleBox = (await title.boundingBox())!;
+  const introductionBox = (await introduction.boundingBox())!;
+  for (const box of [titleBox, introductionBox]) {
+    expect(box.x).toBeGreaterThanOrEqual(sectionBox.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(
+      sectionBox.x + sectionBox.width,
+    );
+    expect(box.y).toBeGreaterThanOrEqual(sectionBox.y);
+    expect(box.y + box.height).toBeLessThanOrEqual(
+      sectionBox.y + sectionBox.height,
+    );
+  }
+  if (touch) {
+    expect(
+      introductionBox.y - titleBox.y - titleBox.height,
+    ).toBeGreaterThanOrEqual(12);
+  } else {
+    const overlapWidth = Math.max(
+      0,
+      Math.min(
+        titleBox.x + titleBox.width,
+        introductionBox.x + introductionBox.width,
+      ) - Math.max(titleBox.x, introductionBox.x),
+    );
+    const overlapHeight = Math.max(
+      0,
+      Math.min(
+        titleBox.y + titleBox.height,
+        introductionBox.y + introductionBox.height,
+      ) - Math.max(titleBox.y, introductionBox.y),
+    );
+    expect(overlapWidth * overlapHeight).toBe(0);
+  }
+
+  const name = checkpoint.getByRole("textbox", {
+    name: "Nombre de la colección",
+    exact: true,
+  });
+  const notes = checkpoint.getByRole("textbox", {
+    name: "Notas de la colección",
+    exact: true,
+  });
+  const search = checkpoint.getByRole("searchbox", {
+    name: "Buscar en la muestra",
+    exact: true,
+  });
+  const standard = checkpoint
+    .getByRole("group", { name: "Formato estándar", exact: true })
+    .getByRole("combobox", { name: "Formato estándar", exact: true });
+  const searchable = checkpoint
+    .getByRole("group", { name: "Formato con búsqueda", exact: true })
+    .getByRole("combobox");
+  await expect(name).toHaveValue("Colección de pruebas");
+  await expect(name).toHaveAccessibleDescription("Entre 2 y 40 caracteres.");
+  await expect(name).not.toHaveAttribute("aria-invalid", "true");
+  await expect(checkpoint.getByRole("alert")).toHaveCount(0);
+  await expect(standard).toHaveText("FLAC");
+  await expect(searchable).toHaveText("FLAC");
+  for (const control of [name, search, standard, searchable]) {
+    expect((await control.boundingBox())!.height).toBe(touch ? 44 : 40);
+    await expect(control).toHaveCSS("border-top-left-radius", "6px");
+  }
+  for (const control of [name, notes, search, standard, searchable]) {
+    await expect(control).toHaveCSS("box-shadow", "none");
+    await expect(control).toHaveCSS("backdrop-filter", "none");
+    expect(
+      await control.evaluate((element) =>
+        parseFloat(getComputedStyle(element).fontSize),
+      ),
+    ).toBeGreaterThanOrEqual(15);
+  }
+  const nameLabel = checkpoint
+    .locator("label")
+    .filter({ hasText: "Nombre de la colección" });
+  expect(
+    await nameLabel.evaluate((element) => getComputedStyle(element).fontFamily),
+  ).toContain("JetBrains Mono");
+  const labelBox = (await nameLabel.boundingBox())!;
+  const nameBox = (await name.boundingBox())!;
+  expect(
+    Math.abs(nameBox.y - labelBox.y - labelBox.height - 8),
+  ).toBeLessThanOrEqual(0.5);
+  for (const [label, control] of [
+    [checkpoint.getByText("Notas de la colección", { exact: true }), notes],
+    [checkpoint.getByText("Búsqueda con espera", { exact: true }), search],
+    [
+      checkpoint.getByText("Grupo de chips", { exact: true }),
+      checkpoint.getByRole("radiogroup", {
+        name: "Orden de muestra",
+        exact: true,
+      }),
+    ],
+    [
+      checkpoint.locator("label").filter({ hasText: "Formato estándar" }),
+      standard,
+    ],
+    [checkpoint.getByText("Formato con búsqueda", { exact: true }), searchable],
+  ] as const) {
+    await expectEightPixelFieldGap(label, control);
+  }
+  const neutralBorder = await name.evaluate(
+    (element) => getComputedStyle(element).borderColor,
+  );
+  await nameLabel.click();
+  await expect(name).toBeFocused();
+  await name.fill("x");
+  await expect(checkpoint.getByRole("alert")).toHaveCount(0);
+  await expect(name).not.toHaveAttribute("aria-invalid", "true");
+  await name.press("Tab");
+  await expect(notes).toBeFocused();
+  await settleFocusRing(notes);
+  await expect(notes).toHaveCSS("outline-width", "2px");
+  await expect(notes).toHaveCSS("outline-color", "rgb(6, 182, 212)");
+  const error = checkpoint.getByRole("alert");
+  await expect(error).toHaveText("Escribe al menos dos caracteres.");
+  await expect(error.locator('[data-tone="warn"]')).toBeVisible();
+  await expect(name).toHaveAttribute("aria-invalid", "true");
+  await expect(name).toHaveAccessibleDescription(
+    "Entre 2 y 40 caracteres. Escribe al menos dos caracteres.",
+  );
+  await expect(name).toHaveCSS("border-color", neutralBorder);
+  await expect(name).toHaveCSS("box-shadow", "none");
+  await name.fill("Colección revisada");
+  await expect(error).toBeVisible();
+  await name.press("Tab");
+  await expect(error).toHaveCount(0);
+  await expect(name).not.toHaveAttribute("aria-invalid", "true");
+  await notes.fill("Una nota editable para esta colección.");
+  await expect(notes).toHaveValue("Una nota editable para esta colección.");
+  await expect(
+    checkpoint.getByRole("textbox", { name: "Campo desactivado", exact: true }),
+  ).toBeDisabled();
+  const identifier = checkpoint.getByRole("textbox", {
+    name: "Identificador de la muestra",
+    exact: true,
+  });
+  await expect(identifier).toHaveValue("crate-demo-01");
+  await expect(identifier).not.toBeEditable();
+
+  await page.clock.install({ time: new Date("2026-10-16T12:00:00Z") });
+  await page.clock.pauseAt(new Date("2026-10-16T12:00:01Z"));
+  await search.fill("Björk");
+  await expect(
+    checkpoint.getByText("Búsqueda aplicada: ninguna", { exact: true }),
+  ).toBeVisible();
+  await page.clock.runFor(1000);
+  await expect(
+    checkpoint.getByText("Búsqueda aplicada: Björk", { exact: true }),
+  ).toBeVisible();
+  const clearSearch = checkpoint.getByRole("button", {
+    name: "Limpiar búsqueda de muestra",
+    exact: true,
+  });
+  await clearSearch.focus();
+  await clearSearch.press("Enter");
+  await expect(search).toHaveValue("");
+  await expect(search).toBeFocused();
+  await expect(clearSearch).toHaveCount(0);
+  await expect(
+    checkpoint.getByText("Búsqueda aplicada: ninguna", { exact: true }),
+  ).toBeVisible();
+  await page.clock.resume();
+
+  const autoplay = checkpoint.getByRole("switch", {
+    name: "Reproducción automática",
+    exact: true,
+  });
+  await expect(autoplay).not.toBeChecked();
+  await autoplay.focus();
+  await autoplay.press("Space");
+  await expect(autoplay).toBeChecked();
+  const keepQueue = checkpoint.getByRole("checkbox", {
+    name: "Conservar la cola de muestra",
+    exact: true,
+  });
+  await expect(keepQueue).toBeChecked();
+  await keepQueue.focus();
+  await keepQueue.press("Space");
+  await expect(keepQueue).not.toBeChecked();
+  const mixed = checkpoint.getByRole("checkbox", {
+    name: "Selección parcial",
+    exact: true,
+  });
+  await expect(mixed).toHaveAttribute("aria-checked", "mixed");
+  await mixed.focus();
+  await mixed.press("Space");
+  await expect(mixed).toHaveAttribute("aria-checked", "mixed");
+  const order = checkpoint.getByRole("radiogroup", {
+    name: "Orden de muestra",
+    exact: true,
+  });
+  const recent = order.getByRole("radio", { name: "Recientes", exact: true });
+  const byName = order.getByRole("radio", { name: "Nombre", exact: true });
+  const byYear = order.getByRole("radio", { name: "Año", exact: true });
+  await expect(recent).toBeChecked();
+  await recent.focus();
+  await recent.press("ArrowRight");
+  await expect(byName).toBeFocused();
+  await expect(byName).toBeChecked();
+  await byName.press("End");
+  await expect(byYear).toBeFocused();
+  await expect(byYear).toBeChecked();
+  await byYear.press("Home");
+  await expect(recent).toBeFocused();
+  await expect(recent).toBeChecked();
+
+  await standard.focus();
+  await standard.press("ArrowDown");
+  const standardMenu = page.getByRole("listbox");
+  await expect(standardMenu).toBeVisible();
+  await expect(standardMenu).not.toHaveCSS("box-shadow", "none");
+  await expect(standardMenu).toHaveCSS("border-top-left-radius", "14px");
+  await expect(standardMenu).toHaveCSS("backdrop-filter", "none");
+  await expect(standardMenu.getByRole("option")).toHaveText([
+    "FLAC",
+    "ALAC",
+    "WAV",
+    "AIFF",
+    "MP3",
+    "AAC",
+    "Ogg Vorbis",
+    "Opus",
+  ]);
+  await page.keyboard.press("End");
+  const standardOpus = standardMenu.getByRole("option", {
+    name: "Opus",
+    exact: true,
+  });
+  await expect(standardOpus).toBeFocused();
+  await standardOpus.press("Enter");
+  await expect(standard).toHaveText("Opus");
+  await expect(standard).toBeFocused();
+  await expect(searchable).toHaveText("FLAC");
+
+  await searchable.focus();
+  await searchable.press("Enter");
+  const searchableMenu = page.getByRole("listbox");
+  await expect(searchableMenu).toBeVisible();
+  await expect(searchableMenu).toHaveCSS("box-shadow", "none");
+  await expect(searchableMenu).toHaveCSS("backdrop-filter", "none");
+  const filter = page.getByRole("searchbox", {
+    name: "Filtrar formatos de muestra",
+    exact: true,
+  });
+  await expect(filter).toBeFocused();
+  const formats = [
+    "FLAC",
+    "ALAC",
+    "WAV",
+    "AIFF",
+    "MP3",
+    "AAC",
+    "Ogg Vorbis",
+    "Opus",
+  ];
+  await expect(searchableMenu.getByRole("option")).toHaveCount(9);
+  for (const [count, format] of formats.entries()) {
+    await expect(
+      searchableMenu.getByRole("option", {
+        name: `${format} ${count}`,
+        exact: true,
+      }),
+    ).toBeVisible();
+  }
+  await filter.fill("sin formato coincidente");
+  await expect(
+    page.getByText("No hay coincidencias en la muestra", { exact: true }),
+  ).toBeVisible();
+  await filter.fill("Opus");
+  await filter.press("ArrowDown");
+  await expect
+    .poll(() =>
+      searchableMenu
+        .getByRole("option")
+        .evaluateAll((options) =>
+          options.some((option) => option === document.activeElement),
+        ),
+    )
+    .toBe(true);
+  await page.keyboard.press("End");
+  const searchableOpus = searchableMenu.getByRole("option", {
+    name: /^Opus\s+7$/,
+  });
+  await expect(searchableOpus).toBeFocused();
+  await searchableOpus.press("Enter");
+  await expect(searchable).toHaveText("Opus");
+  await expect(searchable).toBeFocused();
+  await searchable.click();
+  await expect(filter).toHaveValue("");
+  await searchableMenu
+    .getByRole("option", { name: /^Formato de archivo(?:\s|$)/ })
+    .click();
+  await expect(searchable).toHaveText("Formato de archivo");
+  await expect(standard).toHaveText("Opus");
+  await searchable.focus();
+  await searchable.press("ArrowDown");
+  await expect(searchableMenu).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(searchableMenu).not.toBeVisible();
+  await expect(searchable).toBeFocused();
+
+  const url = page.url();
+  const save = checkpoint.getByRole("button", {
+    name: "Guardar muestra",
+    exact: true,
+  });
+  await save.focus();
+  await save.press("Enter");
+  await expect(checkpoint.getByRole("status")).toHaveText(
+    "Formulario de muestra guardado.",
+  );
+  await expect(name).toHaveValue("Colección revisada");
+  expect(page.url()).toBe(url);
+  expect(apiRequests, "The forms checkpoint has no API requests").toEqual([]);
+  expect(
+    await page.evaluate(() => Reflect.get(window, "__crateFormStorageWrites")),
+    "Form interactions do not write to localStorage",
+  ).toEqual([]);
+  expect(
+    await page.evaluate(() =>
+      JSON.stringify(Object.entries(localStorage).sort()),
+    ),
+  ).toBe(storageBefore);
+  expect(
+    await checkpoint.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
+
+  const viewport = page.viewportSize()!;
+  const sectionHeight = await checkpoint.evaluate((element) =>
+    Math.ceil(element.getBoundingClientRect().height),
+  );
+  await page.setViewportSize({
+    width: viewport.width,
+    height: Math.max(viewport.height, sectionHeight + 64),
+  });
+  await checkpoint.scrollIntoViewIfNeeded();
+  const screenshot = info.outputPath("checkpoint-1o.png");
+  await checkpoint.screenshot({ path: screenshot, animations: "disabled" });
+  await info.attach("Checkpoint 1O", {
+    path: screenshot,
+    contentType: "image/png",
+  });
+}
+
+for (const fixture of [
+  { name: "desktop", width: 1440, height: 1000, touch: false },
+  { name: "touch", width: 390, height: 844, touch: true },
+]) {
+  test.describe(`shared forms ${fixture.name} layout`, () => {
+    test.use({
+      viewport: { width: fixture.width, height: fixture.height },
+      isMobile: fixture.touch,
+      hasTouch: fixture.touch,
+    });
+    test("checkpoint 1O keeps fields, validation and selectors usable without external writes", async ({
+      page,
+    }, info) => {
+      await expectSharedFormsCheckpoint(page, info, fixture.touch);
+    });
+  });
+}
+
+async function expectShortSelectionCheckpoint(
+  page: Page,
+  info: TestInfo,
+  touch: boolean,
+) {
+  const apiRequests: string[] = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (
+      ["fetch", "xhr"].includes(request.resourceType()) ||
+      /^\/(api|rest)(\/|$)/.test(path)
+    ) {
+      apiRequests.push(`${request.method()} ${path}`);
+    }
+  });
+  await page.addInitScript(() => {
+    const writes: string[] = [];
+    Reflect.set(window, "__crateSelectionStorageWrites", writes);
+    for (const method of ["setItem", "removeItem", "clear"]) {
+      const original = Reflect.get(Storage.prototype, method) as (
+        ...args: string[]
+      ) => void;
+      Reflect.set(
+        Storage.prototype,
+        method,
+        function (this: Storage, ...args: string[]) {
+          if (this === localStorage) writes.push(method);
+          original.apply(this, args);
+        },
+      );
+    }
+  });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/#seleccion");
+  // beforeEach loaded the page; a hash change does not execute init scripts.
+  await page.reload();
+  await page.evaluate(() => document.fonts.ready);
+  expect(
+    await page.evaluate(() =>
+      Array.isArray(Reflect.get(window, "__crateSelectionStorageWrites")),
+    ),
+    "Storage instrumentation is installed before sample interactions",
+  ).toBe(true);
+  const storageBefore = await page.evaluate(() =>
+    JSON.stringify(Object.entries(localStorage).sort()),
+  );
+  const checkpoint = page.getByRole("region", {
+    name: "Checkpoint 1P, Selección",
+    exact: true,
+  });
+  await expect(
+    checkpoint.getByRole("heading", {
+      level: 2,
+      name: "Las opciones cortas, a la vista.",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(checkpoint.getByRole("radiogroup")).toHaveCount(5);
+  for (const label of [
+    "Estado de muestra",
+    "Modo de reproducción",
+    "Visibilidad",
+    "Ordenación",
+  ]) {
+    await expectEightPixelFieldGap(
+      checkpoint.getByText(label, { exact: true }),
+      checkpoint.getByRole("radiogroup", { name: label, exact: true }),
+    );
+  }
+  await expect(checkpoint.getByRole("combobox")).toHaveCount(0);
+  await expect(checkpoint.locator("select")).toHaveCount(0);
+  const filtersPanel = checkpoint.getByRole("figure").filter({
+    has: page.getByText("Filtros de Admin", { exact: true }),
+  });
+  const playerPanel = checkpoint.getByRole("figure").filter({
+    has: page.getByText("Vista del reproductor", { exact: true }),
+  });
+  const cratePanel = checkpoint.getByRole("figure").filter({
+    has: page.getByText("Formulario de Crate", { exact: true }),
+  });
+  const filtersBox = (await filtersPanel.boundingBox())!;
+  const playerBox = (await playerPanel.boundingBox())!;
+  const crateBox = (await cratePanel.boundingBox())!;
+  if (touch) {
+    expect(Math.abs(filtersBox.x - crateBox.x)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(filtersBox.width - crateBox.width)).toBeLessThanOrEqual(
+      0.5,
+    );
+    expect(crateBox.y - playerBox.y - playerBox.height).toBeGreaterThanOrEqual(
+      24,
+    );
+  } else {
+    expect(crateBox.x - filtersBox.x - filtersBox.width).toBeGreaterThanOrEqual(
+      24,
+    );
+    expect(Math.abs(filtersBox.y - crateBox.y)).toBeLessThanOrEqual(0.5);
+  }
+
+  const status = checkpoint.getByRole("radiogroup", {
+    name: "Estado de muestra",
+    exact: true,
+  });
+  const taskStates = [
+    ["Todos", "Todos"],
+    ["Pendientes", "attention"],
+    ["Completadas", "completed"],
+    ["Fallidas", "failed"],
+    ["Canceladas", "cancelled"],
+  ] as const;
+  await expect(status.getByRole("radio")).toHaveText(
+    taskStates.map(([label]) => label),
+  );
+  const allTasks = status.getByRole("radio", { name: "Todos", exact: true });
+  await expect(allTasks).toBeChecked();
+  for (const [label, value] of taskStates.slice(1)) {
+    const option = status.getByRole("radio", { name: label, exact: true });
+    await option.click();
+    await expect(option).toBeChecked();
+    await expect(status.getByRole("radio", { checked: true })).toHaveCount(1);
+    await expect(
+      checkpoint.getByText(`Filtro de muestra: ${value}`, { exact: true }),
+    ).toBeVisible();
+  }
+  await status
+    .getByRole("radio", { name: "Canceladas", exact: true })
+    .press("Home");
+  await expect(allTasks).toBeFocused();
+  await expect(allTasks).toBeChecked();
+  await expect(
+    checkpoint.getByText("Filtro de muestra: Todos", { exact: true }),
+  ).toBeVisible();
+  await allTasks.press("End");
+  await expect(
+    status.getByRole("radio", { name: "Canceladas", exact: true }),
+  ).toBeFocused();
+  await expect(
+    checkpoint.getByText("Filtro de muestra: cancelled", { exact: true }),
+  ).toBeVisible();
+
+  const playback = checkpoint.getByRole("radiogroup", {
+    name: "Modo de reproducción",
+    exact: true,
+  });
+  await expect(playback.getByRole("radio")).toHaveText([
+    "Modo DJ",
+    "Modo automático",
+    "Modo Auto DJ",
+  ]);
+  const manual = playback.getByRole("radio", { name: "Modo DJ", exact: true });
+  const automatic = playback.getByRole("radio", {
+    name: "Modo automático",
+    exact: true,
+  });
+  const autoDj = playback.getByRole("radio", {
+    name: "Modo Auto DJ",
+    exact: true,
+  });
+  await expect(manual).toBeChecked();
+  await expect(
+    checkpoint.getByText("Sala permanente: no", { exact: true }),
+  ).toBeVisible();
+  await manual.focus();
+  await manual.press("ArrowRight");
+  await expect(automatic).toBeFocused();
+  await expect(automatic).toBeChecked();
+  await automatic.press("End");
+  await expect(autoDj).toBeFocused();
+  await expect(autoDj).toBeChecked();
+  await expect(
+    checkpoint.getByText("Sala permanente: sí", { exact: true }),
+  ).toBeVisible();
+
+  const surface = checkpoint.getByRole("radiogroup", {
+    name: "Modo de visualización del reproductor",
+    exact: true,
+  });
+  const cd = surface.getByRole("radio", { name: "Modo CD", exact: true });
+  const cover = surface.getByRole("radio", {
+    name: "Modo portada",
+    exact: true,
+  });
+  const visualizer = surface.getByRole("radio", {
+    name: "Modo visualizador",
+    exact: true,
+  });
+  await expect(surface.getByRole("radio")).toHaveCount(3);
+  await expect(cover).toBeChecked();
+  await cover.focus();
+  await cover.press("End");
+  await expect(visualizer).toBeFocused();
+  await expect(visualizer).toBeChecked();
+  await expect(
+    checkpoint.getByText("Vista de muestra: visualizer", { exact: true }),
+  ).toBeVisible();
+  await visualizer.press("Home");
+  await expect(cd).toBeFocused();
+  await expect(cd).toBeChecked();
+  await cd.press("ArrowRight");
+  await expect(cover).toBeFocused();
+  await expect(cover).toBeChecked();
+  await expect(
+    checkpoint.getByText("Vista de muestra: cover", { exact: true }),
+  ).toBeVisible();
+
+  const form = cratePanel.locator("form");
+  const name = form.getByRole("textbox", { name: "Nombre", exact: true });
+  const description = form.getByRole("textbox", {
+    name: "Descripción",
+    exact: true,
+  });
+  await expect(name).toHaveValue("Crate de muestra");
+  await name.fill("Crate para revisar");
+  await description.fill("Una colección editable de muestra.");
+  const visibility = form.getByRole("radiogroup", {
+    name: "Visibilidad",
+    exact: true,
+  });
+  await expect(visibility.getByRole("radio")).toHaveText([
+    "Privado",
+    "Público",
+  ]);
+  const privateOption = visibility.getByRole("radio", {
+    name: "Privado",
+    exact: true,
+  });
+  const publicOption = visibility.getByRole("radio", {
+    name: "Público",
+    exact: true,
+  });
+  await expect(privateOption).toBeChecked();
+  await privateOption.focus();
+  await privateOption.press("End");
+  await expect(publicOption).toBeFocused();
+  await expect(publicOption).toBeChecked();
+  const ordering = form.getByRole("radiogroup", {
+    name: "Ordenación",
+    exact: true,
+  });
+  await expect(ordering.getByRole("radio")).toHaveText([
+    "Sin orden",
+    "Ascendente",
+    "Descendente",
+  ]);
+  const unordered = ordering.getByRole("radio", {
+    name: "Sin orden",
+    exact: true,
+  });
+  const ascending = ordering.getByRole("radio", {
+    name: "Ascendente",
+    exact: true,
+  });
+  const descending = ordering.getByRole("radio", {
+    name: "Descendente",
+    exact: true,
+  });
+  await expect(unordered).toBeChecked();
+  await unordered.focus();
+  await unordered.press("ArrowRight");
+  await expect(ascending).toBeFocused();
+  await expect(ascending).toBeChecked();
+  await ascending.press("End");
+  await expect(descending).toBeFocused();
+  await expect(descending).toBeChecked();
+  for (const label of ["Reproducción en bucle", "Permitir colaboración"]) {
+    const checkbox = form.getByRole("checkbox", { name: label, exact: true });
+    await expect(checkbox).not.toBeChecked();
+    await checkbox.focus();
+    await checkbox.press("Space");
+    await expect(checkbox).toBeChecked();
+  }
+
+  const save = checkpoint.getByRole("button", {
+    name: "Guardar Crate de muestra",
+    exact: true,
+  });
+  await expect(save).toHaveAttribute("form", (await form.getAttribute("id"))!);
+  await expect(
+    form.getByRole("button", { name: "Guardar Crate de muestra" }),
+  ).toHaveCount(0);
+  const lock = checkpoint.getByRole("button", {
+    name: "Bloquear formulario de muestra",
+    exact: true,
+  });
+  await lock.click();
+  const unlock = checkpoint.getByRole("button", {
+    name: "Desbloquear formulario de muestra",
+    exact: true,
+  });
+  await expect(unlock).toBeEnabled();
+  await expect(save).toBeDisabled();
+  for (const role of ["textbox", "radio", "checkbox"] as const) {
+    for (const control of await form.getByRole(role).all()) {
+      await expect(control).toBeDisabled();
+    }
+  }
+  await expect(name).toHaveValue("Crate para revisar");
+  await expect(publicOption).toBeChecked();
+  await expect(descending).toBeChecked();
+  await unlock.click();
+  await expect(lock).toBeVisible();
+  await expect(save).toBeEnabled();
+  for (const role of ["textbox", "radio", "checkbox"] as const) {
+    for (const control of await form.getByRole(role).all()) {
+      await expect(control).toBeEnabled();
+    }
+  }
+  for (const checkbox of await form.getByRole("checkbox").all()) {
+    await expect(checkbox).toBeChecked();
+  }
+  const url = page.url();
+  await expect(cratePanel.getByRole("status")).toHaveText(
+    "Formulario de muestra sin guardar.",
+  );
+  await save.focus();
+  await save.press("Enter");
+  await expect(cratePanel.getByRole("status")).toHaveText(
+    "Formulario de Crate de muestra guardado.",
+  );
+  await expect(name).toHaveValue("Crate para revisar");
+  await expect(description).toHaveValue("Una colección editable de muestra.");
+  expect(page.url()).toBe(url);
+
+  await expect(checkpoint.getByRole("radio")).toHaveCount(16);
+  for (const group of await checkpoint.getByRole("radiogroup").all()) {
+    await expect(group.getByRole("radio", { checked: true })).toHaveCount(1);
+  }
+  for (const chip of await checkpoint.getByRole("radio").all()) {
+    await expect(chip).toHaveCSS("box-shadow", "none");
+    await expect(chip).toHaveCSS("backdrop-filter", "none");
+    if (touch) {
+      const box = (await chip.boundingBox())!;
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+    }
+  }
+  expect(apiRequests, "The selection checkpoint has no API requests").toEqual(
+    [],
+  );
+  expect(
+    await page.evaluate(() =>
+      Reflect.get(window, "__crateSelectionStorageWrites"),
+    ),
+    "Selection does not write to localStorage, including during mount",
+  ).toEqual([]);
+  expect(
+    await page.evaluate(() =>
+      JSON.stringify(Object.entries(localStorage).sort()),
+    ),
+  ).toBe(storageBefore);
+  expect(
+    await checkpoint.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
+
+  const viewport = page.viewportSize()!;
+  const sectionHeight = await checkpoint.evaluate((element) =>
+    Math.ceil(element.getBoundingClientRect().height),
+  );
+  await page.setViewportSize({
+    width: viewport.width,
+    height: Math.max(viewport.height, sectionHeight + 64),
+  });
+  await checkpoint.scrollIntoViewIfNeeded();
+  const screenshot = info.outputPath("checkpoint-1p.png");
+  await checkpoint.screenshot({ path: screenshot, animations: "disabled" });
+  await info.attach("Checkpoint 1P", {
+    path: screenshot,
+    contentType: "image/png",
+  });
+}
+
+for (const fixture of [
+  { name: "desktop", width: 1440, height: 1000, touch: false },
+  { name: "touch", width: 390, height: 844, touch: true },
+]) {
+  test.describe(`short selection ${fixture.name} layout`, () => {
+    test.use({
+      viewport: { width: fixture.width, height: fixture.height },
+      isMobile: fixture.touch,
+      hasTouch: fixture.touch,
+    });
+    test("checkpoint 1P keeps short choices visible, keyboard usable and local", async ({
+      page,
+    }, info) => {
+      await expectShortSelectionCheckpoint(page, info, fixture.touch);
+    });
+  });
+}

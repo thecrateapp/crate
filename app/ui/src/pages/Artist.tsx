@@ -45,7 +45,7 @@ import {
 import { waitForTask } from "@/lib/tasks";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { Button } from "@crate/ui/shadcn/button";
 import { Badge } from "@crate/ui/shadcn/badge";
 import {
@@ -179,25 +179,27 @@ export function MergeArtistDialog({
         </DialogHeader>
 
         <div className="space-y-3">
-          <label
-            htmlFor="merge-artist-target"
-            className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
-          >
-            Target artist
-          </label>
-          <div className="relative">
-            <Search
-              size={15}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
-            />
-            <Input
-              id="merge-artist-target"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="pl-9"
-              placeholder="Search canonical artist"
-              autoFocus
-            />
+          <div className="crate-form-field">
+            <label
+              htmlFor="merge-artist-target"
+              className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
+            >
+              Target artist
+            </label>
+            <div className="relative">
+              <Search
+                size={15}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+              />
+              <Input
+                id="merge-artist-target"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="pl-9"
+                placeholder="Search canonical artist"
+                autoFocus
+              />
+            </div>
           </div>
 
           <div className="max-h-[320px] overflow-y-auto rounded-lg border border-white/10 bg-black/20">
@@ -525,7 +527,17 @@ function ArtistPageDialogs({
         description={`This will permanently delete ${data.name} and all their albums/tracks from the database AND the filesystem. This action cannot be undone.`}
         confirmLabel="Delete Artist"
         variant="destructive"
-        onConfirm={onDelete}
+        onConfirm={() => {
+          void onDelete();
+        }}
+        eyebrow="Confirm action"
+        consequence={`${data.albums.length} albums · ${
+          data.total_tracks ??
+          data.albums.reduce((sum, album) => sum + album.tracks, 0)
+        } tracks · ${
+          data.total_size_mb ??
+          data.albums.reduce((sum, album) => sum + album.size_mb, 0)
+        } MB · permanently deletes database entries and files`}
       />
       <ArtistRepairDialog
         open={showRepairDialog}

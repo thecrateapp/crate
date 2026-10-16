@@ -120,6 +120,7 @@ function RemoteImportConfirmation({
   const { t } = useTranslation();
   return (
     <ConfirmDialog
+      eyebrow={t("actions.confirmation.eyebrow")}
       open={open}
       onCancel={onCancel}
       onConfirm={onConfirm}

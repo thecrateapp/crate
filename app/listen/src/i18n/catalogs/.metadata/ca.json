@@ -127,6 +127,10 @@
     "sourceHash": "sha256:36a64d17b0f512f104c647dd1e12fec0e603fec0c7e7fe22198f4b8560ed914f",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
+  "actions.confirmation.eyebrow": {
+    "sourceHash": "sha256:ffb80606dcd6ffdd47f2e3720b384479a1c527339d67d1029832432805b57736",
+    "reviewedAt": "2026-10-16T10:45:32.407Z"
+  },
   "actions.crate.downloadZip": {
     "sourceHash": "sha256:5f3042ed301b283eb9f765484d3d79c9c70f1ab6bc4ceff9e879e8ffb87d617f",
     "reviewedAt": "2026-10-07T13:21:25.887Z"

@@ -279,6 +279,7 @@ function ConnectDevicesSectionContent() {
         </div>
       )}
       <ConfirmDialog
+        eyebrow={t("actions.confirmation.eyebrow")}
         open={pendingRevoke !== null}
         onOpenChange={(open) => {
           if (!open) setPendingRevoke(null);

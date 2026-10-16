@@ -94,7 +94,7 @@ describe("TopBarUserMenu", () => {
     vi.restoreAllMocks();
   });
 
-  it("uses the canonical glass context menu on desktop", async () => {
+  it("uses the canonical shared context menu on desktop", async () => {
     renderMenu();
 
     expect(screen.getByRole("button", { name: "User menu" })).toHaveClass(
@@ -103,11 +103,7 @@ describe("TopBarUserMenu", () => {
     fireEvent.click(screen.getByRole("button", { name: "User menu" }));
 
     const menu = screen.getByRole("menu");
-    expect(menu).toHaveClass(
-      "listen-glass-panel",
-      "rounded-panel",
-      "z-app-context-menu",
-    );
+    expect(menu).toHaveClass("crate-overlay-surface", "z-app-context-menu");
     expect(screen.getByText("Diego")).toBeInTheDocument();
     expect(screen.getByText("diego@example.test")).toBeInTheDocument();
     expect(
@@ -123,7 +119,7 @@ describe("TopBarUserMenu", () => {
     fireEvent.click(screen.getByRole("button", { name: "User menu" }));
 
     const dialog = screen.getByRole("dialog");
-    expect(dialog.querySelector(".listen-glass-panel")).toBeInTheDocument();
+    expect(dialog.querySelector(".crate-overlay-panel")).toBeInTheDocument();
     expect(
       screen.getByRole("menuitem", { name: /Settings/i }),
     ).toBeInTheDocument();

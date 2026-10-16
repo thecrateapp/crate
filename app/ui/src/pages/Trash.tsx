@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@crate/ui/shadcn/button";
 import { Card } from "@crate/ui/shadcn/card";
 
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { api } from "@/lib/api";
 import { waitForTask } from "@/lib/tasks";
 import { timeAgo } from "@/lib/utils";
@@ -356,7 +356,15 @@ export function Trash() {
         }" from .crate-trash? This cannot be undone.`}
         confirmLabel="Delete Permanently"
         variant="destructive"
-        onConfirm={() => deleteTarget && void hardDelete(deleteTarget)}
+        onConfirm={() => {
+          void (() => deleteTarget && void hardDelete(deleteTarget))();
+        }}
+        eyebrow="Confirm action"
+        consequence={`${
+          deleteTarget ? displayTitle(deleteTarget) : "Track"
+        } · ${
+          deleteTarget ? formatBytes(deleteTarget.size_bytes) : "—"
+        } · permanently deletes the file from .crate-trash`}
       />
 
       <ConfirmDialog
@@ -370,7 +378,13 @@ export function Trash() {
         )}) from .crate-trash? This cannot be undone.`}
         confirmLabel="Empty Trash"
         variant="destructive"
-        onConfirm={() => void hardDeleteAll()}
+        onConfirm={() => {
+          void (() => void hardDeleteAll())();
+        }}
+        eyebrow="Confirm action"
+        consequence={`${items.length} tracks · ${formatBytes(
+          totalSizeBytes,
+        )} · permanently deletes files from .crate-trash`}
       />
     </div>
   );

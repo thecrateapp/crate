@@ -1,11 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { XIcon } from "@crate/ui/icons";
 import { Dialog as DialogPrimitive } from "radix-ui";
 
 import { cn } from "@crate/ui/lib/cn";
 import { Button } from "./button";
+import { OverlayCloseButton } from "./overlay-close-button";
 
 function Dialog({
   ...props
@@ -38,10 +38,7 @@ function DialogOverlay({
   return (
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
-      className={cn(
-        "fixed inset-0 z-app-modal bg-surface-canvas/65 backdrop-blur-sm data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
-        className,
-      )}
+      className={cn("crate-overlay-scrim fixed inset-0 z-app-modal", className)}
       {...props}
     />
   );
@@ -60,20 +57,18 @@ function DialogContent({
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        data-has-close={showCloseButton || undefined}
+        data-overlay-size="md"
         className={cn(
-          "fixed top-[50%] left-[50%] z-app-modal grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-md border border-border-quiet bg-modal-surface p-6 shadow-modal backdrop-blur-xl duration-200 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+          "crate-overlay-panel fixed top-1/2 left-1/2 z-app-modal grid w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 p-6",
           className,
         )}
         {...props}
       >
         {children}
         {showCloseButton && (
-          <DialogPrimitive.Close
-            data-slot="dialog-close"
-            className="absolute top-4 right-4 flex size-10 items-center justify-center text-text-primary/45 transition-colors hover:text-text-primary focus-visible:text-text-primary disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-6"
-          >
-            <XIcon />
-            <span className="sr-only">Close</span>
+          <DialogPrimitive.Close data-slot="dialog-close" asChild>
+            <OverlayCloseButton className="absolute top-4 right-4" />
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
@@ -103,7 +98,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+        "crate-overlay-footer flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end",
         className,
       )}
       {...props}
@@ -125,7 +120,7 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-lg leading-none font-semibold", className)}
+      className={cn("crate-overlay-title", className)}
       {...props}
     />
   );
@@ -138,7 +133,7 @@ function DialogDescription({
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn("text-sm text-text-muted", className)}
+      className={cn("crate-overlay-body", className)}
       {...props}
     />
   );

@@ -22,7 +22,7 @@ import { useApi } from "@/hooks/use-api";
 import { useTaskPoll } from "@/hooks/use-task-poll";
 import { ApiError, api } from "@/lib/api";
 import { AIButton } from "@/components/ui/AIButton";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { Button } from "@crate/ui/shadcn/button";
 import { GenreEqEditor } from "@/components/genres/GenreEqEditor";
@@ -411,7 +411,7 @@ function NodeDetailPanel({
               </Button>
             </div>
           </div>
-          <label htmlFor="genre-description" className="block">
+          <label htmlFor="genre-description" className="crate-form-field">
             <span className="text-[11px] uppercase tracking-wider text-white/35">
               Description
             </span>
@@ -420,7 +420,7 @@ function NodeDetailPanel({
               value={descriptionDraft}
               onChange={(event) => setDescriptionDraft(event.target.value)}
               rows={3}
-              className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/75 outline-none transition focus:border-cyan-400/40"
+              className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/75 outline-none transition focus:border-cyan-400/40"
               placeholder="Short editorial description for this genre."
             />
           </label>
@@ -658,48 +658,50 @@ function NodeDetailPanel({
                 key={config.key}
                 className="rounded-lg border border-white/8 bg-black/20 p-3"
               >
-                <div className="mb-2 flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-semibold text-white/75">
-                      {config.label}
+                <div className="crate-form-field">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-semibold text-white/75">
+                        {config.label}
+                      </div>
+                      <p className="mt-0.5 text-[11px] text-white/35">
+                        {config.helper}
+                      </p>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-white/35">
-                      {config.helper}
-                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      disabled={busy}
+                      onClick={() => saveRelation(config.key)}
+                    >
+                      {busy ? (
+                        <Loader2 size={11} className="mr-1 animate-spin" />
+                      ) : (
+                        <Save size={11} className="mr-1" />
+                      )}
+                      Save
+                    </Button>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    disabled={busy}
-                    onClick={() => saveRelation(config.key)}
+                  <label
+                    htmlFor={`genre-relation-${config.key}`}
+                    className="sr-only"
                   >
-                    {busy ? (
-                      <Loader2 size={11} className="mr-1 animate-spin" />
-                    ) : (
-                      <Save size={11} className="mr-1" />
-                    )}
-                    Save
-                  </Button>
+                    {config.label}
+                  </label>
+                  <input
+                    id={`genre-relation-${config.key}`}
+                    value={value}
+                    onChange={(event) =>
+                      setRelationDrafts((prev) => ({
+                        ...prev,
+                        [config.key]: event.target.value,
+                      }))
+                    }
+                    className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 font-mono text-xs text-white/70 outline-none transition focus:border-cyan-400/40"
+                    placeholder="comma-separated taxonomy slugs"
+                  />
                 </div>
-                <label
-                  htmlFor={`genre-relation-${config.key}`}
-                  className="sr-only"
-                >
-                  {config.label}
-                </label>
-                <input
-                  id={`genre-relation-${config.key}`}
-                  value={value}
-                  onChange={(event) =>
-                    setRelationDrafts((prev) => ({
-                      ...prev,
-                      [config.key]: event.target.value,
-                    }))
-                  }
-                  className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 font-mono text-xs text-white/70 outline-none transition focus:border-cyan-400/40"
-                  placeholder="comma-separated taxonomy slugs"
-                />
                 {stagedProposal ? (
                   <div className="mt-2 rounded-md border border-cyan-400/15 bg-cyan-400/[0.04] px-2.5 py-2 text-[11px] text-white/45">
                     <span className="font-semibold text-cyan-200">
@@ -783,7 +785,11 @@ function NodeDetailPanel({
         description="This removes the taxonomy node, aliases, relations, and all mapped raw genre assignments from artists and albums. This cannot be undone."
         confirmLabel="Delete Genre"
         variant="destructive"
-        onConfirm={deleteNode}
+        onConfirm={() => {
+          void deleteNode();
+        }}
+        eyebrow="Confirm action"
+        consequence={`${node.name} · removes taxonomy, aliases, relations and mapped genre assignments`}
       />
     </div>
   );

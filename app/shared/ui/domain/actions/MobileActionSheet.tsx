@@ -181,7 +181,7 @@ export function MobileActionSheet({
       aria-label={ariaLabel}
       tabIndex={-1}
       className={cn(
-        "fixed inset-0 flex items-end justify-center bg-surface-canvas/58 p-0 backdrop-blur-md z-app-modal",
+        "crate-overlay-scrim fixed inset-0 flex items-end justify-center p-0 z-app-modal",
         isClosing ? "animate-fade-out" : "animate-fade-in",
       )}
       onClickCapture={handleOverlayClick}
@@ -199,14 +199,18 @@ export function MobileActionSheet({
       <div
         ref={resolvedPanelRef}
         data-dismissible-layer-boundary="true"
+        data-overlay-kind={
+          isEntering && !isDragging && !isClosing ? "sheet" : undefined
+        }
+        data-side="bottom"
         className={cn(
-          "listen-glass-panel",
+          "crate-overlay-panel",
           surfaceClassName,
-          "fixed inset-x-0 overflow-hidden overscroll-contain rounded-t-3xl border border-border-quiet shadow-2xl",
+          "fixed inset-x-0 overflow-hidden overscroll-contain",
           isClosing && swipeY === 0
-            ? "animate-sheet-down"
+            ? "crate-overlay-exit"
             : isEntering && !isDragging
-              ? "animate-sheet-up"
+              ? "crate-overlay-enter"
               : undefined,
           className,
         )}
@@ -233,7 +237,7 @@ export function MobileActionSheet({
           className="touch-none pt-3 pb-2"
           {...dragHandleProps}
         >
-          <div className="mx-auto h-1.25 w-14 rounded-full bg-text-primary/22 transition-opacity duration-150 group-hover:opacity-90" />
+          <div className="crate-overlay-grabber mx-auto" />
         </div>
         <div className="max-h-[inherit] overflow-y-auto overscroll-contain">
           {children}

@@ -25,7 +25,7 @@ import {
   DialogTitle,
 } from "@crate/ui/shadcn/dialog";
 import { Input } from "@crate/ui/shadcn/input";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { Skeleton } from "@crate/ui/shadcn/skeleton";
 import { api } from "@/lib/api";
 import {
@@ -297,25 +297,27 @@ export function MoveAlbumToArtistDialog({
         </DialogHeader>
 
         <div className="space-y-3">
-          <label
-            htmlFor="move-album-target"
-            className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
-          >
-            Target artist
-          </label>
-          <div className="relative">
-            <Search
-              size={15}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
-            />
-            <Input
-              id="move-album-target"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="pl-9"
-              placeholder="Search artists"
-              autoFocus
-            />
+          <div className="crate-form-field">
+            <label
+              htmlFor="move-album-target"
+              className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
+            >
+              Target artist
+            </label>
+            <div className="relative">
+              <Search
+                size={15}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+              />
+              <Input
+                id="move-album-target"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="pl-9"
+                placeholder="Search artists"
+                autoFocus
+              />
+            </div>
           </div>
 
           <div className="max-h-[320px] overflow-y-auto rounded-lg border border-white/10 bg-black/20">
@@ -449,25 +451,27 @@ export function MergeAlbumDialog({
         </DialogHeader>
 
         <div className="space-y-3">
-          <label
-            htmlFor="merge-album-target"
-            className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
-          >
-            Target album
-          </label>
-          <div className="relative">
-            <Search
-              size={15}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
-            />
-            <Input
-              id="merge-album-target"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="pl-9"
-              placeholder="Search albums by title or artist"
-              autoFocus
-            />
+          <div className="crate-form-field">
+            <label
+              htmlFor="merge-album-target"
+              className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
+            >
+              Target album
+            </label>
+            <div className="relative">
+              <Search
+                size={15}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+              />
+              <Input
+                id="merge-album-target"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="pl-9"
+                placeholder="Search albums by title or artist"
+                autoFocus
+              />
+            </div>
           </div>
 
           <div className="max-h-[320px] overflow-y-auto rounded-lg border border-white/10 bg-black/20">
@@ -599,7 +603,7 @@ export function SplitAlbumDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="space-y-2">
+          <div className="crate-form-field">
             <label
               htmlFor="split-album-name"
               className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
@@ -1369,7 +1373,11 @@ export function Album() {
           description="This will overwrite current tags with MusicBrainz data. Are you sure?"
           confirmLabel="Apply Tags"
           variant="destructive"
-          onConfirm={() => pendingMatch && applyMatch(pendingMatch)}
+          onConfirm={() => {
+            void (() => pendingMatch && applyMatch(pendingMatch))();
+          }}
+          eyebrow="Confirm action"
+          consequence={`${data.track_count} tracks · overwrites existing tags with MusicBrainz data`}
         />
 
         <ConfirmDialog
@@ -1383,35 +1391,39 @@ export function Album() {
           } from the database AND the filesystem. This action cannot be undone.`}
           confirmLabel="Delete Album"
           variant="destructive"
-          onConfirm={async () => {
-            try {
-              const endpoint = albumManagementApiPath(
-                { albumId: data.id, albumEntityUid: data.entity_uid },
-                "delete",
-              );
-              if (!endpoint) throw new Error("album reference missing");
-              await api<{ task_id: string }>(endpoint, "POST", {
-                mode: "full",
-              });
-              toast.success("Album deletion queued", {
-                description:
-                  "The worker will delete the album in the background.",
-              });
-              navigate(
-                artistPagePath({
-                  artistId: data.artist_id,
-                  artistSlug: data.artist_slug,
-                  artistName: data.artist,
-                }),
-              );
-            } catch (error) {
-              const message =
-                error instanceof Error && error.message
-                  ? error.message
-                  : "Failed to queue album deletion";
-              toast.error(message);
-            }
+          onConfirm={() => {
+            void (async () => {
+              try {
+                const endpoint = albumManagementApiPath(
+                  { albumId: data.id, albumEntityUid: data.entity_uid },
+                  "delete",
+                );
+                if (!endpoint) throw new Error("album reference missing");
+                await api<{ task_id: string }>(endpoint, "POST", {
+                  mode: "full",
+                });
+                toast.success("Album deletion queued", {
+                  description:
+                    "The worker will delete the album in the background.",
+                });
+                navigate(
+                  artistPagePath({
+                    artistId: data.artist_id,
+                    artistSlug: data.artist_slug,
+                    artistName: data.artist,
+                  }),
+                );
+              } catch (error) {
+                const message =
+                  error instanceof Error && error.message
+                    ? error.message
+                    : "Failed to queue album deletion";
+                toast.error(message);
+              }
+            })();
           }}
+          eyebrow="Confirm action"
+          consequence={`${data.track_count} tracks · ${data.total_size_mb} MB · permanently deletes database entries and files`}
         />
       </div>
     </div>

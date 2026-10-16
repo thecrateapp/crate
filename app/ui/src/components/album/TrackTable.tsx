@@ -10,7 +10,7 @@ import {
 import { ResponsiveRadar } from "@nivo/radar";
 
 import { SimilarTracksPanel } from "@/components/track/SimilarTracksPanel";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@crate/ui/shadcn/badge";
@@ -492,25 +492,27 @@ function MoveTrackDialog({
         </DialogHeader>
 
         <div className="space-y-3">
-          <label
-            htmlFor="move-track-target"
-            className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
-          >
-            Target album
-          </label>
-          <div className="relative">
-            <Search
-              size={15}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
-            />
-            <Input
-              id="move-track-target"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="pl-9"
-              placeholder="Search albums by title or artist"
-              autoFocus
-            />
+          <div className="crate-form-field">
+            <label
+              htmlFor="move-track-target"
+              className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
+            >
+              Target album
+            </label>
+            <div className="relative">
+              <Search
+                size={15}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+              />
+              <Input
+                id="move-track-target"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="pl-9"
+                placeholder="Search albums by title or artist"
+                autoFocus
+              />
+            </div>
           </div>
 
           <div className="max-h-[320px] overflow-y-auto rounded-lg border border-white/10 bg-black/20">
@@ -1087,9 +1089,15 @@ export function TrackTable({
         }" to .crate-trash and remove it from this album? This is reversible from the filesystem.`}
         confirmLabel="Quarantine Track"
         variant="destructive"
-        onConfirm={() =>
-          pendingQuarantineTrack && void quarantineTrack(pendingQuarantineTrack)
-        }
+        onConfirm={() => {
+          void (() =>
+            pendingQuarantineTrack &&
+            void quarantineTrack(pendingQuarantineTrack))();
+        }}
+        eyebrow="Confirm action"
+        consequence={`1 track · ${
+          pendingQuarantineTrack?.size_mb ?? "—"
+        } MB · moves to .crate-trash`}
       />
 
       <MoveTrackDialog

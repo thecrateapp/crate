@@ -116,8 +116,8 @@ export function Paths() {
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
-        <div className="flex-1">
-          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-text-primary/35">
+        <div className="crate-form-field flex-1">
+          <div className="text-xs font-semibold uppercase tracking-wider text-text-primary/35">
             {t("paths.length")}
           </div>
           <div className="flex items-center gap-3">
@@ -165,6 +165,7 @@ export function Paths() {
         </div>
       ) : null}
       <ConfirmDialog
+        eyebrow={t("actions.confirmation.eyebrow")}
         open={pendingDelete !== null}
         onOpenChange={(open) => {
           if (!open) setPendingDelete(null);

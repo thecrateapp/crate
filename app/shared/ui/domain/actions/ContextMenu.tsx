@@ -11,12 +11,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import {
-  Check,
-  ChevronDown,
-  ChevronRight,
-  CRATE_ICON_SIZE,
-} from "@crate/ui/icons";
+import { ChevronDown, ChevronRight, CRATE_ICON_SIZE } from "@crate/ui/icons";
 import {
   AppMenuButton,
   AppPopoverDivider,
@@ -24,6 +19,7 @@ import {
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useHoverCapability } from "@crate/ui/lib/use-hover-capability";
 import { cn } from "@crate/ui/lib/cn";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
 
 import { MobileActionSheet } from "./MobileActionSheet";
 import type {
@@ -90,7 +86,7 @@ export function shouldRenderDesktopContextMenu(
   return true;
 }
 
-const DEFAULT_SURFACE_CLASS_NAME = "listen-glass-panel";
+const DEFAULT_SURFACE_CLASS_NAME = "crate-overlay-surface";
 const MENU_ITEM_FOCUS_CLASS_NAME = "crate-focus-inset";
 const MENU_ITEM_SELECTOR = '[role="menuitem"]:not([disabled])';
 
@@ -436,7 +432,7 @@ function ContextMenuDisclosure({
       aria-label={entry.label}
       className={cn(
         surfaceClassName,
-        "fixed z-app-context-menu w-72 max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-y-auto rounded-2xl animate-pop-in",
+        "fixed z-app-context-menu w-72 max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-y-auto",
       )}
       style={{ left: position.left, top: position.top }}
       onKeyDown={handleSubmenuKeyDown}
@@ -537,7 +533,7 @@ function ContextMenuItems({
           return (
             <div
               key={entry.key}
-              className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-text-primary/40"
+              className="crate-overlay-menu-label px-3 pb-1 pt-2"
             >
               {entry.label}
             </div>
@@ -564,13 +560,14 @@ function ContextMenuItems({
             role="menuitem"
             danger={entry.danger}
             disabled={entry.disabled}
+            data-active={entry.active || undefined}
             onClick={(event: ReactMouseEvent<HTMLButtonElement>) => {
               event.stopPropagation();
               handleSelect(entry);
             }}
             className={cn(
               MENU_ITEM_FOCUS_CLASS_NAME,
-              entry.active ? "text-accent-action" : undefined,
+              entry.active ? "text-accent-action-hi" : undefined,
               entry.disabled ? "opacity-50" : undefined,
             )}
           >
@@ -588,12 +585,7 @@ function ContextMenuItems({
               )}
               <ContextMenuItemLabel label={entry.label} />
             </span>
-            {entry.active ? (
-              <Check
-                size={CRATE_ICON_SIZE.md}
-                className="shrink-0 text-accent-action"
-              />
-            ) : null}
+            {entry.active ? <StatusDot /> : null}
           </AppMenuButton>
         );
       })}
@@ -691,7 +683,7 @@ export function ContextMenu({
       onPointerDown={(event) => event.stopPropagation()}
       className={cn(
         surfaceClassName,
-        "fixed z-app-context-menu w-72 max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] origin-top-left overflow-y-auto overflow-x-hidden rounded-2xl animate-pop-in",
+        "fixed z-app-context-menu w-72 max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] origin-top-left overflow-y-auto overflow-x-hidden",
         className,
       )}
       style={style}

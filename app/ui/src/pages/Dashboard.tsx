@@ -32,7 +32,7 @@ import {
   OpsPanel,
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { GridSkeleton } from "@/components/ui/grid-skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOpsSnapshot } from "@/contexts/OpsSnapshotContext";
@@ -1301,15 +1301,20 @@ export function Dashboard() {
         description="This will wipe the entire library database and rebuild from scratch. This includes: wipe DB, health check, repair, full sync, and re-enrichment. This may take a while."
         confirmLabel="Rebuild Library"
         variant="destructive"
-        onConfirm={async () => {
-          try {
-            await api("/api/manage/rebuild", "POST");
-            toast.success("Library rebuild started");
-            void refresh(true);
-          } catch {
-            toast.error("Failed to start rebuild");
-          }
+        onConfirm={() => {
+          void (async () => {
+            try {
+              await api("/api/manage/rebuild", "POST");
+              toast.success("Library rebuild started");
+              void refresh(true);
+            } catch {
+              toast.error("Failed to start rebuild");
+            }
+          })();
         }}
+        eyebrow="Confirm action"
+        consequence="Resets library database · health check · repair · full sync · re-enrichment"
+        confirmation={{ value: "REBUILD", label: "Type REBUILD to confirm" }}
       />
 
       <ConfirmDialog
@@ -1319,15 +1324,20 @@ export function Dashboard() {
         description="This will permanently delete ALL library data (artists, albums, tracks) from the database. Files on disk will NOT be affected. This action cannot be undone."
         confirmLabel="Wipe Database"
         variant="destructive"
-        onConfirm={async () => {
-          try {
-            await api("/api/manage/wipe", "POST", { rebuild: false });
-            toast.success("Library database wiped");
-            void refresh(true);
-          } catch {
-            toast.error("Failed to wipe database");
-          }
+        onConfirm={() => {
+          void (async () => {
+            try {
+              await api("/api/manage/wipe", "POST", { rebuild: false });
+              toast.success("Library database wiped");
+              void refresh(true);
+            } catch {
+              toast.error("Failed to wipe database");
+            }
+          })();
         }}
+        eyebrow="Confirm action"
+        consequence="Database only · files remain on disk"
+        confirmation={{ value: "WIPE", label: "Type WIPE to confirm" }}
       />
     </div>
   );

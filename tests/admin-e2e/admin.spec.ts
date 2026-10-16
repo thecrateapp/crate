@@ -23,7 +23,9 @@ test("opens the command palette as a centered modal over the whole app", async (
     width: viewport.width,
     height: viewport.height,
   });
-  await expect(overlay).toHaveCSS("backdrop-filter", /blur/);
+  await expect(overlay).toHaveCSS("backdrop-filter", "none");
+  await expect(dialog).toHaveCSS("background-color", "rgb(17, 18, 24)");
+  await expect(dialog).toHaveCSS("border-top-left-radius", "14px");
 });
 
 test("finds catalog actions by name and queues them", async ({

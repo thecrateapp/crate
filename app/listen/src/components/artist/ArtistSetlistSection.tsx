@@ -74,8 +74,7 @@ export function ArtistSetlistModal({
       headerClassName="border-text-primary/5 bg-transparent"
       maxWidthClassName="max-w-md"
       mobileSafeArea
-      overlayClassName="bg-surface-canvas/58"
-      panelClassName="listen-glass-panel flex min-h-0 flex-col overflow-hidden border-0 pb-4 sm:max-h-[92vh]"
+      panelClassName="flex min-h-0 flex-col overflow-hidden pb-4 sm:max-h-[92vh]"
     >
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex-1 overflow-y-auto p-2 ">

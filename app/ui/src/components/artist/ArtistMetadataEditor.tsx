@@ -1,3 +1,5 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
@@ -171,7 +173,7 @@ export function ArtistMetadataEditor({
           </DialogHeader>
 
           <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain py-2 pr-1">
-            <section className="space-y-3">
+            <section className="crate-form-field">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-medium text-white/75">
                   Biography
@@ -196,7 +198,7 @@ export function ArtistMetadataEditor({
               </div>
             </section>
 
-            <section className="space-y-3">
+            <section className="crate-form-field">
               <div>
                 <h3 className="text-sm font-medium text-white/75">Genres</h3>
                 <p className="mt-1 text-xs text-white/40">
@@ -214,7 +216,7 @@ export function ArtistMetadataEditor({
             <section className="space-y-3">
               <h3 className="text-sm font-medium text-white/75">Identity</h3>
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2 text-sm">
+                <label className="crate-form-field text-sm">
                   <span className="text-muted-foreground">MusicBrainz ID</span>
                   <Input
                     value={values.mbid}
@@ -223,7 +225,7 @@ export function ArtistMetadataEditor({
                     }
                   />
                 </label>
-                <label className="grid gap-2 text-sm">
+                <label className="crate-form-field text-sm">
                   <span className="text-muted-foreground">Bandcamp URL</span>
                   <Input
                     value={values.bandcamp_url}
@@ -232,7 +234,7 @@ export function ArtistMetadataEditor({
                     }
                   />
                 </label>
-                <label className="grid gap-2 text-sm">
+                <label className="crate-form-field text-sm">
                   <span className="text-muted-foreground">Country</span>
                   <Input
                     value={values.country}
@@ -241,7 +243,7 @@ export function ArtistMetadataEditor({
                     }
                   />
                 </label>
-                <label className="grid gap-2 text-sm">
+                <label className="crate-form-field text-sm">
                   <span className="text-muted-foreground">Area</span>
                   <Input
                     value={values.area}
@@ -250,7 +252,7 @@ export function ArtistMetadataEditor({
                     }
                   />
                 </label>
-                <label className="grid gap-2 text-sm">
+                <label className="crate-form-field text-sm">
                   <span className="text-muted-foreground">Formed</span>
                   <Input
                     value={values.formed}
@@ -260,7 +262,7 @@ export function ArtistMetadataEditor({
                     placeholder="1998"
                   />
                 </label>
-                <label className="grid gap-2 text-sm">
+                <label className="crate-form-field text-sm">
                   <span className="text-muted-foreground">Ended</span>
                   <Input
                     value={values.ended}
@@ -270,26 +272,26 @@ export function ArtistMetadataEditor({
                     placeholder="optional"
                   />
                 </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="text-muted-foreground">Type</span>
-                  <select
+                <div className="crate-form-field">
+                  <MonoLabel as="span">Type</MonoLabel>
+                  <SegmentedControl
+                    as="radio"
+                    label="Type"
                     value={values.artist_type}
-                    onChange={(event) =>
-                      updateField("artist_type", event.target.value)
-                    }
-                    className="h-10 rounded-md border border-white/10 bg-black/25 px-3 text-base text-white"
-                  >
-                    <option value="">Not specified</option>
-                    <option value="Group">Group</option>
-                    <option value="Person">Person</option>
-                    <option value="Character">Character</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </label>
+                    onValueChange={(value) => updateField("artist_type", value)}
+                    items={[
+                      { value: "", label: "Not specified" },
+                      { value: "Group", label: "Group" },
+                      { value: "Person", label: "Person" },
+                      { value: "Character", label: "Character" },
+                      { value: "Other", label: "Other" },
+                    ]}
+                  />
+                </div>
               </div>
             </section>
 
-            <section className="space-y-3">
+            <section className="crate-form-field">
               <div>
                 <h3 className="text-sm font-medium text-white/75">
                   External links

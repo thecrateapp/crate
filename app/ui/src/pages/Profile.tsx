@@ -116,10 +116,10 @@ export function Profile() {
         </div>
 
         <form onSubmit={handleSaveProfile} className="space-y-4">
-          <div>
+          <div className="crate-form-field">
             <label
               htmlFor="profile-display-name"
-              className="text-sm text-muted-foreground mb-1 block"
+              className="text-sm text-muted-foreground block"
             >
               Display Name
             </label>
@@ -129,10 +129,10 @@ export function Profile() {
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          <div>
+          <div className="crate-form-field">
             <label
               htmlFor="profile-username"
-              className="text-sm text-muted-foreground mb-1 block"
+              className="text-sm text-muted-foreground block"
             >
               Username
             </label>
@@ -142,10 +142,10 @@ export function Profile() {
               onChange={(e) => setUsername(e.target.value.replace(/\s+/g, "-"))}
             />
           </div>
-          <div>
+          <div className="crate-form-field">
             <label
               htmlFor="profile-bio"
-              className="text-sm text-muted-foreground mb-1 block"
+              className="text-sm text-muted-foreground block"
             >
               Bio
             </label>

@@ -30,22 +30,24 @@ export function RadioSeedPanel({
 
   return (
     <div className="radio-seed-panel rounded-panel p-5">
-      <div className="radio-seed-heading mb-4 flex items-center gap-2 text-sm font-semibold">
-        <RadioIcon
-          size={CRATE_ICON_SIZE.sm}
-          className="radio-seed-heading-icon"
-        />
-        {t("radio.seed.title")}
-      </div>
+      <div className="crate-form-field">
+        <div className="radio-seed-heading flex items-center gap-2 text-sm font-semibold">
+          <RadioIcon
+            size={CRATE_ICON_SIZE.sm}
+            className="radio-seed-heading-icon"
+          />
+          {t("radio.seed.title")}
+        </div>
 
-      <SearchInput
-        value={query}
-        onValueChange={onQueryChange}
-        label={t("radio.seed.title")}
-        clearLabel={t("common.clear")}
-        placeholder={t("radio.seed.placeholder")}
-        className="radio-seed-input h-12 rounded-lg shadow-none backdrop-blur-none md:text-base"
-      />
+        <SearchInput
+          value={query}
+          onValueChange={onQueryChange}
+          label={t("radio.seed.title")}
+          clearLabel={t("common.clear")}
+          placeholder={t("radio.seed.placeholder")}
+          className="radio-seed-input h-12 rounded-lg shadow-none backdrop-blur-none md:text-base"
+        />
+      </div>
 
       {searching && (
         <Loader2

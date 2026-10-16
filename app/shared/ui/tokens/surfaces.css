@@ -20,7 +20,7 @@
   --surface-panel: var(--crate-token-surface-panel-solid);
   --surface-raised: var(--crate-token-surface-raised-solid);
   --surface-modal: var(--crate-token-surface-modal-solid);
-  --surface-popover: var(--crate-token-surface-overlay-solid);
+  --surface-popover: var(--crate-token-surface-popover-solid);
   --scrollbar-thumb: var(--crate-token-scrollbar-thumb);
   --scrollbar-hover: var(--crate-token-scrollbar-hover);
 }

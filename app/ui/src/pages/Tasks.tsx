@@ -1,3 +1,5 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import {
@@ -31,7 +33,7 @@ import {
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
 import { AdminSelect } from "@/components/ui/AdminSelect";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { Button } from "@crate/ui/shadcn/button";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
@@ -1988,7 +1990,7 @@ export function Tasks() {
           </div>
         }
       >
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+        <div className="flex flex-wrap items-start gap-4">
           <div className="relative min-w-[260px] flex-1">
             <Search
               size={14}
@@ -2001,13 +2003,18 @@ export function Tasks() {
               className="pl-9"
             />
           </div>
-          <AdminSelect
-            value={filterFamily === "all" ? "" : filterFamily}
-            onChange={(value) => setFilterFamily(value || "all")}
-            options={taskFamilies}
-            placeholder="All families"
-            triggerClassName="min-w-[180px]"
-          />
+          <div className="crate-form-field max-w-full">
+            <MonoLabel as="span" className="block">
+              Task family
+            </MonoLabel>
+            <SegmentedControl
+              as="radio"
+              label="Task family"
+              value={filterFamily === "all" ? "" : filterFamily}
+              onValueChange={(value) => setFilterFamily(value || "all")}
+              items={[{ value: "", label: "All families" }, ...taskFamilies]}
+            />
+          </div>
           <AdminSelect
             value={filterType === "all" ? "" : filterType}
             onChange={(value) => setFilterType(value || "all")}
@@ -2017,18 +2024,24 @@ export function Tasks() {
             searchPlaceholder="Filter task types..."
             triggerClassName="min-w-[200px]"
           />
-          <AdminSelect
-            value={filterStatus === "all" ? "" : filterStatus}
-            onChange={(value) => setFilterStatus(value || "all")}
-            options={[
-              { value: "attention", label: "Needs attention" },
-              { value: "completed", label: "Completed" },
-              { value: "failed", label: "Failed" },
-              { value: "cancelled", label: "Cancelled" },
-            ]}
-            placeholder="All final states"
-            triggerClassName="min-w-[170px]"
-          />
+          <div className="crate-form-field max-w-full">
+            <MonoLabel as="span" className="block">
+              Final task state
+            </MonoLabel>
+            <SegmentedControl
+              as="radio"
+              label="Final task state"
+              value={filterStatus === "all" ? "" : filterStatus}
+              onValueChange={(value) => setFilterStatus(value || "all")}
+              items={[
+                { value: "", label: "All final states" },
+                { value: "attention", label: "Needs attention" },
+                { value: "completed", label: "Completed" },
+                { value: "failed", label: "Failed" },
+                { value: "cancelled", label: "Cancelled" },
+              ]}
+            />
+          </div>
         </div>
       </OpsPanel>
 
@@ -2209,7 +2222,13 @@ export function Tasks() {
         description="Cancel this background task? Running jobs may stop mid-operation depending on the worker handler."
         confirmLabel="Cancel task"
         variant="destructive"
-        onConfirm={() => cancelId && handleCancel(cancelId)}
+        onConfirm={() => {
+          void (() => cancelId && handleCancel(cancelId))();
+        }}
+        eyebrow="Confirm action"
+        consequence={`Task ${
+          cancelId ?? ""
+        } · requests cancellation from the worker`}
       />
     </div>
   );

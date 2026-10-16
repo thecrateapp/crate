@@ -1,3 +1,4 @@
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import {
   lazy,
   Suspense,
@@ -51,8 +52,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@crate/ui/shadcn/dialog";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { AdminSelect } from "@/components/ui/AdminSelect";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, ApiError } from "@/lib/api";
@@ -1257,7 +1257,13 @@ export function Users() {
         }? Open sessions will be revoked and owned contributions may be queued for cleanup.`}
         confirmLabel="Delete"
         variant="destructive"
-        onConfirm={handleDelete}
+        onConfirm={() => {
+          void handleDelete();
+        }}
+        eyebrow="Confirm action"
+        consequence={`${
+          deleteTarget?.name || deleteTarget?.email || "User"
+        } · soft-deletes the account · revokes open sessions`}
       />
     </div>
   );
@@ -1552,39 +1558,43 @@ function UserDetailDialog({
                       </p>
                     ) : null}
                     <div className="mt-4 rounded-md border border-white/8 bg-black/15 p-3">
-                      <div className="text-[11px] uppercase tracking-[0.12em] text-white/30">
-                        Roles
+                      <div className="crate-form-field">
+                        <div className="text-[11px] uppercase tracking-[0.12em] text-white/30">
+                          Roles
+                        </div>
+                        {canAssignRoles ? (
+                          <div className="space-y-3">
+                            <RolePicker
+                              value={roleDraft}
+                              onChange={setRoleDraft}
+                              disabled={roleSaving}
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={
+                                roleSaving ||
+                                sameRoleSet(roleDraft, rolesForUser(detail))
+                              }
+                              onClick={handleRoleSave}
+                            >
+                              {roleSaving ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                "Save roles"
+                              )}
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-2 text-sm text-white/70">
+                            {rolesForUser(detail).map((role) => (
+                              <CrateChip key={role}>
+                                {roleLabel(role)}
+                              </CrateChip>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      {canAssignRoles ? (
-                        <div className="mt-3 space-y-3">
-                          <RolePicker
-                            value={roleDraft}
-                            onChange={setRoleDraft}
-                            disabled={roleSaving}
-                          />
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={
-                              roleSaving ||
-                              sameRoleSet(roleDraft, rolesForUser(detail))
-                            }
-                            onClick={handleRoleSave}
-                          >
-                            {roleSaving ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              "Save roles"
-                            )}
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="mt-2 flex flex-wrap gap-2 text-sm text-white/70">
-                          {rolesForUser(detail).map((role) => (
-                            <CrateChip key={role}>{roleLabel(role)}</CrateChip>
-                          ))}
-                        </div>
-                      )}
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         {(detail.capabilities || [])
                           .slice(0, 8)
@@ -1604,58 +1614,60 @@ function UserDetailDialog({
                       </div>
                     </div>
                     <div className="mt-4 rounded-md border border-white/8 bg-black/15 p-3">
-                      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.12em] text-white/30">
-                        <ShieldCheck size={13} />
-                        Account status
-                      </div>
-                      {canManageStatus ? (
-                        <div className="mt-3 space-y-3">
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <AdminSelect
-                              value={statusDraft}
-                              onChange={setStatusDraft}
-                              options={STATUS_OPTIONS}
-                              placeholder="Account status"
-                              allowClear={false}
-                              disabled={statusSaving}
-                              triggerClassName="h-11 w-full max-w-none sm:w-48"
-                              menuClassName="w-[220px]"
-                            />
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={
-                                statusSaving ||
-                                statusDraft === userStatus(detail)
+                      <div className="crate-form-field">
+                        <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.12em] text-white/30">
+                          <ShieldCheck size={13} />
+                          Account status
+                        </div>
+                        {canManageStatus ? (
+                          <div className="space-y-3">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                              <SegmentedControl
+                                as="radio"
+                                label="Account status"
+                                value={statusDraft}
+                                onValueChange={setStatusDraft}
+                                items={STATUS_OPTIONS.map((item) => ({
+                                  ...item,
+                                  disabled: statusSaving,
+                                }))}
+                              />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={
+                                  statusSaving ||
+                                  statusDraft === userStatus(detail)
+                                }
+                                onClick={handleStatusSave}
+                              >
+                                {statusSaving ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  "Save status"
+                                )}
+                              </Button>
+                            </div>
+                            <Input
+                              value={statusReason}
+                              onChange={(event) =>
+                                setStatusReason(event.target.value)
                               }
-                              onClick={handleStatusSave}
-                            >
-                              {statusSaving ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                "Save status"
-                              )}
-                            </Button>
+                              placeholder="Reason for suspension/deletion"
+                            />
+                            {statusDraft !== "active" ? (
+                              <p className="text-xs text-amber-200/75">
+                                Saving this status revokes open sessions and
+                                blocks future login/refresh attempts.
+                              </p>
+                            ) : null}
                           </div>
-                          <Input
-                            value={statusReason}
-                            onChange={(event) =>
-                              setStatusReason(event.target.value)
-                            }
-                            placeholder="Reason for suspension/deletion"
-                          />
-                          {statusDraft !== "active" ? (
-                            <p className="text-xs text-amber-200/75">
-                              Saving this status revokes open sessions and
-                              blocks future login/refresh attempts.
-                            </p>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <div className="mt-2 text-sm text-white/70">
-                          {statusLabel(userStatus(detail))}
-                        </div>
-                      )}
+                        ) : (
+                          <div className="text-sm text-white/70">
+                            {statusLabel(userStatus(detail))}
+                          </div>
+                        )}
+                      </div>
                       {detail.status_reason ? (
                         <div className="mt-3 text-xs text-white/42">
                           Reason: {detail.status_reason}
@@ -2100,7 +2112,7 @@ function SetPasswordDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
+          <div className="crate-form-field">
             <div className="flex items-center justify-between gap-3">
               <label
                 className="text-sm font-medium text-white/80"
@@ -2337,7 +2349,7 @@ function InviteUserDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
+          <div className="crate-form-field">
             <label
               className="text-sm font-medium text-white/80"
               htmlFor="invite-email"
@@ -2353,7 +2365,7 @@ function InviteUserDialog({
               required
             />
           </div>
-          <div className="space-y-2">
+          <div className="crate-form-field">
             <label
               className="text-sm font-medium text-white/80"
               htmlFor="invite-expiry"

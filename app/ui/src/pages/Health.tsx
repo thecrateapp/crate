@@ -12,7 +12,7 @@ import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { cn, timeAgo } from "@/lib/utils";
 import { Button } from "@crate/ui/shadcn/button";
 import { Card } from "@crate/ui/shadcn/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import {
@@ -1157,10 +1157,16 @@ export function Health() {
         }? Files move on disk and each artist is re-synced afterwards.`}
         confirmLabel="Queue repairs"
         onConfirm={() => {
-          const check = pendingBulkFix?.check;
-          setPendingBulkFix(null);
-          if (check) void handleFixType(check);
+          void (() => {
+            const check = pendingBulkFix?.check;
+            setPendingBulkFix(null);
+            if (check) void handleFixType(check);
+          })();
         }}
+        eyebrow="Confirm action"
+        consequence={`${
+          pendingBulkFix?.count ?? 0
+        } issues · moves files on disk · re-syncs each affected artist`}
       />
     </div>
   );

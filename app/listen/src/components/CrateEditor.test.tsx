@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -153,8 +153,11 @@ describe("CrateEditor", () => {
     });
 
     expect(
-      screen.getByRole("combobox", { name: "Ordering" }),
-    ).toHaveTextContent("No order");
+      within(screen.getByRole("radiogroup", { name: "Ordering" })).getByRole(
+        "radio",
+        { name: "No order" },
+      ),
+    ).toBeChecked();
 
     mocks.crate = {
       ...crateDetail("Saved name"),
@@ -172,11 +175,17 @@ describe("CrateEditor", () => {
       "Saved name",
     );
     expect(
-      screen.getByRole("combobox", { name: "Ordering" }),
-    ).toHaveTextContent("Ascending");
+      within(screen.getByRole("radiogroup", { name: "Ordering" })).getByRole(
+        "radio",
+        { name: "Ascending" },
+      ),
+    ).toBeChecked();
     expect(
-      screen.getByRole("combobox", { name: "Visibility" }),
-    ).toHaveTextContent("Public");
+      within(screen.getByRole("radiogroup", { name: "Visibility" })).getByRole(
+        "radio",
+        { name: "Public" },
+      ),
+    ).toBeChecked();
     expect(
       screen.getByRole("checkbox", { name: "Loop playback" }),
     ).toBeChecked();
@@ -193,8 +202,12 @@ describe("CrateEditor", () => {
       { locale: "en" },
     );
 
-    await user.click(screen.getByRole("combobox", { name: "Ordering" }));
-    await user.click(screen.getByRole("option", { name: "Ascending" }));
+    await user.click(
+      within(screen.getByRole("radiogroup", { name: "Ordering" })).getByRole(
+        "radio",
+        { name: "Ascending" },
+      ),
+    );
     fireEvent.submit(screen.getByTestId("crate-form"));
 
     await waitFor(() => expect(onBack).toHaveBeenCalledOnce());
@@ -279,10 +292,11 @@ describe("CrateEditor", () => {
       },
     );
 
-    const ordering = screen.getByRole("combobox", { name: "Ordering" });
-    expect(ordering).toHaveAttribute("data-slot", "select-trigger");
-    await user.click(ordering);
-    await user.click(screen.getByRole("option", { name: "Descending" }));
+    const ordering = screen.getByRole("radiogroup", { name: "Ordering" });
+    expect(ordering).toHaveAttribute("data-slot", "segmented-control");
+    await user.click(
+      within(ordering).getByRole("radio", { name: "Descending" }),
+    );
     fireEvent.click(screen.getByRole("checkbox", { name: "Loop playback" }));
     fireEvent.submit(
       screen.getByRole("textbox", { name: "Name" }).closest("form")!,
@@ -300,18 +314,19 @@ describe("CrateEditor", () => {
     await waitFor(() => expect(onBack).toHaveBeenCalledOnce());
   });
 
-  it("uses the design-system select for crate visibility", async () => {
+  it("uses the shared filter chips for crate visibility", async () => {
     const user = userEvent.setup();
     renderWithListenProviders(<CrateEditor {...editorProps} />, {
       locale: "en",
     });
 
-    const visibility = screen.getByRole("combobox", { name: "Visibility" });
-    expect(visibility).toHaveAttribute("data-slot", "select-trigger");
-    await user.click(visibility);
-    await user.click(screen.getByRole("option", { name: "Public" }));
+    const visibility = screen.getByRole("radiogroup", { name: "Visibility" });
+    expect(visibility).toHaveAttribute("data-slot", "segmented-control");
+    await user.click(within(visibility).getByRole("radio", { name: "Public" }));
 
-    expect(visibility).toHaveTextContent("Public");
+    expect(
+      within(visibility).getByRole("radio", { name: "Public" }),
+    ).toBeChecked();
   });
 
   it("renders the shared CrateForm fields in order for owners", () => {
@@ -344,7 +359,7 @@ describe("CrateEditor", () => {
       locale: "en",
     });
 
-    expect(screen.queryByRole("combobox", { name: "Visibility" })).toBeNull();
+    expect(screen.queryByRole("radiogroup", { name: "Visibility" })).toBeNull();
     expect(
       screen.queryByRole("checkbox", { name: "Allow collaboration" }),
     ).toBeNull();

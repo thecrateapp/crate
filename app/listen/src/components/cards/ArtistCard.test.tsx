@@ -692,7 +692,7 @@ describe("ArtistCard", () => {
     fireEvent.contextMenu(card!, { clientX: 160, clientY: 120 });
 
     const menu = await screen.findByRole("menu");
-    expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-panel");
+    expect(menu).toHaveClass("crate-overlay-surface", "w-72");
     expect(within(menu).getByText("Dredg")).toBeInTheDocument();
     expect(within(menu).getByAltText("Dredg")).toHaveAttribute(
       "src",

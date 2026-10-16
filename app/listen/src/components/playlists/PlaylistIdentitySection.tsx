@@ -88,7 +88,6 @@ export function PlaylistIdentitySection({
 
       <div className="min-w-0 flex-1 space-y-3 pt-1">
         <FormField
-          className="gap-1"
           label={t("playlistComposer.playlistLabel")}
           labelClassName={FIELD_LABEL_CLASS_NAME}
         >
@@ -123,7 +122,6 @@ export function PlaylistIdentitySection({
         </FormField>
 
         <FormField
-          className="gap-1"
           label={t("playlistComposer.descriptionLabel")}
           labelClassName={FIELD_LABEL_CLASS_NAME}
         >

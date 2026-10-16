@@ -232,7 +232,7 @@ export function PlaylistCreateModal({
       closeDisabled={submitting}
       headerClassName="bg-transparent"
       maxWidthClassName="sm:max-w-3xl"
-      panelClassName="listen-glass-panel flex flex-col border-border-quiet"
+      panelClassName="flex flex-col border-border-quiet"
       closeOnEscape={!submitting}
       closeOnOverlay={!submitting}
     >

@@ -1942,5 +1942,6 @@
   "actions.playlist.follow": "Segui playlist",
   "actions.playlist.unfollow": "Smetti di seguire la playlist",
   "playlist.toasts.followed": "Ora segui {name}.",
-  "playlist.toasts.unfollowed": "Non segui più {name}."
+  "playlist.toasts.unfollowed": "Non segui più {name}.",
+  "actions.confirmation.eyebrow": "Conferma"
 }

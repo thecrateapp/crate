@@ -1,3 +1,4 @@
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import {
   useState,
   useCallback,
@@ -23,13 +24,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@crate/ui/shadcn/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@crate/ui/shadcn/select";
 import { api, apiSseUrl } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
 import { toast } from "sonner";
@@ -707,16 +701,17 @@ export function DownloadPage() {
                 className="h-10 rounded-md border-white/10 bg-white/[0.04] pl-9"
               />
             </div>
-            <Select value={quality} onValueChange={setQuality}>
-              <SelectTrigger className="w-36 rounded-md border-white/10 bg-white/[0.04]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="max">Max (HiRes)</SelectItem>
-                <SelectItem value="high">High (FLAC)</SelectItem>
-                <SelectItem value="normal">Normal</SelectItem>
-              </SelectContent>
-            </Select>
+            <SegmentedControl
+              as="radio"
+              label="Download quality"
+              value={quality}
+              onValueChange={setQuality}
+              items={[
+                { value: "max", label: "Max (HiRes)" },
+                { value: "high", label: "High (FLAC)" },
+                { value: "normal", label: "Normal" },
+              ]}
+            />
             <Button
               onClick={() => doSearch()}
               disabled={searching || query.trim().length < 2}

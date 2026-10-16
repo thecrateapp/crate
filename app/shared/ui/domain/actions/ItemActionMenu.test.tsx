@@ -1,5 +1,6 @@
 import { createRef } from "react";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ItemActionMenu, ItemActionMenuButton } from "./ItemActionMenu";
@@ -73,6 +74,42 @@ describe("ItemActionMenu", () => {
 
     expect(screen.getByRole("menu")).toHaveClass("z-app-context-menu");
   });
+  it.each([
+    ["desktop", true],
+    ["mobile sheet", false],
+  ] as const)(
+    "forwards the consumer surface through the %s wrapper without changing action callbacks",
+    async (_mode, desktop) => {
+      isDesktop = desktop;
+      const menuRef = createRef<HTMLDivElement>();
+      const onSelect = vi.fn();
+      const onClose = vi.fn();
+      render(
+        <ItemActionMenu
+          actions={[{ key: "share", label: "Share", onSelect }]}
+          open
+          position={desktop ? { x: 12, y: 20 } : null}
+          menuRef={menuRef}
+          onClose={onClose}
+          surfaceClassName="consumer-actions-surface"
+          sheetLabel="Acciones de la canción"
+        />,
+      );
+
+      expect(menuRef.current).toHaveClass("consumer-actions-surface");
+      expect(menuRef.current).toHaveClass(
+        desktop ? "crate-overlay-surface" : "crate-overlay-panel",
+      );
+      if (!desktop) {
+        expect(
+          screen.getByRole("dialog", { name: "Acciones de la canción" }),
+        ).toContainElement(menuRef.current);
+      }
+      await userEvent.click(screen.getByRole("menuitem", { name: "Share" }));
+      expect(onSelect).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    },
+  );
 });
 
 describe("ItemActionMenuButton", () => {

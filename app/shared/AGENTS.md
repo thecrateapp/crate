@@ -8,7 +8,7 @@ Scope: `app/shared/ui/` (npm workspace `@crate/ui`) and `app/shared/web/` (plain
 | ---------------------- | ------------------------------------------------------------------------------------------------------------- |
 | `app/listen`           | `@crate/ui` heavily (~360 files), `shared/web/{api,use-api,utils,library-routes,sentry,artist-hero-contract}` |
 | `app/ui` (admin)       | `@crate/ui` (~100 files), `shared/web/{api,use-api,utils,library-routes,sentry}`                              |
-| `app/listen-desktop`   | shared identity/preferences and Listen code it pulls in; tsconfig includes `../shared/web/**`                  |
+| `app/listen-desktop`   | shared identity/preferences and Listen code it pulls in; tsconfig includes `../shared/web/**`                 |
 | `app/site`, `app/docs` | `shared/web/sentry` only                                                                                      |
 | `app/cast-receiver`    | none of these (only `@crate/cast-protocol`)                                                                   |
 
@@ -39,6 +39,10 @@ web/artist-hero-contract.ts  Artist hero composition contract types (versioned)
 - Domain components take data and callbacks via props (`onPlay`, `onClose`, `onToggle`, ...). Do not read app contexts (auth, player, router state, i18n) or call app API clients inside `@crate/ui`; apps inject behavior through thin wrappers (see `app/ui/src/components/auth/OAuthButtons.tsx`).
 - `shared/web` factories stay framework-injected: `createUseApi` receives React hooks and an `api` function; `createApiClient` receives callbacks. Do not hardcode app behavior (redirects, token storage, Sentry init) here.
 - Use tokens, not raw values. `design-token-policy.test.ts` budgets arbitrary `rounded-[..]`, `z-[..]`, `shadow-[..]`, `text-[..px]`, `tracking-[..]` per file, and icon sizes must come from `CRATE_ICON_SIZE`.
+- Every stacked form label has an 8 px gap to the component below it, in both apps. Use the
+  shared `.crate-form-field` grid recipe (also used by FormField), not per-caller label margins
+  or `space-y-*`. It aligns content to the start so adjacent wrapping groups cannot stretch
+  that gap. Preserve horizontal rows; their vertical gap is 8 px when they wrap.
 - Listen and Admin share one V3 identity, tokens, primitives, recipes and interaction rules.
   Surfaces are fixed solid; read `--color-card` / `--surface-*`, never branch on app identity.
   `lib/crate-identity.ts` removes legacy visual overrides at startup; functional motion/effects/
@@ -62,7 +66,8 @@ web/artist-hero-contract.ts  Artist hero composition contract types (versioned)
 2. Pick the layer: shadcn (unchanged Radix wrapper) < primitives (app-agnostic) < composites (composed blocks) < domain (music concepts, props/callbacks only).
 3. Add `Thing.tsx` + `Thing.test.tsx` next to it. If it is a `.ts` module or a barrel outside `lib/`, add explicit `exports` + `publishConfig.exports` entries.
 4. Replace the app-local copies in the same change so the export-usage policy stays green and no duplicate survives.
-5. Run the commands below, then typecheck and test BOTH apps.
+5. During development, typecheck and run focused tests for shared changes and affected callers
+   in BOTH apps. Run full suites once when development or the phase closes.
 
 ## Commands
 
@@ -72,7 +77,7 @@ npm run --workspace=app/shared/ui test        # vitest (jsdom); includes policy 
 npm run --workspace=app/shared/ui build       # tsup ESM + tsc declarations into dist/
 npm run design-system:tokens:check            # theme token CSS snapshot (root script)
 npm run design-system:drift                   # drift inventory (scripts/design-system)
-# After any shared change, also:
+# Phase-close validation only (once); use file-scoped tests during development:
 npm run --workspace=app/ui typecheck && npm run --workspace=app/ui test
 npm run --workspace=app/listen typecheck && npm run --workspace=app/listen test
 npm run --workspace=app/listen-desktop typecheck

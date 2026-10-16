@@ -82,7 +82,9 @@ describe("VisualizerSettingsPanel", () => {
         .getAllByRole("switch")
         .some((toggle) => toggle.getAttribute("aria-checked") === "true"),
     ).toBe(true);
-    expect(container.querySelector(".bg-text-primary")).toBeInTheDocument();
+    expect(
+      container.querySelector(".crate-form-switch-thumb"),
+    ).toBeInTheDocument();
     expect(container.querySelector(".border-border-quiet")).toBeInTheDocument();
     expect(container.querySelector(".text-text-muted")).toBeInTheDocument();
     expect(container.querySelector("input[type='range']")).toHaveClass(
@@ -123,7 +125,9 @@ describe("VisualizerSettingsPanel", () => {
     );
 
     expect(container.querySelector(".bg-surface-control")).toBeInTheDocument();
-    expect(container.querySelector(".bg-text-primary")).toBeInTheDocument();
+    expect(
+      container.querySelector(".crate-form-switch-thumb"),
+    ).toBeInTheDocument();
     expect(container.querySelector("input[type='range']")).toBeDisabled();
     expect(container.innerHTML).not.toContain("bg-white");
   });

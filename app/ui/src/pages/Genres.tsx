@@ -11,7 +11,7 @@ import { Input } from "@crate/ui/shadcn/input";
 import { Button } from "@crate/ui/shadcn/button";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { GridSkeleton } from "@/components/ui/grid-skeleton";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { AIButton } from "@/components/ui/AIButton";
 import { GenreNetworkGraph } from "@/components/genres/GenreNetworkGraph";
 import { GenreEqEditor } from "@/components/genres/GenreEqEditor";
@@ -302,95 +302,97 @@ function TaxonomyRelationField({
 
   return (
     <div className="rounded-lg border border-white/8 bg-black/20 p-3">
-      <div className="mb-2 flex items-start justify-between gap-3">
-        <div>
-          <div className="text-xs font-semibold text-white/75">
-            {config.label}
+      <div className="crate-form-field">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold text-white/75">
+              {config.label}
+            </div>
+            <p className="mt-0.5 text-[11px] text-white/35">{config.helper}</p>
           </div>
-          <p className="mt-0.5 text-[11px] text-white/35">{config.helper}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            disabled={busy}
+            onClick={onSave}
+          >
+            {busy ? (
+              <Loader2 size={11} className="mr-1 animate-spin" />
+            ) : (
+              <Save size={11} className="mr-1" />
+            )}
+            Save
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 text-xs"
-          disabled={busy}
-          onClick={onSave}
-        >
-          {busy ? (
-            <Loader2 size={11} className="mr-1 animate-spin" />
-          ) : (
-            <Save size={11} className="mr-1" />
-          )}
-          Save
-        </Button>
-      </div>
 
-      <div className="rounded-md border border-white/10 bg-black/30 p-2 transition focus-within:border-cyan-400/40">
-        {value.length > 0 ? (
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {value.map((slug) => {
-              const option = options.find((item) => item.slug === slug);
-              return (
-                <Badge
-                  key={`${config.key}-${slug}`}
-                  variant="outline"
-                  className="gap-1 border-cyan-400/20 bg-cyan-400/10 pr-1 text-[10px] text-cyan-100"
-                >
-                  <span>{option?.name ?? slug}</span>
-                  <span className="font-mono text-cyan-100/45">{slug}</span>
-                  <button
-                    type="button"
-                    className="rounded-full p-0.5 text-cyan-100/55 transition hover:bg-white/10 hover:text-white"
-                    aria-label={`Remove ${slug}`}
-                    onClick={() => removeSlug(slug)}
+        <div className="rounded-md border border-white/10 bg-black/30 p-2 transition focus-within:border-cyan-400/40">
+          {value.length > 0 ? (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {value.map((slug) => {
+                const option = options.find((item) => item.slug === slug);
+                return (
+                  <Badge
+                    key={`${config.key}-${slug}`}
+                    variant="outline"
+                    className="gap-1 border-cyan-400/20 bg-cyan-400/10 pr-1 text-[10px] text-cyan-100"
                   >
-                    <X size={10} />
-                  </button>
-                </Badge>
-              );
-            })}
-          </div>
-        ) : null}
-        <div className="relative">
-          <label htmlFor="genre-filter" className="sr-only">
-            Filter genres
-          </label>
-          <input
-            id="genre-filter"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setFocused(true);
-            }}
-            onFocus={() => setFocused(true)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                if (suggestions[0]) addSlug(suggestions[0].slug);
-              }
-              if (event.key === "Escape") setFocused(false);
-            }}
-            className="w-full bg-transparent px-1 py-1 font-mono text-xs text-white/70 placeholder:text-white/25"
-            placeholder="Search taxonomy genres..."
-          />
-          {focused && suggestions.length > 0 ? (
-            <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-lg border border-white/10 bg-[#111118] shadow-2xl">
-              {suggestions.map((option) => (
-                <button
-                  key={option.slug}
-                  type="button"
-                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs text-white/70 transition hover:bg-cyan-400/10 hover:text-cyan-100"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => addSlug(option.slug)}
-                >
-                  <span className="font-semibold">{option.name}</span>
-                  <span className="font-mono text-[10px] text-white/35">
-                    {option.slug}
-                  </span>
-                </button>
-              ))}
+                    <span>{option?.name ?? slug}</span>
+                    <span className="font-mono text-cyan-100/45">{slug}</span>
+                    <button
+                      type="button"
+                      className="rounded-full p-0.5 text-cyan-100/55 transition hover:bg-white/10 hover:text-white"
+                      aria-label={`Remove ${slug}`}
+                      onClick={() => removeSlug(slug)}
+                    >
+                      <X size={10} />
+                    </button>
+                  </Badge>
+                );
+              })}
             </div>
           ) : null}
+          <div className="relative">
+            <label htmlFor="genre-filter" className="sr-only">
+              Filter genres
+            </label>
+            <input
+              id="genre-filter"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setFocused(true);
+              }}
+              onFocus={() => setFocused(true)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  if (suggestions[0]) addSlug(suggestions[0].slug);
+                }
+                if (event.key === "Escape") setFocused(false);
+              }}
+              className="w-full bg-transparent px-1 py-1 font-mono text-xs text-white/70 placeholder:text-white/25"
+              placeholder="Search taxonomy genres..."
+            />
+            {focused && suggestions.length > 0 ? (
+              <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-lg border border-white/10 bg-[#111118] shadow-2xl">
+                {suggestions.map((option) => (
+                  <button
+                    key={option.slug}
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs text-white/70 transition hover:bg-cyan-400/10 hover:text-cyan-100"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => addSlug(option.slug)}
+                  >
+                    <span className="font-semibold">{option.name}</span>
+                    <span className="font-mono text-[10px] text-white/35">
+                      {option.slug}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -985,7 +987,7 @@ function TaxonomyNodeEditorialEditor({
               </div>
 
               <div className="space-y-3">
-                <label className="block">
+                <label className="crate-form-field">
                   <span className="text-[11px] uppercase tracking-wider text-white/35">
                     Description
                   </span>
@@ -995,7 +997,7 @@ function TaxonomyNodeEditorialEditor({
                       setDescriptionDraft(event.target.value)
                     }
                     rows={5}
-                    className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/75 transition focus:border-cyan-400/40"
+                    className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/75 transition focus:border-cyan-400/40"
                     placeholder="Short editorial description for this genre."
                   />
                 </label>
@@ -1087,7 +1089,13 @@ function TaxonomyNodeEditorialEditor({
         description={`This removes the taxonomy node, aliases, relations, and all mapped raw genre assignments from artists and albums. This cannot be undone.`}
         confirmLabel="Delete Genre"
         variant="destructive"
-        onConfirm={deleteCanonicalNode}
+        onConfirm={() => {
+          void deleteCanonicalNode();
+        }}
+        eyebrow="Confirm action"
+        consequence={`${
+          node?.name ?? "Genre"
+        } · removes taxonomy, aliases, relations and mapped genre assignments`}
       />
     </>
   );
@@ -1781,7 +1789,13 @@ function GenreList() {
         description="This removes this raw genre from every artist and album that currently uses it. This cannot be undone."
         confirmLabel="Delete Genre"
         variant="destructive"
-        onConfirm={deleteRawGenre}
+        onConfirm={() => {
+          void deleteRawGenre();
+        }}
+        eyebrow="Confirm action"
+        consequence={`${
+          deleteTarget?.name ?? "Genre"
+        } · removes raw genre assignments from artists and albums`}
       />
     </div>
   );
@@ -2259,7 +2273,11 @@ function GenreView({ slug }: { slug: string }) {
         description="This removes this raw genre from every artist and album that currently uses it. If this genre is an alias, the canonical taxonomy node is kept."
         confirmLabel="Delete Genre"
         variant="destructive"
-        onConfirm={deleteCurrentGenre}
+        onConfirm={() => {
+          void deleteCurrentGenre();
+        }}
+        eyebrow="Confirm action"
+        consequence={`${genre.name} · removes raw genre assignments · canonical taxonomy node is kept for aliases`}
       />
     </div>
   );

@@ -1,7 +1,15 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn() }));
 
@@ -11,6 +19,43 @@ vi.mock("sonner", () => ({
 }));
 
 import { Browse } from "./Browse";
+
+const radixElementPolyfills = {
+  hasPointerCapture: () => false,
+  setPointerCapture: () => undefined,
+  releasePointerCapture: () => undefined,
+  scrollIntoView: () => undefined,
+};
+const installedPolyfills: string[] = [];
+
+beforeAll(() => {
+  for (const [name, value] of Object.entries(radixElementPolyfills)) {
+    if (!(name in HTMLElement.prototype)) {
+      Object.defineProperty(HTMLElement.prototype, name, {
+        configurable: true,
+        value,
+      });
+      installedPolyfills.push(name);
+    }
+  }
+  if (typeof globalThis.ResizeObserver === "undefined") {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+  }
+});
+
+afterAll(() => {
+  for (const name of installedPolyfills) {
+    Reflect.deleteProperty(HTMLElement.prototype, name);
+  }
+  vi.unstubAllGlobals();
+});
 
 describe("Browse featured artists", () => {
   beforeEach(() => {
@@ -66,9 +111,8 @@ describe("Browse featured artists", () => {
     expect(firstArtistsRequest).toContain("sort=recent");
     expect(firstArtistsRequest).not.toContain("featured=");
 
-    await userEvent.click(screen.getByRole("button", { name: "Featured" }));
     await userEvent.click(
-      screen.getByRole("button", { name: "Featured artists" }),
+      screen.getByRole("radio", { name: "Featured artists" }),
     );
 
     await waitFor(() => {
@@ -88,9 +132,8 @@ describe("Browse featured artists", () => {
     );
 
     await screen.findByText("Converge");
-    await userEvent.click(screen.getByRole("button", { name: "Issues" }));
     await userEvent.click(
-      screen.getByRole("button", { name: "With open issues" }),
+      screen.getByRole("radio", { name: "With open issues" }),
     );
 
     await waitFor(() => {

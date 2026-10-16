@@ -110,7 +110,7 @@ export function AccountProfileForm({
           {saving ? t("common.saving") : t("settings.account.saveProfile")}
         </Button>
       </div>
-      <div className="space-y-2">
+      <div className="crate-form-field">
         <span className="text-xs text-text-muted">{t("common.email")}</span>
         <p className="px-1 text-sm text-text-primary/60">{email || "—"}</p>
       </div>

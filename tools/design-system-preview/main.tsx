@@ -18,6 +18,7 @@ import {
 } from "@crate/ui/domain/genres/GenrePill";
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
+import { FormField } from "@crate/ui/primitives/FormField";
 import {
   Select,
   SelectTrigger,
@@ -30,6 +31,40 @@ import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { Meter } from "@crate/ui/primitives/Meter";
 import { Readout } from "@crate/ui/primitives/Readout";
 import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
+import {
+  AppModal,
+  ModalBody,
+  ModalFooter,
+} from "@crate/ui/primitives/AppModal";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
+import {
+  Sheet,
+  SheetTrigger,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetClose,
+} from "@crate/ui/shadcn/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+} from "@crate/ui/shadcn/dropdown-menu";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@crate/ui/shadcn/popover";
+import {
+  Tooltip,
+  TooltipProvider,
+  TooltipTrigger,
+  TooltipContent,
+} from "@crate/ui/shadcn/tooltip";
 import { toasterConfig } from "@crate/ui/lib/toaster-config";
 import { toast, Toaster } from "sonner";
 import {
@@ -39,6 +74,8 @@ import {
 import adminTrackReadoutReference from "./references/admin-track-readout.png";
 import { InterfacePreferencesControls } from "../../app/listen/src/components/settings/InterfacePreferencesSection";
 import "./style.css";
+import { FormsCheckpoint } from "./forms-checkpoint";
+import { SelectionCheckpoint } from "./selection-checkpoint";
 
 applyCrateIdentity();
 const disposeFocusRingMotion = installFocusRingMotion();
@@ -100,6 +137,13 @@ const artistGenreProfile: GenreProfileItem[] = [
 ];
 
 function App() {
+  const [sampleModalOpen, setSampleModalOpen] = useState(false);
+  const [sampleConfirmOpen, setSampleConfirmOpen] = useState(false);
+  const [sampleDetails, setSampleDetails] = useState(false);
+  const [sampleLibraryName, setSampleLibraryName] = useState("Sala de escucha");
+  const [sampleLayerStatus, setSampleLayerStatus] = useState(
+    "Ejemplos locales, sin cambios en tu biblioteca.",
+  );
   const [samplePreferences, setSamplePreferences] = useState<UiPreferences>(
     DEFAULT_UI_PREFERENCES,
   );
@@ -228,7 +272,7 @@ function App() {
           crate<span className="version">v3</span>
         </a>
         <MonoLabel
-          meta={["Checkpoint 1M", "Identidad"]}
+          meta={["Checkpoint 1P", "Selección"]}
           className="masthead-meta"
         />
         <a className="jump" href="#primitivas">
@@ -1450,6 +1494,190 @@ function App() {
           </div>
         </div>
       </section>
+      <section
+        id="capas"
+        className="admin-baseline-feature"
+        aria-label="Checkpoint 1N, Diálogos y menús"
+      >
+        <div className="specimen-heading">
+          <div>
+            <MonoLabel size="eyebrow" accent="15">
+              Checkpoint 1N · En revisión
+            </MonoLabel>
+            <h2>Las mismas capas en las dos apps.</h2>
+          </div>
+        </div>
+        <p className="admin-baseline-note">
+          Diálogos, menús y ayudas con las mismas superficies, tipografía y
+          reglas de teclado.
+        </p>
+        <TooltipProvider>
+          <div className="instrument-preview-grid">
+            <InstrumentPanel
+              as="section"
+              headingLevel={3}
+              label={{ children: "Diálogos y confirmaciones" }}
+            >
+              <p className="admin-baseline-note">
+                El foco permanece en la capa abierta y vuelve al control que la
+                abrió. Las acciones destructivas piden confirmación.
+              </p>
+              <div className="readout-preview-actions">
+                <Button
+                  variant="outline"
+                  onClick={() => setSampleModalOpen(true)}
+                >
+                  Abrir diálogo
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setSampleConfirmOpen(true)}
+                >
+                  Abrir confirmación
+                </Button>
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button variant="outline">Abrir panel lateral</Button>
+                  </SheetTrigger>
+                  <SheetContent>
+                    <SheetHeader>
+                      <SheetTitle>Preferencias de la muestra</SheetTitle>
+                      <SheetDescription>
+                        Un panel con la misma identidad de Crate.
+                      </SheetDescription>
+                    </SheetHeader>
+                    <div className="px-6">
+                      <GenrePillRow items={artistGenreProfile} />
+                    </div>
+                    <SheetClose asChild>
+                      <Button variant="ghost" className="mx-6">
+                        Cerrar panel
+                      </Button>
+                    </SheetClose>
+                  </SheetContent>
+                </Sheet>
+              </div>
+            </InstrumentPanel>
+            <InstrumentPanel
+              as="section"
+              headingLevel={3}
+              label={{ children: "Menús y ayudas" }}
+            >
+              <p className="admin-baseline-note">
+                Opciones claras, grupos en mono, estados visibles y superficies
+                sin desenfoque.
+              </p>
+              <div className="readout-preview-actions">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">Abrir menú</Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuLabel>Biblioteca de muestra</DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        setSampleLayerStatus("Vista de muestra actualizada.")
+                      }
+                    >
+                      Actualizar vista
+                    </DropdownMenuItem>
+                    <DropdownMenuCheckboxItem
+                      checked={sampleDetails}
+                      onCheckedChange={(checked) =>
+                        setSampleDetails(checked === true)
+                      }
+                    >
+                      Ver detalles
+                    </DropdownMenuCheckboxItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline">Abrir popover</Button>
+                  </PopoverTrigger>
+                  <PopoverContent aria-label="Opciones de la muestra">
+                    <MonoLabel>Opciones de la muestra</MonoLabel>
+                    <p className="mt-3 text-sm text-text-muted">
+                      Los mismos tokens y primitivas en Listen y Admin.
+                    </p>
+                  </PopoverContent>
+                </Popover>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost">Ver ayuda</Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Las capas comparten identidad y teclado.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </InstrumentPanel>
+          </div>
+        </TooltipProvider>
+        <p role="status" className="admin-baseline-note mt-5">
+          {sampleLayerStatus}
+        </p>
+      </section>
+      <FormsCheckpoint />
+      <SelectionCheckpoint />
+      <AppModal
+        open={sampleModalOpen}
+        onClose={() => setSampleModalOpen(false)}
+        title="Editar biblioteca de muestra"
+        eyebrow="Biblioteca"
+        description="Estos cambios solo afectan al ejemplo."
+        size="md"
+        closeLabel="Cerrar"
+      >
+        <ModalBody className="px-6 py-5">
+          <FormField label="Nombre de la biblioteca" className="gap-2">
+            <Input
+              value={sampleLibraryName}
+              onChange={(event) => setSampleLibraryName(event.target.value)}
+            />
+          </FormField>
+          <Button
+            variant="ghost"
+            className="mt-5"
+            onClick={() => setSampleConfirmOpen(true)}
+          >
+            Confirmación anidada
+          </Button>
+        </ModalBody>
+        <ModalFooter className="flex justify-end gap-3 px-6 py-4">
+          <Button variant="ghost" onClick={() => setSampleModalOpen(false)}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={() => {
+              setSampleLayerStatus("Biblioteca de muestra guardada.");
+              setSampleModalOpen(false);
+            }}
+          >
+            Guardar
+          </Button>
+        </ModalFooter>
+      </AppModal>
+      <ConfirmDialog
+        open={sampleConfirmOpen}
+        onOpenChange={setSampleConfirmOpen}
+        title="Vaciar biblioteca de muestra"
+        eyebrow="Confirmación"
+        description="Es una demostración. Tu biblioteca real no se modifica."
+        consequence="12 archivos · 1,4 GB · Biblioteca de muestra"
+        confirmation={{
+          value: "VACIAR",
+          label: "Escribe VACIAR para confirmar",
+        }}
+        tone="danger"
+        confirmLabel="Vaciar muestra"
+        cancelLabel="Cancelar"
+        closeLabel="Cerrar"
+        onConfirm={async () => {
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 700));
+          setSampleLayerStatus("Acción de muestra confirmada.");
+        }}
+      />
       <footer>
         <MonoLabel
           meta={[
@@ -1463,7 +1691,10 @@ function App() {
             "1J publicado",
             "1K publicado",
             "1L publicado",
-            "1M aprobado",
+            "1M publicado",
+            "1N en revisión",
+            "1O en revisión",
+            "1P en revisión",
           ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>

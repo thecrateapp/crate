@@ -4,6 +4,27 @@
 @import "../../app/shared/ui/tokens/index.css";
 @import "tailwindcss";
 @source "./main.tsx";
+@source "./forms-checkpoint.tsx";
+@source "./selection-checkpoint.tsx";
+@source "../../app/listen/src/components/crates/CrateForm.tsx";
+@source "../../app/listen/src/components/jam/JamRoomCreateOptions.tsx";
+@source "../../app/listen/src/components/player/PlayerSurfaceModeSwitch.tsx";
+@source "../../app/shared/ui/primitives/Checkbox.tsx";
+@source "../../app/shared/ui/primitives/SearchInput.tsx";
+@source "../../app/shared/ui/primitives/SegmentedControl.tsx";
+@source "../../app/shared/ui/shadcn/input.tsx";
+@source "../../app/shared/ui/shadcn/textarea.tsx";
+@source "../../app/shared/ui/composites/AdminSelect.tsx";
+@source "../../app/shared/ui/shadcn/tooltip.tsx";
+@source "../../app/shared/ui/shadcn/popover.tsx";
+@source "../../app/shared/ui/shadcn/dropdown-menu.tsx";
+@source "../../app/shared/ui/shadcn/sheet.tsx";
+@source "../../app/shared/ui/shadcn/alert-dialog.tsx";
+@source "../../app/shared/ui/shadcn/dialog.tsx";
+@source "../../app/shared/ui/shadcn/overlay-close-button.tsx";
+@source "../../app/shared/ui/composites/ConfirmDialog.tsx";
+@source "../../app/shared/ui/primitives/AppPopover.tsx";
+@source "../../app/shared/ui/primitives/AppModal.tsx";
 @source "../../app/shared/ui/primitives/MonoLabel.tsx";
 @source "../../app/shared/ui/primitives/StatusDot.tsx";
 @source "../../app/shared/ui/primitives/StatNumber.tsx";
@@ -191,6 +212,29 @@ main {
   letter-spacing: -0.04em;
   line-height: 1.1;
   margin: 16px 0 0;
+}
+
+#formularios .specimen-heading,
+#seleccion .specimen-heading {
+  gap: 32px;
+}
+
+#formularios .specimen-heading > p,
+#seleccion .specimen-heading > p {
+  max-width: 40ch;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+@media (max-width: 600px) {
+  #formularios .specimen-heading,
+  #seleccion .specimen-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
 }
 .mobile-break {
   display: none;
@@ -880,3 +924,4 @@ footer p {
     grid-template-columns: 1fr;
   }
 }
+@source "../../app/shared/ui/primitives/FormField.tsx";

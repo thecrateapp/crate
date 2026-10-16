@@ -34,7 +34,7 @@ export function PlayerSurfaceModeSwitch({
   variant = "boxed",
 }: PlayerSurfaceModeSwitchProps) {
   const { t } = useTranslation();
-  const buttonClass = size === "md" ? "h-10 w-10" : "h-9 w-9";
+  const buttonClass = size === "md" ? "w-10" : "w-9";
   const iconSize = size === "md" ? 17 : 15;
   const iconClass = size === "md" ? "size-[17px]" : "size-[15px]";
   const modes = allowVisualizer
@@ -43,7 +43,7 @@ export function PlayerSurfaceModeSwitch({
 
   return (
     <SegmentedControl
-      as="tabs"
+      as="radio"
       variant="tonal"
       label={t("player.surface.label")}
       value={mode}
@@ -55,18 +55,10 @@ export function PlayerSurfaceModeSwitch({
         icon: <Icon size={iconSize} className={iconClass} />,
       }))}
       className={cn(
-        variant === "boxed"
-          ? "border border-border-subtle bg-surface-chrome backdrop-blur-sm"
-          : "p-0",
+        variant === "boxed" ? "border border-border-subtle p-1" : "p-0",
         className,
       )}
-      itemClassName={cn(
-        "px-0 data-[state=active]:bg-accent-action/18 data-[state=inactive]:text-text-muted data-[state=inactive]:hover:text-text-secondary",
-        buttonClass,
-        variant === "boxed"
-          ? "data-[state=inactive]:hover:bg-surface-control"
-          : "data-[state=inactive]:hover:bg-surface-chrome",
-      )}
+      itemClassName={cn("px-0", buttonClass)}
     />
   );
 }

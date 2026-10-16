@@ -177,6 +177,7 @@ export function PathDetail() {
       </div>
 
       <ConfirmDialog
+        eyebrow={t("actions.confirmation.eyebrow")}
         open={confirmingDelete}
         onOpenChange={setConfirmingDelete}
         onConfirm={async () => {

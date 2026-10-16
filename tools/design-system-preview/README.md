@@ -162,7 +162,6 @@ canonical baselines. 1F is published with 33 reviewed Linux PNGs and green compa
 `38860652793`. Its local before/after gallery remains explicitly local. 1G is published as `473604f7`; its 33 Linux images from run `38864631250` are reviewed (seven
 expected changes, 26 byte-identical). Full comparison CI passes in run `38865107324`. Preserve all earlier specimens.
 
-
 ## Meter / Checkpoint 1H
 
 Open <http://127.0.0.1:5186/#meters>. Actual Meter/InstrumentPanel specimens show offline counts,
@@ -179,13 +178,11 @@ bounded range values and retain the actual reading in text.
 1G is published with reviewed Linux images and green comparison CI. 1H is published as `6a5b3366`, with 35 reviewed Linux PNGs/provenance in `ef5e7f52`;
 comparison/full frontend CI passes in run `38869556811`. Preserve earlier checkpoint examples.
 
-
 1H local verification passes: 31 cumulative preview checks, including desktop/mobile/forced
 colors, and real app browser checks (Admin 17, Listen 40 with four existing skips). The full frontend
 unit/type/lint/build gates pass; see the handover for counts and unchanged bundle ceilings.
 On this host, run full workspace unit suites sequentially with `--maxWorkers=2` and browser suites
 with one worker; concurrent unrestricted runs saturated the machine. The mockup remains at :5186.
-
 
 ## Readout / Checkpoint 1I
 
@@ -272,7 +269,6 @@ commit/push, Linux captures and continuation to Task 1.13. Preserve this specime
 Published `2c90a6f2`; Linux recording `38883592145` confirms all 43 PNGs byte-identical to 1K.
 The original manifest is imported; comparison CI is pending.
 
-
 ## Shared identity / Checkpoint 1M (local review)
 
 Open <http://127.0.0.1:5186/#identidad>. Listen and Admin share the same identity and primitives;
@@ -284,17 +280,14 @@ localStorage/API. All previous approved specimens remain. 1M is uncommitted pend
 1L is published as `2c90a6f2`; its 43 Linux PNGs are byte-identical to 1K. The original manifest
 is imported in `bf1fa793`; comparison/full CI passes in `38885478542`.
 
-
 1M verification: 41 cumulative preview browser checks pass, plus final desktop/390px advisory
 section captures with actual controls. `checkpoint-1m-{desktop,mobile}.png` in ignored `.artifacts/`
 records the complete section. Appearance passes 41 Chromium and 41 WebKit cases; WebKit tests use
 macOS keyboard navigation and actual CSS capability checks without dropping outline assertions.
 Spec/quality reviews approve. Native device QA and new Linux production captures remain pending.
 
-
 Diego approved 1M on 2026-10-16 and authorised publication/Linux recording and continuation
 with Task 1b.1. The next overlay/menu checkpoint will extend the same preview.
-
 
 ### Checkpoint 1M — publication and Linux capture verification
 
@@ -305,5 +298,68 @@ The original manifest identifies that production SHA, Linux x64 and the pinned P
 `v1.63.0-noble` image. Of 33 PNGs, 31 are byte-identical; only desktop/mobile Settings change
 to the approved three functional preferences. Both changed images are reviewed and imported.
 The ten obsolete skin/light captures were explicitly retired in the production commit.
-Comparison/full CI follows the capture import. Next assigned task: 1b.1 / Checkpoint 1N,
-shared overlays/menus and one ConfirmDialog; preserve its visual review/publication stop.
+Capture/provenance commit `297daaa1` is pushed. Full Frontend Tests and Linux visual comparison
+pass in [38889352392](https://github.com/thecrateapp/crate/actions/runs/38889352392).
+Next assigned task: 1b.1 / Checkpoint 1N, shared overlays/menus and one ConfirmDialog; preserve
+its visual review/publication stop.
+
+## Checkpoint 1N — Shared overlays, local review
+
+Open `http://127.0.0.1:5186/#capas`. The examples use real shared AppModal, nested ConfirmDialog,
+Sheet, DropdownMenu, Popover and Tooltip. Confirmations accept the exact sample word VACIAR;
+all changes stay in local sample state, with no API/localStorage writes. Prior specimens stay.
+
+The close is one shared base in all four dialog/sheet routes: 40 px control, 24 px icon,
+transparent hover and common keyboard focus. It sits 16 px from top/right and never overlaps
+long titles. The sample input uses FormField with an 8 px label gap. Full forms remain 1b.2.
+
+Focused tests cover keyboard/pending/typed/stacked focus, desktop/390 px close geometry,
+identical size/hover, menus, long Sheet titles and absence of horizontal overflow/external
+writes. Advisory section and open modal/confirm captures use `checkpoint-1n-*.png` in ignored
+`.artifacts/`; canonical Linux images remain the 33 approved 1M references. SPEC and QUALITY
+reviews pass. The later 1N–1P publication cut supersedes this local-only stop; new Linux
+recording remains pending.
+
+During development run focused tests only. Full validation runs once when development/the
+phase closes, per Diego's 2026-10-16 instruction.
+
+## Checkpoint 1O — Form foundations, local review
+
+Open <http://127.0.0.1:5186/#formularios>. The sample uses actual shared Input, Textarea,
+Select, Switch, Checkbox, SearchInput, FormField, SegmentedControl and AdminSelect. Edit the
+collection name and blur for validation, try the debounced search and immediate clear,
+keyboard selection, mixed checkbox and disabled/read-only fields. All values stay in sample
+state; no library, API or localStorage writes. The section stacks its heading on mobile.
+
+Admin's local AdminSelect now re-exports the shared implementation, preserving its callers.
+Both variants expose a stable accessible name; search supports IME composition and resets
+on close. Typed confirmations use the same FormField label recipe. SPEC/QUALITY pass.
+
+Only the two `shared forms` preview cases run for this checkpoint's browser verification;
+advisory images live in ignored `.artifacts/checkpoint-1o-{desktop,mobile}.png`. The approved
+Linux references stay unchanged. 1N and 1O are included in the later 1N–1P publication cut;
+the current status and verification record are in the main handover.
+
+## Checkpoint 1P — Short choices and shared field spacing
+
+Open <http://127.0.0.1:5186/#seleccion>. Actual CrateForm, Jam playback options and Player
+view mode use the shared chips, isolated Spanish translations and sample state. Try keyboard
+selection, the Auto DJ permanence behavior, the Crate form lock and external submit button.
+Admin's specimen exercises the same shared radio group. No API/localStorage writes occur.
+
+All vertically stacked labels have 8 px before their control through `.crate-form-field`.
+This is applied throughout both apps, including existing forms; horizontal rows retain their
+layout with an 8 px vertical gap when wrapping. The preview keeps earlier specimens and
+checks actual label/control geometry at 1440/390 px, not just class names. Advisory images
+use ignored `checkpoint-1p-{desktop,mobile}.png`; canonical Linux references are unchanged.
+
+Diego authorised closing 1N–1P through commit/push and transfer to a Linux Codex agent.
+Continue from Task 1b.3 / checkpoint 1Q using
+`docs/plans/2026-10-16-crate-v3-linux-handover.md`. Preserve future review stops and focused tests.
+
+The combined checkpoint commit is `feat(ui): unify v3 overlays, controls and field spacing`.
+Final focused verification passes: six desktop/mobile browser cases for 1M/1O/1P, Shared 22,
+Listen 38 and Admin 74 cases in affected files, four typechecks, scoped lint, both app builds
+and bundle gates, preview build, drift/layers and Listen i18n. Batches overlap earlier records;
+these are not additive full-suite totals. No full suites or new Linux recording ran in this cut.
+The main handover records remaining canonical/native QA and Admin's narrow bundle headroom.

@@ -334,6 +334,7 @@ export function LibraryPlaylistsTab() {
       />
 
       <ConfirmDialog
+        eyebrow={t("actions.confirmation.eyebrow")}
         open={!!deletingPlaylist}
         tone="danger"
         pending={deleting}

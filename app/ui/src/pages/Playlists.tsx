@@ -1,3 +1,6 @@
+import { cn } from "@crate/ui/lib/cn";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import {
   useCallback,
   useEffect,
@@ -30,7 +33,7 @@ import { AdminSelect } from "@/components/ui/AdminSelect";
 import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { Button } from "@crate/ui/shadcn/button";
 import { Card } from "@crate/ui/shadcn/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { Input } from "@crate/ui/shadcn/input";
 import { Textarea } from "@crate/ui/shadcn/textarea";
 import { api } from "@/lib/api";
@@ -217,10 +220,8 @@ function Field({
   children: ReactNode;
 }) {
   return (
-    <div className={className}>
-      <span className="mb-1.5 block text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-        {label}
-      </span>
+    <div className={cn("crate-form-field", className)}>
+      <MonoLabel as="span">{label}</MonoLabel>
       {children}
     </div>
   );
@@ -626,7 +627,13 @@ export function Playlists() {
         description={`Delete "${deleteTarget?.name}"? This cannot be undone.`}
         confirmLabel="Delete"
         variant="destructive"
-        onConfirm={handleDelete}
+        onConfirm={() => {
+          void handleDelete();
+        }}
+        eyebrow="Confirm action"
+        consequence={`${deleteTarget?.name ?? "Playlist"} · ${
+          deleteTarget?.track_count ?? 0
+        } track references · deletes the system playlist`}
       />
     </div>
   );
@@ -718,13 +725,12 @@ function CreateStaticPlaylistPanel({
             />
           </Field>
           <Field label="Category">
-            <AdminSelect
+            <SegmentedControl
+              as="radio"
+              label="Category"
               value={category}
-              onChange={setCategory}
-              options={CATEGORY_OPTIONS}
-              placeholder="Category"
-              allowClear={false}
-              triggerClassName="w-full max-w-none"
+              onValueChange={setCategory}
+              items={CATEGORY_OPTIONS}
             />
           </Field>
           <Field label="Featured rank">
@@ -952,13 +958,12 @@ function CreateSmartPlaylistPanel({
             />
           </Field>
           <Field label="Category">
-            <AdminSelect
+            <SegmentedControl
+              as="radio"
+              label="Category"
               value={category}
-              onChange={setCategory}
-              options={CATEGORY_OPTIONS}
-              placeholder="Category"
-              allowClear={false}
-              triggerClassName="w-full max-w-none"
+              onValueChange={setCategory}
+              items={CATEGORY_OPTIONS}
             />
           </Field>
           <Field label="Featured rank">
@@ -990,16 +995,15 @@ function CreateSmartPlaylistPanel({
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <Field label="Match" className="min-w-[180px]">
-                <AdminSelect
+                <SegmentedControl
+                  as="radio"
+                  label="Match"
                   value={match}
-                  onChange={(value) => setMatch(value as "all" | "any")}
-                  options={[
+                  onValueChange={(value) => setMatch(value as "all" | "any")}
+                  items={[
                     { value: "all", label: "All rules" },
                     { value: "any", label: "Any rule" },
                   ]}
-                  placeholder="Match"
-                  allowClear={false}
-                  triggerClassName="w-full max-w-none"
                 />
               </Field>
               <Field label="Limit" className="w-[120px]">
@@ -1012,13 +1016,12 @@ function CreateSmartPlaylistPanel({
                 />
               </Field>
               <Field label="Sort" className="min-w-[180px]">
-                <AdminSelect
+                <SegmentedControl
+                  as="radio"
+                  label="Sort"
                   value={sort}
-                  onChange={setSort}
-                  options={SORT_OPTIONS}
-                  placeholder="Sort"
-                  allowClear={false}
-                  triggerClassName="w-full max-w-none"
+                  onValueChange={setSort}
+                  items={SORT_OPTIONS}
                 />
               </Field>
             </div>
@@ -1038,7 +1041,7 @@ function CreateSmartPlaylistPanel({
 
               return (
                 <div
-                  key={`${rule.field}-${rule.op}-${rule.value}-${rule.rangeMin}-${rule.rangeMax}`}
+                  key={index}
                   className="rounded-md border border-white/10 bg-card/60 p-3"
                 >
                   <div className="mb-3 flex items-center justify-between gap-3">
@@ -1072,9 +1075,11 @@ function CreateSmartPlaylistPanel({
                     </Field>
 
                     <Field label="Operator">
-                      <AdminSelect
+                      <SegmentedControl
+                        as="radio"
+                        label="Operator"
                         value={rule.op}
-                        onChange={(value) =>
+                        onValueChange={(value) =>
                           updateRule(index, {
                             op: value,
                             value: "",
@@ -1082,10 +1087,7 @@ function CreateSmartPlaylistPanel({
                             rangeMax: "",
                           })
                         }
-                        options={ops}
-                        placeholder="Operator"
-                        allowClear={false}
-                        triggerClassName="w-full max-w-none"
+                        items={ops}
                       />
                     </Field>
 

@@ -162,7 +162,7 @@ export function CrateMembersModal({
       closeLabel={t("common.close")}
       closeOnEscape={!leaveConfirmation}
       headerClassName="bg-transparent"
-      panelClassName="listen-glass-panel flex flex-col border-border-quiet"
+      panelClassName="flex flex-col border-border-quiet"
     >
       <div className="flex min-h-0 flex-col">
         <ModalBody className="space-y-5 p-5">
@@ -284,6 +284,7 @@ export function CrateMembersModal({
                 {t("crate.members.leave")}
               </Button>
               <ConfirmDialog
+                eyebrow={t("actions.confirmation.eyebrow")}
                 open={leaveConfirmation}
                 tone="danger"
                 pending={leaving}

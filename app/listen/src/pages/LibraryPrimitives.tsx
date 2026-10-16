@@ -35,6 +35,7 @@ export function ContributionWithdrawDialog({
   const { t } = useTranslation();
   return (
     <ConfirmDialog
+      eyebrow={t("actions.confirmation.eyebrow")}
       open={open}
       tone="danger"
       pending={pending}

@@ -125,7 +125,6 @@ export function Register() {
 
         <FormField
           label={t("common.name")}
-          className="gap-1"
           labelClassName="font-normal text-text-primary/60"
         >
           <Input
@@ -140,7 +139,6 @@ export function Register() {
         </FormField>
         <FormField
           label={t("common.email")}
-          className="gap-1"
           labelClassName="font-normal text-text-primary/60"
         >
           <Input
@@ -155,7 +153,6 @@ export function Register() {
         </FormField>
         <FormField
           label={t("common.password")}
-          className="gap-1"
           labelClassName="font-normal text-text-primary/60"
         >
           <Input

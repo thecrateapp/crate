@@ -29,13 +29,8 @@ export interface SegmentedControlProps<T extends string = string> {
 }
 
 const SIZE_CLASS_NAME: Record<SegmentedControlSize, string> = {
-  sm: "h-7 gap-1 px-2.5 text-xs [&_svg:not([class*='size-'])]:size-3.5",
-  md: "h-9 gap-1.5 px-3.5 text-sm [&_svg:not([class*='size-'])]:size-4",
-};
-
-const SELECTED_CLASS_NAME: Record<SegmentedControlVariant, string> = {
-  solid: "bg-accent-action text-accent-action-foreground shadow-action",
-  tonal: "bg-accent-action/12 text-accent-action",
+  sm: "gap-1 px-2.5 [&_svg:not([class*='size-'])]:size-3.5",
+  md: "gap-1.5 px-3 [&_svg:not([class*='size-'])]:size-4",
 };
 
 export function SegmentedControl<T extends string = string>({
@@ -111,11 +106,8 @@ export function SegmentedControl<T extends string = string>({
       data-variant={variant}
       data-size={size}
       className={cn(
-        "items-center gap-1 rounded-full p-1",
+        "flex-wrap items-center gap-2",
         fullWidth ? "flex w-full" : "inline-flex",
-        variant === "solid"
-          ? "border border-border-subtle bg-surface-control"
-          : "bg-transparent",
         className,
       )}
     >
@@ -135,19 +127,16 @@ export function SegmentedControl<T extends string = string>({
             aria-label={item.ariaLabel}
             tabIndex={index === focusableIndex ? 0 : -1}
             disabled={item.disabled}
+            data-slot="chip"
             data-state={selected ? "active" : "inactive"}
             onClick={() => {
               if (!selected) onValueChange(item.value);
             }}
             onKeyDown={(event) => handleKeyDown(event, index)}
             className={cn(
-              "relative inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full font-medium transition-[color,background-color,box-shadow] disabled:pointer-events-none disabled:opacity-50",
-              "after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 pointer-fine:after:hidden",
+              "crate-form-chip relative inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full border py-1 font-mono text-label tracking-chip disabled:pointer-events-none disabled:opacity-50",
               SIZE_CLASS_NAME[size],
               fullWidth && "flex-1",
-              selected
-                ? SELECTED_CLASS_NAME[variant]
-                : "text-text-secondary hover:text-text-primary",
               itemClassName,
             )}
           >

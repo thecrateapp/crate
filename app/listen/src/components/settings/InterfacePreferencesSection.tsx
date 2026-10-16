@@ -1,3 +1,5 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -7,13 +9,6 @@ import {
   subscribeUiPreferences,
   type UiPreferences,
 } from "@crate/ui/lib/interface-preferences";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@crate/ui/shadcn/select";
 import { Section } from "./SettingsPrimitives";
 
 type PreferencePatch = Partial<Omit<UiPreferences, "version">>;
@@ -55,28 +50,21 @@ export function InterfacePreferencesControls({
       {fields.map((field) => (
         <div
           key={field.key}
-          className="flex flex-wrap items-center justify-between gap-3"
+          className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2"
         >
-          <span className="text-sm font-medium text-text-primary">
-            {field.label}
-          </span>
-          <Select
+          <MonoLabel as="span">{field.label}</MonoLabel>
+          <SegmentedControl
+            as="radio"
+            label={field.label}
             value={preferences[field.key]}
             onValueChange={(value) =>
               onChange({ [field.key]: value } as PreferencePatch)
             }
-          >
-            <SelectTrigger aria-label={field.label} className="w-full sm:w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {field.values.map((value) => (
-                <SelectItem key={value} value={value}>
-                  {labels.values[value]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            items={field.values.map((value) => ({
+              value,
+              label: labels.values[value],
+            }))}
+          />
         </div>
       ))}
     </Section>

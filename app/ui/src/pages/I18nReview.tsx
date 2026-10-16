@@ -1,3 +1,5 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
@@ -753,15 +755,21 @@ function BundlesSection({
                 value === "all" ? "All locales" : value
               }
             />
-            <FilterSelect
-              label="Status"
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={STATUS_FILTERS}
-              formatOption={(value) =>
-                value === "all" ? "All statuses" : statusLabel(value)
-              }
-            />
+            <div className="crate-form-field">
+              <MonoLabel as="span" className="block">
+                Status
+              </MonoLabel>
+              <SegmentedControl
+                as="radio"
+                label="Status"
+                value={statusFilter}
+                onValueChange={setStatusFilter}
+                items={STATUS_FILTERS.map((value) => ({
+                  value,
+                  label: value === "all" ? "All statuses" : statusLabel(value),
+                }))}
+              />
+            </div>
             <FilterSelect
               label="Source"
               value={sourceFilter}
@@ -1192,8 +1200,8 @@ function FilterSelect({
   formatOption: (value: string) => string;
 }) {
   return (
-    <label className="block min-w-0">
-      <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-white/35">
+    <label className="crate-form-field">
+      <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-white/35">
         {label}
       </span>
       <select

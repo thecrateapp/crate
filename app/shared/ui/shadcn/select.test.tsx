@@ -59,4 +59,30 @@ describe("Select", () => {
 
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it("uses the shared field recipe while retaining invalid and label attributes", () => {
+    const ref = { current: null as HTMLButtonElement | null };
+    render(
+      <Select defaultValue="private">
+        <SelectTrigger
+          ref={ref}
+          aria-label="Visibility"
+          aria-invalid
+          aria-describedby="visibility-error"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <p id="visibility-error">Choose visibility</p>
+      </Select>,
+    );
+    const trigger = screen.getByRole("combobox", { name: "Visibility" });
+    expect(ref.current).toBe(trigger);
+    expect(trigger).toHaveClass("crate-form-control");
+    expect(trigger).toHaveAttribute("aria-invalid", "true");
+    expect(trigger).toHaveAccessibleDescription("Choose visibility");
+    expect(trigger.className).not.toMatch(
+      /state-danger|backdrop-blur|shadow-control/,
+    );
+    expect(trigger).not.toHaveClass("outline-none", "outline-hidden");
+  });
 });

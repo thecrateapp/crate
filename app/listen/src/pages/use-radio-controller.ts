@@ -36,37 +36,40 @@ export function useRadioController() {
     });
   }, []);
 
-  const search = useCallback(async (query: string) => {
-    if (query.length < 2) {
-      dispatch({ type: "search-cleared" });
-      return;
-    }
-    dispatch({ type: "search-started" });
-    try {
-      const [searchData, genresData] = await Promise.all([
-        api<RadioSearchResponse>(
-          `/api/catalog/search?q=${encodeURIComponent(query)}&limit=5`,
-        ),
-        api<RadioGenre[]>("/api/genres"),
-      ]);
-      dispatch({
-        type: "search-succeeded",
-        value: buildSearchResults(searchData, genresData, query),
-      });
-    } catch {
-      dispatch({ type: "search-failed" });
-    } finally {
-      dispatch({ type: "search-finished" });
-    }
-  }, []);
+  useEffect(() => {
+    const query = state.query;
+    if (query.length < 2) return;
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      dispatch({ type: "search-started" });
+      try {
+        const [searchData, genresData] = await Promise.all([
+          api<RadioSearchResponse>(
+            `/api/catalog/search?q=${encodeURIComponent(query)}&limit=5`,
+          ),
+          api<RadioGenre[]>("/api/genres"),
+        ]);
+        if (!active) return;
+        dispatch({
+          type: "search-succeeded",
+          value: buildSearchResults(searchData, genresData, query),
+        });
+      } catch {
+        if (active) dispatch({ type: "search-failed" });
+      } finally {
+        if (active) dispatch({ type: "search-finished" });
+      }
+    }, 300);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [state.query]);
 
-  const onQueryChange = useCallback(
-    (query: string) => {
-      dispatch({ type: "set-query", value: query });
-      void search(query);
-    },
-    [search],
-  );
+  const onQueryChange = useCallback((query: string) => {
+    dispatch({ type: "set-query", value: query });
+    if (query.length < 2) dispatch({ type: "search-cleared" });
+  }, []);
 
   const startStation = useCallback(
     async (station: PersonalizedRadioStation) => {

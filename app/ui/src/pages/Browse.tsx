@@ -1,3 +1,5 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import {
   useState,
   useEffect,
@@ -12,7 +14,7 @@ import {
 } from "@/components/ui/AdminSelect";
 import { Button } from "@crate/ui/shadcn/button";
 import { Skeleton } from "@crate/ui/shadcn/skeleton";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { api } from "@/lib/api";
 import {
   artistActionApiPath,
@@ -406,30 +408,46 @@ export function Browse() {
           searchPlaceholder="Search formats..."
         />
 
-        <AdminSelect
-          placeholder="Featured"
-          value={featured}
-          onChange={(nextValue) => setParam("featured", nextValue)}
-          options={FEATURED_OPTIONS}
-          triggerClassName="min-w-[130px] max-w-[170px]"
-        />
+        <div className="crate-form-field max-w-full">
+          <MonoLabel as="span" className="block">
+            Featured
+          </MonoLabel>
+          <SegmentedControl
+            as="radio"
+            label="Featured"
+            value={featured}
+            onValueChange={(nextValue) => setParam("featured", nextValue)}
+            items={[{ value: "", label: "Featured" }, ...FEATURED_OPTIONS]}
+          />
+        </div>
 
-        <AdminSelect
-          placeholder="Issues"
-          value={hasIssues}
-          onChange={(nextValue) => setParam("has_issues", nextValue)}
-          options={ISSUE_OPTIONS}
-          triggerClassName="min-w-[130px] max-w-[170px]"
-        />
+        <div className="crate-form-field max-w-full">
+          <MonoLabel as="span" className="block">
+            Issues
+          </MonoLabel>
+          <SegmentedControl
+            as="radio"
+            label="Issues"
+            value={hasIssues}
+            onValueChange={(nextValue) => setParam("has_issues", nextValue)}
+            items={[{ value: "", label: "Issues" }, ...ISSUE_OPTIONS]}
+          />
+        </div>
 
-        <AdminSelect
-          placeholder="Recently Added"
-          value={sort}
-          onChange={(nextValue) => setParam("sort", nextValue || "recent")}
-          options={sortOptions}
-          allowClear={false}
-          triggerClassName="min-w-[120px] max-w-[150px]"
-        />
+        <div className="crate-form-field max-w-full">
+          <MonoLabel as="span" className="block">
+            Sort artists
+          </MonoLabel>
+          <SegmentedControl
+            as="radio"
+            label="Sort artists"
+            value={sort}
+            onValueChange={(nextValue) =>
+              setParam("sort", nextValue || "recent")
+            }
+            items={sortOptions}
+          />
+        </div>
 
         <Button
           size="sm"
@@ -597,7 +615,11 @@ export function Browse() {
         description={`This will permanently delete ${selected.size} artist(s) and all their files. This action cannot be undone.`}
         confirmLabel="Delete"
         variant="destructive"
-        onConfirm={batchDelete}
+        onConfirm={() => {
+          void batchDelete();
+        }}
+        eyebrow="Confirm action"
+        consequence={`${selected.size} artists · permanently deletes all their files`}
       />
     </div>
   );

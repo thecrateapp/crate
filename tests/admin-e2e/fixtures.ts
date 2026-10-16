@@ -155,8 +155,14 @@ export const test = base.extend<AdminFixtures>({
     await provide(async (path) => {
       await page.goto(path);
       await page.waitForFunction(() => document.fonts.status === "loaded");
+      const desktopNavigation = await page.evaluate(
+        () => window.matchMedia("(min-width: 768px)").matches,
+      );
       await expect(
-        page.getByRole("button", { name: "Collapse sidebar" }),
+        page.getByRole("button", {
+          name: desktopNavigation ? "Collapse sidebar" : "Open navigation",
+          exact: true,
+        }),
       ).toBeVisible();
     });
   },
