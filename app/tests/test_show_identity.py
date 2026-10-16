@@ -495,3 +495,32 @@ def test_structured_provider_reference_matches_legacy_prefixed_alias(pg_db, prov
     synced = put(candidate(date="2027-03-04"), provider, provider + ":legacy-event")
     assert synced["show_id"] == first["show_id"]
     assert str(row(first["show_id"])["date"]) == "2027-03-03"
+
+
+@pytest.mark.parametrize("action", ["attend", "remind", "unattend"])
+def test_missing_show_relation_operations_are_idempotent(pg_db, action):
+    from crate.db.repositories import shows_attendance as attendance
+    from crate.db.repositories.auth_user_accounts import create_user
+
+    user = create_user("missing-show@example.test", role="user")
+    if action == "remind":
+        result = attendance.create_show_reminder(user["id"], 2147483647, "day_before")
+    else:
+        function = (
+            attendance.attend_show if action == "attend" else attendance.unattend_show
+        )
+        result = function(user["id"], 2147483647)
+    assert result is False
+    with read_scope() as session:
+        assert (
+            session.execute(
+                text("SELECT count(*) FROM user_show_attendance")
+            ).scalar_one()
+            == 0
+        )
+        assert (
+            session.execute(
+                text("SELECT count(*) FROM user_show_reminders")
+            ).scalar_one()
+            == 0
+        )

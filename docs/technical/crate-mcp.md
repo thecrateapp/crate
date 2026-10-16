@@ -1123,6 +1123,9 @@ A confirmed terminal preparation failure unlocks the retained draft with a new p
 an uncertain acceptance retries its original key/job. Changing consolidation IDs, the canonical
 choice or the duplicate selection invalidates the previous plan. Shared artist edits clear stale
 library UIDs; optional field clears on an explicitly selected existing show are sent as nulls.
+Restoring a draft uses a pure state updater, preserving pending corrections and canonical saved
+rows under StrictMode. Attendance/reminder operations on a missing show return false without
+writing, preserving idempotent removal rather than turning a missing ID into an exception.
 
 Extraction is a closed `extract_shows` command using the existing acceptance ledger, agent jobs,
 `tasks`, Dramatiq actor, maintenance pool and resource governor. There is no second job engine.

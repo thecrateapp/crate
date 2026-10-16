@@ -275,22 +275,25 @@ export function AddShowDialog({ open, onOpenChange, onSaved }: Props) {
               disabled={busy || phase === "uncertain" || phase === "saved"}
               onBusyChange={setSourceBusy}
               onDraft={(imported) => {
-                const rows = imported.candidates.map((candidate) => ({
-                  ...candidate,
-                  source_draft_id: imported.draft_id,
-                }));
                 setDraft((current) => {
-                  for (let index = 0; index < rows.length; index++) {
-                    const row = rows[index]!;
-                    const existing = current.candidates.find(
-                      (candidate) => candidate.item_id === row.item_id,
-                    );
-                    if (
-                      existing &&
+                  const existingById = new Map(
+                    current.candidates.map((candidate) => [
+                      candidate.item_id,
+                      candidate,
+                    ]),
+                  );
+                  const rows = imported.candidates.map((candidate) => {
+                    const row = {
+                      ...candidate,
+                      source_draft_id: imported.draft_id,
+                    };
+                    const existing = existingById.get(row.item_id);
+                    return existing &&
                       !isShowSaved(imported.publication?.[row.item_id])
-                    )
-                      rows[index] = { ...row, ...existing };
-                  }
+                      ? { ...row, ...existing }
+                      : row;
+                  });
+                  const rowIds = new Set(rows.map((row) => row.item_id));
                   const blank =
                     current.candidates.length === 1 &&
                     !current.candidates[0]?.artist_name &&
@@ -299,10 +302,7 @@ export function AddShowDialog({ open, onOpenChange, onSaved }: Props) {
                     ? rows
                     : [
                         ...current.candidates.filter(
-                          (candidate) =>
-                            !rows.some(
-                              (row) => row.item_id === candidate.item_id,
-                            ),
+                          (candidate) => !rowIds.has(candidate.item_id),
                         ),
                         ...rows,
                       ];

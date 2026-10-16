@@ -413,6 +413,8 @@ Rollout por capacidades: diagnóstico → primera acción → permisos/Admin/OAu
 
 Las migraciones publicadas 109–116 permanecen intactas. La prueba de grants de 115 ahora compara su contrato literal de 24 grants, en lugar de derivarlo del catálogo posterior de 30 grants. El CI instala Tesseract y los idiomas eng/spa para ejecutar OCR real. El gate publicado debe comprobarse sobre el HEAD exacto, no inferirse de estos resultados locales.
 
+La persistent review de `20b1c44b` detectó además una regresión con shows inexistentes: asistencia, retirada y recordatorios ahora devuelven `False` sin excepción ni escritura. Tres casos RED→GREEN y 67 regresiones PostgreSQL pasaron. Se eliminó también la mutación de un array capturado fuera del updater React al recuperar borradores; un caso StrictMode verifica correcciones pendientes, fuente inmutable y filas canónicas ya guardadas. El corte posterior vuelve a ejecutar CI completo y persistent review sobre su SHA exacto.
+
 La evidencia detallada y las limitaciones están en `docs/technical/crate-mcp.md`, la evaluación CPU en `docs/technical/crate-show-ocr-evaluation.json` y la medida batch en `docs/technical/crate-show-import-load.json`. El catálogo aditivo 1.1.0 contiene 52 herramientas/30 grants. El smoke con modelo real es opt-in y no se ha ejecutado; las pruebas deterministas usan proveedores simulados.
 
 Ampliación solicitada por Diego el 2026-10-16 para esta misma rama/PR. Esta es la última fase funcional del plan; se conservan las fases 0–7 y su orden. La implementación se realiza en esta rama tras la fase 7. La entrega global requiere superar también el gate de esta fase.

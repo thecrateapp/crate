@@ -1,4 +1,5 @@
 import { screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -65,6 +66,80 @@ async function fillManual() {
 }
 
 describe("AddShowDialog", () => {
+  it("restores a source in StrictMode while retaining unsaved edits and canonical saved rows", async () => {
+    const original = vi.mocked(api).getMockImplementation()!;
+    let restoring = false;
+    const rows = [1, 2].map((index) =>
+      Object.freeze({
+        item_id: `resume-${index}`,
+        artist_name: "Band",
+        date: `2027-03-0${index}`,
+        venue: "Hall",
+        city: "Original City",
+      }),
+    );
+    vi.mocked(api).mockImplementation(async (...args) => {
+      const url = args[0];
+      if (url.endsWith("/availability"))
+        return {
+          configured: false,
+          vision: "unknown",
+          connectivity: "not_checked",
+          ocr: { available: true },
+        };
+      if (url.endsWith("/drafts"))
+        return {
+          items: [
+            { id: "resume-draft", job_id: "resume-job", status: "completed" },
+          ],
+        };
+      if (url.endsWith("/drafts/resume-draft"))
+        return {
+          result: {
+            raw_text: "source",
+            coverage: "incomplete",
+            candidates: restoring
+              ? rows.map((row) => ({ ...row, city: "Final City" }))
+              : rows,
+            publication: restoring
+              ? {
+                  "resume-2": {
+                    item_id: "resume-2",
+                    show_id: 8,
+                    status: "created",
+                  },
+                }
+              : {},
+          },
+        };
+      return original(...args);
+    });
+    renderWithAdminProviders(
+      <StrictMode>
+        <AddShowDialog open onOpenChange={vi.fn()} onSaved={vi.fn()} />
+      </StrictMode>,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Assisted import" }));
+    await user.click(await screen.findByText("Recover a private draft"));
+    await user.click(await screen.findByRole("button", { name: /resume/i }));
+    await user.clear(await screen.findByLabelText("City for show 1"));
+    await user.type(screen.getByLabelText("City for show 1"), "Manual City");
+    restoring = true;
+    await user.click(screen.getByRole("button", { name: /resume/i }));
+    await waitFor(() =>
+      expect(screen.getByLabelText("City for show 2")).toBeDisabled(),
+    );
+    expect(screen.getByLabelText("City for show 1")).toHaveValue("Manual City");
+    expect(screen.getByLabelText("City for show 1")).not.toBeDisabled();
+    expect(screen.getByLabelText("City for show 2")).toHaveValue("Final City");
+    expect(screen.getByRole("link", { name: "Open show 8" })).toHaveAttribute(
+      "href",
+      "/shows?show_id=8",
+    );
+    expect(rows.every((row) => row.city === "Original City")).toBe(true);
+  });
+
   it("creates a manual show after exact server review without querying the LLM", async () => {
     const saved = vi.fn();
     renderWithAdminProviders(
