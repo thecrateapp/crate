@@ -19,7 +19,8 @@ plan; the status table separates local implementation from pending QA.
   with reviewed Linux images/provenance in `ef5e7f52`; comparison/full frontend CI passes in run
   `38869556811`. Readout 1I is published as `a80f396b`; its 36 Linux images are reviewed and
   imported from run `38871597394` in `dd71eb72`; comparison/full frontend CI passes in
-  `38872274120`. Rebase/PR/release remain gated.
+  `38872274120`. ProgressHairline 1J is published as `0660fbd2`, with 40 reviewed Linux images
+  imported from run `38876594597`; comparison CI is pending. Rebase/PR/release remain gated.
 
 ## Sources of truth, in reading order
 
@@ -156,7 +157,7 @@ is a token-based chart configuration, not a selectable product skin.
 | 1.7 / Checkpoint 1G | Published `473604f7` + reviewed Linux images/provenance in `c44b31f3`; recording 38864631250 and full comparison/frontend CI 38865107324 pass. |
 | 1.8 / Checkpoint 1H | Published `6a5b3366` + reviewed Linux images/provenance `ef5e7f52`; recording `38869057068` and comparison/full frontend CI `38869556811` pass. |
 | 1.9 / Checkpoint 1I | Published `a80f396b` + reviewed Linux images/provenance `dd71eb72`; recording `38871597394` and comparison/full frontend CI `38872274120` pass. |
-| 1.10 / Checkpoint 1J | Implemented locally; 3,962 unit tests, preview 35 / Admin 20 / Listen 42 browser checks and all type/lint/build/gates pass. Visual review pending; no 1J publication. |
+| 1.10 / Checkpoint 1J | Approved/published `0660fbd2`; 40 Linux images reviewed/imported from `38876594597`. Full local verification passes; comparison CI pending. |
 | 1.10–1.12, 1b | Not started; respect applicable gates and the next review checkpoint. |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -559,7 +560,7 @@ Changing only the preview leaves that live node and text untouched. No motion lo
 ## Checkpoint 1J — ProgressHairline (Task 1.10)
 
 Diego approved the visual checkpoint on 2026-10-16 and authorised commit/push, canonical Linux
-captures and continuation to the shared toaster configuration (Task 1.11). Publication in progress.
+captures and continuation to the shared toaster configuration (Task 1.11). Published as `0660fbd2`.
 The props-only primitive accepts a normalized value, accessible label/valueText and 1/2px thickness.
 Finite values clamp to 0–1, write `--p` through the fill ref and expose a 0–100 ARIA range. Missing
 or non-finite values omit `aria-valuenow`. The indeterminate 36% block uses the pinned site's
@@ -599,5 +600,10 @@ and the shared OS/Crate/document motion gate permits it; otherwise it is static.
   gzip: Admin 514,803 B / 532,480; Listen 204,762 B / 307,200. No ceiling increased. The final Upload
   desktop/mobile rerun passes with captures focused on the pending file queue, avoiding fixed
   chrome inside a tall element screenshot. Spec/quality reviews approve; local concurrency remains bounded.
-- Remaining gates: canonical Linux capture/diff review and comparison CI. The shared toaster
+- Canonical Linux recording passes in <https://github.com/thecrateapp/crate/actions/runs/38876594597>,
+  source `0660fbd2`, Playwright 1.63.0-noble / Linux x64. Artifact `12035801498` SHA256
+  `716889696d8d273628c6dd5878e4c5df8fe36b358a8bc5b2cf32ef556291225a` matches the downloaded ZIP.
+  All 40 PNGs/original manifest are imported: 35 byte-identical; Tasks changes from the old thick
+  progress bar to the hairline, and four focused Tasks/Upload desktop/mobile scenes are new.
+- Remaining gate: comparison CI. The shared toaster
   configuration (Task 1.11) is the next authorised visual checkpoint.

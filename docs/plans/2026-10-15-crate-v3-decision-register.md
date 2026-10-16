@@ -334,3 +334,8 @@ Preserve the 36 Linux PNGs from 1I and stop before toaster Task 1.11.
 On 2026-10-16 Diego approved Checkpoint 1J and explicitly authorised commit/push, canonical Linux
 CI captures and continuation to the shared toaster configuration (Task 1.11). This supersedes the
 local-only publication notes above. Keep the persistent mockup and stop at the next visual checkpoint.
+
+1J is published as `0660fbd2`. Linux recording `38876594597` passes; artifact `12035801498`
+has verified SHA256 `716889696d8d273628c6dd5878e4c5df8fe36b358a8bc5b2cf32ef556291225a`.
+Review covers one changed Tasks page and four new Tasks/Upload progress scenes; 35 images are
+byte-identical. Import all 40 PNGs and the original manifest. Comparison CI is the next gate.

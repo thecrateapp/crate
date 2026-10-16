@@ -224,4 +224,5 @@ All 3,962 unit tests, 35 cumulative preview checks, Admin 20 and Listen 42 brows
 full results are in the handover. Capture the pending file queue rather than the tall Upload page
 to keep fixed mobile chrome outside the focused progress image.
 Diego approved 1J on 2026-10-16 and authorised publication/Linux captures and shared toasts 1.11.
-Publication and canonical capture QA are in progress; preserve this specimen.
+Published `0660fbd2`; 40 Linux images from run `38876594597` are reviewed/imported (35 unchanged,
+Tasks changed, four new progress scenes). Comparison CI is pending; preserve this specimen.

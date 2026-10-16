@@ -1393,7 +1393,8 @@ remain indeterminate because that transport has no byte telemetry. Tests-first a
 pass, along with all 3,962 unit tests and preview 35 / Admin 20 / Listen 42 browser checks.
 Spec/quality reviews and all type/lint/build/bundle/tooling gates pass; results are in the handover.
 Diego approved 1J on 2026-10-16 and authorised commit/push, Linux CI captures and continuation to
-the shared toaster configuration (Task 1.11). Publication/capture QA is in progress.
+the shared toaster configuration (Task 1.11). Published `0660fbd2`; Linux run `38876594597` passes
+with 40 reviewed PNGs (35 unchanged, Tasks changed, four new progress scenes). Comparison CI pending.
 
 **Files:**
 
