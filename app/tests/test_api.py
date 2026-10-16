@@ -1694,11 +1694,21 @@ class TestTasksAPI:
         }
         with (
             patch("crate.api.tasks.get_task", return_value=mock_task),
-            patch("crate.api.tasks.update_task") as mock_update,
+            patch(
+                "crate.db.repositories.task_control.request_cancellation",
+                return_value={
+                    "status": "cancelled",
+                    "cancellation_requested": True,
+                    "request_state": "cancelled",
+                },
+            ) as mock_cancel,
+            patch("crate.api.tasks.cancel_media_worker_job") as mock_media_cancel,
         ):
             resp = test_app.post("/api/tasks/t1/cancel")
             assert resp.status_code == 200
-            mock_update.assert_called_once_with("t1", status="cancelled")
+            assert resp.json()["request_state"] == "cancelled"
+            assert mock_cancel.call_args.args == ("t1",)
+            mock_media_cancel.assert_called_once_with("t1")
 
 
 class TestPlaylistCurationAPI:

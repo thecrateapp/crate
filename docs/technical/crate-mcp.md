@@ -1002,6 +1002,9 @@ instead of an acknowledged cancellation; eight focused CI cases passed on Python
 PostgreSQL. Later CI exposed additional acquisition and artwork tests that used synthetic task
 IDs without isolating the cancellation lookup. Their fixtures now stub that boundary; the two
 selected files passed 93 cases. This does not establish a complete backend-suite pass.
+Another shard exposed a revoked agent command whose actor precheck raised before persisting the
+private failure result. The actor now records that failure without running the handler; 14 focused
+actor cases and the Admin cancellation contract passed with PostgreSQL.
 
 The phase-6 focused selection passed **37 PostgreSQL-backed cases** across the editorial plan,
 MCP, migration, rule, refinement and override files. These cover migration/bootstrap, exact creation,

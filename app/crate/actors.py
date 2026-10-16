@@ -720,14 +720,23 @@ def _execute_task(task_type: str, task_id: str):
         log.debug("Queue wait recording failed", exc_info=True)
 
     try:
+        from crate.agent_diagnostics import DiagnosticError
         from crate.db.repositories.agent_task_control import check_task_authority
 
+        authority_failed = False
         if task.get("origin") == "agent":
-            check_task_authority(task_id)
-        config = load_config()
-        result = handler(task_id, task.get("params", {}), config)
+            try:
+                check_task_authority(task_id)
+            except DiagnosticError as error:
+                from crate.db.repositories.agent_requests import fail_job
 
-        if _is_cancelled(task_id):
+                result = fail_job(task_id, error.code, str(error))
+                authority_failed = True
+        if not authority_failed:
+            config = load_config()
+            result = handler(task_id, task.get("params", {}), config)
+
+        if not authority_failed and _is_cancelled(task_id):
             if isinstance(result, dict) and result.get("_delegated"):
                 update_task(task_id, status="delegated", result=result)
             acknowledged = acknowledge_cancellation(
