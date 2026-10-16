@@ -402,6 +402,8 @@ Rollout por capacidades: diagnóstico → primera acción → permisos/Admin/OAu
 
 **Fase 8 — creación manual y asistida de shows en Admin y MCP**
 
+**En desarrollo Linux 2026-10-16:** primer bloque de identidad canónica, aliases y procedencia por campo; migración 117 aditiva sin merges automáticos, archivo conservando identidad y consolidación explícita con transferencia de asistencia/recordatorios. Writer de proveedores compartido y lecturas por lineup. 78 casos focalizados PostgreSQL y de contratos pasaron; el editor Admin, extracción y contratos MCP de esta fase todavía están en implementación. Las suites completas se reservan para el cierre de toda la feature.
+
 Ampliación solicitada por Diego el 2026-10-16 para esta misma rama/PR. Esta es la última fase funcional del plan; se conservan las fases 0–7 y su orden. Se incorpora para revisión, sin implementar ahora el alta de shows. La entrega global no se considera completa hasta superar también este gate.
 
 **Resultado esperado.** En Admin, “Add show” permite introducir un concierto manualmente o importar un flyer, una captura o un enlace de Instagram/evento mediante el LLM configurado o mediante OCR local gratuito, utilizable sin ningún LLM. Un cartel de gira produce todas sus fechas como shows individuales revisables. Desde MCP, el agente cliente realiza la lectura/extracción y envía el lote estructurado; Crate valida, deduplica y persiste con las mismas reglas que Admin. Repetir una solicitud o importar el mismo concierto desde otra fuente no crea otro show.

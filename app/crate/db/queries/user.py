@@ -152,8 +152,8 @@ def get_feed_shows(followed_names: list[str], today: date, limit: int) -> list[d
             SELECT 'show' AS type, s.artist_name AS artist, s.venue AS title,
                    s.city, s.country, s.date, s.url, s.image_url
             FROM shows s
-            WHERE s.artist_name = ANY(:followed_names)
-            AND s.date >= :today
+            WHERE (s.artist_name = ANY(:followed_names) OR s.lineup && CAST(:followed_names AS text[]))
+            AND s.date >= :today AND s.merged_into_id IS NULL
             ORDER BY s.date
             LIMIT :limit
         """),
@@ -308,8 +308,9 @@ def get_upcoming_shows(
                     s.source, s.lastfm_attendance, s.lastfm_url, s.tickets_url
                 FROM shows s
                 LEFT JOIN library_artists la ON la.name = s.artist_name
-                WHERE s.artist_name = ANY(:followed_names)
+                WHERE (s.artist_name = ANY(:followed_names) OR s.lineup && CAST(:followed_names AS text[]))
                   AND s.date >= :today
+                  AND s.merged_into_id IS NULL
                   AND s.status != 'cancelled'
                 """
                     + geo_clause

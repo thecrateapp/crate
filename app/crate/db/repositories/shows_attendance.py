@@ -11,9 +11,17 @@ def _rowcount(result: object) -> int:
     return int(getattr(result, "rowcount", 0) or 0)
 
 
+def _canonical_id(session, show_id):
+    return session.execute(
+        text("SELECT COALESCE(merged_into_id,id) FROM shows WHERE id=:id"),
+        {"id": show_id},
+    ).scalar_one()
+
+
 def attend_show(user_id: int, show_id: int) -> bool:
     now = datetime.now(timezone.utc).isoformat()
     with transaction_scope() as session:
+        show_id = _canonical_id(session, show_id)
         result = session.execute(
             text(
                 """
@@ -29,6 +37,7 @@ def attend_show(user_id: int, show_id: int) -> bool:
 
 def unattend_show(user_id: int, show_id: int) -> bool:
     with transaction_scope() as session:
+        show_id = _canonical_id(session, show_id)
         result = session.execute(
             text(
                 "DELETE FROM user_show_attendance WHERE user_id = :user_id AND show_id = :show_id"
@@ -41,6 +50,7 @@ def unattend_show(user_id: int, show_id: int) -> bool:
 def create_show_reminder(user_id: int, show_id: int, reminder_type: str) -> bool:
     now = datetime.now(timezone.utc).isoformat()
     with transaction_scope() as session:
+        show_id = _canonical_id(session, show_id)
         result = session.execute(
             text(
                 """

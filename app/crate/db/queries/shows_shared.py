@@ -33,6 +33,8 @@ def _show_location_key(show: dict) -> str:
 
 
 def _can_merge_show_rows(first: dict, second: dict) -> bool:
+    if first.get("id") and second.get("id") and first["id"] != second["id"]:
+        return False
     if _show_location_key(first) != _show_location_key(second):
         return False
     first_time = _normalize_show_text(first.get("local_time"))

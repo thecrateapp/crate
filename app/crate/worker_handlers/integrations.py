@@ -108,7 +108,8 @@ def _handle_sync_shows(task_id: str, params: dict, config: dict) -> dict:
                     continue
                 upsert_show(
                     external_id=external_id,
-                    artist_name=name,
+                    artist_name=event.get("artist_name")
+                    or next(iter(event.get("lineup") or []), name),
                     date=event.get("local_date") or event.get("date", "")[:10],
                     local_time=event.get("local_time"),
                     venue=event.get("venue"),
