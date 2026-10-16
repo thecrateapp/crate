@@ -44,18 +44,24 @@ def record_job_result(result: dict) -> None:
     from crate.metrics import record_later
 
     verification = (result.get("verification") or {}).get("status")
-    execution = result.get("execution") or {}
-    outcome = (
-        "conflict"
-        if execution.get("status") == "conflict"
-        else "verification_failed"
-        if verification in {"failed", "manual_reconciliation_required"}
-        else "failed"
-        if result.get("status") == "failed"
-        else "prepared"
-        if execution.get("status") == "prepared"
-        else "completed"
-    )
+    execution = (result.get("execution") or {}).get("status")
+    status = result.get("status")
+    if execution == "conflict":
+        outcome = "conflict"
+    elif verification in {"failed", "manual_reconciliation_required"}:
+        outcome = "verification_failed"
+    elif status == "cancelled" or execution == "cancelled":
+        outcome = "cancelled"
+    elif status == "partial" or execution == "partial":
+        outcome = "partial"
+    elif status == "failed" or execution == "failed":
+        outcome = "failed"
+    elif execution == "prepared":
+        outcome = "prepared"
+    elif status == "completed" and execution == "completed":
+        outcome = "completed"
+    else:
+        outcome = "unavailable"
     try:
         record_later(f"mcp.job.{outcome}", 1)
     except Exception:  # noqa: BLE001 — never fail an operation for a metric.

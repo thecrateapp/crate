@@ -596,6 +596,8 @@ def read_diagnostics(
             "mcp.job.verification_failed",
             "mcp.job.failed",
             "mcp.job.completed",
+            "mcp.job.cancelled",
+            "mcp.job.partial",
             "mcp.auth.denied",
             "mcp.auth.unavailable",
         }

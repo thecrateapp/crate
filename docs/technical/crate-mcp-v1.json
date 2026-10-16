@@ -2496,6 +2496,8 @@
                   "mcp.job.verification_failed",
                   "mcp.job.failed",
                   "mcp.job.completed",
+                  "mcp.job.cancelled",
+                  "mcp.job.partial",
                   "mcp.auth.denied",
                   "mcp.auth.unavailable"
                 ],
@@ -2563,7 +2565,7 @@
         "title": "DiagnosticsInput",
         "type": "object"
       },
-      "input_schema_sha256": "1a149a8ab26d875b1e3731f4159df6657670594f57554d398b6c3d51b138d011",
+      "input_schema_sha256": "759b01a835f37455fcaa06bf54b13fab343d57080cb3a254b72140f29e0e724d",
       "name": "read_diagnostics",
       "read_only": true
     },

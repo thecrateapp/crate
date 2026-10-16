@@ -156,10 +156,24 @@ report directory. The load measurement file uses the standard artifact directory
 | workflows | Diagnosis and temporary-filesystem repair, high-risk/global human approval, actual metadata tags/locks, simulated provider failure, DSP generations, indexed sync, export/rehydrate, scheduler recovery, runtime CAS/adoption, editorial create/edit, two OAuth clients with refresh/revoke over TCP. |
 | load      | Paired foreground API/service-worker work at equal dataset/concurrency, with added MCP traffic in the mixed arm.                                                                                                                                                                                      |
 
-The workflow matrix passed **14 cases**, with no skips. A fresh Python process recovered the
+The contract group passed **36 cases**, the workflows group **14 cases**, and the paired load
+group **one case**, all without skips. A fresh Python process recovered the
 original committed pending task; a newly constructed MCP endpoint replayed the original ID before
 and after worker completion. This does not emulate PostgreSQL loss or a broker/Docker crash during
 a filesystem effect; uncertain-effect reconciliation remains manual.
+
+### Validation record — 2026-10-16
+
+The existing 48K-track response-budget regression also passed. Documentation integrity (43
+canonical documents), six selected portal smoke cases, the docs build, Ruff and targeted Pyright
+passed. No complete local backend or frontend suites were run.
+
+Independent SPEC/QUALITY review found one P2: cancelled and partial worker results incremented
+the completed counter. Focused RED→GREEN regressions now distinguish those states, preserve
+verification failure and classify unknown outcomes as unavailable. The minor artifact-drift
+finding was also addressed: the published JSON must match the complete export, including output
+schema, scope/capability mapping and SDK metadata. Remaining external gates are described below;
+current CI and persistent review belong to the exact commit shown in PR #292.
 
 ## Load evidence and proposed rollout budget
 
@@ -198,7 +212,10 @@ Redis admission fails closed. Disconnect does not authorize repeating an accepte
 
 Bounded asynchronous recording stores per-tool latency/result bytes and aggregate
 `mcp.tool.latency_ms` / `mcp.tool.response_bytes`. Counters distinguish denials, rate limits,
-conflicts, replay/dedup and worker verification failure. Auth uses `mcp.auth.denied` /
+conflicts, replay/dedup and worker verification failure. Worker cancellations and partial
+execution have separate `mcp.job.cancelled` / `mcp.job.partial` counters; unknown outcomes never
+count as completed. Failed verification takes precedence when effects require reconciliation.
+Auth uses `mcp.auth.denied` /
 `mcp.auth.unavailable`; worker outcomes use `mcp.job.*`. Names never contain identities, tokens,
 URLs, arguments or result values. Existing Redis retention and bounded queue apply. Missing
 samples can mean dropped telemetry/storage failure, not zero events. Minute summaries expose

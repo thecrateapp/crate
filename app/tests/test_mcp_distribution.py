@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import anyio
 import mcp.types as types
+import pytest
 
 from crate.agent_access import AgentPrincipal
 from crate.agent_discovery import get_operation_catalog
@@ -83,10 +84,7 @@ def test_distribution_contains_every_tool_schema_and_no_private_configuration():
             Path(__file__).resolve().parents[2] / "docs/technical/crate-mcp-v1.json"
         ).read_text()
     )
-    assert published["version"] == artifact["version"]
-    assert {row["name"]: row["input_schema_sha256"] for row in published["tools"]} == {
-        row["name"]: row["input_schema_sha256"] for row in artifact["tools"]
-    }
+    assert published == artifact
 
 
 def test_auth_denial_metric_does_not_include_bearer_or_identity(monkeypatch):
@@ -256,6 +254,52 @@ def test_worker_verification_failure_has_its_own_metric(monkeypatch):
     assert result["verification"]["status"] == "manual_reconciliation_required"
     assert samples == [("mcp.job.verification_failed", 1)]
     assert "/private" not in json.dumps(result)
+
+
+@pytest.mark.parametrize(
+    ("status", "execution", "verification", "outcome"),
+    [
+        ("cancelled", "cancelled", "not_required", "cancelled"),
+        ("cancelled", "completed", "passed", "cancelled"),
+        ("completed", "partial", "partial", "partial"),
+        ("partial", "partial", "partial", "partial"),
+        ("failed", "partial", "manual_reconciliation_required", "verification_failed"),
+        ("failed", "conflict", "not_required", "conflict"),
+        ("failed", "failed", "not_required", "failed"),
+        ("completed", "prepared", "not_required", "prepared"),
+        ("completed", "completed", "passed", "completed"),
+        (None, None, None, "unavailable"),
+    ],
+)
+def test_job_metrics_preserve_incomplete_and_unknown_outcomes(
+    monkeypatch, status, execution, verification, outcome
+):
+    from crate.mcp.telemetry import record_job_result
+
+    samples = []
+    monkeypatch.setattr(
+        "crate.metrics.record_later", lambda *args: samples.append(args)
+    )
+    record_job_result(
+        {
+            "status": status,
+            "execution": {"status": execution},
+            "verification": {"status": verification},
+        }
+    )
+    assert samples == [(f"mcp.job.{outcome}", 1)]
+
+
+@pytest.mark.parametrize("series", ["mcp.job.cancelled", "mcp.job.partial"])
+def test_incomplete_job_metric_series_are_explicitly_readable(monkeypatch, series):
+    from crate.agent_diagnostics import read_diagnostics
+    from crate.mcp.schemas import DiagnosticsInput
+
+    monkeypatch.setattr("crate.metrics.query_recent", lambda *_, **__: [])
+    args = DiagnosticsInput.model_validate(
+        {"source": "metric_series", "series": series}
+    )
+    assert read_diagnostics(**args.model_dump())["data"]["series"] == series
 
 
 def test_mcp_metrics_can_be_read_only_through_the_closed_series_contract(monkeypatch):
