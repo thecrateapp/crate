@@ -811,6 +811,9 @@ def test_move_soulseek_files_keeps_requested_artist_without_artist_tags(
 def test_library_upload_syncs_each_album_and_emits_grouped_completion(
     monkeypatch, tmp_path
 ):
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.is_cancelled", lambda _task_id: False
+    )
     staging_dir = tmp_path / "staging"
     raw_dir = staging_dir / "raw"
     extracted_dir = staging_dir / "extracted"

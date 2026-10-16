@@ -6,6 +6,7 @@ from collections import Counter
 from uuid import UUID
 
 OPERATIONS = {
+    "editorial_change": ("editorial.prepare", "curation.playlists.write"),
     "job_retry": ("ops.jobs.retry", "ops.tasks.manage"),
     "job_cancel": ("ops.jobs.cancel", "ops.tasks.manage"),
     "schedule_run": ("ops.schedules.run", "ops.tasks.manage"),

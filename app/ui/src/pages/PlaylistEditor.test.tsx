@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("react-router", () => ({
@@ -32,6 +32,7 @@ vi.mock("sonner", () => ({
 }));
 
 import { useApi } from "@/hooks/use-api";
+import { api } from "@/lib/api";
 import { PlaylistEditor } from "./PlaylistEditor";
 
 const mockUseApi = vi.mocked(useApi);
@@ -122,12 +123,35 @@ describe("PlaylistEditor", () => {
       screen.getByPlaceholderText("Search tracks matching this playlist..."),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Refine tracklist with AI/i }),
+      screen.getByRole("button", { name: /Suggest refinements/i }),
     ).toBeInTheDocument();
     expect(screen.getByText("Add rule")).toBeInTheDocument();
     expect(screen.getByText("generated")).toBeInTheDocument();
     expect(
       screen.getByText(/Upload a clean image-only hero asset/i),
     ).toBeInTheDocument();
+  });
+
+  it("applies only server-stored refinement action IDs", async () => {
+    vi.mocked(api).mockImplementation(async (url) => {
+      if (url.endsWith("/refine")) {
+        return {
+          proposal_id: "proposal-1",
+          editorial_revision: 7,
+          summary: "One repeated track",
+          issues: [],
+          actions: [{ id: "remove:1", type: "remove_track", label: "Remove duplicate", reason: "Repeated", position: 1, track_id: 1 }],
+        } as never;
+      }
+      return { ok: true, applied_count: 1 } as never;
+    });
+    render(<PlaylistEditor />);
+    fireEvent.click(screen.getByRole("button", { name: /Suggest refinements/i }));
+    await screen.findByText("Editorial refinement proposal");
+    fireEvent.click(screen.getByRole("button", { name: /Apply safe fixes/i }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith(
+      "/api/admin/system-playlists/42/refine/apply", "POST",
+      { proposal_id: "proposal-1", action_ids: ["remove:1"] },
+    ));
   });
 });

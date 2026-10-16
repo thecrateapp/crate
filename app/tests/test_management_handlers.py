@@ -721,9 +721,16 @@ def test_smart_playlist_refresh_reports_each_enqueued_playlist(monkeypatch):
     monkeypatch.setattr(
         management,
         "get_smart_playlists_for_refresh",
-        lambda: [{"id": 1, "name": "Daily"}, {"id": 2, "name": "Weekly"}],
+        lambda: [
+            {"id": 1, "name": "Daily", "editorial_revision": 1, "generation_epoch": 0},
+            {"id": 2, "name": "Weekly", "editorial_revision": 1, "generation_epoch": 0},
+        ],
     )
-    monkeypatch.setattr(management, "create_task", lambda *args, **kwargs: "t")
+    monkeypatch.setattr(
+        management,
+        "enqueue_system_playlist_generation",
+        lambda *args, **kwargs: {"task_id": "t", "deduplicated": False},
+    )
 
     result = management._handle_refresh_system_smart_playlists("task-1", {}, {})
 
@@ -745,9 +752,12 @@ def test_system_playlist_generation_reports_rule_and_write_phases(monkeypatch):
             "name": "Daily",
             "smart_rules": {"limit": 1},
             "total_duration": 120,
+            "editorial_revision": 1,
         },
     )
-    monkeypatch.setattr(management, "set_generation_status", lambda *args: None)
+    monkeypatch.setattr(
+        management, "set_generation_status", lambda *args, **kwargs: (2, 1)
+    )
     monkeypatch.setattr(management, "log_generation_start", lambda *args: 9)
     monkeypatch.setattr(management, "log_generation_complete", lambda *args: None)
     monkeypatch.setattr(

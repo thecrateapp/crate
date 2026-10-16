@@ -35,7 +35,11 @@ def prepare_operation(
     trace_id=None,
     session=None,
 ) -> dict:
-    grant = operation_grant(operation)
+    grant = (
+        "editorial.publish"
+        if operation == "editorial_change" and parameters.get("kind") == "visibility"
+        else operation_grant(operation)
+    )
     payload = {
         "domain_operation": operation,
         "parameters": parameters,
@@ -179,12 +183,17 @@ def apply_operation(
         "plan_version": plan_version,
     }
     with optional_scope(session) as current:
-        requests._authorize(current, principal, {grant})
+        requests._authorize(
+            current, principal, set() if operation == "editorial_change" else {grant}
+        )
         requests._lock_principal(current, principal.id)
         replay = requests._replay(
             current, principal, "apply_operation", key, requests._hash(request_payload)
         )
         if replay and replay["status"] in {"completed", "failed", "cancelled"}:
+            accepted = requests._job(current, replay["job_id"])
+            if accepted is not None:
+                requests._authorize(current, principal, accepted["required_grants"])
             return replay
         plan = _get(current, plan_id, lock=True)
         if plan["operation"] != operation:
@@ -192,6 +201,13 @@ def apply_operation(
                 "INVALID_ARGUMENT", "Plan has a different library operation"
             )
         validate_plan_authorization(current, plan, principal, job_id=plan["task_id"])
+        extra_grants = set()
+        if operation == "editorial_change":
+            extra_grants = {"editorial.publish"}
+            if plan["document"].get("kind") != "visibility":
+                extra_grants.add("editorial.write")
+            requests._authorize(current, principal, extra_grants)
+            requests._authorize(current, principal, plan["required_grants"])
         if replay:
             return replay
         if plan["version"] != plan_version:
@@ -214,7 +230,7 @@ def apply_operation(
             raise DiagnosticError("PLAN_STALE", "Plan is not ready or has expired")
         payload = {
             **request_payload,
-            "required_grants": plan["required_grants"],
+            "required_grants": sorted(set(plan["required_grants"]) | extra_grants),
             "target_keys": plan["execution_data"]["target_keys"],
         }
         summary = requests._accept(

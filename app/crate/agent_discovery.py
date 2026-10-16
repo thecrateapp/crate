@@ -114,7 +114,15 @@ def get_operation_catalog(principal: AgentPrincipal) -> dict:
             ),
             **_LIMITS.get(name, {"plans": 1}),
         }
-        grants = [grant] if grant else []
+        grants = (
+            ["editorial.prepare", "editorial.write", "editorial.publish"]
+            if name == "editorial_plan_apply"
+            else []
+            if name in {"editorial_plan_get", "editorial_plan_validate"}
+            else [grant]
+            if grant
+            else []
+        )
         allowed = _allowed(principal, name)
         status = (
             "disabled"
@@ -128,6 +136,31 @@ def get_operation_catalog(principal: AgentPrincipal) -> dict:
                 "name": name,
                 "status": status,
                 "required_grants": grants,
+                **(
+                    {
+                        "grants_by_variant": {
+                            "prepare_visibility": ["editorial.publish"],
+                            "publish_new_or_duplicate": [
+                                "editorial.prepare",
+                                "editorial.write",
+                                "editorial.publish",
+                            ],
+                            "publish_existing_visibility": ["editorial.publish"],
+                        }
+                    }
+                    if name == "editorial_publication_set"
+                    else {}
+                ),
+                **(
+                    {
+                        "grants_by_variant": {
+                            "owned_editorial_plan": ["editorial.prepare"],
+                            "owned_visibility_plan": ["editorial.publish"],
+                        }
+                    }
+                    if name in {"editorial_plan_get", "editorial_plan_validate"}
+                    else {}
+                ),
                 **(
                     {
                         "grants_by_operation": {

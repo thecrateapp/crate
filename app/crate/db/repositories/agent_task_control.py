@@ -243,7 +243,7 @@ def check_task_authority(task_id):
             .first()
         )
         if row is None:
-            return True
+            return False
         stopping = (
             row["status"] == "cancelled" or row["cancellation_requested_at"] is not None
         )

@@ -17,7 +17,7 @@ def operation_target_keys(targets: list[dict], *, session=None) -> list[str]:
             or target.get("album_uid")
             or target.get("track_uid")
         )
-        if kind in {"task", "schedule", "runtime"}:
+        if kind in {"task", "schedule", "runtime", "playlist"}:
             name = target.get("name")
             if not isinstance(name, str) or not name or len(name) > 128:
                 raise ValueError("Invalid operational target")

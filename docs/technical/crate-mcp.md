@@ -9,6 +9,11 @@ verified: 2026-10-16
 sources:
   [
     app/crate/agent_operations.py,
+    app/crate/agent_editorial.py,
+    app/crate/mcp/editorial_schemas.py,
+    app/crate/db/repositories/editorial_plans.py,
+    app/crate/db/schema_sections/editorial_v116.py,
+    .agents/skills/crate-editorial-playlists/SKILL.md,
     app/crate/agent_instance_operations.py,
     app/crate/agent_runtime.py,
     app/crate/runtime_policy_contract.py,
@@ -71,8 +76,9 @@ Crate exposes an optional MCP endpoint for remote agents to inspect and maintain
 OAuth/service credentials, integration management and exact human approval share one persisted
 plan/job engine. Phase 4 extends it with selected checks, quality, repairs, metadata, enrichment,
 analysis, indexed-album sync and metadata portability. Phase 5 adds scoped instance operations,
-schedules and revisioned runtime policy. Editorial playlists, final rollout and assisted shows remain
-later phases. Deployment and action flags remain disabled by default.
+schedules and revisioned runtime policy. Phase 6 adds private editorial plans, exact system-playlist
+publication and a versioned client skill. Final rollout and assisted shows remain later phases.
+Deployment and action flags remain disabled by default.
 
 ## Connection and deployment
 
@@ -923,3 +929,95 @@ selection also preserves phase-2/4 workflows. These sets overlap; do not add the
 reported zero errors; the local environment retained a pre-existing `requests` source-resolution
 warning in Admin metrics. The OpenAPI selection also emits existing duplicate Operation ID warnings.
 No complete backend/frontend suite was run for this cut.
+
+## Phase 6 editorial playlists — 2026-10-16
+
+Phase 6 uses Admin's `playlists`, `playlist_tracks`, `playlist_track_exclusions`, smart-rule
+engine and blueprints. Migration 116 adds four grants (`editorial.read`, `editorial.prepare`,
+`editorial.write`, `editorial.publish`), a playlist revision and generation epoch, plus private
+revision-bound Admin refinement proposals. No separate playlist draft table is created. New system
+playlists become visible only in the atomic apply transaction. An agent's system playlist remains
+managed through the existing curator capability; delegated creation records the human manager and
+all agent commands retain integration identity in the shared audit/job ledger.
+
+The MCP catalog adds `editorial_playlists_list`, `editorial_playlist_get`, `editorial_options`,
+`editorial_candidates_search`, `editorial_plan_prepare`, `editorial_plan_get`,
+`editorial_plan_validate`, `editorial_plan_apply` and `editorial_publication_set`. Preparation is a
+worker job in the shared plan/approval engine. The plan stores the full ordered selection and
+metadata privately; MCP pages at most 50 selection rows. The review document includes the
+description, generation mode, scope, visibility, before/after discovery and refresh policy,
+existing/new exclusions and full ordered rows. `editorial_playlist_get(section=history)` combines
+bounded generation history with applied editorial audit events. A configured Listen origin yields
+`listen_url` on active playlists using `/curation/playlist/{id}`; inactive playlists and instances
+without a valid origin return `null`. New static choices require real local
+track UIDs. Smart rules use enumerated fields, operators and sorts, a 100-track plan cap, real
+`least_played` ordering over the `all_time` listening projection, and the existing diversity,
+variant and override logic. Preparation never starts generation or sends a notification.
+
+Creation/duplication goes through `editorial_publication_set`; edits/refinement/regeneration and
+the separate future refresh policy go through `editorial_plan_apply`. Every mutation of an
+existing system playlist requires `editorial.write` **and** `editorial.publish`; a pure visibility
+change requires `editorial.publish`. The calling principal also retains the grant used to prepare
+its owned plan. High-risk/public editorial plans require exact human approval. Worker apply checks
+the current credential/delegation, plan version, approval, playlist revision/epoch, row and
+exclusion snapshot, and each selected library track fingerprint inside the write transaction. It
+preserves manual/locked rows and row IDs, carries persistent exclusions across duplicates, and
+persists the approved smart selection without drawing it again. A new smart playlist starts with
+`auto_refresh_enabled=false`; converting static to smart also clears any latent refresh flag.
+Enabling later refresh requires another approved plan. Local tracks with a global catalog mapping
+retain local identity through regeneration; if the local row disappears and a remote source remains,
+protected rows and editorial plans fall back to the verified global identity. New exclusions retain
+both local and global identities and are fingerprinted before apply.
+
+Admin refinement is a heuristic proposal stored server-side with actor, expiry, revision and
+exclusion fingerprint. The client submits proposal/action IDs, never mutable positions or deletion
+payloads. Empty selection removes zero rows. The UI labels it as editorial refinement and does
+not require LLM availability. Admin's `/generate` returns `task_id`, `generation_status` and a
+deduplication flag in its declared response model. The generation worker captures a revision/epoch
+token at enqueue and again at start, and refuses to overwrite a playlist changed before or during
+evaluation. Scheduler and Admin share deduplicated admission. A later automatic refresh
+can use the existing operator notification path; the separate refresh-policy plan declares this
+future effect. Publication itself sends no notification.
+
+The versioned skill is at `.agents/skills/crate-editorial-playlists/`. MCP does not install it.
+Copy that directory into a compatible client's skills directory to enable editorial guidance;
+the server contracts and grants work without the skill. The skill directs the client to review
+every plan page, explain sparse or conflicting library evidence, request human approval only when
+the server requires it, and verify the final playlist. It does not grant access or choose an
+unreviewed track on behalf of the server.
+
+Cover artwork is outside the editorial MCP input contract: the current private plan store has no
+bounded cover-asset staging surface. Curators can use the existing Admin cover flow; MCP does not
+claim that a requested cover is part of the approved plan or gate publication on its upload.
+
+### Phase 5 CI follow-up and phase 6 validation
+
+The exact phase-5 commit `1a81543e29e0f2f633012ddb3f05ebe90795e694` had a failed backend
+shard 8/8; the other seven backend shards were cancelled and coverage skipped. Security scan,
+quality, React Doctor, OpenSubsonic smoke and the persistent review job completed. The persistent
+review was updated to that exact commit and raised only a conditional import-order concern;
+Ruff on that file passed. The failed shard exposed a real missing-task cancellation bug plus
+outdated phase-5 grant expectations and fake-task fixtures. The missing task now returns false
+instead of an acknowledged cancellation; eight focused CI cases passed on Python 3.13 with real
+PostgreSQL. This does not establish a complete backend-suite pass.
+
+The phase-6 focused selection passed **37 PostgreSQL-backed cases** across the editorial plan,
+MCP, migration, rule, refinement and override files. These cover migration/bootstrap, exact creation,
+smart freezing, locks, exclusions, duplicate state, CAS against concurrent edits/generation,
+grant/approval enforcement, replay, refinement proposals, Admin generation deduplication and
+`least_played` ordering. The official Python MCP SDK exercised a remote-style ASGI session for
+create, review pagination, human approval, publication, edit, replay and stale-plan detection.
+An additional 12-case boundary selection passed, including the ORM migration-head check.
+Selected PlaylistEditor Vitest cases, UI typecheck, Ruff and the skill format validator passed.
+An independent skill evaluation used six simulated briefs: static theme, smart rules, locked-row
+edit, sparse search, concurrent edit and prepare-only. It found no remaining workflow gap after
+the skill was updated to replay the same preparation key when `ops.jobs.read` is absent. Independent
+SPEC and QUALITY second reviews found no P1/P2 remaining. These were focused checks, not complete
+suites. The local setup used Python 3.13 in a container and Testcontainers PostgreSQL; PostgreSQL
+cases were not skipped.
+
+Limits: a single editorial plan supports at most 100 tracks and must fit the shared 40 KiB plan
+document budget. Candidate availability is based on indexed local library identity; it does not
+prove that the audio file remains present until a playback attempt. No production flags were
+enabled and no external client or provider was validated in production. The six skill briefs used
+fixtures rather than a connected production agent. Cover upload remains an Admin operation.

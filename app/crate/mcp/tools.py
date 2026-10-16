@@ -8,7 +8,7 @@ import anyio
 import mcp.types as types
 from pydantic import ValidationError
 
-from crate import agent_diagnostics, agent_discovery, agent_maintenance
+from crate import agent_diagnostics, agent_discovery, agent_maintenance, agent_editorial
 from crate.agent_access import actions_enabled, authorization_context
 from crate.agent_diagnostics import DiagnosticError
 from crate.db.audit import log_audit
@@ -46,8 +46,48 @@ from crate.mcp.operation_schemas import (
     RuntimeUpdatePreview,
     AuditInput,
 )
+from crate.mcp.editorial_schemas import (
+    EditorialList,
+    EditorialGet,
+    EditorialOptions,
+    EditorialCandidates,
+    EditorialPrepare,
+    EditorialPlanRead,
+    EditorialPlanApply,
+    EditorialPublication,
+)
 
 CATALOG = {
+    "editorial_playlists_list": (
+        EditorialList,
+        "editorial.read",
+        "List bounded system playlist state and revision evidence.",
+    ),
+    "editorial_playlist_get": (
+        EditorialGet,
+        "editorial.read",
+        "Read system playlist metadata and paginated rows, exclusions or editorial/generation history.",
+    ),
+    "editorial_options": (
+        EditorialOptions,
+        "editorial.read",
+        "List supported smart-rule fields, sorts and local blueprints.",
+    ),
+    "editorial_candidates_search": (
+        EditorialCandidates,
+        "editorial.read",
+        "Find bounded local track candidates and their exact UIDs and availability.",
+    ),
+    "editorial_plan_get": (
+        EditorialPlanRead,
+        "editorial.prepare",
+        "Read an owned private editorial plan with paginated exact selection.",
+    ),
+    "editorial_plan_validate": (
+        EditorialPlanRead,
+        "editorial.prepare",
+        "Recheck the owned plan's revision, rows and track fingerprints without writing.",
+    ),
     "read_audit": (
         AuditInput,
         "ops.audit.read",
@@ -116,6 +156,21 @@ CATALOG = {
 }
 
 ACTION_CATALOG = {
+    "editorial_plan_prepare": (
+        EditorialPrepare,
+        "editorial.prepare",
+        "Prepare a private, exact editorial selection in a worker; no system playlist is created.",
+    ),
+    "editorial_plan_apply": (
+        EditorialPlanApply,
+        "editorial.write",
+        "Apply an approved edit with editorial.write and editorial.publish; recheck exact selection and CAS.",
+    ),
+    "editorial_publication_set": (
+        EditorialPublication,
+        "editorial.publish",
+        "Prepare a revision-bound visibility change or publish an approved new playlist with required grants.",
+    ),
     "preview_job_retry": (
         JobControlPreview,
         "ops.jobs.retry",
@@ -285,6 +340,14 @@ def _principal(context):
 
 
 def _allowed(principal, name, arguments=None):
+    if name == "editorial_plan_apply":
+        return {
+            "editorial.prepare",
+            "editorial.write",
+            "editorial.publish",
+        } <= principal.grants
+    if name in {"editorial_plan_get", "editorial_plan_validate"}:
+        return bool(principal.grants & {"editorial.prepare", "editorial.publish"})
     if name == "get_operation_catalog":
         return bool(principal.grants)
     if name == "read_diagnostics" and arguments is None:
@@ -296,6 +359,7 @@ def _allowed(principal, name, arguments=None):
             principal.grants
             & (
                 {"library.repair.photo_flag"}
+                | {"editorial.publish"}
                 | {entry[0] for entry in OPERATIONS.values()}
             )
         )
@@ -345,7 +409,9 @@ def _execute(principal, name, arguments, trace_id):
         with admission(principal.id):
             if name in ACTION_CATALOG:
                 module = (
-                    agent_operations
+                    agent_editorial
+                    if name.startswith("editorial_")
+                    else agent_operations
                     if hasattr(agent_operations, name)
                     else agent_maintenance
                 )
@@ -378,6 +444,8 @@ def _execute(principal, name, arguments, trace_id):
             )
             if name in {"get_operation_catalog", "get_plan", "get_analysis_status"}:
                 return getattr(agent_discovery, name)(principal, **arguments)
+            if name.startswith("editorial_"):
+                return getattr(agent_editorial, name)(principal, **arguments)
             if name == "get_library_quality":
                 return agent_discovery.get_library_quality(**arguments)
             if name in {"inspect_artist", "list_library_issues"}:

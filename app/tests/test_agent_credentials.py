@@ -118,9 +118,22 @@ def test_action_grants_are_explicit_and_do_not_expand_existing_diagnostic_grants
         "library.sync.run",
         "library.metadata.export",
         "library.metadata.rehydrate",
+        "ops.jobs.cancel",
+        "ops.schedules.run",
+        "ops.schedules.write",
+        "ops.runtime.write",
+        "editorial.prepare",
     }
     assert not ACTION_GRANTS & PILOT_GRANTS
-    assert ALLOWED_GRANTS == PILOT_GRANTS | ACTION_GRANTS
+    assert ALLOWED_GRANTS == PILOT_GRANTS | ACTION_GRANTS | {
+        "ops.audit.read",
+        "ops.jobs.manage_instance",
+        "ops.schedules.read",
+        "ops.runtime.read",
+        "editorial.read",
+        "editorial.write",
+        "editorial.publish",
+    }
     issued = credentials.create_credential(
         "Maintenance integration", ACTION_GRANTS, _expiry()
     )

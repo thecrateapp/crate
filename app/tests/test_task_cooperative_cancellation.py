@@ -12,6 +12,7 @@ from crate.agent_diagnostics import DiagnosticError
 from crate.db.queries.tasks import get_task
 from crate.db.repositories.tasks import create_task, start_task, update_task
 from crate.db.repositories.tasks_updates import fail_or_retry_task
+from crate.db.repositories.agent_task_control import check_task_authority
 from crate.db.tx import transaction_scope
 
 
@@ -30,6 +31,10 @@ def _row(task_id):
     row = get_task(task_id)
     assert row is not None
     return row
+
+
+def test_missing_task_does_not_signal_cancellation(controls):
+    assert check_task_authority("missing-task") is False
 
 
 def test_pending_cancel_is_terminal_and_prevents_actor_claim(controls):

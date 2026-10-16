@@ -54,7 +54,15 @@ def test_instance_migration_and_bootstrap_use_identical_additive_ddl(monkeypatch
 def test_instance_schema_grants_are_frozen_from_runtime_catalog(monkeypatch):
     before = RecordingExecutor()
     create_agent_operations_v115_schema(before)
-    assert all(f"'{grant}'" in " ".join(before.statements) for grant in ALLOWED_GRANTS)
+    phase_five_grants = ALLOWED_GRANTS - {
+        "editorial.read",
+        "editorial.prepare",
+        "editorial.write",
+        "editorial.publish",
+    }
+    assert all(
+        f"'{grant}'" in " ".join(before.statements) for grant in phase_five_grants
+    )
 
     monkeypatch.setattr(
         "crate.agent_access.ALLOWED_GRANTS", frozenset({"future.scope"})

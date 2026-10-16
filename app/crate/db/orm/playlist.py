@@ -3,7 +3,17 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import UUID, Boolean, DateTime, Float, ForeignKey, Integer, JSON, Text
+from sqlalchemy import (
+    UUID,
+    BigInteger,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    JSON,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from crate.db.engine import Base
@@ -51,6 +61,12 @@ class Playlist(Base):
         Text, nullable=False, server_default="idle"
     )
     generation_error: Mapped[str | None] = mapped_column(Text)
+    editorial_revision: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, server_default="1"
+    )
+    generation_epoch: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, server_default="0"
+    )
     last_generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

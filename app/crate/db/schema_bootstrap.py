@@ -18,6 +18,7 @@ from crate.db.schema_sections.agent_commands_v111 import (
     create_agent_commands_v111_schema,
 )
 from crate.db.schema_sections.mcp_oauth_v112 import create_mcp_oauth_v112_schema
+from crate.db.schema_sections.editorial_v116 import create_editorial_v116_schema
 
 
 def create_schema(cur):
@@ -68,3 +69,4 @@ def create_schema(cur):
     create_acquisition_schema(cur)
     create_curation_schema(cur)
     create_activity_schema(cur)
+    create_editorial_v116_schema(cur)

@@ -164,6 +164,8 @@ interface RefinementAction {
 }
 
 interface RefinementProposal {
+  proposal_id: string;
+  editorial_revision: number;
   summary: string;
   issues: RefinementIssue[];
   actions: RefinementAction[];
@@ -816,10 +818,6 @@ export function PlaylistEditor() {
   );
 
   const handleRefineTracklist = useCallback(async () => {
-    if (!llmAvailable) {
-      toast.error(llmUnavailableReason);
-      return;
-    }
     setRefining(true);
     try {
       const result = await api<RefinementProposal>(
@@ -827,20 +825,20 @@ export function PlaylistEditor() {
         "POST",
       );
       setRefineProposal(result);
-      toast.success("AI refinement staged for review");
+      toast.success("Refinement staged for review");
     } catch (error) {
       toast.error(apiErrorDetail(error, "Failed to refine tracklist"));
     } finally {
       setRefining(false);
     }
-  }, [id, llmAvailable, llmUnavailableReason]);
+  }, [id]);
 
   const handleApplyRefinement = useCallback(async () => {
     if (!refineProposal?.actions.length) return;
     setApplyingRefinement(true);
     try {
       await api(`/api/admin/system-playlists/${id}/refine/apply`, "POST", {
-        actions: refineProposal.actions,
+        proposal_id: refineProposal.proposal_id,
         action_ids: refineProposal.actions.map((action) => action.id),
       });
       toast.success("Refinement applied");
@@ -1527,19 +1525,16 @@ export function PlaylistEditor() {
                     are locked against future auto-refreshes.
                   </p>
                 </div>
-                <AIButton
+                <Button
                   type="button"
                   onClick={handleRefineTracklist}
-                  loading={refining}
                   disabled={
                     refining ||
-                    !llmAvailable ||
                     (playlist.tracks?.length ?? 0) === 0
                   }
-                  title={!llmAvailable ? llmUnavailableReason : undefined}
                 >
-                  Refine tracklist with AI
-                </AIButton>
+                  {refining ? "Preparing refinements..." : "Suggest refinements"}
+                </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1644,7 +1639,7 @@ export function PlaylistEditor() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
-                        AI refinement proposal
+                        Editorial refinement proposal
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {refineProposal.summary}

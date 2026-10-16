@@ -126,3 +126,135 @@ def test_reorder_playlist_can_lock_curated_track_order(pg_db):
     reordered = get_playlist_tracks(playlist_id)
     assert [track["title"] for track in reordered] == ["Second", "First"]
     assert [track["locked"] for track in reordered] == [True, True]
+
+
+def test_reorder_rejects_missing_duplicate_and_library_track_ids(pg_db):
+    from crate.db.repositories.playlists_create import create_playlist
+    from crate.db.repositories.playlists_detail_reads import get_playlist_tracks
+    from crate.db.repositories.playlists_tracks import (
+        add_playlist_tracks,
+        reorder_playlist,
+    )
+
+    first = _seed_track(pg_db, title="First", filename="20-first.flac")
+    second = _seed_track(pg_db, title="Second", filename="21-second.flac")
+    prelude_id = create_playlist("Prelude", scope="system")
+    add_playlist_tracks(
+        prelude_id, [{"track_id": first["id"]}, {"track_id": second["id"]}]
+    )
+    playlist_id = create_playlist("Reorder contract", scope="system")
+    add_playlist_tracks(
+        playlist_id, [{"track_id": first["id"]}, {"track_id": second["id"]}]
+    )
+    rows = get_playlist_tracks(playlist_id)
+    row_ids = [row["id"] for row in rows]
+
+    for invalid in (
+        [row_ids[0]],
+        [row_ids[0], row_ids[0]],
+        [first["id"], second["id"]],
+    ):
+        with pytest.raises(ValueError, match="permutation"):
+            reorder_playlist(playlist_id, invalid)
+
+    assert [row["id"] for row in get_playlist_tracks(playlist_id)] == row_ids
+
+
+def test_regeneration_keeps_local_identity_when_global_uid_is_present(pg_db):
+    from sqlalchemy import text
+    from crate.db.tx import transaction_scope
+    from crate.db.repositories.playlists_create import create_playlist
+    from crate.db.repositories.playlists_detail_reads import get_playlist_tracks
+    from crate.db.repositories.playlists_tracks import (
+        add_playlist_tracks,
+        regenerate_playlist_tracks,
+    )
+    from tests.test_global_catalog_playlists import _seed_playlist_and_global_track
+
+    local = _seed_track(pg_db, title="Local locked", filename="30-local.flac")
+    _other_playlist, _artist, _album, global_uid = _seed_playlist_and_global_track(
+        pg_db
+    )
+    with transaction_scope() as session:
+        session.execute(
+            text("""UPDATE global_catalog_tracks SET local_track_id=:id,
+                local_track_entity_uid=CAST(:uid AS uuid),has_local=TRUE
+                WHERE global_track_uid=CAST(:global_uid AS uuid)"""),
+            {
+                "id": local["id"],
+                "uid": str(local["entity_uid"]),
+                "global_uid": global_uid,
+            },
+        )
+    playlist_id = create_playlist(
+        "Local and global",
+        scope="system",
+        generation_mode="smart",
+        is_smart=True,
+        smart_rules={"rules": [], "limit": 1},
+    )
+    add_playlist_tracks(
+        playlist_id, [{"track_id": local["id"], "source": "manual", "locked": True}]
+    )
+    before = get_playlist_tracks(playlist_id)[0]
+    assert before["global_track_uid"] == global_uid
+    regenerate_playlist_tracks(playlist_id, [], target_count=1)
+    after = get_playlist_tracks(playlist_id)[0]
+    assert after["global_track_uid"] == global_uid
+    assert after["track_entity_uid"] == str(local["entity_uid"])
+    assert after["track_path"] == local["path"]
+    assert after["source"] == "manual" and after["locked"] is True
+
+
+def test_regeneration_falls_back_to_remote_global_when_local_row_disappears(pg_db):
+    from sqlalchemy import text
+    from crate.db.tx import transaction_scope
+    from crate.db.repositories.playlists_create import create_playlist
+    from crate.db.repositories.playlists_detail_reads import get_playlist_tracks
+    from crate.db.repositories.playlists_tracks import (
+        add_playlist_tracks,
+        regenerate_playlist_tracks,
+    )
+    from tests.test_global_catalog_playlists import _seed_playlist_and_global_track
+
+    local = _seed_track(pg_db, title="Local then remote", filename="31-local.flac")
+    _other_playlist, _artist, _album, global_uid = _seed_playlist_and_global_track(
+        pg_db
+    )
+    with transaction_scope() as session:
+        session.execute(
+            text("""UPDATE global_catalog_tracks SET local_track_id=:id,
+                local_track_entity_uid=CAST(:uid AS uuid),has_local=TRUE
+                WHERE global_track_uid=CAST(:global_uid AS uuid)"""),
+            {
+                "id": local["id"],
+                "uid": str(local["entity_uid"]),
+                "global_uid": global_uid,
+            },
+        )
+    playlist_id = create_playlist(
+        "Remote fallback",
+        scope="system",
+        generation_mode="smart",
+        is_smart=True,
+        smart_rules={"rules": [], "limit": 1},
+    )
+    add_playlist_tracks(
+        playlist_id, [{"track_id": local["id"], "source": "manual", "locked": True}]
+    )
+    with transaction_scope() as session:
+        session.execute(
+            text("DELETE FROM library_tracks WHERE id=:id"), {"id": local["id"]}
+        )
+        session.execute(
+            text("""UPDATE global_catalog_tracks SET local_track_id=NULL,
+            local_track_entity_uid=NULL,has_local=FALSE,has_remote=TRUE
+            WHERE global_track_uid=CAST(:global_uid AS uuid)"""),
+            {"global_uid": global_uid},
+        )
+    regenerate_playlist_tracks(playlist_id, [], target_count=1)
+    after = get_playlist_tracks(playlist_id)
+    assert len(after) == 1
+    assert after[0]["global_track_uid"] == global_uid
+    assert after[0]["track_entity_uid"] is None
+    assert after[0]["source"] == "manual" and after[0]["locked"] is True

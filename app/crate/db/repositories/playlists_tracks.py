@@ -17,7 +17,23 @@ from crate.db.tx import optional_scope
 
 def _resolve_playlist_track(track: dict, *, session: Session) -> dict | None:
     global_track_uid = track.get("global_track_uid") or track.get("globalTrackUid")
-    if global_track_uid:
+    has_local_ref = any(
+        track.get(key)
+        for key in (
+            "track_id",
+            "libraryTrackId",
+            "id",
+            "track_entity_uid",
+            "entity_uid",
+            "trackEntityUid",
+            "entityUid",
+            "track_storage_id",
+            "trackStorageId",
+            "track_path",
+            "path",
+        )
+    )
+    if global_track_uid and not has_local_ref:
         return _resolve_global_playlist_track(str(global_track_uid), session=session)
 
     track_id = track.get("track_id") or track.get("libraryTrackId") or track.get("id")
@@ -42,6 +58,10 @@ def _resolve_playlist_track(track: dict, *, session: Session) -> dict | None:
         resolved_entity_uid = library_track.get("entity_uid") or track_entity_uid
         resolved_storage_id = library_track.get("storage_id") or track_storage_id
         if not resolved_entity_uid and not resolved_storage_id:
+            if global_track_uid:
+                return _resolve_global_playlist_track(
+                    str(global_track_uid), session=session
+                )
             return None
         return {
             "global_track_uid": _resolve_local_global_track_uid(
@@ -64,6 +84,8 @@ def _resolve_playlist_track(track: dict, *, session: Session) -> dict | None:
             ),
         }
 
+    if global_track_uid:
+        return _resolve_global_playlist_track(str(global_track_uid), session=session)
     return None
 
 
@@ -108,6 +130,7 @@ def _resolve_global_playlist_track(
                     duration_seconds
                 FROM global_catalog_tracks
                 WHERE global_track_uid = :global_track_uid
+                  AND (has_local OR has_remote)
                 """
             ),
             {"global_track_uid": global_track_uid},
@@ -286,18 +309,29 @@ def reorder_playlist(
 ) -> None:
     def _impl(s: Session) -> None:
         now = datetime.now(timezone.utc)
-        for position, track_id in enumerate(track_ids, 1):
+        existing = set(
             s.execute(
-                text(
-                    "UPDATE playlist_tracks SET position = :pos, locked = CASE WHEN :lock_tracks THEN TRUE ELSE locked END WHERE id = :tid AND playlist_id = :playlist_id"
-                ),
-                {
-                    "pos": position,
-                    "tid": track_id,
-                    "playlist_id": playlist_id,
-                    "lock_tracks": lock_tracks,
-                },
+                text("SELECT id FROM playlist_tracks WHERE playlist_id=:id FOR UPDATE"),
+                {"id": playlist_id},
+            ).scalars()
+        )
+        if len(track_ids) != len(existing) or set(track_ids) != existing:
+            raise ValueError(
+                "track_ids must be a permutation of playlist_track_id rows"
             )
+        s.execute(
+            text("""UPDATE playlist_tracks AS pt
+                SET position = ordered.position,
+                    locked = CASE WHEN :lock_tracks THEN TRUE ELSE pt.locked END
+                FROM unnest(CAST(:track_ids AS integer[])) WITH ORDINALITY
+                    AS ordered(id, position)
+                WHERE pt.playlist_id = :playlist_id AND pt.id = ordered.id"""),
+            {
+                "playlist_id": playlist_id,
+                "track_ids": track_ids,
+                "lock_tracks": lock_tracks,
+            },
+        )
         playlist = s.get(Playlist, playlist_id)
         if playlist is not None:
             playlist.updated_at = now
@@ -371,9 +405,24 @@ def regenerate_playlist_tracks(
     tracks: list[dict],
     *,
     target_count: int,
+    expected_revision: int | None = None,
+    expected_epoch: int | None = None,
     session: Session | None = None,
 ) -> int:
     def _impl(s: Session) -> int:
+        if expected_revision is not None or expected_epoch is not None:
+            token = s.execute(
+                text(
+                    "SELECT editorial_revision,generation_epoch FROM playlists WHERE id=:id FOR UPDATE"
+                ),
+                {"id": playlist_id},
+            ).first()
+            if (
+                token is None
+                or (expected_revision is not None and token[0] != expected_revision)
+                or (expected_epoch is not None and token[1] != expected_epoch)
+            ):
+                raise ValueError("Playlist changed during generation")
         preserved = _get_preserved_playlist_tracks(s, playlist_id)
         exclusions = _get_playlist_track_exclusion_keys(s, playlist_id)
         preserved_keys = {_track_identity_key(track) for track in preserved}

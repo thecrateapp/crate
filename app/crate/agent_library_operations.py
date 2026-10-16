@@ -24,11 +24,17 @@ _ADAPTERS = {
     "library_sync": "crate.agent_sync",
     "metadata_export": "crate.agent_portability",
     "metadata_rehydrate": "crate.agent_portability",
+    "editorial_change": "crate.agent_editorial",
 }
 
 
 def _require(principal, operation):
-    if not actions_enabled() or operation_grant(operation) not in principal.grants:
+    grants = (
+        {"editorial.prepare", "editorial.publish"}
+        if operation == "editorial_change"
+        else {operation_grant(operation)}
+    )
+    if not actions_enabled() or not principal.grants.intersection(grants):
         raise DiagnosticError(
             "FORBIDDEN", "Library operation is not granted or actions are disabled"
         )
@@ -124,7 +130,8 @@ def execute_operation_job(task_id: str, config: dict) -> dict:
                 config,
                 **(
                     {"principal": jobs.requests._principal_for_job(job)}
-                    if operation in {"job_retry", "job_cancel", "schedule_run"}
+                    if operation
+                    in {"job_retry", "job_cancel", "schedule_run", "editorial_change"}
                     else {}
                 ),
             )

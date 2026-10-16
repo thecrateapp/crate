@@ -50,6 +50,9 @@ from crate.db.repositories.playlists import (
     set_generation_status,
     update_playlist,
 )
+from crate.db.repositories.playlists_generation_state import (
+    enqueue_system_playlist_generation,
+)
 from crate.db.repositories.tasks import create_task
 from crate.task_progress import TaskProgress, emit_progress
 from crate.utils import PHOTO_NAMES
@@ -2280,6 +2283,23 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
     if not playlist:
         return {"error": "Playlist not found"}
 
+    if triggered_by == "scheduler" and (
+        not playlist.get("is_active") or not playlist.get("auto_refresh_enabled")
+    ):
+        return {"status": "skipped", "reason": "Automatic refresh is disabled"}
+    expected_revision = params.get("expected_revision")
+    expected_epoch = params.get("expected_epoch")
+    if triggered_by == "scheduler" and (
+        expected_revision is None or expected_epoch is None
+    ):
+        return {"status": "skipped", "reason": "Automatic refresh token is missing"}
+    if (
+        expected_revision is not None
+        and playlist["editorial_revision"] != expected_revision
+    ) or (
+        expected_epoch is not None and playlist["generation_epoch"] != expected_epoch
+    ):
+        return {"status": "skipped", "reason": "Playlist changed after enqueue"}
     rules = playlist.get("smart_rules")
     if not rules:
         return {"error": "No smart rules configured"}
@@ -2287,7 +2307,14 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
     name = playlist.get("name", f"Playlist {playlist_id}")
     emit_task_event(task_id, "info", {"message": f"Generating: {name}"})
 
-    set_generation_status(playlist_id, "running")
+    generation_token = set_generation_status(
+        playlist_id,
+        "running",
+        expected_revision=playlist["editorial_revision"],
+        expected_epoch=expected_epoch,
+    )
+    if generation_token is None:
+        return {"error": "Playlist changed before generation started"}
     log_id = log_generation_start(playlist_id, rules, triggered_by)
     progress = TaskProgress(phase="evaluate_rules", phase_count=2, total=2, item=name)
     emit_progress(task_id, progress, force=True)
@@ -2318,11 +2345,13 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
             playlist_id,
             track_dicts,
             target_count=target_count,
+            expected_revision=generation_token[0],
+            expected_epoch=generation_token[1],
         )
         refreshed = get_playlist(playlist_id) or {}
         total_duration = refreshed.get("total_duration") or 0
 
-        set_generation_status(playlist_id, "idle")
+        set_generation_status(playlist_id, "idle", expected_epoch=generation_token[1])
         log_generation_complete(log_id, track_count, total_duration)
         progress.done = 2
         emit_progress(task_id, progress, force=True)
@@ -2348,7 +2377,9 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
         return {"track_count": track_count, "duration_sec": total_duration}
 
     except Exception as e:
-        set_generation_status(playlist_id, "failed", str(e))
+        set_generation_status(
+            playlist_id, "failed", str(e), expected_epoch=generation_token[1]
+        )
         log_generation_failed(log_id, str(e))
         emit_task_event(
             task_id,
@@ -2376,14 +2407,17 @@ def _handle_refresh_system_smart_playlists(
         progress.done += 1
         progress.item = str(pl.get("name") or pl["id"])
         emit_progress(task_id, progress)
-        create_task(
-            "generate_system_playlist",
-            {
-                "playlist_id": pl["id"],
-                "triggered_by": "scheduler",
-            },
-        )
-        enqueued += 1
+        try:
+            admitted = enqueue_system_playlist_generation(
+                pl["id"],
+                triggered_by="scheduler",
+                expected_revision=pl["editorial_revision"],
+                expected_epoch=pl["generation_epoch"],
+            )
+        except ValueError:
+            continue
+        if not admitted["deduplicated"]:
+            enqueued += 1
 
     emit_task_event(
         task_id, "info", {"message": f"Enqueued {enqueued} playlist generation tasks"}

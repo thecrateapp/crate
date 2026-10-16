@@ -31,6 +31,9 @@ ALLOWED_GRANTS = (
             "ops.jobs.manage_instance",
             "ops.schedules.read",
             "ops.runtime.read",
+            "editorial.read",
+            "editorial.write",
+            "editorial.publish",
         }
     )
 )
@@ -47,6 +50,9 @@ SCOPE_CAPABILITIES = {
     "ops.jobs.manage_instance": "ops.tasks.manage",
     "ops.schedules.read": "ops.tasks.manage",
     "ops.runtime.read": "ops.runtime.manage",
+    "editorial.read": "curation.playlists.write",
+    "editorial.write": "curation.playlists.write",
+    "editorial.publish": "curation.playlists.write",
 }
 SCOPE_CAPABILITIES.update(
     {grant: capability for grant, capability in OPERATIONS.values()}
