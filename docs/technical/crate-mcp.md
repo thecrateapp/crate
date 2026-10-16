@@ -1010,6 +1010,12 @@ The next backend shard exposed a system-playlist batching fixture that omitted t
 the exact batching case passed. The persistent review at that commit also identified a test
 patch of the process-global `time.sleep`; the daemon test now replaces only the daemon's `time`
 reference, and all four parameterized cases passed. CI is being rerun for this correction.
+The following shard exposed an intermittent disconnect assertion in the existing federated
+streaming test: Starlette's threadpool adapter did not deterministically close the underlying
+sync generator when its async iterator was closed after a chunk. The remote stream now wraps
+that adapter with an async generator that explicitly closes the sync body; the selected
+streaming file passed 12 cases. This is outside editorial logic but closes the upstream
+context/client promptly on disconnect.
 
 The phase-6 focused selection passed **37 PostgreSQL-backed cases** across the editorial plan,
 MCP, migration, rule, refinement and override files. These cover migration/bootstrap, exact creation,
