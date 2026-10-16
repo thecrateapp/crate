@@ -2379,11 +2379,19 @@ class TestHomeCaching:
 
     def test_update_task_completed_clears_stale_error(self, pg_db):
         task_id = pg_db.create_task("scan")
-        pg_db.update_task(task_id, status="failed", error="Orphaned: worker restarted")
+        pg_db.update_task(task_id, status="running", error="Previous attempt failed")
         pg_db.update_task(task_id, status="completed", result={"ok": True})
         task = pg_db.get_task(task_id)
         assert task["status"] == "completed"
         assert task["error"] is None
+
+    def test_update_task_does_not_reopen_failed_terminal(self, pg_db):
+        task_id = pg_db.create_task("scan")
+        pg_db.update_task(task_id, status="failed", error="Orphaned: worker restarted")
+        pg_db.update_task(task_id, status="completed", result={"ok": True})
+        task = pg_db.get_task(task_id)
+        assert task["status"] == "failed"
+        assert task["error"] == "Orphaned: worker restarted"
 
     def test_list_tasks(self, pg_db):
         pg_db.create_task("scan")
