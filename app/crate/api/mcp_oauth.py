@@ -203,9 +203,9 @@ def authorize(request: Request):
         + ". This application requests:</p><ul>"
         + scopes
         + "</ul><p>Access is limited to your current permissions. <a href='/oauth/connections'>Manage your connected applications</a>.</p><form method='post' action='/oauth/consent'><input type='hidden' name='consent_id' value='"
-        + consent_id
+        + html.escape(consent_id, quote=True)
         + "'><input type='hidden' name='nonce' value='"
-        + nonce
+        + html.escape(nonce, quote=True)
         + "'><button name='decision' value='approve'>Allow access</button><button name='decision' value='deny'>Deny</button></form>"
     )
 
@@ -356,13 +356,15 @@ def connections(request: Request, before: str | None = None):
         body += _permission_list(row["scopes"])
         body += "</ul>"
         if row["revoked_at"] is None:
+            if consent_id is None or nonce is None:
+                raise HTTPException(503, "Connection controls are unavailable")
             body += (
                 "<form method='post' action='/oauth/connections/"
                 + row["id"]
                 + "/revoke'><input type='hidden' name='consent_id' value='"
-                + consent_id
+                + html.escape(consent_id, quote=True)
                 + "'><input type='hidden' name='nonce' value='"
-                + nonce
+                + html.escape(nonce, quote=True)
                 + "'><button>Revoke access</button></form>"
             )
         body += "</article>"

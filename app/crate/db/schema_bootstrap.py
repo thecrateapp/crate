@@ -13,7 +13,6 @@ from crate.db.schema_sections.agent_admin_v113 import create_agent_admin_v113_sc
 from crate.db.schema_sections.agent_commands_v111 import (
     create_agent_commands_v111_schema,
 )
-
 from crate.db.schema_sections.mcp_oauth_v112 import create_mcp_oauth_v112_schema
 
 

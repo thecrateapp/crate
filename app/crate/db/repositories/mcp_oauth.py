@@ -733,7 +733,11 @@ def credential_user(credential, *, session):
 
 
 def resolve_oauth_access_token(raw, *, session=None):
-    if not oauth_enabled() or not raw.startswith("crate_mcp_at_"):
+    if (
+        not oauth_enabled()
+        or not isinstance(raw, str)
+        or not raw.startswith("crate_mcp_at_")
+    ):
         return None
 
     def _impl(current):

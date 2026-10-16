@@ -14,6 +14,25 @@ from crate.db.queries import agent_library, agent_operations
 from crate.repair_catalog import REPAIR_CATALOG_BY_CHECK
 from crate.task_registry import TASK_TYPES
 
+_CREDENTIAL_KEYS = frozenset(
+    {
+        "password",
+        "passwd",
+        "secret",
+        "token",
+        "authorization",
+        "proxyauthorization",
+        "cookie",
+        "cookies",
+        "setcookie",
+        "apikey",
+        "accesstoken",
+        "refreshtoken",
+        "clientsecret",
+        "privatekey",
+    }
+)
+
 
 class DiagnosticError(Exception):
     def __init__(self, code: str, message: str, retry_after: int | None = None):
@@ -69,7 +88,12 @@ def _safe(value):
     if isinstance(value, str):
         return _text(value)
     if isinstance(value, dict):
-        return {key: _safe(item) for key, item in value.items()}
+        return {
+            key: "[redacted]"
+            if re.sub(r"[^a-z0-9]", "", str(key).lower()) in _CREDENTIAL_KEYS
+            else _safe(item)
+            for key, item in value.items()
+        }
     if isinstance(value, (tuple, list)):
         return [_safe(item) for item in value]
     if isinstance(value, (datetime, UUID)):
@@ -239,6 +263,11 @@ def _rows(rows, limit):
         safe = _safe(row)
         cost = len(json.dumps(safe, ensure_ascii=False).encode())
         if size + cost > 40000:
+            if not selected:
+                raise DiagnosticError(
+                    "RESPONSE_TOO_LARGE",
+                    "The first evidence item exceeds the page budget",
+                )
             break
         selected.append(safe)
         size += cost
@@ -312,6 +341,13 @@ def list_library_issues(
     cursor=None,
     principal=None,
 ):
+    if artist_uid is not None:
+        try:
+            artist_uid = str(UUID(artist_uid))
+        except (ValueError, TypeError, AttributeError):
+            raise DiagnosticError(
+                "INVALID_ARGUMENT", "An artist UUID is required"
+            ) from None
     record = agent_library.read_health_snapshot()
     result = _snapshot(record, "ops:health", [])
     if record is None or result["availability"] == "unavailable":

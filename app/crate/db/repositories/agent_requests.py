@@ -218,11 +218,9 @@ def _replay(current, principal, operation, key, payload_hash):
             "IDEMPOTENCY_CONFLICT", "Idempotency key was used with a different request"
         )
     job = _job(current, row["task_id"])
-    if (
-        job is not None
-        and (job.get("authorization_context") or {}).get("authorization_id")
-        != principal.authorization_id
-    ):
+    if job is not None and (
+        job.get("authorization_context") or {}
+    ) != authorization_context(principal):
         raise DiagnosticError(
             "FORBIDDEN", "The accepted request belongs to a different authorization"
         )
@@ -425,11 +423,13 @@ def accept_apply(
 
         _authorize(current, principal, {"library.repair.photo_flag"})
         _lock_principal(current, principal.id)
-        plan = _plan(current, principal.id, plan_id, lock=True)
-        validate_plan_authorization(current, plan, principal, job_id=plan["task_id"])
         replay = _replay(
             current, principal, "apply_repairs", key, _hash(request_payload)
         )
+        if replay and replay["status"] in {"completed", "failed", "cancelled"}:
+            return replay
+        plan = _plan(current, principal.id, plan_id, lock=True)
+        validate_plan_authorization(current, plan, principal, job_id=plan["task_id"])
         if replay:
             return replay
         if plan["version"] != plan_version:
@@ -617,17 +617,16 @@ def _execution_job(current, task_id):
 def load_job_for_execution(task_id: str, *, session: Session | None = None) -> dict:
     with optional_scope(session) as current:
         job = _execution_job(current, task_id)
+        if job["result"] is not None:
+            return job
         if job["operation"] == "apply_repairs":
             from crate.db.repositories.agent_plans import validate_plan_authorization
 
             plan = _plan(current, job["principal_id"], job["payload"]["plan_id"])
-            if job["result"] is None:
-                validate_plan_authorization(
-                    current, plan, _principal_for_job(job), worker=True, job_id=task_id
-                )
-            if job["result"] is None and (
-                not plan["unexpired"] or plan["state"] != "queued"
-            ):
+            validate_plan_authorization(
+                current, plan, _principal_for_job(job), worker=True, job_id=task_id
+            )
+            if not plan["unexpired"] or plan["state"] != "queued":
                 raise DiagnosticError(
                     "PLAN_STALE", "Repair plan expired or is no longer queued"
                 )
