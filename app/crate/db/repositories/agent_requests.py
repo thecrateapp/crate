@@ -66,7 +66,7 @@ def _authorize(current, principal, grants, *, worker=False):
     row = (
         current.execute(
             text("""
-        SELECT p.enabled, p.grants, p.kind, c.revoked_at, c.expires_at > NOW() AS unexpired
+        SELECT p.enabled, p.grants, p.kind, p.human_owner_user_id, c.revoked_at, c.expires_at > NOW() AS unexpired
         FROM agent_principals p JOIN agent_credentials c ON c.principal_id = p.id
         WHERE p.id = :principal_id AND c.id = :credential_id
         FOR SHARE OF p, c
@@ -91,6 +91,11 @@ def _authorize(current, principal, grants, *, worker=False):
         raise DiagnosticError(
             "FORBIDDEN", "Required integration permissions are not granted"
         )
+    if row["kind"] == "human" or principal.human_actor_id is not None:
+        from crate.db.repositories.show_editor_access import authorize_show_editor
+
+        authorize_show_editor(current, principal, row, grants)
+        return
     if row["kind"] == "delegated":
         from crate.db.repositories.mcp_oauth import delegated_authorization_grants
 
@@ -395,7 +400,7 @@ def _accept(
 
     record_task_provenance(
         task_id,
-        origin="agent",
+        origin="admin" if principal.human_actor_id is not None else "agent",
         actor_user_id=principal.actor_user_id,
         agent_context=principal_context(principal),
         required_grants=grants,
@@ -649,6 +654,7 @@ def _principal_for_job(job):
         actor_user_id=context.get("actor_user_id"),
         client_id=context.get("client_id"),
         accepted_scopes=frozenset(context["accepted_scopes"]) if context else None,
+        human_actor_id=context.get("human_actor_id"),
     )
 
 

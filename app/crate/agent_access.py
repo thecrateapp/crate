@@ -34,6 +34,7 @@ ALLOWED_GRANTS = (
             "editorial.read",
             "editorial.write",
             "editorial.publish",
+            "curation.shows.read",
         }
     )
 )
@@ -53,6 +54,7 @@ SCOPE_CAPABILITIES = {
     "editorial.read": "curation.playlists.write",
     "editorial.write": "curation.playlists.write",
     "editorial.publish": "curation.playlists.write",
+    "curation.shows.read": "library.view",
 }
 SCOPE_CAPABILITIES.update(
     {grant: capability for grant, capability in OPERATIONS.values()}
@@ -74,9 +76,16 @@ class AgentPrincipal:
     actor_user_id: int | None = None
     client_id: str | None = None
     accepted_scopes: frozenset[str] | None = None
+    human_actor_id: int | None = None
 
 
 def authorization_context(principal: AgentPrincipal) -> dict:
+    if principal.human_actor_id is not None:
+        return {
+            "human_actor_id": principal.human_actor_id,
+            "actor_user_id": principal.human_actor_id,
+            "accepted_scopes": sorted(principal.accepted_scopes or principal.grants),
+        }
     if principal.authorization_id is None:
         return {}
     return {

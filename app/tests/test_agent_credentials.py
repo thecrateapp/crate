@@ -106,6 +106,7 @@ def test_action_feature_requires_explicit_true(monkeypatch, value, enabled):
 
 def test_action_grants_are_explicit_and_do_not_expand_existing_diagnostic_grants(pg_db):
     assert ACTION_GRANTS == {
+        "curation.shows.write",
         "library.health.run",
         "library.repair.photo_flag",
         "ops.jobs.retry",
@@ -126,6 +127,7 @@ def test_action_grants_are_explicit_and_do_not_expand_existing_diagnostic_grants
     }
     assert not ACTION_GRANTS & PILOT_GRANTS
     assert ALLOWED_GRANTS == PILOT_GRANTS | ACTION_GRANTS | {
+        "curation.shows.read",
         "ops.audit.read",
         "ops.jobs.manage_instance",
         "ops.schedules.read",

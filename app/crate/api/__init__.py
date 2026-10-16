@@ -591,9 +591,11 @@ def create_app() -> FastAPI:
     app.include_router(admin_metrics_router)
     from crate.api.agent_integrations import router as agent_integrations_router
     from crate.api.agent_plans import router as agent_plans_router
+    from crate.api.show_imports import router as show_imports_router
 
     app.include_router(agent_integrations_router)
     app.include_router(agent_plans_router)
+    app.include_router(show_imports_router)
 
     # Static files
     base = Path(__file__).resolve().parent.parent

@@ -53,3 +53,35 @@ def test_show_migration_downgrade_keeps_canonical_show_rows(pg_db, monkeypatch):
         assert session.execute(text("SELECT count(*) FROM shows")).scalar_one() == 1
         migration.upgrade()
         assert session.execute(text("SELECT count(*) FROM shows")).scalar_one() == 1
+
+
+def test_shared_plan_rollback_removes_internal_proofs_and_restores_previous_grants(
+    pg_db, monkeypatch
+):
+    from crate.db.repositories.auth_user_accounts import create_user
+    from crate.db.repositories.show_imports import get_show_editor_principal
+
+    user = create_user("migration-editor@example.test", role="curator")
+    get_show_editor_principal(user["id"])
+    migration = import_module("crate.db.migrations.versions.118_shared_show_plans")
+    with transaction_scope() as session:
+
+        class Executor:
+            def execute(self, statement):
+                return session.execute(text(statement))
+
+        monkeypatch.setattr(migration, "op", Executor())
+        migration.downgrade()
+        assert (
+            session.execute(
+                text("SELECT count(*) FROM agent_principals WHERE kind='human'")
+            ).scalar_one()
+            == 0
+        )
+        check = session.execute(
+            text(
+                "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='agent_principals_grants_check'"
+            )
+        ).scalar_one()
+        assert "curation.shows" not in check
+        migration.upgrade()

@@ -68,7 +68,7 @@ def list_integrations(
                     FROM (SELECT * FROM mcp_oauth_authorizations WHERE principal_id=p.id
                           ORDER BY (revoked_at IS NULL) DESC, created_at DESC, id DESC LIMIT 20) a) AS authorizations,
                    EXISTS(SELECT 1 FROM mcp_oauth_authorizations WHERE principal_id=p.id OFFSET 20) AS authorizations_truncated
-            FROM agent_principals p WHERE (:before IS NULL OR p.id < CAST(:before AS uuid))
+            FROM agent_principals p WHERE p.kind<>'human' AND (:before IS NULL OR p.id < CAST(:before AS uuid))
               AND (:principal IS NULL OR p.id = CAST(:principal AS uuid))
             ORDER BY p.id DESC LIMIT :limit
         """),
@@ -152,7 +152,9 @@ def update_integration(
         _require(current, actor)
         row = (
             current.execute(
-                text("SELECT * FROM agent_principals WHERE id=:id FOR UPDATE"),
+                text(
+                    "SELECT * FROM agent_principals WHERE id=:id AND kind<>'human' FOR UPDATE"
+                ),
                 {"id": principal_id},
             )
             .mappings()
@@ -257,7 +259,9 @@ def revoke_integration_credential(
     with optional_scope(session) as current:
         _require(current, actor)
         principal = current.execute(
-            text("SELECT principal_id::text FROM agent_credentials WHERE id=:id"),
+            text(
+                "SELECT c.principal_id::text FROM agent_credentials c JOIN agent_principals p ON p.id=c.principal_id WHERE c.id=:id AND p.kind<>'human'"
+            ),
             {"id": str(UUID(credential_id))},
         ).scalar_one_or_none()
         if principal is None:

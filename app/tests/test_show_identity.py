@@ -266,6 +266,7 @@ def test_explicit_consolidation_transfers_relations_and_keeps_redirect_identity(
         {"longitude": -181},
         {"doors_time": "8pm"},
         {"extra": True},
+        {"artist_uid": "-" * 36},
     ],
 )
 def test_closed_candidate_rejects_invented_or_invalid_values(changes):

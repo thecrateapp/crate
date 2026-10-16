@@ -103,6 +103,16 @@ def test_guard_uses_fresh_database_roles_and_not_jwt_role(human_actor):
     assert caught.value.status_code == 403
 
 
+def test_internal_human_show_proofs_are_not_managed_as_remote_integrations(human_actor):
+    from crate.db.repositories.show_imports import get_show_editor_principal
+
+    internal = get_show_editor_principal(human_actor["id"])
+    assert integrations.list_integrations() == []
+    with pytest.raises(DiagnosticError) as error:
+        integrations.revoke_integration_credential(human_actor, internal.credential_id)
+    assert error.value.code == "NOT_FOUND"
+
+
 @pytest.mark.parametrize(
     "mutation",
     ["bearer", "remote", "token_query", "media_query", "listen_cookie", "sessionless"],

@@ -172,6 +172,7 @@ def list_credentials(*, session: Session | None = None) -> list[dict]:
                            p.name, p.enabled, p.grants, c.created_at, c.expires_at, c.revoked_at
                     FROM agent_principals p
                     JOIN agent_credentials c ON c.principal_id = p.id
+                    WHERE p.kind<>'human'
                     ORDER BY p.created_at DESC, c.created_at DESC, c.id
                     """
                 )

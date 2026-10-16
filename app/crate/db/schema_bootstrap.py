@@ -20,6 +20,7 @@ from crate.db.schema_sections.agent_commands_v111 import (
 from crate.db.schema_sections.mcp_oauth_v112 import create_mcp_oauth_v112_schema
 from crate.db.schema_sections.editorial_v116 import create_editorial_v116_schema
 from crate.db.schema_sections.shows_v117 import create_shows_v117_schema
+from crate.db.schema_sections.show_plans_v118 import create_show_plans_v118_schema
 
 
 def create_schema(cur):
@@ -72,3 +73,4 @@ def create_schema(cur):
     create_activity_schema(cur)
     create_editorial_v116_schema(cur)
     create_shows_v117_schema(cur)
+    create_show_plans_v118_schema(cur)

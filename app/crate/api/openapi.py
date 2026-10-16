@@ -382,6 +382,7 @@ _AUTH_REQUIRED_PREFIXES = frozenset(
         "/api/missing-search",
         "/api/insights",
         "/api/shows",
+        "/api/show-imports",
         "/api/upcoming",
         "/api/network",
         "/api/batch",

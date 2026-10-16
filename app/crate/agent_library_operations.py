@@ -10,6 +10,7 @@ from crate.db.queries.agent_operation_targets import operation_target_keys
 from crate.db.repositories import agent_operation_jobs as jobs
 
 _ADAPTERS = {
+    "shows_import": "crate.agent_shows",
     "job_retry": "crate.agent_instance_operations",
     "job_cancel": "crate.agent_instance_operations",
     "schedule_run": "crate.agent_instance_operations",
@@ -29,6 +30,12 @@ _ADAPTERS = {
 
 
 def _require(principal, operation):
+    if principal.human_actor_id is not None:
+        if operation == "shows_import" and "curation.shows.write" in principal.grants:
+            return
+        raise DiagnosticError(
+            "FORBIDDEN", "Human show editor permits only reviewed show imports"
+        )
     grants = (
         {"editorial.prepare", "editorial.publish"}
         if operation == "editorial_change"
@@ -82,12 +89,13 @@ def execute_operation_job(task_id: str, config: dict) -> dict:
 
     effect_depth = 0
     attempted_effect = False
+    human_show_editor = False
 
     def authorize(effect=None):
         nonlocal effect_depth, attempted_effect
         if is_cancelled(task_id):
             raise DiagnosticError("CANCELLED", "Operation cancellation was requested")
-        if (
+        if not human_show_editor and (
             not actions_enabled()
             or os.environ.get("CRATE_MCP_ENABLED", "false").lower() != "true"
         ):
@@ -109,12 +117,17 @@ def execute_operation_job(task_id: str, config: dict) -> dict:
         return jobs.with_operation_authority(task_id, held)
 
     try:
-        if (
+        job = jobs.load_operation_job(task_id)
+        context = job.get("authorization_context") or {}
+        human_show_editor = bool(
+            context.get("human_actor_id")
+            and job["payload"]["domain_operation"] == "shows_import"
+        )
+        if not human_show_editor and (
             not actions_enabled()
             or os.environ.get("CRATE_MCP_ENABLED", "false").lower() != "true"
         ):
             raise DiagnosticError("FORBIDDEN", "MCP library operations are disabled")
-        job = jobs.load_operation_job(task_id)
         if job["result"] is not None:
             return job["result"]
         operation = job["payload"]["domain_operation"]
@@ -131,7 +144,13 @@ def execute_operation_job(task_id: str, config: dict) -> dict:
                 **(
                     {"principal": jobs.requests._principal_for_job(job)}
                     if operation
-                    in {"job_retry", "job_cancel", "schedule_run", "editorial_change"}
+                    in {
+                        "job_retry",
+                        "job_cancel",
+                        "schedule_run",
+                        "editorial_change",
+                        "shows_import",
+                    }
                     else {}
                 ),
             )

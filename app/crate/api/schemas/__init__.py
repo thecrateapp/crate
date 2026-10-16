@@ -1,6 +1,15 @@
 # ruff: noqa: F401
 """Response-oriented Pydantic models for the HTTP API contract."""
 
+from crate.api.schemas.show_imports import (
+    ShowCandidate,
+    ShowImportSelection,
+    ShowPlanApplyInput,
+    ShowAcceptedJob,
+    ShowJobState,
+    ShowPlanEvidence,
+)
+
 from crate.api.schemas.agents import (
     AgentCollectionResponse,
     AgentCredentialSecretResponse,
@@ -416,6 +425,12 @@ from crate.api.schemas.utility import (
 )
 
 __all__ = [
+    "ShowCandidate",
+    "ShowImportSelection",
+    "ShowPlanApplyInput",
+    "ShowAcceptedJob",
+    "ShowJobState",
+    "ShowPlanEvidence",
     "AgentCollectionResponse",
     "AgentCredentialSecretResponse",
     "CredentialExpiry",

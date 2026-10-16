@@ -3,8 +3,16 @@
 from datetime import date as Date
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    RootModel,
+    field_validator,
+    model_validator,
+)
 
 Text = Annotated[str, Field(min_length=1, max_length=240)]
 
@@ -67,6 +75,11 @@ class ShowCandidate(BaseModel):
                 raise ValueError("Unknown IANA timezone") from None
         return value
 
+    @field_validator("artist_uid")
+    @classmethod
+    def validate_artist_uid(cls, value):
+        return str(UUID(value)) if value is not None else None
+
     @field_validator("date", mode="before")
     @classmethod
     def validate_date(cls, value):
@@ -99,4 +112,35 @@ class ShowImportSelection(BaseModel):
         return self
 
 
-__all__ = ["ShowCandidate", "ShowImportSelection"]
+class ShowPlanApplyInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    plan_version: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    idempotency_key: Annotated[
+        str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
+    ]
+
+
+class ShowAcceptedJob(BaseModel):
+    job_id: str
+    status: str
+    replayed: bool = False
+
+
+class ShowJobState(BaseModel):
+    job_id: str
+    status: str
+    result: dict | None = None
+
+
+class ShowPlanEvidence(RootModel[dict]):
+    """The complete private plan from the shared engine, without response truncation."""
+
+
+__all__ = [
+    "ShowCandidate",
+    "ShowImportSelection",
+    "ShowPlanApplyInput",
+    "ShowAcceptedJob",
+    "ShowJobState",
+    "ShowPlanEvidence",
+]
