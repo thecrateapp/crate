@@ -16,6 +16,7 @@ GROUPS = {
         "tests/test_mcp_evaluation_runner.py",
         "tests/test_mcp_restart.py",
         "tests/test_mcp_limits.py",
+        "tests/test_mcp_library_maintenance.py::test_new_action_discovery_and_catalog_describe_actual_grants_and_flags",
     ],
     "workflows": [
         "tests/test_agent_actions_workflow.py",

@@ -470,12 +470,17 @@ def test_metadata_patch_preserves_explicit_fields_and_omits_every_unprovided_def
 
 
 @pytest.mark.parametrize("enabled", ["true", "false"])
+@pytest.mark.parametrize("worker_availability", ["available", "unavailable"])
 def test_new_action_discovery_and_catalog_describe_actual_grants_and_flags(
-    action_transport, monkeypatch, enabled
+    action_transport, monkeypatch, enabled, worker_availability
 ):
     app, token, *_ = action_transport
     _grant(action_transport, ALLOWED_GRANTS)
     monkeypatch.setenv("CRATE_MCP_ACTIONS_ENABLED", enabled)
+    monkeypatch.setattr(
+        "crate.agent_diagnostics.get_instance_status",
+        lambda: {"data": {"worker": {"availability": worker_availability}}},
+    )
 
     async def run():
         async with app.router.lifespan_context(app), _client(app, token) as session:
@@ -490,7 +495,18 @@ def test_new_action_discovery_and_catalog_describe_actual_grants_and_flags(
             }
             for name in names:
                 assert entries[name]["status"] == (
-                    "enabled" if enabled == "true" else "disabled"
+                    "disabled"
+                    if enabled == "false"
+                    else "enabled"
+                    if worker_availability == "available"
+                    else "unavailable"
+                )
+                assert entries[name]["readiness"]["missing"] == (
+                    ["actions_disabled"]
+                    if enabled == "false"
+                    else []
+                    if worker_availability == "available"
+                    else ["fresh_worker_evidence"]
                 )
                 assert (name in listed) is (enabled == "true")
                 if enabled == "true":

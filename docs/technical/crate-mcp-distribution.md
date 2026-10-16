@@ -156,7 +156,7 @@ report directory. The load measurement file uses the standard artifact directory
 | workflows | Diagnosis and temporary-filesystem repair, high-risk/global human approval, actual metadata tags/locks, simulated provider failure, DSP generations, indexed sync, export/rehydrate, scheduler recovery, runtime CAS/adoption, editorial create/edit, two OAuth clients with refresh/revoke over TCP. |
 | load      | Paired foreground API/service-worker work at equal dataset/concurrency, with added MCP traffic in the mixed arm.                                                                                                                                                                                      |
 
-The contract group passed **36 cases**, the workflows group **14 cases**, and the paired load
+The contract group passed **40 cases**, the workflows group **14 cases**, and the paired load
 group **one case**, all without skips. A fresh Python process recovered the
 original committed pending task; a newly constructed MCP endpoint replayed the original ID before
 and after worker completion. This does not emulate PostgreSQL loss or a broker/Docker crash during
@@ -174,6 +174,11 @@ verification failure and classify unknown outcomes as unavailable. The minor art
 finding was also addressed: the published JSON must match the complete export, including output
 schema, scope/capability mapping and SDK metadata. Remaining external gates are described below;
 current CI and persistent review belong to the exact commit shown in PR #292.
+
+CI also exposed an older maintenance-discovery assertion that treated an enabled action flag
+as worker readiness. The regression was reproduced locally and expanded to cover both worker
+availability states with both flag states; the two affected discovery files passed 135 selected
+cases. The four-state case is included in the finite contract runner.
 
 ## Load evidence and proposed rollout budget
 
