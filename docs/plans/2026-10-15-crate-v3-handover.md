@@ -359,3 +359,17 @@ no change. The two callsites gain `border border-border-quiet`; tokens and behav
 - Remaining gates: canonical Linux captures of both new scenes with diff review, and completion
   of the manual route QA required by Task 1.0. Publication was explicitly approved on 2026-10-16.
   Do not close Task 1.0 or start InstrumentPanel 1.7 from these local checks alone.
+
+### 1F publication and canonical Linux recording — 2026-10-16
+
+- Published source: `6e793ebdf3ccf02c950e18af489c719dc60ac463` on `origin/feat/crate_v3`.
+- Successful capture run: <https://github.com/thecrateapp/crate/actions/runs/38859757212>,
+  artifact `12028567230`, SHA-256
+  `7aef4a2701a2c92440ecec599bb3ac556d75e13ce43a9d652ce9c11ef7bd458c` verified after download.
+- Original manifest confirms the exact source, Playwright 1.63.0 Noble, Linux x64; retained at
+  `tests/visual/capture-manifest.json`. All 31 existing PNGs are byte-identical to 1E.
+  Two new canonical PNGs cover the four real Audio Profile KPIs and the open crop modal.
+  Both have been visually reviewed; the quiet exterior borders and fixture content are as expected.
+- Canonical image import is complete. Comparison CI on the imported-baseline revision and the
+  remaining manual route review still precede production changes for InstrumentPanel 1.7.
+  Tests for 1.7 may be prepared independently; they are not part of the 1F publication.

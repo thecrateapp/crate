@@ -727,7 +727,7 @@ function App() {
         <div className="specimen-heading">
           <div>
             <MonoLabel size="eyebrow" accent="07">
-              Checkpoint 1F · En revisión
+              Checkpoint 1F · Publicado
             </MonoLabel>
             <h2>Tarjetas que se distinguen.</h2>
           </div>
@@ -813,7 +813,7 @@ function App() {
             "1A–1C publicados",
             "1D provisional",
             "1E publicado",
-            "1F en revisión",
+            "1F publicado",
           ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>
