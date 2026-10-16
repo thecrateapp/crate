@@ -34,6 +34,7 @@ export function MediaGrid({
       data-testid="media-grid"
       data-density={usesMinWidth ? undefined : density}
       className={cn(
+        "crate-media-grid min-w-0",
         MEDIA_GRID_BASE_CLASS_NAME,
         usesMinWidth ? null : MEDIA_GRID_DENSITY_CLASS_NAME[density],
         className,
@@ -44,7 +45,7 @@ export function MediaGrid({
               ...style,
               ["--media-grid-min" as string]: `${minItemWidth}px`,
               gridTemplateColumns:
-                "repeat(auto-fill, minmax(var(--media-grid-min), 1fr))",
+                "repeat(auto-fill, minmax(min(100%, var(--media-grid-min)), 1fr))",
             }
           : style
       }

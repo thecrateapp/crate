@@ -3,11 +3,22 @@
 @import "../../app/shared/fonts/poppins.css";
 @import "../../app/shared/ui/tokens/index.css";
 @import "tailwindcss";
+@import "../../app/listen/src/components/player/bar/player-seek-bar.css";
 @source "./main.tsx";
 @source "./forms-checkpoint.tsx";
 @source "./selection-checkpoint.tsx";
 @source "./tabs-checkpoint.tsx";
 @source "./states-checkpoint.tsx";
+@source "./tracks-checkpoint.tsx";
+@source "../../app/listen/src/components/player/bar/PlayerSeekBarVariants.tsx";
+@source "../../app/listen/src/components/player/bar/PlayerProgressBeam.tsx";
+@source "../../app/listen/src/components/player/bar/player-seek-bar-model.ts";
+@source "../../app/listen/src/components/cards/TrackRowContent.tsx";
+@source "../../app/listen/src/components/cards/TrackRowPlaybackControl.tsx";
+@source "../../app/shared/ui/domain/media/MediaCover.tsx";
+@source "../../app/shared/ui/domain/media/PlayButton.tsx";
+@source "../../app/shared/ui/domain/tracks/TrackList.tsx";
+@source "../../app/shared/ui/shadcn/table.tsx";
 @source "../../app/shared/ui/lib/media-layout.ts";
 @source "../../app/shared/ui/domain/entity/EntityCard.tsx";
 @source "../../app/shared/ui/domain/entity/EntityPrimaryAction.tsx";
@@ -948,3 +959,7 @@ footer p {
 
 .state-preview-reserved { min-block-size: 340px; }
 .state-preview-route { min-block-size: 120px; }
+
+#pistas { scroll-margin-top: 32px; }
+#pistas .specimen-heading h2 { overflow-wrap: normal; }
+@media (max-width:760px) { #pistas .specimen-heading { display: block; } #pistas .specimen-heading h2 { font-size: 2.5rem; } #pistas .specimen-heading > p { margin-top: 24px; } }

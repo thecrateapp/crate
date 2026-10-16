@@ -7,6 +7,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
+import { MediaCover } from "@crate/ui/domain/media/MediaCover";
 import { useTranslation } from "react-i18next";
 import { CRATE_ICON_SIZE, Clock, Disc3 } from "@crate/ui/icons";
 
@@ -90,7 +91,7 @@ function albumOfflineMeta(
   if (state === "ready") {
     return record?.trackCount
       ? t("common.offlineCount", { count: record.trackCount })
-      : getOfflineStateLabel(state) ?? "";
+      : (getOfflineStateLabel(state) ?? "");
   }
   if (isOfflineBusy(state) && record?.trackCount) {
     return t("common.offlineProgress", {
@@ -206,9 +207,7 @@ export function AlbumCardArtwork({
       alt={album}
       className={className}
       fallback={
-        <div className="grid size-full place-items-center bg-surface-elevated text-text-primary/35">
-          <Disc3 size={iconSize} />
-        </div>
+        <MediaCover alt={album} iconSize={iconSize} className="size-full" />
       }
       imageProps={{ loading: "lazy", decoding: "async" }}
       imageClassName="object-cover"

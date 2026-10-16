@@ -1,8 +1,14 @@
 /* crate-ui — Typography */
 
+:root {
+  --type-meta-size: 0.65625rem;
+}
+
 @theme inline {
   --font-display: var(--font-display-stack);
   --font-mono: var(--font-mono-stack);
+  --text-meta: var(--type-meta-size);
+  --text-meta--line-height: 1rem;
   --text-label: 0.6875rem;
   --text-label--line-height: 1.4;
   --text-eyebrow: 0.71875rem;

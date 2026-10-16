@@ -157,3 +157,34 @@ describe("TrackTable", () => {
     expect(onTrackQuarantined).toHaveBeenCalled();
   });
 });
+
+it("keeps the semantic management table and shows only existing Camelot analysis", () => {
+  render(
+    <TrackTable
+      tracks={[track]}
+      artist="Converge"
+      analysisData={{
+        concubine: {
+          tempo: 124,
+          key: "A",
+          scale: "minor",
+          energy: null,
+          mood: null,
+          danceability: null,
+          valence: null,
+          acousticness: null,
+          instrumentalness: null,
+          loudness: null,
+          dynamic_range: null,
+          spectral_complexity: null,
+        },
+      }}
+    />,
+  );
+  expect(screen.getByRole("table")).toHaveClass("crate-track-table");
+  expect(screen.getByText("124 · 8A")).toHaveClass("crate-track-analysis");
+  expect(screen.getByText("1:19")).toHaveClass("font-mono", "tabular-nums");
+  expect(screen.getByRole("link", { name: "Download track" })).toHaveAttribute(
+    "download",
+  );
+});

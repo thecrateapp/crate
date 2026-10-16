@@ -6,16 +6,17 @@ plan; the status table separates implementation from pending QA.
 Current transfer: **1N–1P are complete in the checkpoint commit
 `feat(ui): unify v3 overlays, controls and field spacing`**. Diego authorised commit/push and
 continuation on Linux; this final publication record supersedes earlier local-only stops below.
-**1Q is approved and published as `e863c22715de39b974fc1cf527003fc498d59215`.** Task 1b.4 /
-checkpoint 1R is implemented locally at <http://127.0.0.1:5186/#estados> and stops for Diego's
-review before publication or 1b.5. Resume on Linux with
+**1R is approved and published as `093dcb1fbfe67d1f994ee49e27aefd802d258c54`.** Task 1b.5 /
+checkpoint 1S is implemented locally at <http://127.0.0.1:5186/#pistas> and stops for Diego's
+review before publication or 1b.6. His review retains the current Listen play/halo/ring and
+luminous seek trail, adapted to V3 with 1–2 px strokes. Resume on Linux with
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
 Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 
 ## Where the work lives
 
 - Active Linux worktree: `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing branch
-  `feat/crate_v3`, published HEAD `e863c22715de39b974fc1cf527003fc498d59215` (1Q);
+  `feat/crate_v3`, published HEAD `093dcb1fbfe67d1f994ee49e27aefd802d258c54` (1R);
   transfer checkpoint `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. Node 22.23.3, root
   dependencies and persistent :5186 preview are prepared. This isolates the MCP agent's
   `/home/diego/Code/Ninja/crate` checkout (`feat/crate_mcp`); leave its files untouched.
@@ -199,7 +200,8 @@ is a token-based chart configuration, not a selectable product skin.
 | 1b.1 / Checkpoint 1N                                         | Complete in the combined 1N–1P publication cut authorised by Diego; shared overlays/menus, ConfirmDialog and one close recipe. Focused checks and SPEC/QUALITY pass; new canonical Linux recording/native QA pending.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 1b.2 / Checkpoints 1O–1P                                     | Complete in the combined publication cut: nine form foundations, 28 short selectors, caller review, Radio debounce and global 8 px field spacing. Focused checks and SPEC/QUALITY pass. Next: 1b.3 / 1Q; Linux continuation instructions are tracked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 1b.3 / Checkpoint 1Q | Approved and published as `e863c227`; focused replay 39 Vitest / three Chromium cases passes. |
-| 1b.4 / Checkpoint 1R | Implemented locally at `#estados`; awaiting Diego’s checkpoint review. Shared state foundations, shell fallbacks, skeleton compatibility exports and focused geometry fixes. Final verification below. |
+| 1b.4 / Checkpoint 1R | Approved/published as `093dcb1f`; scoped replay 309 Vitest / three Chromium cases passed before publication. |
+| 1b.5 / Checkpoint 1S | Local at `#pistas`, awaiting Diego's review before publication or 1b.6. Track/media/table foundations and retained Listen play/ring/seek trail. Final verification below. |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -1258,3 +1260,162 @@ to Task 1b.5, keeping the preview active and stopping at the next checkpoint (1S
 This supersedes the local-only publication stops above. Publish the reviewed 1R changes as
 `feat(ui): one set of loading, empty and error states`; resolve its SHA from git log.
 No PR, merge/rebase, deploy, release, full suite/CI or canonical baseline update is authorised.
+
+
+### Checkpoint 1R publication — 2026-10-16
+
+Approved 1R is committed and pushed as **`093dcb1fbfe67d1f994ee49e27aefd802d258c54`**
+(`feat(ui): one set of loading, empty and error states`). Fresh serial scoped validation
+passed 309 Vitest and three Chromium cases before commit; `git ls-remote` verifies the remote
+branch at this SHA. Continue locally with Task1b.5 / checkpoint1S, keeping :5186 alive and
+stopping for Diego's review before another publication. No full suite/CI or baseline update.
+
+
+## Checkpoint 1S — Track rows, media and retained playback identity, local review, 2026-10-16
+
+Approved 1R is published as `093dcb1fbfe67d1f994ee49e27aefd802d258c54`. Task 1b.5 / 1S
+is local in the same isolated Linux worktree and existing `feat/crate_v3` branch. The MCP
+checkout is untouched. Preview: <http://127.0.0.1:5186/#pistas>. Stop for Diego's visual
+review before 1S commit/push or Task 1b.6. This final record supersedes earlier local-only
+1R status and the initial interpretation that removed row progress/glow.
+
+### Scope and review amendments
+
+- Shared TrackList/MediaGrid retain their item/virtualization contracts, with continuous hairlines
+  and grid minima that fit narrow containers. MediaCover uses mono initials on the accent wash,
+  retains explicit fallbacks and image retry/reset behavior, and gets an inset hairline.
+  EntityCard supplies 14/500 titles and 10.5 px mono metadata, with no cover lift/scale/shadow.
+  Shared PlayButton overlays retain the 40 px accent disc and 44 px coarse hit area.
+- Listen's actual TrackRowContent and PlaybackControl are reused by production and the persistent
+  specimen. Existing selection, row/keyboard playback, menus, likes, queue data and duration remain.
+  The active row has a 2 px bar and accent-hi title. Supplied BPM/key, quality, explicit and remote
+  provenance use mono metadata; absent data is omitted. Camelot follows the existing bliss mapping,
+  with unknown/partial keys preserved. The stale provenance ring precedes text so ellipsis cannot
+  hide it. New Listen strings are present in all seven catalogs.
+- Diego explicitly retained the current Listen play's essence: halo, layers and advancing ring.
+  The original visual structure now uses V3 tokens and a 2 px ring. Only the active progress leaf
+  subscribes to `usePlayerProgress`; rows/lists and duration do not subscribe to ticks. He also
+  retained the current player's luminous seek trail, narrowed to 2 px (thin 1 px). The real
+  horizontal GlowSeekBar keeps native keyboard seeking, scrubbing and disabled/Jam behavior,
+  with 40/44 px fine/coarse interaction areas. Its existing local CSS is extracted for production
+  and preview reuse. Motion/effects preferences retain position while suppressing animation/glow.
+  This is a scoped amendment, not a redesign of every player surface.
+- Existing artist circles, artwork auth/retries/srcset, offline/pre-release behavior and card
+  controllers remain. Album/artist fallbacks adopt the identity; editorial artist titles also use
+  the shared scale. Admin TrackTable remains a real management table with its existing permissions,
+  mutations, lyrics/download/retry and analysis popovers. It has no player capability to invent.
+  Shared table geometry supplies a sticky canvas header, tabular right-aligned numeric cells and
+  comparison-column reductions at 1000/760 px. Later global Admin icon/status work is still pending.
+- Read-only review found collapsed narrow-row titles and 40 px coarse tablet card menus. Chromium
+  reproduced both before fixes. Container queries yield quality/analysis/provenance at 480/620/800 px,
+  and all card menu targets reach 44 px. The explicit DS numeric-alignment requirement was completed
+  with a failing-then-passing regression. No second review or broader page migration was requested.
+
+### Focused verification and limits
+
+Serial Vitest `--maxWorkers=1` passes **Shared 99 / eight files, Admin 5 / two files and
+Listen 239 / seventeen files**, with **four existing Listen skips** (343 passed, four skipped).
+The final Listen batch includes TrackRow, AlbumCard, ArtistCard, data mapping, QueueTrackRow,
+QueuePanel, PlaylistTrackList, affected Album/Artist/Library pages, catalogs/policies and
+PlayerSeekBar/ExtendedPlayer/FullscreenPlayer/PlayerBar. The four documented TEST_GAP skips
+cover native/gesture/real-animation behavior; they are not counted as passing. No full suite ran.
+
+**Ten Chromium cases pass**, serial `--workers=1`: seven for 1S plus the three affected 1R state
+cases. They measure 1440/390 px geometry, narrow 300/360 px row containers, 1024 px touch menus,
+14/500 and 10.5 px typography, 8 px field spacing, 1–2 px seek tracks/2 px active bar, advancing
+and paused ring/seek position, keyboard scrubbing, reduced motion/effects-off, stable height,
+cover hairline/initials, numeric/sticky tables, column thresholds and no overflow/API/storage writes.
+One coarse-menu lookup timed out once during iteration; its isolated replay and the final serial
+replay pass. Advisory PNGs and the IAB review image are ignored local evidence, not baselines.
+
+Shared/Admin/Listen/Desktop typechecks pass. Strict preview sources and the affected 1R/1S browser
+specs pass with the apps' ambient declarations. Scoped ESLint and formatting pass. Shared layers:
+**141 source files, zero violations**; all **15 drift metrics** remain within unchanged ceilings.
+A semantic-role gate caught the new glyph foreground using a surface role; the existing
+`accent-action-foreground` fixes it without raising a ceiling. The organic-radius exception moves
+with the retained play view; no new exemption or dependency is added. Listen i18n reports no errors
+or warnings. Preview and both app production builds/bundle gates pass; existing chunk warnings remain.
+
+Admin initial JavaScript: **529,065 B gzip / 532,480 B** (unchanged; **3,415 B** headroom).
+Listen: **199,899 B / 307,200 B**. No lockfile/package/export changes. Generated Admin tsbuildinfo
+is excluded. Keep the Node 22 preview process alive on :5186 for Diego's review.
+
+Pinned `app/web` object **258bbaee** is unavailable locally even after fetching feat/website;
+GitHub commit lookup returns 422. The pin is preserved and no current website/vnext substitute
+was used. This implementation follows the explicit DS contracts; pixel fidelity against that
+object remains unverified. Actual backend/audio/remote/offline/native execution and assistive-
+technology QA remain integration/device work; focused mocks and browser geometry do not certify it.
+
+All **33 canonical PNGs and the original 1M manifest are unchanged**. Linux recording/comparison
+for 1N–1P and later changes, native QA and the single full validation at phase/development close
+remain pending. No full CI, canonical baseline regeneration, 1S publication, PR, merge/rebase,
+Smart Mix integration, deployment or release was performed. Await Diego at 1S.
+
+
+### 1S review follow-up — keep seek head attached, 2026-10-16
+
+Diego reported the progress head moving separately from the beam. The beam interpolated its
+transform for 150 ms; both idle/hover heads jumped to the target left position immediately.
+The scoped CSS correction shares duration/easing through `motion-duration-fast` and suppresses
+movement on all three under reduced motion. No player/controller/public-prop or stroke change.
+The same recipe fixes both PlayerSeekBar and the existing desktop PlayerBarProgress consumer.
+
+Two Chromium regressions first reproduced detached heads at 1440/390 px, then passed with the
+fix. They sample actual beam/trail endpoints and both head centres at 0/30/75/120/150 ms during
+forward/backward seeks, real pointer dragging and live demo ticks; separation stays below 0.75 px.
+The final affected 1S browser file passes all **nine cases** with one worker. This supersedes its
+previous seven-case count; unrelated 1R cases were not rerun for this local CSS correction.
+
+Fresh scoped verification also passes **31 Vitest cases in PlayerSeekBar/PlayerBar**, serial
+`--maxWorkers=1`, strict preview/spec types, formatting, all 15 drift metrics and Listen production
+build/budget. Listen remains **199,899 B gzip / 307,200 B**; no Admin JavaScript/import changed.
+The existing large-chunk warning remains. Preview rendering is verified and stays active on :5186;
+local evidence is ignored at `.artifacts/review/checkpoint-1s-attached-head.png`.
+
+1S remains local for Diego's review: no commit/push or 1b.6 advancement. Canonical references,
+the unavailable site pin, native/assistive-technology QA and phase-close validation retain the
+limits above. No full suite, canonical recording or CI run was triggered.
+
+
+### Latest 1S review correction — common edge, smaller point, 2026-10-16
+
+This supersedes the equal-duration/easing correction above. Diego still observed detachment during
+continuous dragging, clarifying that the beam moved before the point. He also requested a smaller
+point and a proportionate beam. Natural rAF observations reproduced over 123 px separation on the
+390 px specimen. The earlier regression paused each animation and set its time independently,
+which concealed divergence during real retargeting; that test is replaced, not retained as proof.
+
+A new app-local pure `PlayerProgressBeam` renders one absolute moving edge shared by the fill,
+trail and idle/engaged heads. Both PlayerSeekBar and desktop PlayerBarProgress use it. Only that
+common width animates; neither point has independent positional animation. No per-frame React
+state or new playback subscription is introduced. The point is **4 px idle / 6 px engaged**;
+the glow envelope is **8 px** with a 2 px blur and smaller head halo, while core strokes remain
+**2 px / thin 1 px**. Native range/desktop slider controllers, keyboard, scrubbing, Jam locks,
+40/44 px hit areas and motion/effects preferences remain. Unused independent left/scale styles
+and model fields retire. Inline-style drift ceiling tightens **88 → 86**, with no raised metric.
+
+The two new regressions sample untouched animation frames throughout uninterrupted, reversing
+pointer drags, keyboard seeks and live demo ticks at 1440/390 px. No pause/currentTime/finish calls
+are used. Rendered head centres stay within 0.75 px of the beam endpoint in both axes. Sizes are
+also measured. The IAB preview was exercised with real forward/backward drags and retained for
+Diego; local image: `.artifacts/review/checkpoint-1s-common-beam.png`.
+
+Fresh serial checks pass **95 Vitest cases / six affected files**, with the same **four existing
+TEST_GAP skips**, plus **nine Chromium cases** in the affected 1S file. Strict preview/spec types,
+scoped ESLint, formatting, all 15 drift metrics, Listen production build/budget and preview build
+pass. A long batched process was interrupted during production build; the standalone build replay
+passes and is the final build evidence. Existing large-chunk warnings remain.
+
+Listen initial JavaScript is **199,922 B gzip / 307,200 B** (23 B above the preceding correction).
+No Admin import/JavaScript change; its last verified 529,065 B / 532,480 B and 3,415 B headroom stand.
+No full suite or CI, canonical baseline update, publication or advance beyond 1S. The unavailable
+site pin, canonical/native/assistive-technology QA and phase-close validation limits remain.
+
+
+### Checkpoint 1S approval and publication authorisation — 2026-10-16
+
+Diego approved the complete 1S checkpoint, including the final common-edge progress correction
+and smaller point/beam. He explicitly authorised commit/push and continuation to Task 1b.6,
+keeping :5186 active and stopping for the next review at 1T. This supersedes all local-only
+1S stops above. Publish as `feat(ui): restyle track rows and media grids`; record the resulting
+SHA after publication. No full suite/CI, baseline regeneration, PR, merge/rebase, deploy or release.

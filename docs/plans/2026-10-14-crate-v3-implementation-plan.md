@@ -3,7 +3,7 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Published checkpoints through 1Q are recorded in the handover; preserve the next 1R review stop.
+> Diego's go-ahead. Published checkpoints through 1R are recorded in the handover; preserve the next 1S review stop.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -1717,6 +1717,19 @@ Final focused verification, bundle size and QA limits are recorded in the handov
 Commit: `feat(ui): one set of loading, empty and error states`.
 
 ### Task 1b.5: Track rows and media grids
+
+**1S local review — 2026-10-16:** 1R is approved/published as `093dcb1f`. The persistent
+`#pistas` specimen uses the real row composition/control, shared media and table recipes.
+Keep the existing active Listen halo, layers and advancing progress ring; Diego explicitly
+requires their essence. His next review amendment retains the horizontal seek trail with
+2 px default / 1 px thin strokes and a full keyboard/touch interaction area. The latest review
+uses one common moving edge for beam and point (4 px idle / 6 px engaged), verified with natural
+continuous/reversing drag frames; equal-timing independent animations were insufficient. Changes stay
+inside existing PlayerSeekBar contracts; its local CSS is reused by production and preview.
+Metadata uses existing row data only. Preserve native artwork, offline/remote behavior,
+selection, menus and virtualization. Narrow container metadata must leave title/actions space.
+See the final handover for focused checks, bundle sizes and outstanding QA. Stop at 1S before
+commit/push or 1b.6; no canonical recording or full CI/suite during this iteration.
 
 **Files:** `app/shared/ui/domain/tracks/TrackList.tsx`, `app/shared/ui/domain/lists/MediaGrid.tsx`, `app/shared/ui/domain/media/{MediaCover,PlayButton}.tsx`, Listen `components/cards/{TrackRow,TrackRowParts,AlbumCard,ArtistCard}.tsx`, Admin `components/album/TrackTable.tsx` (DS §5.5).
 

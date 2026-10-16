@@ -26,10 +26,11 @@ describe("MediaCover", () => {
     expect(container.querySelector("svg")).toBeInTheDocument();
   });
 
-  it("renders default Music icon when no fallback and no src", () => {
+  it("uses a dash when no initials or artwork are available", () => {
     const { container } = render(<MediaCover />);
     const svg = container.querySelector("svg");
-    expect(svg).toBeInTheDocument();
+    expect(svg).toBeNull();
+    expect(container.textContent).toContain("—");
   });
 
   it("switches to fallback on image error", () => {
@@ -120,4 +121,15 @@ describe("MediaCover fallback", () => {
     rerender(<MediaCover src="next.jpg" fallback="X" />);
     expect(getByTestId("media-cover-image")).toHaveAttribute("src", "next.jpg");
   });
+});
+
+it("uses technical initials and a shared inset hairline when artwork is absent", () => {
+  const { getByRole, container } = render(
+    <MediaCover alt="A Moon Shaped Pool" />,
+  );
+  expect(getByRole("img", { name: "A Moon Shaped Pool" })).toHaveTextContent(
+    "AP",
+  );
+  expect(getByRole("img")).toHaveClass("crate-media-cover");
+  expect(container.querySelector("svg")).toBeNull();
 });

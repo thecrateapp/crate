@@ -4,20 +4,21 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — checkpoint 1R
+## Active Linux workspace — checkpoint 1S
 
 Diego's latest request overrides the clone-only setup below: isolate this work from the
 Crate MCP agent. The managed worktree is `/home/diego/.codex/worktrees/crate-v3-1q/crate`,
 on the existing `feat/crate_v3` branch, tracking `origin/feat/crate_v3`. HEAD is published
-`e863c22715de39b974fc1cf527003fc498d59215` (approved 1Q); the original transfer checkpoint
+`093dcb1fbfe67d1f994ee49e27aefd802d258c54` (approved 1R); the original transfer checkpoint
 `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. The original checkout
 `/home/diego/Code/Ninja/crate` stays on `feat/crate_mcp` with the other agent's changes.
 Do not switch, reset or edit that checkout. No extra clone/worktree is needed to resume.
 
 Node 22.23.3 and root `npm ci` are ready. The live preview remains at
-`http://127.0.0.1:5186/#estados`; it needs no backend. 1Q is committed/pushed with Diego's
-approval. Task 1b.4 / checkpoint 1R is local and stops for his review before publication or 1b.5.
-Read the final 1R record
+`http://127.0.0.1:5186/#pistas`; it needs no backend. 1R is committed/pushed with Diego's
+approval. Task 1b.5 / checkpoint 1S is local and stops for his review before publication or 1b.6.
+Diego explicitly retained the existing Listen layered play/halo/progress ring and the luminous
+seek trail (2 px, thin 1 px) during review. Do not simplify these into flat controls. Read the final 1S record
 in the main handover for verification and limits. The generic bootstrap below is retained
 for a future fresh machine; it does not replace this active worktree.
 

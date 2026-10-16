@@ -8,7 +8,7 @@ export type PlayButtonReveal = "hover" | "always";
 
 const SIZE_CLASS_NAME: Record<PlayButtonSize, string> = {
   sm: "size-10",
-  md: "size-11",
+  md: "size-10",
   lg: "size-14",
 };
 
@@ -19,10 +19,12 @@ const ICON_SIZE: Record<PlayButtonSize, number> = {
 };
 
 const HOVER_REVEAL_CLASS_NAME =
-  "pointer-fine:translate-y-2 pointer-fine:opacity-0 pointer-fine:group-hover:translate-y-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:translate-y-0 pointer-fine:group-focus-within:opacity-100 pointer-fine:group-hover/card:translate-y-0 pointer-fine:group-hover/card:opacity-100 pointer-fine:group-focus-within/card:translate-y-0 pointer-fine:group-focus-within/card:opacity-100 focus-visible:translate-y-0 focus-visible:opacity-100";
+  "pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100 pointer-fine:group-hover/card:opacity-100 pointer-fine:group-focus-within/card:opacity-100 focus-visible:opacity-100";
 
-export interface PlayButtonProps
-  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
+export interface PlayButtonProps extends Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  "children"
+> {
   size?: PlayButtonSize;
   reveal?: PlayButtonReveal;
   playing?: boolean;
@@ -60,7 +62,7 @@ export const PlayButton = forwardRef<HTMLButtonElement, PlayButtonProps>(
         data-reveal={reveal}
         data-state={loading ? "loading" : playing ? "playing" : "idle"}
         className={cn(
-          "inline-flex shrink-0 items-center justify-center rounded-full bg-accent-action text-accent-action-foreground shadow-action transition-[transform,opacity,background-color,box-shadow] hover:scale-105 hover:bg-accent-action-hover disabled:pointer-events-none disabled:opacity-50",
+          "crate-play-button inline-flex shrink-0 items-center justify-center rounded-full bg-accent-action text-accent-action-foreground transition-[opacity,background-color] hover:bg-accent-action-hover disabled:pointer-events-none disabled:opacity-50",
           SIZE_CLASS_NAME[size],
           reveal === "hover" && !playing && !loading && HOVER_REVEAL_CLASS_NAME,
           className,

@@ -2,9 +2,11 @@
 
 Status: product design, revised 2026-10-15. Canonical clone `/Users/diego/Code/crate-v3`, branch
 `feat/crate_v3`. The handover records implementation and QA status; historical analysis is not a
-current progress report. Checkpoints through 1Q are published (`e863c227`). Task 1b.4 /
-checkpoint 1R is local on Linux at `#estados`, awaiting review. Its commit/push and continuation
-to 1b.5 remain gated. The final handover supersedes historical local-only notes.
+current progress report. Checkpoints through 1R are approved and published (`093dcb1f`).
+Task 1b.5 / checkpoint 1S is local on Linux at `#pistas`, awaiting review before publication or
+1b.6. The final handover supersedes historical local-only notes. Diego's 1S review explicitly
+preserves the current Listen play essence (halo, layers and progress ring) and seek trail,
+adapted to V3 with 1–2 px strokes; see DS §5.5.
 
 
 Scope: Admin (`app/ui`), Listen (`app/listen`, which also ships as Capacitor iOS/Android and inside the

@@ -1,6 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { CrateIcon } from "@crate/ui/icons";
-import { Music } from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
 import type { MediaImageShape } from "./MediaEntity";
 
@@ -41,13 +40,13 @@ export function MediaCover({
       : null;
 
   const baseClasses = cn(
-    "overflow-hidden bg-text-primary/5",
+    "crate-media-cover overflow-hidden",
     shapeClass(shape),
     className,
   );
 
   if (!imageSrc) {
-    const Icon = fallbackIcon ?? Music;
+    const Icon = fallbackIcon;
     const hasCustomFallback =
       fallback !== undefined && fallback !== null && fallback !== false;
 
@@ -60,17 +59,22 @@ export function MediaCover({
       >
         {hasCustomFallback ? (
           typeof fallback === "string" || typeof fallback === "number" ? (
-            <span
-              aria-hidden="true"
-              className="text-sm font-semibold uppercase text-text-muted"
-            >
+            <span aria-hidden="true" className="crate-media-initials">
               {fallback}
             </span>
           ) : (
             fallback
           )
+        ) : Icon ? (
+          <Icon
+            aria-hidden="true"
+            size={iconSize}
+            className="text-text-muted"
+          />
         ) : (
-          <Icon size={iconSize} className="text-text-primary/25" />
+          <span aria-hidden="true" className="crate-media-initials">
+            {initials(alt)}
+          </span>
         )}
       </div>
     );
@@ -100,4 +104,14 @@ function shapeClass(shape: MediaImageShape): string {
   if (shape === "circle") return "rounded-full";
   if (shape === "rounded") return "rounded-2xl";
   return "rounded-lg";
+}
+
+function initials(value: string): string {
+  const words = value.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "—";
+  return (
+    words.length === 1
+      ? Array.from(words[0]!).slice(0, 2).join("")
+      : `${Array.from(words[0]!)[0]}${Array.from(words[words.length - 1]!)[0]}`
+  ).toUpperCase();
 }

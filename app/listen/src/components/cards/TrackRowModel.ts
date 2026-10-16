@@ -41,6 +41,7 @@ export interface TrackRowData {
   path?: string;
   track_number?: number;
   format?: string;
+  explicit?: boolean;
   bitrate?: number | null;
   sample_rate?: number | null;
   bit_depth?: number | null;
@@ -156,9 +157,9 @@ function resolveTrackRowState(
 
   const hasLinkActions = Boolean(
     track.artist_id != null ||
-      track.global_artist_uid ||
-      track.album_id != null ||
-      track.global_album_uid,
+    track.global_artist_uid ||
+    track.album_id != null ||
+    track.global_album_uid,
   );
 
   return {

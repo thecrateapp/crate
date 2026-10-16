@@ -13,7 +13,7 @@ const apiMocks = vi.hoisted(() => ({
   resolveMaybeApiAssetUrl: vi.fn((url: string | null | undefined) =>
     url?.startsWith("/api/")
       ? `https://api.example.test${url}&token=native-token`
-      : url ?? null,
+      : (url ?? null),
   ),
 }));
 
@@ -124,7 +124,7 @@ describe("AlbumCard", () => {
 
     expect(
       screen.getByRole("button", { name: "Add to collection" }),
-    ).toHaveClass("shadow-icon-control");
+    ).not.toHaveClass("shadow-icon-control");
     const image = screen.getByAltText("Inlet");
     expect(image).toHaveAttribute("sizes");
     expect(image.getAttribute("srcset")).toMatch(/size=160[^,]* 160w/);

@@ -1943,5 +1943,7 @@
   "actions.playlist.unfollow": "Smetti di seguire la playlist",
   "playlist.toasts.followed": "Ora segui {name}.",
   "playlist.toasts.unfollowed": "Non segui più {name}.",
-  "actions.confirmation.eyebrow": "Conferma"
+  "actions.confirmation.eyebrow": "Conferma",
+  "trackRow.explicit": "Esplicito",
+  "trackRow.via": "via {node}"
 }

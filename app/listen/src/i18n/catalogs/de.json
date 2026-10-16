@@ -1943,5 +1943,7 @@
   "actions.playlist.unfollow": "Playlist nicht mehr folgen",
   "playlist.toasts.followed": "Du folgst jetzt {name}.",
   "playlist.toasts.unfollowed": "Du folgst {name} nicht mehr.",
-  "actions.confirmation.eyebrow": "Bestätigung"
+  "actions.confirmation.eyebrow": "Bestätigung",
+  "trackRow.explicit": "Explizit",
+  "trackRow.via": "über {node}"
 }

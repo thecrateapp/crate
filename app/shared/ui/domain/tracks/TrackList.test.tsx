@@ -47,6 +47,7 @@ describe("TrackList", () => {
       />,
     );
 
+    expect(screen.getByTestId("track-list")).toHaveClass("crate-track-list");
     expect(screen.getByText("1. Track 1")).toBeInTheDocument();
     expect(screen.getByText("3. Track 3")).toBeInTheDocument();
     expect(screen.queryByTestId("virtual-list")).not.toBeInTheDocument();

@@ -27,8 +27,6 @@ const UNUSED_EXPORT_ALLOWLIST: Record<string, string> = {
     "Building block rendered inside EntityCard and EntityRow.",
   "domain/media":
     "Barrel over MediaCover and MediaEntity for entity components.",
-  "domain/media/MediaCover":
-    "Cover primitive rendered by EntityCard and EntityRow.",
   "domain/media/MediaEntity":
     "Entity model types consumed by MediaCover and the entity components.",
   "domain/user": "Barrel for the shared UserMenu.",

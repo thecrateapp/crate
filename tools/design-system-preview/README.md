@@ -409,3 +409,47 @@ actual card/row geometry, 8px field gaps, indicator delay/cancellation, reduced 
 or writes and the approved marker placement. Advisory `checkpoint-1r-{1440,390}.png` images
 are ignored local review material. Preserve all canonical 33 PNGs and the original 1M manifest.
 Stop at 1R for Diego's review; no commit/push or advance to 1b.5 is implied by marker approval.
+
+
+Diego approved complete 1R on 2026-10-16; published as `093dcb1f`. This supersedes the
+local-only stop above. The next stop is 1S, before another publication or 1b.6.
+
+## Track rows and media / Checkpoint 1S — local review
+
+Open <http://127.0.0.1:5186/#pistas>. Real TrackList, TrackRowContent/PlaybackControl,
+MediaGrid, EntityCard, MediaCover, PlayButton and table recipes use fictional data/actions.
+The active Listen play preserves its halo/layers/advancing ring. The actual PlayerSeekBar
+retains its luminous trail, with a 2 px comfortable / 1 px compact stroke and 40/44 px interaction
+area. Both follow the same local demonstration clock; no audio, library request or saved setting.
+Try play/pause, seeking by pointer/keyboard, density, like and menus. Earlier specimens remain.
+
+The Admin specimen demonstrates the actual shared table recipe with sample actions; it does
+not mount the management controller or invent a player. Production TrackTable retains its real
+permissions, mutations, download/lyrics/retry and analysis popovers. Columns drop at 1000/760 px.
+Narrow row containers preserve title and controls before hiding optional metadata. Artist circles
+and native artwork behavior remain. Existing numeric/analysis data and initials fill missing art.
+
+Scoped browser checks:
+
+```bash
+npm run design-system:preview:test -- tracks-checkpoint.spec.ts states-checkpoint.spec.ts --workers=1
+```
+
+They cover 1440/390 px, narrow 300/360 px rows, coarse 1024 px menus, typography, real 8 px form gaps,
+1–2 px seek/2 px ring, active bar, keyboard/scrub/advance/pause/motion/effects, sticky/numeric table,
+no overflow or API/storage writes. Advisory PNGs stay ignored beneath `.artifacts/design-system-preview/`.
+Preserve all 33 canonical 1M PNGs and manifest. Final checks/budgets and unresolved pin/native QA are
+in the main handover. Stop at 1S for Diego; no 1S commit/push or 1b.6 is authorised yet.
+
+
+1S review follow-up: the seek head and beam now share the same motion timing. Two browser
+regressions sample their rendered positions throughout forward/backward seeks, pointer drag and
+live demonstration ticks at 1440/390 px; both head variants remain within 0.75 px of the beam end.
+Reduced motion removes movement transitions from both. Keep this correction local for 1S review.
+
+
+Latest 1S review correction supersedes the equal-timing fix above: natural uninterrupted dragging
+still separated the independently animated head and beam. `PlayerProgressBeam` now owns one moving
+edge in both real player consumers. The point is 4 px idle / 6 px engaged, the trail envelope 8 px,
+and the core stays 1–2 px. The two regressions now sample real rAF frames during continuous forward,
+reverse and repeated drags, seeks and live ticks without pausing or changing animation clocks.

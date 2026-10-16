@@ -32,8 +32,7 @@ export interface EntityCardClassNames {
 }
 
 export interface EntityCardProps
-  extends EntityPrimaryActionProps,
-    EntityMenuProps {
+  extends EntityPrimaryActionProps, EntityMenuProps {
   title: string;
   subtitle?: ReactNode;
   meta?: ReactNode;
@@ -69,7 +68,7 @@ const MENU_BUTTON_CLASS_NAME: Record<
 };
 
 const FOLLOW_BUTTON_CLASS_NAME =
-  "pointer-events-auto size-10 rounded-full border border-border-subtle bg-surface-icon-control shadow-icon-control backdrop-blur-md hover:-translate-y-px";
+  "pointer-events-auto size-10 rounded-full border border-border-subtle bg-surface-canvas";
 
 function followRevealClassName(following: boolean) {
   return following
@@ -121,7 +120,7 @@ function EntityCardOverlayControls({
   const circle = shape === "circle";
   const playButton = onPlay ? (
     <PlayButton
-      size="md"
+      size="sm"
       reveal={circle ? "always" : "hover"}
       playing={overlay.playing}
       loading={overlay.loading}
@@ -151,7 +150,7 @@ function EntityCardOverlayControls({
       {circle ? (
         <div
           data-slot="entity-overlay-controls"
-          className="flex items-center justify-center gap-2 transition-[transform,opacity] pointer-fine:translate-y-2 pointer-fine:opacity-0 pointer-fine:group-hover/card:translate-y-0 pointer-fine:group-hover/card:opacity-100 pointer-fine:group-focus-within/card:translate-y-0 pointer-fine:group-focus-within/card:opacity-100"
+          className="flex items-center justify-center gap-2 transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover/card:opacity-100 pointer-fine:group-focus-within/card:opacity-100"
         >
           {playButton}
           {follow ? (
@@ -220,7 +219,7 @@ export const EntityCard = memo(function EntityCard({
   return (
     <article
       className={cn(
-        "item-action-target group/card relative snap-start rounded-xl text-left transition-colors",
+        "crate-entity-card item-action-target group/card relative snap-start rounded-xl text-left transition-colors",
         layout === "grid"
           ? "w-full min-w-0"
           : cn("shrink-0", compact ? "w-[120px]" : "w-[160px]"),
@@ -244,16 +243,14 @@ export const EntityCard = memo(function EntityCard({
         current={selected}
         className={cn(
           "group block w-full rounded-xl text-left transition-colors disabled:cursor-not-allowed disabled:hover:bg-transparent",
-          centered
-            ? "p-0"
-            : "p-[var(--content-card-padding)] hover:bg-text-primary/5",
+          centered ? "p-0" : "p-[var(--content-card-padding)]",
           classNames?.action,
         )}
       >
         <span
           data-slot="entity-artwork"
           className={cn(
-            "relative mb-[var(--content-card-gap)] block aspect-square overflow-hidden bg-text-primary/5",
+            "relative mb-[var(--content-card-gap)] block aspect-square overflow-hidden bg-accent-action/16",
             SHAPE_RADIUS_CLASS_NAME[shape],
             classNames?.artwork,
           )}
@@ -277,7 +274,7 @@ export const EntityCard = memo(function EntityCard({
         >
           <span
             className={cn(
-              "block min-w-0 truncate text-sm font-medium text-text-primary",
+              "crate-entity-title block min-w-0 truncate text-sm font-medium text-text-primary",
               classNames?.title,
             )}
           >
@@ -296,7 +293,7 @@ export const EntityCard = memo(function EntityCard({
         {subtitle != null ? (
           <span
             className={cn(
-              "block truncate text-xs text-text-muted",
+              "crate-media-meta block truncate text-text-muted",
               centered && "text-center",
               classNames?.subtitle,
             )}
@@ -307,7 +304,7 @@ export const EntityCard = memo(function EntityCard({
         {meta != null ? (
           <span
             className={cn(
-              "block truncate text-xs tabular-nums text-text-muted",
+              "crate-media-meta block truncate tabular-nums text-text-muted",
               centered && "text-center",
               classNames?.meta,
             )}

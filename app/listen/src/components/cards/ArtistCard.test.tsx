@@ -351,11 +351,16 @@ describe("ArtistCard", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders the editorial variant as a larger circular tile", () => {
+  it("renders the editorial variant as a larger circular tile with the shared title scale", () => {
     renderWithListenProviders(
       <ArtistCard variant="editorial" name="Dredg" artistId={1} />,
     );
 
+    expect(screen.getByText("Dredg")).toHaveClass("text-sm", "font-medium");
+    expect(screen.getByText("Dredg")).not.toHaveClass(
+      "text-base",
+      "font-semibold",
+    );
     expect(screen.getByAltText("Dredg")).toHaveAttribute("sizes", "156px");
     expect(screen.getByText("Dredg").closest("article")).toHaveAttribute(
       "data-shape",
@@ -552,7 +557,7 @@ describe("ArtistCard", () => {
     resolveMaybeApiAssetUrlMock.mockImplementation((url) =>
       url?.startsWith("/api/")
         ? `https://api.example.test${url}&token=desktop-token`
-        : url ?? null,
+        : (url ?? null),
     );
 
     renderWithListenProviders(
@@ -675,7 +680,7 @@ describe("ArtistCard", () => {
     resolveMaybeApiAssetUrlMock.mockImplementation((url) =>
       url?.startsWith("/api/")
         ? `https://api.example.test${url}&media_ticket=menu-ticket`
-        : url ?? null,
+        : (url ?? null),
     );
 
     renderWithListenProviders(

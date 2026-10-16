@@ -189,11 +189,6 @@ export const ArtistCard = memo(function ArtistCard({
             )
           : RAIL_WIDTH_CLASS_NAME[sizeKey],
       )}
-      classNames={
-        variant === "editorial"
-          ? { title: "text-base font-semibold" }
-          : undefined
-      }
       artwork={
         <ArtistCardArtwork
           photoArtwork={model.photoArtwork}

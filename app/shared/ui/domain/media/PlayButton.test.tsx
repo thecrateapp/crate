@@ -12,10 +12,10 @@ describe("PlayButton", () => {
     expect(button).toHaveClass(
       "rounded-full",
       "bg-accent-action",
-      "shadow-action",
-      "size-11",
+      "crate-play-button",
+      "size-10",
     );
-    expect(button).not.toHaveClass("focus-visible:shadow-focus");
+    expect(button).not.toHaveClass("shadow-action", "hover:scale-105");
     expect(button).toHaveAttribute("data-state", "idle");
   });
 

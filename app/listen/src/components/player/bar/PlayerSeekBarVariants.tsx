@@ -1,7 +1,9 @@
-import type { CSSProperties, PointerEvent } from "react";
+import type { PointerEvent } from "react";
 import { useTranslation } from "react-i18next";
 
-import { formatPlayerTime } from "@/components/player/bar/player-bar-utils";
+import { formatPlayerTime } from "./player-bar-utils";
+
+import { PlayerProgressBeam } from "./PlayerProgressBeam";
 
 import type { SeekBarModel } from "./player-seek-bar-model";
 
@@ -147,40 +149,14 @@ export function GlowSeekBar({
           hoverTime={model.hoverTime}
           className="-top-6"
         />
-        <div
-          className={`listen-player-progress-track absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-full ${model.glowTrackClass}`}
-        />
-        <div
-          className="listen-player-progress-width-dynamic pointer-events-none absolute left-0 top-1/2 h-3 overflow-hidden rounded-full opacity-65"
-          style={model.glowWidthStyle}
-        >
-          <div className="listen-player-progress-glow absolute inset-0 blur-[3px]" />
-          <div className="listen-player-progress-fill absolute inset-y-[5px] inset-x-0 rounded-full" />
-        </div>
-        <div
-          className={`listen-player-progress-fill listen-player-progress-width-dynamic absolute left-0 top-1/2 rounded-full ${model.glowTrackClass}`}
-          style={model.glowWidthStyle}
-        />
-        <div
-          className={`listen-player-progress-thumb listen-player-progress-left-dynamic pointer-events-none absolute top-1/2 size-2 -translate-y-1/2 rounded-full transition-opacity duration-150 ${
-            model.progress > 0 ? "opacity-[0.62]" : "opacity-0"
-          }`}
-          style={{
-            ...model.glowLeftStyle,
-          }}
-        />
-        <div
-          className="listen-player-progress-thumb-active listen-player-progress-left-active-dynamic absolute top-1/2 size-2.5 -translate-y-1/2 rounded-full border opacity-0 transition-opacity duration-150 group-hover:opacity-100"
-          style={
-            {
-              "--progress-left": `calc(${model.progress}% - 5px)`,
-            } as CSSProperties
-          }
+        <PlayerProgressBeam
+          progressPercent={model.progress}
+          trackClassName={model.glowTrackClass}
         />
         <SeekInput
           model={model}
           disabled={disabled}
-          className="absolute inset-x-0 top-1/2 h-8 -translate-y-1/2 cursor-pointer opacity-0 disabled:cursor-default"
+          className="listen-player-progress-input absolute inset-0 w-full cursor-pointer opacity-0 disabled:cursor-default"
         />
       </div>
     </SeekBarFrame>

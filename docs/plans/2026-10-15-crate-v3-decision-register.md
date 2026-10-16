@@ -538,3 +538,54 @@ Diego questioned the yellow dot beside the large page error title: “puede que 
 identificador visual, pero no ahi”. Move it into the eyebrow beside `Error de servicio · 503`;
 he confirmed “pefecto, ese es su sitio”. This approves that placement, not the whole 1R checkpoint.
 Keep the title clean; compact error text still uses the shared warning state treatment.
+
+
+### Checkpoint 1R publication / 1S local review — 2026-10-16
+
+Diego approved complete 1R and authorised commit/push and continuation to Task 1b.5, keeping
+:5186 active and stopping at 1S. Published `093dcb1fbfe67d1f994ee49e27aefd802d258c54`;
+remote verified. This supersedes the earlier local-only 1R stop and marker-only approval.
+
+1S applies DS §5.5 to shared lists/grids/covers/play, Listen row/card foundations and Admin's
+existing management TrackTable. Admin has no player capability here; do not invent playback.
+Preserve selection, virtualization, offline/remote/native artwork pipelines and action controllers.
+Metadata uses supplied analysis/quality/explicit/provenance, never fabricated values. Container
+queries hide lower-priority metadata before narrow queue/recommendation titles collapse.
+
+During review Diego required the current Listen play button's essence: halo, layers and a ring
+that advances with playback. This explicitly supersedes the author's initial flat-control
+interpretation. Restore the progress leaf and original visual structure, adapted to shared V3
+tokens with a 2 px ring. Only that leaf subscribes to ticks. Diego also retained the current
+player's luminous seek trail, made finer: horizontal GlowSeekBar is 2 px (thin 1 px), with native
+keyboard/scrubbing and broad touch targets. Production and mockup reuse the actual local control
+and CSS. Respect motion/effects preferences. No global player redesign follows from this scope.
+
+Pinned site object `258bbaee` is unavailable on this Linux clone even after fetching feat/website;
+GitHub commit lookup returns 422. Preserve the pin, use the explicit DS contract and report this
+fidelity limit; never substitute current website HEAD or vnext. Stop at 1S before publication or
+1b.6. The existing 33 canonical PNGs and 1M manifest, Linux comparisons, native QA and phase-close
+validation remain separate.
+
+
+### 1S review correction — attached seek head, 2026-10-16
+
+Diego observed the progress head moving separately from the luminous beam. The beam animated
+its transform for 150 ms while both head variants changed left position immediately. Keep their
+existing appearance and geometry, but share the same duration/easing through `motion-duration-fast`.
+Reduced motion must suppress movement transitions on both beam and heads. This is a local 1S
+bugfix, not checkpoint approval or authorisation to publish or continue to 1b.6.
+
+
+### 1S review correction — one moving beam edge and smaller head, 2026-10-16
+
+Diego confirmed the continuous drag still detached the head, clarifying that the beam advanced
+before the point. He also requested a smaller point and a matching beam. This supersedes the
+previous equal-duration/easing fix: use a single app-local PlayerProgressBeam in both the native
+range seek control and desktop PlayerBarProgress. One absolute moving edge owns the fill, trail
+and both head variants; no head has its own positional animation. Keep 1–2 px core strokes,
+reduce the head to 4 px idle / 6 px engaged, with an 8 px trail envelope and proportionate glow.
+The interaction area remains 40/44 px. Preserve existing seek, Jam and keyboard controllers.
+
+Natural rAF sampling during uninterrupted/reversing dragging reproduced the old separation.
+The earlier test artificially aligned animation times and missed it; replace that test with
+observations of actual frames. These corrections stay local at 1S, pending Diego's review.

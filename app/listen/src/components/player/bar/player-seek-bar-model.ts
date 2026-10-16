@@ -6,7 +6,7 @@ import type {
   SyntheticEvent,
 } from "react";
 
-import { formatPlayerTime } from "@/components/player/bar/player-bar-utils";
+import { formatPlayerTime } from "./player-bar-utils";
 
 export interface SeekBarModel {
   safeDuration: number;
@@ -17,8 +17,6 @@ export interface SeekBarModel {
   trackRef: RefObject<HTMLDivElement | null>;
   sliderStyle: CSSVariableStyle;
   glowTrackClass: string;
-  glowWidthStyle: CSSVariableStyle;
-  glowLeftStyle: CSSVariableStyle;
   beginScrubbing: () => void;
   endScrubbing: () => void;
   handleHover: (event: PointerEvent<HTMLDivElement>) => void;
@@ -101,9 +99,7 @@ export function useSeekBarModel(
     hoverTime,
     trackRef,
     sliderStyle,
-    glowTrackClass: thin ? "h-[3px]" : "h-1",
-    glowWidthStyle: { "--progress-scale": `${progress / 100}` },
-    glowLeftStyle: { "--progress-left": `calc(${progress}% - 4px)` },
+    glowTrackClass: thin ? "h-px" : "h-0.5",
     beginScrubbing,
     endScrubbing,
     handleHover,

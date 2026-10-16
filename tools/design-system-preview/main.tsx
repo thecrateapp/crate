@@ -77,6 +77,7 @@ import "./style.css";
 import { FormsCheckpoint } from "./forms-checkpoint";
 import { SelectionCheckpoint } from "./selection-checkpoint";
 import { TabsCheckpoint } from "./tabs-checkpoint";
+import { TracksCheckpoint } from "./tracks-checkpoint";
 import { StatesCheckpoint } from "./states-checkpoint";
 
 applyCrateIdentity();
@@ -1624,6 +1625,7 @@ function App() {
       <SelectionCheckpoint />
       <TabsCheckpoint />
       <StatesCheckpoint />
+      <TracksCheckpoint />
       <AppModal
         open={sampleModalOpen}
         onClose={() => setSampleModalOpen(false)}
@@ -1700,7 +1702,8 @@ function App() {
             "1O publicado",
             "1P publicado",
             "1Q publicado",
-            "1R en revisión",
+            "1R publicado",
+            "1S publicado",
           ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>

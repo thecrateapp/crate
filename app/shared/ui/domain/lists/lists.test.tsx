@@ -59,7 +59,7 @@ describe("lists", () => {
       const grid = container.firstChild as HTMLElement;
       expect(grid).toHaveStyle("--media-grid-min: 200px");
       expect(grid).toHaveStyle(
-        "grid-template-columns: repeat(auto-fill, minmax(var(--media-grid-min), 1fr))",
+        "grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--media-grid-min)), 1fr))",
       );
       expect(grid).not.toHaveAttribute("data-density");
     });

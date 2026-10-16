@@ -1,0 +1,93 @@
+/* Listen seek control: the existing luminous trail, with a 1–2 px V3 stroke. */
+.listen-player-progress-track {
+  background: var(--surface-quiet);
+}
+
+.listen-player-progress-position {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  /* Children share this edge; they never animate their positions independently. */
+  transition: width var(--motion-duration-fast);
+}
+
+.listen-player-seek-input {
+  accent-color: var(--accent-action);
+  background: linear-gradient(
+    90deg,
+    var(--accent-action) 0%,
+    var(--accent-action) var(--seek-progress),
+    var(--surface-quiet) var(--seek-progress),
+    var(--surface-quiet) 100%
+  );
+}
+
+.listen-player-progress-glow {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-action) 0%, transparent) 0%,
+    color-mix(in srgb, var(--accent-action) 8%, transparent) 44%,
+    color-mix(in srgb, var(--accent-action) 28%, transparent) 82%,
+    color-mix(in srgb, var(--accent-action) 55%, var(--text-primary)) 100%
+  );
+}
+
+.listen-player-progress-fill {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-action) 14%, transparent),
+    color-mix(in srgb, var(--accent-action) 56%, transparent),
+    color-mix(in srgb, var(--accent-action) 78%, var(--text-primary))
+  );
+}
+
+.listen-player-progress-thumb {
+  background: var(--control-thumb);
+  box-shadow:
+    0 0 3px color-mix(in srgb, var(--accent-action) 62%, transparent),
+    0 0 6px color-mix(in srgb, var(--accent-action) 34%, transparent);
+}
+
+.listen-player-progress-thumb-active {
+  border-color: color-mix(in srgb, var(--accent-action) 80%, transparent);
+  background: var(--control-thumb);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--accent-action) 14%, transparent);
+}
+
+.listen-player-progress-tooltip {
+  border-color: var(--border-quiet);
+  background: var(--surface-overlay);
+  color: var(--text-primary);
+}
+
+.listen-player-progress {
+  min-height: 40px;
+}
+.listen-player-progress-input {
+  height: 100%;
+}
+.listen-player-progress:has(input:focus-visible) {
+  outline: 2px solid var(--accent-action-hi);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+[data-crate-effects="off"] .listen-player-progress-trail {
+  display: none;
+}
+[data-crate-effects="off"] .listen-player-progress-thumb,
+[data-crate-effects="off"] .listen-player-progress-thumb-active {
+  box-shadow: none;
+}
+@media (pointer: coarse) {
+  .listen-player-progress {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .listen-player-progress-position,
+  .listen-player-progress-thumb,
+  .listen-player-progress-thumb-active {
+    transition: none;
+  }
+}

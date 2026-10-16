@@ -14,11 +14,11 @@ const ICON_IMPORT =
 const DYNAMIC_ICON = /^(?:[A-Z]\w*)?Icon$/;
 
 const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
+  "components/cards/TrackRowPlaybackControl.tsx": { [ORGANIC_BLOB_RADIUS]: 1 },
   "components/album/ReleaseCountdown.tsx": {
     "tracking-[-0.075em]": 1,
     "tracking-[0.13em]": 1,
   },
-  "components/cards/TrackRowParts.tsx": { [ORGANIC_BLOB_RADIUS]: 1 },
   "components/dev/TauriDevLogPanel.tsx": {
     "text-[0.65rem]": 1,
     "text-[0.68rem]": 1,

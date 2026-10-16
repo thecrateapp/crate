@@ -52,11 +52,11 @@ export function TrackList<T>({
       aria-labelledby={labelledBy}
       data-testid="track-list"
       data-virtualized={virtualized || undefined}
-      className={cn("min-w-0", className)}
+      className={cn("crate-track-list min-w-0", className)}
     >
       {header && !isEmpty ? header : null}
       {isEmpty ? (
-        empty ?? null
+        (empty ?? null)
       ) : virtualized && VirtualList ? (
         <VirtualList
           items={items}

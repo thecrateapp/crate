@@ -1,7 +1,7 @@
 # Crate v3 design system
 
-Current implementation: checkpoints through 1Q are published (`e863c227`); Task 1b.4 / 1R
-is local on Linux at `#estados`, awaiting Diego's review. Later publication remains gated.
+Current implementation: checkpoints through 1R are approved and published (`093dcb1f`);
+Task 1b.5 / 1S is local on Linux at `#pistas`, awaiting Diego's review before publication or 1b.6.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
 `/Users/diego/Code/crate-v3`, branch `feat/crate_v3`. The handover owns implementation/QA status.
@@ -9,7 +9,7 @@ Registry and harness references predating Task 1.13 are historical; current cons
 single-identity equivalents without recreating retired exports.
 Historical reports retain their original measurements; they do not certify current test results.
 The single Crate v3 identity is published through Task 1.13 / Checkpoint 1M (`21873d24`).
-Task 1b.4 / Checkpoint 1R is in local review; later checkpoint publication remains gated.
+Task 1b.5 / Checkpoint 1S is in local review; later checkpoint publication remains gated.
 
 Visual source of truth: the new site only, `app/web` at the approved git reference:
 
@@ -3702,12 +3702,25 @@ Listen (`components/layout/*`):
   | actions. Index swaps to a play glyph on hover or focus; playing row = active bar plus title in
   accent hi; trailing mono `124 · 8A` on desktop from data already in the row; quality and explicit
   flags as mono tags; remote items carry `via <node>` (5.13); duration tabular, never re-rendered per
-  tick.
+  tick. The active Listen control retains its existing layered play/pause, halo and advancing
+  circular progress ring, using V3 semantic colours and a 2 px ring. Only the active progress
+  leaf subscribes to playback ticks; rows/lists and the duration do not. Diego explicitly retained
+  this essence during 1S review (2026-10-16), superseding the initial flat-control interpretation.
+- Playback seek: preserve the current luminous gradient trail. Horizontal glow tracks are 2 px,
+  or 1 px with `thin`; keep 40 px fine / 44 px coarse interaction areas, native range keyboard
+  behavior, scrubbing and disabled/Jam handling. Respect reduced motion and effects-off without
+  losing the current position. Beam and both head variants share one moving edge, through the
+  app-local `PlayerProgressBeam`; never position or animate them independently. The head is 4 px
+  idle / 6 px on interaction, with an 8 px glow envelope and a restrained halo proportional to it.
+  Only the common edge animates (`motion-duration-fast`); reduced motion disables that movement.
+  Validate uninterrupted, reversing pointer drags with natural frame sampling, never by manually
+  aligning animation clocks. This scoped 1S review amendment does not redesign other players.
 - Media grid and rail (`MediaGrid`, `MediaRail`, `EntityCard`, `MediaCover`): square covers without
   shadow, 1 px inset hairline (`ring-1 ring-inset ring-border-quiet`), title sans 14/500 truncated,
   meta mono 10.5 px (`2019 · LP`); hover: hairline to `accent-action-hi/40`, title to accent hi, no
   lift or scale; play overlay = 40 px accent disc on hover or focus; placeholder `accent-action/16`
-  with mono initials.
+  with mono initials. Existing artist circles and native artwork auth/retry/srcset remain.
+  Container-aware row metadata yields to title/actions in narrow queues and recommendation cards.
 
 ### 5.6 Forms
 

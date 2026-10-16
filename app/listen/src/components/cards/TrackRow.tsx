@@ -1,3 +1,8 @@
+import { TrackRowContent } from "./TrackRowContent";
+import {
+  formatTrackAnalysis,
+  formatTrackQuality,
+} from "@crate/ui/lib/track-meta";
 import { memo, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
@@ -62,6 +67,16 @@ export const TrackRow = memo(function TrackRow({
   });
   const isActive = isActiveOverride ?? currentTrack?.id === model.playbackId;
   const compact = density === "compact";
+  const analysis = formatTrackAnalysis(
+    track.bpm,
+    track.audio_key,
+    track.audio_scale,
+  );
+  const quality = formatTrackQuality(
+    track.format,
+    track.bit_depth,
+    track.sample_rate,
+  );
   const playback = useTrackRowPlayback({
     disabled: model.disabled,
     isActive,
@@ -82,9 +97,10 @@ export const TrackRow = memo(function TrackRow({
   return (
     <div
       className={cn(
-        "item-action-target group track-row flex items-center gap-[var(--content-row-gap)] rounded-lg transition-colors",
+        "item-action-target group track-row flex items-center gap-[var(--content-row-gap)] transition-colors",
         compact ? "px-2 py-1.5" : "px-3 py-[var(--content-row-padding-y)]",
       )}
+      aria-current={isActive ? "true" : undefined}
       data-active={isActive}
       data-density={density}
       data-disabled={model.disabled}
@@ -130,94 +146,100 @@ export const TrackRow = memo(function TrackRow({
           : undefined
       }
     >
-      {rank != null ? (
-        <span className="w-6 shrink-0 text-right text-xs tabular-nums text-text-muted">
-          {rank}
-        </span>
-      ) : null}
-      <TrackRowLeadingControl
-        compact={compact}
-        cover={model.cover}
-        disabled={model.disabled}
-        index={index}
-        isActive={isActive}
-        isPlaying={isPlaying}
-        playControlLabel={playback.playControlLabel}
-        showCoverThumb={showCoverThumb}
-        trackNumber={track.track_number}
-        onClick={handlePlayControlClick}
-      />
-
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-[var(--content-row-inline-gap)]">
-          <div
-            className={cn(
-              "min-w-0 truncate text-sm",
-              isActive ? "font-medium text-accent-action" : "text-text-primary",
-            )}
-          >
-            {track.title || t("trackRow.unknownTitle")}
-          </div>
-          {!model.isRemote ? (
-            <OfflineBadge
-              state={model.offlineState}
-              compact
-              subtle
-              className="shrink-0"
+      <TrackRowContent
+        rank={rank}
+        leading={
+          <TrackRowLeadingControl
+            compact={compact}
+            cover={model.cover}
+            disabled={model.disabled}
+            index={index}
+            isActive={isActive}
+            isPlaying={isPlaying}
+            playControlLabel={playback.playControlLabel}
+            showCoverThumb={showCoverThumb}
+            trackNumber={track.track_number}
+            onClick={handlePlayControlClick}
+          />
+        }
+        title={track.title || t("trackRow.unknownTitle")}
+        titleAccessory={
+          <>
+            {!model.isRemote ? (
+              <OfflineBadge
+                state={model.offlineState}
+                compact
+                subtle
+                className="shrink-0"
+              />
+            ) : null}
+            {model.disabled ? (
+              <CrateBadge icon={Clock} tone="neutral">
+                {t("trackRow.soon")}
+              </CrateBadge>
+            ) : null}
+          </>
+        }
+        details={
+          <TrackRowDetails
+            globalAlbumUid={track.global_album_uid}
+            globalArtistUid={track.global_artist_uid}
+            navigate={navigate}
+            offlineLabel={model.offlineLabel}
+            offlineState={model.offlineState}
+            showAlbum={showAlbum}
+            showArtist={showArtist}
+            track={track}
+          />
+        }
+        meta={meta}
+        quality={quality}
+        analysis={analysis}
+        explicitLabel={track.explicit ? t("trackRow.explicit") : undefined}
+        provenance={
+          model.isRemote && (track.node_name || track.node_uid) ? (
+            <>
+              {track.availability?.stale ||
+              track.availability?.healthy === false ? (
+                <span aria-hidden="true" className="crate-track-source-ring" />
+              ) : null}
+              {t("trackRow.via", { node: track.node_name || track.node_uid })}
+            </>
+          ) : undefined
+        }
+        duration={
+          showDuration && track.duration != null && track.duration > 0
+            ? formatDuration(track.duration)
+            : undefined
+        }
+        like={
+          showLike ? (
+            <TrackRowLikeControl
+              hasTrackRef={model.hasTrackRef}
+              liked={model.liked}
+              toggleTrackLike={toggleTrackLike}
+              track={track}
             />
-          ) : null}
-          {model.disabled ? (
-            <CrateBadge icon={Clock} tone="neutral">
-              {t("trackRow.soon")}
-            </CrateBadge>
-          ) : null}
-        </div>
-        <TrackRowDetails
-          globalAlbumUid={track.global_album_uid}
-          globalArtistUid={track.global_artist_uid}
-          navigate={navigate}
-          offlineLabel={model.offlineLabel}
-          offlineState={model.offlineState}
-          showAlbum={showAlbum}
-          showArtist={showArtist}
-          track={track}
-        />
-        {meta != null ? (
-          <div className="truncate text-xs tabular-nums text-text-muted">
-            {meta}
-          </div>
-        ) : null}
-      </div>
-
-      {showDuration && track.duration != null && track.duration > 0 && (
-        <span className="text-text-muted shrink-0 text-xs tabular-nums">
-          {formatDuration(track.duration)}
-        </span>
-      )}
-
-      {showLike ? (
-        <TrackRowLikeControl
-          hasTrackRef={model.hasTrackRef}
-          liked={model.liked}
-          toggleTrackLike={toggleTrackLike}
-          track={track}
-        />
-      ) : null}
-      <TrackRowActions
-        actionMenu={model.actionMenu}
-        compact={compact}
-        cover={model.cover}
-        extraActions={extraActions}
-        onActionMenuOpen={onActionMenuOpen}
-        onAddToPlaylist={onAddToPlaylist}
-        onCreatePlaylist={onCreatePlaylist}
-        onPlayOverride={onPlayOverride}
-        onSelectionActionMenuOpen={onSelectionActionMenuOpen}
-        playlistOptions={playlistOptions}
-        selectable={selectable}
-        selected={selected}
-        showLocalActions={model.showLocalActions}
-        track={track}
+          ) : null
+        }
+        actions={
+          <TrackRowActions
+            actionMenu={model.actionMenu}
+            compact={compact}
+            cover={model.cover}
+            extraActions={extraActions}
+            onActionMenuOpen={onActionMenuOpen}
+            onAddToPlaylist={onAddToPlaylist}
+            onCreatePlaylist={onCreatePlaylist}
+            onPlayOverride={onPlayOverride}
+            onSelectionActionMenuOpen={onSelectionActionMenuOpen}
+            playlistOptions={playlistOptions}
+            selectable={selectable}
+            selected={selected}
+            showLocalActions={model.showLocalActions}
+            track={track}
+          />
+        }
       />
     </div>
   );

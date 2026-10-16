@@ -1943,5 +1943,7 @@
   "actions.playlist.unfollow": "Utzi playlistari jarraitzeari",
   "playlist.toasts.followed": "Orain {name} jarraitzen duzu.",
   "playlist.toasts.unfollowed": "Jada ez duzu {name} jarraitzen.",
-  "actions.confirmation.eyebrow": "Berrespena"
+  "actions.confirmation.eyebrow": "Berrespena",
+  "trackRow.explicit": "Esplizitua",
+  "trackRow.via": "{node} bidez"
 }
