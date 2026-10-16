@@ -54,7 +54,8 @@ def test_instance_evidence_accepts_legacy_naive_iso_timestamps(monkeypatch):
 
     assert result["availability"] == "available"
     assert all(
-        source["availability"] == "available" for source in result["data"].values()
+        result["data"][source]["availability"] == "available"
+        for source in ("library", "worker", "analysis")
     )
 
 

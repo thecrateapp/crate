@@ -1025,6 +1025,9 @@ could read the payload from an older PostgreSQL snapshot and start the same effe
 finish now lock the task in a separate statement before reading the payload. The 31-case
 repair-preparation file passed with PostgreSQL, and its concurrent-delivery test now starts
 both attempts behind a barrier.
+The next shard exposed two stale test assertions: the shared lazy handler group now also
+catalogs `agent_control`, and instance status contains a `readiness` map alongside the three
+availability-bearing evidence sources. Both tests now assert those contracts explicitly.
 
 The phase-6 focused selection passed **37 PostgreSQL-backed cases** across the editorial plan,
 MCP, migration, rule, refinement and override files. These cover migration/bootstrap, exact creation,

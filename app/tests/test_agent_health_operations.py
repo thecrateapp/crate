@@ -430,7 +430,7 @@ def test_agent_maintenance_runtime_is_lazy_governed_and_cannot_dispatch_from_tas
             group for group in worker._HANDLER_GROUPS if "agent_maintenance" in group[2]
         )
     )
-    assert list(registry) == ["agent_maintenance"]
+    assert set(registry) == {"agent_control", "agent_maintenance"}
     importer.assert_not_called()
     handler = registry["agent_maintenance"]
     assert handler(
