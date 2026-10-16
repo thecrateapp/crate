@@ -462,6 +462,8 @@ def apply_editorial_execution(execution: dict, *, session=None) -> dict:
             state = None
         validate_editorial_execution(execution, session=current)
         if kind == "visibility":
+            if playlist_id is None or state is None:
+                raise DiagnosticError("PLAN_STALE", "System playlist was not found")
             current.execute(
                 text("""UPDATE playlists SET is_active=:active,
                 updated_at=NOW() WHERE id=:id"""),
@@ -480,6 +482,8 @@ def apply_editorial_execution(execution: dict, *, session=None) -> dict:
                 "track_count": len(state["tracks"]),
             }
         if kind == "refresh_policy":
+            if playlist_id is None or state is None:
+                raise DiagnosticError("PLAN_STALE", "System playlist was not found")
             current.execute(
                 text("""UPDATE playlists SET auto_refresh_enabled=:enabled,
                 generation_epoch=generation_epoch+1,updated_at=NOW() WHERE id=:id"""),

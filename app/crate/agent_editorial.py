@@ -277,6 +277,8 @@ def compile_operation(
 ) -> dict:
     if operation != "editorial_change":
         raise DiagnosticError("INVALID_ARGUMENT", "Unsupported editorial operation")
+    if principal is None:
+        raise DiagnosticError("INVALID_ARGUMENT", "Editorial plan requires a principal")
     kind = parameters.get("kind")
     if kind == "visibility":
         if (
@@ -291,14 +293,23 @@ def compile_operation(
         if parameters.get("playlist_id")
         else None
     )
+    if state is None and kind != "create":
+        raise DiagnosticError("NOT_FOUND", "System playlist was not found")
+    source_state = (
+        state if state is not None else {"playlist": {}, "tracks": [], "exclusions": []}
+    )
     if (
         kind == "visibility"
-        and state["playlist"]["editorial_revision"] != parameters["expected_revision"]
+        and source_state["playlist"]["editorial_revision"]
+        != parameters["expected_revision"]
     ):
         raise DiagnosticError(
             "PLAN_STALE", "Playlist revision changed before publication preparation"
         )
-    if kind == "refresh_policy" and state["playlist"]["generation_mode"] != "smart":
+    if (
+        kind == "refresh_policy"
+        and source_state["playlist"]["generation_mode"] != "smart"
+    ):
         raise DiagnosticError(
             "INVALID_ARGUMENT", "Only smart playlists have refresh policy"
         )
@@ -322,7 +333,7 @@ def compile_operation(
     if kind == "regenerate" and mode != "smart":
         raise DiagnosticError("INVALID_ARGUMENT", "Only smart playlists can regenerate")
     if mode == "smart" and kind not in {"visibility", "refresh_policy"}:
-        if not rules:
+        if not isinstance(rules, dict) or not rules:
             raise DiagnosticError(
                 "INVALID_ARGUMENT", "Smart playlist rules are required"
             )
@@ -337,7 +348,7 @@ def compile_operation(
         description = original.get("description") or ""
     exclusions = set(parameters.get("exclude_track_uids") or [])
     existing_exclusions = (
-        {item["track_uid"] for item in state["exclusions"] if item["track_uid"]}
+        {item["track_uid"] for item in source_state["exclusions"] if item["track_uid"]}
         if state
         else set()
     )
@@ -350,12 +361,16 @@ def compile_operation(
     elif kind == "refine":
         selection = [
             item
-            for item in _existing_selection(state["tracks"])
+            for item in _existing_selection(source_state["tracks"])
             if item.get("track_uid") not in exclusions
         ]
     elif kind == "duplicate":
-        selection = _existing_selection(state["tracks"], duplicate=True)
+        selection = _existing_selection(source_state["tracks"], duplicate=True)
     elif mode == "smart":
+        if not isinstance(rules, dict):
+            raise DiagnosticError(
+                "INVALID_ARGUMENT", "Smart playlist rules are required"
+            )
         candidates = execute_smart_rules(rules)
         if isinstance(candidates, int):
             candidates = []
@@ -373,7 +388,7 @@ def compile_operation(
             _existing_selection(
                 [
                     row
-                    for row in state["tracks"]
+                    for row in source_state["tracks"]
                     if row["source"] != "generated" or row["locked"]
                 ]
             )
@@ -467,7 +482,7 @@ def compile_operation(
         "new_exclusion_fingerprints": {
             uid: resolved_exclusions[uid]["fingerprint"] for uid in new_exclusions
         },
-        "copied_exclusions": state["exclusions"] if kind == "duplicate" else [],
+        "copied_exclusions": source_state["exclusions"] if kind == "duplicate" else [],
         "is_active": True
         if kind in {"create", "duplicate"}
         else parameters.get("is_active", original.get("is_active")),
@@ -504,7 +519,7 @@ def compile_operation(
                 "name": name,
                 "track_count": len(selection)
                 if kind not in {"visibility", "refresh_policy"}
-                else len(state["tracks"]),
+                else len(source_state["tracks"]),
                 "description": description,
                 "generation_mode": mode,
                 "scope": original.get("scope", "system"),
@@ -549,13 +564,13 @@ def compile_operation(
         "new_exclusions": new_exclusions,
         "existing_exclusions": [
             {"track_uid": row["track_uid"], "global_track_uid": row["global_track_uid"]}
-            for row in state["exclusions"]
+            for row in source_state["exclusions"]
         ]
         if state
         else [],
         "copied_exclusions": [
             {"track_uid": row["track_uid"], "global_track_uid": row["global_track_uid"]}
-            for row in state["exclusions"]
+            for row in source_state["exclusions"]
         ]
         if kind == "duplicate"
         else [],
@@ -566,7 +581,7 @@ def compile_operation(
             "playlist_count": 1,
             "track_count": len(selection)
             if kind not in {"visibility", "refresh_policy"}
-            else len(state["tracks"]),
+            else len(source_state["tracks"]),
             "duration_seconds": sum(
                 float(item.get("duration") or 0) for item in selection
             ),
