@@ -21,9 +21,11 @@ export interface ShowConsolidation {
 }
 export function ShowConsolidationEditor({
   disabled,
+  onChange,
   onReview,
 }: {
   disabled: boolean;
+  onChange: () => void;
   onReview: (selection: ShowConsolidation) => void;
 }) {
   const [ids, setIds] = useState("");
@@ -33,6 +35,7 @@ export function ShowConsolidationEditor({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   async function load() {
+    onChange();
     const chosen = ids.split(",").map((value) => Number(value.trim()));
     if (
       chosen.length < 2 ||
@@ -86,6 +89,7 @@ export function ShowConsolidationEditor({
             onChange={(event) => {
               setIds(event.target.value);
               setRows([]);
+              onChange();
             }}
           />
         </label>
@@ -112,6 +116,7 @@ export function ShowConsolidationEditor({
                   setDuplicates((current) =>
                     current.filter((id) => id !== row.id),
                   );
+                  onChange();
                 }}
               />{" "}
               Keep this canonical show
@@ -121,13 +126,14 @@ export function ShowConsolidationEditor({
                 <input
                   type="checkbox"
                   checked={duplicates.includes(row.id)}
-                  onChange={(event) =>
+                  onChange={(event) => {
                     setDuplicates((current) =>
                       event.target.checked
                         ? [...current, row.id]
                         : current.filter((id) => id !== row.id),
-                    )
-                  }
+                    );
+                    onChange();
+                  }}
                 />{" "}
                 Transfer this duplicate
               </label>

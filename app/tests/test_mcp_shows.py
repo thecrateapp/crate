@@ -87,6 +87,71 @@ def test_show_catalog_has_closed_inputs_and_canonical_outcomes():
     )
 
 
+def test_structured_provider_alias_survives_reschedule_and_provider_sync(
+    show_world, monkeypatch
+):
+    from crate.db.tx import read_scope
+    from sqlalchemy import text
+    from crate.db.repositories.shows_ticketmaster_upserts import upsert_show
+
+    monkeypatch.setenv("CRATE_MCP_ENABLED", "true")
+    monkeypatch.setenv("CRATE_MCP_ACTIONS_ENABLED", "true")
+    principal = create_credential(
+        "Provider references",
+        ["curation.shows.read", "curation.shows.write"],
+        datetime.now(UTC) + timedelta(days=1),
+    ).principal
+    ids = []
+    for day in (2, 3):
+        queued = agent_shows.preview_shows_import(
+            principal,
+            candidates=items(
+                date=f"2027-03-0{day}",
+                source_provider="ticketmaster",
+                source_event_id="structured-event",
+            ),
+            idempotency_key=f"preview-{day}",
+        )["data"]
+        plan = execute(queued)["plan"]
+        assert plan["executable"] is True
+        if day == 3:
+            assert plan["changes"][0]["before"]["date"] == "2027-03-02"
+        queued = agent_shows.apply_shows_import(
+            principal,
+            plan_id=plan["plan_id"],
+            plan_version=plan["plan_version"],
+            idempotency_key=f"apply-{day}",
+        )["data"]
+        result = execute(queued)
+        assert result["verification"]["status"] == "passed", result
+        ids.append(result["execution"]["items"][0]["show_id"])
+    assert ids[0] == ids[1]
+    assert (
+        upsert_show(
+            "structured-event",
+            "External Band",
+            "2027-03-03",
+            venue="Sala Norte",
+            city="Madrid",
+        )
+        == ids[0]
+    )
+    with read_scope() as session:
+        assert session.execute(text("SELECT count(*) FROM shows")).scalar_one() == 1
+        assert (
+            session.execute(
+                text(
+                    "SELECT show_id FROM show_source_aliases WHERE event_id='structured-event'"
+                )
+            ).scalar_one()
+            == ids[0]
+        )
+        provenance = session.execute(
+            text("SELECT field_provenance FROM shows")
+        ).scalar_one()
+        assert provenance["date"]["provider"] == "mcp"
+
+
 def test_two_integrations_apply_competing_exact_previews_without_duplicate_events(
     show_world, monkeypatch
 ):

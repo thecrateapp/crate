@@ -1,6 +1,7 @@
 """Revision 115 shares additive frozen DDL with fresh schema bootstrap."""
 
 from importlib import import_module
+import re
 
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
@@ -54,15 +55,39 @@ def test_instance_migration_and_bootstrap_use_identical_additive_ddl(monkeypatch
 def test_instance_schema_grants_are_frozen_from_runtime_catalog(monkeypatch):
     before = RecordingExecutor()
     create_agent_operations_v115_schema(before)
-    phase_five_grants = ALLOWED_GRANTS - {
-        "editorial.read",
-        "editorial.prepare",
-        "editorial.write",
-        "editorial.publish",
+    phase_five_grants = {
+        "library.health.read",
+        "ops.status.read",
+        "ops.jobs.read",
+        "ops.logs.read",
+        "library.health.run",
+        "library.repair.photo_flag",
+        "ops.jobs.retry",
+        "ops.jobs.cancel_pending",
+        "library.quality.run",
+        "library.repair.run",
+        "library.metadata.write",
+        "library.enrichment.run",
+        "library.analysis.run",
+        "library.sync.run",
+        "library.metadata.export",
+        "library.metadata.rehydrate",
+        "ops.audit.read",
+        "ops.jobs.manage_instance",
+        "ops.jobs.cancel",
+        "ops.schedules.read",
+        "ops.schedules.run",
+        "ops.schedules.write",
+        "ops.runtime.read",
+        "ops.runtime.write",
     }
-    assert all(
-        f"'{grant}'" in " ".join(before.statements) for grant in phase_five_grants
+    constraint = next(
+        statement
+        for statement in before.statements
+        if "ADD CONSTRAINT agent_principals_grants_check" in statement
     )
+    assert set(re.findall(r"'([^']+)'", constraint)) == phase_five_grants
+    assert phase_five_grants <= ALLOWED_GRANTS
 
     monkeypatch.setattr(
         "crate.agent_access.ALLOWED_GRANTS", frozenset({"future.scope"})

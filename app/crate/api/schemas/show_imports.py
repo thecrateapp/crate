@@ -120,6 +120,9 @@ class ShowCandidate(BaseModel):
 
     @model_validator(mode="after")
     def validate_coordinates(self):
+        providers = {"ticketmaster", "setlistfm", "lastfm"}
+        if bool(self.source_event_id) != (self.source_provider in providers):
+            raise ValueError("A provider reference requires its provider and event ID")
         if (self.latitude is None) != (self.longitude is None):
             raise ValueError("Latitude and longitude must be supplied together")
         if bool(self.existing_show_id) != bool(self.expected_revision):

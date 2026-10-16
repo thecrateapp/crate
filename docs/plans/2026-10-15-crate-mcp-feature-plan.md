@@ -1,7 +1,7 @@
 # Crate MCP — Feature Implementation Plan
 
 > **For agents:** REQUIRED SUB-SKILL: Use viterbit:executing-plans to implement this plan task-by-task.
-> **Estado: plan aprobado por Diego el 2026-10-16. Fases 0–6 publicadas en PR #292 (corte e5f12533, CI completo verde); fase 7 implementada y validada localmente, con revisión SPEC/QUALITY y su P2 corregido mediante regresiones focalizadas. Consultar el CI y la persistent review del commit exacto en la misma PR. Fase 8 pendiente. Rama feat/crate_mcp. Despliegue y activación pendientes.**
+> **Estado: plan aprobado por Diego el 2026-10-16. Fases 0–8 implementadas en feat/crate_mcp, PR #292. El corte publicado de fase 7, f80679ee, tiene CI verde; fase 8 incorpora revisión SPEC/QUALITY, correcciones con regresiones y el gate local final descrito abajo. Consultar el CI y la persistent review del HEAD exacto de la misma PR para su gate publicado. Despliegue y activación pendientes.**
 
 **Goal:** Entregar el MCP remoto completo de Crate para diagnóstico, mantenimiento de biblioteca, operaciones y creación de playlists editoriales, con permisos, planes revisables, auditoría, gestión en Admin y una skill editorial distribuible. Incluye el alta manual/asistida de shows añadida como fase 8. El piloto es el primer incremento de la feature.
 
@@ -402,7 +402,16 @@ Rollout por capacidades: diagnóstico → primera acción → permisos/Admin/OAu
 
 **Fase 8 — creación manual y asistida de shows en Admin y MCP**
 
-**Estado Linux 2026-10-16:** implementación funcional de 8.1–8.6 en esta rama, con migraciones aditivas 117–119. Identidad/aliases/procedencia y archivo, planes compartidos Admin/MCP, editor manual/asistido, OCR local real, visión/OCR→texto explícitos, fuentes privadas con TTL y límites, tres herramientas MCP y lecturas/invalidation por lineup implementados. 8.7 está en validación: 340 pruebas backend focalizadas pasaron con PostgreSQL real (un smoke de modelo real omitido por ser opt-in) y 45 casos UI pasaron. Tipos, lint y revisión final se verifican antes del gate de suites completas. No se ha hecho merge, despliegue ni activación de flags.
+**Estado Linux 2026-10-16:** implementación de 8.1–8.7 en esta rama, con migraciones aditivas 117–119. Identidad/aliases/procedencia y archivo, planes compartidos Admin/MCP, editor manual/asistido, OCR local real, visión/OCR→texto explícitos, fuentes privadas con TTL y límites, tres herramientas MCP y lecturas/invalidation por lineup implementados. La revisión fresca SPEC/QUALITY encontró seis P2, todos reproducidos y corregidos mediante RED→GREEN: relaciones durante consolidación, ID externo heredado, destino físico repetido, preparación fallida, invalidación del editor de consolidación y referencias de proveedor estructuradas. Se añadieron regresiones para prefijos heredados y correcciones del editor. No se ha hecho merge, despliegue ni activación de flags.
+
+**Gate final local (después de las pruebas focalizadas):**
+
+- Backend completo según el gate del repositorio/CI, excluyendo únicamente los dos archivos históricos `test_stats_integration.py` y `test_user_stats_aggregates.py`: **6390 passed, 2 failed, 13 skipped** en 1105 s. Los dos fallos fueron ausencia del binario `make` en la imagen local; tras instalarlo en esa imagen desechable, el archivo completo `test_deploy_release_commands.py` pasó **49 casos**. Sus comandos son `make -n`; no hubo despliegue.
+- Ocho omisiones pgvector se debían al chequeo de extensión durante collection, antes del bootstrap del template. No se cuentan como validación: tras inicializar la base desechable antes de collection, `test_bliss_queries.py` pasó **66 casos, sin skips**. En conjunto quedan validados los 6400 casos backend distintos del gate; permanecen cinco omisiones: dos guards históricos de rutas ausentes, harness de federación de dos nodos, smoke opt-in con modelo real y benchmark opt-in de estadísticas.
+- Admin completo: **316 pruebas / 80 archivos**. Listen completo: **2834 passed, 4 skipped / 375 archivos**. Docs: integridad de 43 documentos, **8 pruebas** y build.
+- Pyright completo: cero errores/avisos. Ruff check/format: 1599 archivos conformes. Admin typecheck, lint y build pasan. Persisten avisos existentes de IDs OpenAPI duplicados, APIs DOM no implementadas en jsdom y tamaño de chunks.
+
+Las migraciones publicadas 109–116 permanecen intactas. La prueba de grants de 115 ahora compara su contrato literal de 24 grants, en lugar de derivarlo del catálogo posterior de 30 grants. El CI instala Tesseract y los idiomas eng/spa para ejecutar OCR real. El gate publicado debe comprobarse sobre el HEAD exacto, no inferirse de estos resultados locales.
 
 La evidencia detallada y las limitaciones están en `docs/technical/crate-mcp.md`, la evaluación CPU en `docs/technical/crate-show-ocr-evaluation.json` y la medida batch en `docs/technical/crate-show-import-load.json`. El catálogo aditivo 1.1.0 contiene 52 herramientas/30 grants. El smoke con modelo real es opt-in y no se ha ejecutado; las pruebas deterministas usan proveedores simulados.
 

@@ -1090,6 +1090,20 @@ source evidence. Explicit consolidation is a high-risk plan with mandatory human
 exact revisions: it transfers attendance/reminders/aliases, retains archived source rows and
 flattens old ID redirects. It never runs as an automatic backfill.
 
+Redirect resolution and attendance/reminder mutations hold a shared transaction advisory lock;
+consolidation takes its exclusive counterpart before show row locks. A concurrent relation write
+therefore finishes before transfer or resolves the committed canonical ID. Archived legacy
+`external_id` values remain intact; aliases resolve provider syncs without attempting to reuse an
+occupied unique legacy ID on the canonical row. A selected batch cannot contain two corrections
+of the same physical show or two references to the same provider event.
+
+Structured imports can provide paired `source_provider` / `source_event_id` references for
+Ticketmaster, Setlist.fm or Last.fm. Matching, sorted transaction locks and alias persistence use
+those references in both preview and apply. Setlist.fm/Last.fm bare and provider-prefixed IDs
+resolve the existing identity, including legacy bare aliases; inconsistent legacy aliases require
+explicit reconciliation. The reference never impersonates a provider: field provenance retains
+the actual manual/MCP editor, and the exact plan shows any existing target and revision.
+
 Outbox invalidations cover shows, upcoming, home and affected library artists. The relay dispatches
 committed show invalidations to live caches; the projector refreshes snapshots. No HTTP handler
 rebuilds a snapshot. A batch emits one set of invalidations. Finite `shows.import.*` counters contain
@@ -1104,6 +1118,11 @@ rows. Excluded dates remain pending. Changing any selected content invalidates t
 Results retain canonical links and saved-row locks; a network-uncertain request retries its exact
 key. Owned private drafts can be resumed, including pending/failed jobs and staged image references.
 A stop request is distinct from the worker's actual acknowledgement.
+
+A confirmed terminal preparation failure unlocks the retained draft with a new preparation key;
+an uncertain acceptance retries its original key/job. Changing consolidation IDs, the canonical
+choice or the duplicate selection invalidates the previous plan. Shared artist edits clear stale
+library UIDs; optional field clears on an explicitly selected existing show are sent as nulls.
 
 Extraction is a closed `extract_shows` command using the existing acceptance ledger, agent jobs,
 `tasks`, Dramatiq actor, maintenance pool and resource governor. There is no second job engine.
@@ -1171,6 +1190,26 @@ acknowledgement, split tours, attendance/reminders and exact approval. SDK trans
 new tool workflow; Admin tests cover manual/assisted review, pending rows, canonical links, uncertain
 retry, both entry pages and the shared operational approval page. The final suite/review gate is
 recorded in the plan when it has actually run.
+
+The fresh final SPEC/QUALITY review reported six P2 findings; each was reproduced before its fix
+with PostgreSQL/Vitest. The final local backend gate ran all 6405 collected cases (the same two
+historical stats-file exclusions as CI): 6390 passed, two failed because the disposable image lacked
+`make`, and 13 skipped. After adding `make`, all 49 release-command dry-run cases passed. Eight
+pgvector skips were recovered with a migrated disposable base before collection: all 66 bliss-query
+cases passed without skips. Thus 6400 distinct backend cases were validated across the gate and
+these environment recoveries; the five remaining skips are two legacy missing-route guards and
+the opt-in federation harness, live model and stats benchmark. The single local full invocation
+did not have a green exit; the exact pushed-head CI is the final standard-runner gate.
+
+Complete Admin tests passed 316 cases; Listen passed 2834 with four existing skips; docs passed
+eight plus integrity/build. Full Pyright, Ruff check/format and Admin typecheck/lint/build passed.
+The original 115 grant DDL remains frozen; its test now checks the literal phase-five grant set.
+CI explicitly installs Tesseract eng/spa. See the plan for commands, review fixes and exclusions.
+
+No real-browser/mobile visual audit, live paid model call, production-copy migration timing,
+production capacity run, public proxy or new commercial-client certification was performed.
+Local fixtures, deterministic providers and prior phase-seven client evidence do not establish
+those properties. The default OCR/manual paths remain independent of a model or network.
 
 The [CPU OCR evaluation](crate-show-ocr-evaluation.json) compares PSM 3/6/11 on five original CC0
 synthetic sources, including artistic/illegible text. Tesseract **5.5.0** recovered all three clean tour

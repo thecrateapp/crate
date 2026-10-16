@@ -71,6 +71,32 @@ def scalar(sql):
         return session.execute(text(sql)).scalar_one()
 
 
+def test_selection_rejects_two_corrections_of_the_same_physical_show(show_world):
+    _, original = prepare(show_world)
+    _, written = apply(show_world, original)
+    show = written["execution"]["items"][0]
+    _, plan = prepare(
+        show_world,
+        key="duplicate-corrections",
+        candidates=[
+            {
+                **items()[0],
+                "item_id": f"correction-{day}",
+                "existing_show_id": show["show_id"],
+                "expected_revision": show["revision"],
+                "date": f"2027-03-0{day}",
+            }
+            for day in (3, 4)
+        ],
+    )
+    assert plan["executable"] is False
+    assert {issue["item_id"] for issue in plan["issues"]} == {
+        "correction-3",
+        "correction-4",
+    }
+    assert scalar("SELECT date::text FROM shows") == "2027-03-02"
+
+
 def test_admin_show_plan_works_without_mcp_flags_or_llm_and_replays_durable_ids(
     show_world,
 ):

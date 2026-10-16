@@ -56,27 +56,76 @@ def identity_key(candidate):
     return hashlib.sha256("\x1f".join(values).encode()).hexdigest()
 
 
-def _rows(current, candidate, source):
-    alias = None
+def _source_alias(candidate, source):
+    """A provider reference identifies a show; it does not change its editor."""
     if source.get("event_id"):
-        alias = current.execute(
-            text(
-                "SELECT show_id FROM show_source_aliases WHERE provider=:provider AND event_id=:event_id"
-            ),
-            source,
-        ).scalar_one_or_none()
-    if alias or candidate.get("existing_show_id"):
+        alias = {"provider": source["provider"], "event_id": source["event_id"]}
+    elif candidate.get("source_event_id"):
+        alias = {
+            "provider": candidate["source_provider"],
+            "event_id": candidate["source_event_id"],
+        }
+    else:
+        return None
+    alias["event_id"] = _legacy_id(alias)
+    return alias
+
+
+def _alias_variants(alias):
+    event_id, provider = alias["event_id"], alias["provider"]
+    # Older Last.fm rows may have only the bare lastfm_event_id alias.
+    return (
+        [event_id, event_id.removeprefix(provider + ":")]
+        if provider != "ticketmaster"
+        else [event_id]
+    )
+
+
+def _legacy_id(alias):
+    provider, event_id = alias["provider"], alias["event_id"]
+    return (
+        event_id
+        if provider == "ticketmaster" or event_id.startswith(provider + ":")
+        else provider + ":" + event_id
+    )
+
+
+def _lock_keys(candidate, source):
+    keys = {"show:base:" + identity_base(candidate)}
+    alias = _source_alias(candidate, source)
+    if alias:
+        keys.add("show:alias:" + alias["provider"] + ":" + alias["event_id"])
+        keys.add("show:legacy:" + _legacy_id(alias))
+    return keys
+
+
+def _rows(current, candidate, source):
+    alias_ids = []
+    reference = _source_alias(candidate, source)
+    if reference:
+        alias_ids = (
+            current.execute(
+                text(
+                    "SELECT DISTINCT COALESCE(s.merged_into_id,s.id) FROM show_source_aliases a "
+                    "JOIN shows s ON s.id=a.show_id WHERE a.provider=:provider AND a.event_id=ANY(:variants)"
+                ),
+                {**reference, "variants": _alias_variants(reference)},
+            )
+            .scalars()
+            .all()
+        )
+    if alias_ids or candidate.get("existing_show_id"):
         rows = (
             current.execute(
                 text(
-                    "SELECT * FROM shows WHERE id=COALESCE((SELECT merged_into_id FROM shows WHERE id=:id),:id)"
+                    "SELECT * FROM shows WHERE id=ANY(:ids) OR id IN (SELECT merged_into_id FROM shows WHERE id=ANY(:ids))"
                 ),
-                {"id": alias or candidate["existing_show_id"]},
+                {"ids": alias_ids or [candidate["existing_show_id"]]},
             )
             .mappings()
             .all()
         )
-        return list(map(dict, rows)), True
+        return [dict(row) for row in rows if not row["merged_into_id"]], True
     rows = (
         current.execute(
             text("""SELECT * FROM shows WHERE date=CAST(:date AS date)
@@ -100,11 +149,11 @@ def _match(current, candidate, source) -> dict:
 
 def _match_rows(candidate, rows, exact) -> dict:
     if exact:
-        if not rows:
+        if len(rows) != 1:
             return {
                 "status": "conflict",
-                "matches": [],
-                "reason": "Selected show is missing",
+                "matches": [row["id"] for row in rows],
+                "reason": "Selected show is missing or provider aliases conflict",
             }
         row = rows[0]
         if (
@@ -210,13 +259,18 @@ def match_show_candidates(
         raise ValueError("Choose 1 to 50 show candidates")
 
     def read(current):
-        keys = [
-            {
-                "artist": normalize(candidate.get("artist_name")),
-                "date": candidate.get("date"),
-            }
-            for candidate in candidates
-        ]
+        keys = []
+        for candidate in candidates:
+            alias = _source_alias(candidate, {})
+            keys.append(
+                {
+                    "item_id": candidate["item_id"],
+                    "artist": normalize(candidate.get("artist_name")),
+                    "date": candidate.get("date"),
+                    **(alias or {"provider": None, "event_id": None}),
+                    "alternate_event_id": _alias_variants(alias)[-1] if alias else None,
+                }
+            )
         ids = list(
             set(expected_ids)
             | {
@@ -225,8 +279,15 @@ def match_show_candidates(
                 if candidate.get("existing_show_id")
             }
         )
-        statement = """WITH wanted AS (SELECT * FROM jsonb_to_recordset(CAST(:keys AS jsonb)) AS w(artist text,date date))
-            SELECT s.* FROM shows s WHERE s.id=ANY(:ids)
+        statement = """WITH wanted AS (SELECT * FROM jsonb_to_recordset(CAST(:keys AS jsonb))
+                AS w(item_id text,artist text,date date,provider text,event_id text,alternate_event_id text)),
+            resolved_aliases AS (
+                SELECT w.item_id,COALESCE(s.merged_into_id,a.show_id) AS show_id
+                FROM wanted w JOIN show_source_aliases a ON a.provider=w.provider AND a.event_id IN (w.event_id,w.alternate_event_id)
+                JOIN shows s ON s.id=a.show_id),
+            alias_items AS (SELECT show_id,jsonb_agg(item_id) AS item_ids FROM resolved_aliases GROUP BY show_id)
+            SELECT s.*,COALESCE(a.item_ids,'[]'::jsonb) AS _alias_items FROM shows s
+            LEFT JOIN alias_items a ON a.show_id=s.id WHERE a.show_id IS NOT NULL OR s.id=ANY(:ids)
             OR s.id IN (SELECT merged_into_id FROM shows WHERE id=ANY(:ids))
             OR (s.merged_into_id IS NULL AND EXISTS(SELECT 1 FROM wanted w WHERE s.date=w.date
                 AND lower(regexp_replace(btrim(s.artist_name),'\\s+',' ','g'))=w.artist)) ORDER BY s.id"""
@@ -239,10 +300,17 @@ def match_show_candidates(
             ).mappings()
         ]
         indexed = {row["id"]: row for row in rows}
+        aliases = {}
+        for row in rows:
+            for item in set(row.pop("_alias_items")):
+                aliases.setdefault(item, []).append(row)
         results = {}
         for candidate in candidates:
             selected = candidate.get("existing_show_id")
-            if selected:
+            alias_rows = aliases.get(candidate["item_id"])
+            if alias_rows:
+                matches = alias_rows
+            elif selected:
                 row = indexed.get(selected)
                 row = (
                     indexed.get(row["merged_into_id"])
@@ -258,7 +326,7 @@ def match_show_candidates(
                     and identity_base(row) == identity_base(candidate)
                 ]
             results[candidate["item_id"]] = _match_rows(
-                candidate, matches, bool(selected)
+                candidate, matches, bool(selected or alias_rows)
             )
         return results
 
@@ -279,10 +347,7 @@ def upsert_canonical_show(
             "reason": "Artist and unambiguous date are required",
         }
     with optional_scope(session) as current:
-        lock_keys = {"show:base:" + identity_base(candidate)}
-        if source.get("event_id"):
-            lock_keys.add("show:alias:" + source["provider"] + ":" + source["event_id"])
-        for key in sorted(lock_keys):
+        for key in sorted(_lock_keys(candidate, source)):
             current.execute(
                 text("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))"),
                 {"key": key},
@@ -396,15 +461,13 @@ def upsert_canonical_show(
             sql = f"INSERT INTO shows ({','.join(fields)},created_at,updated_at) VALUES ({','.join(expressions[key] for key in fields)},NOW(),NOW()) RETURNING id,revision"
         stored = dict(current.execute(text(sql), values).mappings().one())
         show_id = stored["id"]
-        if source.get("event_id"):
-            legacy_id = source["event_id"]
-            if source["provider"] != "ticketmaster" and not legacy_id.startswith(
-                source["provider"] + ":"
-            ):
-                legacy_id = source["provider"] + ":" + legacy_id
+        alias = _source_alias(candidate, source)
+        if alias:
+            legacy_id = _legacy_id(alias)
             updated_revision = current.execute(
                 text(
-                    "UPDATE shows SET external_id=:external WHERE id=:id AND external_id IS NULL RETURNING revision"
+                    "UPDATE shows SET external_id=:external WHERE id=:id AND external_id IS NULL "
+                    "AND NOT EXISTS(SELECT 1 FROM shows WHERE external_id=:external) RETURNING revision"
                 ),
                 {"external": legacy_id, "id": show_id},
             ).scalar_one_or_none()
@@ -423,11 +486,11 @@ def upsert_canonical_show(
                 "evidence": encoded,
             },
         ).scalar_one_or_none()
-        if source.get("event_id"):
+        if alias:
             current.execute(
                 text("""INSERT INTO show_source_aliases(provider,event_id,show_id,evidence)
                 VALUES (:provider,:event_id,:id,CAST(:evidence AS jsonb)) ON CONFLICT DO NOTHING"""),
-                {**source, "id": show_id, "evidence": encoded},
+                {**alias, "id": show_id, "evidence": encoded},
             )
         if _matched is None:
             invalidate_show_views(

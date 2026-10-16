@@ -7,10 +7,18 @@ def test_show_import_editor_routes_use_cookie_auth_and_named_contracts(test_app)
     prepare = paths["/api/show-imports/plans"]["post"]
     assert prepare["tags"] == ["curation"]
     assert prepare["security"] == [{"cookieAuth": []}]
-    assert prepare["requestBody"]["content"]["application/json"]["schema"]["$ref"].endswith("/ShowImportSelection")
-    assert prepare["responses"]["202"]["content"]["application/json"]["schema"]["$ref"].endswith("/ShowAcceptedJob")
-    assert paths["/api/show-imports/jobs/{job_id}"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith("/ShowJobState")
-    assert paths["/api/show-imports/plans/{plan_id}"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith("/ShowPlanEvidence")
+    assert prepare["requestBody"]["content"]["application/json"]["schema"][
+        "$ref"
+    ].endswith("/ShowImportSelection")
+    assert prepare["responses"]["202"]["content"]["application/json"]["schema"][
+        "$ref"
+    ].endswith("/ShowAcceptedJob")
+    assert paths["/api/show-imports/jobs/{job_id}"]["get"]["responses"]["200"][
+        "content"
+    ]["application/json"]["schema"]["$ref"].endswith("/ShowJobState")
+    assert paths["/api/show-imports/plans/{plan_id}"]["get"]["responses"]["200"][
+        "content"
+    ]["application/json"]["schema"]["$ref"].endswith("/ShowPlanEvidence")
 
 
 def test_openapi_exposes_security_schemes(test_app):

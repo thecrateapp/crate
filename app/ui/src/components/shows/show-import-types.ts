@@ -22,6 +22,8 @@ export interface ShowCandidate {
   price_range?: string | null;
   status?: string;
   source_ref?: string | null;
+  source_provider?: "manual" | "mcp" | "ticketmaster" | "setlistfm" | "lastfm";
+  source_event_id?: string | null;
   evidence?: string | null;
   source_draft_id?: string;
   extractor?: string;
@@ -94,11 +96,29 @@ export function emptyShow(): ShowCandidate {
 }
 
 export function showPayload(candidate: ShowCandidate): ShowCandidate {
-  return Object.fromEntries(
-    Object.entries(candidate).filter(
-      ([, value]) => value !== "" && value !== undefined,
-    ),
-  ) as ShowCandidate;
+  const clearable = new Set([
+    "artist_uid",
+    "local_time",
+    "doors_time",
+    "timezone",
+    "region",
+    "country",
+    "country_code",
+    "address_line1",
+    "postal_code",
+    "url",
+    "tickets_url",
+    "image_url",
+    "price_range",
+  ]);
+  const payload: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(candidate)) {
+    if (value === undefined) continue;
+    if (value === "") {
+      if (candidate.existing_show_id && clearable.has(key)) payload[key] = null;
+    } else payload[key] = value;
+  }
+  return payload as unknown as ShowCandidate;
 }
 
 export interface ShowDraft {

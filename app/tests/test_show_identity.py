@@ -1,7 +1,7 @@
 """Canonical event identity is shared by human, agent and provider writes."""
 
-from concurrent.futures import ThreadPoolExecutor
-from threading import Barrier
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from threading import Barrier, Event
 
 import pytest
 from sqlalchemy import text
@@ -394,3 +394,104 @@ def test_provider_rechecks_a_row_consolidated_between_match_and_lock(
     assert result["status"] == "conflict"
     assert row(second["show_id"])["identity_key"] is None
     assert row(second["show_id"])["merged_into_id"] == first["show_id"]
+
+
+@pytest.mark.parametrize("action", ["attend", "remind", "unattend"])
+def test_relation_write_racing_consolidation_reaches_canonical_id(
+    pg_db, monkeypatch, action
+):
+    from crate.db.repositories import shows_attendance as attendance
+    from crate.db.repositories.auth_user_accounts import create_user
+    from crate.db.repositories.show_consolidation import consolidate_shows
+
+    user = create_user("relation-race@example.test", role="user")
+    canonical = put(candidate(local_time="18:00"))
+    duplicate = put(candidate(local_time="21:00"))
+    if action == "unattend":
+        attendance.attend_show(user["id"], duplicate["show_id"])
+    resolved, release = Event(), Event()
+    original = attendance._canonical_id
+
+    def pause_after_resolution(session, show_id):
+        result = original(session, show_id)
+        resolved.set()
+        assert release.wait(timeout=10)
+        return result
+
+    monkeypatch.setattr(attendance, "_canonical_id", pause_after_resolution)
+
+    def write():
+        if action == "remind":
+            return attendance.create_show_reminder(
+                user["id"], duplicate["show_id"], "day_before"
+            )
+        function = (
+            attendance.unattend_show if action == "unattend" else attendance.attend_show
+        )
+        return function(user["id"], duplicate["show_id"])
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        writing = pool.submit(write)
+        assert resolved.wait(timeout=5)
+        merging = pool.submit(
+            consolidate_shows,
+            canonical["show_id"],
+            [duplicate["show_id"]],
+            {
+                str(canonical["show_id"]): canonical["revision"],
+                str(duplicate["show_id"]): duplicate["revision"],
+            },
+        )
+        try:
+            merging.result(timeout=0.3)
+        except TimeoutError:
+            pass  # Correct coordination waits until the relation write commits.
+        finally:
+            release.set()
+        assert writing.result(timeout=10) is True
+        assert merging.result(timeout=10)["status"] == "completed"
+    table = "user_show_reminders" if action == "remind" else "user_show_attendance"
+    with read_scope() as session:
+        actual = session.execute(text(f"SELECT show_id FROM {table}")).scalars().all()
+    assert actual == ([] if action == "unattend" else [canonical["show_id"]])
+
+
+def test_provider_sync_after_consolidating_into_manual_canonical(pg_db):
+    from crate.db.repositories.show_consolidation import consolidate_shows
+
+    canonical = put(candidate(local_time="18:00"))
+    duplicate = put(candidate(local_time="21:00"), "ticketmaster", "merged-provider")
+    consolidate_shows(
+        canonical["show_id"],
+        [duplicate["show_id"]],
+        {
+            str(canonical["show_id"]): canonical["revision"],
+            str(duplicate["show_id"]): duplicate["revision"],
+        },
+    )
+    result = put(candidate(local_time="21:00"), "ticketmaster", "merged-provider")
+    assert result["show_id"] == canonical["show_id"]
+    assert row(canonical["show_id"])["local_time"] == "18:00"
+    with read_scope() as session:
+        assert (
+            session.execute(
+                text(
+                    "SELECT show_id FROM show_source_aliases WHERE event_id='merged-provider'"
+                )
+            ).scalar_one()
+            == canonical["show_id"]
+        )
+
+
+@pytest.mark.parametrize("provider", ["setlistfm", "lastfm"])
+def test_structured_provider_reference_matches_legacy_prefixed_alias(pg_db, provider):
+    first = put(candidate(), provider, provider + ":legacy-event")
+    edited = put(
+        candidate(
+            date="2027-03-03", source_provider=provider, source_event_id="legacy-event"
+        )
+    )
+    assert edited["show_id"] == first["show_id"]
+    synced = put(candidate(date="2027-03-04"), provider, provider + ":legacy-event")
+    assert synced["show_id"] == first["show_id"]
+    assert str(row(first["show_id"])["date"]) == "2027-03-03"

@@ -32,7 +32,11 @@ it("loads real revisions and requires an explicit canonical/duplicate choice", a
   });
   const review = vi.fn();
   renderWithAdminProviders(
-    <ShowConsolidationEditor disabled={false} onReview={review} />,
+    <ShowConsolidationEditor
+      disabled={false}
+      onChange={vi.fn()}
+      onReview={review}
+    />,
   );
   const user = userEvent.setup();
   await user.click(screen.getByText("Consolidate existing shows"));

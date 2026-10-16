@@ -105,11 +105,20 @@ export function AddShowDialog({ open, onOpenChange, onSaved }: Props) {
       const job = await waitForShowJob(accepted.job_id, abort.signal);
       if (request.kind === "prepare") {
         const prepared = job.result?.plan;
-        if (job.status !== "completed" || !prepared)
-          throw new Error(
+        if (job.status !== "completed" || !prepared) {
+          pending.current = null;
+          setPlan(null);
+          setPhase("editing");
+          keys.current = {
+            prepare: crypto.randomUUID(),
+            apply: crypto.randomUUID(),
+          };
+          setError(
             job.result?.execution?.error ??
               "Preparation failed; your draft is preserved.",
           );
+          return;
+        }
         const complete = await api<ShowPlan>(
           `/api/show-imports/plans/${prepared.plan_id}`,
           "GET",
@@ -314,6 +323,7 @@ export function AddShowDialog({ open, onOpenChange, onSaved }: Props) {
           ) : null}
           <ShowConsolidationEditor
             disabled={locked}
+            onChange={invalidate}
             onReview={(consolidation) => {
               invalidate();
               pending.current = {
@@ -389,7 +399,10 @@ export function AddShowDialog({ open, onOpenChange, onSaved }: Props) {
                         ? {
                             ...candidate,
                             ...(sharedArtist.trim()
-                              ? { artist_name: sharedArtist.trim() }
+                              ? {
+                                  artist_name: sharedArtist.trim(),
+                                  artist_uid: null,
+                                }
                               : {}),
                             ...(sharedCountry.trim()
                               ? { country_code: sharedCountry.trim() }

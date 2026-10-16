@@ -12,6 +12,13 @@ def _rowcount(result: object) -> int:
 
 
 def _canonical_id(session, show_id):
+    # Hold redirect topology stable through the relation mutation. Consolidation
+    # takes the exclusive counterpart before any show row locks.
+    session.execute(
+        text(
+            "SELECT pg_advisory_xact_lock_shared(hashtextextended('show:redirects',0))"
+        )
+    )
     return session.execute(
         text("SELECT COALESCE(merged_into_id,id) FROM shows WHERE id=:id"),
         {"id": show_id},

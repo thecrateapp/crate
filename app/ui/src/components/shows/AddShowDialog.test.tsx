@@ -130,6 +130,105 @@ describe("AddShowDialog", () => {
     await waitFor(() => expect(screen.getByLabelText("Artist")).toBeDisabled());
   });
 
+  it("unlocks a preserved draft after a definitive preparation failure", async () => {
+    const implementation = vi.mocked(api).getMockImplementation()!;
+    let failed = true;
+    vi.mocked(api).mockImplementation(async (...args) => {
+      if (args[0].endsWith("/jobs/prepare-1") && failed)
+        return {
+          status: "failed",
+          result: {
+            execution: {
+              error: "Plan exceeds 40 KB",
+              error_code: "LIMIT_EXCEEDED",
+            },
+          },
+        };
+      return implementation(...args);
+    });
+    renderWithAdminProviders(
+      <AddShowDialog open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
+    );
+    const user = await fillManual();
+    await user.click(screen.getByRole("button", { name: "Review selection" }));
+    await screen.findByText("Plan exceeds 40 KB");
+    expect(screen.getByLabelText("Artist")).not.toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "Retry same review" }),
+    ).not.toBeInTheDocument();
+    const first = vi
+      .mocked(api)
+      .mock.calls.find(([url]) => url.endsWith("/plans"))![2];
+    await user.type(screen.getByLabelText("Venue"), " Annex");
+    failed = false;
+    await user.click(screen.getByRole("button", { name: "Review selection" }));
+    await screen.findByRole("button", { name: "Save selected shows" });
+    const attempts = vi
+      .mocked(api)
+      .mock.calls.filter(([url]) => url.endsWith("/plans"));
+    expect(attempts).toHaveLength(2);
+    expect(
+      (attempts[1]![2] as { idempotency_key: string }).idempotency_key,
+    ).not.toEqual((first as { idempotency_key: string }).idempotency_key);
+  });
+
+  it.each(["canonical", "duplicates", "ids"])(
+    "invalidates a reviewed consolidation after editing %s",
+    async (change) => {
+      const implementation = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation(async (...args) => {
+        if (args[0].includes("/shows?"))
+          return {
+            items: [7, 8].map((id) => ({
+              id,
+              revision: 2,
+              artist_name: "Band",
+              date: "2027-03-02",
+              venue: "Hall",
+              city: "City",
+              attendance_count: 1,
+              reminder_count: 0,
+            })),
+          };
+        if (args[0].endsWith("/plans") && args[1] === "POST")
+          return { job_id: "prepare-1", status: "pending" };
+        return implementation(...args);
+      });
+      renderWithAdminProviders(
+        <AddShowDialog open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
+      );
+      const user = userEvent.setup();
+      await user.click(screen.getByText("Consolidate existing shows"));
+      await user.type(
+        screen.getByLabelText("Existing show IDs, separated by commas"),
+        "7,8",
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Load shows for consolidation" }),
+      );
+      await user.click(await screen.findByLabelText("Transfer this duplicate"));
+      await user.click(
+        screen.getByRole("button", { name: "Review exact consolidation" }),
+      );
+      await screen.findByRole("button", { name: "Save selected shows" });
+      if (change === "canonical")
+        await user.click(
+          screen.getAllByLabelText("Keep this canonical show")[1]!,
+        );
+      else if (change === "duplicates")
+        await user.click(screen.getByLabelText("Transfer this duplicate"));
+      else
+        await user.type(
+          screen.getByLabelText("Existing show IDs, separated by commas"),
+          ",9",
+        );
+      expect(
+        screen.queryByRole("button", { name: "Save selected shows" }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText(/review again/i)).toBeInTheDocument();
+    },
+  );
+
   it("does not expose the editor without the show-writing capability", () => {
     renderWithAdminProviders(
       <AddShowDialog open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
@@ -164,6 +263,7 @@ it("saves only selected tour dates and preserves excluded rows for another batch
             candidates: [1, 2, 3].map((index) => ({
               item_id: `tour-${index}`,
               artist_name: "Band",
+              artist_uid: "10000000-0000-0000-0000-000000000001",
               date: `2027-03-0${index}`,
               venue: "Hall",
               city: "City",
@@ -184,6 +284,12 @@ it("saves only selected tour dates and preserves excluded rows for another batch
   await screen.findByLabelText("Select show 3");
   await user.click(screen.getByLabelText("Select show 1"));
   await user.click(screen.getByLabelText("Select show 2"));
+  await user.type(screen.getByLabelText("Shared artist"), "Corrected Band");
+  await user.click(
+    screen.getByRole("button", {
+      name: "Apply shared fields to selected dates",
+    }),
+  );
   await user.click(screen.getByRole("button", { name: "Review selection" }));
   await user.click(
     await screen.findByRole("button", { name: "Save selected shows" }),
@@ -195,4 +301,12 @@ it("saves only selected tour dates and preserves excluded rows for another batch
   expect(screen.getByLabelText("Date for show 3")).toHaveValue("2027-03-03");
   expect(screen.getByLabelText("Artist for show 3")).not.toBeDisabled();
   expect(candidates).toHaveLength(2);
+  expect(
+    candidates.every(
+      (candidate) =>
+        candidate.artist_name === "Corrected Band" &&
+        candidate.artist_uid == null,
+    ),
+  ).toBe(true);
+  expect(screen.getByLabelText("Artist for show 3")).toHaveValue("Band");
 });

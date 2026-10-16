@@ -66,6 +66,7 @@ def compile_show_import(candidates: list[dict], source: dict, *, session=None) -
                 candidate["artist_name"] = matches[0]["name"]
         batch_matches = identities.match_show_candidates(selected, session=current)
         items, issues = [], []
+        issues.extend(_repeated_target_issues(selected, batch_matches))
         repeated = {}
         for index, candidate in enumerate(selected):
             for prior in selected[:index]:
@@ -166,6 +167,33 @@ class _SelectionConflict(Exception):
     pass
 
 
+def _repeated_target_issues(candidates, matches):
+    targets = {}
+    repeated = {}
+    for candidate in candidates:
+        row = matches[candidate["item_id"]].get("show")
+        alias = identities._source_alias(candidate, {})
+        keys = []
+        if row:
+            keys.append(("show", row["id"]))
+        if alias:
+            keys.append(("alias", alias["provider"], alias["event_id"]))
+        for key in keys:
+            prior = targets.setdefault(key, candidate["item_id"])
+            if prior != candidate["item_id"]:
+                repeated[candidate["item_id"]] = prior
+                repeated[prior] = candidate["item_id"]
+    return [
+        {
+            "item_id": item,
+            "related_item_id": other,
+            "status": "conflict",
+            "reason": "Selected rows target the same saved show or provider event; resolve or exclude one",
+        }
+        for item, other in repeated.items()
+    ]
+
+
 def _same_selected_values(candidate, row):
     for key in identities._FIELDS:
         value = candidate.get(key)
@@ -232,8 +260,9 @@ def apply_exact_show_import(execution: dict, task_id: str, *, session=None) -> d
             )
             for key in sorted(
                 {
-                    "show:base:" + identities.identity_base(item["candidate"])
+                    key
                     for item in items
+                    for key in identities._lock_keys(item["candidate"], source)
                 }
             ):
                 current.execute(
@@ -254,6 +283,8 @@ def apply_exact_show_import(execution: dict, task_id: str, *, session=None) -> d
                 lock=True,
                 session=current,
             )
+            if _repeated_target_issues([item["candidate"] for item in items], matches):
+                raise _SelectionConflict("Selected rows now target the same show")
             for item in items:
                 candidate = item["candidate"]
                 matched = matches[candidate["item_id"]]

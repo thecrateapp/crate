@@ -16,6 +16,9 @@ def consolidate_shows(
             "reason": "Choose one canonical show and distinct duplicates",
         }
     with optional_scope(session) as current:
+        current.execute(
+            text("SELECT pg_advisory_xact_lock(hashtextextended('show:redirects',0))")
+        )
         rows = (
             current.execute(
                 text("SELECT * FROM shows WHERE id=ANY(:ids) ORDER BY id FOR UPDATE"),

@@ -135,6 +135,11 @@ jobs:
         run: pip install -r requirements-test.txt
         working-directory: app
 
+      - name: Install local OCR test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa
+
       - name: Run test shard with coverage
         env:
           CRATE_POSTGRES_USER: crate
