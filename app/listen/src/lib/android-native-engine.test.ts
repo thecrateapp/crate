@@ -293,6 +293,7 @@ describe("android native engine flags", () => {
       incomingTrackId: "runtime-3",
       mode: "adaptive",
       outgoingCueMs: 176000,
+      fallbackReason: "low_confidence",
     } as unknown as EngineTransitionPlan;
     const timedOutSameEdge = {
       outgoingTrackId: "runtime-2",

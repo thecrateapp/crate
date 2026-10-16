@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PlaySource, Track } from "@/contexts/player-types";
-import type { EngineQueueSnapshot } from "@/lib/playback-engine";
+import type {
+  EngineQueueSnapshot,
+  EngineTransitionPlan,
+} from "@/lib/playback-engine";
 import {
   getServerSmartMixCapabilities,
   getSmartMixCapabilities,
@@ -10,6 +13,7 @@ import {
   legacySmartTransitionSeconds,
   SMART_TRANSITION_LONG_SECONDS,
   SMART_TRANSITION_SHORT_SECONDS,
+  keepServerPlans,
   SmartMixTransitionPlanner,
   type SmartMixCapabilities,
   type SmartMixRequest,
@@ -582,6 +586,37 @@ describe("SmartMixTransitionPlanner startup and offline contract", () => {
     const serialized = JSON.stringify([plans, cached]);
     expect(serialized).not.toContain("media_ticket");
     expect(serialized).not.toContain("/music/");
+  });
+});
+
+describe("keepServerPlans", () => {
+  const edge = { outgoingTrackId: "runtime-1", incomingTrackId: "runtime-2" };
+  const timedOut = {
+    ...edge,
+    outgoingCueMs: 0,
+    fallbackReason: "planner_timeout",
+  } as EngineTransitionPlan;
+
+  it("keeps an installed adaptive server plan that reports low_confidence", () => {
+    const serverPlan = {
+      ...edge,
+      outgoingCueMs: 176000,
+      fallbackReason: "low_confidence",
+    } as EngineTransitionPlan;
+
+    expect(keepServerPlans([serverPlan], [timedOut])).toEqual([serverPlan]);
+  });
+
+  it("replaces an installed client fallback with the new plan", () => {
+    const capabilityFallback = {
+      ...edge,
+      durationMs: 0,
+      fallbackReason: "capability_unavailable",
+    } as EngineTransitionPlan;
+
+    expect(keepServerPlans([capabilityFallback], [timedOut])).toEqual([
+      timedOut,
+    ]);
   });
 });
 

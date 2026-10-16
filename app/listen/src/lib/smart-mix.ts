@@ -166,6 +166,11 @@ const TRANSIENT_FALLBACK_REASONS = new Set([
   "planner_timeout",
   "planner_unavailable",
 ]);
+const CLIENT_FALLBACK_REASONS = new Set([
+  ...TRANSIENT_FALLBACK_REASONS,
+  "capability_unavailable",
+  "offline",
+]);
 
 export function hasTransientPlanFallback(
   plans: EngineTransitionPlan[] | undefined,
@@ -189,7 +194,7 @@ export function keepServerPlans(
       (candidate) =>
         candidate.outgoingTrackId === plan.outgoingTrackId &&
         candidate.incomingTrackId === plan.incomingTrackId &&
-        !candidate.fallbackReason,
+        !CLIENT_FALLBACK_REASONS.has(candidate.fallbackReason ?? ""),
     );
     return serverPlan ?? plan;
   });
