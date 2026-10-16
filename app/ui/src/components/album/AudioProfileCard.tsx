@@ -246,7 +246,7 @@ function StatBox({
   color: string;
 }) {
   return (
-    <div className="bg-secondary/50 rounded-md p-3">
+    <div className="bg-secondary/50 rounded-md border border-border-quiet p-3">
       <div className={`flex items-center gap-1.5 mb-1 ${color}`}>
         {icon}
         <span className="text-[10px] uppercase tracking-wider text-muted-foreground">

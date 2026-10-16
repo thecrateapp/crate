@@ -1,6 +1,6 @@
 # Crate v3 handover
 
-Entry point for agents picking up Crate v3. Revised 2026-10-15. Read this file and the implementation
+Entry point for agents picking up Crate v3. Revised 2026-10-16. Read this file and the implementation
 plan; the status table separates local implementation from pending QA.
 
 ## Where the work lives
@@ -11,7 +11,10 @@ plan; the status table separates local implementation from pending QA.
   pushed to `origin/feat/crate_v3` with Diego's approval on 2026-10-15. The branch now tracks
   `origin`, not `local-external`. Checkpoint 1B was approved, committed as `c28a97e0` and pushed on 2026-10-15;
   1C (`e60e6f50`) and provisional 1D (`d881a728`) were committed and pushed with his explicit
-  approval on 2026-10-15. Rebase/PR/release remain gated.
+  approval on 2026-10-15. Checkpoint 1E is published as `552a31f1`, its search-fixture fix as
+  `c7e9e961`, and reviewed Linux baselines as `cf477986`; full comparison CI passes.
+  Diego approved Checkpoint 1F publication and its Linux capture run on 2026-10-16;
+  canonical image review and remaining route QA still precede InstrumentPanel 1.7. Rebase/PR/release remain gated.
 
 ## Sources of truth, in reading order
 
@@ -47,16 +50,36 @@ material, not the committed CI screenshot source. The current additions are at
 <http://127.0.0.1:5186/#filas-y-chips>: interactive rows, link/multiline examples, toggle/action pills
 and static tags. The approved 1A specimens remain on the same page.
 
-`PLAYWRIGHT_CHANNEL=chrome npm run design-system:preview:test` passes 24 cumulative local browser
+`PLAYWRIGHT_CHANNEL=chrome npm run design-system:preview:test` passes 26 cumulative local browser
 checks, including percentage-bearing GenrePill, keyboard focus, real Select options, 44px touch
 targets and held-pointer reduced motion. The appearance harness passes 26 Chrome checks, including
 the real Listen search in desktop/mobile and open/closed states. These local Chrome runs do not
 qualify desktop runtime floors, WebKit, device QA or CI screenshot baselines. Review GenrePill at
 <http://127.0.0.1:5186/#genre-pill> and the new focus block at <http://127.0.0.1:5186/#foco>.
 
-Checkpoint 0 remains open: 0.11 comparison CI, 0.15 runtime qualification and relevant device
-reviews are pending; 0.14 production measurement may wait until the wheel and needs assignment.
-Admin captures in 0.11 still precede 1.0. Focused tests do not substitute for CI/screenshots/device QA.
+Task 0.11 is complete: canonical Linux capture, image review and comparison CI pass on `cf477986`.
+Checkpoint 0 remains open for 0.15 runtime qualification and relevant device reviews; 0.14
+production measurement may wait until the wheel and needs assignment. Admin contrast 1.0 is
+implemented at Checkpoint 1F, with publication approved; its own Linux captures and remaining
+route QA precede InstrumentPanel 1.7.
+
+## Admin visual direction — 2026-10-16
+
+Diego reaffirmed the site's TrackReadout as the final Audio Profile target: four large figures
+with top rules, five thin feature bars and a 20-value bipolar Bliss strip, no KPI boxes or icons.
+PD §4.7 / DS §4.5 / Task 3.9b already own this replacement and its data prerequisites. The mockup
+at `#contraste-admin` now includes his supplied image as a labelled visual target; it is not a
+production component, Linux baseline or completed readout. Loudness remains `dB` in the app until
+the validated integrated-LUFS contract exists. The temporary 1F contrast repair is not final design
+approval of the final readout. Diego authorised publication of the temporary 1F repair on
+2026-10-16, its Linux capture run and continuation to InstrumentPanel after the applicable gates.
+
+Admin V3 removes almost all icons, including redundant icons on labelled actions/navigation;
+only narrowly justified functional exceptions remain. This supersedes the previous general
+navigation/action icon allowance for Admin. Task 1b.8 owns inventory, consumer/accessibility tests,
+reviewable migration groups and Linux visual QA; each page task follows the rule. Listen/desktop
+icons are unaffected. No blanket removal or reordering of Task 3.9b is implemented in this update. Diego explicitly
+confirmed that TrackReadout will be addressed when its planned task arrives.
 
 ## One visual identity
 
@@ -81,7 +104,7 @@ is a token-based chart configuration, not a selectable product skin.
    commit messages are conventional and contain no co-author/generated attribution. **Do not create
    commits until Diego gives the go-ahead.** His 2026-10-15 commit/push approvals covered 1A and
    1B with the persistent preview. On 2026-10-15 he also explicitly authorised commit/push of
-   1C and provisional 1D, then continuation with the next plan block. Subsequent checkpoints
+   1C and provisional 1D, then 1E with Linux CI captures and continuation with the next plan block. Subsequent checkpoints
    remain subject to review and a separate publication go-ahead.
 4. The single integrator updates this handover/status after integrating agent results. Agents report
    their scope, patch and verification; they do not independently overwrite canonical status.
@@ -114,12 +137,13 @@ is a token-based chart configuration, not a selectable product skin.
 | 0.0 font licence; 0.1 tracking steps 1–2; 0.2 internal clone | Implemented and pushed with 1A; rebase/PR pending approval and Smart Mix integration                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 0.3 decisions                                                | Accepted, including one identity, small Admin captures and 520 KiB budget; calendar estimates provisional                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | 0.4–0.10, 0.12, 0.13                                         | Local implementation recorded; does not certify full CI, screenshots or device QA                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| 0.11 visual baselines                                        | Checkpoint 1E capture infrastructure implemented locally; 7 full-page Admin scenes and desktop/mobile Smart EQ smoke pass. Publication and Linux CI capture authorised by Diego; 31 Linux PNGs imported/reviewed from run 38807507930; pending comparison CI on the baseline commit; precedes Admin 1.0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 0.11 visual baselines                                        | Complete: 1E published; 31 canonical Linux PNGs imported/reviewed from run 38807507930. Full Frontend Tests and visual comparison pass on `cf477986` in run 38808354069 (appearance 26, Listen 34 / four skips, Admin 12). This prerequisite precedes the local 1F diff                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | 0.14 production graph                                        | Pending assignment; required before wheel, may wait during primitives                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 0.15 desktop runtime                                         | Pending qualification or approved fallback                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Checkpoint 0                                                 | Open; no claim of CI/device/visual approval                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Checkpoint 0                                                 | Open for remaining production/runtime/device gates; 0.11 Linux comparison is complete                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 1.2–1.4 / Checkpoint 1A                                      | Committed/pushed as `efe6cf2e`. At 1A: Shared 679, Admin 248, Listen 2,853 and Desktop 50 tests pass (Listen has 4 skipped); 66 focused primitive/CSS tests pass after the minified-fallback correction. Shared/Admin/Listen/Desktop typechecks, both app lints, package/app builds and 15 drift metrics pass without budget changes. Static spec/quality reviews found no actionable defects. Diego approved the mockup and authorised commit/push on 2026-10-15. CI/baselines/device QA remain pending                                                                                                                                                                                                                                                                                                                                         |
-| 1.0/1.7–1.12, 1b                                             | Not started; respect applicable gates                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 1.0 / Checkpoint 1F                                          | Local review diff: two Admin hairline callsites, real before/after mockup, Admin 248 unit / 14 browser and preview 26 pass. Spec/quality reviews pass. Publication approved by Diego on 2026-10-16; pending new Linux captures and remaining manual route QA                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 1.7–1.12, 1b                                                 | Not started; 1.7 waits for Task 1.0 and its applicable QA                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -240,11 +264,11 @@ is a token-based chart configuration, not a selectable product skin.
 ## Checkpoint 1E — capture infrastructure before Admin adoption
 
 Diego approved Checkpoint 1E and explicitly authorised its commit/push, the canonical Linux CI
-capture run and continuation with the next plan block on 2026-10-15. Task 0.11 preparation is
-verified locally and published as `552a31f1`; canonical captures and image review still precede
-Admin adoption. This checkpoint changes
-fixtures, capture tooling, CI and the mockup; Admin card contrast 1.0 and InstrumentPanel 1.7 have
-not started. Theme runtime retirement and the deferred 1D focus polish remain later work.
+capture run and continuation with the next plan block on 2026-10-15. Capture infrastructure is
+published as `552a31f1`, the debounced search fixture fix as `c7e9e961`, and reviewed Linux
+baselines as `cf477986`. Canonical recording, image review and full comparison CI pass, closing
+Task 0.11 before Admin changes. Task 1.0 is now a separate local 1F review diff; InstrumentPanel
+1.7 has not started. Theme runtime retirement and deferred 1D focus polish remain later work.
 
 - `appearance-chromium` and manual `update-listen-visual` run in
   `mcr.microsoft.com/playwright:v1.63.0-noble` on Linux amd64. Manual recording uploads both apps'
@@ -272,10 +296,9 @@ not started. Theme runtime retirement and the deferred 1D focus polish remain la
 - Review the seven current Admin scenes at <http://127.0.0.1:5186/#base-admin>. The gallery now imports the committed Linux PNGs directly, including on a clean clone. These
   references precede the V3 Admin redesign. The README explains advisory local rendering. Approved 1A–1C and provisional 1D remain in the same persistent mockup.
 
-Publication, canonical capture, manifest verification and image review are done. Run comparison
-CI on the imported-baseline revision.
-Only then close 0.11 and continue Admin 1.0 → InstrumentPanel 1.7. Do not claim 0.11 complete from
-local smoke results or move to Admin adoption while the Linux image review is pending.
+Publication, canonical capture, manifest verification, image review and comparison CI are done.
+Task 0.11 is closed by the successful run below. Admin 1.0 proceeds at its own Checkpoint 1F;
+its new visual states still need publication, Linux capture/review and remaining route QA before 1.7.
 
 ### 1E CI follow-up
 
@@ -284,7 +307,7 @@ intentional skips) and generated seven Admin scenes, but failed one functional c
 case: its 300 ms debounced `/api/search` request lacked a fixture. Fast local clicks had hidden
 the request. The test now waits for the search response before selecting the action, reproducing
 the missing route locally; a typed-shape empty artists/albums/tracks fixture preserves strict
-unknown-route failures. Do not import PNGs from the failed run. Repeat capture on the fix SHA.
+unknown-route failures. No PNGs were imported from the failed run; the successful repeat used the fix SHA.
 
 ### 1E canonical capture review
 
@@ -302,5 +325,37 @@ unknown-route failures. Do not import PNGs from the failed run. Repeat capture o
 - Full Admin pages include Genres Sound Intelligence and System Resources. EQ shows ten bands,
   the genre-taxonomy source and inherited Rock in desktop/mobile. No PNG was generated on Mac
   for baseline import. The mockup's 1E gallery now uses these exact committed references.
-- Canonical recording and image review pass; comparison CI on the imported-baseline revision is
-  the remaining 0.11 gate before starting Admin 1.0. Other Phase 0/runtime/device gates remain open.
+- Comparison and full Frontend Tests pass: <https://github.com/thecrateapp/crate/actions/runs/38808354069>,
+  source `cf4779868208bc4dc9445d1e80f545dc277f3988`. Appearance 26, Listen 34 / four intentional
+  skips, Admin 12; all frontend suites, types, lint, builds, budgets and design gates pass. This
+  closes 0.11. Other Phase 0/runtime/device gates remain open.
+
+## Checkpoint 1F — Admin card contrast (Task 1.0)
+
+Diego approved commit/push of the contrast checkpoint, its Linux capture run and continuation
+with InstrumentPanel on 2026-10-16. Canonical capture/review and route QA still precede 1.7. Diego's 2026-10-16
+feedback confirms the unboxed TrackReadout as final Audio Profile, not the legacy KPI treatment.
+The mockup distinguishes that target from this temporary contrast comparison. Inventory at
+`cf477986` found 99 background-token usages across 39 files, with only two borderless card
+callsites: four Audio Profile KPI boxes and the image-crop modal. Existing Card/Badge/Select
+borders, artwork placeholders, progress tracks, hover states and separated calendar cells need
+no change. The two callsites gain `border border-border-quiet`; tokens and behaviour stay intact.
+
+- The seven 1E captures do not expose either state. `tests/admin-e2e/card-contrast.spec.ts` adds
+  deterministic analysis data for the real Album KPI grid and opens the real crop modal with a
+  synthetic image. Tests reproduced the missing 0px border, then passed with the fix. They check
+  all four sides against the effective quiet token, normalising browser colour representations
+  to RGBA, and confirm cancellation performs no API write. No upload is submitted.
+- The persistent mockup at <http://127.0.0.1:5186/#contraste-admin> shows real before/after crops
+  from local browser renders, clearly labelled advisory. They live in ignored `.artifacts/`;
+  missing assets retain an explicit placeholder. The 31 canonical 1E PNGs remain unchanged.
+- Verification passes: Admin 248 unit tests, 14 browser checks, preview 26 checks, Admin types and
+  lint, Admin/preview builds and unchanged bundle budget: 515,384 B gzip / 532,480 B ceiling.
+  Spec and quality review have no actionable findings.
+- Manual local review visited 24 of 25 sidebar destinations, covering populated, empty and some
+  loading states. Logs navigation timed out in the browser harness and is unqualified; entity
+  details, editors and non-sidebar routes are not fully walked. This is not a completed all-route
+  qualification. Focused fixture tests cover the two changed surfaces independently.
+- Remaining gates: canonical Linux captures of both new scenes with diff review, and completion
+  of the manual route QA required by Task 1.0. Publication was explicitly approved on 2026-10-16.
+  Do not close Task 1.0 or start InstrumentPanel 1.7 from these local checks alone.

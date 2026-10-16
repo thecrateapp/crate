@@ -209,11 +209,13 @@ params, window_seconds)` and `dispatch_due()`): the first trigger sets `<key>:di
 
 Status: implementation in progress. Tasks 0.0, 0.1 steps 1–2, 0.2–0.10, 0.12 and 0.13 have
 local implementation recorded in the handover. This does not close CI, screenshot or device QA.
-Checkpoint 0 remains open for 0.11/0.14/0.15 and its reviews (0.14 may wait until the wheel).
+Task 0.11 is complete with reviewed Linux baselines and green comparison CI at `cf477986`.
+Checkpoint 0 remains open for 0.14/0.15 and device reviews (0.14 may wait until the wheel).
 Diego approved Checkpoint 1A (1.2–1.4) on 2026-10-15 after reviewing the mockup and authorised
 commit/push of that batch and its persistent preview, published as `efe6cf2e` on `origin/feat/crate_v3`.
 Tasks 1.5–1.6 are implemented and approved at Checkpoint 1B; Diego authorised their commit/push. Runtime theme retirement (1.13) is planned, not implemented. Local full-suite results
-are in the handover; CI, production screenshot baselines and device QA remain pending.
+are in the handover; Linux baseline comparison and full frontend CI pass on 1E. Device/runtime
+QA and later tasks' own visual gates remain pending.
 
 ---
 
@@ -285,7 +287,9 @@ linear(0, 1))`, and no final state may depend on an animation running.
   - Admin copy is English.
   - Shared components take copy as props.
 - [ ] **Conventions.**
-  - Admin uses `lucide-react` and `sonner`; Listen uses `@crate/ui/icons` and `notify`.
+  - Admin uses `sonner`; V3 removes almost all Admin icons (DS §1.7 / Task 1b.8).
+    `lucide-react` is only the source for reviewed functional exceptions. Listen keeps
+    `@crate/ui/icons` and `notify`.
   - Nivo only for statistical charts (PD1). No emojis.
   - A component goes into `@crate/ui` only when both apps import it directly in the same change.
 - [ ] **Performance.** Applies the rules listed under "Repo rules that apply", plus:
@@ -329,9 +333,13 @@ The original four commits established the visual baseline; subsequent commits im
 of Phase 0. They are history, not a current progress counter. The handover records completion and
 QA separately. Documents are tracked, the internal clone exists and Bricolage is in place.
 
-**Current order:** 1A/1B are approved/pushed; GenrePill 1C (`e60e6f50`) and provisional 1D (`d881a728`) are pushed with approval. Further focus-fade visual polishing is deferred. Continue capture preparation at Checkpoint 1E (Task 0.11), then stop for review before its publication/canonical capture run. Smart Mix and Phase 0 gates remain separate. Checkpoint 0 remains open: visual baselines 0.11 and runtime qualification
-0.15 are pending; production measurement 0.14 is needed before the wheel and requires assignment.
-No exception authorises 1.0 or the rest of Phase 1 before review; Admin captures still precede 1.0.
+**Current order:** 1A–1C and provisional 1D are approved/pushed. Further focus-fade visual
+polishing is deferred. Diego approved publication of 1E, its Linux capture run and continuation.
+Task 0.11 is complete: 31 reviewed Linux PNGs and green comparison/full frontend CI on `cf477986`
+(run `38808354069`). Task 1.0 is implemented locally at Checkpoint 1F for review; its own Linux
+captures and remaining manual route QA still precede InstrumentPanel 1.7. Smart Mix and Phase 0
+gates remain separate: runtime qualification 0.15 and device QA are pending; production measurement
+0.14 is needed before the wheel and requires assignment.
 
 The integration sequence is Smart Mix on `main` → approved rebase of `feat/crate_v3` → website
 integration → internal milestones → one joint P0 major for Listen, Admin, site and docs. R0 work
@@ -775,8 +783,10 @@ and known-below-AA allowance with the retired runtime. Crate v3 contrast and QA 
 both Smart EQ scenes are published. Successful Linux run `38807507930` at `c7e9e961` produced
 31 reviewed PNGs (24 Listen / seven Admin), imported with the original provenance manifest.
 The shared runtime guard blocks local baseline recording; advisory `CRATE_VISUAL_SMOKE=1`
-renders write only to ignored test results. Pending: comparison CI on the imported baselines.
-**0.11 remains open until comparison passes; do not start Admin 1.0/1.7 yet.**
+renders write only to ignored test results. Imported-baseline revision `cf477986` passes full
+Frontend Tests and visual comparison in run `38808354069`: appearance 26, Listen 34 / four
+intentional skips, Admin 12. **Task 0.11 is complete.** Task 1.0 proceeds in a separate local
+checkpoint; its own visual/route gates still precede 1.7.
 
 **Files:**
 
@@ -978,11 +988,18 @@ Continue Task 0.11 before Admin 1.0 → InstrumentPanel 1.7.
 
 ### Checkpoint 1E — capture preparation before Admin changes
 
-Keep the existing mockup and add `#base-admin` with the seven actual current Admin scenes,
-clearly labelled local references with Linux baselines pending. Preserve the approved primitives
-and provisional focus specimen. Stop for review of the capture pipeline; publish only with Diego's
-go-ahead, then run the pinned Linux job and review/import its images before Admin 1.0. This
-checkpoint prepares Task 0.11 and does not close its image/CI gates.
+Diego approved/published 1E and authorised canonical Linux captures. The existing mockup at
+`#base-admin` now shows seven actual committed Linux Admin references. Preserve approved
+primitives and provisional focus. Recording run `38807507930`, manifest/image review and comparison
+run `38808354069` pass; Task 0.11 is complete before the separate 1F Admin change.
+
+### Checkpoint 1F — Admin card contrast
+
+Task 1.0 is implemented locally at two callsites. Review actual before/after local renders at
+<http://127.0.0.1:5186/#contraste-admin>; canonical 1E references remain unchanged. Admin 248 unit
+checks, 14 browser checks and preview 26 pass, with spec/quality review and unchanged bundle
+budget. Stop for Diego's review. Publication, two new Linux scene captures/diff review and remaining
+manual route QA precede Task 1.0 completion and InstrumentPanel 1.7. Details are in the handover.
 
 Only primitives and helpers that both apps import directly in the same change.
 
@@ -996,6 +1013,27 @@ Only primitives and helpers that both apps import directly in the same change.
   re-baseline at the end.
 
 ### Task 1.0: Keep Admin cards visible on the new canvas (PD6 / [D6])
+
+**Current inventory / Checkpoint 1F:** the historical estimate below is superseded by the
+`cf477986` inventory: 99 real background-token usages across 39 files, but only two borderless
+card callsites remain: `AudioProfileCard.StatBox` (four KPIs) and the `ImageCropUpload` modal.
+These hairlines are a temporary repair to legacy surfaces. Diego reaffirmed on 2026-10-16 that
+Audio Profile's final design is the unboxed, icon-free site TrackReadout (Task 3.9b), not these KPIs.
+The mockup shows his reference separately, labelled as the target rather than an implementation.
+Existing Card/Badge/Select recipes already supply their borders; artwork placeholders, progress
+tracks, hover states and calendar cells with grid separators are not card surfaces. Apply PD6(a)
+only to those two callsites. The seven initial Admin baselines do not show either state, so add
+focused real-Album scenes with deterministic analysis data and an open synthetic-image crop.
+Their Linux baselines and the route walkthrough belong to this task's own visual QA.
+
+**Local status:** both hairlines are implemented with browser regressions in
+`tests/admin-e2e/card-contrast.spec.ts` and the persistent 1F before/after preview. Tests reproduced
+0px borders before the fix; Admin 248 unit / 14 browser and preview 26 pass afterwards. Types,
+lint, builds and the 532,480 B budget pass (515,384 B initial JS gzip). Spec/quality review passes.
+Diego approved commit/push and the Linux capture run on 2026-10-16. Pending: canonical Linux
+capture/review of these new states and the
+remaining manual route walkthrough. Logs and non-sidebar/detail/editor routes remain unqualified;
+24 sidebar destinations were visited, including some loading states. **Task 1.0 is not closed.**
 
 **Why:** `d9df9d51` changed `--crate-token-surface-card-solid` from `#16161e` to `#0d0e14`, about
 1.07:1 against the `#0a0a0f` canvas (`crate-v3-analysis/v3-state.md:322`). Admin uses `bg-card`,
@@ -1232,7 +1270,7 @@ for Diego to review the percentage-bearing component. Its commit/push was author
   - header made of two `MonoLabel`s and a status slot in `aria-live="polite"`
   - `as`, `headingLevel`
 - Modify (Listen adopter): `app/listen/src/components/settings/SettingsPrimitives.tsx` (`Section` renders `InstrumentPanel as="section"`)
-- Modify (Admin adopter): `app/ui/src/pages/SystemHealth.tsx` (the "Resources" `OpsPanel` becomes `InstrumentPanel`)
+- Modify (Admin adopter): `app/ui/src/pages/SystemHealth.tsx` (the "Resources" `OpsPanel` becomes `InstrumentPanel`; no decorative panel/header icons per DS §1.7)
 - Test:
   - `app/listen/src/pages/Settings.test.tsx`
   - `app/ui/src/pages/SystemHealth.test.tsx`: new page test, using `renderWithAdminProviders` from `app/ui/src/test/render-with-admin-providers.tsx`
@@ -1420,7 +1458,8 @@ DS §5.5–5.11 and PD §3.1.5, and need an owner before any screen is restyled.
 
 Only two of these tasks are needed by the instruments: 1b.3 (tabs, e.g. the Wheel/Tree/Grid toggle)
 and 1b.4 (warming, empty and error states). They complete the internal Foundation milestone.
-1b.1, 1b.2, 1b.5, 1b.6 and 1b.7 may run alongside later internal groups when assigned and gate
+1b.1, 1b.2, 1b.5, 1b.6, 1b.7 and the Admin icon migration 1b.8 may run alongside later internal
+groups when assigned and gate
 only Phase 6. Product work continues into `feat/crate_v3`; it does not move to `main` after Foundation.
 
 Each task below follows the same shape: inventory with `grep`, failing render and a11y tests,
@@ -1505,11 +1544,43 @@ Test: `Shell.test.tsx` in both apps (first Tab focuses the link; Enter moves foc
 
 Commit: `feat(a11y): add a skip link to both shells`.
 
+### Task 1b.8: Remove almost all Admin icons (Diego, 2026-10-16)
+
+**Scope:** the Admin app, including labelled navigation and actions. Default to text, display
+figures, mono labels, rules and dots with state words; remove decorative and redundant icons.
+Listen/desktop player and navigation icon policy is unchanged. This is an explicit V3 direction,
+not authorisation to execute a blanket icon deletion before a reviewed inventory.
+
+**Files:**
+
+- Inventory `lucide-react` imports, icon props/maps and wrapped/shared icons in `app/ui/src/**`.
+  Record every retained functional exception and why text or a simple marker is insufficient.
+  Check existing close/disclosure/playback controls individually; they are not blanket exemptions.
+- Modify `app/ui/src/components/layout/{Sidebar,CommandPalette,Shell}.tsx` and the page/component
+  callsites identified by the inventory. Task 3.2 adopts text navigation and reconciles this work;
+  each later page task starts with the same policy rather than reintroducing icons.
+- For shared components that already expose an icon prop, Admin omits it. Do not remove icons
+  globally from shared controls used by Listen; if a shared control needs an opt-out, change it
+  with consumer tests and preserve the other app's behaviour.
+- Create `app/ui/src/admin-icon-policy.test.ts`: a source-policy check over the inventoried icon
+  entry points, with explicit per-callsite reviewed exceptions that may only shrink. Do not rely
+  only on direct `lucide-react` imports; wrapped icons/props need coverage too.
+- Update the affected route/component tests, `Sidebar.test.tsx`, `CommandPalette.test.tsx` and
+  `Shell.test.tsx` for text labels, capabilities, keyboard operation, state and 44px touch targets.
+  Remove unused icon imports; remove the package only if no justified import remains.
+
+**Steps:** inventory first and show it at a checkpoint; write failing render/accessibility and
+policy tests; migrate a reviewable group at a time; run `VT-ADMIN`, `TYPES`, `LINT`, `BUNDLE-ADMIN`
+and `ADMIN-E2E`; record/review Linux captures of changed states. Keep the persistent mockup current
+and stop for visual review/publication approval per group. No behaviour or permissions are removed.
+
+Commit per reviewed group: `refactor(ui): replace redundant Admin icons with text`.
+
 ### Checkpoint 1b
 
 After the last of the parallel 1b tasks, Diego walks Admin and Listen with the shared layer
 restyled. Unrestyled screens then read as v3 at the level of tokens, dialogs, forms, states, rows
-and status colour. Until then the baseline for an un-migrated screen is the foundation (tokens,
+and status colour, with almost all Admin icons retired under 1b.8. Until then the baseline for an un-migrated screen is the foundation (tokens,
 focus, toasts, tabs, states) plus whichever 1b tasks have shipped (Rollout → Partial migration during development). This checkpoint gates Phase 6, not the internal Foundation milestone.
 
 ---
@@ -2903,6 +2974,7 @@ Admin scramble.
 - Modify: `app/ui/src/components/layout/Sidebar.tsx`
   - `MonoLabel` group labels; regrouped if PD14 = (a)
   - active item with a 2 px `accent-action-hi` bar
+  - text navigation without decorative item icons; reconcile Task 1b.8 and keep its reviewed exceptions narrow
   - badges as a mono count plus `StatusDot`
   - the collapsed 72 px rail keeps only the dots
 - Modify: `app/ui/src/components/layout/Shell.tsx`
@@ -3312,6 +3384,14 @@ Commits:
 Release note: re-analysing an album that is already queued returns the queued task.
 
 ### Task 3.9b: Shared `TrackReadout` in Admin Analysis, Admin Album and Listen Info tab
+
+**Visual target confirmed 2026-10-16:** follow the site `TrackReadout.astro` at pin `258bbaee`,
+reaffirmed by Diego's screenshot: large BPM/key/loudness/dynamic-range figures beneath top rules,
+five thin feature bars and a bipolar 20-value Bliss strip. No per-metric boxes, metric icons,
+header icons or substituted radar. Preserve V3 typography/tokens, real state and honest units;
+the reference's LUFS label does not override the `dB` contract until validated integrated LUFS
+exists. 1F's legacy contrast repair does not implement or approve the final Audio Profile.
+This confirmation does not silently reorder the backend/Camelot/shared-consumer prerequisites.
 
 **Files:**
 

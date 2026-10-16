@@ -20,6 +20,7 @@ import {
   SelectItem,
 } from "@crate/ui/shadcn/select";
 import { StatNumber } from "@crate/ui/primitives/StatNumber";
+import adminTrackReadoutReference from "./references/admin-track-readout.png";
 import "./style.css";
 
 const disposeFocusRingMotion = installFocusRingMotion();
@@ -37,6 +38,26 @@ const adminScenes = [
   { key: "album", label: "Album" },
   { key: "settings", label: "Settings" },
   { key: "system", label: "System Health" },
+];
+const adminContrastImages = import.meta.glob<string>(
+  "./.artifacts/admin-contrast/**/*.png",
+  { eager: true, query: "?url", import: "default" },
+);
+const adminContrastScenes = [
+  {
+    name: "admin-audio-profile-kpis",
+    title: "Audio Profile",
+    description:
+      "Componente anterior con un ajuste temporal de contraste. Será sustituido por TrackReadout.",
+    width: 220,
+  },
+  {
+    name: "admin-image-crop-modal",
+    title: "Recorte de imagen",
+    description:
+      "Cambio mínimo: solo un borde exterior de 1 px. El rediseño del modal llegará con la tarea 1b.1.",
+    width: 600,
+  },
 ];
 
 const artistGenreProfile: GenreProfileItem[] = [
@@ -94,7 +115,7 @@ function App() {
           crate<span className="version">v3</span>
         </a>
         <MonoLabel
-          meta={["Checkpoint 1E", "Base de Admin · Linux CI"]}
+          meta={["Checkpoint 1F", "Contornos de Admin"]}
           className="masthead-meta"
         />
         <a className="jump" href="#primitivas">
@@ -698,9 +719,102 @@ function App() {
           })}
         </div>
       </section>
+      <section
+        id="contraste-admin"
+        className="admin-baseline-feature"
+        aria-label="Checkpoint 1F, contraste de tarjetas de Admin"
+      >
+        <div className="specimen-heading">
+          <div>
+            <MonoLabel size="eyebrow" accent="07">
+              Checkpoint 1F · En revisión
+            </MonoLabel>
+            <h2>Tarjetas que se distinguen.</h2>
+          </div>
+        </div>
+        <p className="admin-baseline-note">
+          Comparación local. Capturas de Linux del cambio pendientes.
+        </p>
+        <p className="admin-baseline-note">
+          Ajuste provisional de contraste. El diseño final de Audio Profile es
+          TrackReadout.
+        </p>
+        <aside
+          id="audio-profile-objetivo"
+          className="admin-audio-target"
+          aria-labelledby="audio-profile-objetivo-heading"
+        >
+          <MonoLabel as="h3" id="audio-profile-objetivo-heading">
+            Audio Profile · diseño objetivo
+          </MonoLabel>
+          <p className="admin-baseline-note">
+            Referencia visual del site aportada por Diego. Cifras grandes,
+            reglas, cinco barras y vector Bliss, sin cajas de métricas ni
+            iconos. Pendiente de implementar en la tarea 3.9b.
+          </p>
+          <a href={adminTrackReadoutReference} target="_blank" rel="noreferrer">
+            <img
+              src={adminTrackReadoutReference}
+              alt="Referencia visual de TrackReadout del site: cifras, cinco barras y vector Bliss, sin iconos"
+              width={1412}
+              height={1048}
+              loading="lazy"
+            />
+          </a>
+          <p className="admin-baseline-note">
+            Imagen de referencia, no captura de la app. La app conservará dB
+            hasta disponer de una medición LUFS validada. Admin V3 prescinde de
+            casi todos los iconos, también en navegación y acciones con texto.
+          </p>
+        </aside>
+        <div className="admin-contrast-layout">
+          {adminContrastScenes.map(({ name, title, description, width }) => (
+            <article key={name} className="admin-contrast-specimen">
+              <MonoLabel as="h3">{title}</MonoLabel>
+              <p className="admin-baseline-note">{description}</p>
+              <div className="admin-contrast-pair">
+                {(["before", "after"] as const).map((phase) => {
+                  const source =
+                    adminContrastImages[
+                      `./.artifacts/admin-contrast/${phase}/${name}.png`
+                    ];
+                  return (
+                    <figure key={phase}>
+                      <figcaption>
+                        {phase === "before" ? "Antes" : "Con borde"}
+                      </figcaption>
+                      {source ? (
+                        <a href={source} target="_blank" rel="noreferrer">
+                          <img
+                            src={source}
+                            alt={`${title}: ${
+                              phase === "before" ? "antes" : "con borde"
+                            }`}
+                            width={width}
+                            loading="lazy"
+                          />
+                        </a>
+                      ) : (
+                        <p className="admin-capture-pending">
+                          Vista local pendiente de generar
+                        </p>
+                      )}
+                    </figure>
+                  );
+                })}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
       <footer>
         <MonoLabel
-          meta={["1A–1C publicados", "1D provisional", "1E publicado"]}
+          meta={[
+            "1A–1C publicados",
+            "1D provisional",
+            "1E publicado",
+            "1F en revisión",
+          ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>
       </footer>

@@ -92,6 +92,132 @@ async function expectAdminReferenceGallery(page: Page) {
   ).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
 }
 
+async function expectAdminContrastGallery(page: Page) {
+  await page.goto("/#contraste-admin");
+  const gallery = page.locator("#contraste-admin");
+  await expect(
+    gallery.getByRole("heading", {
+      level: 2,
+      name: "Tarjetas que se distinguen.",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    gallery.getByText(
+      "Comparación local. Capturas de Linux del cambio pendientes.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(
+    gallery.getByText(
+      "Ajuste provisional de contraste. El diseño final de Audio Profile es TrackReadout.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+
+  const target = gallery.locator("aside#audio-profile-objetivo");
+  await expect(target).toHaveCount(1);
+  await expect(gallery.locator("article #audio-profile-objetivo")).toHaveCount(
+    0,
+  );
+  await expect(
+    target.getByRole("heading", {
+      level: 3,
+      name: "Audio Profile · diseño objetivo",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(target.locator("img")).toHaveCount(1);
+  const reference = target.getByRole("img", {
+    name: "Referencia visual de TrackReadout del site: cifras, cinco barras y vector Bliss, sin iconos",
+    exact: true,
+  });
+  await reference.scrollIntoViewIfNeeded();
+  await expect(reference).toBeVisible();
+  await expect
+    .poll(() =>
+      reference.evaluate((element) => {
+        const image = element as HTMLImageElement;
+        return (
+          image.complete && image.naturalWidth > 0 && image.naturalHeight > 0
+        );
+      }),
+    )
+    .toBe(true);
+  const source = await reference.evaluate(
+    (element) => (element as HTMLImageElement).currentSrc,
+  );
+  const fullImageLink = reference.locator("xpath=ancestor::a[1]");
+  await expect(fullImageLink).toHaveCount(1);
+  expect(
+    await fullImageLink.evaluate(
+      (element) => (element as HTMLAnchorElement).href,
+    ),
+  ).toBe(source);
+
+  const articles = gallery.locator("article");
+  await expect(articles).toHaveCount(2);
+  await expect(gallery.locator("figure")).toHaveCount(4);
+  for (const title of ["Audio Profile", "Recorte de imagen"]) {
+    const article = articles.filter({
+      has: page.getByRole("heading", { level: 3, name: title, exact: true }),
+    });
+    await expect(article).toHaveCount(1);
+    await expect(article.locator("figure")).toHaveCount(2);
+    for (const [caption, alt] of [
+      ["Antes", `${title}: antes`],
+      ["Con borde", `${title}: con borde`],
+    ]) {
+      const figure = article.locator("figure").filter({
+        has: page.locator("figcaption", { hasText: caption }),
+      });
+      await expect(figure).toHaveCount(1);
+      await expect(figure.locator("figcaption")).toHaveText(caption);
+      const image = figure.getByRole("img", { name: alt, exact: true });
+      const placeholder = figure.getByText("Vista local pendiente de generar", {
+        exact: true,
+      });
+      if ((await image.count()) > 0) {
+        await expect(figure.locator("img")).toHaveCount(1);
+        await expect(placeholder).toHaveCount(0);
+        await image.scrollIntoViewIfNeeded();
+        await expect(image).toBeVisible();
+        await expect
+          .poll(() =>
+            image.evaluate((element) => {
+              const preview = element as HTMLImageElement;
+              return (
+                preview.complete &&
+                preview.naturalWidth > 0 &&
+                preview.naturalHeight > 0
+              );
+            }),
+          )
+          .toBe(true);
+        const source = await image.evaluate(
+          (element) => (element as HTMLImageElement).currentSrc,
+        );
+        expect(new URL(source).pathname).toMatch(/\.png$/i);
+        const targets = await figure
+          .getByRole("link")
+          .evaluateAll((links) =>
+            links.map((link) => (link as HTMLAnchorElement).href),
+          );
+        expect(targets).toContain(source);
+      } else {
+        await expect(figure.locator("img")).toHaveCount(0);
+        await placeholder.scrollIntoViewIfNeeded();
+        await expect(placeholder).toBeVisible();
+        await expect(figure.locator('a[href*=".png"]')).toHaveCount(0);
+      }
+    }
+  }
+
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto("/#filas-y-chips");
   await page.evaluate(() => document.fonts.ready);
@@ -109,6 +235,12 @@ test("shows the seven Admin reference scenes with local previews or explicit pen
   page,
 }) => {
   await expectAdminReferenceGallery(page);
+});
+
+test("shows both Admin contrast comparisons with local images or explicit pending states", async ({
+  page,
+}) => {
+  await expectAdminContrastGallery(page);
 });
 
 test("selects a whole row through its trailing slot", async ({ page }) => {
@@ -351,6 +483,12 @@ test.describe("touch layout", () => {
     page,
   }) => {
     await expectAdminReferenceGallery(page);
+  });
+
+  test("keeps both Admin contrast comparisons usable without horizontal overflow", async ({
+    page,
+  }) => {
+    await expectAdminContrastGallery(page);
   });
 
   test("keeps 44px interactive targets without horizontal overflow", async ({

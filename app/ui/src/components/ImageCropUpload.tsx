@@ -127,7 +127,7 @@ export function ImageCropUpload({
           onClick={cancel}
         >
           <div
-            className="bg-card rounded-md shadow-2xl w-[90vw] max-w-[600px] overflow-hidden"
+            className="bg-card rounded-md border border-border-quiet shadow-2xl w-[90vw] max-w-[600px] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">

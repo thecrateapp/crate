@@ -205,3 +205,34 @@ comparison CI passes. No Admin restyle or final focus-polish approval is implied
 Diego approved Checkpoint 1E on 2026-10-15 and explicitly authorised its commit/push, the Linux CI
 capture run and continuation with the next plan block. Verify provenance and review/import the
 canonical PNGs before Admin adoption; retain the mockup and review checkpoints.
+
+## Admin typography and Audio Profile direction — 2026-10-16
+
+Diego clarified: “el audio profile deberia verse mas parecido a esto, tambien es un mockup de
+admin en el site nuevo” and “en admin vamos a prescindir de muchisimos iconos, de practimanete todos”.
+His reference shows four large BPM/key/loudness/dynamic-range figures, top rules, five thin feature
+bars and a bipolar 20-value Bliss strip, without per-metric cards or icons.
+
+The existing TrackReadout target (PD §4.7 / DS §4.5 / Task 3.9b) is reaffirmed. Checkpoint 1F's
+legacy KPI hairlines are temporary contrast work, not final Audio Profile design or visual
+approval. Keep the site pin `258bbaee`, Crate V3 tokens/fonts, no app grain/marketing cycling,
+and `dB` until integrated LUFS is backed by the validated measurement contract. No dependency
+reordering or runtime implementation is implied by recording this direction.
+
+The prior DS §1.7 statement that icons stay on navigation/actions is superseded for Admin.
+Almost all Admin icons are retired, including decorative headers/metrics and redundant icons
+beside labelled actions/navigation. Text, numerals, rules and dots with state words carry the UI.
+Retained functional icons require a narrow per-callsite justification and checkpoint review;
+no blanket action/navigation exemption. Task 1b.8 owns the cross-screen inventory and migration,
+with each page task adopting the rule. Preserve functionality, capabilities, accessible names,
+keyboard operation and touch targets. `lucide-react` remains the source for any approved Admin
+exception; Listen/desktop icon conventions are unchanged. This is a target, not an implemented
+whole-Admin removal. No commit/push of 1F or blanket source deletion has been authorised.
+
+Diego confirmed the existing sequence: “vale, si ya esta planificada, la abordamos cuando toque”.
+Keep Task 3.9b in its planned position; the reference does not advance its implementation.
+
+On 2026-10-16 Diego explicitly authorised commit/push of Checkpoint 1F, its Linux CI captures,
+and continuation to InstrumentPanel with the persistent mockup and review checkpoints. This
+supersedes the local-only publication notes above, without advancing the deferred TrackReadout
+or globally deleting Admin icons. Task 1.0 visual/route QA still precedes production adoption in 1.7.

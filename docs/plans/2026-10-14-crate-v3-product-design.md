@@ -88,7 +88,9 @@ Principles:
 1. **The product is an instrument.** A screen is a figure: a mono header over a hairline, display
    numerals for quantities, hairline rows for lists, a dot plus a word for state. No glass, no
    lifted cards, no icon tiles, no decorative gradients. Boxed cards only for objects (ticket, JSON
-   sidecar, terminal, toast, dialog).
+   sidecar, terminal, toast, dialog). Admin removes almost all icons, including icons beside
+   labelled navigation/actions; retain only individually reviewed functional exceptions. Listen
+   player/navigation icons are unaffected (Diego, 2026-10-16; DS §1.7, Task 1b.8).
 2. **Real data only.** First paint shows the current state from a warmed payload. Motion happens
    only when data changes: a spring re-targets, a new edge draws, a counter counts up on first view,
    a task event moves a cursor. The site's marketing devices are not ported: no auto-cycling
@@ -128,8 +130,9 @@ Principles:
 8. **Placement and conventions.**
    - A component goes into `@crate/ui` only when both apps render it in the same change. Otherwise it
      stays in the app, math included.
-   - Admin uses `lucide-react`, `sonner` and English copy. Listen uses `@crate/ui/icons`, `notify` and
-     i18n in 7 catalogs (en, es, fr, de, it, ca, eu).
+   - Admin uses `sonner` and English copy; almost all icons are retired, with `lucide-react`
+     reserved for reviewed functional exceptions (DS §1.7). Listen uses `@crate/ui/icons`, `notify`
+     and i18n in 7 catalogs (en, es, fr, de, it, ca, eu).
    - Shared visuals take data, copy, icons and callbacks as props; no `useApi`, SSE, i18n or player
      context inside `@crate/ui`.
 
@@ -1351,7 +1354,7 @@ edges come from MusicBrainz, AI proposals and curators.
   scramble, `its own preset` or `inherited from X`; the mini EQ springs (140/15).
 - **Click or Enter** pins. The inspector shows name and origin badge (core / overlay / local
   override), family, direct and roll-up counts as `StatNumber`s, the EQ block (4.6.2), relations
-  grouped by the 4 types as `HairlineList` rows with provenance (crate-core with a lucide `Lock`,
+  grouped by the 4 types as `HairlineList` rows with textual provenance (`crate-core · locked`,
   manual, musicbrainz, ai_proposal, other), aliases with origin (`nodes[].aliases`), and `Open
 genre`. Escape clears.
 - **Modes**: chips `EQ coverage` (default), `Content` (radius and label weight by
@@ -1526,11 +1529,7 @@ interface GenreWheelPayload {
     target: string;
     type: RelationType;
     provenance:
-      | "crate-core"
-      | "manual"
-      | "musicbrainz"
-      | "ai_proposal"
-      | "other"; // see Modes
+      "crate-core" | "manual" | "musicbrainz" | "ai_proposal" | "other"; // see Modes
     locked: boolean;
     suppressed: boolean;
     confidence: number;
@@ -1760,6 +1759,11 @@ site's `src/data/scale.json`.
 
 #### Album readout (Admin) and Info tab (Listen)
 
+- **Visual target reaffirmed 2026-10-16:** Diego's site reference is the Admin Audio Profile
+  direction: large figures with top rules, five thin feature bars and bipolar Bliss values,
+  without metric cards or icons. Checkpoint 1F only repairs contrast on the legacy component;
+  it is not the final design. The app keeps V3 tokens and honest units (`dB` until validated LUFS),
+  no marketing grain or automatic cycling. Implementation remains Task 3.9b with its prerequisites.
 - Admin Album: the readout replaces `AudioProfileCard` and the per-track radar tooltip; `TrackTable`
   selects the track. The existing `Analyze` header button becomes `Re-analyse album`
   (`library.analysis.manage`, deduplicated); after `done` the panel refetches and then polls the

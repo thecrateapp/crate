@@ -97,3 +97,42 @@ capture configurations default to comparison-only mode; recording is rejected ou
 Linux amd64 CI runtime. After publication approval, dispatch **Frontend Tests** on the published
 branch with **update_visual = true**, review its artifact and manifest, then import the PNGs and
 run comparison CI. Keep each checkpoint's new changes separate from the reviewed references.
+
+## Admin card contrast / Checkpoint 1F
+
+Open <http://127.0.0.1:5186/#contraste-admin> for the two real Admin surfaces changed by Task 1.0:
+four Audio Profile KPI boxes and the image-crop modal. Each has a local **Before / With border**
+comparison. The only product change adds `border border-border-quiet` to these two callsites.
+The 1E gallery remains the committed Linux reference; it passes comparison CI in run `38808354069`.
+
+Local comparison PNGs are optional, ignored review assets under
+`.artifacts/admin-contrast/{before,after}/`. A clean clone displays explicit missing-image
+placeholders until they are supplied. The before images were preserved before adding the borders.
+Regenerate advisory after images from the current real components with:
+
+```bash
+CRATE_VISUAL_SMOKE=1 PLAYWRIGHT_CHANNEL=chrome npm run test:admin-e2e -- --workers=1 --grep 'quiet hairline'
+```
+
+Copy the resulting `admin-audio-profile-kpis.png` and `admin-image-crop-modal.png` from the two
+ignored `test-results/admin-e2e/` test directories into `.artifacts/admin-contrast/after/`.
+Do not overwrite the preserved before images with renders of the changed components. The tests
+open deterministic analysis data and a synthetic crop image, then cancel without submitting an
+upload. They check actual rendered borders against the quiet token.
+
+The local preview and its 26 checks do not close 1F Linux image review or Task 1.0's remaining
+manual route qualification. Stop for review before publication and before InstrumentPanel 1.7.
+
+### Audio Profile target clarified — 2026-10-16
+
+The existing 1F KPI comparison is a temporary repair to the legacy component, not the final design.
+`#audio-profile-objetivo` shows Diego's supplied site reference, copied without alteration into
+`references/admin-track-readout.png`. This is a visual reference, not a generated baseline or a
+working TrackReadout. The final Task 3.9b component has large figures above rules, five feature
+bars and a bipolar Bliss strip, without metric cards or icons, and uses the existing V3 tokens.
+The image's LUFS label does not override the app's `dB` contract before validated integrated LUFS.
+
+Admin V3 removes almost all icons, including redundant icons beside text actions/navigation;
+Task 1b.8 plans the reviewed migration and limited functional exceptions. Listen/desktop icons
+remain under their existing convention. The mockup retains the 1E Linux references and 1F local
+comparisons without presenting either as the final Audio Profile design.

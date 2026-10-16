@@ -587,13 +587,20 @@ max(12vh, 96px)` becomes the shell's header height plus 24 px).
 
 ### 1.7 Iconography
 
-- Admin: `lucide-react`. Listen and Desktop: `@crate/ui/icons` (Solar) sized with
-  `CRATE_ICON_SIZE`. The Linux titlebar must switch from undeclared `lucide-react` to
-  `@crate/ui/icons`.
+- **Admin V3 is typographic by default** (Diego, 2026-10-16): remove almost all icons, including
+  decorative metric/header icons and icons beside labelled navigation or actions. Use text,
+  numerals, rules and a dot plus a state word. An icon is a narrowly reviewed functional exception,
+  not the default for navigation or actions; it retains an accessible name, keyboard behaviour
+  and the coarse-pointer target. `lucide-react` remains the source for any justified Admin exception,
+  not a requirement to render an icon. Task 1b.8 owns the inventory and remaining migration.
+- Listen and Desktop retain `@crate/ui/icons` (Solar) sized with `CRATE_ICON_SIZE`; this Admin
+  decision does not remove their player/navigation controls. The Linux titlebar must switch from
+  undeclared `lucide-react` to `@crate/ui/icons`.
 - Shared components never import an icon set; they take icons as `ReactNode` or
   `ComponentType<{ size }>` props.
 - Instruments are typographic: `→`, `·`, CSS dots, rings and triangles. No icon tiles in panel or
-  stat headers. Icons stay on actions and navigation.
+  stat headers. Listen may retain icons on actions and navigation; Admin follows the minimal-exception
+  rule above.
 - Sizes: 16 px in rows and chips, 18 to 20 px in navigation, 22 px in the Listen mobile tab bar.
 - No emojis anywhere, including task icons (`task_icon()` defaults to a gear emoji and must not be
   rendered).
@@ -955,8 +962,10 @@ interface StatNumberProps {
 #### `HairlineList` / `HairlineRow`
 
 ```ts
-interface HairlineRowProps
-  extends Omit<LiHTMLAttributes<HTMLLIElement>, "children"> {
+interface HairlineRowProps extends Omit<
+  LiHTMLAttributes<HTMLLIElement>,
+  "children"
+> {
   index?: number; // zero-padded mono index, 2.4ch to 3ch
   trailing?: ReactNode; // fixed-ch mono meta or a StatusDot
   muted?: boolean; // title in text-subtle
@@ -1497,7 +1506,8 @@ events) are owned by the product design; where an entry and the product design d
 contract, the product design wins and the entry points to it.
 
 Common rules for every entry (not repeated): sections 3.4 to 3.10 apply; Listen copy goes through
-the 7 catalogs; Admin uses `lucide-react` and `sonner`, Listen `@crate/ui/icons` and `notify`;
+the 7 catalogs; Admin uses `sonner` and follows the almost-no-icons rule in §1.7 (`lucide-react`
+only for reviewed functional exceptions); Listen keeps `@crate/ui/icons` and `notify`;
 "if you touch it, you test it" (pytest per changed public function, Vitest + Testing Library,
 Go table tests); new Admin pages get a page-level `*.test.tsx`; migrations are numbered against
 `main`, which is canonical: after the approved Smart Mix merge and v3 rebase, use the actual
@@ -2083,6 +2093,15 @@ reorganisation), Album (replaces `AudioProfileCard`, the `TrackTable` radar tool
 "Analyze" button). Listen Info tab in `ExtendedPlayerTabs` and `FullscreenPlayerTabs` (replaces
 `InfoTabAudioProfile` and `InfoTabBliss`; retire `InfoTabQuietMetrics` and the loudness/DR rows of
 `InfoTabSource`; product chrome uses the fixed Crate v3 tokens; artwork colours remain content).
+
+**Visual target confirmed by Diego, 2026-10-16.** Use the site readout anatomy for Admin Audio
+Profile: four large typographic figures with top rules (BPM, key/Camelot, loudness, dynamic range),
+five thin feature bars and the 20-value bipolar Bliss strip. No per-metric card fills or enclosing
+boxes, no metric/header icons, and no radar replacing this anatomy. The 1F legacy-card hairlines
+are a temporary contrast repair, not approval of that old design. Preserve the single Crate V3
+fonts/tokens and responsive scale; do not port site grain, example data or automatic cycling.
+The site image says LUFS; the live readout keeps `dB` until the validated integrated-LUFS contract
+is available, as required below. Task 3.9b still owns implementation and its data prerequisites.
 
 **Data.**
 
