@@ -428,3 +428,16 @@ Diego approved Checkpoint 1M on 2026-10-16 and authorised commit/push, canonical
 and continuation with Task 1b.1. Retire the ten obsolete variant PNGs and record/review the
 33 remaining single-identity references in Linux CI. Preserve later review/publication stops.
 This supersedes earlier local-only 1M notes; rebase/PR/release remain gated.
+
+
+### Checkpoint 1M — publication and Linux capture verification
+
+Published and pushed as `21873d24997ca53ca3218c891a8d70fae296cc78`. Linux recording
+[38888497469](https://github.com/thecrateapp/crate/actions/runs/38888497469) passes. Artifact
+`12040079621` has verified SHA256 `4fdf97def687772a3830bb34671a79d944fc6530f498470b7743edef38940731`.
+The original manifest identifies that production SHA, Linux x64 and the pinned Playwright
+`v1.63.0-noble` image. Of 33 PNGs, 31 are byte-identical; only desktop/mobile Settings change
+to the approved three functional preferences. Both changed images are reviewed and imported.
+The ten obsolete skin/light captures were explicitly retired in the production commit.
+Comparison/full CI follows the capture import. Next assigned task: 1b.1 / Checkpoint 1N,
+shared overlays/menus and one ConfirmDialog; preserve its visual review/publication stop.

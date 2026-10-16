@@ -3,7 +3,7 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Published checkpoints through 1L are recorded in the handover; preserve the next 1M review stop.
+> Diego's go-ahead. Published checkpoints through 1M are recorded in the handover; preserve the next 1N review stop.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -1506,7 +1506,7 @@ Commit: `chore(ui): remove unused shared ops and show components`.
 
 ### Task 1.13: Retire the theme runtime and migrate visual preferences (PD53)
 
-**Status: approved by Diego on 2026-10-16 — Checkpoint 1M; publication/CI recording in progress.** Diego assigned
+**Status: published `21873d24`; reviewed Linux captures from `38888497469`. Comparison CI follows.** Diego assigned
 this task on 2026-10-16 after approving 1L. The consumer/transport/persistence inventories find
 no technical coupling to unmerged Smart Mix or the site; execute on the current v3 branch. This
 explicit assignment supersedes the earlier integrated-baseline scheduling prerequisite for 1.13
@@ -5379,3 +5379,16 @@ know in advance.
    single Crate v3 identity across Listen, Admin, site and docs. P1/P2 remain subsequent work.
 7. Full applicable Phase 7 QA and reviewed final screenshots/screencast precede the major. No
    checklist grants permission for commits, push, PRs, tags, deploys or production access.
+
+
+### Checkpoint 1M — publication and Linux capture verification
+
+Published and pushed as `21873d24997ca53ca3218c891a8d70fae296cc78`. Linux recording
+[38888497469](https://github.com/thecrateapp/crate/actions/runs/38888497469) passes. Artifact
+`12040079621` has verified SHA256 `4fdf97def687772a3830bb34671a79d944fc6530f498470b7743edef38940731`.
+The original manifest identifies that production SHA, Linux x64 and the pinned Playwright
+`v1.63.0-noble` image. Of 33 PNGs, 31 are byte-identical; only desktop/mobile Settings change
+to the approved three functional preferences. Both changed images are reviewed and imported.
+The ten obsolete skin/light captures were explicitly retired in the production commit.
+Comparison/full CI follows the capture import. Next assigned task: 1b.1 / Checkpoint 1N,
+shared overlays/menus and one ConfirmDialog; preserve its visual review/publication stop.
