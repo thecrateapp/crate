@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle, useState } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -277,13 +277,17 @@ describe("HeroCompositionCanvas", () => {
     );
 
     const onRecipeChange = vi.fn();
+    const mobileRecipe: HeroRecipe = {
+      ...initialRecipe,
+      crop: { x: 720, y: 0, width: 960, height: 1200 },
+    };
     const { container, rerender } = render(
       <HeroCompositionCanvas
         sourceUrl="data:image/jpeg;base64,source"
         artistName="Converge"
         composition="mobile"
         aspect={4 / 5}
-        recipe={initialRecipe}
+        recipe={mobileRecipe}
         appearance={appearance}
         onRecipeChange={onRecipeChange}
       />,
@@ -299,15 +303,13 @@ describe("HeroCompositionCanvas", () => {
       "bg-transparent",
     );
     expect(container.querySelector('[data-fill="#0a0a0f"]')).toBeNull();
-    onRecipeChange.mockClear();
-
     rerender(
       <HeroCompositionCanvas
         sourceUrl="data:image/jpeg;base64,source"
         artistName="Converge"
         composition="mobile"
         aspect={4 / 5}
-        recipe={initialRecipe}
+        recipe={mobileRecipe}
         appearance={resolveAppearance(
           { ...DEFAULT_APPEARANCE_PREFERENCES, mode: "dark" },
           { prefersColorSchemeDark: true, prefersReducedMotion: false },
@@ -319,6 +321,26 @@ describe("HeroCompositionCanvas", () => {
     expect(onRecipeChange).not.toHaveBeenCalled();
     expect(localStorage.getItem("crate.listen.appearance.v2")).toBe(
       "unchanged",
+    );
+  });
+
+  it("normalizes a crop from another aspect ratio after the image loads", async () => {
+    const onRecipeChange = vi.fn();
+    render(
+      <HeroCompositionCanvas
+        sourceUrl="data:image/jpeg;base64,source"
+        artistName="Converge"
+        composition="mobile"
+        aspect={4 / 5}
+        recipe={initialRecipe}
+        onRecipeChange={onRecipeChange}
+      />,
+    );
+    await waitFor(() =>
+      expect(onRecipeChange).toHaveBeenCalledWith({
+        ...initialRecipe,
+        crop: { x: 720, y: 0, width: 960, height: 1200 },
+      }),
     );
   });
 
