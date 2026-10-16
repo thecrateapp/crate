@@ -156,8 +156,32 @@ parent's vertical spacing; a real Admin browser regression verifies the Resource
 The status slot shares the header's MonoLabel metrics in a flex wrapper, so it does not raise
 the title baseline. Desktop/mobile checks compare rule-to-heading offsets; both remain 22px.
 
-The cumulative browser suite has 28 checks. Two cases attach advisory `checkpoint-1g.png` images
+At 1G the cumulative browser suite had 28 checks. Two cases attach advisory `checkpoint-1g.png` images
 under the ignored `.artifacts/design-system-preview/` output (desktop and 390px); they are not
 canonical baselines. 1F is published with 33 reviewed Linux PNGs and green comparison CI in run
 `38860652793`. Its local before/after gallery remains explicitly local. 1G is published as `473604f7`; its 33 Linux images from run `38864631250` are reviewed (seven
-expected changes, 26 byte-identical). Comparison CI is pending. Preserve all earlier specimens.
+expected changes, 26 byte-identical). Full comparison CI passes in run `38865107324`. Preserve all earlier specimens.
+
+
+## Meter / Checkpoint 1H
+
+Open <http://127.0.0.1:5186/#meters>. Actual Meter/InstrumentPanel specimens show offline counts,
+transcoding capacity with a limit tick, a working over-limit toggle, missing data and 1–4px
+tracks. All values are fictional. Browser coverage checks desktop, 390px and forced colors;
+`checkpoint-1h.png` attachments remain advisory, never committed Linux baselines.
+
+Both apps adopt the real primitive: Offline count/byte readings and Admin Transcode Slots.
+Their rows retain useful track width rather than squeezing into the old metric tiles. Missing
+quota or native filesystem storage retains the byte readout; an unknown runtime never invents
+capacity. Missing values use a labelled group with a described reading; valid meters expose
+bounded range values and retain the actual reading in text.
+
+1G is published with reviewed Linux images and green comparison CI. 1H is local for visual review;
+publication and Linux capture/diff review await approval. Preserve earlier checkpoint examples.
+
+
+1H local verification passes: 31 cumulative preview checks, including desktop/mobile/forced
+colors, and real app browser checks (Admin17, Listen40 with four existing skips). The full frontend
+unit/type/lint/build gates pass; see the handover for counts and unchanged bundle ceilings.
+On this host, run full workspace unit suites sequentially with `--maxWorkers=2` and browser suites
+with one worker; concurrent unrestricted runs saturated the machine. The mockup remains at :5186.

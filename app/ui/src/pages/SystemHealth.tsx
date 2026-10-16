@@ -25,6 +25,7 @@ import {
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
+import { Meter } from "@crate/ui/primitives/Meter";
 import { useApi } from "@/hooks/use-api";
 import { taskLabel, useTaskCatalog } from "@/lib/task-catalog";
 
@@ -735,7 +736,7 @@ function PlaybackTranscodingOverview({
       description="Cached AAC delivery coverage, playback worker slots and recent transcode health for Listen."
     >
       <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <OpsStatTile
             icon={Headphones}
             label="Lossless Coverage"
@@ -746,13 +747,6 @@ function PlaybackTranscodingOverview({
                 : "Waiting for cache stats"
             }
             tone={stats && stats.coverage_percent > 0 ? "success" : "default"}
-          />
-          <OpsStatTile
-            icon={Activity}
-            label="Transcode Slots"
-            value={`${runtime?.active ?? 0}/${runtime?.limit ?? 1}`}
-            caption="Active playback worker capacity"
-            tone={(runtime?.active ?? 0) > 0 ? "primary" : "default"}
           />
           <OpsStatTile
             icon={HardDrive}
@@ -777,6 +771,24 @@ function PlaybackTranscodingOverview({
               failRate > 5 || (stats?.failed ?? 0) > 0 ? "warning" : "default"
             }
           />
+        </div>
+
+        <div className="min-w-0">
+          <Meter
+            label="Transcode Slots"
+            value={
+              runtime?.active != null && runtime?.limit != null
+                ? runtime.active
+                : null
+            }
+            max={runtime?.limit ?? 0}
+            valueText={`${runtime?.active}/${runtime?.limit}`}
+            over={runtime != null && runtime.active > runtime.limit}
+            thickness={2}
+          />
+          <p className="mt-2 text-xs text-text-muted">
+            Active playback worker capacity
+          </p>
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">

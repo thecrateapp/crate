@@ -1011,7 +1011,7 @@ Listen skips remain. Preview 28, Admin browser 15 and Listen smoke 34 / four ski
 quality reviews pass. Details and budgets are in the handover. Diego approved the corrected visual
 checkpoint on 2026-10-16 and authorised publication, Linux capture/review and continuation to Meter
 1.8. Canonical Linux capture/diff review passes in run `38864631250` (26 unchanged, seven expected
-changes); comparison CI against the imported images is pending.
+changes); comparison/full frontend CI passes in run `38865107324` on `c44b31f3`.
 
 Only primitives and helpers that both apps import directly in the same change.
 
@@ -1285,7 +1285,7 @@ parent; a real Admin browser regression verifies the 24px gap before Metric Stre
 are in the handover.
 Diego approved the corrected checkpoint on 2026-10-16 and authorised commit/push, canonical Linux
 capture/review and continuation to 1.8. Published as `473604f7`; Linux capture/diff review passes
-in run `38864631250`. Comparison CI remains pending.
+in run `38864631250`; comparison/full frontend CI passes in `38865107324` on `c44b31f3`.
 
 **Files:**
 
@@ -1315,6 +1315,16 @@ in run `38864631250`. Comparison CI remains pending.
 4. Commit: `feat(ui): add InstrumentPanel and adopt it in Settings and System`.
 
 ### Task 1.8: `Meter` with first adopters
+
+**Local status / Checkpoint 1H:** primitive and both adopters implemented locally, with the
+persistent specimen at <http://127.0.0.1:5186/#meters>. Valid samples use a bounded ARIA meter;
+missing/invalid ranges use a described group (DS §2.3). Web storage uses profile bytes/quota;
+native filesystems and unavailable estimates retain counts/bytes without a quota meter.
+Real browser QA reproduced a collapsed track in Admin's five-column tile; both adopters now
+use full-width meter rows, tested at desktop/mobile widths. All local gates and spec/quality reviews pass (Shared753/Admin257/Listen2867/Desktop50 unit;
+Admin17/Listen40 browser, preview31). Final results and unchanged budgets are in the handover.
+Diego approved 1H on 2026-10-16 and authorised its publication/Linux captures and continuation
+to Readout 1.9. Canonical image review and comparison CI remain pending.
 
 **Files:**
 

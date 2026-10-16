@@ -1100,6 +1100,15 @@ interface MeterProps {
   `origin-left`; the `--v` custom property is written through a ref, never as React state per
   frame. Limit tick: 1 px `bg-text-primary`, 4 px above and below the track.
 - `role="meter"` with `aria-valuemin`, `aria-valuemax`, `aria-valuenow`, `aria-valuetext`.
+- Clamp the fill and `aria-valuenow` to the valid range; retain the actual sample in
+  `valueText` and the visible over-limit label. WAI-ARIA requires `aria-valuenow` to be within
+  that range ([APG](https://www.w3.org/WAI/ARIA/apg/patterns/meter/)). A null/non-finite sample or
+  invalid maximum has no numeric range: render a labelled group with a described reading and no
+  fill/range attributes, instead of an incomplete meter. Null displays `n/a`; an empty count
+  retains its truthful `0/0` text. `valueRef` points to the fill element for `--v` writes.
+- Offline uses profile bytes against the browser quota only on web. A missing, rejected or
+  invalid estimate, or a native filesystem runtime, retains the count and byte readout without
+  a quota meter; the origin's unrelated `usage` is not a profile measurement.
 - Over state never relies on colour alone: the label text changes.
 - Forced colors: track border `CanvasText`, fill `Highlight`, tick `CanvasText`.
 - Row layout: `grid-template-columns: auto minmax(0,1fr) 5ch` (label, track, value).

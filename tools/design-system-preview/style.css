@@ -8,6 +8,7 @@
 @source "../../app/shared/ui/primitives/StatusDot.tsx";
 @source "../../app/shared/ui/primitives/StatNumber.tsx";
 @source "../../app/shared/ui/primitives/InstrumentPanel.tsx";
+@source "../../app/shared/ui/primitives/Meter.tsx";
 @source "../../app/shared/ui/primitives/Switch.tsx";
 @source "../../app/listen/src/components/settings/SettingsPrimitives.tsx";
 @source "../../app/shared/ui/primitives/HairlineList.tsx";
@@ -783,6 +784,10 @@ footer p {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
+}
+.meter-preview-rows {
+  display: grid;
+  gap: 28px;
 }
 .admin-audio-target a,
 .admin-audio-target img {

@@ -2992,3 +2992,54 @@ button.genre-pill:hover,
 [data-crate-motion="reduced"] .stats-digging-list li {
   animation: none;
 }
+
+.crate-meter {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 5ch;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.crate-meter > :first-child {
+  max-width: 24ch;
+  overflow-wrap: anywhere;
+}
+
+.crate-meter-value {
+  overflow-wrap: anywhere;
+}
+
+.crate-meter-fill {
+  --v: 0;
+  transform: scaleX(var(--v));
+}
+
+.crate-meter-track[data-thickness="1"] {
+  height: 1px;
+}
+.crate-meter-track[data-thickness="2"] {
+  height: 2px;
+}
+.crate-meter-track[data-thickness="3"] {
+  height: 3px;
+}
+.crate-meter-track[data-thickness="4"] {
+  height: 4px;
+}
+
+@media (forced-colors: active) {
+  .crate-meter-track {
+    box-sizing: content-box;
+    outline: 1px solid CanvasText;
+    border-top: 1px solid CanvasText;
+  }
+  .crate-meter-fill {
+    forced-color-adjust: none;
+    background: Highlight;
+  }
+  .crate-meter-limit {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+}

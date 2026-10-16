@@ -672,3 +672,193 @@ test.describe("instrument panel touch layout", () => {
     await expectInstrumentPanelCheckpoint(page, info);
   });
 });
+
+async function expectMeterCheckpoint(page: Page, info: TestInfo) {
+  await page.goto("/#meters");
+  await page.evaluate(() => document.fonts.ready);
+  const checkpoint = page.locator("#meters");
+  await expect(
+    checkpoint.getByRole("heading", {
+      level: 2,
+      name: "Medir capacidad sin ocultar los límites.",
+      exact: true,
+    }),
+  ).toBeVisible();
+
+  const offline = checkpoint.getByRole("meter", {
+    name: "Pistas offline",
+    exact: true,
+  });
+  await expect(offline).toHaveAttribute("aria-valuemin", "0");
+  await expect(offline).toHaveAttribute("aria-valuemax", "48");
+  await expect(offline).toHaveAttribute("aria-valuenow", "36");
+  await expect(offline).toHaveAttribute("aria-valuetext", "36/48");
+  await expect(offline.getByText("36/48", { exact: true })).toBeVisible();
+  const offlineFill = offline.locator(".crate-meter-fill");
+  expect(
+    await offlineFill.evaluate((element) =>
+      parseFloat(getComputedStyle(element).getPropertyValue("--v")),
+    ),
+  ).toBeCloseTo(0.75);
+  expect(
+    await offlineFill.evaluate(
+      (element) => new DOMMatrixReadOnly(getComputedStyle(element).transform).a,
+    ),
+  ).toBeCloseTo(0.75);
+
+  const transcoding = checkpoint.getByRole("meter", {
+    name: /^Transcodificación(?:\s|$)/,
+  });
+  await expect(transcoding).toHaveAttribute("aria-valuemax", "4");
+  await expect(transcoding).toHaveAttribute("aria-valuenow", "2");
+  await expect(transcoding).toHaveAttribute("aria-valuetext", "2/4");
+  const limit = transcoding.locator(".crate-meter-limit");
+  await expect(limit).toHaveAttribute("aria-hidden", "true");
+  const limitPosition = await transcoding.evaluate((element) => {
+    const track = element.querySelector(".crate-meter-track");
+    const tick = element.querySelector(".crate-meter-limit");
+    if (!track || !tick) throw new Error("Expected a meter track and limit");
+    const trackBox = track.getBoundingClientRect();
+    const tickBox = tick.getBoundingClientRect();
+    return {
+      actual: tickBox.left + tickBox.width / 2,
+      expected: trackBox.left + trackBox.width * 0.75,
+    };
+  });
+  expect(
+    Math.abs(limitPosition.actual - limitPosition.expected),
+  ).toBeLessThanOrEqual(1);
+
+  await checkpoint
+    .getByRole("button", { name: "Superar límite", exact: true })
+    .click();
+  await expect(transcoding).toHaveAccessibleName(/over · max 4/);
+  await expect(transcoding).toHaveAttribute("aria-valuenow", "4");
+  await expect(transcoding).toHaveAttribute("aria-valuetext", "5/4");
+  const overValue = transcoding.getByText("5/4", { exact: true });
+  await expect(overValue).toBeVisible();
+  const warning = await transcoding.evaluate((element) => {
+    const probe = document.createElement("span");
+    probe.style.color = "var(--state-warning)";
+    element.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  });
+  await expect(overValue).toHaveCSS("color", warning);
+  await expect(transcoding.locator(".crate-meter-fill")).toHaveCSS(
+    "background-color",
+    warning,
+  );
+  expect(
+    await transcoding
+      .locator(".crate-meter-fill")
+      .evaluate(
+        (element) =>
+          new DOMMatrixReadOnly(getComputedStyle(element).transform).a,
+      ),
+  ).toBeCloseTo(1);
+  await checkpoint
+    .getByRole("button", { name: "Restablecer capacidad", exact: true })
+    .click();
+  await expect(transcoding).toHaveAccessibleName("Transcodificación");
+  await expect(transcoding).toHaveAttribute("aria-valuenow", "2");
+  await expect(transcoding).toHaveAttribute("aria-valuetext", "2/4");
+
+  const missing = checkpoint.getByRole("group", {
+    name: "Sin datos",
+    exact: true,
+  });
+  await expect(missing.getByText("n/a", { exact: true })).toBeVisible();
+  await expect(missing).toHaveAccessibleDescription("n/a");
+  for (const attribute of ["aria-valuemin", "aria-valuemax", "aria-valuenow"]) {
+    await expect(missing).not.toHaveAttribute(attribute);
+  }
+  await expect(missing.locator(".crate-meter-fill")).not.toBeVisible();
+
+  for (const thickness of [1, 2, 3, 4]) {
+    await expect(
+      checkpoint
+        .getByRole("meter", { name: `Grosor ${thickness}`, exact: true })
+        .locator(".crate-meter-track"),
+    ).toHaveCSS("height", `${thickness}px`);
+  }
+  expect(
+    await checkpoint.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
+
+  const screenshot = info.outputPath("checkpoint-1h.png");
+  await checkpoint.screenshot({ path: screenshot, animations: "disabled" });
+  await info.attach("Checkpoint 1H", {
+    path: screenshot,
+    contentType: "image/png",
+  });
+}
+
+test("keeps the meter checkpoint accessible and interactive", async ({
+  page,
+}, info) => {
+  await expectMeterCheckpoint(page, info);
+});
+
+test.describe("meter touch layout", () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+
+  test("keeps the meters usable at 390px without horizontal overflow", async ({
+    page,
+  }, info) => {
+    await expectMeterCheckpoint(page, info);
+  });
+});
+
+test("keeps meter tracks, fills and limits visible in forced colors", async ({
+  page,
+}) => {
+  await page.emulateMedia({ forcedColors: "active" });
+  await page.goto("/#meters");
+  const checkpoint = page.locator("#meters");
+  const offline = checkpoint.getByRole("meter", {
+    name: "Pistas offline",
+    exact: true,
+  });
+  await expect(offline).toBeVisible();
+  const systemColors = await offline.evaluate((element) => {
+    const probe = document.createElement("span");
+    probe.style.forcedColorAdjust = "none";
+    probe.style.color = "CanvasText";
+    probe.style.backgroundColor = "Highlight";
+    element.append(probe);
+    const style = getComputedStyle(probe);
+    const colors = {
+      canvasText: style.color,
+      highlight: style.backgroundColor,
+    };
+    probe.remove();
+    return colors;
+  });
+  const track = offline.locator(".crate-meter-track");
+  await expect(track).toHaveCSS("border-top-color", systemColors.canvasText);
+  expect(
+    await track.evaluate((element) =>
+      parseFloat(getComputedStyle(element).borderTopWidth),
+    ),
+  ).toBeGreaterThan(0);
+  await expect(offline.locator(".crate-meter-fill")).toHaveCSS(
+    "background-color",
+    systemColors.highlight,
+  );
+  await expect(
+    checkpoint
+      .getByRole("meter", { name: "Transcodificación", exact: true })
+      .locator(".crate-meter-limit"),
+  ).toHaveCSS("background-color", systemColors.canvasText);
+});

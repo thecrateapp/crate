@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { notify } from "@crate/ui/lib/notify";
+import { Meter } from "@crate/ui/primitives/Meter";
+import { StatNumber } from "@crate/ui/primitives/StatNumber";
 
 import {
   ArrowDownToLine,
@@ -13,6 +16,7 @@ import { Button } from "@crate/ui/shadcn/button";
 import { Section } from "@/components/settings/SettingsPrimitives";
 import { useOffline } from "@/contexts/OfflineContext";
 import { formatBytes } from "@/lib/utils";
+import { usesNativeFilesystem } from "@/lib/platform";
 
 export function OfflineSection() {
   const { t } = useTranslation();
@@ -23,20 +27,40 @@ export function OfflineSection() {
     syncAll,
     clearActiveProfile,
   } = useOffline();
+  const [storageQuota, setStorageQuota] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (usesNativeFilesystem || !navigator.storage?.estimate) return;
+    let disposed = false;
+    void navigator.storage
+      .estimate()
+      .then(({ quota }) => {
+        if (!disposed) {
+          setStorageQuota(
+            quota != null && Number.isFinite(quota) && quota > 0 ? quota : null,
+          );
+        }
+      })
+      .catch(() => {
+        if (!disposed) setStorageQuota(null);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [offlineSummary.totalBytes]);
 
   return (
     <Section
       title={t("settings.offline.title")}
       description={t("settings.offline.subtitle")}
     >
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-border-quiet/10 bg-text-primary/[0.03] p-4">
-          <div className="text-xs uppercase tracking-eyebrow-wide text-text-primary/40">
-            {t("settings.offline.items")}
-          </div>
-          <div className="mt-2 text-2xl font-semibold text-text-primary">
-            {offlineSummary.itemCount}
-          </div>
+      <div className="space-y-5">
+        <div>
+          <StatNumber
+            value={offlineSummary.itemCount}
+            label={t("settings.offline.items")}
+            size="md"
+          />
           <p className="mt-1 text-xs text-text-muted">
             {t("settings.offline.readyItems", {
               count: offlineSummary.readyItemCount,
@@ -48,24 +72,37 @@ export function OfflineSection() {
               : ""}
           </p>
         </div>
-        <div className="rounded-xl border border-border-quiet/10 bg-text-primary/[0.03] p-4">
-          <div className="text-xs uppercase tracking-eyebrow-wide text-text-primary/40">
-            {t("common.tracks")}
-          </div>
-          <div className="mt-2 text-2xl font-semibold text-text-primary">
-            {offlineSummary.readyTrackCount}/{offlineSummary.trackCount}
-          </div>
+        <div>
+          <Meter
+            label={t("common.tracks")}
+            value={offlineSummary.readyTrackCount}
+            max={offlineSummary.trackCount}
+            valueText={`${offlineSummary.readyTrackCount}/${offlineSummary.trackCount}`}
+          />
           <p className="mt-1 text-xs text-text-muted">
             {t("settings.offline.mirrored")}
           </p>
         </div>
-        <div className="rounded-xl border border-border-quiet/10 bg-text-primary/[0.03] p-4">
-          <div className="text-xs uppercase tracking-eyebrow-wide text-text-primary/40">
-            {t("settings.offline.storage")}
-          </div>
-          <div className="mt-2 text-2xl font-semibold text-text-primary">
-            {formatBytes(offlineSummary.totalBytes)}
-          </div>
+        <div>
+          {storageQuota != null ? (
+            <Meter
+              label={t("settings.offline.storage")}
+              value={offlineSummary.totalBytes}
+              max={storageQuota}
+              over={offlineSummary.totalBytes > storageQuota}
+              valueText={`${formatBytes(offlineSummary.totalBytes)} / ${formatBytes(storageQuota)}`}
+              thickness={3}
+            />
+          ) : (
+            <>
+              <div className="text-xs uppercase tracking-eyebrow-wide text-text-primary/40">
+                {t("settings.offline.storage")}
+              </div>
+              <div className="mt-2 text-2xl font-semibold text-text-primary">
+                {formatBytes(offlineSummary.totalBytes)}
+              </div>
+            </>
+          )}
           <p className="mt-1 text-xs text-text-muted">
             {t("settings.offline.footprint")}
           </p>

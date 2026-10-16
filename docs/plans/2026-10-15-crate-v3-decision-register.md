@@ -267,4 +267,22 @@ notes above without authorising a merge, release or deployment.
 Checkpoint 1G is published as `473604f7`. Linux recording `38864631250` passes; artifact
 `12030469443` has verified SHA256 `d351c4876b8b862e3949a848ba866e41cfb14597b1b4f8d4d1ee82f5442a3d45`.
 Manual review covers the seven changed images (System and six Settings); the other 26 are
-byte-identical. Import the original manifest and all 33 PNGs; comparison CI remains separate.
+byte-identical. The original manifest/all 33 PNGs are published in `c44b31f3`; comparison and full
+frontend CI pass in run `38865107324`.
+
+
+Checkpoint 1H implements Task1.8 locally and stops for visual review. Meter keeps actual numeric
+text when its fill/ARIA range clamps; missing/invalid ranges are described groups, not incomplete
+ARIA meters. Native offline file bytes cannot be measured against browser quota; fall back to
+count/byte readings there. Web quota uses profile totalBytes and never unrelated origin usage.
+Real browser QA found a 0px track in the five-column Admin tile; use a full-width row, as in
+Offline. Preserve 1G's 33 Linux PNGs and manifest until 1H publication/recording is approved.
+
+1H local verification and spec/quality reviews pass: 3,927 frontend unit tests, 31 preview checks,
+Admin17 and Listen40 browser checks (four existing Listen skips), types/lints/builds/gates within
+unchanged ceilings. Keep local workspace suites sequential with maxWorkers2 after unrestricted
+parallel runs saturated the host. This result stops for Diego's visual review; 1H stays unpublished.
+
+On 2026-10-16 Diego approved Checkpoint 1H, explicitly authorising commit/push, Linux CI captures
+and continuation to Readout (Task1.9). This supersedes the local-only publication notes above.
+Keep the persistent mockup and stop at the next visual checkpoint; no merge/release/deploy is implied.

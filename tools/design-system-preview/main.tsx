@@ -21,6 +21,7 @@ import {
 } from "@crate/ui/shadcn/select";
 import { StatNumber } from "@crate/ui/primitives/StatNumber";
 import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
+import { Meter } from "@crate/ui/primitives/Meter";
 import {
   Section,
   ToggleRow,
@@ -87,6 +88,7 @@ const artistGenreProfile: GenreProfileItem[] = [
 ];
 
 function App() {
+  const [meterOver, setMeterOver] = useState(false);
   const [panelLive, setPanelLive] = useState(true);
   const [normalization, setNormalization] = useState(false);
   const [focusActions, setFocusActions] = useState(0);
@@ -122,7 +124,7 @@ function App() {
           crate<span className="version">v3</span>
         </a>
         <MonoLabel
-          meta={["Checkpoint 1G", "InstrumentPanel"]}
+          meta={["Checkpoint 1H", "Meter"]}
           className="masthead-meta"
         />
         <a className="jump" href="#primitivas">
@@ -822,7 +824,7 @@ function App() {
         <div className="specimen-heading">
           <div>
             <MonoLabel size="eyebrow" accent="08">
-              Checkpoint 1G · En revisión
+              Checkpoint 1G · Aprobado
             </MonoLabel>
             <h2>Una estructura común para los paneles.</h2>
           </div>
@@ -830,7 +832,8 @@ function App() {
         <p className="admin-baseline-note">
           InstrumentPanel real y la sección de Settings que ya lo utiliza. Una
           regla, etiquetas y estado; el contenido conserva su propia estructura.
-          Datos ficticios para revisar el componente. Capturas Linux pendientes.
+          Datos ficticios para revisar el componente. Capturas Linux de 1G
+          revisadas.
         </p>
         <div className="instrument-preview-grid">
           <InstrumentPanel
@@ -885,6 +888,78 @@ function App() {
           </InstrumentPanel>
         </div>
       </section>
+      <section
+        id="meters"
+        className="admin-baseline-feature"
+        aria-label="Checkpoint 1H, Meter"
+      >
+        <div className="specimen-heading">
+          <div>
+            <MonoLabel size="eyebrow" accent="09">
+              Checkpoint 1H · En revisión
+            </MonoLabel>
+            <h2>Medir capacidad sin ocultar los límites.</h2>
+          </div>
+        </div>
+        <p className="admin-baseline-note">
+          Pistas disponibles, capacidad y límite. El aviso incluye texto; una
+          lectura ausente se distingue de cero. Datos ficticios para revisar
+          Meter. Capturas Linux de este checkpoint pendientes.
+        </p>
+        <div className="instrument-preview-grid">
+          <InstrumentPanel
+            as="section"
+            headingLevel={3}
+            label={{ children: "Uso y capacidad" }}
+          >
+            <div className="meter-preview-rows">
+              <Meter
+                label="Pistas offline"
+                value={36}
+                max={48}
+                valueText="36/48"
+                thickness={2}
+              />
+              <Meter
+                label="Transcodificación"
+                value={meterOver ? 5 : 2}
+                max={4}
+                limit={3}
+                over={meterOver}
+                valueText={meterOver ? "5/4" : "2/4"}
+                thickness={2}
+              />
+              <Meter label="Sin datos" value={null} max={4} valueText="n/a" />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-5"
+              onClick={() => setMeterOver((over) => !over)}
+            >
+              {meterOver ? "Restablecer capacidad" : "Superar límite"}
+            </Button>
+          </InstrumentPanel>
+          <InstrumentPanel
+            as="section"
+            headingLevel={3}
+            label={{ children: "Grosores de la escala" }}
+          >
+            <div className="meter-preview-rows">
+              {([1, 2, 3, 4] as const).map((thickness) => (
+                <Meter
+                  key={thickness}
+                  label={`Grosor ${thickness}`}
+                  value={48}
+                  max={100}
+                  valueText="48%"
+                  thickness={thickness}
+                />
+              ))}
+            </div>
+          </InstrumentPanel>
+        </div>
+      </section>
       <footer>
         <MonoLabel
           meta={[
@@ -892,7 +967,8 @@ function App() {
             "1D provisional",
             "1E publicado",
             "1F publicado",
-            "1G en revisión",
+            "1G publicado",
+            "1H en revisión",
           ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>

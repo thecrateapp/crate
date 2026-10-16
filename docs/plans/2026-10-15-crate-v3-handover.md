@@ -15,7 +15,7 @@ plan; the status table separates local implementation from pending QA.
   `c7e9e961`, and reviewed Linux baselines as `cf477986`; full comparison CI passes.
   Checkpoint 1F is published as `6e793ebd`, with reviewed Linux images in `82f14594`;
   comparison and full frontend CI pass in run `38860652793`. InstrumentPanel 1G is published as `473604f7`, with reviewed Linux captures from run
-  `38864631250`; comparison CI is pending. Rebase/PR/release remain gated.
+  `38864631250`; comparison/full frontend CI passes in run `38865107324`. Rebase/PR/release remain gated.
 
 ## Sources of truth, in reading order
 
@@ -48,10 +48,10 @@ The persistent component/visual mockup lives in `tools/design-system-preview/` a
 `npm run design-system:preview` at <http://127.0.0.1:5186/#primitivas>. Extend the same page at
 every checkpoint with real components, preserving the approved examples. This is local review
 material, not the committed CI screenshot source. The current checkpoint is
-<http://127.0.0.1:5186/#paneles>: InstrumentPanel with real Settings adoption, live status and an
-unruled section. The approved row/chip/GenrePill specimens and earlier references remain on the page.
+<http://127.0.0.1:5186/#meters>: Meter with capacity, limit, over-limit and missing-data states.
+InstrumentPanel remains at `#paneles` with its approved spacing and live status. The approved row/chip/GenrePill specimens and earlier references remain on the page.
 
-`PLAYWRIGHT_CHANNEL=chrome npm run design-system:preview:test` passes 28 cumulative local browser
+`PLAYWRIGHT_CHANNEL=chrome npm run design-system:preview:test` passes 31 cumulative local browser
 checks, including percentage-bearing GenrePill, keyboard focus, real Select options, 44px touch
 targets and held-pointer reduced motion. The appearance harness passes 26 Chrome checks, including
 the real Listen search in desktop/mobile and open/closed states. These local Chrome runs do not
@@ -63,7 +63,7 @@ Checkpoint 0 remains open for 0.15 runtime qualification and relevant device rev
 production measurement may wait until the wheel and needs assignment. Admin contrast 1.0 is
 published at Checkpoint 1F with reviewed Linux images, green comparison CI and the local route
 walkthrough recorded below. InstrumentPanel 1.7 is published at Checkpoint 1G; its Linux capture
-review passes and comparison CI is next.
+review and full comparison CI pass. Meter 1.8 is the local Checkpoint 1H awaiting visual review.
 
 ## Admin visual direction — 2026-10-16
 
@@ -145,8 +145,9 @@ is a token-based chart configuration, not a selectable product skin.
 | Checkpoint 0                                                 | Open for remaining production/runtime/device gates; 0.11 Linux comparison is complete                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 1.2–1.4 / Checkpoint 1A                                      | Committed/pushed as `efe6cf2e`. At 1A: Shared 679, Admin 248, Listen 2,853 and Desktop 50 tests pass (Listen has 4 skipped); 66 focused primitive/CSS tests pass after the minified-fallback correction. Shared/Admin/Listen/Desktop typechecks, both app lints, package/app builds and 15 drift metrics pass without budget changes. Static spec/quality reviews found no actionable defects. Diego approved the mockup and authorised commit/push on 2026-10-15. CI/baselines/device QA remain pending                                                                                                                                                                                                                                                                                                                                         |
 | 1.0 / Checkpoint 1F                                          | Published `6e793ebd` + canonical images `82f14594`; 33 Linux PNGs reviewed (31 unchanged, two new), full comparison/frontend CI green in run 38860652793. Local route walkthrough completed with the pre-existing artist-alias defect and deep-state limits recorded below                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| 1.7 / Checkpoint 1G                                          | Local InstrumentPanel with real Listen Settings/Admin Resources adopters and updated mockup; spec/quality reviews pass. Pending Diego review/publication and Linux capture/diff review of 1G                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| 1.8–1.12, 1b                                                 | Not started; respect applicable gates and the next review checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 1.7 / Checkpoint 1G | Published `473604f7` + reviewed Linux images/provenance in `c44b31f3`; recording 38864631250 and full comparison/frontend CI 38865107324 pass. |
+| 1.8 / Checkpoint 1H | Meter and real adopters implemented locally; spec/quality and local gates pass. Mockup #meters ready for visual review; no 1H publication/Linux recording yet. |
+| 1.9–1.12, 1b | Not started; respect applicable gates and the next review checkpoint. |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -439,7 +440,57 @@ stream subscriptions are added. Header/content changes use the existing snapshot
   All 33 PNGs are retained: 26 byte-identical; the seven reviewed changes are System Resources
   and six existing Settings captures (the legacy appearance matrix awaits retirement in 1.13).
   Images show the expected top rules/open sections, retained controls and 24px Admin panel gap.
-- Remaining gate: comparison CI against the imported images. Visual review and publication
-  approval are complete.
+- Comparison and full frontend CI pass in <https://github.com/thecrateapp/crate/actions/runs/38865107324>,
+  source `c44b31f3`: appearance 26, Listen 34 / four skips, Admin 15; unit/types/lint/builds/budgets
+  and design gates pass. This closes the 1G publication/capture checkpoint.
   Local smoke images are advisory only. Meter 1.8 is the next authorised checkpoint. TrackReadout and global Admin
   icon retirement retain their planned tasks; 1D focus polishing stays deferred.
+
+
+## Checkpoint 1H — Meter (Task 1.8)
+
+Diego approved the visual checkpoint on 2026-10-16 and authorised commit/push, canonical Linux
+captures and continuation to Readout (Task 1.9). Publication/capture results follow below.
+The shared props-only primitive uses MonoLabel, a quiet track and accent fill, a limit tick and
+1–4px tracks. Its fill exposes `valueRef` and writes `--v` through the DOM ref per sample; no
+animation loop, timers or React state per frame. Fixed styling stays in CSS; the drift ceiling
+is unchanged. Over-limit readings retain the real value in text and add `over · max N`.
+
+- ARIA clarification in DS §2.3: valid meters clamp `aria-valuenow` to the numeric range while
+  `aria-valuetext` retains the actual sample. Null/non-finite samples or invalid ranges render
+  a labelled group described by the visible reading, without fill or numeric range attributes.
+  Missing data displays `n/a`; an empty mirror retains `0/0`. This avoids an invalid meter role
+  with no required value and does not invent zero/capacity.
+- Listen OfflineSection uses readyTrackCount/trackCount and profile totalBytes/browser quota.
+  It preserves sync/remove actions, disabling and existing translated copy. Quota is sampled
+  on mount/byte changes without polling or storage-permission prompts; failed/missing/invalid
+  estimates retain the count and byte readout. Native filesystem runtimes do not mix their
+  file bytes with the web origin quota. Unrelated origin `usage` is not profile consumption.
+- Admin replaces only Transcode Slots with active/limit from the existing delivery payload;
+  absent or incomplete runtime renders `n/a`, replacing the former invented `0/1` fallback.
+  Other statistics, requests, worker state and refresh behaviour are unchanged.
+- Real browser QA reproduced a 0px track inside the old five-column card layout. Transcoding
+  is now a full-width row below the four remaining cards; Offline has full-width count/storage
+  rows and a StatNumber item summary. Browser tests require at least 80px of useful track in
+  desktop/mobile layouts. Admin opens directly at mobile width; resizing mounted Nivo charts
+  produced unrelated SVG animation errors and is outside this Meter layout check.
+- The persistent mockup at <http://127.0.0.1:5186/#meters> uses actual Meter/InstrumentPanel
+  components with fictional readings, a working over-limit toggle, missing data and all four
+  thicknesses. Earlier specimens remain visible. Preview browser checks include forced colors;
+  local images are advisory. Two focused Offline screenshots join the next Linux capture run
+  only after 1H visual/publication approval; the 33 committed 1G PNGs/manifest stay unchanged.
+- Verification passes: Shared 753, Admin 257, Listen 2,867 and Desktop 50 unit tests (3,927 passing;
+  four existing Listen skips). Admin browser 17, Listen smoke 40 / four skips, cumulative preview
+  31 pass; the three Meter desktop/mobile/forced-color checks pass again after allowing longer
+  mono labels to stay intact. Both real adopters keep useful tracks at desktop/mobile widths.
+  Four typechecks, both app lints, shared/Admin/Listen/preview builds, 49 tooling tests, token
+  policy, 15 drift budgets and layer boundaries pass. Initial JS gzip: Admin 515,406 B / 532,480;
+  Listen 204,757 B / 307,200. No ceiling increased. SPEC and code-quality reviews are approved.
+- The first simultaneous unrestricted unit runs saturated the host and timed out; they do not
+  qualify any gate. The complete successful rerun executes workspaces sequentially with
+  `--maxWorkers=2`. Keep that local limit; run browser suites with one worker and avoid launching
+  several unrestricted workspace suites together. No stale test processes remain.
+- Plans, handover and the persistent preview are current. Visual review/publication approval
+  are complete. Remaining gates: canonical Linux captures/diff review and comparison CI.
+- Readout 1.9 is the next authorised visual checkpoint. TrackReadout 3.9b, global Admin icon retirement,
+  theme runtime retirement and the deferred 1D focus polish retain their planned tasks.
