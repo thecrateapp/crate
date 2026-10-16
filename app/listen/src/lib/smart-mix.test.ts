@@ -383,32 +383,34 @@ describe("SmartMixTransitionPlanner startup and offline contract", () => {
     vi.useRealTimers();
   });
 
-  it("plans at most the next three edges", async () => {
-    const tracks = [
-      ...TRACKS,
-      {
-        id: "runtime-5",
-        entityUid: "55555555-5555-4555-8555-555555555555",
-        title: "Five",
-        artist: "Band E",
-      },
-    ];
+  it("plans at most the next thirty-two edges from the current track", async () => {
+    const tracks: Track[] = Array.from({ length: 40 }, (_, index) => ({
+      id: `runtime-${index + 1}`,
+      entityUid: `00000000-0000-4000-8000-${String(index + 1).padStart(
+        12,
+        "0",
+      )}`,
+      title: `Track ${index + 1}`,
+      artist: `Band ${index + 1}`,
+    }));
     const request = vi.fn().mockResolvedValue({
       plannerVersion: "smart-mix-v2",
       plans: [],
     });
     const planner = new SmartMixTransitionPlanner(request);
 
-    const plans = await planner.plan(planInput({ tracks }));
+    const plans = await planner.plan(planInput({ tracks, currentIndex: 5 }));
 
     const body = request.mock.calls[0]![2] as { edges: unknown[] };
-    expect(body.edges).toHaveLength(3);
-    expect(
-      plans.map((plan) => [plan.outgoingTrackId, plan.incomingTrackId]),
-    ).toEqual([
-      ["runtime-1", "runtime-2"],
-      ["runtime-2", "runtime-3"],
-      ["runtime-3", "runtime-4"],
+    expect(body.edges).toHaveLength(32);
+    expect(plans).toHaveLength(32);
+    expect([plans[0]?.outgoingTrackId, plans[0]?.incomingTrackId]).toEqual([
+      "runtime-6",
+      "runtime-7",
+    ]);
+    expect([plans[31]?.outgoingTrackId, plans[31]?.incomingTrackId]).toEqual([
+      "runtime-37",
+      "runtime-38",
     ]);
   });
 
@@ -471,20 +473,81 @@ describe("SmartMixTransitionPlanner startup and offline contract", () => {
     await expect(first).resolves.toEqual([]);
   });
 
-  it("does not retry a failed generation until it is invalidated", async () => {
+  it("retries a generation that fell back on a transient planner failure", async () => {
     const request = vi.fn().mockRejectedValue(new Error("network down"));
+    const planner = new SmartMixTransitionPlanner(request);
+
+    const first = await planner.plan(planInput());
+    expect(first[0]?.fallbackReason).toBe("planner_unavailable");
+
+    request.mockResolvedValue({
+      plannerVersion: "smart-mix-v2",
+      plans: [serverPlan(TRACKS[0]!, TRACKS[1]!)],
+    });
+    const second = await planner.plan(planInput());
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(second[0]).toMatchObject({
+      outgoingCueMs: 176000,
+      confidence: 0.88,
+    });
+    expect(second[0]?.fallbackReason).toBeUndefined();
+  });
+
+  it("does not retry a generation the server answered", async () => {
+    const request = vi.fn().mockResolvedValue({
+      plannerVersion: "smart-mix-v2",
+      plans: [],
+    });
     const planner = new SmartMixTransitionPlanner(request);
 
     const first = await planner.plan(planInput());
     const second = await planner.plan(planInput());
 
     expect(request).toHaveBeenCalledTimes(1);
+    expect(first[0]?.fallbackReason).toBe("missing_profile");
     expect(second).toEqual(first);
-    expect(first[0]?.fallbackReason).toBe("planner_unavailable");
+  });
 
-    planner.invalidate();
-    await planner.plan(planInput());
-    expect(request).toHaveBeenCalledTimes(2);
+  it("gives a plan-ahead request the slack before the transition", async () => {
+    vi.useFakeTimers();
+    const { request, signals } = pendingRequest();
+    const planner = new SmartMixTransitionPlanner(request);
+    const tracks = TRACKS.map((track) => ({ ...track, duration: 200 }));
+
+    const result = planner.plan(planInput({ tracks, positionMs: 0 }));
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(signals[0]?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(signals[0]?.aborted).toBe(true);
+    expect((await result)[0]?.fallbackReason).toBe("planner_timeout");
+  });
+
+  it("shrinks the deadline to the time left before the transition", async () => {
+    vi.useFakeTimers();
+    const { request, signals } = pendingRequest();
+    const planner = new SmartMixTransitionPlanner(request);
+    const tracks = TRACKS.map((track) => ({ ...track, duration: 200 }));
+
+    void planner.plan(planInput({ tracks, positionMs: 187_000 }));
+    await vi.advanceTimersByTimeAsync(3_999);
+    expect(signals[0]?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(signals[0]?.aborted).toBe(true);
+  });
+
+  it("keeps the one second deadline when the transition is imminent", async () => {
+    vi.useFakeTimers();
+    const { request, signals } = pendingRequest();
+    const planner = new SmartMixTransitionPlanner(request);
+    const tracks = TRACKS.map((track) => ({ ...track, duration: 200 }));
+
+    void planner.plan(planInput({ tracks, positionMs: 195_000 }));
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(signals[0]?.aborted).toBe(true);
   });
 
   it("cancels in-flight planning and discards the late result", async () => {

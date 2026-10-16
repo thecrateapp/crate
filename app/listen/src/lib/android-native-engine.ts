@@ -22,6 +22,7 @@ import {
 } from "@/lib/native-playback-intent";
 import {
   getSmartMixCapabilities,
+  keepServerPlans,
   setSmartMixCapabilities,
   subscribeSmartMixCapabilities,
   type SmartMixCapabilities,
@@ -198,6 +199,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
     | ((currentIndex?: number) => Promise<EngineTransitionPlan[] | undefined>)
     | undefined;
   private planInstallGeneration = 0;
+  private installedPlans: EngineTransitionPlan[] = [];
 
   constructor() {
     subscribeSmartMixCapabilities(() => {
@@ -324,6 +326,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
       snapshot;
     this.queueRevision = queue.revision;
     this.replanTransitionPlans = replanTransitionPlans;
+    this.installedPlans = [];
     this.queueMixRequested = queue.crossfadeMs > 0;
     this.appliedCrossfadeMs = effectiveNativeCrossfadeMs(queue.crossfadeMs);
     const pendingGeneration = ++this.planInstallGeneration;
@@ -356,7 +359,14 @@ export class AndroidNativeEngine implements PlaybackEngine {
       ) {
         return;
       }
-      await nativePlayback.setTransitionPlans({ revision, transitionPlans });
+      const mergedPlans = keepServerPlans(this.installedPlans, transitionPlans);
+      await nativePlayback.setTransitionPlans({
+        revision,
+        transitionPlans: mergedPlans,
+      });
+      if (revision === this.queueRevision) {
+        this.installedPlans = mergedPlans;
+      }
     } catch (error) {
       console.warn("[native-playback] transition plans not installed:", error);
     }

@@ -125,7 +125,7 @@ Estos son defaults objetivo que P01 fija en fixtures/configuración; los presupu
 
 | Recurso            | Límite inicial                                                                                                                                             |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Plan HTTP          | 32 edges por batch; Android precarga 3 y no espera más de 1s por planificación                                                                             |
+| Plan HTTP          | 32 edges por batch; Android precarga 32 y espera hasta 10s si falta margen                                                                                 |
 | Ranking/browse     | 500 candidatos elegibles; 50 resultados por search; 500 pistas por carpeta VDJ, con partes numeradas para playlists más largas                             |
 | JSON nativo        | 2MiB por respuesta de catálogo/planes/summary, profundidad32; full profile hasta8MiB solo si se solicita explícitamente; abortar antes de crecer el buffer |
 | Cursor             | No aplica a VDJ: el SDK no tiene paginación                                                                                                                |
@@ -262,7 +262,7 @@ Para DSP, fijar budgets de timeout/RSS/concurrencia según el análisis-worker d
 
 Se continúa con Media3 `1.10.1` fijado actualmente en `app/listen/android/variables.gradle`, dos `ExoPlayerNativePlaybackDeck`, `NativeMixController`, `NativeMixAudioProcessor` y `CrateMixPlayer`. Un salto de versión Media3 solo se justifica con una necesidad y regresión verificadas; no es prerrequisito inventado.
 
-`setQueue`/play disponen inmediatamente de sus media items. Planning se precarga fuera del camino de arranque, máximo los siguientes 3 edges con dedup y una petición activa por generación de cola. Deadline inicial 1s para obtener un plan remoto; agotado → fallback y cancelación real. Cambiar cola/cuenta/origen/cues o abortar playback invalida requests y resultados tardíos. Una respuesta no puede reconfigurar una transición que ya empezó.
+`setQueue`/play disponen inmediatamente de sus media items. Planning se precarga fuera del camino de arranque, máximo los siguientes 32 edges (el límite del batch) con dedup y una petición activa por generación de cola, y la ventana se desplaza en cada cambio de pista. El deadline sale del margen hasta la transición: margen − 5s, entre 1s y 10s; sin duración o posición conocidas, 1s. Agotado → fallback y cancelación real. Un fallback por timeout o planner caído no se cachea: el siguiente replan lo vuelve a pedir, y nunca sustituye un plan de servidor ya instalado para el mismo edge. Cambiar cola/cuenta/origen/cues o abortar playback invalida requests y resultados tardíos. Una respuesta no puede reconfigurar una transición que ya empezó.
 
 Offline significa **cero requests de planning**. Se aceptan planes/perfiles locales únicamente si existen y coinciden sus identidades/revisiones/contexto; de lo contrario se usa fallback local. La caché de planes no conserva credenciales ni URLs y su clave no es solo el par de track IDs. El mismo contrato funciona con archivos descargados y streams autenticados, sin convertir la red en requisito del crossfade básico.
 

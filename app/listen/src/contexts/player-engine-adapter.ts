@@ -27,6 +27,7 @@ import {
 import {
   getSmartMixCapabilities,
   type SmartMixCapabilities,
+  hasTransientPlanFallback,
   type SmartMixPlanInput,
   SmartMixTransitionPlanner,
   subscribeSmartMixCapabilities,
@@ -264,20 +265,35 @@ export async function toStartupEngineQueueSnapshot(
     capabilities: getSmartMixCapabilities(),
     networkAvailable: isNetworkAvailable(),
     identity: getApiBase(),
+    positionMs: options.positionMs,
   };
+  let retryPending = false;
+  const planTransitions = (input: SmartMixPlanInput) =>
+    smartMixTransitionPlanner.plan(input).then((plans) => {
+      retryPending = hasTransientPlanFallback(plans);
+      return plans;
+    });
   const transitionPlansPromise = nativeTarget
-    ? smartMixTransitionPlanner.plan(planInput)
+    ? planTransitions(planInput)
     : Promise.resolve(undefined);
-  const replanTransitionPlans = (currentIndex = planInput.currentIndex) => {
+  const replanTransitionPlans = (currentIndex?: number) => {
     const capabilities = getSmartMixCapabilities();
+    const trackAdvanced =
+      currentIndex !== undefined && currentIndex !== planInput.currentIndex;
     if (
-      currentIndex === planInput.currentIndex &&
+      !trackAdvanced &&
+      !retryPending &&
       sameCapabilities(capabilities, planInput.capabilities)
     ) {
       return Promise.resolve(undefined);
     }
-    planInput = { ...planInput, currentIndex, capabilities };
-    return smartMixTransitionPlanner.plan(planInput);
+    planInput = {
+      ...planInput,
+      currentIndex: currentIndex ?? planInput.currentIndex,
+      capabilities,
+      positionMs: trackAdvanced ? 0 : undefined,
+    };
+    return planTransitions(planInput);
   };
   const engineTracks = await toStartupEngineTracks(
     options.tracks,

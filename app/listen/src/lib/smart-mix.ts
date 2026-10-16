@@ -119,6 +119,7 @@ export interface SmartMixPlanInput {
   capabilities: SmartMixCapabilities;
   networkAvailable?: boolean;
   identity?: string;
+  positionMs?: number;
 }
 
 interface TransitionEdge {
@@ -158,7 +159,41 @@ export type SmartMixRequest = (
 ) => Promise<TransitionPlanBatchResponse>;
 
 export const SMART_MIX_PLANNING_DEADLINE_MS = 1_000;
-const MAX_PLANNED_EDGES = 3;
+export const SMART_MIX_PLAN_AHEAD_DEADLINE_MS = 10_000;
+const PLAN_AHEAD_SAFETY_MS = 5_000;
+const MAX_PLANNED_EDGES = 32;
+const TRANSIENT_FALLBACK_REASONS = new Set([
+  "planner_timeout",
+  "planner_unavailable",
+]);
+
+export function hasTransientPlanFallback(
+  plans: EngineTransitionPlan[] | undefined,
+): boolean {
+  return (
+    plans?.some((plan) =>
+      TRANSIENT_FALLBACK_REASONS.has(plan.fallbackReason ?? ""),
+    ) ?? false
+  );
+}
+
+export function keepServerPlans(
+  installed: EngineTransitionPlan[],
+  incoming: EngineTransitionPlan[],
+): EngineTransitionPlan[] {
+  return incoming.map((plan) => {
+    if (!TRANSIENT_FALLBACK_REASONS.has(plan.fallbackReason ?? "")) {
+      return plan;
+    }
+    const serverPlan = installed.find(
+      (candidate) =>
+        candidate.outgoingTrackId === plan.outgoingTrackId &&
+        candidate.incomingTrackId === plan.incomingTrackId &&
+        !candidate.fallbackReason,
+    );
+    return serverPlan ?? plan;
+  });
+}
 
 interface SmartMixPlannerOptions {
   deadlineMs?: number;
@@ -180,6 +215,27 @@ export class SmartMixTransitionPlanner {
     options: SmartMixPlannerOptions = {},
   ) {
     this.deadlineMs = options.deadlineMs ?? SMART_MIX_PLANNING_DEADLINE_MS;
+  }
+
+  private requestDeadlineMs(input: SmartMixPlanInput): number {
+    const durationMs = (input.tracks[input.currentIndex]?.duration ?? 0) * 1000;
+    const positionMs = input.positionMs;
+    if (
+      !(durationMs > 0) ||
+      positionMs == null ||
+      !Number.isFinite(positionMs)
+    ) {
+      return this.deadlineMs;
+    }
+    const slackMs =
+      durationMs -
+      positionMs -
+      clampDuration(input.preferredDurationMs) -
+      PLAN_AHEAD_SAFETY_MS;
+    return Math.max(
+      this.deadlineMs,
+      Math.min(Math.trunc(slackMs), SMART_MIX_PLAN_AHEAD_DEADLINE_MS),
+    );
   }
 
   cancel(): void {
@@ -209,7 +265,10 @@ export class SmartMixTransitionPlanner {
       (plans) => {
         if (this.active?.controller === controller) {
           this.active = undefined;
-          if (!controller.signal.aborted || plans.length > 0) {
+          if (
+            (!controller.signal.aborted || plans.length > 0) &&
+            !hasTransientPlanFallback(plans)
+          ) {
             this.settled = { key, plans };
           }
         }
@@ -288,7 +347,7 @@ export class SmartMixTransitionPlanner {
     const deadline = setTimeout(() => {
       timedOut = true;
       controller.abort();
-    }, this.deadlineMs);
+    }, this.requestDeadlineMs(input));
     try {
       const response = await this.request(
         "/api/playback/transition-plans",

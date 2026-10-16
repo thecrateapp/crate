@@ -270,6 +270,76 @@ describe("android native engine flags", () => {
     });
   });
 
+  it("keeps installed server plans when a plan-ahead request times out", async () => {
+    vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+    const state = {
+      revision: "queue-rev-1",
+      playbackState: "playing",
+      isPlaying: true,
+      index: 0,
+      positionMs: 0,
+      durationMs: 0,
+      queueSize: 3,
+      crossfadeMs: 12000,
+      eqEnabled: false,
+    };
+    nativePlaybackMock.getState.mockResolvedValue(state);
+    nativePlaybackMock.setQueue.mockResolvedValue(state);
+    nativePlaybackMock.setTransitionPlans.mockResolvedValue({ accepted: true });
+    const nativeEngineModule = await import("@/lib/android-native-engine");
+    const engine = new nativeEngineModule.AndroidNativeEngine();
+    const serverPlan = {
+      outgoingTrackId: "runtime-2",
+      incomingTrackId: "runtime-3",
+      mode: "adaptive",
+      outgoingCueMs: 176000,
+    } as unknown as EngineTransitionPlan;
+    const timedOutSameEdge = {
+      outgoingTrackId: "runtime-2",
+      incomingTrackId: "runtime-3",
+      mode: "adaptive",
+      outgoingCueMs: 0,
+      fallbackReason: "planner_timeout",
+    } as unknown as EngineTransitionPlan;
+    const timedOutNewEdge = {
+      outgoingTrackId: "runtime-3",
+      incomingTrackId: "runtime-4",
+      mode: "adaptive",
+      outgoingCueMs: 0,
+      fallbackReason: "planner_timeout",
+    } as unknown as EngineTransitionPlan;
+    const replanTransitionPlans = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValue([timedOutSameEdge, timedOutNewEdge]);
+
+    await engine.loadQueue({
+      revision: "queue-rev-1",
+      tracks: [],
+      currentIndex: 0,
+      positionMs: 0,
+      autoplay: false,
+      repeat: "off",
+      crossfadeMs: 12000,
+      volume: 1,
+      pendingTransitionPlans: Promise.resolve([serverPlan]),
+      replanTransitionPlans,
+    });
+    await vi.waitFor(() =>
+      expect(nativePlaybackMock.setTransitionPlans).toHaveBeenCalledTimes(1),
+    );
+
+    engine.planAhead(1);
+
+    await vi.waitFor(() =>
+      expect(nativePlaybackMock.setTransitionPlans).toHaveBeenCalledTimes(2),
+    );
+    expect(nativePlaybackMock.setTransitionPlans).toHaveBeenLastCalledWith({
+      revision: "queue-rev-1",
+      transitionPlans: [serverPlan, timedOutNewEdge],
+    });
+  });
+
   it("keeps re-planned plans when stale cold-start plans resolve later", async () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
     const state = {

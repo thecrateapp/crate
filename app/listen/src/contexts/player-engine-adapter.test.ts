@@ -596,6 +596,71 @@ describe("player engine adapter", () => {
       );
     });
 
+    it("re-plans the same index after the planner timed out", async () => {
+      vi.useFakeTimers();
+      apiMock.mockImplementation(
+        (
+          path: string,
+          _method: string,
+          _body: unknown,
+          options?: { signal?: AbortSignal },
+        ) =>
+          path === "/api/playback/transition-plans"
+            ? new Promise((_resolve, reject) => {
+                options?.signal?.addEventListener("abort", () =>
+                  reject(new DOMException("Aborted", "AbortError")),
+                );
+              })
+            : Promise.resolve(null),
+      );
+      const snapshot = await toStartupEngineQueueSnapshot(
+        nativeSnapshotOptions("retry-after-timeout"),
+      );
+      await vi.advanceTimersByTimeAsync(1000);
+      expect((await snapshot.pendingTransitionPlans)?.[0]?.fallbackReason).toBe(
+        "planner_timeout",
+      );
+      apiMock.mockClear();
+      apiMock.mockResolvedValue(null);
+
+      await snapshot.replanTransitionPlans?.(0);
+
+      expect(apiMock).toHaveBeenCalledWith(
+        "/api/playback/transition-plans",
+        "POST",
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it("waits longer for startup plans when the transition is minutes away", async () => {
+      vi.useFakeTimers();
+      const signals: AbortSignal[] = [];
+      apiMock.mockImplementation(
+        (
+          path: string,
+          _method: string,
+          _body: unknown,
+          options?: { signal?: AbortSignal },
+        ) => {
+          if (path !== "/api/playback/transition-plans") {
+            return Promise.resolve(null);
+          }
+          if (options?.signal) signals.push(options.signal);
+          return new Promise(() => {});
+        },
+      );
+
+      await toStartupEngineQueueSnapshot({
+        ...nativeSnapshotOptions("startup-slack"),
+        tracks: NATIVE_QUEUE.map((track) => ({ ...track, duration: 180 })),
+      });
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(signals).toHaveLength(1);
+      expect(signals[0]?.aborted).toBe(false);
+    });
+
     it("does not call the planner while the device is offline", async () => {
       vi.stubGlobal("navigator", { ...navigator, onLine: false });
       apiMock.mockResolvedValue(null);
