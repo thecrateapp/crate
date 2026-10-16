@@ -1,12 +1,15 @@
 # Crate v3 design system
 
+Current implementation: 1N–1P are published in `53177736`; Diego approved Task 1b.3 / 1Q
+on Linux at `#pestanas`, authorising publication and 1b.4. Preserve the next 1R review stop.
+
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
 `/Users/diego/Code/crate-v3`, branch `feat/crate_v3`. The handover owns implementation/QA status.
 Registry and harness references predating Task 1.13 are historical; current consumers use its
 single-identity equivalents without recreating retired exports.
 Historical reports retain their original measurements; they do not certify current test results.
 The single Crate v3 identity is published through Task 1.13 / Checkpoint 1M (`21873d24`).
-Task 1b.1 / Checkpoint 1N is in local verification; later checkpoint publication remains gated.
+Task 1b.3 / Checkpoint 1Q is approved for publication; later checkpoint publication remains gated.
 
 Visual source of truth: the new site only, `app/web` at the approved git reference:
 
@@ -3765,7 +3768,14 @@ migration. New canonical Linux recording and native QA remain separate from loca
 - Filtering a list: a `CratePill` group with `aria-pressed`.
 - Selected tab or filter lives in the URL (`?tab=`, `?section=`, `?queue=`, `?check=`, `?release=`,
   `?genre=`).
-- Mobile: one horizontally scrolling row.
+- Mobile: one horizontally scrolling row. Shared Tabs keeps Radix keyboard/ARIA, controlled
+  state and orientation props; the existing `default` and `line` variant names both use this
+  single recipe. Tabs have 44 px minimum targets and use the global inset keyboard outline inside the scroll row.
+- App-local `useTabParam(values, defaultValue, { param?, replace? })` returns `[tab, setTab]`.
+  Unknown/missing URL values read as the fallback without rewriting the link. Invalid writes
+  are ignored; valid changes push history unless replacement is explicitly requested. Keep
+  unrelated/repeated parameters, hash, path, route state and scroll. Production pages adopt
+  this helper with their assigned migrations; path-based Library links retain their adapter.
 
 ### 5.9 Dialogs, sheets, popovers, menus, tooltips
 

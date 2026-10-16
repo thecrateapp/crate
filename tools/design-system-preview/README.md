@@ -363,3 +363,26 @@ Listen 38 and Admin 74 cases in affected files, four typechecks, scoped lint, bo
 and bundle gates, preview build, drift/layers and Listen i18n. Batches overlap earlier records;
 these are not additive full-suite totals. No full suites or new Linux recording ran in this cut.
 The main handover records remaining canonical/native QA and Admin's narrow bundle headroom.
+
+
+## Text tabs / Checkpoint 1Q — local Linux review
+
+Open <http://127.0.0.1:5186/#pestanas>. Both samples use actual shared Radix Tabs and the
+separate app-local URL hooks. Try arrows/Home/End, direct and unknown links, previous/next,
+and browser back/forward. Admin uses `tab`; Listen's `listenTab` is a second isolated sample
+parameter. Unknown values display Resumen while the unknown URL remains visible. Each
+horizontal list scrolls on mobile; disabled tabs are skipped and active panels are named.
+All earlier specimens remain; these samples make no API/localStorage writes.
+
+Run only `npm run design-system:preview:test -- tabs-checkpoint.spec.ts --workers=1` for this
+block's browser checks. They cover actual typography, 2px accent underline, 44px targets,
+keyboard/ARIA, URL/history, 8px label/readout geometry and responsive heading/overflow.
+The attached `checkpoint-1q-{1440,390}.png` files are ignored local advisory images, never
+canonical baselines. Linux 1N–1P recording/comparison, native QA and phase-close full validation
+remain pending. Preserve all 33 canonical 1M PNGs and original manifest. Stop at Diego's review
+before 1b.4, commit or push; final scoped results are in the main handover.
+
+
+Diego approved 1Q on 2026-10-16 and authorised commit/push and continuation to 1b.4.
+This supersedes the local-only stop above. Keep this specimen and the preview active;
+stop for the next visual review at checkpoint 1R. Baselines/native/phase-close QA remain separate.

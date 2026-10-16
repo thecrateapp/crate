@@ -6,6 +6,8 @@
 @source "./main.tsx";
 @source "./forms-checkpoint.tsx";
 @source "./selection-checkpoint.tsx";
+@source "./tabs-checkpoint.tsx";
+@source "../../app/shared/ui/shadcn/tabs.tsx";
 @source "../../app/listen/src/components/crates/CrateForm.tsx";
 @source "../../app/listen/src/components/jam/JamRoomCreateOptions.tsx";
 @source "../../app/listen/src/components/player/PlayerSurfaceModeSwitch.tsx";
@@ -215,12 +217,14 @@ main {
 }
 
 #formularios .specimen-heading,
-#seleccion .specimen-heading {
+#seleccion .specimen-heading,
+#pestanas .specimen-heading {
   gap: 32px;
 }
 
 #formularios .specimen-heading > p,
-#seleccion .specimen-heading > p {
+#seleccion .specimen-heading > p,
+#pestanas .specimen-heading > p {
   max-width: 40ch;
   margin: 0;
   color: var(--text-muted);
@@ -230,7 +234,8 @@ main {
 
 @media (max-width: 600px) {
   #formularios .specimen-heading,
-  #seleccion .specimen-heading {
+  #seleccion .specimen-heading,
+  #pestanas .specimen-heading {
     flex-direction: column;
     align-items: flex-start;
     gap: 16px;

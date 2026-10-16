@@ -6,11 +6,17 @@ plan; the status table separates implementation from pending QA.
 Current transfer: **1N–1P are complete in the checkpoint commit
 `feat(ui): unify v3 overlays, controls and field spacing`**. Diego authorised commit/push and
 continuation on Linux; this final publication record supersedes earlier local-only stops below.
-Next is **Task 1b.3 / checkpoint 1Q**. Start on Linux with
+**Diego approved Task 1b.3 / checkpoint 1Q on 2026-10-16**, authorising commit/push and
+continuation to Task 1b.4. Preserve the next visual checkpoint review stop. Resume on Linux with
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
 Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 
 ## Where the work lives
+
+- Active Linux worktree: `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing branch
+  `feat/crate_v3`, base `53177736a7643c232cbb19e744a2b2ee9077efaf`. Node 22.23.3, root
+  dependencies and persistent :5186 preview are prepared. This isolates the MCP agent's
+  `/home/diego/Code/Ninja/crate` checkout (`feat/crate_mcp`); leave its files untouched.
 
 - Canonical clone: `/Users/diego/Code/crate-v3`, branch `feat/crate_v3`, with its own dependencies.
   Assigned agents use isolated worktrees on the internal disk; never use the removed external tree.
@@ -190,6 +196,7 @@ is a token-based chart configuration, not a selectable product skin.
 | 1.12 / Checkpoint 1L                                         | Published `2c90a6f2`; recording `38883592145` passes with all 43 PNGs byte-identical. Original manifest imported in `bf1fa793`; comparison/full CI passes in `38885478542`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | 1b.1 / Checkpoint 1N                                         | Complete in the combined 1N–1P publication cut authorised by Diego; shared overlays/menus, ConfirmDialog and one close recipe. Focused checks and SPEC/QUALITY pass; new canonical Linux recording/native QA pending.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 1b.2 / Checkpoints 1O–1P                                     | Complete in the combined publication cut: nine form foundations, 28 short selectors, caller review, Radio debounce and global 8 px field spacing. Focused checks and SPEC/QUALITY pass. Next: 1b.3 / 1Q; Linux continuation instructions are tracked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 1b.3 / Checkpoint 1Q | Implemented locally on Linux; awaits Diego’s review at `#pestanas`. Shared text tabs, two app-local URL helpers and focused tests are complete. See final 1Q record. No commit/push or continuation to 1b.4. |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -1060,3 +1067,85 @@ fabricate provenance. Full validation remains the single run at development/phas
 Continue with **Task 1b.3 / checkpoint 1Q**, text tabs and app-local URL helpers. Bootstrap,
 reading order, preview, focused verification, site pin and future review boundaries are in
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
+
+
+## Checkpoint 1Q — Text tabs and URL helpers, Linux local review, 2026-10-16
+
+**Stop for Diego's review at <http://127.0.0.1:5186/#pestanas>.** No commit/push, later task,
+PR, merge/rebase, deployment, release or CI run has been performed for 1Q. HEAD remains
+`53177736a7643c232cbb19e744a2b2ee9077efaf`. The work is uncommitted in the managed worktree
+`/home/diego/.codex/worktrees/crate-v3-1q/crate`, on existing `feat/crate_v3`. The other agent's
+MCP checkout remains separate. Node 22.23.3 and root `npm ci` are ready; the persistent preview
+is live on loopback :5186 without a backend. All earlier specimens remain on the same page.
+
+### Scope and contracts
+
+- Shared `Tabs` retains Radix props, ARIA relationships, roving focus, disabled items,
+  controlled/uncontrolled state, manual activation, orientation and `default`/`line` exports.
+  Both variants use one recipe: Mono 11.5 px / .14em uppercase, transparent surfaces,
+  a 2 px `accent-action-hi` active underline, 44 px targets and horizontal mobile scrolling.
+  Vertical keyboard behavior remains supported. The scroll row uses the existing inset
+  focus treatment, including its animated shadow; forced colors use a visible system marker.
+- Inventory confirms Admin Download is the only production consumer of shared Tabs today.
+  Its actual five panels have a keyboard regression test. No production page adopts a new
+  URL helper in this checkpoint. Library's existing `/collection/:section` and `?tab=`
+  adapters, player panel semantics and filter radio groups remain for their planned phases.
+- Separate app-local hooks expose `useTabParam(values, defaultValue, { param?, replace? })`
+  returning readonly `[tab, setTab]`. Missing/unknown values show the fallback without
+  rewriting links; invalid writes are ignored. Valid writes push history by default,
+  explicit replacement is supported, and writing the current raw value is a no-op.
+  Other/repeated query parameters, path, hash, route state and scroll survive.
+- `#pestanas` uses both actual helpers, with `tab` and a sample-only `listenTab`, direct/unknown
+  links and previous/next controls. Browser history works. The sample uses no API or storage
+  writes and keeps the 8 px label/read-only URL gap through `.crate-form-field`.
+
+### Focused verification and limits
+
+All validation chains use one test/browser worker and run serially. No full suite runs.
+The final focused batches pass: **Shared 18 cases / five files; Admin 11 / two files;
+Listen 10 / one file** (39 total). They cover shared tabs, form/focus recipes, design/export
+policies, each real app-local router helper and actual Download panel behavior.
+
+**Three Chromium browser cases pass:** desktop 1440 px, mobile/touch 390 px, and forced colors
+with reduced motion. They verify typography, physical underline, hit targets, horizontal row,
+ARIA/panel selection, disabled skipping, arrows/Home/End, deep links, unknown values, parameter
+preservation, back/forward, global inset focus, 8 px URL label spacing, responsive heading,
+no document overflow and no sample API/storage writes. The third test waits for the committed
+selected tab before reading the pseudo-element; a transient pre-navigation read was corrected.
+The mobile heading defect was reproduced before stacking it; the focus-offset defect was
+reproduced at both sizes before applying `crate-focus-inset`.
+
+Shared, Admin, Listen and Desktop typechecks pass. The new preview component/spec also pass
+standalone strict TypeScript checking. Scoped ESLint (nine changed TS/TSX files), formatting,
+Admin production build/bundle gate, preview production build, the one repository drift-budget
+case and shared layer check pass. Layers remain 139 source files / zero violations; no budget
+or ceiling is raised. Build warnings about existing large chunks remain.
+
+Final Admin initial JavaScript is **527,332 B gzip / 532,480 B**, leaving **5,148 B**;
+the previous published handover recorded 526,386 B. No dependencies, lockfile or package exports
+change. Listen production bundling was not repeated: no production Listen consumer imports
+the new hook/Tabs yet; its typecheck and focused hook cases pass. Desktop runtime tests were
+not expanded for an unadopted hook; its typecheck passes.
+
+An independent read-only source review found one P2: the scroll row could clip the outer
+keyboard outline. The regression failed at both widths, then passed with the shared inset
+focus class; the related focus CSS cases pass. No other actionable source findings were
+reported. The reviewer did not execute tests or inspect final documentation/mobile rendering;
+the integrator ran the checks above and inspected the final desktop/mobile advisory images.
+
+Advisory screenshots are ignored under `.artifacts/design-system-preview/` as
+`checkpoint-1q-{1440,390}.png`; they are not baselines. All **33 canonical Linux PNGs and the
+original 1M manifest are unchanged**. Approved CI recording/comparison for 1N–1P, native QA,
+1Q's visual approval and the single full validation at development/phase close remain pending.
+Do not advance to Task 1b.4 or publish 1Q until Diego directs continuation.
+
+
+### Checkpoint 1Q approval and publication authorisation — 2026-10-16
+
+Diego approved 1Q and explicitly requested commit/push, continuation to Task 1b.4,
+keeping the preview active and stopping at the next visual checkpoint (1R) for review.
+This supersedes the local-only stops above. Publish the reviewed 1Q diff as
+`feat(ui): add text tabs that keep their state in the URL`; resolve its SHA with git log.
+No PR, merge/rebase, deploy, release, full validation or baseline/CI update is authorised.
+The next block covers shared loading/empty/error states and reserved skeleton geometry.
+Canonical 33 PNGs/1M manifest, pending Linux recording/comparison and native QA remain unchanged.

@@ -2,8 +2,9 @@
 
 Status: product design, revised 2026-10-15. Canonical clone `/Users/diego/Code/crate-v3`, branch
 `feat/crate_v3`. The handover records implementation and QA status; historical analysis is not a
-current progress report. Checkpoints through 1M are published; Task 1b.1 / Checkpoint 1N is
-authorised for local implementation and review. Its commit/push awaits Diego's approval.
+current progress report. Checkpoints through 1P are published in `53177736`; Task 1b.3 /
+Checkpoint 1Q was approved on Linux at `#pestanas` on 2026-10-16. Diego authorised its
+commit/push and continuation to 1b.4, with the next review stop at checkpoint 1R.
 
 Scope: Admin (`app/ui`), Listen (`app/listen`, which also ships as Capacitor iOS/Android and inside the
 Tauri shell `app/listen-desktop`), shared `@crate/ui` (`app/shared/ui`), and the backend work in

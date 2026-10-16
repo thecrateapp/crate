@@ -491,3 +491,31 @@ original manifest. Rebase, PR, deploy and release remain outside this publicatio
 The next task is 1b.3 / proposed checkpoint 1Q, with a review stop before later blocks or further
 publication. Follow the tracked Linux bootstrap in `2026-10-16-crate-v3-linux-handover.md`;
 use the existing `feat/crate_v3` remote branch and preserve the persistent component preview.
+
+
+### Checkpoint 1Q — text tabs and app-local URL state, 2026-10-16
+
+Diego assigned only Task 1b.3 and requested isolation from the agent working on Crate MCP.
+Use the managed Linux worktree `/home/diego/.codex/worktrees/crate-v3-1q/crate`, branch
+`feat/crate_v3`, based on published `53177736a7643c232cbb19e744a2b2ee9077efaf`.
+The MCP checkout remains on `feat/crate_mcp`; its working files are not part of this diff.
+
+Preserve shared Radix props/variants; `default` and `line` now share one text-tab identity.
+Keep helpers separate per app and adopt them in production pages only in their assigned phases.
+The helper contract validates reads/writes, falls back without canonicalizing unknown links,
+pushes navigation by default and supports explicit replacement. Preserve unrelated/repeated
+query values, hash, route state and scroll. Keep existing path-based Library links unchanged.
+The persistent `#pestanas` preview exercises both real helpers and back/forward navigation;
+its second named parameter is confined to sample routing.
+
+1Q is local and awaits Diego's visual review. No authorisation to commit/push this block,
+advance to 1b.4, merge/rebase, deploy, release or regenerate canonical baselines is inferred.
+Focused checks only, with one test/browser worker; full validation remains at phase close.
+Canonical 33 Linux PNGs/1M manifest and pending 1N–1P Linux/native QA remain unchanged.
+
+
+### Checkpoint 1Q approval — 2026-10-16
+
+Diego approved 1Q and authorised its commit/push and continuation to Task 1b.4, preserving
+the active preview and stopping for review at checkpoint 1R. This supersedes 1Q's local-only
+publication stop above. No CI/baseline update, PR, merge/rebase, deployment or release is implied.

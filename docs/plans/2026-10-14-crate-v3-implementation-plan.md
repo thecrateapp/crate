@@ -3,7 +3,7 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Published checkpoints through 1M are recorded in the handover; preserve the next 1N review stop.
+> Diego's go-ahead. Published checkpoints through 1P are recorded in the handover; preserve the next 1R review stop.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -1663,6 +1663,26 @@ Commit: `feat(ui): restyle form controls in the v3 language`.
 **Files:** `app/shared/ui/shadcn/tabs.tsx` (text tabs, 2 px `accent-action-hi` underline), a URL-param helper per app (`app/ui/src/hooks/use-tab-param.ts`, `app/listen/src/hooks/use-tab-param.ts`; app-local because routers differ). Pages adopt the helper in their Phase 3–6 tasks.
 
 Test: tab ARIA, the helper round-trips `?tab=` and ignores unknown values.
+
+Status: **Checkpoint 1Q approved by Diego on 2026-10-16, commit/push authorised**, preview at
+`http://127.0.0.1:5186/#pestanas`. The shared Radix wrapper retains its public props,
+controlled/uncontrolled state, orientation and `default`/`line` variant names; both names
+render the same text recipe. It uses Mono 11.5 px / .14em uppercase, a real 2 px
+`accent-action-hi` underline, 44 px targets and one scrollable horizontal row.
+Inventory found one production consumer, Admin Download; its five actual panels have a
+keyboard regression test. Existing Library/ExtendedPlayer tab adapters remain for their phases.
+
+Both app-local `useTabParam(values, defaultValue, { param?, replace? })` hooks return a
+readonly `[tab, setTab]`. Missing/unknown values read as the default without rewriting the
+URL. Invalid writes are ignored; valid changes push history by default, replacement is opt-in,
+and repeated current writes do nothing. Other query values (including repeats), path, hash,
+route state and scroll survive. The preview imports both actual hooks; `listenTab` is only
+its second sample's isolated parameter, not a new production URL contract.
+
+Focused tests/types/lint, preview geometry and the Admin bundle gate are recorded in the
+handover. No page URL migration, new dependency, canonical image/manifest update or CI run.
+Diego authorised 1Q publication and continuation to 1b.4, with the next review stop at 1R.
+Full validation remains once at development/phase close.
 
 Commit: `feat(ui): add text tabs that keep their state in the URL`.
 

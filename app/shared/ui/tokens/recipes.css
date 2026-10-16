@@ -3632,3 +3632,76 @@ button.genre-pill:hover,
     min-height: 44px;
   }
 }
+
+/* Text panel tabs: the same recipe for both apps and both legacy variants. */
+.crate-tabs-list {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 24px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 4px 4px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.crate-tab-trigger {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 0 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.crate-tab-trigger:hover,
+.crate-tab-trigger[data-state="active"] {
+  color: var(--text-primary);
+}
+.crate-tab-trigger:disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+.crate-tab-trigger::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent-action-hi);
+  opacity: 0;
+}
+.crate-tab-trigger[data-state="active"]::after {
+  opacity: 1;
+}
+.crate-tabs-list[data-orientation="vertical"] {
+  flex-direction: column;
+  align-items: stretch;
+  flex-shrink: 0;
+  overflow-x: visible;
+  border-bottom: 0;
+  border-inline-end: 1px solid var(--border-subtle);
+  padding: 4px 0 4px 4px;
+}
+.crate-tab-trigger[data-orientation="vertical"] {
+  justify-content: flex-start;
+  padding: 8px 16px 8px 0;
+}
+.crate-tab-trigger[data-orientation="vertical"]::after {
+  inset-inline: auto 0;
+  inset-block: 0;
+  width: 2px;
+  height: auto;
+}
+@media (forced-colors: active) {
+  .crate-tab-trigger::after {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+}
