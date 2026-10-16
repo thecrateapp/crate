@@ -91,4 +91,4 @@ npm run --workspace=app/listen-desktop typecheck
 - Changing a token value in `tokens/` changes both apps. Check Listen and Admin together on the fixed V3 surfaces.
 - `library-routes.ts` builds URLs the backend and readplane serve; changing a path shape is a cross-stack change.
 - `api.ts` in-flight GET dedupe and abort semantics are relied on by both `useApi` instances; keep behavior stable.
-- Admin still keeps local duplicates of composites/primitives (`app/ui/src/components/ui/`); consolidate instead of adding a third copy. Show cards and Ops surfaces remain app-local; the unused shared copies were removed in Task 1.12. Shared `domain/shows/show-types.ts` remains consumed by Admin.
+- AdminSelect and Admin card/grid/table skeleton subpaths are compatibility re-exports of shared implementations; loading/empty/error state foundations are shared (1b.4). Admin still keeps other local duplicates of composites/primitives (`app/ui/src/components/ui/`); consolidate instead of adding a third copy. Show cards and Ops surfaces remain app-local; the unused shared copies were removed in Task 1.12. Shared `domain/shows/show-types.ts` remains consumed by Admin.

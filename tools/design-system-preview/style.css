@@ -7,6 +7,18 @@
 @source "./forms-checkpoint.tsx";
 @source "./selection-checkpoint.tsx";
 @source "./tabs-checkpoint.tsx";
+@source "./states-checkpoint.tsx";
+@source "../../app/shared/ui/lib/media-layout.ts";
+@source "../../app/shared/ui/domain/entity/EntityCard.tsx";
+@source "../../app/shared/ui/domain/entity/EntityPrimaryAction.tsx";
+@source "../../app/shared/ui/domain/states/LoadingState.tsx";
+@source "../../app/shared/ui/domain/lists/EmptyState.tsx";
+@source "../../app/shared/ui/primitives/ErrorState.tsx";
+@source "../../app/shared/ui/composites/CardSkeleton.tsx";
+@source "../../app/shared/ui/composites/GridSkeleton.tsx";
+@source "../../app/shared/ui/composites/TableSkeleton.tsx";
+@source "../../app/shared/ui/domain/lists/MediaGrid.tsx";
+@source "../../app/shared/ui/shadcn/skeleton.tsx";
 @source "../../app/shared/ui/shadcn/tabs.tsx";
 @source "../../app/listen/src/components/crates/CrateForm.tsx";
 @source "../../app/listen/src/components/jam/JamRoomCreateOptions.tsx";
@@ -218,13 +230,15 @@ main {
 
 #formularios .specimen-heading,
 #seleccion .specimen-heading,
-#pestanas .specimen-heading {
+#pestanas .specimen-heading,
+#estados .specimen-heading {
   gap: 32px;
 }
 
 #formularios .specimen-heading > p,
 #seleccion .specimen-heading > p,
-#pestanas .specimen-heading > p {
+#pestanas .specimen-heading > p,
+#estados .specimen-heading > p {
   max-width: 40ch;
   margin: 0;
   color: var(--text-muted);
@@ -235,7 +249,8 @@ main {
 @media (max-width: 600px) {
   #formularios .specimen-heading,
   #seleccion .specimen-heading,
-  #pestanas .specimen-heading {
+  #pestanas .specimen-heading,
+  #estados .specimen-heading {
     flex-direction: column;
     align-items: flex-start;
     gap: 16px;
@@ -930,3 +945,6 @@ footer p {
   }
 }
 @source "../../app/shared/ui/primitives/FormField.tsx";
+
+.state-preview-reserved { min-block-size: 340px; }
+.state-preview-route { min-block-size: 120px; }

@@ -1,3 +1,5 @@
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { api } from "@/lib/api";
@@ -106,14 +108,6 @@ const GlobalCatalog = lazy(() =>
   })),
 );
 
-function PageSpinner() {
-  return (
-    <div className="flex items-center justify-center py-24">
-      <div className="h-6 w-6 animate-spin rounded-md border-2 border-primary border-t-transparent" />
-    </div>
-  );
-}
-
 function SetupGuard() {
   useEffect(() => {
     api<{ needs_setup: boolean }>("/api/setup/status")
@@ -129,7 +123,7 @@ function SetupGuard() {
 
 function ProfileRedirect() {
   const { user, loading, hasCapability } = useAuth();
-  if (loading) return <PageSpinner />;
+  if (loading) return <LoadingState variant="route" />;
   if (!user) return <Navigate to="/login" replace />;
   if (!hasCapability("users.view")) return <Navigate to="/browse" replace />;
   return <Navigate to={`/users?inspect=${user.id}`} replace />;
@@ -147,14 +141,12 @@ function AdminIndex() {
     return <Navigate to="/system" replace />;
   if (hasCapability("library.view")) return <Navigate to="/browse" replace />;
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-center">
-      <p className="text-lg font-semibold text-foreground">
-        No console landing page available
-      </p>
-      <p className="max-w-md text-sm text-muted-foreground">
-        Your role can access the console, but this surface is not enabled yet.
-      </p>
-    </div>
+    <ErrorState
+      variant="page"
+      kind="unavailable"
+      title="No console landing page available"
+      message="Your role can access the console, but this surface is not enabled yet."
+    />
   );
 }
 
@@ -203,7 +195,7 @@ export default function App() {
       <AuthProvider>
         <TooltipProvider>
           <SetupGuard />
-          <Suspense fallback={<PageSpinner />}>
+          <Suspense fallback={<LoadingState variant="route" />}>
             <Routes>
               <Route path="setup" element={<Setup />} />
               <Route path="login" element={<Login />} />

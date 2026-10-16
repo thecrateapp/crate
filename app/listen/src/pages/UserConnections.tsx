@@ -1,3 +1,4 @@
+import { Skeleton } from "@crate/ui/shadcn/skeleton";
 import { useLocation, useParams } from "react-router";
 import { BackLink } from "@crate/ui/domain/navigation";
 import { LoadingState } from "@crate/ui/domain/states";
@@ -50,7 +51,23 @@ export function UserConnections() {
 
       <section className="rounded-panel border border-border-quiet bg-text-primary/[0.03] p-5 sm:p-6">
         {loading ? (
-          <LoadingState label={t("common.loadingShort")} className="py-12" />
+          <LoadingState label={t("common.loadingShort")}>
+            <div className="space-y-3">
+              {Array.from({ length: 5 }, (_, index) => (
+                <div
+                  key={index}
+                  data-slot="skeleton-user-row"
+                  className="crate-skeleton-user-row"
+                >
+                  <Skeleton className="crate-skeleton-avatar" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Skeleton className="h-4 w-1/2" />
+                    <Skeleton className="h-3 w-1/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </LoadingState>
         ) : data && data.length > 0 ? (
           <div className="space-y-3">
             {data.map((item) => (

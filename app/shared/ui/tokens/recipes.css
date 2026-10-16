@@ -3705,3 +3705,108 @@ button.genre-pill:hover,
     forced-color-adjust: none;
   }
 }
+
+/* Static placeholder geometry; route progress uses the shared motion gates. */
+.crate-skeleton {
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+.crate-skeleton-card {
+  min-block-size: 108px;
+  padding-block: 16px;
+  border-top: 1px solid var(--border-quiet);
+}
+.crate-skeleton-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  text-align: start;
+}
+.crate-skeleton-table th {
+  height: 32px;
+  font-weight: 400;
+  color: var(--text-subtle);
+}
+.crate-skeleton-table td {
+  height: 44px;
+  color: var(--text-muted);
+}
+.crate-skeleton-table th,
+.crate-skeleton-table td {
+  padding-inline: 12px;
+  font-family: var(--font-mono-stack);
+  font-size: 11.5px;
+  border-bottom: 1px solid var(--border-quiet);
+}
+.crate-loading-route {
+  min-block-size: 120px;
+  display: grid;
+  place-items: center;
+}
+.crate-loading-route[data-variant="screen"] {
+  min-block-size: 100dvh;
+}
+.crate-loading-route-mark {
+  inline-size: 120px;
+  display: grid;
+  gap: 12px;
+}
+.crate-empty-state,
+.crate-error-state {
+  min-block-size: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  padding-block: 32px;
+}
+.crate-error-page {
+  min-block-size: 320px;
+  padding-block: 48px;
+}
+.crate-error-page-title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: var(--tracking-display);
+}
+
+.crate-skeleton-media {
+  min-inline-size: 0;
+}
+.crate-skeleton-media-cover {
+  inline-size: 100%;
+  aspect-ratio: 1;
+  margin-block-end: var(--content-card-gap);
+}
+.crate-skeleton-media[data-variant="album"] {
+  padding: var(--content-card-padding);
+}
+.crate-skeleton-media[data-variant="artist"] {
+  inline-size: 100%;
+  max-inline-size: calc(140px + 2 * var(--content-card-padding));
+  margin-inline: auto;
+  text-align: center;
+}
+.crate-skeleton-media[data-variant="artist-fill"] {
+  text-align: center;
+}
+.crate-skeleton-media[data-variant^="artist"] .crate-skeleton-media-cover {
+  border-radius: 50%;
+}
+.crate-skeleton-media[data-variant="station"] .crate-skeleton-media-cover {
+  margin-block-end: 0;
+}
+.crate-skeleton-user-row {
+  display: flex;
+  align-items: center;
+  gap: var(--content-row-gap);
+  padding: var(--content-row-padding-y) 12px;
+  border: 1px solid var(--border-quiet);
+}
+.crate-skeleton-avatar {
+  inline-size: 44px;
+  block-size: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}

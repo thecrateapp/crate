@@ -1,10 +1,19 @@
 import { Skeleton } from "@crate/ui/shadcn/skeleton";
 
-export function CardSkeleton() {
+export function CardSkeleton({ label = "Loading" }: { label?: string }) {
   return (
-    <div className="bg-surface-container border border-border-subtle rounded-md p-6">
-      <Skeleton className="h-8 w-20 mb-2" />
-      <Skeleton className="h-4 w-16" />
+    <div
+      role="status"
+      aria-label={label}
+      data-slot="skeleton-card"
+      className="crate-skeleton-card"
+    >
+      <span className="sr-only">{label}</span>
+      <div aria-hidden="true">
+        <Skeleton className="mb-2 h-8 w-20" />
+        <Skeleton className="h-4 w-16" />
+        <span className="font-display text-numeral-sm text-text-muted">—</span>
+      </div>
     </div>
   );
 }

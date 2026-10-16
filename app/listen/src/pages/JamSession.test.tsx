@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect, useState, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -704,14 +704,15 @@ describe("JamSession lobby - room cards", () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("JamSession room loading", () => {
-  it("shows a spinner while room data is loading", () => {
+  it("shows named reserved geometry while room data is loading", async () => {
     mockParams.roomId = "room-1";
     mockUseApiLoading.value = true;
     mockUseApiData.value = null;
     renderWithListenProviders(<JamSession />);
 
-    const spinner = document.querySelector(".animate-spin");
-    expect(spinner).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: /Loading/ })).toBeInTheDocument();
+    expect(document.querySelector(".animate-spin")).toBeNull();
+    await act(async () => {});
   });
 });
 
@@ -2560,7 +2561,7 @@ describe("JamSession unauthenticated", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders room if roomId is set but user is null", () => {
+  it("renders room if roomId is set but user is null", async () => {
     mockParams.roomId = "room-1";
     mockUseApiLoading.value = true;
     mockUseApiData.value = null;
@@ -2568,8 +2569,9 @@ describe("JamSession unauthenticated", () => {
       auth: { user: null, loading: false },
     });
 
-    // Should show spinner while loading
-    const spinner = document.querySelector(".animate-spin");
-    expect(spinner).toBeInTheDocument();
+    // Keep the named loading region even before authentication resolves.
+    expect(screen.getByRole("status", { name: /Loading/ })).toBeInTheDocument();
+    expect(document.querySelector(".animate-spin")).toBeNull();
+    await act(async () => {});
   });
 });

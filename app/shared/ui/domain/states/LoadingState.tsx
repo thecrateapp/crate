@@ -1,48 +1,82 @@
-import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@crate/ui/lib/cn";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
+import { TableSkeleton } from "@crate/ui/composites/TableSkeleton";
 
-import { CrateLoader } from "../brand/CrateLoader";
-
-export type LoadingStateVariant = "section" | "page" | "screen";
+export type LoadingStateVariant = "section" | "route" | "page" | "screen";
 
 export interface LoadingStateProps {
   variant?: LoadingStateVariant;
   label?: string;
+  /** @deprecated Route indicators no longer use marketing phrases. */
   phrases?: readonly string[];
   className?: string;
+  /** The section's final layout, with reserved readings instead of invented data. */
+  children?: ReactNode;
+}
+
+function RouteLoadingState({
+  variant,
+  label,
+  className,
+}: Required<Pick<LoadingStateProps, "variant" | "label">> &
+  Pick<LoadingStateProps, "className">) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(true), 200);
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label={visible ? label : undefined}
+      data-testid="loading-state"
+      data-variant={variant}
+      className={cn(
+        "crate-loading-route",
+        variant === "screen" && "min-h-dvh",
+        className,
+      )}
+    >
+      {visible ? (
+        <div className="crate-loading-route-mark">
+          <MonoLabel>{label}</MonoLabel>
+          <ProgressHairline label={label} />
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function LoadingState({
   variant = "section",
   label = "Loading",
-  phrases,
   className,
+  children,
 }: LoadingStateProps) {
-  if (variant === "section") {
+  if (variant !== "section")
     return (
-      <div
-        role="status"
-        aria-live="polite"
-        data-testid="loading-state"
-        data-variant={variant}
-        className={cn("flex items-center justify-center py-16", className)}
-      >
-        <Loader2
-          size={CRATE_ICON_SIZE.xl}
-          aria-hidden="true"
-          className="animate-spin text-accent-action"
-        />
-        <span className="sr-only">{label}</span>
-      </div>
+      <RouteLoadingState
+        variant={variant}
+        label={label}
+        className={className}
+      />
     );
-  }
-
   return (
-    <CrateLoader
-      variant={variant}
-      label={label}
-      phrases={phrases}
-      className={className}
-    />
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label={label}
+      data-testid="loading-state"
+      data-variant={variant}
+      className={cn("min-w-0", className)}
+    >
+      <span className="sr-only">{label}</span>
+      <div aria-hidden="true">
+        {children ?? <TableSkeleton rows={3} columns={3} />}
+      </div>
+    </div>
   );
 }

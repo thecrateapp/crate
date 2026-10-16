@@ -33,3 +33,19 @@ describe("JustLandedSection", () => {
     expect(screen.getAllByText("High Vis")).toHaveLength(1);
   });
 });
+
+it("reserves the actual seven-item artist rail while loading", () => {
+  const { container } = renderWithListenProviders(
+    <JustLandedSection loading />,
+  );
+  expect(screen.getByTestId("media-rail")).toHaveAttribute(
+    "data-rail-fit",
+    "columns",
+  );
+  expect(
+    container.querySelectorAll(
+      '[data-slot="skeleton-cover"][data-variant="artist-fill"]',
+    ),
+  ).toHaveLength(7);
+  expect(container.querySelector('[data-slot="skeleton-table"]')).toBeNull();
+});

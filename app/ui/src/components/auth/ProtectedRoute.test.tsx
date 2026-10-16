@@ -1,17 +1,31 @@
-import { screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { CapabilityRoute, ProtectedRoute } from "./ProtectedRoute";
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 
 describe("ProtectedRoute", () => {
-  it("shows spinner while loading", () => {
+  afterEach(() => vi.useRealTimers());
+  it.each([
+    ProtectedRoute,
+    ({ children }: { children: React.ReactNode }) => (
+      <CapabilityRoute anyOf={["admin.access"]}>{children}</CapabilityRoute>
+    ),
+  ])("reserves route loading and delays its indicator", (Guard) => {
+    vi.useFakeTimers();
     renderWithAdminProviders(
-      <ProtectedRoute>
+      <Guard>
         <div>Protected</div>
-      </ProtectedRoute>,
+      </Guard>,
       { auth: { loading: true } },
     );
-    expect(document.querySelector(".animate-spin")).toBeInTheDocument();
+    expect(document.querySelector(".animate-spin")).toBeNull();
+    expect(screen.getByRole("status")).not.toHaveAttribute("aria-busy", "true");
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    act(() => vi.advanceTimersByTime(200));
+    expect(
+      screen.getByRole("progressbar", { name: "Loading" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Protected")).toBeNull();
   });
 
   it("shows admin required message when not admin", () => {
@@ -36,6 +50,9 @@ describe("ProtectedRoute", () => {
       screen.getByText(/Admin console access required/i),
     ).toBeInTheDocument();
     expect(screen.getByText(/user@example.com/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: "Admin console access required" }),
+    ).toHaveAttribute("data-variant", "page");
   });
 
   it("renders children when authenticated as admin", () => {
@@ -111,6 +128,9 @@ describe("ProtectedRoute", () => {
       },
     );
     expect(screen.getByText(/Permission required/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: "Permission required" }),
+    ).toHaveAttribute("data-variant", "page");
     expect(screen.queryByText("Protected")).not.toBeInTheDocument();
   });
 });

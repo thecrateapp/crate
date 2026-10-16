@@ -519,3 +519,22 @@ Canonical 33 Linux PNGs/1M manifest and pending 1N–1P Linux/native QA remain u
 Diego approved 1Q and authorised its commit/push and continuation to Task 1b.4, preserving
 the active preview and stopping for review at checkpoint 1R. This supersedes 1Q's local-only
 publication stop above. No CI/baseline update, PR, merge/rebase, deployment or release is implied.
+
+
+### Checkpoint 1R — states, local review, 2026-10-16
+
+1Q is published as `e863c22715de39b974fc1cf527003fc498d59215`; Diego's continuation authorises
+Task 1b.4 locally with the next review stop at 1R. The shared state recipes retain public
+compatibility aliases and worker/router callbacks. Three Admin skeleton import subpaths stay
+as re-exports; their duplicate implementations and the dead local ErrorState retire.
+
+Section loading accepts final-layout children. Fix the explicitly composed Library card and
+sort-row dimensions, Home/Radio rail shapes and user avatar rows. Complex legacy sections and
+direct CrateLoader users still need their assigned page migrations; do not certify all page
+geometry or global spinner retirement from this foundation checkpoint. Keep focused checks and
+one worker per test/browser chain. Preserve canonical captures and the phase-close full run.
+
+Diego questioned the yellow dot beside the large page error title: “puede que tenga sentido un
+identificador visual, pero no ahi”. Move it into the eyebrow beside `Error de servicio · 503`;
+he confirmed “pefecto, ese es su sitio”. This approves that placement, not the whole 1R checkpoint.
+Keep the title clean; compact error text still uses the shared warning state treatment.

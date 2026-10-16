@@ -77,6 +77,7 @@ import "./style.css";
 import { FormsCheckpoint } from "./forms-checkpoint";
 import { SelectionCheckpoint } from "./selection-checkpoint";
 import { TabsCheckpoint } from "./tabs-checkpoint";
+import { StatesCheckpoint } from "./states-checkpoint";
 
 applyCrateIdentity();
 const disposeFocusRingMotion = installFocusRingMotion();
@@ -1622,6 +1623,7 @@ function App() {
       <FormsCheckpoint />
       <SelectionCheckpoint />
       <TabsCheckpoint />
+      <StatesCheckpoint />
       <AppModal
         open={sampleModalOpen}
         onClose={() => setSampleModalOpen(false)}
@@ -1697,7 +1699,8 @@ function App() {
             "1N publicado",
             "1O publicado",
             "1P publicado",
-            "1Q en revisión",
+            "1Q publicado",
+            "1R en revisión",
           ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>

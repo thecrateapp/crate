@@ -1,7 +1,7 @@
 # Crate v3 design system
 
-Current implementation: 1N–1P are published in `53177736`; Diego approved Task 1b.3 / 1Q
-on Linux at `#pestanas`, authorising publication and 1b.4. Preserve the next 1R review stop.
+Current implementation: checkpoints through 1Q are published (`e863c227`); Task 1b.4 / 1R
+is local on Linux at `#estados`, awaiting Diego's review. Later publication remains gated.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
 `/Users/diego/Code/crate-v3`, branch `feat/crate_v3`. The handover owns implementation/QA status.
@@ -9,7 +9,7 @@ Registry and harness references predating Task 1.13 are historical; current cons
 single-identity equivalents without recreating retired exports.
 Historical reports retain their original measurements; they do not certify current test results.
 The single Crate v3 identity is published through Task 1.13 / Checkpoint 1M (`21873d24`).
-Task 1b.3 / Checkpoint 1Q is approved for publication; later checkpoint publication remains gated.
+Task 1b.4 / Checkpoint 1R is in local review; later checkpoint publication remains gated.
 
 Visual source of truth: the new site only, `app/web` at the approved git reference:
 
@@ -3829,6 +3829,16 @@ States are the table in 3.4. Component changes:
 - `ErrorState` (`primitives/ErrorState`): page variant = eyebrow (`ERROR · 503`, `NOT FOUND`),
   Bricolage 800 title around 2.5 rem, `text-text-muted` body, Retry CTA, Back link, no red icon;
   compact variant for panels (Admin's `components/ui/error-state.tsx` is dead and is deleted).
+- Named live loading regions must not remain `aria-busy=true`; do not defer their announcements
+  indefinitely. Decorative placeholders are hidden from assistive tech and the status contains
+  the caller's loading text. The delayed route indicator cancels its timer on unmount.
+- Empty `panel`/`dashed` and retired icon props remain compatibility aliases, using the same
+  inline text recipe. Compact display titles meet the 20 px minimum; page titles stay 2.5 rem.
+  Any page error identifier belongs beside the eyebrow/code, not the display title (Diego,
+  2026-10-16). No decorative error icon or danger colour is reintroduced.
+- Section callers can inject final layout geometry; GridSkeleton supports actual media density,
+  album padding, capped/fill artist circles and station rails. Compatibility placeholders do
+  not certify every complex legacy page's final geometry; page migrations own those compositions.
 - Offline (Listen `domain/offline/OfflineBadge`): mono `OFFLINE` tag with a ring dot; disabled
   actions explain why in text.
 

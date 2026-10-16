@@ -386,3 +386,26 @@ before 1b.4, commit or push; final scoped results are in the main handover.
 Diego approved 1Q on 2026-10-16 and authorised commit/push and continuation to 1b.4.
 This supersedes the local-only stop above. Keep this specimen and the preview active;
 stop for the next visual review at checkpoint 1R. Baselines/native/phase-close QA remain separate.
+
+
+## Shared states / Checkpoint 1R — local review
+
+Open <http://127.0.0.1:5186/#estados>. Real LoadingState, EmptyState, ErrorState, Card/Grid/Table
+Skeletons, StatusDot and ProgressHairline show static reserved layouts, the delayed 120px route
+indicator, errors and Retry/Back. Manual sample modes cover loading/building/ready/stale/error/
+empty/offline. The same readings remain in loading/ready, last data survives retry/error/offline,
+and disabled refresh explains why. Loading/empty have no header status. There are no API or
+storage writes and every earlier checkpoint remains.
+
+The page error marker sits beside its eyebrow/code, as Diego approved, with a clean display
+title. Media examples compare placeholder geometry against actual shared EntityCard shells,
+including capped artist circles and album padding. Library also reserves the mobile sort row;
+Home/Radio use real rail columns and user rows reserve their avatar/text shape. Complex legacy
+page layouts and remaining direct CrateLoader users retain their page-phase work.
+
+Run `npm run design-system:preview:test -- states-checkpoint.spec.ts --workers=1` for this
+checkpoint. Browser checks cover 1440/390 px, live labels, keyboard Retry, retained readings,
+actual card/row geometry, 8px field gaps, indicator delay/cancellation, reduced motion, no overflow
+or writes and the approved marker placement. Advisory `checkpoint-1r-{1440,390}.png` images
+are ignored local review material. Preserve all canonical 33 PNGs and the original 1M manifest.
+Stop at 1R for Diego's review; no commit/push or advance to 1b.5 is implied by marker approval.

@@ -1,3 +1,4 @@
+import { GridSkeleton } from "@crate/ui/composites/GridSkeleton";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
@@ -43,7 +44,26 @@ export function LibraryAlbumsTab() {
     });
   }, [albums, sort]);
 
-  if (loading) return <LoadingState label={t("common.loadingShort")} />;
+  if (loading)
+    return (
+      <LoadingState label={t("common.loadingShort")}>
+        <div className="space-y-4">
+          {!isDesktop ? (
+            <div
+              data-slot="library-sort-placeholder"
+              aria-hidden="true"
+              className="flex h-10 items-center justify-between gap-3"
+            >
+              <span className="font-mono text-label text-text-subtle">—</span>
+              <span className="flex h-10 w-43 items-center text-sm text-text-muted">
+                —
+              </span>
+            </div>
+          ) : null}
+          <GridSkeleton density="default" variant="album" />
+        </div>
+      </LoadingState>
+    );
   if (!albums || albums.length === 0) {
     return (
       <EmptyState

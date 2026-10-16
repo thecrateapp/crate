@@ -32,12 +32,12 @@ export { CratePill, CrateChip } from "@crate/ui/primitives/CrateBadge";
 
 export { AdminSelect, type AdminSelectOption } from "./AdminSelect";
 export { AIButton } from "./AIButton";
-export { CardSkeleton } from "./card-skeleton";
+export { CardSkeleton } from "@crate/ui/composites/CardSkeleton";
 export { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
-export { ErrorState } from "./error-state";
-export { GridSkeleton } from "./grid-skeleton";
+export { ErrorState } from "@crate/ui/primitives/ErrorState";
+export { GridSkeleton } from "@crate/ui/composites/GridSkeleton";
 export { ImageLightbox } from "./image-lightbox";
 export { MusicContextMenu } from "./music-context-menu";
 export { QrCodeImage } from "./QrCodeImage";
 export { StarRating } from "./star-rating";
-export { TableSkeleton } from "./table-skeleton";
+export { TableSkeleton } from "@crate/ui/composites/TableSkeleton";

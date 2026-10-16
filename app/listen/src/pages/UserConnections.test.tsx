@@ -67,3 +67,21 @@ describe("UserConnections", () => {
     expect(screen.getByText("Aún no sigue a nadie.")).toBeVisible();
   });
 });
+
+it("reserves avatar rows instead of a table while loading", () => {
+  vi.mocked(useApi).mockReturnValue({
+    data: null,
+    loading: true,
+    error: null,
+    refetch: vi.fn(),
+  });
+  const { container } = renderWithListenProviders(<UserConnections />, {
+    route: "/users/diego/followers",
+    path: "/users/:username/followers",
+  });
+  expect(screen.getByRole("status")).toHaveAccessibleName();
+  expect(
+    container.querySelectorAll('[data-slot="skeleton-user-row"]'),
+  ).toHaveLength(5);
+  expect(container.querySelector('[data-slot="skeleton-table"]')).toBeNull();
+});

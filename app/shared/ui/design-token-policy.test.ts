@@ -29,9 +29,7 @@ const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
   },
 };
 
-const ICON_SIZE_BUDGET: Record<string, Record<string, number>> = {
-  "primitives/ErrorState.tsx": { "32": 1 },
-};
+const ICON_SIZE_BUDGET: Record<string, Record<string, number>> = {};
 
 function productionSourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {

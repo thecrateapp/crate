@@ -202,7 +202,7 @@ describe("lists", () => {
   });
 
   describe("EmptyState", () => {
-    it("renders title, message, and default icon", () => {
+    it("renders the default inline state with title and message, without an icon", () => {
       const { getByText, getByTestId, container } = render(
         <EmptyState
           title="No music"
@@ -213,21 +213,21 @@ describe("lists", () => {
       expect(getByTestId("empty-state")).toBeInTheDocument();
       expect(getByText("No music")).toBeInTheDocument();
       expect(getByText("Add some tracks to get started.")).toBeInTheDocument();
-      expect(container.querySelector("svg")).toBeInTheDocument();
+      expect(container.querySelector("svg")).not.toBeInTheDocument();
     });
 
-    it("renders a custom icon", () => {
+    it("accepts the retired icon prop without restoring an icon tile", () => {
       const { container } = render(
         <EmptyState icon={Disc} title="No albums" />,
       );
 
-      expect(container.querySelector("svg")).toBeInTheDocument();
+      expect(container.querySelector("svg")).not.toBeInTheDocument();
     });
 
     it("does not render title or message when omitted", () => {
       const { container } = render(<EmptyState icon={Music} />);
 
-      expect(container.querySelector("svg")).toBeInTheDocument();
+      expect(container.querySelector("svg")).not.toBeInTheDocument();
       expect(container.textContent).toBe("");
     });
 
@@ -259,7 +259,8 @@ describe("lists", () => {
         />,
       );
 
-      expect(getByTestId("empty-state")).toHaveClass("border-dashed");
+      expect(getByTestId("empty-state")).not.toHaveClass("border-dashed");
+      expect(getByRole("status", { name: "No crates" })).toBeInTheDocument();
       expect(
         getByRole("heading", { level: 2, name: "No crates" }),
       ).toBeInTheDocument();

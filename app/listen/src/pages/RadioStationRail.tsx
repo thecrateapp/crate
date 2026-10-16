@@ -1,3 +1,4 @@
+import { GridSkeleton } from "@crate/ui/composites/GridSkeleton";
 import { useTranslation } from "react-i18next";
 import { MediaRail, SectionHeader } from "@crate/ui/domain/lists";
 import { LoadingState } from "@crate/ui/domain/states";
@@ -27,7 +28,9 @@ export function RadioStationRail({
     return (
       <section className="space-y-4">
         <SectionHeader title={title} subtitle={subtitle} />
-        <LoadingState label={t("common.loadingShort")} className="py-10" />
+        <LoadingState label={t("common.loadingShort")}>
+          <GridSkeleton layout="rail" variant="station" count={5} />
+        </LoadingState>
       </section>
     );
   }

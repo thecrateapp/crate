@@ -4,18 +4,20 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — checkpoint 1Q
+## Active Linux workspace — checkpoint 1R
 
 Diego's latest request overrides the clone-only setup below: isolate this work from the
 Crate MCP agent. The managed worktree is `/home/diego/.codex/worktrees/crate-v3-1q/crate`,
 on the existing `feat/crate_v3` branch, tracking `origin/feat/crate_v3`. HEAD is published
-`53177736a7643c232cbb19e744a2b2ee9077efaf`; its ancestry check passes. The original checkout
+`e863c22715de39b974fc1cf527003fc498d59215` (approved 1Q); the original transfer checkpoint
+`53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. The original checkout
 `/home/diego/Code/Ninja/crate` stays on `feat/crate_mcp` with the other agent's changes.
 Do not switch, reset or edit that checkout. No extra clone/worktree is needed to resume.
 
 Node 22.23.3 and root `npm ci` are ready. The live preview remains at
-`http://127.0.0.1:5186/#pestanas`; it needs no backend. Diego approved 1Q and authorised its
-commit/push and continuation to 1b.4, stopping at checkpoint 1R for review. Read the final 1Q record
+`http://127.0.0.1:5186/#estados`; it needs no backend. 1Q is committed/pushed with Diego's
+approval. Task 1b.4 / checkpoint 1R is local and stops for his review before publication or 1b.5.
+Read the final 1R record
 in the main handover for verification and limits. The generic bootstrap below is retained
 for a future fresh machine; it does not replace this active worktree.
 
@@ -86,7 +88,7 @@ advisory checks. Canonical PNGs still come from the approved Linux CI job, not l
 
 1. Root `AGENTS.md`, then `app/shared/AGENTS.md`, `app/listen/AGENTS.md`, `app/ui/AGENTS.md`.
 2. `docs/plans/2026-10-15-crate-v3-handover.md` — latest state, authorisation and QA gaps.
-3. `docs/plans/2026-10-14-crate-v3-implementation-plan.md` — Task 1b.3 next.
+3. `docs/plans/2026-10-14-crate-v3-implementation-plan.md` — Task 1b.4 / 1R at review stop.
 4. `docs/plans/2026-10-15-crate-v3-decision-register.md`.
 5. `docs/plans/2026-10-14-crate-v3-design-system.md` and product design from the same date.
 6. Historical evidence under `docs/plans/crate-v3-analysis/` only when needed.
@@ -131,9 +133,11 @@ The live page retains all specimens: `#capas` (1N), `#formularios` (1O), `#selec
 with isolated Spanish translations and local state. It makes no API/localStorage writes.
 Extend this same page for future review; do not replace earlier specimens with another app.
 
-## Next task and stopping point
+## Historical transfer assignment — completed by published 1Q
 
-Continue **Task 1b.3**, proposed next visual checkpoint **1Q**:
+The original transfer assigned **Task 1b.3 / checkpoint 1Q** below. It is now approved and
+published. The active stop is **Task 1b.4 / 1R**, described at the top and in the final main
+handover record; do not repeat 1Q or advance to 1b.5. Original scope:
 
 - Shared text tabs in `app/shared/ui/shadcn/tabs.tsx`, with the specified 2 px accent underline.
 - Separate URL-param helpers in `app/ui/src/hooks/use-tab-param.ts` and
@@ -175,3 +179,13 @@ without checking the appropriate app budget.
 The latest local focused results, fixes and final publication pointer are in the main handover.
 Ignored `/tmp` patches, preview advisory PNGs and Mac process IDs are not transferred and must
 not be prerequisites for continuing.
+
+
+## 1R review readiness
+
+The final main handover records 309 focused Vitest cases, three Chromium cases, four app/package
+typechecks, scoped lint, builds and budgets. Admin is now **529,065 / 532,480 B gzip**, leaving
+**3,415 B**; Listen is **199,908 / 307,200 B**. The page error marker sits beside its eyebrow,
+with Diego's placement approval; the whole checkpoint remains at review stop. The preview was
+restarted with forced dependency optimisation after a stale HMR module left the IAB tab blank;
+rendering and the final browser replay are verified. Use Node 22 and keep :5186 running.

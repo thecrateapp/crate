@@ -3,7 +3,7 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Published checkpoints through 1P are recorded in the handover; preserve the next 1R review stop.
+> Diego's go-ahead. Published checkpoints through 1Q are recorded in the handover; preserve the next 1R review stop.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -1664,7 +1664,7 @@ Commit: `feat(ui): restyle form controls in the v3 language`.
 
 Test: tab ARIA, the helper round-trips `?tab=` and ignores unknown values.
 
-Status: **Checkpoint 1Q approved by Diego on 2026-10-16, commit/push authorised**, preview at
+Status: **Checkpoint 1Q approved and published as `e863c227` on 2026-10-16**, preview at
 `http://127.0.0.1:5186/#pestanas`. The shared Radix wrapper retains its public props,
 controlled/uncontrolled state, orientation and `default`/`line` variant names; both names
 render the same text recipe. It uses Mono 11.5 px / .14em uppercase, a real 2 px
@@ -1692,6 +1692,27 @@ Commit: `feat(ui): add text tabs that keep their state in the URL`.
 
 Test: `states.test.tsx` (each state names itself to assistive tech; skeletons reserve the final
 geometry; no `animate-spin` outside buttons).
+
+Status: **Checkpoint 1R implemented locally, awaiting Diego's review** at
+`http://127.0.0.1:5186/#estados`. Shared static skeletons, inline empty states, compact/page
+errors and delayed route loading are implemented. Two Admin PageSpinner definitions/four
+callsites and both Listen shell fallbacks use the shared indicator. Three Admin skeleton
+subpaths re-export the shared composites; the dead local ErrorState retires. Preserve public
+aliases, callbacks, capability checks, URL redirects and translated caller copy.
+
+Loading sections accept the caller's final layout. Library Albums/Artists now match actual
+card padding/circle cap, media density and mobile sort-row height. Home/Radio rails and user
+rows get matching placeholder shapes. Generic section placeholders remain compatibility
+fallbacks for complex, unmigrated page layouts; their exact multi-section geometry and direct
+CrateLoader users remain page-phase work. PD50 is applied to migrated foundation/route files,
+not claimed globally. Do not restyle unrelated screens to satisfy a global spinner assertion.
+
+The preview keeps the same readings in loading and ready, retains last sample data on
+stale/error/retry/offline and names every state. Loading/empty omit a header status. The page
+error identifier sits in its eyebrow, never beside the large title (Diego's review correction).
+Final focused verification, bundle size and QA limits are recorded in the handover. Stop at
+1R before commit/push or Task 1b.5. No full suites or canonical baseline/CI update in iteration.
+
 
 Commit: `feat(ui): one set of loading, empty and error states`.
 

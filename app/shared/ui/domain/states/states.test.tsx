@@ -1,38 +1,84 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 
-import {
-  CRATE_LOADER_DEFAULT_PHRASES,
-  CrateLoader,
-  LoadingState,
-} from "./index";
+import { CrateLoader, LoadingState } from "./index";
 
 describe("LoadingState", () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
-  it("renders a section spinner with an accessible status label", () => {
-    render(<LoadingState label="Loading albums" />);
-
-    const status = screen.getByRole("status");
-    expect(status).toHaveAttribute("data-variant", "section");
-    expect(status).toHaveTextContent("Loading albums");
-    expect(status.querySelector("svg")).toHaveClass("animate-spin");
+  it("names section loading and reserves visible static readings without a spinner", () => {
+    const { container } = render(<LoadingState label="Loading albums" />);
+    expect(
+      screen.getByRole("status", { name: "Loading albums" }),
+    ).not.toHaveAttribute("aria-busy", "true");
+    expect(
+      container.querySelector('[data-slot="skeleton-table"]'),
+    ).toBeInTheDocument();
+    expect(container.textContent).toContain("—");
+    expect(
+      container.querySelector(".animate-spin, .animate-pulse, svg"),
+    ).toBeNull();
   });
 
-  it.each(["page", "screen"] as const)(
-    "delegates the %s variant to the Crate loader",
-    (variant) => {
-      vi.spyOn(Math, "random").mockReturnValue(0);
-      render(<LoadingState variant={variant} label="Loading artist" />);
+  it("accepts the caller's final layout while hiding decorative readings from assistive tech", () => {
+    render(
+      <LoadingState label="Loading tracks">
+        <div data-testid="final-layout">— / —</div>
+      </LoadingState>,
+    );
+    expect(screen.getByTestId("final-layout")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("final-layout").closest('[aria-hidden="true"]'),
+    ).not.toBeNull();
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+  });
 
-      const status = screen.getByRole("status");
-      expect(status).toHaveAttribute("data-variant", variant);
-      expect(status).toHaveTextContent("Loading artist");
-      expect(status).toHaveTextContent(CRATE_LOADER_DEFAULT_PHRASES[0]);
+  it.each(["route", "page", "screen"] as const)(
+    "delays the %s indicator by 200ms without reserving fake progress",
+    (variant) => {
+      vi.useFakeTimers();
+      render(
+        <LoadingState
+          variant={variant}
+          label="Loading artist"
+          phrases={["Do not cycle"]}
+        />,
+      );
+      expect(screen.queryByText("Loading artist")).toBeNull();
+      act(() => vi.advanceTimersByTime(199));
+      expect(screen.queryByRole("progressbar")).toBeNull();
+      act(() => vi.advanceTimersByTime(1));
+      expect(
+        screen.getByRole("status", { name: "Loading artist" }),
+      ).toHaveAttribute("data-variant", variant);
+      expect(
+        screen.getByRole("progressbar", { name: "Loading artist" }),
+      ).not.toHaveAttribute("aria-valuenow");
+      expect(screen.queryByText("Do not cycle")).toBeNull();
     },
   );
+
+  it("does not defer the route announcement behind a permanent busy flag", () => {
+    vi.useFakeTimers();
+    render(<LoadingState variant="route" label="Loading tracks" />);
+    act(() => vi.advanceTimersByTime(200));
+    expect(
+      screen.getByRole("status", { name: "Loading tracks" }),
+    ).not.toHaveAttribute("aria-busy", "true");
+  });
+
+  it("cancels a route indicator that resolves before its delay", () => {
+    vi.useFakeTimers();
+    const { unmount } = render(
+      <LoadingState variant="route" label="Loading" />,
+    );
+    expect(vi.getTimerCount()).toBe(1);
+    unmount();
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });
 
 describe("CrateLoader", () => {
