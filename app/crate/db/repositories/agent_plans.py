@@ -1,0 +1,327 @@
+"""One persisted plan model with exact human decisions and transactional reservation."""
+
+import json
+from uuid import UUID
+
+from sqlalchemy import text
+
+from crate.agent_access import authorization_context
+from crate.agent_diagnostics import DiagnosticError, _safe
+from crate.db.repositories.agent_human_sessions import require_agent_human_capabilities
+from crate.db.repositories.agent_requests import _hash
+from crate.db.tx import optional_scope, read_scope
+
+
+def _document(row):
+    observation = row["observation"]
+    content = {
+        "operation": "repair_photo_flag",
+        "targets": [{"artist_uid": row["artist_uid"], "name": observation["name"]}],
+        "source_versions": {
+            "observation_id": str(row["observation_id"]),
+            "observed_at": observation["observed_at"],
+            "filesystem_fingerprint": observation["filesystem_fingerprint"],
+        },
+        "changes": [
+            {
+                "artist_uid": row["artist_uid"],
+                "field": "has_photo",
+                "before": row["before_value"],
+                "after": row["after_value"],
+            }
+        ],
+        "impact": {
+            "artist_count": 1,
+            "database_fields": 1,
+            "filesystem_writes": False,
+            "notifications": False,
+        },
+        "risk": "low",
+        "reversibility": "The flag can be recomputed from current photo evidence; restoring the old flag can reintroduce inconsistency.",
+        "authorization_context": row["authorization_context"],
+        "policy_revision": row["policy_revision"],
+        "approval_required": row["approval_required"],
+        "expires_at": row["expires_at"].isoformat(),
+    }
+    return {
+        "plan_id": row["id"],
+        "principal_id": str(row["principal_id"]),
+        "plan_version": row["version"],
+        "content_hash": _hash(content),
+        "authorization_context_hash": _hash(row["authorization_context"]),
+        "state": row["state"],
+        "created_at": row["created_at"].isoformat(),
+        "job_id": row["task_id"],
+        "target_count": 1,
+        "returned_count": 1,
+        "truncated": False,
+        "result": row["result"],
+        **content,
+    }
+
+
+def _get(current, plan_id, *, lock=False):
+    try:
+        plan_id = str(UUID(str(plan_id)))
+    except (ValueError, TypeError):
+        raise DiagnosticError("INVALID_ARGUMENT", "A plan UUID is required") from None
+    row = (
+        current.execute(
+            text(
+                """
+        SELECT p.*, p.id::text AS id, p.artist_uid::text AS artist_uid, o.observation,
+               p.expires_at > NOW() AS unexpired
+        FROM agent_repair_plans p JOIN agent_photo_observations o ON o.id = p.observation_id
+        WHERE p.id = :id
+    """
+                + (" FOR UPDATE OF p" if lock else "")
+            ),
+            {"id": plan_id},
+        )
+        .mappings()
+        .first()
+    )
+    if row is None:
+        raise DiagnosticError("NOT_FOUND", "Plan was not found")
+    return dict(row)
+
+
+def get_plan(plan_id: str, *, session=None) -> dict:
+    if session is not None:
+        return {
+            key: _safe(value)
+            for key, value in _document(_get(session, plan_id)).items()
+        }
+    with read_scope() as current:
+        return {
+            key: _safe(value)
+            for key, value in _document(_get(current, plan_id)).items()
+        }
+
+
+def list_plans(*, state=None, limit=20, before=None, session=None) -> list[dict]:
+    def _read(current):
+        return [
+            dict(row)
+            for row in current.execute(
+                text("""
+            SELECT id::text AS plan_id, principal_id::text, artist_uid::text, version AS plan_version,
+                   state, approval_required, created_at, expires_at, task_id AS job_id
+            FROM agent_repair_plans WHERE (:state IS NULL OR state = :state)
+              AND (:before IS NULL OR id < CAST(:before AS uuid))
+            ORDER BY id DESC LIMIT :limit
+        """),
+                {"state": state, "before": before, "limit": min(max(limit, 1), 101)},
+            ).mappings()
+        ]
+
+    if session is not None:
+        return _read(session)
+    with read_scope() as current:
+        return _read(current)
+
+
+def validate_plan_authorization(current, plan, principal, *, worker=False, job_id=None):
+    policy = (
+        current.execute(
+            text("""
+        SELECT policy_revision, require_approval FROM agent_principals WHERE id = :id FOR SHARE
+    """),
+            {"id": principal.id},
+        )
+        .mappings()
+        .one()
+    )
+    if str(plan["principal_id"]) != principal.id or plan[
+        "authorization_context"
+    ] != authorization_context(principal):
+        raise DiagnosticError(
+            "FORBIDDEN", "Plan belongs to a different integration authorization"
+        )
+    if (
+        plan["policy_revision"] != policy["policy_revision"]
+        or plan["approval_required"] != policy["require_approval"]
+    ):
+        raise DiagnosticError(
+            "PLAN_STALE", "Integration policy changed; prepare a new plan"
+        )
+    if not plan["approval_required"]:
+        return
+    approval = (
+        current.execute(
+            text("""
+        SELECT * FROM agent_plan_approvals WHERE plan_id = :id FOR UPDATE
+    """),
+            {"id": plan["id"]},
+        )
+        .mappings()
+        .first()
+    )
+    document = _document(plan)
+    if (
+        not approval
+        or approval["decision"] != "approved"
+        or approval["plan_version"] != plan["version"]
+        or approval["content_hash"] != document["content_hash"]
+        or approval["policy_revision"] != policy["policy_revision"]
+        or approval["authorization_context"] != authorization_context(principal)
+        or (
+            approval["reserved_job_id"] is not None
+            and approval["reserved_job_id"] != job_id
+        )
+        or (worker and approval["reserved_job_id"] != job_id)
+    ):
+        raise DiagnosticError(
+            "APPROVAL_REQUIRED", "An exact current human approval is required"
+        )
+    valid = current.execute(
+        text("SELECT :expiry > NOW()"), {"expiry": approval["expires_at"]}
+    ).scalar_one()
+    if not valid:
+        raise DiagnosticError("PLAN_STALE", "Human approval has expired")
+
+
+def reserve_plan_approval(current, plan_id, job_id):
+    current.execute(
+        text(
+            "UPDATE agent_plan_approvals SET reserved_job_id = :job WHERE plan_id = :id AND reserved_job_id IS NULL"
+        ),
+        {"id": plan_id, "job": job_id},
+    )
+
+
+def decide_plan(
+    actor: dict,
+    plan_id: str,
+    *,
+    decision: str,
+    plan_version: str,
+    content_hash: str,
+    policy_revision: int,
+    authorization_context_hash: str,
+    session=None,
+) -> dict:
+    if decision not in {"approved", "rejected"}:
+        raise DiagnosticError("INVALID_ARGUMENT", "Unsupported human decision")
+    with optional_scope(session) as current:
+        require_agent_human_capabilities(
+            actor,
+            {"agents.plans.approve", "agents.plans.review", "library.repair.run"},
+            session=current,
+        )
+        plan = _get(current, plan_id, lock=True)
+        document = _document(plan)
+        policy = (
+            current.execute(
+                text(
+                    "SELECT enabled, grants, policy_revision, require_approval FROM agent_principals WHERE id = :id FOR SHARE"
+                ),
+                {"id": plan["principal_id"]},
+            )
+            .mappings()
+            .one()
+        )
+        if (
+            not plan["unexpired"]
+            or not policy["enabled"]
+            or "library.repair.photo_flag" not in policy["grants"]
+            or policy["policy_revision"] != policy_revision
+            or plan["policy_revision"] != policy_revision
+            or not plan["approval_required"]
+            or document["content_hash"] != content_hash
+            or plan["version"] != plan_version
+            or _hash(plan["authorization_context"]) != authorization_context_hash
+        ):
+            raise DiagnosticError(
+                "PLAN_STALE", "The reviewed plan or policy is no longer current"
+            )
+        previous = (
+            current.execute(
+                text("SELECT * FROM agent_plan_approvals WHERE plan_id = :id"),
+                {"id": plan["id"]},
+            )
+            .mappings()
+            .first()
+        )
+        if previous:
+            if (
+                previous["decision"] == decision
+                and previous["content_hash"] == content_hash
+            ):
+                return {key: _safe(value) for key, value in document.items()}
+            raise DiagnosticError(
+                "STATE_CONFLICT", "The plan already has a human decision"
+            )
+        if plan["state"] != "awaiting_approval":
+            raise DiagnosticError("STATE_CONFLICT", "Plan is not awaiting human review")
+        context = plan["authorization_context"]
+        if context:
+            from crate.db.repositories.mcp_oauth import delegated_authorization_grants
+
+            grants = delegated_authorization_grants(
+                context["authorization_id"],
+                principal_id=str(plan["principal_id"]),
+                actor_user_id=context["actor_user_id"],
+                client_id=context["client_id"],
+                accepted_scopes=context["accepted_scopes"],
+                session=current,
+                worker=True,
+            )
+            if "library.repair.photo_flag" not in grants:
+                raise DiagnosticError(
+                    "FORBIDDEN", "The delegated operation is no longer authorized"
+                )
+        current.execute(
+            text("""
+            INSERT INTO agent_plan_approvals (plan_id, principal_id, plan_version, content_hash,
+                authorization_context, policy_revision, decision, approved_by, expires_at)
+            VALUES (:id, :principal, :version, :hash, CAST(:context AS jsonb), :policy, :decision, :user, :expiry)
+        """),
+            {
+                "id": plan["id"],
+                "principal": plan["principal_id"],
+                "version": plan_version,
+                "hash": content_hash,
+                "context": json.dumps(context),
+                "policy": policy_revision,
+                "decision": decision,
+                "user": actor["id"],
+                "expiry": plan["expires_at"],
+            },
+        )
+        state = "authorized" if decision == "approved" else "rejected"
+        current.execute(
+            text("UPDATE agent_repair_plans SET state = :state WHERE id = :id"),
+            {"id": plan["id"], "state": state},
+        )
+        current.execute(
+            text("""
+            INSERT INTO audit_log (timestamp, user_id, action, target_type, target_name, details_json)
+            VALUES (NOW(), :user, :action, 'agent_plan', :id, CAST(:details AS jsonb))
+        """),
+            {
+                "user": actor["id"],
+                "action": f"agent.plan.{decision}",
+                "id": plan["id"],
+                "details": json.dumps(
+                    {
+                        "principal_id": str(plan["principal_id"]),
+                        "plan_id": plan["id"],
+                        "plan_version": plan_version,
+                        "content_hash": content_hash,
+                        "policy_revision": policy_revision,
+                        **context,
+                    }
+                ),
+            },
+        )
+        return get_plan(plan["id"], session=current)
+
+
+__all__ = [
+    "decide_plan",
+    "get_plan",
+    "list_plans",
+    "reserve_plan_approval",
+    "validate_plan_authorization",
+]

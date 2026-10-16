@@ -1,5 +1,6 @@
 """Persisted agent diagnostics stay bounded and never change functional state."""
 
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -142,6 +143,58 @@ def test_job_detail_omits_secret_payloads_and_handles_missing(evidence):
     assert result["result_status"] == "skipped"
     assert not {"params_json", "result_json", "params", "result"} & result.keys()
     assert agent_operations.read_job("missing") is None
+
+
+def test_agent_job_detail_exposes_bounded_execution_and_verification_without_raw_plan(
+    evidence,
+):
+    from crate.db.tx import transaction_scope
+
+    payload = {
+        "status": "completed",
+        "execution": {
+            "status": "applied",
+            "path": "/private/music",
+            "issue_id": 12,
+            "observation_id": "o" * 256,
+            "plan_id": "p" * 256,
+            "artist_uid": ARTIST_UID,
+        },
+        "verification": {"status": "conflict", "secret": "verification-secret"},
+        "projection": {"status": "pending", "token": "projection-secret"},
+        "error_code": "e" * 256,
+        "plan": {"filesystem_path": "/private/music", "token": "plan-secret"},
+        "idempotency_key": "private-request-key",
+    }
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "UPDATE tasks SET result_json = CAST(:result AS jsonb) WHERE id = :id"
+            ),
+            {"result": json.dumps(payload), "id": "agent-job-002"},
+        )
+    result = agent_operations.read_job("agent-job-002")
+    assert result["execution_status"] == "applied"
+    assert result["verification_status"] == "conflict"
+    assert result["projection_status"] == "pending"
+    assert result["issue_id"] == "12"
+    assert result["observation_id"] == "o" * 128
+    assert result["plan_id"] == "p" * 128
+    assert result["artist_uid"] == ARTIST_UID
+    assert result["error_code"] == "e" * 80
+    serialized = json.dumps(result, default=str)
+    for private in (
+        "/private/music",
+        "verification-secret",
+        "projection-secret",
+        "plan-secret",
+        "private-request-key",
+    ):
+        assert private not in serialized
+    assert (
+        not {"result_json", "params_json", "plan", "execution", "verification"}
+        & result.keys()
+    )
 
 
 def test_log_reads_are_time_scoped_bounded_and_omit_metadata(evidence):

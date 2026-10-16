@@ -1,6 +1,22 @@
 # ruff: noqa: F401
 """Response-oriented Pydantic models for the HTTP API contract."""
 
+from crate.api.schemas.agents import (
+    AgentCollectionResponse,
+    AgentCredentialSecretResponse,
+    CredentialExpiry,
+    IntegrationCreate,
+    IntegrationUpdate,
+    OAuthClientCreate,
+    OAuthClientUpdate,
+    PlanDecision,
+)
+from crate.api.schemas.mcp_oauth import (
+    MCPAuthorizationServerMetadata,
+    MCPOAuthErrorResponse,
+    MCPOAuthTokenResponse,
+    MCPProtectedResourceMetadata,
+)
 from crate.api.schemas.acquisition import (
     AcquisitionDownloadRequest,
     AcquisitionDownloadResponse,
@@ -398,6 +414,18 @@ from crate.api.schemas.utility import (
 )
 
 __all__ = [
+    "AgentCollectionResponse",
+    "AgentCredentialSecretResponse",
+    "CredentialExpiry",
+    "IntegrationCreate",
+    "IntegrationUpdate",
+    "OAuthClientCreate",
+    "OAuthClientUpdate",
+    "PlanDecision",
+    "MCPAuthorizationServerMetadata",
+    "MCPOAuthErrorResponse",
+    "MCPOAuthTokenResponse",
+    "MCPProtectedResourceMetadata",
     "AcquisitionDownloadRequest",
     "AcquisitionDownloadResponse",
     "AcquisitionQueueItemResponse",

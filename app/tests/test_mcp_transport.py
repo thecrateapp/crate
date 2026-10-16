@@ -237,7 +237,7 @@ def test_exact_endpoint_has_no_redirect_and_bounded_request_body(transport_app):
     [
         ("get_instance_status", {}),
         ("list_library_issues", {"limit": 2}),
-        ("inspect_artist", {"artist_uid": "artist-1"}),
+        ("inspect_artist", {"artist_uid": "10000000-0000-0000-0000-000000000001"}),
         ("list_jobs", {"states": ["failed"]}),
         ("get_job", {"job_id": "job-1"}),
         ("read_diagnostics", {"source": "worker_logs", "task_id": "job-1"}),

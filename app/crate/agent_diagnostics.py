@@ -3,11 +3,13 @@
 import base64
 import hashlib
 import json
+import math
 import os
 import re
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
+from crate.agent_access import actions_enabled
 from crate.db.queries import agent_library, agent_operations
 from crate.repair_catalog import REPAIR_CATALOG_BY_CHECK
 from crate.task_registry import TASK_TYPES
@@ -27,9 +29,10 @@ def _date(value):
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=UTC)
     try:
-        return datetime.fromisoformat(str(value))
+        parsed = datetime.fromisoformat(str(value))
     except (TypeError, ValueError):
         return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
 def _text(value, limit=2048):
@@ -71,7 +74,11 @@ def _safe(value):
         return [_safe(item) for item in value]
     if isinstance(value, (datetime, UUID)):
         return str(value)
-    return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if value is None or isinstance(value, (bool, int)):
+        return value
+    return _text(value)
 
 
 def _pick(value, keys):
@@ -238,7 +245,7 @@ def _rows(rows, limit):
     return selected
 
 
-def _issue(row):
+def _issue(row, principal=None):
     result = _pick(
         row,
         (
@@ -257,7 +264,10 @@ def _issue(row):
     )
     entry = REPAIR_CATALOG_BY_CHECK.get(row.get("check_type"))
     result.update(
-        risk=getattr(entry, "risk", "unknown"), can_execute_for_this_principal=False
+        risk=getattr(entry, "risk", "unknown"),
+        can_execute_for_this_principal=_can_repair_photo(
+            principal, row.get("check_type")
+        ),
     )
     result["availability"], result["reason"] = _fresh(
         row.get("last_seen_at"),
@@ -265,6 +275,15 @@ def _issue(row):
         int(os.environ.get("CRATE_MCP_HEALTH_STALE_SECONDS", "604800")),
     )
     return result
+
+
+def _can_repair_photo(principal, check_type):
+    return bool(
+        principal
+        and actions_enabled()
+        and check_type == "has_photo_desync"
+        and "library.repair.photo_flag" in principal.grants
+    )
 
 
 def _runs(runs):
@@ -285,11 +304,17 @@ def _runs(runs):
 
 
 def list_library_issues(
-    *, check_type=None, severity=None, artist_uid=None, limit=20, cursor=None
+    *,
+    check_type=None,
+    severity=None,
+    artist_uid=None,
+    limit=20,
+    cursor=None,
+    principal=None,
 ):
     record = agent_library.read_health_snapshot()
     result = _snapshot(record, "ops:health", [])
-    if result["availability"] == "unavailable":
+    if record is None or result["availability"] == "unavailable":
         return result
     payload = record.get("payload_json") or {}
     filters = {"check_type": check_type, "severity": severity, "artist_uid": artist_uid}
@@ -312,7 +337,9 @@ def list_library_issues(
             for key, value in filters.items()
         )
     ]
-    selected = _rows([_issue(row) for row in matches[offset : offset + limit]], limit)
+    selected = _rows(
+        [_issue(row, principal) for row in matches[offset : offset + limit]], limit
+    )
     position = offset + len(selected)
     has_more = position < len(matches)
     counts = payload.get("counts") or {}
@@ -361,7 +388,7 @@ def list_library_issues(
     return result
 
 
-def inspect_artist(*, artist_uid=None, name=None, limit=20):
+def inspect_artist(*, artist_uid=None, name=None, limit=20, principal=None):
     if artist_uid:
         try:
             artist_uid = str(UUID(artist_uid))
@@ -373,7 +400,9 @@ def inspect_artist(*, artist_uid=None, name=None, limit=20):
         artist_uid=artist_uid, name=name, limit=limit + 1
     )
     artists = evidence.get("artists") or []
-    issues = _rows([_issue(row) for row in evidence.get("issues") or []], limit)
+    issues = _rows(
+        [_issue(row, principal) for row in evidence.get("issues") or []], limit
+    )
     resolution = (
         "resolved" if len(artists) == 1 else "ambiguous" if artists else "not_found"
     )
@@ -391,12 +420,16 @@ def inspect_artist(*, artist_uid=None, name=None, limit=20):
                     "risk": entry.risk,
                     "scope": entry.scope,
                     "auto_fixable": entry.auto_fixable,
-                    "can_execute_for_this_principal": False,
+                    "can_execute_for_this_principal": _can_repair_photo(
+                        principal, entry.check_type
+                    ),
                 }
                 for entry in list(REPAIR_CATALOG_BY_CHECK.values())[:100]
                 if entry.supports_artist_scope
             ],
-            "can_execute_for_this_principal": False,
+            "can_execute_for_this_principal": resolution == "resolved"
+            and _can_repair_photo(principal, "has_photo_desync"),
+            "repair_precondition": "A fresh directed check and an exact unexpired plan are required for has_photo_desync",
         },
         observed_at=artists[0].get("updated_at") if len(artists) == 1 else None,
         availability="available" if artists else "unavailable",
@@ -451,18 +484,22 @@ def get_job(job_id):
         observed_at=(row or {}).get("updated_at"),
         availability="available" if row else "unavailable",
         reason=None if row else "Job not found",
-        interpretation="Pending can include governor/window deferral. Completed can mean skipped or downstream work pending. No retry or cancellation is authorized.",
+        interpretation="Pending can include governor/window deferral. Completed can mean skipped or downstream work pending. For agent jobs, inspect execution, verification and projection separately. Retry/cancel require separate grants and eligible ownership/state.",
     )
 
 
 def read_diagnostics(*, source, task_id=None, since=None, until=None, limit=20):
+    if source not in {"worker_logs", "worker_status", "analysis_status"}:
+        raise DiagnosticError("INVALID_ARGUMENT", "Unknown diagnostic source")
     if source != "worker_logs":
         key = "worker_live" if source == "worker_status" else "analysis_status"
         evidence = agent_operations.read_status_evidence()
         records = {row["key"]: row for row in evidence.get("runtime") or []}
         return _runtime(records.get(key), key)
-    until = _date(until) if until else _now()
-    since = _date(since) if since else until - timedelta(hours=1)
+    until = _date(until) if until is not None else _now()
+    if until is None:
+        raise DiagnosticError("INVALID_ARGUMENT", "Invalid log window timestamp")
+    since = _date(since) if since is not None else until - timedelta(hours=1)
     if (
         not since
         or not until

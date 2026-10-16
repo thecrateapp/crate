@@ -88,7 +88,16 @@ def read_job(job_id: str, *, session: Session | None = None) -> dict | None:
                 text(f"""
             SELECT {JOB_FIELDS}, worker_id, max_duration_sec,
                    LEFT(error, 2048) AS error, LEFT(progress, 2048) AS progress,
-                   LEFT(result_json ->> 'status', 80) AS result_status
+                   LEFT(result_json ->> 'status', 80) AS result_status,
+                   LEFT(result_json -> 'execution' ->> 'status', 80) AS execution_status,
+                   LEFT(result_json -> 'verification' ->> 'status', 80) AS verification_status,
+                   LEFT(result_json -> 'projection' ->> 'status', 80) AS projection_status,
+                   LEFT(result_json -> 'execution' ->> 'issue_id', 32) AS issue_id,
+                   LEFT(result_json -> 'execution' ->> 'observation_id', 128) AS observation_id,
+                   LEFT(result_json -> 'execution' ->> 'plan_id', 128) AS plan_id,
+                   LEFT(result_json -> 'execution' ->> 'artist_uid', 128) AS artist_uid,
+                   LEFT(COALESCE(result_json -> 'execution' ->> 'error_code',
+                                 result_json ->> 'error_code'), 80) AS error_code
             FROM tasks WHERE id = :id
         """),
                 {"id": job_id},

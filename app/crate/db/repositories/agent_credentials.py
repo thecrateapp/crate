@@ -9,7 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from crate.agent_access import (
-    PILOT_GRANTS,
+    ALLOWED_GRANTS,
     AgentPrincipal,
     IssuedCredential,
     digest_token,
@@ -98,10 +98,10 @@ def create_credential(
     ):
         raise ValueError("Integration name must contain 1 to 120 printable characters")
     if isinstance(grants, str):
-        raise TypeError("Grants must be a collection of allowed read scopes")
+        raise TypeError("Grants must be a collection of allowed scopes")
     grants = frozenset(grants)
-    if not grants or not grants <= PILOT_GRANTS:
-        raise ValueError("Grants must be a nonempty subset of the allowed read scopes")
+    if not grants or not grants <= ALLOWED_GRANTS:
+        raise ValueError("Grants must be a nonempty subset of the allowed scopes")
     expires_at = _expiry(expires_at)
     principal_id = str(uuid4())
     with optional_scope(session) as current:
@@ -140,7 +140,7 @@ def resolve_credential(
                 SELECT p.id::text, c.id::text AS credential_id, p.name, p.grants
                 FROM agent_credentials c
                 JOIN agent_principals p ON p.id = c.principal_id
-                WHERE c.token_digest = :digest AND p.enabled
+                WHERE c.token_digest = :digest AND p.enabled AND p.kind = 'service'
                   AND c.revoked_at IS NULL AND c.expires_at > NOW()
                 """
                 ),
@@ -197,7 +197,7 @@ def rotate_credential(
             current.execute(
                 text(
                     """
-                SELECT p.id::text, p.name, p.grants, p.enabled, c.revoked_at
+                SELECT p.id::text, p.name, p.grants, p.enabled, p.kind, c.revoked_at
                 FROM agent_credentials c
                 JOIN agent_principals p ON p.id = c.principal_id
                 WHERE c.id = :id
@@ -209,7 +209,12 @@ def rotate_credential(
             .mappings()
             .first()
         )
-        if row is None or row["revoked_at"] is not None or not row["enabled"]:
+        if (
+            row is None
+            or row["revoked_at"] is not None
+            or not row["enabled"]
+            or row["kind"] != "service"
+        ):
             raise ValueError(
                 "Credential does not exist, is revoked or integration is disabled"
             )

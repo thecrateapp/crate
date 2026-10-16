@@ -6,7 +6,15 @@ from uuid import uuid4
 
 import pytest
 from crate import agent_credentials_cli as cli
-from crate.agent_access import PILOT_GRANTS, TOKEN_PREFIX, digest_token, generate_token
+from crate.agent_access import (
+    ACTION_GRANTS,
+    ALLOWED_GRANTS,
+    PILOT_GRANTS,
+    TOKEN_PREFIX,
+    actions_enabled,
+    digest_token,
+    generate_token,
+)
 from crate.db.repositories import agent_credentials as credentials
 from crate.db.tx import read_scope, transaction_scope
 from sqlalchemy import text
@@ -81,6 +89,36 @@ def test_create_stores_only_digest_and_independent_immutable_identity(pg_db):
     assert audit["details_json"] == {
         "principal_id": principal.id,
         "credential_id": principal.credential_id,
+    }
+
+
+@pytest.mark.parametrize(
+    "value,enabled",
+    [(None, False), ("false", False), ("true", True), ("TRUE", True), ("1", False)],
+)
+def test_action_feature_requires_explicit_true(monkeypatch, value, enabled):
+    if value is None:
+        monkeypatch.delenv("CRATE_MCP_ACTIONS_ENABLED", raising=False)
+    else:
+        monkeypatch.setenv("CRATE_MCP_ACTIONS_ENABLED", value)
+    assert actions_enabled() is enabled
+
+
+def test_action_grants_are_explicit_and_do_not_expand_existing_diagnostic_grants(pg_db):
+    assert ACTION_GRANTS == {
+        "library.health.run",
+        "library.repair.photo_flag",
+        "ops.jobs.retry",
+        "ops.jobs.cancel_pending",
+    }
+    assert not ACTION_GRANTS & PILOT_GRANTS
+    assert ALLOWED_GRANTS == PILOT_GRANTS | ACTION_GRANTS
+    issued = credentials.create_credential(
+        "Maintenance integration", ACTION_GRANTS, _expiry()
+    )
+    assert credentials.resolve_credential(issued.token).grants == ACTION_GRANTS
+    assert credentials.resolve_credential(_issue().token).grants == {
+        "library.health.read"
     }
 
 
@@ -275,6 +313,28 @@ def test_cli_create_list_rotate_revoke_only_prints_secret_on_issuance(pg_db, cap
     assert cli.main(["revoke", rotated["credential_id"]]) == 0
     assert json.loads(capsys.readouterr().out)["revoked"] is True
     assert credentials.resolve_credential(rotated["token"]) is None
+
+
+def test_cli_issues_only_explicit_action_grants(pg_db, capsys):
+    assert (
+        cli.main(
+            [
+                "create",
+                "--name",
+                "Photo maintenance",
+                "--grant",
+                "library.health.run",
+                "--grant",
+                "library.repair.photo_flag",
+                "--expires-in-days",
+                "7",
+            ]
+        )
+        == 0
+    )
+    result = json.loads(capsys.readouterr().out)
+    principal = credentials.resolve_credential(result["token"])
+    assert principal.grants == {"library.health.run", "library.repair.photo_flag"}
 
 
 def test_cli_validates_expiry_and_hides_database_exceptions(capsys, monkeypatch):

@@ -369,6 +369,7 @@ def create_app() -> FastAPI:
                 "stack",
                 "setup",
                 "admin",
+                "agents",
                 "admin-auth",
             },
             title="Crate Admin & System API",
@@ -518,6 +519,9 @@ def create_app() -> FastAPI:
 
     # Auth + management + settings + enrichment BEFORE browse (browse has {name:path} catch-all)
     app.include_router(setup_router)
+    from crate.api.mcp_oauth import router as mcp_oauth_router
+
+    app.include_router(mcp_oauth_router)
     app.include_router(auth_router)
     app.include_router(media_access_router)
     app.include_router(admin_auth_router)
@@ -576,6 +580,11 @@ def create_app() -> FastAPI:
     app.include_router(admin_federation_router)
     app.include_router(admin_global_catalog_router)
     app.include_router(admin_metrics_router)
+    from crate.api.agent_integrations import router as agent_integrations_router
+    from crate.api.agent_plans import router as agent_plans_router
+
+    app.include_router(agent_integrations_router)
+    app.include_router(agent_plans_router)
 
     # Static files
     base = Path(__file__).resolve().parent.parent

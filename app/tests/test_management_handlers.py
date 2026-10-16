@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock
 
 import pytest
-
 from crate.artist_lifecycle import ArtistIdentityChangedError
 from crate.worker_handlers.management import (
     _handle_delete_artist,
@@ -351,7 +350,7 @@ def test_move_artist_restores_directory_when_database_rename_fails(
     assert not target.exists()
 
 
-def test_handle_repair_revalidates_applied_checks(monkeypatch):
+def test_handle_repair_revalidates_photo_only_for_target_artist(monkeypatch):
     emitted: list[tuple[str, str, dict]] = []
     domain_events: list[tuple[str, dict, str, str]] = []
     resolved_issue_ids: list[int] = []
@@ -403,8 +402,14 @@ def test_handle_repair_revalidates_applied_checks(monkeypatch):
         def __init__(self, config):
             self.config = config
 
-        def run_selected(self, check_types, *, progress_callback=None, persist=True):
+        def run_selected(self, *args, **kwargs):
+            raise AssertionError("Photo repair must not revalidate the whole library")
+
+        def run_selected_for_artists(
+            self, check_types, artists, *, progress_callback=None, persist=True
+        ):
             assert set(check_types) == {"has_photo_desync"}
+            assert artists == ["Birds In Row"]
             assert persist is True
             if progress_callback:
                 progress_callback({"check": "has_photo_desync", "done": 0, "total": 1})
@@ -481,7 +486,7 @@ def test_handle_repair_revalidates_applied_checks(monkeypatch):
     }
     assert "open after revalidation" in result["message"]
     assert any(
-        "Revalidating 1 repaired check type" in payload.get("message", "")
+        "Revalidating 1 artist-scoped check type" in payload.get("message", "")
         for _, _, payload in emitted
     )
     assert any(

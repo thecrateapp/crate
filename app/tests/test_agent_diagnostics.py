@@ -7,6 +7,7 @@ from pathlib import Path
 import httpx
 import pytest
 from crate import agent_diagnostics as diagnostics
+from crate.agent_access import AgentPrincipal
 
 NOW = datetime(2026, 10, 16, 12, tzinfo=UTC)
 ARTIST_UID = "10000000-0000-0000-0000-000000000001"
@@ -242,6 +243,77 @@ def test_artist_uid_is_validated_before_database_access(monkeypatch):
     assert caught.value.code == "INVALID_ARGUMENT"
 
 
+@pytest.mark.parametrize(
+    "enabled,grants,expected",
+    [
+        ("true", {"library.repair.photo_flag"}, True),
+        ("false", {"library.repair.photo_flag"}, False),
+        ("true", {"library.health.run"}, False),
+        ("true", {"library.health.read"}, False),
+        ("true", None, False),
+    ],
+)
+def test_diagnostics_advertise_only_photo_repairs_permitted_for_this_principal(
+    monkeypatch, enabled, grants, expected
+):
+    monkeypatch.setenv("CRATE_MCP_ACTIONS_ENABLED", enabled)
+    principal = (
+        AgentPrincipal("integration", "credential", "Agent", frozenset(grants))
+        if grants is not None
+        else None
+    )
+    issues = [issue(1, check_type="has_photo_desync"), issue(2)]
+    monkeypatch.setattr(
+        diagnostics.agent_library,
+        "read_health_snapshot",
+        lambda: snapshot(issues=issues),
+    )
+    monkeypatch.setattr(
+        diagnostics.agent_library,
+        "read_artist_evidence",
+        lambda **_kwargs: {
+            "artists": [{"entity_uid": ARTIST_UID, "name": "Echo"}],
+            "issues": issues,
+            "runs": {},
+        },
+    )
+    listed = diagnostics.list_library_issues(principal=principal)
+    inspected = diagnostics.inspect_artist(artist_uid=ARTIST_UID, principal=principal)
+    for rows in (listed["data"], inspected["data"]["issues"]):
+        flags = {
+            row["check_type"]: row["can_execute_for_this_principal"] for row in rows
+        }
+        assert flags == {"has_photo_desync": expected, "duplicate_tracks": False}
+    catalog = {
+        row["check_type"]: row["can_execute_for_this_principal"]
+        for row in inspected["data"]["repair_catalog"]
+    }
+    assert catalog["has_photo_desync"] is expected
+    assert not any(
+        allowed for check, allowed in catalog.items() if check != "has_photo_desync"
+    )
+    assert inspected["data"]["can_execute_for_this_principal"] is expected
+    assert "fresh directed check" in inspected["data"]["repair_precondition"]
+
+
+def test_repair_grant_does_not_make_ambiguous_artist_executable(monkeypatch):
+    monkeypatch.setenv("CRATE_MCP_ACTIONS_ENABLED", "true")
+    principal = AgentPrincipal(
+        "integration", "credential", "Agent", frozenset({"library.repair.photo_flag"})
+    )
+    monkeypatch.setattr(
+        diagnostics.agent_library,
+        "read_artist_evidence",
+        lambda **_kwargs: {
+            "artists": [{"name": "Echo"}, {"name": "Echoes"}],
+            "issues": [],
+        },
+    )
+    result = diagnostics.inspect_artist(name="Echo", principal=principal)
+    assert result["data"]["resolution"] == "ambiguous"
+    assert result["data"]["can_execute_for_this_principal"] is False
+
+
 def test_job_pagination_forwards_keyset_and_preserves_filters(monkeypatch):
     calls = []
     rows = [
@@ -288,7 +360,7 @@ def test_failed_job_returns_redacted_evidence_without_retry(monkeypatch):
     for secret in ("secret-value", "bearer-value", "/home/private/file", "user:pass"):
         assert secret not in error
     assert "[redacted]" in error
-    assert "No retry" in result["interpretation"]
+    assert "Retry/cancel require separate grants" in result["interpretation"]
 
 
 def test_missing_job_returns_unknown_instead_of_completed(monkeypatch):

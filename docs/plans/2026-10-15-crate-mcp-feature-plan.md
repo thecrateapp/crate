@@ -1,7 +1,7 @@
 # Crate MCP — Feature Implementation Plan
 
 > **For agents:** REQUIRED SUB-SKILL: Use viterbit:executing-plans to implement this plan task-by-task.
-> **Estado: plan aprobado por Diego el 2026-10-16. Implementación autorizada de las fases 0 y 1 en feat/crate_mcp. Revisar el resultado antes de las acciones. Despliegue y activación pendientes.**
+> **Estado: plan aprobado por Diego el 2026-10-16. Fases 0 y 1 entregadas en PR #292; fases 2 y 3 preparadas para revisión en la PR #292 tras autorización de Diego. Implementación en feat/crate_mcp. Despliegue y activación pendientes.**
 
 **Goal:** Entregar el MCP remoto completo de Crate para diagnóstico, mantenimiento de biblioteca, operaciones y creación de playlists editoriales, con permisos, planes revisables, auditoría, gestión en Admin y una skill editorial distribuible. El piloto es el primer incremento de la feature.
 
@@ -9,7 +9,11 @@
 
 **Tech Stack:** Python 3.13, FastAPI/ASGI, SDK oficial Python MCP con versión fijada al validar compatibilidad, Pydantic, PostgreSQL, Dramatiq y projector existentes.
 
-**Entrega fases 0/1 (2026-10-16):** implementadas para revisión. SDK oficial 2.3.0, credenciales dedicadas, seis herramientas, migraciones 109/110, diagnóstico sin mutaciones funcionales y productor health acotado. Evidencia y reproducción en [guía MCP](../technical/crate-mcp.md#validation-record--2026-10-16). Las fases de acción siguen pendientes de revisión. El endpoint permanece desactivado por defecto.
+**Entrega fases 0/1 (2026-10-16):** implementadas en [PR #292](https://github.com/thecrateapp/crate/pull/292). SDK oficial 2.3.0, credenciales dedicadas, seis herramientas, migraciones 109/110, diagnóstico sin mutaciones funcionales y productor health acotado. Evidencia y reproducción en [guía MCP](../technical/crate-mcp.md#validation-record--2026-10-16). El endpoint permanece desactivado por defecto.
+
+**Fase 2 (2026-10-16):** implementada y validada para revisión tras “siguiente fase”: comprobación dirigida, planes persistidos de un único flag, ejecución/verificación y retry/cancel acotados. Migración 111; gate adicional `CRATE_MCP_ACTIONS_ENABLED=false` por defecto. 866 casos backend verificados, PostgreSQL/Redis reales y recorrido SDK por HTTP local; [evidencia](../technical/crate-mcp.md#phase-2-validation--2026-10-16). Limitación explícita: un crash tras el cambio puede dejar verificación pendiente sin recuperación automática del actor terminal. Las fases 4–7 siguen pendientes.
+
+**Fase 3 (2026-10-16):** conexión OAuth con Authlib 1.9.1/SDK MCP 2.3.0, consent y gestión/revocación de conexiones propias; Admin para credenciales, clientes, grants y actividad; aprobación humana exacta ligada a política/delegación, con reserva transaccional. Migraciones 112/113 y configuración API/workers desactivada por defecto. Gate real sobre PostgreSQL/Redis con MCP Python SDK y Authlib por TCP, sin afirmar compatibilidad de Codex CLI ni del proxy público. Revisión de conformidad y calidad aprobadas; tres carreras reproducidas y corregidas con regresiones concurrentes. [Evidencia](../technical/crate-mcp.md#phase-3-validation--2026-10-16). Entrega de fases 2/3 en la PR #292; activación en producción pendiente.
 
 **Fecha:** 2026-10-15. **Rama:** feat/crate_mcp. **Base:** origin/main, 2451aa7537d15f7790edca565fb64367982e7b2a.
 **Worktree:** /Users/diego/.codex/worktrees/crate-mcp/musicdock.
@@ -429,4 +433,4 @@ El despliegue futuro sigue el flujo SHA/manifiesto de Crate. Activar primero dia
 
 El SDK permite montar su app ASGI en FastAPI y exige integrar su lifecycle en el host: [guía oficial de montaje](https://py.sdk.modelcontextprotocol.io/run/asgi/). Los transportes y la autorización HTTP se describen en [MCP transports](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports) y [MCP authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization). El Bearer privado solo delimita la primera entrega; OAuth y su interoperabilidad se implementan en fase 3.
 
-**Revisión solicitada antes de ejecutar:** validar el alcance v1 completo, el orden de fases, MCP integrado en crate-api, OAuth como entrega de producto, la primera reparación acotada y la skill editorial con propuesta persistida antes de publicación. Ninguna fase está implementada ni validada por este documento.
+**Revisiones:** alcance v1 y fases 0–3 autorizados. Este documento conserva el plan de la feature completa; no declara implementadas las fases 4–7. Revisar cada entrega y su evidencia antes de ampliar capacidades o activar en producción.

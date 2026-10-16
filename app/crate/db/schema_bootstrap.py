@@ -9,6 +9,12 @@ from crate.db.schema_sections import (
     create_library_schema,
 )
 from crate.db.schema_sections.agent_access_v109 import create_agent_access_v109_schema
+from crate.db.schema_sections.agent_admin_v113 import create_agent_admin_v113_schema
+from crate.db.schema_sections.agent_commands_v111 import (
+    create_agent_commands_v111_schema,
+)
+
+from crate.db.schema_sections.mcp_oauth_v112 import create_mcp_oauth_v112_schema
 
 
 def create_schema(cur):
@@ -25,6 +31,9 @@ def create_schema(cur):
     create_core_schema(cur)
     create_auth_schema(cur)
     create_agent_access_v109_schema(cur)
+    create_agent_commands_v111_schema(cur)
+    create_mcp_oauth_v112_schema(cur)
+    create_agent_admin_v113_schema(cur)
     create_library_schema(cur)
     cur.execute(
         """

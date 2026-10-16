@@ -5,7 +5,7 @@ import json
 import sys
 from datetime import UTC, datetime, timedelta
 
-from crate.agent_access import PILOT_GRANTS, IssuedCredential
+from crate.agent_access import ALLOWED_GRANTS, IssuedCredential
 from crate.db.repositories.agent_credentials import (
     create_credential,
     list_credentials,
@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     create.add_argument("--name", required=True)
     create.add_argument(
-        "--grant", action="append", choices=sorted(PILOT_GRANTS), required=True
+        "--grant", action="append", choices=sorted(ALLOWED_GRANTS), required=True
     )
     create.add_argument("--expires-in-days", type=int, default=90)
     commands.add_parser(

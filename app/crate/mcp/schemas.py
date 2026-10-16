@@ -70,6 +70,35 @@ class JobInput(ClosedInput):
     job_id: Identifier
 
 
+EntityUID = Annotated[
+    str,
+    Field(
+        pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    ),
+]
+IdempotencyKey = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")]
+
+
+class HealthCheckInput(ClosedInput):
+    artist_uid: EntityUID
+    check_type: Literal["has_photo_desync"] = "has_photo_desync"
+    idempotency_key: IdempotencyKey
+
+
+class RepairPreviewInput(ClosedInput):
+    issue_id: Annotated[int, Field(strict=True, gt=0)]
+
+
+class RepairApplyInput(ClosedInput):
+    plan_id: EntityUID
+    plan_version: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    idempotency_key: IdempotencyKey
+
+
+class JobRetryInput(JobInput):
+    idempotency_key: IdempotencyKey
+
+
 class DiagnosticsInput(ClosedInput):
     source: Literal["worker_logs", "worker_status", "analysis_status"]
     task_id: Identifier | None = None

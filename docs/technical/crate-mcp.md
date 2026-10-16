@@ -1,6 +1,6 @@
 ---
-title: Crate MCP diagnostics
-summary: Connect remote agents to bounded, authenticated library and operations diagnostics.
+title: Crate MCP
+summary: Connect remote agents with OAuth, scoped maintenance and exact human plan review.
 section: operations
 audience: [operator, developer]
 status: canonical
@@ -10,10 +10,25 @@ sources:
   [
     app/crate/mcp/server.py,
     app/crate/mcp/auth.py,
+    app/crate/mcp/oauth.py,
+    app/crate/mcp/oauth_config.py,
+    app/crate/api/mcp_oauth.py,
+    app/crate/api/agent_integrations.py,
+    app/crate/api/agent_plans.py,
+    app/crate/db/repositories/mcp_oauth.py,
+    app/crate/db/repositories/agent_plans.py,
+    app/crate/db/repositories/agent_integrations.py,
+    app/crate/db/repositories/agent_human_sessions.py,
+    app/ui/src/pages/AgentIntegrations.tsx,
+    app/ui/src/pages/AgentPlanReview.tsx,
     app/crate/mcp/tools.py,
     app/crate/mcp/schemas.py,
     app/crate/agent_credentials_cli.py,
     app/crate/agent_diagnostics.py,
+    app/crate/agent_maintenance.py,
+    app/crate/artist_photo.py,
+    app/crate/db/repositories/agent_requests.py,
+    app/crate/db/repositories/agent_repair_plans.py,
     app/crate/db/repositories/agent_credentials.py,
     app/crate/db/queries/agent_library.py,
     app/crate/db/queries/agent_operations.py,
@@ -25,29 +40,38 @@ sources:
   ]
 ---
 
-# Crate MCP diagnostics
+# Crate MCP
 
 Crate exposes an optional MCP endpoint for remote agents to inspect the local library,
-persisted worker status, job history and bounded logs. This delivery covers phases 0 and 1:
-connection, dedicated credentials and six read tools. Maintenance actions, OAuth onboarding,
-integration management in Admin and editorial playlist creation remain outside this delivery.
+persisted worker status, job history and bounded logs. Phases 0–3 provide six read tools,
+five independently enabled maintenance tools, OAuth connections, integration management in Admin
+and exact human approval when policy requires it. The first repair only updates one artist's
+`has_photo` database flag. Broader maintenance and editorial playlists remain later phases.
 
 ## Connection and deployment
 
 The endpoint is `https://api.<your-domain>/mcp`, hosted inside `crate-api`. Use that exact path,
 without a trailing slash or a legacy `/sse` suffix. The official Python SDK is pinned to
-`mcp==2.3.0`. Transport is stateless Streamable HTTP with JSON responses; clients must support
-configuring an `Authorization: Bearer <token>` header. There is no OAuth discovery or consent
-flow in this phase, and an OAuth-only agent host cannot connect using this private pilot.
+`mcp==2.3.0`. Transport is stateless Streamable HTTP with JSON responses. Connect through OAuth
+or explicitly provision a service integration with its dedicated Bearer credential. Human session
+cookies identify the person during consent and Admin review; they never authenticate MCP calls.
 
 `CRATE_MCP_ENABLED=false` is the default in the development, project and home Compose files.
 Enabling it applies to both the API endpoint and the projector's background health snapshot
 producer. Existing migrations must be applied before issuing credentials. Keeping the flag
 disabled leaves the endpoint unavailable and does not start its health snapshot producer.
+Actions additionally require `CRATE_MCP_ACTIONS_ENABLED=true` in the API and maintenance worker.
+Both flags default to false; granting an action scope alone does not enable actions.
+Apply migrations through 113 before using OAuth, integration management or plan approvals.
 
 | Setting                             | Default                                                        | Purpose                                                                                                                       |
 | ----------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `CRATE_MCP_ENABLED`                 | `false`                                                        | Enable the endpoint and background health projection.                                                                         |
+| `CRATE_MCP_ACTIONS_ENABLED`         | `false`                                                        | Enable the bounded action catalog and execution by workers.                                                                   |
+| `CRATE_MCP_OAUTH_ENABLED`           | `false`                                                        | Enable delegated OAuth access in the API and workers.                                                                         |
+| `CRATE_MCP_OAUTH_ISSUER`            | Empty                                                          | Explicit canonical HTTPS API origin, without path/query. It also defines the `/mcp` resource audience.                        |
+| `CRATE_MCP_OAUTH_ALLOW_LOCALHOST`   | `false`                                                        | Explicit development opt-in for an HTTP loopback issuer; keep false for remote deployments.                                   |
+| `CRATE_MCP_ADMIN_ORIGINS`           | Derived Admin/API origins                                      | Additional comma-separated exact origins for human consent and Admin mutations. Distinct from machine Origin allowlisting.    |
 | `CRATE_MCP_ALLOWED_HOSTS`           | Empty: derive `localhost:*`, `127.0.0.1:*` and `api.${DOMAIN}` | Comma-separated Host allowlist. Set the actual API hostname when it differs from the derived name.                            |
 | `CRATE_MCP_ALLOWED_ORIGINS`         | Empty                                                          | Comma-separated exact origins permitted when an Origin header is present. Server-to-server clients normally omit this header. |
 | `CRATE_MCP_OPS_FRESH_SECONDS`       | `60`                                                           | Snapshot freshness window.                                                                                                    |
@@ -57,7 +81,7 @@ disabled leaves the endpoint unavailable and does not start its health snapshot 
 | `CRATE_MCP_HEALTH_STALE_SECONDS`    | `604800`                                                       | Maximum historical check age used in a current evaluation.                                                                    |
 
 All three Compose profiles pass these settings into the API. The projector receives the enable
-flag. An empty Host setting selects the derived allowlist; it does not allow every host.
+flag. Workers receive the same OAuth enable/issuer settings to revalidate delegated jobs before effects. An empty Host setting selects the derived allowlist; it does not allow every host.
 Allowlisting an Origin does not provide OAuth or automatically configure browser CORS.
 
 Terminate TLS at the existing API reverse proxy, preserve the Host and Authorization headers,
@@ -70,6 +94,80 @@ For local development, `http://127.0.0.1:8585/mcp` is suitable for an SDK test c
 local SDK exchange establishes transport compatibility, not certification of a particular
 remote agent host, public TLS proxy or production deployment. Record those checks separately.
 
+## OAuth connections and Admin
+
+Set the same `CRATE_MCP_OAUTH_ISSUER=https://api.<your-domain>` in API and maintenance workers,
+then explicitly enable OAuth and MCP. Keep actions disabled until their separate rollout is authorized.
+Forward `/mcp`, `/oauth/*` and both well-known metadata paths to the API over HTTPS, preserving
+Authorization and Host. Discovery is public; tokens and consent responses are not cacheable.
+The issuer is configured, never inferred from untrusted forwarded headers.
+
+| Endpoint                                    | Purpose                                                                                    |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `/.well-known/oauth-protected-resource/mcp` | MCP protected-resource discovery, resource and allowed scopes.                             |
+| `/.well-known/oauth-authorization-server`   | Authorization server discovery and supported grants/PKCE.                                  |
+| `/oauth/authorize`, `/oauth/consent`        | Crate login, consent showing actual permitted scopes, one-time session-bound confirmation. |
+| `/oauth/token`                              | Authorization-code exchange and rotating refresh tokens.                                   |
+| `/oauth/revoke`                             | Revoke the delegated authorization, including pending jobs' authority.                     |
+| `/oauth/connections`                        | Human owners inspect and revoke their own connections without global Admin permissions.    |
+
+Register public clients in **Admin → Agent integrations** before connecting. Supply the exact
+client ID, callback URIs and scope ceiling. A URL client ID explicitly opts into Client ID Metadata
+Documents: its public HTTPS document must match the registration. Fetches pin validated public IPs,
+retain TLS hostname verification, reject redirects/internal destinations and cap time and body size.
+Dynamic Client Registration is not enabled; clients requiring it need a separate compatibility decision.
+
+The authorization server uses **Authlib 1.9.1** grant validation, PKCE S256, exact redirect/resource
+validation, one-use codes and opaque access/refresh tokens stored as digests. Access tokens expire;
+refresh tokens rotate, and reuse revokes their family. Exchanges and reuse detection share a
+stable authorization lock before locking individual codes/tokens, so a concurrent rotation cannot
+leave a newly inserted descendant active. A fresh consent creates a new authorization
+ID; old revoked grants and their queued jobs do not regain authority. The MCP SDK resource verifier
+rechecks the persisted grant and current user permissions on every request.
+
+Effective permissions intersect issued/accepted scopes, current OAuth authorization, enabled client,
+integration grants, current delegating user capabilities and the operation's target restrictions.
+Two people using the same client have separate principals. An already accepted job survives normal
+access-token expiry but cannot apply new effects after grant revocation, account disablement,
+capability downgrade, issuer change or OAuth disablement.
+
+Admin lists service integrations separately from connected accounts. It manages scope ceilings,
+enablement and exact-plan review policy, registers/disables clients, rotates/revokes service tokens
+and disconnects delegated grants. Service tokens appear once on creation/rotation, in component
+state only; close the dialog after storing the token. Listings and activity omit digests and secrets.
+Policies use revision checks: a concurrent edit returns conflict and preserves the unsaved proposal
+until the operator reloads the current policy.
+
+Human management requires a fresh, active Crate cookie session and the relevant capability:
+`agents.integrations.manage`, `agents.activity.view`, `agents.plans.review` or `agents.plans.approve`.
+Granting a scope also requires its existing domain capability. Unsafe requests require an explicitly
+configured Origin; Bearer credentials, human JWT headers and `Remote-*` shortcuts are rejected.
+These additive capabilities are available to instance admins; other role presets keep their current access.
+
+Activity pages expose only allowlisted bounded evidence and link to persisted plans/jobs. Accepted,
+executed and verified remain separate outcomes. The activity query uses the principal/time/ID index;
+access-history summaries return at most 20 entries with explicit truncation and active access first.
+
+## Exact human plan review
+
+The existing photo repair plan is the single persisted source for both agent preview and Admin
+review. Its full document contains the exact artist and field change, source observation/version,
+impact, risk, expiry, reversibility and authorization context. The current operation has one target;
+there is no hidden sample or implicit approval of further artists.
+
+An integration can require human review. Preview then returns `awaiting_approval`; an authorized
+human reviews all changes at **Admin → Agent plans** and approves or rejects. Approval binds the
+principal, authorization context, plan version, canonical content hash and policy revision. It does
+not grant missing scopes, and MCP exposes no approval tool. Incomplete, expired or changed plans
+must be prepared/reviewed again. A policy change invalidates existing plans even when a previously
+approved change would remain small.
+
+Acceptance reserves the approval once in the same transaction as the job. Replay returns that
+job; a different request cannot consume the approval again. The worker checks current authority,
+approval and sources before applying the flag and records verification independently. Human
+reviewer deletion preserves the decision with an empty live user reference; the audit retains the
+original actor ID.
+
 ## Provision an integration
 
 Credentials belong to independent machine principals, not human users or roles. Each credential
@@ -80,6 +178,13 @@ PostgreSQL stores only a SHA-256 digest. Grants are a nonempty subset of:
 - `ops.status.read`
 - `ops.jobs.read`
 - `ops.logs.read`
+- `library.health.run`
+- `library.repair.photo_flag`
+- `ops.jobs.retry`
+- `ops.jobs.cancel_pending`
+
+Read credentials retain their existing four scopes. Action grants must be provisioned explicitly;
+there is no automatic escalation or inheritance from an Admin role.
 
 An instance owner provisions credentials through the CLI in the API runtime. For example, in
 the development profile:
@@ -116,7 +221,7 @@ atomically revokes the old credential and prints the new token once. Update the 
 rotation. Revocation takes effect on the next request; an existing connection carries no authority
 of its own. A disabled principal cannot authenticate or rotate credentials.
 
-The MCP endpoint accepts only its dedicated Bearer credential. Human JWTs, cookies, query tokens,
+The MCP endpoint accepts only dedicated service or delegated OAuth Bearer credentials. Human JWTs, cookies, query tokens,
 duplicate Authorization headers and mixed authentication are rejected. Machine credentials do
 not authenticate Admin, Listen, media, OpenSubsonic or federation routes. Provisioning is not an
 MCP tool. Credential lifecycle changes and diagnostic access are audited using machine IDs;
@@ -136,13 +241,70 @@ Input schemas reject unknown arguments; filters are limited to the supported fie
 | `get_job`             | `ops.jobs.read`                                                                               | `job_id`. Returns the safe fields of one task without raw parameters or results.                                                                                                 |
 | `read_diagnostics`    | `ops.logs.read` for `worker_logs`; `ops.status.read` for `worker_status` or `analysis_status` | Required `source`; optional `limit`. `worker_logs` also accepts `task_id`, `since` and `until`.                                                                                  |
 
+## Bounded actions (phase 2)
+
+The action catalog is hidden and direct calls are denied while the action flag is disabled.
+All inputs are closed schemas. An integration can have one active maintenance job. Concurrent
+work on the same artist is serialized; another integration receives `TARGET_BUSY` without
+learning the other integration's job ID.
+
+| Tool               | Grant                                     | Contract                                                                                                                                                                                                                    |
+| ------------------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `run_health_check` | `library.health.run`                      | One `artist_uid`, `check_type=has_photo_desync`, `idempotency_key`. The worker observes only that artist and persists run-linked evidence; it does not repair or refresh global check timestamps.                           |
+| `preview_repairs`  | `library.repair.photo_flag`               | One `issue_id` from this integration's recent directed check. Persists an immutable single-change plan and returns `plan_id`, `plan_version`, `before`, `after` and expiry. No filesystem access or enqueue in the request. |
+| `apply_repairs`    | `library.repair.photo_flag`               | Exact `plan_id`, `plan_version`, `idempotency_key`. The worker reobserves the filesystem, checks identity and preconditions, updates one database flag and observes again. It never downloads or writes an image.           |
+| `retry_job`        | `ops.jobs.retry` and `library.health.run` | Own failed directed health check only, with server-recovered parameters and `idempotency_key`. Maximum three retry jobs per original check. Permanent authorization/identity failures and repairs cannot be retried.        |
+| `cancel_job`       | `ops.jobs.cancel_pending`                 | Own pending directed check or photo repair only. Cancellation and the worker's claim have one winner. Repeating cancellation returns the existing result; running or finished jobs return `STATE_CONFLICT`.                 |
+
+Use `get_job` with `ops.jobs.read` to follow acceptance, execution, verification and projection.
+After the directed check finishes, its job exposes the `issue_id` needed by `preview_repairs`.
+`EVIDENCE_STALE` requires a new directed check, never an implicit full scan. Evidence and plans
+are valid for at most 15 minutes. A different principal cannot apply the plan. Any changed
+photo fingerprint, artist identity or incompatible database state yields a conflict.
+
+`can_execute_for_this_principal` describes the enabled grant for this check; it does not waive
+the fresh-evidence and exact-plan requirements. There is no `confirm=true` parameter: the
+explicit photo-flag grant is the authorization for this bounded action.
+
+Acceptance, the task row, idempotency mapping and audit record commit together; broker dispatch
+runs only after commit. Crate's existing stale-pending recovery handles lost dispatches.
+The same principal, operation and key returns the same job after completion. Reusing a key for
+a different payload returns `IDEMPOTENCY_CONFLICT`. Keys contain 1–128 ASCII letters, digits,
+dots, underscores, colons or hyphens and start with a letter or digit.
+
+Request mappings survive runtime task cleanup. A purged result returns `RESULT_EXPIRED` and
+does not execute again. If an HTTP response is lost or returns `ACTION_STATUS_UNKNOWN`, replay
+the original key or inspect the known job; creating a new key represents a new intention.
+
+Workers recheck the stored credential's revocation, principal status and current grants before
+effects. Normal credential expiration after acceptance does not cancel a job; revocation or
+rotation of that credential blocks pending effects. Disabling the MCP/action flags also blocks
+new worker effects. Effects already committed are preserved and reported.
+
+The database change, plan result, audit and invalidation events share a transaction. Filesystem
+observation is not atomic with that transaction: post-check results therefore distinguish
+`verified`, `pending` and `conflict`. An applied change with incomplete verification is never
+reported as a rollback. Projection is recorded as `pending` at the change and is eventually
+refreshed by the projector; it is not a live assertion that all read models have caught up.
+If a worker dies after committing the flag but before verification, the persisted result retains
+the applied effect and pending verification. Redelivery to the operation can verify without
+reapplying; automatic recovery after the actor has become terminal is not guaranteed. A new
+directed check can establish current coherence without repeating the consumed repair plan.
+
+The Admin photo fixer shares UID-based observation and compare-and-set. Historical issues
+without an artist UID require a new check. This path revalidates only affected artists; other
+repair types and the generic Admin batch-selection contract remain unchanged.
+
+## Diagnostic evidence semantics
+
 `read_diagnostics` timestamps must include a timezone. Its default log window is the previous
 hour; a requested window may span at most 24 hours and cannot be in the future. These are existing
 database logs, not arbitrary files, Docker logs or remote service requests.
 
-Issue risk and repair metadata are explanatory only. `can_execute_for_this_principal` is always
-false. No tool runs health checks, retries or cancels jobs, repairs tags, changes schedules,
-deletes files or publishes playlists.
+The six diagnostic tools do not run checks or enqueue changes. Issue risk is explanatory;
+`can_execute_for_this_principal` is false unless the photo-flag action is enabled and explicitly
+granted. No tool in this delivery repairs tags, changes schedules, deletes files or publishes
+playlists.
 
 ## Reading evidence correctly
 
@@ -242,3 +404,113 @@ The largest result was 11,039 bytes. Assertions enforce at most one diagnostic S
 are observations rather than brittle CI assertions; the initial local comparison target was
 p95 below 500 ms. This small dataset does not establish production-scale or concurrent-load
 performance. Public TLS/proxy acceptance remains a deployment check before enabling the pilot.
+
+## Phase 2 validation — 2026-10-16
+
+The final combined backend suite passed all 866 cases. Coverage includes real PostgreSQL transactions,
+concurrent acceptance and cancellation, migration 111 downgrade/reupgrade, credential revocation,
+expired/stale plans, audit rollback, retained idempotency after task cleanup and Admin photo repair.
+The seven documentation tests, documentation build/integrity and all three Compose configurations
+also pass. Independent specification and code-quality reviews found no outstanding blockers.
+
+`tests/test_agent_actions_workflow.py` runs the official SDK over a real loopback HTTP server,
+with real PostgreSQL/Redis and temporary artist directories. Both complete check→preview→apply→verify
+and changed-photo conflict scenarios pass. `tests/test_agent_actor_contract.py` exercises the actual
+actor: revocation and stale plans remain failed, success is verified, and redelivery does not
+overwrite the persisted outcome. No production library or external provider is used.
+
+Reproduce the phase-specific checks from `app/`:
+
+```bash
+../.venv/bin/python -m pytest tests/test_agent_request_idempotency.py \
+  tests/test_agent_repair_plans.py tests/test_agent_job_controls.py \
+  tests/test_agent_commands_migration.py tests/test_agent_maintenance.py \
+  tests/test_artist_photo.py tests/test_mcp_actions.py \
+  tests/test_agent_actions_workflow.py tests/test_agent_actor_contract.py -q
+```
+
+Both enable flags remain false by default. This validation does not activate the endpoint,
+certify public TLS/proxy behavior or claim automatic recovery of terminal jobs whose post-effect
+verification is still pending.
+
+## Phase 3 validation — 2026-10-16
+
+The final combined regression run passed **649 backend tests**. Admin passed **263 tests in 70
+files**, lint, typecheck and production build. Pyright 1.1.411, Ruff 0.15.22 and Bandit's CI-equivalent
+medium-severity/high-confidence scan passed; the scan covered all 42 changed backend Python files.
+The documentation passed seven tests, integrity checks for 42 canonical documents and its build.
+
+Real TCP interoperability tests identify **MCP Python SDK 2.3.0** and **Authlib 1.9.1** as the two
+clients. The second is a test client combining `AsyncOAuth2Client` with MCP JSON-RPC requests,
+rather than a certification of a desktop agent host. Both complete discovery, Crate cookie login/consent, MCP initialization and reads, rotating
+refresh and revocation using PostgreSQL and Redis. The SDK client also uses explicitly registered
+Client ID Metadata Documents. An ordinary user without Admin access can sign in, consent to their
+actual permissions and revoke only their own connections, including while OAuth is disabled.
+These tests do not establish Codex CLI OAuth compatibility or public TLS/proxy acceptance.
+
+Delegated-job regressions traverse actual grants, persisted job/plan context, worker identity
+reconstruction and the real photo-repair handler. Normal access-token expiry permits an accepted
+job to complete. Grant revocation and capability downgrade, both before loading and immediately
+before writing, deny the effect. Service jobs retain their existing behavior.
+
+Independent specification and security/quality reviews completed with no outstanding P1/P2 findings.
+The reviews reproduced three concurrency bugs against real PostgreSQL before their fixes:
+
+- Reusing a consumed refresh or authorization code while its descendant rotates could leave the
+  new descendant active. A stable authorization lock now serializes generation and family revocation;
+  both forward and reverse transaction orderings are covered.
+- Editing a person's own integration policy could deadlock with its worker. Shared user locks keep
+  downgrade/disable protection while remaining compatible with the human session guard.
+- Grant revocation could deadlock with a worker holding its synthetic credential. Delegated
+  validation now locks the grant before principal/credential rows, including direct human plan
+  approval, matching revocation and token exchange order.
+
+Admin tests cover fresh cookie sessions, scope/domain permissions, one-time secret presentation,
+secret-free bounded activity, client registration/scope changes, exact approval hashes, expiry,
+policy conflicts, single reservation and concurrent decisions. UI tests cover complete diffs,
+review reset across plans/versions, conflict reload with the proposal retained and token cleanup
+on dialog dismissal. Schema tests cover bootstrap and ordered downgrade/reupgrade through 113,
+including retained credentials and reviewer deletion. OpenAPI exposes these human routes in the
+Admin variant with cookie-only security. All three Compose profiles retain disabled flags and
+pass matching issuer/OAuth settings to the API and action workers.
+
+Reproduce the phase-specific checks from `app/`:
+
+```bash
+../.venv/bin/python -m pytest tests/test_mcp_oauth.py \
+  tests/test_mcp_oauth_integration.py tests/test_mcp_oauth_migration.py \
+  tests/test_mcp_oauth_concurrency.py tests/test_agent_oauth_jobs.py \
+  tests/test_mcp_compose_contract.py tests/test_agent_admin.py \
+  tests/test_agent_plan_approvals.py tests/test_agent_admin_migration.py -q
+```
+
+The endpoint, actions and OAuth remain independently disabled by default. No production library,
+external provider, deployment or activation was used for these tests.
+
+## CI review of PR #292 — 2026-10-16
+
+Reviewed the [persistent suggestions](https://github.com/thecrateapp/crate/pull/292#issuecomment-6209726555)
+against commit `01fcd117` and the current implementation before any subsequent commit or push.
+The [quality job](https://github.com/thecrateapp/crate/actions/runs/38861845970/job/116845676220)
+reported four optional-value Pyright errors in diagnostic snapshot/window handling. Explicit guards
+now narrow those values before access or arithmetic; Pyright 1.1.411 reports no errors in that module.
+
+- Normalize legacy naive ISO evidence timestamps to UTC, matching existing naive datetime behavior.
+  The public MCP log schema still requires explicit timezone information.
+- Project uncommon database scalar values through bounded redaction and convert nonfinite numbers
+  to null, preserving valid JSON. Unknown diagnostic sources fail before accessing the database.
+- Keep optional output fields optional. JSON Schema defaults do not make those fields required;
+  `exclude_unset=True` is valid and preserves explicitly returned null evidence.
+- Keep keyset decoding and validation at the application boundary before the repository call.
+  A malformed cursor is rejected before SQL; it is never passed as a raw string to the query helper.
+- Keep admission fail-closed after lease loss. A completed action with an uncertain response uses
+  `ACTION_STATUS_UNKNOWN` and the original idempotency key; weakening the lease to a warning would
+  change the enforced concurrency contract.
+- `httpx2` is the actual client dependency of the pinned MCP SDK, not a mistaken alias. All eight
+  [backend test shards](https://github.com/thecrateapp/crate/actions/runs/38861845970) passed on CI.
+
+The automatic missing-security-evidence comment is contradicted by the successful
+[Bandit security scan and uploaded report](https://github.com/thecrateapp/crate/actions/runs/38861845970/job/116845675825).
+The bot also reports missing Checks write permission; granting that GitHub App permission is an
+installation-owner operation and is independent of the code corrections. New regression tests in
+`test_agent_review_regressions.py` reproduced 12 failing cases before the fixes and pass afterward.

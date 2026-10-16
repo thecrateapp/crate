@@ -1716,3 +1716,25 @@ def test_openapi_types_playlist_and_crate_collaboration_routes(test_app):
         data["paths"]["/api/playlists/{playlist_id}/leave"]["post"]["security"] == auth
     )
     assert data["paths"]["/api/crates/{crate_id}/members"]["post"]["security"] == auth
+
+
+def test_openapi_types_human_agent_management_and_keeps_it_cookie_only(test_app):
+    schema = test_app.get("/openapi.json").json()
+    admin_schema = test_app.get("/openapi-admin-system.json").json()
+    expected = {
+        ("/api/admin/agent-integrations", "get"): "AgentCollectionResponse",
+        ("/api/admin/agent-integrations", "post"): "AgentCredentialSecretResponse",
+        ("/api/admin/agent-plans", "get"): "AgentCollectionResponse",
+    }
+    assert "agents" in {tag["name"] for tag in admin_schema["tags"]}
+    for (path, method), model in expected.items():
+        for document in (schema, admin_schema):
+            operation = document["paths"][path][method]
+            assert operation["tags"] == ["agents"]
+            assert operation["security"] == [{"cookieAuth": []}]
+            assert (
+                operation["responses"]["200"]["content"]["application/json"]["schema"][
+                    "$ref"
+                ]
+                == f"#/components/schemas/{model}"
+            )

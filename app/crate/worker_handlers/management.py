@@ -96,6 +96,11 @@ def _unmark_processing(artist_name: str):
 
 
 def _handle_health_check(task_id: str, params: dict, config: dict) -> dict:
+    if params.get("agent_command"):
+        from crate.agent_maintenance import execute_agent_job
+
+        return execute_agent_job(task_id, config)
+
     from crate.health_check import ARTIST_SCOPED_CHECKS, LibraryHealthCheck
 
     p_hc = TaskProgress(phase="health_check", phase_count=1)
@@ -133,10 +138,15 @@ def _handle_health_check(task_id: str, params: dict, config: dict) -> dict:
 
 
 def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
-    from crate.health_check import ARTIST_SCOPED_CHECKS, LibraryHealthCheck
-    from crate.repair import LibraryRepair
+    if params.get("agent_command"):
+        from crate.agent_maintenance import execute_agent_job
+
+        return execute_agent_job(task_id, config)
+
     from crate.db.admin_health_surface import publish_health_surface_signal
     from crate.db.domain_events import append_domain_event
+    from crate.health_check import ARTIST_SCOPED_CHECKS, LibraryHealthCheck
+    from crate.repair import LibraryRepair
 
     dry_run = params.get("dry_run", True)
     auto_only = params.get("auto_only", True)
@@ -250,6 +260,9 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
 
             for check_type in applied_check_types:
                 catalog_entry = REPAIR_CATALOG_BY_CHECK.get(check_type)
+                if check_type == "has_photo_desync":
+                    artist_revalidation_check_types.append(check_type)
+                    continue
                 if (
                     catalog_entry is not None
                     and not catalog_entry.supports_global_scope

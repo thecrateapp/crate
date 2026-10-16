@@ -5,15 +5,14 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+from crate.artist_photo import observe_artist_photo
 from crate.audio import read_tags
 from crate.db.health import (
     cleanup_old_resolved,
-    upsert_health_issue,
     resolve_stale_artist_issues,
     resolve_stale_issues,
+    upsert_health_issue,
 )
-from crate.db.repositories.health_issues import record_health_check_runs
-from crate.health_issue_text import describe_health_issue, health_issue_identity
 from crate.db.queries.health import (
     get_albums_with_year,
     get_all_albums,
@@ -31,7 +30,9 @@ from crate.db.queries.health import (
     get_tracks_tag_sample,
     get_zombie_artists,
 )
+from crate.db.repositories.health_issues import record_health_check_runs
 from crate.db.repositories.library import get_library_artist
+from crate.health_issue_text import describe_health_issue, health_issue_identity
 from crate.repair_catalog import (
     REPAIR_CATALOG,
     REPAIR_CATALOG_BY_CHECK,
@@ -46,7 +47,12 @@ from crate.worker_handlers.migration import (
 
 log = logging.getLogger(__name__)
 
-ARTIST_SCOPED_CHECKS = ("artist_layout_fix", "duplicate_albums", "duplicate_tracks")
+ARTIST_SCOPED_CHECKS = (
+    "artist_layout_fix",
+    "duplicate_albums",
+    "duplicate_tracks",
+    "has_photo_desync",
+)
 
 
 def artwork_variant_health_sample(*, max_assets: int = 100) -> dict[str, int]:
@@ -135,6 +141,28 @@ class LibraryHealthCheck:
                             get_duplicate_tracks(artist_name=artist_name)
                         )
                     )
+                elif check_type == "has_photo_desync":
+                    artist = get_library_artist(artist_name)
+                    if artist is None:
+                        raise ValueError("Artist no longer exists")
+                    observation = observe_artist_photo(
+                        self.config, str(artist["entity_uid"])
+                    )
+                    if observation["db_has_photo"] != observation["fs_has_photo"]:
+                        issues.append(
+                            {
+                                "check": "has_photo_desync",
+                                "severity": "low",
+                                "auto_fixable": True,
+                                "details": {
+                                    "artist": observation["name"],
+                                    "artist_uid": observation["artist_uid"],
+                                    "folder_name": observation["folder_name"],
+                                    "db_has_photo": observation["db_has_photo"],
+                                    "fs_has_photo": observation["fs_has_photo"],
+                                },
+                            }
+                        )
                 else:
                     log.debug(
                         "No artist-scoped revalidation implemented for %s", check_type
@@ -485,6 +513,8 @@ class LibraryHealthCheck:
                         "auto_fixable": True,
                         "details": {
                             "artist": row["name"],
+                            "artist_uid": str(row["entity_uid"]),
+                            "folder_name": row["folder_name"],
                             "db_has_photo": db_has_photo,
                             "fs_has_photo": fs_has_photo,
                         },
