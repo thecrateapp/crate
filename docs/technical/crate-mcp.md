@@ -999,7 +999,9 @@ review was updated to that exact commit and raised only a conditional import-ord
 Ruff on that file passed. The failed shard exposed a real missing-task cancellation bug plus
 outdated phase-5 grant expectations and fake-task fixtures. The missing task now returns false
 instead of an acknowledged cancellation; eight focused CI cases passed on Python 3.13 with real
-PostgreSQL. This does not establish a complete backend-suite pass.
+PostgreSQL. Later CI exposed additional acquisition and artwork tests that used synthetic task
+IDs without isolating the cancellation lookup. Their fixtures now stub that boundary; the two
+selected files passed 93 cases. This does not establish a complete backend-suite pass.
 
 The phase-6 focused selection passed **37 PostgreSQL-backed cases** across the editorial plan,
 MCP, migration, rule, refinement and override files. These cover migration/bootstrap, exact creation,

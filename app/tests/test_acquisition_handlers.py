@@ -645,6 +645,9 @@ def test_upcoming_pre_release_queries_use_strict_future_filter(monkeypatch):
 def test_check_new_releases_skips_recently_checked_artists(monkeypatch):
     checked_at = datetime.now(timezone.utc)
     mb_calls: list[str] = []
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.is_cancelled", lambda _task_id: False
+    )
 
     monkeypatch.setattr(
         "crate.worker_handlers.acquisition.get_library_artists",
@@ -1011,6 +1014,9 @@ def test_library_upload_skips_albums_that_already_exist(monkeypatch, tmp_path):
     )
     monkeypatch.setattr("crate.worker_handlers.acquisition.start_scan", lambda: None)
 
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.is_cancelled", lambda _task_id: False
+    )
     result = _handle_library_upload(
         "task-upload-skip",
         {"staging_dir": str(staging_dir), "uploader_user_id": 1},
