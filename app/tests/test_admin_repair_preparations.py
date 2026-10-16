@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 from unittest.mock import Mock
 
 import pytest
@@ -504,15 +505,14 @@ def test_concurrent_worker_deliveries_claim_frozen_effect_only_once(
     _config, _issues, preview = prepared_admin_photo_plan
     job = _accept(preview)
     start_task(job)
+    ready = Barrier(2)
+
+    def load_execution(_delivery):
+        ready.wait(timeout=10)
+        return plans.load_admin_repair_execution(job, preview["preparation_task_id"], 1)
+
     with ThreadPoolExecutor(max_workers=2) as executor:
-        deliveries = list(
-            executor.map(
-                lambda _: plans.load_admin_repair_execution(
-                    job, preview["preparation_task_id"], 1
-                ),
-                range(2),
-            )
-        )
+        deliveries = list(executor.map(load_execution, range(2)))
     executions = [item for item in deliveries if "execution" in item]
     uncertain = [item for item in deliveries if "result" in item]
     assert len(executions) == 1

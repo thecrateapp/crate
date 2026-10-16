@@ -1019,6 +1019,12 @@ context/client promptly on disconnect.
 The next backend run found a completeness chunk test with a synthetic task ID and no `tasks`
 table in its minimal fixture. Its cancellation lookup is now stubbed at the worker boundary;
 the selected completeness file passed 10 cases.
+The subsequent shard found a genuine Admin repair claim race. The preparation query locked
+the task row while joining the JSON payload in the same statement, so a waiting delivery
+could read the payload from an older PostgreSQL snapshot and start the same effect. Claim and
+finish now lock the task in a separate statement before reading the payload. The 31-case
+repair-preparation file passed with PostgreSQL, and its concurrent-delivery test now starts
+both attempts behind a barrier.
 
 The phase-6 focused selection passed **37 PostgreSQL-backed cases** across the editorial plan,
 MCP, migration, rule, refinement and override files. These cover migration/bootstrap, exact creation,

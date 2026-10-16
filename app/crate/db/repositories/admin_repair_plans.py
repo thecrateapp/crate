@@ -33,11 +33,15 @@ def _authority(current, actor_user_id: int) -> None:
 
 
 def _preparation(current, task_id: str, actor_user_id: int, *, locked=False) -> dict:
+    if locked:
+        # Fetch the payload in a later statement, after any competing writer commits.
+        current.execute(
+            text("SELECT id FROM tasks WHERE id=:id FOR UPDATE"), {"id": task_id}
+        ).first()
     row = (
         current.execute(
             text(
                 "SELECT t.*,p.payload AS repair_payload,p.expires_at AS preparation_expires_at FROM tasks t LEFT JOIN admin_repair_preparations p ON p.task_id=t.id WHERE t.id=:id"
-                + (" FOR UPDATE OF t" if locked else "")
             ),
             {"id": task_id},
         )
@@ -196,10 +200,13 @@ def finish_admin_repair_execution(
     task_id: str, preparation_task_id: str, result: dict, *, session=None
 ) -> dict:
     with optional_scope(session) as current:
+        # The payload read must follow the task lock to see the winning result.
+        current.execute(
+            text("SELECT id FROM tasks WHERE id=:id FOR UPDATE"),
+            {"id": preparation_task_id},
+        ).first()
         row = current.execute(
-            text(
-                "SELECT p.payload FROM admin_repair_preparations p JOIN tasks t ON t.id=p.task_id WHERE t.id=:id FOR UPDATE OF t"
-            ),
+            text("SELECT payload FROM admin_repair_preparations WHERE task_id=:id"),
             {"id": preparation_task_id},
         ).scalar_one()
         if row.get("consumed_by") != task_id:
