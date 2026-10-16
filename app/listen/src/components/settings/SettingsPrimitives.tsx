@@ -67,6 +67,7 @@ export function RangeRow({
         max={max}
         step={step}
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(Number(event.target.value))}
         className="settings-range w-full disabled:cursor-not-allowed"
       />

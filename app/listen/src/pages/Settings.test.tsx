@@ -40,6 +40,9 @@ vi.mock("@/lib/api", async (importOriginal) => {
       if (url === "/api/auth/subsonic-token") {
         return { configured: false };
       }
+      if (url === "/api/auth/access-tokens") {
+        return [];
+      }
       return {};
     }),
   };
@@ -72,6 +75,7 @@ describe("Settings", () => {
     expect(screen.getByPlaceholderText("tu-handle")).toBeInTheDocument();
     expect(screen.getByText("Enlaces rápidos")).toBeInTheDocument();
     expect(screen.getByText("OpenSubsonic")).toBeInTheDocument();
+    expect(screen.getByText("Tokens de acceso")).toBeInTheDocument();
     expect(container.querySelector(".settings-header")).toBeInTheDocument();
     expect(container.querySelector(".settings-section")).toBeInTheDocument();
   });

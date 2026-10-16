@@ -13,17 +13,43 @@ import type {
   EngineRepeatMode,
   EngineState,
   EngineTrack,
+  EngineTransitionPlan,
   PlaybackEngine,
 } from "@/lib/playback-engine";
 import {
   beginNativePlaybackIntent,
   cancelNativePlaybackRecoveryIntent,
 } from "@/lib/native-playback-intent";
+import {
+  getSmartMixCapabilities,
+  keepServerPlans,
+  setSmartMixCapabilities,
+  subscribeSmartMixCapabilities,
+  type SmartMixCapabilities,
+} from "@/lib/smart-mix";
+import {
+  getCrossfadeDurationPreference,
+  NATIVE_PLAYER_DISABLED_KEY,
+  registerNativeMixRuntime,
+} from "@/lib/player-playback-prefs";
 
-const NATIVE_PLAYER_DISABLED_KEY = "crate-native-player-disabled";
 const NATIVE_PLAYER_CROSSFADE_KEY = "crate-native-player-crossfade-enabled";
+const NATIVE_SMART_MIX_KILL_SWITCH_KEY = "crate-native-smart-mix-kill-switch";
 const NATIVE_PLAYER_EQ_KEY = "crate-native-player-eq-enabled";
 const NATIVE_READY_PROBE_DELAYS_MS = [0, 100, 250] as const;
+const LOCAL_SMART_MIX_TEST_ENABLED =
+  import.meta.env.VITE_CRATE_SMART_MIX_LOCAL_TEST === "true";
+const LOCAL_SMART_MIX_CROSSFADE_MS = (() => {
+  const parsed = Number.parseInt(
+    import.meta.env.VITE_CRATE_SMART_MIX_LOCAL_CROSSFADE_MS ?? "",
+    10,
+  );
+  return Number.isFinite(parsed)
+    ? Math.max(250, Math.min(parsed, 12_000))
+    : 3000;
+})();
+
+export type AndroidNativeSmartMixCapabilities = SmartMixCapabilities;
 
 type NativeEventEnvelope = {
   event?: EngineEventName;
@@ -42,6 +68,10 @@ type CrateNativePlaybackPlugin = {
   getState(): Promise<EngineState>;
   drainEvents(): Promise<{ events?: NativeEventEnvelope[] }>;
   setQueue(options: EngineQueueSnapshot): Promise<EngineState>;
+  setTransitionPlans(options: {
+    revision: string;
+    transitionPlans: EngineTransitionPlan[];
+  }): Promise<{ accepted: boolean }>;
   appendTracks(options: {
     revision: string;
     tracks: EngineTrack[];
@@ -90,6 +120,8 @@ export function isAndroidNativePlayerAvailable(): boolean {
   return isAndroidNative;
 }
 
+registerNativeMixRuntime(isAndroidNativePlayerAvailable);
+
 export function shouldUseAndroidNativePlayer(): boolean {
   if (!isAndroidNativePlayerAvailable()) return false;
   try {
@@ -113,6 +145,42 @@ export function setAndroidNativePlayerEnabled(enabled: boolean): void {
   }
 }
 
+export function setAndroidNativeSmartMixCapabilities(
+  capabilities: AndroidNativeSmartMixCapabilities,
+): void {
+  setSmartMixCapabilities(capabilities);
+}
+
+export function setAndroidNativeSmartMixKillSwitch(enabled: boolean): void {
+  try {
+    if (enabled) {
+      localStorage.setItem(NATIVE_SMART_MIX_KILL_SWITCH_KEY, "true");
+    } else {
+      localStorage.removeItem(NATIVE_SMART_MIX_KILL_SWITCH_KEY);
+    }
+  } catch {
+    // The kill switch fails closed through the other rollout gates.
+  }
+}
+
+function isAndroidNativeSmartMixKilled(): boolean {
+  try {
+    return localStorage.getItem(NATIVE_SMART_MIX_KILL_SWITCH_KEY) === "true";
+  } catch {
+    return true;
+  }
+}
+
+function effectiveNativeCrossfadeMs(requestedMs: number): number {
+  if (requestedMs <= 0 || isAndroidNativeSmartMixKilled()) return 0;
+  if (LOCAL_SMART_MIX_TEST_ENABLED) return LOCAL_SMART_MIX_CROSSFADE_MS;
+  const capabilities = getSmartMixCapabilities();
+  if (!capabilities.available || !capabilities.androidNativeCrossfade) {
+    return 0;
+  }
+  return requestedMs;
+}
+
 export function isAndroidNativeEqEnabled(): boolean {
   try {
     return localStorage.getItem(NATIVE_PLAYER_EQ_KEY) !== "false";
@@ -125,6 +193,62 @@ export class AndroidNativeEngine implements PlaybackEngine {
   private readyPromise: Promise<void> | null = null;
   private queueRevision = "";
   private notificationPermissionPrompted = false;
+  private queueMixRequested = false;
+  private appliedCrossfadeMs: number | null = null;
+  private replanTransitionPlans:
+    | ((currentIndex?: number) => Promise<EngineTransitionPlan[] | undefined>)
+    | undefined;
+  private planInstallGeneration = 0;
+  private installedPlans: EngineTransitionPlan[] = [];
+
+  constructor() {
+    subscribeSmartMixCapabilities(() => {
+      void this.applySmartMixPreference();
+      this.replanForCapabilities();
+    });
+  }
+
+  planAhead(currentIndex: number): void {
+    this.replanForCapabilities(currentIndex);
+  }
+
+  private replanForCapabilities(currentIndex?: number): void {
+    const replan = this.replanTransitionPlans;
+    if (!replan || !this.queueMixRequested) return;
+    const revision = this.queueRevision;
+    void replan(currentIndex)
+      .then((transitionPlans) => {
+        if (!transitionPlans?.length) return;
+        return this.installTransitionPlans(
+          revision,
+          Promise.resolve(transitionPlans),
+        );
+      })
+      .catch((error) => {
+        console.warn(
+          "[native-playback] transition plans not replanned:",
+          error,
+        );
+      });
+  }
+
+  private async applySmartMixPreference(): Promise<void> {
+    if (!this.queueMixRequested) return;
+    const crossfadeMs = effectiveNativeCrossfadeMs(
+      getCrossfadeDurationPreference() * 1000,
+    );
+    if (crossfadeMs === this.appliedCrossfadeMs) return;
+    this.appliedCrossfadeMs = crossfadeMs;
+    try {
+      await this.ensureReady();
+      await nativePlayback.setCrossfadeMs({ crossfadeMs });
+    } catch (error) {
+      console.warn(
+        "[native-playback] Smart Mix preference not applied:",
+        error,
+      );
+    }
+  }
 
   private async ensureReady(): Promise<void> {
     for (const delayMs of NATIVE_READY_PROBE_DELAYS_MS) {
@@ -198,8 +322,54 @@ export class AndroidNativeEngine implements PlaybackEngine {
     if (snapshot.autoplay) {
       await this.ensureNotificationPermission();
     }
-    this.queueRevision = snapshot.revision;
-    return nativePlayback.setQueue({ ...snapshot, crossfadeMs: 0 });
+    const { pendingTransitionPlans, replanTransitionPlans, ...queue } =
+      snapshot;
+    this.queueRevision = queue.revision;
+    this.replanTransitionPlans = replanTransitionPlans;
+    this.installedPlans = [];
+    this.queueMixRequested = queue.crossfadeMs > 0;
+    this.appliedCrossfadeMs = effectiveNativeCrossfadeMs(queue.crossfadeMs);
+    const pendingGeneration = ++this.planInstallGeneration;
+    const state = await nativePlayback.setQueue({
+      ...queue,
+      crossfadeMs: this.appliedCrossfadeMs,
+    });
+    if (pendingTransitionPlans) {
+      void this.installTransitionPlans(
+        queue.revision,
+        pendingTransitionPlans,
+        pendingGeneration,
+      );
+    }
+    this.replanForCapabilities();
+    return state;
+  }
+
+  private async installTransitionPlans(
+    revision: string,
+    pendingPlans: Promise<EngineTransitionPlan[] | undefined>,
+    generation = ++this.planInstallGeneration,
+  ): Promise<void> {
+    try {
+      const transitionPlans = await pendingPlans;
+      if (
+        !transitionPlans?.length ||
+        revision !== this.queueRevision ||
+        generation !== this.planInstallGeneration
+      ) {
+        return;
+      }
+      const mergedPlans = keepServerPlans(this.installedPlans, transitionPlans);
+      await nativePlayback.setTransitionPlans({
+        revision,
+        transitionPlans: mergedPlans,
+      });
+      if (revision === this.queueRevision) {
+        this.installedPlans = mergedPlans;
+      }
+    } catch (error) {
+      console.warn("[native-playback] transition plans not installed:", error);
+    }
   }
 
   async play(): Promise<EngineState> {
@@ -278,9 +448,12 @@ export class AndroidNativeEngine implements PlaybackEngine {
   }
 
   async setCrossfadeMs(crossfadeMs: number): Promise<EngineState> {
-    void crossfadeMs;
     await this.ensureReady();
-    return nativePlayback.setCrossfadeMs({ crossfadeMs: 0 });
+    this.queueMixRequested = crossfadeMs > 0;
+    this.appliedCrossfadeMs = effectiveNativeCrossfadeMs(crossfadeMs);
+    return nativePlayback.setCrossfadeMs({
+      crossfadeMs: this.appliedCrossfadeMs,
+    });
   }
 
   async setVolume(volume: number): Promise<EngineState> {

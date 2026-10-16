@@ -6,6 +6,7 @@ const STREAM_PROBE_TIMEOUT_MS = 4000;
 
 export async function probeTrackAvailability(
   track: Track | undefined,
+  options: { serverReachableOnly?: boolean } = {},
 ): Promise<boolean> {
   if (!track) return false;
 
@@ -26,6 +27,7 @@ export async function probeTrackAvailability(
       signal: controller.signal,
     });
     response.body?.cancel().catch(() => {});
+    if (options.serverReachableOnly) return response.status < 500;
     return response.ok || response.status === 206;
   } catch {
     return false;

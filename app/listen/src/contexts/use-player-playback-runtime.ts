@@ -102,6 +102,8 @@ export function usePlayerPlaybackRuntime({
     isPlayingRef,
     shuffleRef,
     unshuffledQueueRef,
+    playSource,
+    playSourceRef,
   });
 
   useEqualizerRuntime(currentTrack);
@@ -129,8 +131,10 @@ export function usePlayerPlaybackRuntime({
       currentTimeRef,
       effectiveCrossfadeMsRef,
       lastNonZeroVolumeRef,
+      playSourceRef,
       queueRef,
       repeatRef,
+      shuffleRef,
     },
   );
 
@@ -241,9 +245,11 @@ export function usePlayerPlaybackRuntime({
     commitDuration,
     commitIsBuffering,
     commitIsPlaying,
+    crossfadeTimerRef,
     currentIndexRef,
     currentTimeRef,
     currentTrackRef,
+    durationRef,
     effectiveCrossfadeMsRef,
     ensureTrackerSession,
     flushCurrentPlayEvent,
@@ -254,6 +260,8 @@ export function usePlayerPlaybackRuntime({
     rememberActiveTrack,
     repeatRef,
     rotateTrackerSession,
+    setCrossfadeTransition,
+    shuffleRef,
   });
 
   usePlayerPreferenceRuntime({

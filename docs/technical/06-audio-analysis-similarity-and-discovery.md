@@ -16,6 +16,11 @@ sources:
 
 # Audio Analysis, Similarity, and Discovery Intelligence
 
+> Smart Mix, Android native crossfade and VirtualDJ continuation are defined
+> exclusively by the [unified design](smart-mix-design.md) and
+> [implementation plan](smart-mix-implementation-plan.md). Earlier feature
+> plans and spikes are historical; this page remains general subsystem context.
+
 ## Why this subsystem matters
 
 Crate's discovery features are not only metadata-driven. They also depend on audio-derived signals and similarity vectors.

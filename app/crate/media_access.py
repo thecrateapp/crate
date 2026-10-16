@@ -17,6 +17,7 @@ from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 MediaAudience = Literal["artwork", "stream", "sse", "ws"]
 
 MEDIA_ACCESS_TTL_SECONDS = 60
+ACCESS_TOKEN_MEDIA_TTL_SECONDS = 15 * 60
 _KEY_PREFIX = "media-access:v1:"
 _VALID_AUDIENCES = frozenset({"artwork", "stream", "sse", "ws"})
 _memory_lock = threading.Lock()
@@ -38,7 +39,8 @@ class IssuedMediaAccessTicket:
 @dataclass(frozen=True)
 class ValidatedMediaAccessTicket:
     user_id: int
-    session_id: str
+    session_id: str | None
+    access_token_id: int | None
     audience: MediaAudience
     path: str
 
@@ -58,11 +60,11 @@ def _ticket_key(ticket: str) -> str:
     return f"{_KEY_PREFIX}{digest}"
 
 
-def _store(key: str, payload: str) -> None:
+def _store(key: str, payload: str, ttl_seconds: int) -> None:
     try:
         redis_client = _redis_client()
         if redis_client is not None:
-            redis_client.set(key, payload, ex=MEDIA_ACCESS_TTL_SECONDS)
+            redis_client.set(key, payload, ex=ttl_seconds)
             return
     except Exception as exc:
         raise MediaAccessUnavailable(
@@ -72,7 +74,7 @@ def _store(key: str, payload: str) -> None:
         raise MediaAccessUnavailable("Media access ticket storage is unavailable")
     with _memory_lock:
         _memory_tickets[key] = (
-            time.monotonic() + MEDIA_ACCESS_TTL_SECONDS,
+            time.monotonic() + ttl_seconds,
             payload,
         )
 
@@ -155,35 +157,43 @@ def normalize_media_access_path(path: str) -> str:
 def issue_media_access_ticket(
     *,
     user_id: int,
-    session_id: str,
+    session_id: str | None = None,
+    access_token_id: int | None = None,
     audience: MediaAudience,
     path: str,
 ) -> IssuedMediaAccessTicket:
     if audience not in _VALID_AUDIENCES:
         raise ValueError("Unsupported media access audience")
-    if user_id <= 0 or not session_id:
-        raise ValueError("A persisted user session is required")
+    if user_id <= 0 or bool(session_id) == bool(access_token_id):
+        raise ValueError("Exactly one media access identity is required")
+    if access_token_id is not None and access_token_id <= 0:
+        raise ValueError("A valid access token identity is required")
     normalized_path = normalize_media_access_path(path)
     if media_audience_for_path(normalized_path) != audience:
         raise ValueError("Media access path does not match its audience")
 
     ticket = secrets.token_urlsafe(32)
-    payload = json.dumps(
-        {
-            "user_id": user_id,
-            "session_id": session_id,
-            "audience": audience,
-            "path": normalized_path,
-        },
-        separators=(",", ":"),
+    payload_data = {
+        "user_id": user_id,
+        "audience": audience,
+        "path": normalized_path,
+    }
+    if session_id is not None:
+        payload_data["session_id"] = session_id
+    if access_token_id is not None:
+        payload_data["access_token_id"] = access_token_id
+    payload = json.dumps(payload_data, separators=(",", ":"))
+    ttl_seconds = (
+        ACCESS_TOKEN_MEDIA_TTL_SECONDS
+        if access_token_id is not None
+        else MEDIA_ACCESS_TTL_SECONDS
     )
-    _store(_ticket_key(ticket), payload)
+    _store(_ticket_key(ticket), payload, ttl_seconds)
     return IssuedMediaAccessTicket(
         ticket=ticket,
         audience=audience,
         path=normalized_path,
-        expires_at=datetime.now(timezone.utc)
-        + timedelta(seconds=MEDIA_ACCESS_TTL_SECONDS),
+        expires_at=datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds),
     )
 
 
@@ -211,12 +221,29 @@ def validate_media_access_ticket(
         ):
             return None
         user_id = int(data["user_id"])
-        session_id = str(data["session_id"])
-        if user_id <= 0 or not session_id:
+        session_id_raw = data.get("session_id")
+        access_token_id_raw = data.get("access_token_id")
+        session_id = (
+            str(session_id_raw)
+            if isinstance(session_id_raw, str) and session_id_raw
+            else None
+        )
+        access_token_id = (
+            int(access_token_id_raw)
+            if isinstance(access_token_id_raw, int)
+            and not isinstance(access_token_id_raw, bool)
+            else None
+        )
+        if (
+            user_id <= 0
+            or bool(session_id) == bool(access_token_id)
+            or (access_token_id is not None and access_token_id <= 0)
+        ):
             return None
         return ValidatedMediaAccessTicket(
             user_id=user_id,
             session_id=session_id,
+            access_token_id=access_token_id,
             audience=audience,
             path=normalized_path,
         )

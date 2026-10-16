@@ -82,6 +82,7 @@ import {
 
 describe("capacitor OAuth callback helpers", () => {
   beforeEach(() => {
+    vi.unstubAllEnvs();
     localStorage.clear();
     apiMock.mockReset();
     getSecureSessionValue.mockReset();
@@ -143,6 +144,52 @@ describe("capacitor OAuth callback helpers", () => {
       expect.stringMatching(/^crate\.oauth\./),
       expect.stringContaining('"next":"/stats"'),
     );
+  });
+
+  it("uses an isolated OAuth callback scheme for debug builds", async () => {
+    vi.stubEnv("VITE_CRATE_OAUTH_SCHEME", "cratemusic-dbg");
+    apiMock.mockResolvedValue({
+      provider: "google",
+      login_url: "https://accounts.example/authorize",
+    });
+    setSecureSessionValue.mockResolvedValue(undefined);
+
+    await beginNativeOAuth("google", "/stats");
+
+    expect(apiMock).toHaveBeenCalledWith(
+      "server-a",
+      "/api/auth/oauth/google/start",
+      "POST",
+      expect.objectContaining({
+        return_to: "cratemusic-dbg://oauth/callback",
+      }),
+    );
+
+    getSecureSessionValue.mockResolvedValue(
+      JSON.stringify({
+        verifier: "v".repeat(43),
+        next: "/stats",
+        createdAt: Date.now(),
+        serverId: "server-a",
+      }),
+    );
+    apiMock.mockResolvedValue({ token: "access-token" });
+    removeSecureSessionValue.mockResolvedValue(undefined);
+
+    await expect(
+      consumeOAuthCallbackUrl(
+        `cratemusic-dbg://oauth/callback?code=one-time-code-token&state=${"s".repeat(
+          43,
+        )}`,
+      ),
+    ).resolves.toEqual({ handled: true, next: "/stats" });
+    expect(
+      await consumeOAuthCallbackUrl(
+        `cratemusic://oauth/callback?code=one-time-code-token&state=${"s".repeat(
+          43,
+        )}`,
+      ),
+    ).toEqual({ handled: false, next: "/" });
   });
 
   it("exchanges a one-time callback code and always deletes its verifier", async () => {

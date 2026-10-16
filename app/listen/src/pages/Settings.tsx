@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { PageHeader } from "@crate/ui/domain/navigation";
 
+import { AccessTokensSection } from "@/components/settings/AccessTokensSection";
 import { AccountSection } from "@/components/settings/AccountSection";
 import { BandcampSection } from "@/components/settings/BandcampSection";
 import { LISTEN_APPEARANCE_SETTINGS_ENABLED } from "@/app-shell/feature-flags";
@@ -35,6 +36,7 @@ export function Settings() {
       <SleepTimerSection />
       <AccountSection />
       <OpenSubsonicCredentialsSection />
+      <AccessTokensSection />
       <ScrobbleSection />
       <BandcampSection />
       <LinksSection />

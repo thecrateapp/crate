@@ -2,6 +2,7 @@ import base64
 import hashlib
 import logging
 import os
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from threading import RLock
@@ -163,6 +164,7 @@ from crate.user_avatars import (
     fetch_avatar,
     is_proxyable_avatar_url,
 )
+from crate.config import vdj_enabled
 
 log = logging.getLogger(__name__)
 
@@ -180,6 +182,37 @@ _login_failure_memory: dict[str, tuple[int, datetime]] = {}
 _oauth_invite_memory: dict[str, tuple[str, datetime]] = {}
 _login_failure_lock = RLock()
 _oauth_invite_lock = RLock()
+
+
+_ENTITY_SEGMENT = r"[^/]+"
+_VDJ_ACCESS_TOKEN_ROUTES: tuple[tuple[frozenset[str], re.Pattern[str]], ...] = tuple(
+    (frozenset(methods), re.compile(pattern))
+    for methods, pattern in (
+        ({"GET"}, r"/api/search"),
+        ({"GET"}, r"/api/auth/me"),
+        ({"GET"}, r"/api/capabilities"),
+        ({"GET"}, r"/api/vdj/catalog/folders"),
+        ({"GET"}, r"/api/vdj/catalog/folders/[^/]+"),
+        ({"POST"}, r"/api/auth/media-access"),
+        ({"POST"}, r"/api/playback/transition-plans"),
+        ({"POST"}, r"/api/me/play-events"),
+        (
+            {"GET"},
+            rf"/api/tracks/by-entity/{_ENTITY_SEGMENT}/(?:mix-profile|compatible|playback)",
+        ),
+        ({"GET", "HEAD"}, rf"/api/tracks/by-entity/{_ENTITY_SEGMENT}/stream"),
+        ({"GET"}, rf"/api/vdj/tracks/by-entity/{_ENTITY_SEGMENT}/playback"),
+        ({"GET", "HEAD"}, rf"/api/vdj/tracks/by-entity/{_ENTITY_SEGMENT}/stream"),
+    )
+)
+
+
+def _is_vdj_access_token_request(method: str, path: str) -> bool:
+    normalized_method = method.upper()
+    return any(
+        normalized_method in methods and pattern.fullmatch(path)
+        for methods, pattern in _VDJ_ACCESS_TOKEN_ROUTES
+    )
 
 
 def _parse_allowed_email_domains() -> list[str]:
@@ -410,7 +443,7 @@ def _require_native_oauth_link_auth(request: Request) -> tuple[dict, str]:
 
 def _is_listen_return_to(return_to: str | None) -> bool:
     value = (return_to or "").strip()
-    if value.startswith("cratemusic://"):
+    if native_oauth_auth.is_native_callback_url(value):
         return True
     if not value.startswith(("http://", "https://")):
         return False
@@ -485,7 +518,7 @@ def _infer_oauth_app_id(request: Request, return_to: str | None) -> str | None:
     if _is_listen_return_to(return_to):
         return (
             "listen-native"
-            if (return_to or "").startswith("cratemusic://")
+            if native_oauth_auth.is_native_callback_url(return_to)
             else "listen-web"
         )
     return None
@@ -950,7 +983,8 @@ def _allowed_redirect_origins() -> set[str]:
 def _callback_origin(return_to: str | None = None, *, app_id: str | None = None) -> str:
     allowed = _allowed_redirect_origins()
     if return_to and (
-        return_to.startswith("cratemusic://") or _is_native_listen_app_id(app_id)
+        native_oauth_auth.is_native_callback_url(return_to)
+        or _is_native_listen_app_id(app_id)
     ):
         # Native/Tauri OAuth still needs an HTTPS callback registered with
         # Google/Apple. Keep it on Listen, not Admin, so desktop/mobile auth
@@ -976,7 +1010,7 @@ def _validate_return_to(return_to: str | None, *, app_id: str | None = None) -> 
     """Validate return_to against allowed origins. Returns safe URL or fallback."""
     if not return_to:
         return "/"
-    if return_to.startswith("cratemusic://"):
+    if native_oauth_auth.is_native_callback_url(return_to):
         return return_to
     if return_to.startswith("/") and not return_to.startswith("//"):
         return return_to
@@ -1004,7 +1038,11 @@ def _append_query_param(url: str, key: str, value: str) -> str:
 
 
 def _native_oauth_completion_redirect_url(
-    *, app_id: str | None, code: str, state: str
+    *,
+    app_id: str | None,
+    code: str,
+    state: str,
+    return_to: str | None = None,
 ) -> str:
     if (app_id or "").strip().lower() == "listen-tauri":
         redirect_url = (
@@ -1013,7 +1051,11 @@ def _native_oauth_completion_redirect_url(
         fragment = urlencode({"desktop": "tauri", "code": code, "state": state})
         return f"{redirect_url}#{fragment}"
 
-    redirect_url = _NATIVE_CALLBACK_URL
+    redirect_url = (
+        return_to
+        if return_to in native_oauth_auth.NATIVE_OAUTH_CALLBACK_URLS
+        else _NATIVE_CALLBACK_URL
+    )
     redirect_url = _append_query_param(redirect_url, "code", code)
     return _append_query_param(redirect_url, "state", state)
 
@@ -1477,6 +1519,42 @@ class AuthMiddleware:
             str(session_id) if session_id else None,
         )
 
+    def _resolve_access_token_user(self, token: str) -> dict | None:
+        from crate.db.repositories.access_tokens import resolve_access_token
+
+        resolved = resolve_access_token(token)
+        if not resolved:
+            return None
+        return {
+            "id": resolved["user_id"],
+            "email": resolved["email"],
+            "role": resolved.get("role", "user"),
+            "username": resolved.get("username"),
+            "name": resolved.get("name"),
+            "session_id": None,
+            "auth_type": "access_token",
+            "access_token_id": resolved["id"],
+            "scopes": resolved["scopes"],
+        }
+
+    def _resolve_access_token_user_by_id(self, token_id: int) -> dict | None:
+        from crate.db.repositories.access_tokens import resolve_access_token_by_id
+
+        resolved = resolve_access_token_by_id(token_id)
+        if not resolved:
+            return None
+        return {
+            "id": resolved["user_id"],
+            "email": resolved["email"],
+            "role": resolved.get("role", "user"),
+            "username": resolved.get("username"),
+            "name": resolved.get("name"),
+            "session_id": None,
+            "auth_type": "access_token",
+            "access_token_id": resolved["id"],
+            "scopes": resolved["scopes"],
+        }
+
     async def resolve_user(self, request: Request) -> dict | None:
         user = None
 
@@ -1490,7 +1568,12 @@ class AuthMiddleware:
             token = request.query_params.get("token")
         # 3. Cookie auth — try app-specific cookie first, then default
         if token:
-            user = await run_in_threadpool(self._resolve_token_user, token)
+            resolver = (
+                self._resolve_access_token_user
+                if token.startswith("crv_")
+                else self._resolve_token_user
+            )
+            user = await run_in_threadpool(resolver, token)
         else:
             media_ticket = request.query_params.get("media_ticket")
             if media_ticket:
@@ -1510,11 +1593,19 @@ class AuthMiddleware:
                     else None
                 )
                 if validated:
-                    user = await run_in_threadpool(
-                        self._resolve_session_user,
-                        validated.user_id,
-                        validated.session_id,
-                    )
+                    if validated.access_token_id is not None:
+                        user = await run_in_threadpool(
+                            self._resolve_access_token_user_by_id,
+                            validated.access_token_id,
+                        )
+                        if user and user.get("id") != validated.user_id:
+                            user = None
+                    else:
+                        user = await run_in_threadpool(
+                            self._resolve_session_user,
+                            validated.user_id,
+                            validated.session_id,
+                        )
 
         if not user and not token:
             for cookie_name in _auth_cookie_candidates(request):
@@ -1552,6 +1643,9 @@ class AuthMiddleware:
                     else "user",
                 }
 
+        if user and user.get("auth_type") == "access_token":
+            if not _is_vdj_access_token_request(request.method, request.url.path):
+                return None
         return user
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -1561,7 +1655,11 @@ class AuthMiddleware:
 
         request = Request(scope, receive=receive)
         scope.setdefault("state", {})
-        scope["state"]["user"] = await self.resolve_user(request)
+        user = await self.resolve_user(request)
+        if user and user.get("auth_type") == "access_token":
+            if not _is_vdj_access_token_request(request.method, request.url.path):
+                user = None
+        scope["state"]["user"] = user
         await self.app(scope, receive, send)
 
 
@@ -1611,6 +1709,23 @@ def _require_roles_manage(request: Request) -> dict:
 
 def _require_auth_manage(request: Request) -> dict:
     return require_permission(request, "auth.manage")
+
+
+def _require_vdj_scope(request: Request, scope: str) -> dict:
+    user = _require_auth(request)
+    if user.get("auth_type") != "access_token":
+        return user
+    if not vdj_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="VirtualDJ integration is disabled on this server",
+        )
+    if scope not in set(user.get("scopes") or []):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access token is missing required scope: {scope}",
+        )
+    return user
 
 
 # ── Routes ───────────────────────────────────────────────────────
@@ -1826,6 +1941,13 @@ def auth_me(request: Request):
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     db_user = get_user_by_id(user["id"]) if user.get("id") else None
+    if db_user and user.get("auth_type") == "access_token":
+        payload = _user_public(db_user)
+        payload["username"] = db_user.get("username")
+        payload["auth_type"] = "access_token"
+        payload["scopes"] = list(user.get("scopes") or [])
+        payload["capabilities"] = []
+        return payload
     if db_user:
         payload = _user_public(db_user)
         payload["username"] = db_user.get("username")
@@ -2342,7 +2464,7 @@ def oauth_callback(
                 raise HTTPException(
                     status_code=400, detail="OAuth authorization was denied"
                 )
-            callback_url = _NATIVE_CALLBACK_URL
+            callback_url = parsed_state.get("return_to") or _NATIVE_CALLBACK_URL
         else:
             raise HTTPException(
                 status_code=400, detail="OAuth authorization was denied"
@@ -2577,6 +2699,7 @@ def oauth_callback(
         _clear_failed_login(rate_key, request)
         redirect_url = _native_oauth_completion_redirect_url(
             app_id=str(app_id) if app_id else None,
+            return_to=parsed_state.get("return_to"),
             code=handoff_code,
             state=str(native_state),
         )

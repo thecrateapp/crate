@@ -12,6 +12,11 @@ sources:
 
 # Playback, Realtime, and Subsonic
 
+> Smart Mix, Android native crossfade and VirtualDJ continuation are defined
+> exclusively by the [unified design](smart-mix-design.md) and
+> [implementation plan](smart-mix-implementation-plan.md). Earlier feature
+> plans and spikes are historical; this page remains general subsystem context.
+
 ## Listen playback architecture
 
 Playback is a defining subsystem of `app/listen`, not a peripheral utility.
