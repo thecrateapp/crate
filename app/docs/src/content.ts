@@ -100,6 +100,10 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/opensubsonic.md?raw").then(
       (module) => module.default,
     ),
+  "docs/technical/crate-mcp.md": () =>
+    import("../../../docs/technical/crate-mcp.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/tauri-desktop-support.md": () =>
     import("../../../docs/technical/tauri-desktop-support.md?raw").then(
       (module) => module.default,

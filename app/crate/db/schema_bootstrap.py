@@ -8,6 +8,7 @@ from crate.db.schema_sections import (
     create_curation_schema,
     create_library_schema,
 )
+from crate.db.schema_sections.agent_access_v109 import create_agent_access_v109_schema
 
 
 def create_schema(cur):
@@ -23,6 +24,7 @@ def create_schema(cur):
 
     create_core_schema(cur)
     create_auth_schema(cur)
+    create_agent_access_v109_schema(cur)
     create_library_schema(cur)
     cur.execute(
         """

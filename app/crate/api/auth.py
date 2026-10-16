@@ -1478,6 +1478,16 @@ class AuthMiddleware:
         )
 
     async def resolve_user(self, request: Request) -> dict | None:
+        # Machine credentials never participate in the human fallback chain.
+        if request.url.path.rstrip("/") == "/mcp" or any(
+            "crate_mcp_" in value
+            for value in [
+                request.headers.get("Authorization", ""),
+                *request.query_params.values(),
+                *request.cookies.values(),
+            ]
+        ):
+            return None
         user = None
 
         # 1. Bearer token auth (primary for all clients)
@@ -1560,6 +1570,19 @@ class AuthMiddleware:
             return
 
         request = Request(scope, receive=receive)
+        if request.url.path.rstrip("/") != "/mcp" and any(
+            "crate_mcp_" in value
+            for value in [
+                request.headers.get("Authorization", ""),
+                *request.query_params.values(),
+                *request.cookies.values(),
+            ]
+        ):
+            response = JSONResponse(
+                {"error": "MCP_CREDENTIAL_WRONG_RESOURCE"}, status_code=401
+            )
+            await response(scope, receive, send)
+            return
         scope.setdefault("state", {})
         scope["state"]["user"] = await self.resolve_user(request)
         await self.app(scope, receive, send)

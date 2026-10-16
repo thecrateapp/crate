@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -215,7 +215,11 @@ async def lifespan(app: FastAPI):
 
     event_loop_monitor_task = asyncio.create_task(monitor_event_loop_lag())
     try:
-        yield
+        async with AsyncExitStack() as stack:
+            mcp_manager = getattr(app.state, "mcp_manager", None)
+            if mcp_manager is not None:
+                await stack.enter_async_context(mcp_manager.run())
+            yield
     finally:
         stop_cache_invalidation_runtime()
         from crate.federation.client import close_shared_clients
@@ -250,6 +254,13 @@ def create_app() -> FastAPI:
         default_response_class=DateAwareJSONResponse,
     )
     app.openapi = lambda: custom_openapi(app)
+    if os.environ.get("CRATE_MCP_ENABLED", "false").lower() == "true":
+        from starlette.routing import Route
+
+        from crate.mcp.server import create_mcp_server
+
+        _, app.state.mcp_manager, mcp_app = create_mcp_server()
+        app.router.routes.append(Route("/mcp", endpoint=mcp_app))
 
     from crate.subsonic.errors import OpenSubsonicError
     from crate.subsonic.protocol import render_response

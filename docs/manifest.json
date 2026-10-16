@@ -207,6 +207,15 @@
     "order": 150
   },
   {
+    "sourcePath": "docs/technical/crate-mcp.md",
+    "route": "/operations/crate-mcp",
+    "section": "operations",
+    "title": "Crate MCP diagnostics",
+    "summary": "Connect remote agents to bounded, authenticated library and operations diagnostics.",
+    "keywords": ["mcp", "agents", "diagnostics", "credentials"],
+    "order": 170
+  },
+  {
     "sourcePath": "docs/technical/storage-retention.md",
     "route": "/operations/storage-retention",
     "section": "operations",
