@@ -21,7 +21,8 @@ plan; the status table separates local implementation from pending QA.
   imported from run `38871597394` in `dd71eb72`; comparison/full frontend CI passes in
   `38872274120`. ProgressHairline 1J is published as `0660fbd2`, with 40 reviewed Linux images
   imported from run `38876594597` in `3f470ec6`; comparison/full frontend CI passes in
-  `38877216337`. Rebase/PR/release remain gated.
+  `38877216337`. Shared toasts 1K is published as `7b46021d`; 43 Linux images/original manifest
+  are reviewed/imported from run `38880022435`. Comparison CI is pending. Rebase/PR/release remain gated.
 
 ## Sources of truth, in reading order
 
@@ -75,7 +76,8 @@ production measurement may wait until the wheel and needs assignment. Admin cont
 published at Checkpoint 1F with reviewed Linux images, green comparison CI and the local route
 walkthrough recorded below. InstrumentPanel 1.7 is published at Checkpoint 1G; its Linux capture
 review and full comparison CI pass. Meter 1.8 is published at 1H and Readout 1.9 at 1I;
-ProgressHairline 1.10 is published at 1J; shared toaster configuration 1.11 is the local 1K review.
+ProgressHairline 1.10 is published at 1J; shared toaster configuration 1.11 is published at 1K.
+Unused shared component cleanup 1.12 is the next authorised checkpoint.
 
 ## Admin visual direction — 2026-10-16
 
@@ -161,7 +163,7 @@ is a token-based chart configuration, not a selectable product skin.
 | 1.8 / Checkpoint 1H | Published `6a5b3366` + reviewed Linux images/provenance `ef5e7f52`; recording `38869057068` and comparison/full frontend CI `38869556811` pass. |
 | 1.9 / Checkpoint 1I | Published `a80f396b` + reviewed Linux images/provenance `dd71eb72`; recording `38871597394` and comparison/full frontend CI `38872274120` pass. |
 | 1.10 / Checkpoint 1J | Published `0660fbd2` + reviewed Linux images/provenance `3f470ec6`; recording `38876594597` and comparison/full frontend CI `38877216337` pass. |
-| 1.11 / Checkpoint 1K | Approved by Diego; commit/push and Linux captures authorised. Full local verification and spec/quality reviews pass; Linux capture/review/comparison pending. |
+| 1.11 / Checkpoint 1K | Published `7b46021d`; 43 Linux images/original manifest reviewed/imported from `38880022435` (40 unchanged, three new toast scenes). Comparison CI pending. |
 | 1.12, 1b | Not started; respect applicable gates and the next review checkpoint. |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -459,7 +461,7 @@ stream subscriptions are added. Header/content changes use the existing snapshot
   source `c44b31f3`: appearance 26, Listen 34 / four skips, Admin 15; unit/types/lint/builds/budgets
   and design gates pass. This closes the 1G publication/capture checkpoint.
   Local smoke images are advisory only. Meter 1.8 and Readout 1.9 are approved/published;
-  ProgressHairline 1.10 is published; shared toaster configuration 1.11 is the current local review. TrackReadout and global Admin
+  ProgressHairline 1.10 and shared toaster configuration 1.11 are published; cleanup 1.12 is the next checkpoint. TrackReadout and global Admin
   icon retirement retain their planned tasks; 1D focus polishing stays deferred.
 
 
@@ -616,7 +618,7 @@ and the shared OS/Crate/document motion gate permits it; otherwise it is static.
 ## Checkpoint 1K — Shared toaster configuration (Task 1.11)
 
 Diego approved 1K on 2026-10-16 and authorised commit/push, canonical Linux captures and continuation
-to Task 1.12. Publication/capture references are recorded below as they complete.
+to Task 1.12. Published as `7b46021d`; Linux capture references are recorded below.
 One typed `toasterConfig` supplies Sonner classes, its existing 4000ms default duration and no
 default icons. Both app mounts remove `richColors`. Admin keeps dark/bottom-right; Listen keeps
 its runtime colour/native synchronization, bottom-center placement and mobile bottom-chrome
@@ -649,5 +651,10 @@ offset. The `notify` API, per-call duration/icon overrides, messages and actions
 - Shared/Admin/Listen/preview builds, 49 tooling tests, 15 drift budgets and layer boundaries pass
   (zero violations across 144 source files). Initial JS gzip is Admin 514,933 B / 532,480 and
   Listen 204,904 B / 307,200; no ceiling increased. The 40 canonical PNGs/manifest remain unchanged.
-- Remaining gates: authorised publication, Linux capture/diff review and comparison CI. Task 1.12
-  is the next authorised checkpoint; preserve the reviewed mockup and stop again for review.
+- Canonical Linux recording passes in <https://github.com/thecrateapp/crate/actions/runs/38880022435>,
+  source `7b46021d`, Playwright 1.63.0-noble / Linux x64. Artifact `12037047924` SHA256
+  `476048805f9b0ab4b6115f65bdbe1d944afea9e9ace3bc2c127d54d1f54ca41e` matches the downloaded ZIP.
+  All 43 PNGs/original manifest are imported: 40 byte-identical and three new reviewed toast
+  scenes (Admin genre save, Listen Upload desktop/mobile), with quiet borders, cyan text and no icons.
+- Remaining gate: comparison CI. Task 1.12 is the next authorised checkpoint; preserve the reviewed
+  mockup and stop again for review.

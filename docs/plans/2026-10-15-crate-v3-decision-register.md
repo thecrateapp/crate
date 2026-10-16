@@ -362,3 +362,8 @@ Linux capture/review/comparison remain gates; 1K is local and the 40 canonical i
 On 2026-10-16 Diego approved Checkpoint 1K and explicitly authorised commit/push, canonical Linux
 captures and continuation to unused shared component cleanup (Task 1.12). This supersedes the
 local-only approval notes above. Keep the persistent mockup and stop at the next review checkpoint.
+
+1K is published as `7b46021d`. Linux recording `38880022435` passes; artifact `12037047924`
+has verified SHA256 `476048805f9b0ab4b6115f65bdbe1d944afea9e9ace3bc2c127d54d1f54ca41e`.
+All 43 PNGs and the original manifest are reviewed/imported: 40 byte-identical, plus three new
+Admin-save/Listen-Upload desktop/mobile toast scenes. Comparison CI is the next gate.

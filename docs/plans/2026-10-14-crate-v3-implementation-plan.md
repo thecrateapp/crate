@@ -341,7 +341,8 @@ comparison/full frontend CI (`38860652793`) and the local route walkthrough are 
 InstrumentPanel 1.7 is published at 1G (`473604f7`); Meter 1.8 at 1H (`6a5b3366`, Linux images
 `ef5e7f52`). Readout 1.9 is published (`a80f396b`, Linux images `dd71eb72`);
 ProgressHairline 1.10 is published (`0660fbd2`, Linux images `3f470ec6`);
-shared toaster configuration 1.11 is the current local checkpoint. Smart Mix and Phase 0
+shared toaster configuration 1.11 is published (`7b46021d`, reviewed Linux run `38880022435`);
+cleanup 1.12 is the next authorised checkpoint. Smart Mix and Phase 0
 gates remain separate: runtime qualification 0.15 and device QA are pending; production measurement
 0.14 is needed before the wheel and requires assignment.
 
@@ -1422,7 +1423,7 @@ Comparison/full frontend CI passes in run `38877216337`.
 
 ### Task 1.11: Shared toaster config (PD12 / [D10])
 
-**Local status / Checkpoint 1K:** one typed config is mounted by Admin and Listen, retaining
+**Published status / Checkpoint 1K:** one typed config is mounted by Admin and Listen, retaining
 their positions, Listen's theme/native-mode synchronization and its mobile bottom-chrome offset.
 The base duration remains 4000ms; per-call overrides and `notify` stay intact. Shared object-card
 recipes supply 380px maximum width, 12/16px padding, 14px messages, mono 11.5px muted descriptions
@@ -1432,6 +1433,8 @@ duration and embedded positioning are preview-only. All 3,971 units and preview 
 Listen 42 browser checks pass, alongside types/lints/builds/budgets/tooling gates. Spec/quality
 reviews approve; full evidence is in the handover. Diego approved 1K on 2026-10-16 and authorised
 commit/push, Linux CI captures and continuation to cleanup Task 1.12. Keep its next review checkpoint.
+Published `7b46021d`; Linux run `38880022435` passes with 43 reviewed PNGs (40 unchanged and three
+new toast scenes). All PNGs/original manifest are imported; comparison CI is pending.
 
 **Remaining DS §5.10 consumer checklist:** contextual MonoLabel type words, task-id/Open task links
 and inline-first feedback are pending the screen migrations. Preserve caller semantics/i18n rather

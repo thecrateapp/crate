@@ -248,6 +248,8 @@ desktop/390px and real Admin-save/Listen-Upload outcomes, including late Sonner 
 and collapsed-stack visibility. All 3,971 units, 37 cumulative preview checks, Admin 21 and Listen
 42 browser checks pass (four existing Listen skips); type/lint/build/budget/tooling gates and
 spec/quality reviews pass.
-Advisory PNGs are not canonical baselines; three toast scenes join the next approved Linux run.
+Advisory PNGs are not canonical baselines. Three toast scenes are reviewed/imported from Linux run
+`38880022435`, source `7b46021d`: all 43 PNGs/original manifest, including 40 unchanged images.
 Diego approved 1K on 2026-10-16 and authorised commit/push, Linux captures and cleanup Task 1.12.
-Final verification and review results live in the handover. Preserve this specimen.
+Published `7b46021d`; comparison CI is pending. Final verification and review results live in the
+handover. Preserve this specimen.
