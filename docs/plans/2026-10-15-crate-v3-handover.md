@@ -22,7 +22,8 @@ plan; the status table separates local implementation from pending QA.
   `38872274120`. ProgressHairline 1J is published as `0660fbd2`, with 40 reviewed Linux images
   imported from run `38876594597` in `3f470ec6`; comparison/full frontend CI passes in
   `38877216337`. Shared toasts 1K is published as `7b46021d`; 43 Linux images/original manifest
-  are reviewed/imported from run `38880022435`. Comparison CI is pending. Rebase/PR/release remain gated.
+  are reviewed/imported from run `38880022435` in `181ca4d4`. Comparison/full frontend CI passes in
+  `38880774591`. Rebase/PR/release remain gated.
 
 ## Sources of truth, in reading order
 
@@ -51,19 +52,21 @@ further visual polishing is deferred. Admin 1.0 and its capture/route prerequisi
 complete; InstrumentPanel 1.7, Meter 1.8, Readout 1.9 and ProgressHairline 1.10 are approved/published.
 Diego approved shared toaster configuration 1.11 / Checkpoint 1K on 2026-10-16 and authorised
 commit/push, canonical Linux captures and continuation to unused shared component cleanup 1.12.
-Theme runtime retirement 1.13 remains outside this batch.
+Diego approved unused shared component cleanup 1.12 / Checkpoint 1L on 2026-10-16 and authorised
+commit/push, canonical Linux captures and continuation to theme runtime retirement 1.13.
 
 The persistent component/visual mockup lives in `tools/design-system-preview/` and runs with
 `npm run design-system:preview` at <http://127.0.0.1:5186/#primitivas>. Extend the same page at
 every checkpoint with real components, preserving the approved examples. This is local review
 material, not the committed CI screenshot source. The current checkpoint is
-<http://127.0.0.1:5186/#toasts>: actual toasts with shared styling, manual examples and local retry.
+<http://127.0.0.1:5186/#limpieza>: an inventory of the four retired unused components, rendered with
+current shared primitives. Approved toasts remain at `#toasts` with manual examples and local retry.
 ProgressHairline remains at `#progreso` with known/indeterminate progress and both line thicknesses.
 Readout remains at `#readout` with its separate preview and committed announcement.
 Meter remains at `#meters` with its approved capacity/limit/missing-data examples.
 InstrumentPanel remains at `#paneles` with its approved spacing and live status. The approved row/chip/GenrePill specimens and earlier references remain on the page.
 
-`PLAYWRIGHT_CHANNEL=chrome npm run design-system:preview:test` passes 37 cumulative local browser
+`PLAYWRIGHT_CHANNEL=chrome npm run design-system:preview:test` passes 39 cumulative local browser
 checks, including percentage-bearing GenrePill, keyboard focus, real Select options, 44px touch
 targets and held-pointer reduced motion. The appearance harness passes 26 Chrome checks, including
 the real Listen search in desktop/mobile and open/closed states. These local Chrome runs do not
@@ -77,7 +80,7 @@ published at Checkpoint 1F with reviewed Linux images, green comparison CI and t
 walkthrough recorded below. InstrumentPanel 1.7 is published at Checkpoint 1G; its Linux capture
 review and full comparison CI pass. Meter 1.8 is published at 1H and Readout 1.9 at 1I;
 ProgressHairline 1.10 is published at 1J; shared toaster configuration 1.11 is published at 1K.
-Unused shared component cleanup 1.12 is the next authorised checkpoint.
+Unused shared component cleanup 1.12 is the current local review checkpoint.
 
 ## Admin visual direction — 2026-10-16
 
@@ -163,12 +166,13 @@ is a token-based chart configuration, not a selectable product skin.
 | 1.8 / Checkpoint 1H | Published `6a5b3366` + reviewed Linux images/provenance `ef5e7f52`; recording `38869057068` and comparison/full frontend CI `38869556811` pass. |
 | 1.9 / Checkpoint 1I | Published `a80f396b` + reviewed Linux images/provenance `dd71eb72`; recording `38871597394` and comparison/full frontend CI `38872274120` pass. |
 | 1.10 / Checkpoint 1J | Published `0660fbd2` + reviewed Linux images/provenance `3f470ec6`; recording `38876594597` and comparison/full frontend CI `38877216337` pass. |
-| 1.11 / Checkpoint 1K | Published `7b46021d`; 43 Linux images/original manifest reviewed/imported from `38880022435` (40 unchanged, three new toast scenes). Comparison CI pending. |
-| 1.12, 1b | Not started; respect applicable gates and the next review checkpoint. |
+| 1.11 / Checkpoint 1K | Published `7b46021d`; 43 Linux images/provenance `181ca4d4` from `38880022435` (40 unchanged, three new toast scenes). Comparison/full frontend CI `38880774591` passes. |
+| 1.12 / Checkpoint 1L | Approved by Diego; commit/push and Linux captures authorised. Local verification and spec/quality reviews pass. |
+| 1b | Not started; respect applicable gates and the next review checkpoint. |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
-| 1.13 runtime theme retirement                                | Planned, not implemented; outside current batch; required for the joint major                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 1.13 runtime theme retirement | Assigned by Diego after approving 1L; inventory/integration prerequisite review begins before implementation. Required for the joint major. |
 | Phases 2–7                                                   | Pending; reconcile Smart Mix overlap after rebase before marking tasks complete                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ## Integration and release order
@@ -461,7 +465,7 @@ stream subscriptions are added. Header/content changes use the existing snapshot
   source `c44b31f3`: appearance 26, Listen 34 / four skips, Admin 15; unit/types/lint/builds/budgets
   and design gates pass. This closes the 1G publication/capture checkpoint.
   Local smoke images are advisory only. Meter 1.8 and Readout 1.9 are approved/published;
-  ProgressHairline 1.10 and shared toaster configuration 1.11 are published; cleanup 1.12 is the next checkpoint. TrackReadout and global Admin
+  ProgressHairline 1.10 and shared toaster configuration 1.11 are published; cleanup 1.12 is the current local checkpoint. TrackReadout and global Admin
   icon retirement retain their planned tasks; 1D focus polishing stays deferred.
 
 
@@ -656,5 +660,43 @@ offset. The `notify` API, per-call duration/icon overrides, messages and actions
   `476048805f9b0ab4b6115f65bdbe1d944afea9e9ace3bc2c127d54d1f54ca41e` matches the downloaded ZIP.
   All 43 PNGs/original manifest are imported: 40 byte-identical and three new reviewed toast
   scenes (Admin genre save, Listen Upload desktop/mobile), with quiet borders, cyan text and no icons.
-- Remaining gate: comparison CI. Task 1.12 is the next authorised checkpoint; preserve the reviewed
-  mockup and stop again for review.
+- Comparison/full frontend CI passes in <https://github.com/thecrateapp/crate/actions/runs/38880774591>,
+  source `181ca4d4`. This closes 1K publication/capture QA; preserve the reviewed mockup.
+
+## Checkpoint 1L — Unused shared component cleanup (Task 1.12)
+
+Diego approved 1L on 2026-10-16 and authorised commit/push, canonical Linux captures and continuation
+to theme runtime retirement 1.13. Publication/capture references follow as they complete.
+
+- Import/re-export/manifest review found zero production consumers for shared OpsPageHero,
+  OpsPanel, OpsStatTile and ShowCard. They and their two exclusive test files are removed (nine
+  obsolete cases). App-local Ops/ShowCard implementations and shared show-types/test/explicit
+  exports are preserved. The package is private and its wildcard exports need no manifest change.
+- Remove the general Ops export-policy bypass, ShowCard unused-export exception, its two hand-made
+  GenrePill exceptions, obsolete literal type/icon budgets and the stale Listen local-copy
+  exception. The policies failed before cleanup (four initial failures, plus the full Listen
+  suite detecting the additional stale duplicate exception). They continue to guard active code.
+- Measured drift drops: arbitrary utilities 54→53 and inline styles 89→88. Lower both ceilings;
+  no budget or policy scope increases. Update Shared/Admin instructions; historical analysis and
+  layer-inventory fixture strings remain evidence rather than executable dependencies.
+- <http://127.0.0.1:5186/#limpieza> records the cleanup with actual current primitives and retains
+  all approved specimens. Desktop/390px checks cover four readable entries, overflow and named
+  regions/headings. The two new cases failed before the section existed; additional heading
+  assertions reproduced an ignored InstrumentPanel prop and pass with its real label/heading API.
+- Unit verification: Shared 763, Admin 268 and Desktop 50 pass in full. Listen's full run passes
+  2,880 cases with four existing skips and detects only the stale ShowCard duplicate exception;
+  after removing that entry, all three component-policy cases pass on the focused rerun. Together
+  these cover 3,962 current cases; the nine-case drop from 1K retires tests of deleted components.
+  Suites run serially with maxWorkers=2. No remaining test failure is unresolved.
+- Browser QA passes preview 39 / Admin 21 / Listen 42, with four existing Listen skips. Both new
+  preview cases pass again after correcting named headings and matching the existing 20px content
+  spacing. The desktop/mobile PNGs were reviewed locally and remain advisory.
+- Four typechecks, both app lints, shared/Admin/Listen/preview builds, bundle checks, 49 tooling
+  tests, token CSS sync, 15 drift budgets and layer boundaries pass (zero violations across 140
+  source files). Shared output was rebuilt from an empty generated dist directory and contains
+  none of the four retired modules. Initial JS gzip is Admin 514,932 B / 532,480 and Listen
+  204,904 B / 307,200; no ceiling increased.
+- Spec/quality reviews approve. The 43 reviewed Linux PNGs and original manifest remain unchanged
+  by this cleanup.
+- Remaining gates: authorised publication and Linux capture/review/comparison. Theme runtime
+  retirement 1.13 is now assigned; review its integration prerequisites and keep the next checkpoint.

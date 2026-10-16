@@ -188,7 +188,7 @@ function App() {
           crate<span className="version">v3</span>
         </a>
         <MonoLabel
-          meta={["Checkpoint 1K", "Toasts"]}
+          meta={["Checkpoint 1L", "Limpieza"]}
           className="masthead-meta"
         />
         <a className="jump" href="#primitivas">
@@ -1206,7 +1206,7 @@ function App() {
           Avisos reales con la configuración compartida de Admin y Listen. Datos
           ficticios y acciones locales. En las apps duran 4 segundos por
           defecto; aquí permanecen visibles para revisarlos. Capturas Linux de
-          1K pendientes.
+          1K revisadas.
         </p>
         <div className="instrument-preview-grid">
           <InstrumentPanel
@@ -1284,6 +1284,62 @@ function App() {
           </InstrumentPanel>
         </div>
       </section>
+      <section
+        id="limpieza"
+        className="admin-baseline-feature"
+        aria-label="Checkpoint 1L, Limpieza de componentes"
+      >
+        <div className="specimen-heading">
+          <div>
+            <MonoLabel size="eyebrow" accent="13">
+              Checkpoint 1L · Aprobado
+            </MonoLabel>
+            <h2>Una base compartida más limpia.</h2>
+          </div>
+        </div>
+        <p className="admin-baseline-note">
+          La limpieza no cambia las pantallas actuales.
+        </p>
+        <div className="instrument-preview-grid">
+          <InstrumentPanel
+            as="section"
+            headingLevel={3}
+            label={{ children: "Código sin uso" }}
+          >
+            <div className="instrument-preview-values">
+              <StatNumber value="4" label="Componentes retirados" size="md" />
+              <StatNumber value="0" label="Consumidores activos" size="md" />
+            </div>
+            <p className="admin-baseline-note mt-5">
+              Se retiran las copias compartidas que ninguna pantalla utiliza.
+              Admin conserva sus paneles de operaciones. Admin y Listen
+              conservan sus tarjetas de conciertos.
+            </p>
+          </InstrumentPanel>
+          <InstrumentPanel
+            as="section"
+            headingLevel={3}
+            label={{ children: "Retirados del paquete compartido" }}
+          >
+            <HairlineList as="ul" label="Componentes retirados" ruled={false}>
+              {["OpsPageHero", "OpsPanel", "OpsStatTile", "ShowCard"].map(
+                (name) => (
+                  <HairlineRow
+                    key={name}
+                    trailing={<MonoLabel>Retirado</MonoLabel>}
+                  >
+                    {name}
+                  </HairlineRow>
+                ),
+              )}
+            </HairlineList>
+            <p className="admin-baseline-note mt-5">
+              Las primitivas aprobadas y todos los ejemplos anteriores
+              permanecen disponibles en este mockup.
+            </p>
+          </InstrumentPanel>
+        </div>
+      </section>
       <footer>
         <MonoLabel
           meta={[
@@ -1295,7 +1351,8 @@ function App() {
             "1H publicado",
             "1I publicado",
             "1J publicado",
-            "1K aprobado",
+            "1K publicado",
+            "1L aprobado",
           ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>

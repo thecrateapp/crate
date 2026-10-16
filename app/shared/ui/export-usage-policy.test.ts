@@ -18,7 +18,6 @@ const BASE_SYSTEM_EXPORTS: Array<[RegExp, string]> = [
   [/^tokens\//, "Token stylesheets are composed through tokens/index.css."],
   [/^icons(?:\/|$)/, "The icon catalogue is a base-system module."],
   [/^composites\//, "Admin-oriented composites are kept for app/ui by plan."],
-  [/^domain\/stats\/Ops/, "Ops stats surfaces are kept for admin by plan."],
 ];
 
 const UNUSED_EXPORT_ALLOWLIST: Record<string, string> = {
@@ -30,8 +29,6 @@ const UNUSED_EXPORT_ALLOWLIST: Record<string, string> = {
     "Cover primitive rendered by EntityCard and EntityRow.",
   "domain/media/MediaEntity":
     "Entity model types consumed by MediaCover and the entity components.",
-  "domain/shows/ShowCard":
-    "Shared show card; admin still renders its local components/shows/ShowCard copy.",
   "domain/user": "Barrel for the shared UserMenu.",
   "domain/user/UserMenu":
     "Shared account menu; listen renders its own TopBarUserMenu.",

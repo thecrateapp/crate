@@ -366,4 +366,28 @@ local-only approval notes above. Keep the persistent mockup and stop at the next
 1K is published as `7b46021d`. Linux recording `38880022435` passes; artifact `12037047924`
 has verified SHA256 `476048805f9b0ab4b6115f65bdbe1d944afea9e9ace3bc2c127d54d1f54ca41e`.
 All 43 PNGs and the original manifest are reviewed/imported: 40 byte-identical, plus three new
-Admin-save/Listen-Upload desktop/mobile toast scenes. Comparison CI is the next gate.
+Admin-save/Listen-Upload desktop/mobile toast scenes, published in `181ca4d4`. Comparison/full
+frontend CI `38880774591` passes against that commit. This closes the 1K publication/capture checkpoint.
+
+Checkpoint 1L implements unused shared component cleanup (Task 1.12) locally. Production import
+review confirms no consumers of shared OpsPageHero, OpsPanel, OpsStatTile or ShowCard; remove
+them and their two exclusive test files (nine obsolete cases). Preserve app-local Ops/ShowCard
+and shared show-types/test/explicit exports. Remove their export/token/GenrePill/local-copy policy
+exceptions and obsolete active guidance; wildcard exports need no manifest change. Drift ceilings
+drop from 54 to 53 arbitrary utilities and 89 to 88 inline styles. The mockup at #limpieza uses
+current primitives, retains all previous examples and records zero consumers; no deleted UI is
+recreated. Spec/quality reviews approve after a browser regression caught unnamed preview panels
+and verified their real label/heading API. Preserve all 43 reviewed Linux PNGs/provenance and stop
+for Diego's review before publishing 1L or starting Task 1.13.
+
+1L verification covers 3,962 current unit cases: full Shared 763 / Admin 268 / Desktop 50 pass;
+Listen's full run has 2,880 passing/four existing skips and only the stale ShowCard local-copy
+exception failure, corrected with all three policy cases passing on rerun. Browser preview 39 /
+Admin 21 / Listen 42 pass, including final desktop/390px heading/spacing checks. Four typechecks,
+both lints, all builds, 49 tooling tests, token sync, 15 drift budgets and layer boundaries across
+140 source files pass. Initial JS gzip is Admin 514,932 B / 532,480 and Listen 204,904 B / 307,200;
+no ceiling increased. Clean generated shared output contains none of the retired modules.
+
+On 2026-10-16 Diego approved Checkpoint 1L and explicitly authorised commit/push, canonical Linux
+captures and continuation to theme runtime retirement (Task 1.13). This supersedes the local-only
+approval notes above. Keep the persistent mockup and stop at the next review checkpoint.

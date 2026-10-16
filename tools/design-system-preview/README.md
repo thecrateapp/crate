@@ -251,5 +251,21 @@ spec/quality reviews pass.
 Advisory PNGs are not canonical baselines. Three toast scenes are reviewed/imported from Linux run
 `38880022435`, source `7b46021d`: all 43 PNGs/original manifest, including 40 unchanged images.
 Diego approved 1K on 2026-10-16 and authorised commit/push, Linux captures and cleanup Task 1.12.
-Published `7b46021d`; comparison CI is pending. Final verification and review results live in the
+Published `7b46021d`, Linux references `181ca4d4`; comparison/full frontend CI `38880774591` passes.
+Final verification and review results live in the
 handover. Preserve this specimen.
+
+## Unused shared components / Checkpoint 1L
+
+Open <http://127.0.0.1:5186/#limpieza>. This checkpoint records a cleanup rather than a screen
+redesign. Four shared components with zero production consumers are retired: OpsPageHero, OpsPanel,
+OpsStatTile and ShowCard. Their app-local counterparts and the shared show types remain active.
+Current InstrumentPanel, StatNumber and HairlineList render the inventory; retired components are
+not imported into the showcase. Every earlier approved specimen remains available.
+
+Desktop/390px checks verify the four entries, named panels/headings and no overflow. They caught
+an ignored panel title prop; the showcase now uses the real label/heading API. Spec/quality reviews
+pass. Preview 39 / Admin 21 / Listen 42 browser checks, types/lints/builds/budgets and design gates
+pass. Unit verification and its focused stale-policy rerun are recorded precisely in the handover.
+The 43 reviewed Linux PNGs/manifest stay unchanged. Diego approved 1L on 2026-10-16 and authorised
+commit/push, Linux captures and continuation to Task 1.13. Preserve this specimen.

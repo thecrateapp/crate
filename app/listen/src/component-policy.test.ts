@@ -18,8 +18,6 @@ const LOCAL_COPY_ALLOWLIST: Record<string, string> = {
     "Listen wrapper over the shared ContextMenu with a translated sheet label.",
   "components/player/extended/InfoTabPrimitives.tsx:StarRating":
     "Read-only rating display; the shared StarRating is an interactive button group.",
-  "components/upcoming/ShowCard.tsx:ShowCard":
-    "Listen upcoming card with attendance and expansion, unrelated to the shared admin show card.",
 };
 
 function sourceFiles(directory: string, extensions: RegExp): string[] {

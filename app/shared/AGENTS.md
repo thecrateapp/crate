@@ -35,7 +35,7 @@ web/artist-hero-contract.ts  Artist hero composition contract types (versioned)
 
 ## Hard rules
 
-- A component goes in `@crate/ui` only when BOTH admin and listen use it. Single-app components stay in that app. `export-usage-policy.test.ts` fails if a `@crate/ui` module is not imported by `app/listen/src` or `app/ui/src`, unless it matches a base-system prefix (shadcn, tokens, icons, composites, `domain/stats/Ops*`) or is listed in `UNUSED_EXPORT_ALLOWLIST` with a reason.
+- A component goes in `@crate/ui` only when BOTH admin and listen use it. Single-app components stay in that app. `export-usage-policy.test.ts` fails if a `@crate/ui` module is not imported by `app/listen/src` or `app/ui/src`, unless it matches a base-system prefix (shadcn, tokens, icons, composites) or is listed in `UNUSED_EXPORT_ALLOWLIST` with a reason.
 - Domain components take data and callbacks via props (`onPlay`, `onClose`, `onToggle`, ...). Do not read app contexts (auth, player, router state, i18n) or call app API clients inside `@crate/ui`; apps inject behavior through thin wrappers (see `app/ui/src/components/auth/OAuthButtons.tsx`).
 - `shared/web` factories stay framework-injected: `createUseApi` receives React hooks and an `api` function; `createApiClient` receives callbacks. Do not hardcode app behavior (redirects, token storage, Sentry init) here.
 - Use tokens, not raw values. `design-token-policy.test.ts` budgets arbitrary `rounded-[..]`, `z-[..]`, `shadow-[..]`, `text-[..px]`, `tracking-[..]` per file, and icon sizes must come from `CRATE_ICON_SIZE`.
@@ -47,7 +47,7 @@ web/artist-hero-contract.ts  Artist hero composition contract types (versioned)
 ## How apps import
 
 - `@crate/ui` resolves through the npm workspace symlink (`node_modules/@crate/ui` -> `app/shared/ui`). The `exports` map points at SOURCE `.ts/.tsx` files, so apps compile the source directly; `dist/` (tsup + tsc) is only used by `publishConfig`. A shared edit is live in every consumer immediately.
-- Subpath imports only: `@crate/ui/shadcn/button`, `@crate/ui/primitives/AppModal`, `@crate/ui/composites/ConfirmDialog`, `@crate/ui/lib/cn`, `@crate/ui/domain/shows/ShowCard`, `@crate/ui/icons`. CSS: `@import "@crate/ui/tokens/index.css"`.
+- Subpath imports only: `@crate/ui/shadcn/button`, `@crate/ui/primitives/AppModal`, `@crate/ui/composites/ConfirmDialog`, `@crate/ui/lib/cn`, `@crate/ui/domain/genres/GenrePill`, `@crate/ui/icons`. CSS: `@import "@crate/ui/tokens/index.css"`.
 - Wildcard subpaths (`./domain/*`, `./primitives/*`, ...) map to `*.tsx` only. Folder barrels (`index.ts`) and `.ts` modules (`domain/actions`, `domain/media/MediaEntity`, `domain/shows/show-types`, ...) need an explicit entry in BOTH `exports` and `publishConfig.exports`; `lib/*` maps to `*.ts`.
 - `shared/web` is not a package: import by relative path (`../../../shared/web/api`). Admin and listen wrap it in `src/lib/api.ts`, `src/hooks/use-api.ts`, `src/lib/utils.ts`, `src/lib/library-routes.ts`; app code should import those wrappers.
 - Consumers scan shared classes via Tailwind `@source "../../shared/ui"` in their CSS entry. A new consumer must add it or shared component classes will be purged.
@@ -82,4 +82,4 @@ npm run --workspace=app/listen-desktop typecheck
 - Changing a token value in `tokens/` changes both surfaces in both apps. Check solid and glass.
 - `library-routes.ts` builds URLs the backend and readplane serve; changing a path shape is a cross-stack change.
 - `api.ts` in-flight GET dedupe and abort semantics are relied on by both `useApi` instances; keep behavior stable.
-- Admin still keeps local duplicates of composites/primitives (`app/ui/src/components/ui/`) and of `ShowCard`; consolidate instead of adding a third copy.
+- Admin still keeps local duplicates of composites/primitives (`app/ui/src/components/ui/`); consolidate instead of adding a third copy. Show cards and Ops surfaces remain app-local; the unused shared copies were removed in Task 1.12. Shared `domain/shows/show-types.ts` remains consumed by Admin.

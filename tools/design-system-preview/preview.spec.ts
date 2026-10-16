@@ -1371,3 +1371,78 @@ test.describe("toast touch layout", () => {
     await expectToasterCheckpoint(page, info);
   });
 });
+
+async function expectSharedCleanupCheckpoint(page: Page, info: TestInfo) {
+  await page.goto("/#limpieza");
+  await page.evaluate(() => document.fonts.ready);
+  const checkpoint = page.locator("section#limpieza");
+  await expect(checkpoint).toHaveAccessibleName(
+    "Checkpoint 1L, Limpieza de componentes",
+  );
+  await expect(
+    checkpoint.getByRole("heading", {
+      level: 2,
+      name: "Una base compartida más limpia.",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    checkpoint.getByText("La limpieza no cambia las pantallas actuales.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+
+  for (const name of ["Código sin uso", "Retirados del paquete compartido"]) {
+    const panel = checkpoint.getByRole("region", { name, exact: true });
+    await expect(panel).toBeVisible();
+    await expect(
+      panel.getByRole("heading", { level: 3, name, exact: true }),
+    ).toBeVisible();
+  }
+
+  const retired = checkpoint.getByRole("list", {
+    name: "Componentes retirados",
+    exact: true,
+  });
+  await expect(retired.getByRole("listitem")).toHaveCount(4);
+  for (const name of ["OpsPageHero", "OpsPanel", "OpsStatTile", "ShowCard"]) {
+    const label = retired.getByText(name, { exact: true });
+    await expect(label).toHaveCount(1);
+    await label.scrollIntoViewIfNeeded();
+    await expect(label).toBeVisible();
+  }
+
+  expect(
+    await checkpoint.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
+  const screenshot = info.outputPath("checkpoint-1l.png");
+  await checkpoint.screenshot({ path: screenshot, animations: "disabled" });
+  await info.attach("Checkpoint 1L", {
+    path: screenshot,
+    contentType: "image/png",
+  });
+}
+
+test("presents the retired shared components without changing existing screens", async ({
+  page,
+}, info) => {
+  await expectSharedCleanupCheckpoint(page, info);
+});
+
+test.describe("shared cleanup touch layout", () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  test("keeps the cleanup evidence readable at 390px without overflow", async ({
+    page,
+  }, info) => {
+    await expectSharedCleanupCheckpoint(page, info);
+  });
+});

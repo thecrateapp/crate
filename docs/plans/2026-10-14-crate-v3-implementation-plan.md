@@ -341,8 +341,8 @@ comparison/full frontend CI (`38860652793`) and the local route walkthrough are 
 InstrumentPanel 1.7 is published at 1G (`473604f7`); Meter 1.8 at 1H (`6a5b3366`, Linux images
 `ef5e7f52`). Readout 1.9 is published (`a80f396b`, Linux images `dd71eb72`);
 ProgressHairline 1.10 is published (`0660fbd2`, Linux images `3f470ec6`);
-shared toaster configuration 1.11 is published (`7b46021d`, reviewed Linux run `38880022435`);
-cleanup 1.12 is the next authorised checkpoint. Smart Mix and Phase 0
+shared toaster configuration 1.11 is published (`7b46021d`, Linux images `181ca4d4`);
+cleanup 1.12 is the current local checkpoint. Smart Mix and Phase 0
 gates remain separate: runtime qualification 0.15 and device QA are pending; production measurement
 0.14 is needed before the wheel and requires assignment.
 
@@ -1434,7 +1434,7 @@ Listen 42 browser checks pass, alongside types/lints/builds/budgets/tooling gate
 reviews approve; full evidence is in the handover. Diego approved 1K on 2026-10-16 and authorised
 commit/push, Linux CI captures and continuation to cleanup Task 1.12. Keep its next review checkpoint.
 Published `7b46021d`; Linux run `38880022435` passes with 43 reviewed PNGs (40 unchanged and three
-new toast scenes). All PNGs/original manifest are imported; comparison CI is pending.
+new toast scenes), imported in `181ca4d4`. Comparison/full frontend CI passes in `38880774591`.
 
 **Remaining DS §5.10 consumer checklist:** contextual MonoLabel type words, task-id/Open task links
 and inline-first feedback are pending the screen migrations. Preserve caller semantics/i18n rather
@@ -1461,17 +1461,36 @@ than inserting generic global labels. Task 1.11 completes configuration only, no
 
 ### Task 1.12: Remove dead shared components
 
+**Local status / Checkpoint 1L:** dependency review found no production consumers for the four
+shared components. They and their two exclusive test files are removed, along with obsolete
+export, token, GenrePill and local-copy exceptions. The app-local Ops/ShowCard implementations
+and shared `show-types.ts`, its tests and explicit exports remain intact. Wildcard exports need
+no manifest change. The measured drift ceilings drop from 54 to 53 arbitrary utilities and 89
+to 88 inline styles. The persistent mockup at <http://127.0.0.1:5186/#limpieza> records the cleanup
+using current primitives and retains every previous specimen; it does not recreate the deleted UI.
+Spec/quality reviews pass after restoring the preview panels' visible/accessibly named headings.
+Verification passes, including the corrected stale local-copy policy, four typechecks, both lints,
+builds/budgets, design gates and preview 39 / Admin 21 / Listen 42 browser cases. Exact full-suite
+and focused-rerun results are in the handover. Diego approved 1L on 2026-10-16 and authorised
+commit/push, Linux captures and continuation to theme runtime retirement 1.13. Keep the next checkpoint.
+
 **Files:**
 
 - Delete: `app/shared/ui/domain/stats/{OpsPageHero,OpsPanel,OpsStatTile}.tsx`, `app/shared/ui/domain/shows/ShowCard.tsx` (verify no importer with `grep -rn` first)
+- Delete: `app/shared/ui/domain/stats/semantic-shadows.test.tsx` and `domain/shows/ShowCard.test.tsx`
+  (nine tests exclusively covering the retired components; retain `show-types.test.ts`).
 - Modify:
   - `app/shared/ui/export-usage-policy.test.ts:33` (allowlist)
   - `app/listen/src/genre-pill-policy.test.ts:15-17` (the `shared/domain/shows/ShowCard.tsx`
     allowlist entries)
+  - `app/listen/src/component-policy.test.ts` (the now-stale local ShowCard duplicate exception)
   - `app/shared/ui/design-token-policy.test.ts:28,33,34` (the `ShowCard.tsx` budgets and the
     `domain/stats/OpsPageHero.tsx` icon budget)
-  - `app/shared/AGENTS.md:49`
-  - `app/shared/ui/package.json` (exports, if any are explicit)
+  - `app/shared/AGENTS.md` and `app/ui/AGENTS.md` (remove active guidance pointing to deleted copies)
+  - `scripts/design-system/drift-budget.json` (lower the two measured ceilings; never raise them)
+  - `tools/design-system-preview/{main.tsx,preview.spec.ts,README.md}` (cleanup inventory and
+    accessible desktop/390px checkpoint). Existing layer-test fixture strings are not real imports.
+  - `app/shared/ui/package.json` only if exports are explicit (none of the four are; keep unchanged)
 
 **Steps:** delete the files, update the allowlists, then run `VT-UI`,
 `VT-LISTEN src/genre-pill-policy.test.ts`, `GATES` and `TYPES`.
