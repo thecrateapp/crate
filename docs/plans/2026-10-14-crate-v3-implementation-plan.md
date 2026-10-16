@@ -1360,7 +1360,8 @@ mode changes. Shared 4 / Listen 9 / Admin 7 focused tests and preview 33 / Admin
 pass; spec/quality reviews approve. All 3,937 frontend unit tests, types/lints/builds/gates and bundle
 budgets pass; full results are recorded in the handover.
 Diego approved 1I on 2026-10-16 and authorised commit/push, Linux CI captures and continuation to
-ProgressHairline 1.10. Publication and canonical capture QA are in progress.
+ProgressHairline 1.10. Published `a80f396b`; Linux run `38871597394` passes with 36 reviewed PNGs
+(33 identical, two EQ headers changed, one new GenreEqEditor scene). Comparison CI is the next gate.
 
 **Files:**
 

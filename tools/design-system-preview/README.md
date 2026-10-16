@@ -199,4 +199,5 @@ Listen adopts the EQ header and Admin the synchronization line; committed extern
 end a pending manual preview. All 3,937 frontend unit tests, types/lints/builds/gates and bundle
 budgets pass; spec/quality reviews approve. Full results are in the handover.
 Diego approved 1I on 2026-10-16 and authorised publication/Linux captures and ProgressHairline 1.10.
-Publication and canonical capture QA are in progress; preserve this specimen at the next checkpoint.
+Published `a80f396b`; 36 Linux images from run `38871597394` are reviewed/imported (33 unchanged,
+two EQ headers changed, one new editor scene). Comparison CI is pending; preserve this specimen.

@@ -307,3 +307,8 @@ stop before 1.10.
 On 2026-10-16 Diego approved Checkpoint 1I and explicitly authorised commit/push, canonical Linux
 CI captures and continuation to ProgressHairline (Task 1.10). This supersedes the local-only
 publication notes above. Keep the persistent mockup and stop at the next visual checkpoint.
+
+1I is published as `a80f396b`. Linux recording `38871597394` passes; artifact `12033384073`
+has verified SHA256 `c6e2230780326e0da172db9fc9e74627efb7dd18415f14ba0a5abca7b6414cd2`.
+Review covers two changed Listen EQ headers and one new GenreEqEditor scene; 33 images are
+byte-identical. Import all 36 PNGs and the original manifest. Comparison CI is the next gate.

@@ -17,7 +17,8 @@ plan; the status table separates local implementation from pending QA.
   comparison and full frontend CI pass in run `38860652793`. InstrumentPanel 1G is published as `473604f7`, with reviewed Linux captures from run
   `38864631250`; comparison/full frontend CI passes in run `38865107324`. Meter 1H is published as `6a5b3366`,
   with reviewed Linux images/provenance in `ef5e7f52`; comparison/full frontend CI passes in run
-  `38869556811`. Rebase/PR/release remain gated.
+  `38869556811`. Readout 1I is published as `a80f396b`; its 36 Linux images are reviewed and
+  imported from run `38871597394`. Comparison CI remains pending. Rebase/PR/release remain gated.
 
 ## Sources of truth, in reading order
 
@@ -150,7 +151,7 @@ is a token-based chart configuration, not a selectable product skin.
 | 1.0 / Checkpoint 1F                                          | Published `6e793ebd` + canonical images `82f14594`; 33 Linux PNGs reviewed (31 unchanged, two new), full comparison/frontend CI green in run 38860652793. Local route walkthrough completed with the pre-existing artist-alias defect and deep-state limits recorded below                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | 1.7 / Checkpoint 1G | Published `473604f7` + reviewed Linux images/provenance in `c44b31f3`; recording 38864631250 and full comparison/frontend CI 38865107324 pass. |
 | 1.8 / Checkpoint 1H | Published `6a5b3366` + reviewed Linux images/provenance `ef5e7f52`; recording `38869057068` and comparison/full frontend CI `38869556811` pass. |
-| 1.9 / Checkpoint 1I | Readout and real EQ adopters implemented locally; 3,937 unit tests and preview 33 / Admin 18 / Listen 40 browser checks pass. Visual review pending; no 1I publication. |
+| 1.9 / Checkpoint 1I | Approved/published `a80f396b`; 36 Linux images reviewed/imported from `38871597394`. Full local verification passes; comparison CI pending. |
 | 1.10–1.12, 1b | Not started; respect applicable gates and the next review checkpoint. |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -508,7 +509,7 @@ is unchanged. Over-limit readings retain the real value in text and add `over ·
 ## Checkpoint 1I — Readout (Task 1.9)
 
 Diego approved the visual checkpoint on 2026-10-16 and authorised its commit/push, canonical
-Linux captures and continuation to ProgressHairline (Task 1.10). Publication/capture in progress.
+Linux captures and continuation to ProgressHairline (Task 1.10). Published as `a80f396b`.
 The props-only primitive renders a mono 11.5px visible line, muted text, wide tracking, 1.4em
 minimum height and a default 12ch reserve. `minWidthCh` writes a CSS variable through the DOM
 ref; the minimum is capped at the container width and longer text can wrap. The visible span
@@ -539,6 +540,11 @@ Changing only the preview leaves that live node and text untouched. No motion lo
   both app lints, shared/Admin/Listen/preview builds, 49 tooling tests, 15 drift budgets and layer
   boundaries pass. Initial JS gzip: Admin 515,402 B / 532,480; Listen 204,757 B / 307,200. No ceiling
   increased. Spec and quality reviews are approved; local runs retain the bounded concurrency.
-- Remaining gates: canonical Linux capture/diff review and comparison CI. Diego authorised
+- Canonical Linux recording passes in <https://github.com/thecrateapp/crate/actions/runs/38871597394>,
+  source `a80f396b`, Playwright 1.63.0-noble / Linux x64. Artifact `12033384073` SHA256
+  `c6e2230780326e0da172db9fc9e74627efb7dd18415f14ba0a5abca7b6414cd2` matches the downloaded ZIP.
+  All 36 PNGs and the original manifest are imported: 33 byte-identical, two reviewed EQ header
+  changes (desktop/mobile), and a new focused GenreEqEditor capture. Controls/curve remain intact.
+- Remaining gate: comparison CI. Diego authorised
   ProgressHairline 1.10 as the next visual checkpoint. TrackReadout 3.9b, global Admin icon retirement, runtime theme retirement
   and the deferred 1D focus polish retain their planned tasks.
