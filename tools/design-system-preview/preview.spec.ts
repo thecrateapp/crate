@@ -992,3 +992,159 @@ test.describe("readout touch layout", () => {
     await expectReadoutCheckpoint(page, info);
   });
 });
+
+async function expectHairlineScale(fill: Locator, expected: number) {
+  await expect
+    .poll(() =>
+      fill.evaluate((element) => {
+        const transform = getComputedStyle(element).transform;
+        return transform === "none" ? 1 : new DOMMatrixReadOnly(transform).a;
+      }),
+    )
+    .toBeCloseTo(expected, 4);
+}
+
+async function expectProgressHairlineCheckpoint(page: Page, info: TestInfo) {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/#progreso");
+  await page.evaluate(() => document.fonts.ready);
+  const checkpoint = page.locator("#progreso");
+  await expect(checkpoint).toHaveAccessibleName(
+    "Checkpoint 1J, ProgressHairline",
+  );
+  const determinate = checkpoint.getByRole("progressbar", {
+    name: "Importación de biblioteca",
+    exact: true,
+  });
+  const preparing = checkpoint.getByRole("progressbar", {
+    name: "Preparación de audio",
+    exact: true,
+  });
+  const fill = determinate.locator(".crate-progress-hairline-fill");
+  const preparingFill = preparing.locator(".crate-progress-hairline-fill");
+  const expectPercentageAlignment = async (value: string) => {
+    const percentage = checkpoint
+      .locator(".crate-readout")
+      .filter({ hasText: new RegExp(`^${value} %$`) });
+    await expect(percentage).toHaveCount(1);
+    const textRight = await percentage.evaluate((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return range.getBoundingClientRect().right;
+    });
+    const trackRight = await determinate.evaluate(
+      (element) => element.getBoundingClientRect().right,
+    );
+    expect(Math.abs(textRight - trackRight)).toBeLessThanOrEqual(1);
+  };
+  await determinate.scrollIntoViewIfNeeded();
+  await expect(determinate).toHaveAttribute("aria-valuenow", "50");
+  await expect(determinate).toHaveAttribute("aria-valuetext", /12.*24/);
+  await expect(determinate).toHaveCSS("height", "2px");
+  await expectHairlineScale(fill, 0.5);
+  await expectPercentageAlignment("50");
+  const advance = checkpoint.getByRole("button", {
+    name: "Avanzar 25 %",
+    exact: true,
+  });
+  await advance.click();
+  await expect(determinate).toHaveAttribute("aria-valuenow", "75");
+  await expectHairlineScale(fill, 0.75);
+  await expectPercentageAlignment("75");
+  await advance.click();
+  await expect(determinate).toHaveAttribute("aria-valuenow", "100");
+  await expectHairlineScale(fill, 1);
+  await advance.click();
+  await expect(determinate).toHaveAttribute("aria-valuenow", "100");
+  await checkpoint
+    .getByRole("button", { name: "Reiniciar progreso", exact: true })
+    .click();
+  await expect(determinate).toHaveAttribute("aria-valuenow", "0");
+  await expectHairlineScale(fill, 0);
+
+  await preparing.scrollIntoViewIfNeeded();
+  await expect(preparing).toHaveCSS("height", "1px");
+  await expect(preparing).not.toHaveAttribute("aria-valuenow");
+  await expect(preparing).toHaveAttribute("data-animated", "true");
+  await expect(preparingFill).toHaveCSS("animation-duration", "2.4s");
+  await expect(preparingFill).toHaveCSS(
+    "animation-timing-function",
+    "cubic-bezier(0.65, 0, 0.35, 1)",
+  );
+  const geometry = await preparing.evaluate((element) => {
+    const inner = element.querySelector(".crate-progress-hairline-fill");
+    if (!inner) throw new Error("Progress fill missing");
+    return {
+      track: element.getBoundingClientRect().width,
+      fill: parseFloat(getComputedStyle(inner).width),
+    };
+  });
+  expect(geometry.fill / geometry.track).toBeCloseTo(0.36, 2);
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(preparing).not.toHaveAttribute("data-animated", "true");
+  await expect(preparingFill).toHaveCSS("animation-name", "none");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expect(preparing).toHaveAttribute("data-animated", "true");
+  await page.evaluate(() => {
+    document.documentElement.dataset.crateMotion = "reduced";
+  });
+  await expect(preparing).not.toHaveAttribute("data-animated", "true");
+  await expect(preparingFill).toHaveCSS("animation-name", "none");
+  await page.evaluate(() => {
+    delete document.documentElement.dataset.crateMotion;
+  });
+  await expect(preparing).toHaveAttribute("data-animated", "true");
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(preparing).not.toHaveAttribute("data-animated", "true");
+  await preparing.scrollIntoViewIfNeeded();
+  await expect(preparing).toHaveAttribute("data-animated", "true");
+
+  await checkpoint
+    .getByRole("button", { name: "Completar preparación", exact: true })
+    .click();
+  await expect(preparing).toHaveAttribute("aria-valuenow", "100");
+  await expect(preparing).not.toHaveAttribute("data-indeterminate", "true");
+  await expect(preparingFill).toHaveCSS("animation-name", "none");
+  await checkpoint
+    .getByRole("button", { name: "Volver a preparar", exact: true })
+    .click();
+  await expect(preparing).not.toHaveAttribute("aria-valuenow");
+
+  expect(
+    await checkpoint.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await advance.click();
+  await advance.click();
+  const screenshot = info.outputPath("checkpoint-1j.png");
+  await checkpoint.screenshot({ path: screenshot, animations: "disabled" });
+  await info.attach("Checkpoint 1J", {
+    path: screenshot,
+    contentType: "image/png",
+  });
+}
+
+test("keeps the progress hairline checkpoint truthful and motion gated", async ({
+  page,
+}, info) => {
+  await expectProgressHairlineCheckpoint(page, info);
+});
+
+test.describe("progress hairline touch layout", () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  test("keeps progress hairlines usable at 390px without overflow", async ({
+    page,
+  }, info) => {
+    await expectProgressHairlineCheckpoint(page, info);
+  });
+});

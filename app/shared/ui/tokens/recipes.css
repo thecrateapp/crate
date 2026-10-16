@@ -3001,6 +3001,65 @@ button.genre-pill:hover,
   min-width: 0;
 }
 
+.crate-progress-hairline {
+  display: block;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  height: 2px;
+  overflow: hidden;
+  background: var(--border-quiet);
+}
+
+.crate-progress-hairline[data-thickness="1"] {
+  height: 1px;
+}
+
+.crate-progress-hairline-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--accent-action-hi);
+  transform-origin: left;
+  transform: scaleX(var(--p, 0));
+}
+
+.crate-progress-hairline[data-indeterminate] .crate-progress-hairline-fill {
+  width: 36%;
+  transform: none;
+}
+
+.crate-progress-hairline[data-animated] .crate-progress-hairline-fill {
+  animation: crate-progress-building 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes crate-progress-building {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(280%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crate-progress-hairline[data-animated] .crate-progress-hairline-fill {
+    animation: none;
+  }
+}
+
+[data-crate-motion="reduced"] .crate-progress-hairline .crate-progress-hairline-fill {
+  animation: none;
+}
+
+@media (forced-colors: active) {
+  .crate-progress-hairline {
+    background: CanvasText;
+  }
+  .crate-progress-hairline-fill {
+    background: Highlight;
+  }
+}
+
 .crate-readout {
   display: inline-block;
   min-width: min(var(--readout-min-width, 12ch), 100%);

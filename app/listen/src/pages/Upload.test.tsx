@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 
 const toastErrorMock = vi.hoisted(() => vi.fn());
 
@@ -167,5 +167,242 @@ describe("Upload", () => {
 
     expect(container.innerHTML).toContain("bg-surface-canvas/50");
     expect(container.innerHTML).not.toContain("gradient-bg-50");
+  });
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((onResolve, onReject) => {
+    resolve = onResolve;
+    reject = onReject;
+  });
+  return { promise, resolve, reject };
+}
+
+function chooseFiles(container: HTMLElement, files: File[]) {
+  const input = container.querySelector('input[type="file"]');
+  if (!(input instanceof HTMLInputElement))
+    throw new Error("Upload input missing");
+  fireEvent.change(input, { target: { files } });
+  return input;
+}
+
+describe("uploadMusicFiles byte reporting", () => {
+  beforeEach(() => vi.mocked(api).mockReset());
+
+  it("reports confirmed bytes per unequal file, including short last chunks, without changing chunk counts", async () => {
+    vi.mocked(api)
+      .mockResolvedValueOnce({
+        upload_id: "bytes",
+        file_count: 2,
+        chunk_size: 4,
+      })
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({
+        task_id: "task",
+        upload_id: "bytes",
+        file_count: 2,
+        total_bytes: 10,
+      });
+    const onFileProgress = vi.fn();
+    const onProgress = vi.fn();
+
+    await uploadMusicFiles(
+      [new File(["abcdefg"], "large.flac"), new File(["abc"], "small.flac")],
+      { chunkedThresholdBytes: 4, onProgress, onFileProgress },
+    );
+
+    expect(onFileProgress.mock.calls.map(([progress]) => progress)).toEqual([
+      { fileIndex: 0, loadedBytes: 0, totalBytes: 7 },
+      { fileIndex: 1, loadedBytes: 0, totalBytes: 3 },
+      { fileIndex: 0, loadedBytes: 4, totalBytes: 7 },
+      { fileIndex: 0, loadedBytes: 7, totalBytes: 7 },
+      { fileIndex: 1, loadedBytes: 3, totalBytes: 3 },
+    ]);
+    expect(onProgress.mock.calls.map(([progress]) => progress)).toEqual([
+      { done: 1, total: 3 },
+      { done: 2, total: 3 },
+      { done: 3, total: 3 },
+    ]);
+    expect(
+      (vi.mocked(api).mock.calls[2]?.[2] as FormData).get("chunk"),
+    ).toHaveProperty("size", 3);
+    expect(
+      (vi.mocked(api).mock.calls[3]?.[2] as FormData).get("file_index"),
+    ).toBe("1");
+  });
+
+  it("does not advance bytes while a chunk is pending or when the next chunk fails", async () => {
+    const firstChunk = deferred<unknown>();
+    vi.mocked(api)
+      .mockResolvedValueOnce({
+        upload_id: "bytes",
+        file_count: 1,
+        chunk_size: 4,
+      })
+      .mockImplementationOnce(() => firstChunk.promise)
+      .mockRejectedValueOnce(new Error("Chunk rejected"));
+    const onFileProgress = vi.fn();
+    const onProgress = vi.fn();
+    const result = uploadMusicFiles([new File(["abcdefg"], "track.flac")], {
+      chunkedThresholdBytes: 4,
+      onProgress,
+      onFileProgress,
+    });
+    const rejected = expect(result).rejects.toThrow("Chunk rejected");
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(2));
+    expect(onFileProgress.mock.calls.map(([progress]) => progress)).toEqual([
+      { fileIndex: 0, loadedBytes: 0, totalBytes: 7 },
+    ]);
+    expect(onProgress).not.toHaveBeenCalled();
+    firstChunk.resolve({ ok: true });
+    await rejected;
+    expect(onFileProgress).toHaveBeenLastCalledWith({
+      fileIndex: 0,
+      loadedBytes: 4,
+      totalBytes: 7,
+    });
+    expect(onProgress).toHaveBeenCalledExactlyOnceWith({ done: 1, total: 2 });
+    expect(api).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not fabricate file bytes for a direct fetch upload", async () => {
+    const request = deferred<{
+      task_id: string;
+      upload_id: string;
+      file_count: number;
+      total_bytes: number;
+    }>();
+    vi.mocked(api).mockImplementationOnce(() => request.promise);
+    const onFileProgress = vi.fn();
+    const onProgress = vi.fn();
+    const result = uploadMusicFiles([new File(["abc"], "track.flac")], {
+      onProgress,
+      onFileProgress,
+    });
+    expect(onFileProgress).not.toHaveBeenCalled();
+    request.resolve({
+      task_id: "task",
+      upload_id: "direct",
+      file_count: 1,
+      total_bytes: 3,
+    });
+    await result;
+    expect(onFileProgress).not.toHaveBeenCalled();
+    expect(onProgress).not.toHaveBeenCalled();
+  });
+});
+
+describe("Upload file progress", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api).mockReset();
+  });
+
+  it("shows one named indeterminate bar per file during a direct request and clears it on success", async () => {
+    const request = deferred<{
+      task_id: string;
+      upload_id: string;
+      file_count: number;
+      total_bytes: number;
+    }>();
+    vi.mocked(api).mockImplementationOnce(() => request.promise);
+    const { container } = renderWithListenProviders(<Upload />, {
+      locale: "en",
+    });
+    const input = chooseFiles(container, [
+      new File(["abc"], "first.flac"),
+      new File(["abcde"], "second.flac"),
+    ]);
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Import to library" }));
+
+    expect(input).toBeDisabled();
+    expect(screen.getAllByRole("progressbar")).toHaveLength(2);
+    for (const name of ["first.flac", "second.flac"]) {
+      const bar = screen.getByRole("progressbar", { name });
+      expect(bar).not.toHaveAttribute("aria-valuenow");
+      expect(bar).toHaveAttribute("data-indeterminate", "true");
+    }
+    await act(async () =>
+      request.resolve({
+        task_id: "task",
+        upload_id: "direct",
+        file_count: 2,
+        total_bytes: 8,
+      }),
+    );
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(input).not.toBeDisabled();
+    expect(screen.queryByText("first.flac")).not.toBeInTheDocument();
+  });
+
+  it("uses confirmed file bytes for chunked uploads and discards failed progress before a retry", async () => {
+    const size = 80 * 1024 * 1024 + 3;
+    const file = new File(["abc"], "large.flac");
+    Object.defineProperty(file, "size", { value: size });
+    const firstChunk = deferred<unknown>();
+    const rejectedChunk = deferred<unknown>();
+    vi.mocked(api)
+      .mockResolvedValueOnce({
+        upload_id: "first",
+        file_count: 1,
+        chunk_size: size - 3,
+      })
+      .mockImplementationOnce(() => firstChunk.promise)
+      .mockImplementationOnce(() => rejectedChunk.promise);
+    const { container } = renderWithListenProviders(<Upload />, {
+      locale: "en",
+    });
+    const input = chooseFiles(container, [file]);
+    fireEvent.click(screen.getByRole("button", { name: "Import to library" }));
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(2));
+    const bar = screen.getByRole("progressbar", { name: "large.flac" });
+    expect(bar).toHaveAttribute("aria-valuenow", "0");
+    expect(bar).toHaveAttribute(
+      "aria-valuetext",
+      expect.stringMatching(/0.*80/),
+    );
+    await act(async () => firstChunk.resolve({ ok: true }));
+    expect(Number(bar.getAttribute("aria-valuenow"))).toBeCloseTo(
+      ((size - 3) / size) * 100,
+      5,
+    );
+    expect(input).toBeDisabled();
+    await act(async () => rejectedChunk.reject(new Error("Chunk rejected")));
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(input).not.toBeDisabled();
+    expect(screen.getByText("large.flac")).toBeInTheDocument();
+
+    const retryInit = deferred<unknown>();
+    const retryChunk = deferred<unknown>();
+    vi.mocked(api)
+      .mockImplementationOnce(() => retryInit.promise)
+      .mockImplementationOnce(() => retryChunk.promise)
+      .mockResolvedValueOnce({
+        task_id: "task-retry",
+        upload_id: "retry",
+        file_count: 1,
+        total_bytes: size,
+      });
+    fireEvent.click(screen.getByRole("button", { name: "Import to library" }));
+    expect(
+      screen.getByRole("progressbar", { name: "large.flac" }),
+    ).not.toHaveAttribute("aria-valuenow");
+    await act(async () =>
+      retryInit.resolve({
+        upload_id: "retry",
+        file_count: 1,
+        chunk_size: size,
+      }),
+    );
+    expect(
+      screen.getByRole("progressbar", { name: "large.flac" }),
+    ).toHaveAttribute("aria-valuenow", "0");
+    await act(async () => retryChunk.resolve({ ok: true }));
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 });

@@ -311,4 +311,26 @@ publication notes above. Keep the persistent mockup and stop at the next visual 
 1I is published as `a80f396b`. Linux recording `38871597394` passes; artifact `12033384073`
 has verified SHA256 `c6e2230780326e0da172db9fc9e74627efb7dd18415f14ba0a5abca7b6414cd2`.
 Review covers two changed Listen EQ headers and one new GenreEqEditor scene; 33 images are
-byte-identical. Import all 36 PNGs and the original manifest. Comparison CI is the next gate.
+byte-identical. All 36 PNGs and the original manifest are published in `dd71eb72`;
+comparison/full frontend CI `38872274120` passes. This closes the 1I publication/capture checkpoint.
+
+Checkpoint 1J implements ProgressHairline (Task 1.10) locally. The 1/2px primitive uses a ref-written
+normalized fill and an ARIA 0–100 range; unknown values omit `aria-valuenow`. Indeterminate motion
+matches the pinned site (36% block, 2.4s easing), gated by intersection and OS/Crate/document motion
+availability, with a static fallback and no JavaScript animation loop. Tasks preserves its existing
+stream and server percentage. Upload preserves chunk callbacks/requests and reports confirmed
+bytes per file after successful chunks; direct fetch has no byte telemetry and stays indeterminate.
+ScanProgress is component-tested without inventing a production consumer. Removing Admin shadcn
+imports/barrel does not change the Listen/shared-only drift metric of 96. Keep the ceiling unchanged.
+Task terminal events remove the unknown bar while retaining context and last known numeric values.
+Diego requested the percentage align with the full track's right edge; inherited text alignment
+keeps Readout's reserve, with actual-text geometry tests at 50%/75% on desktop/mobile. Mockup
+`#progreso` passes 35 browser checks; Admin 20 and Listen 42 pass with four existing Listen skips.
+All 3,962 frontend unit tests, types/lints/builds, 49 tooling tests, 15 drift budgets and layer gates
+pass. Initial JS gzip is Admin 514,803 B / 532,480 and Listen 204,762 B / 307,200; no ceiling
+increased. Spec/quality reviews approve. Visual review and publication/Linux QA remain gates.
+Preserve the 36 Linux PNGs from 1I and stop before toaster Task 1.11.
+
+On 2026-10-16 Diego approved Checkpoint 1J and explicitly authorised commit/push, canonical Linux
+CI captures and continuation to the shared toaster configuration (Task 1.11). This supersedes the
+local-only publication notes above. Keep the persistent mockup and stop at the next visual checkpoint.

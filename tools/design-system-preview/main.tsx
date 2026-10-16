@@ -23,6 +23,7 @@ import { StatNumber } from "@crate/ui/primitives/StatNumber";
 import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { Meter } from "@crate/ui/primitives/Meter";
 import { Readout } from "@crate/ui/primitives/Readout";
+import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
 import {
   Section,
   ToggleRow,
@@ -100,6 +101,8 @@ function App() {
   const [editableGenres, setEditableGenres] = useState(artistGenreProfile);
   const [openedGenre, setOpenedGenre] = useState<string | null>(null);
   const [motion, setMotion] = useState(true);
+  const [importProgress, setImportProgress] = useState(0.5);
+  const [preparingAudio, setPreparingAudio] = useState(true);
   const [above, setAbove] = useState(false);
   const [selected, setSelected] = useState(0);
   const [genres, setGenres] = useState(["Jazz", "Ambient"]);
@@ -127,7 +130,7 @@ function App() {
           crate<span className="version">v3</span>
         </a>
         <MonoLabel
-          meta={["Checkpoint 1I", "Readout"]}
+          meta={["Checkpoint 1J", "ProgressHairline"]}
           className="masthead-meta"
         />
         <a className="jump" href="#primitivas">
@@ -971,7 +974,7 @@ function App() {
         <div className="specimen-heading">
           <div>
             <MonoLabel size="eyebrow" accent="10">
-              Checkpoint 1I · En revisión
+              Checkpoint 1I · Aprobado
             </MonoLabel>
             <h2>Una lectura estable, un anuncio al confirmar.</h2>
           </div>
@@ -979,7 +982,7 @@ function App() {
         <p className="admin-baseline-note">
           La vista previa conserva espacio para la lectura y mantiene el último
           anuncio confirmado. Datos ficticios para revisar el componente.
-          Capturas Linux de este checkpoint pendientes.
+          Capturas Linux de 1I revisadas.
         </p>
         <div className="instrument-preview-grid">
           <InstrumentPanel
@@ -1036,6 +1039,98 @@ function App() {
           </InstrumentPanel>
         </div>
       </section>
+      <section
+        id="progreso"
+        className="admin-baseline-feature"
+        aria-label="Checkpoint 1J, ProgressHairline"
+      >
+        <div className="specimen-heading">
+          <div>
+            <MonoLabel size="eyebrow" accent="11">
+              Checkpoint 1J · En revisión
+            </MonoLabel>
+            <h2>El progreso, en una línea.</h2>
+          </div>
+        </div>
+        <p className="admin-baseline-note">
+          Avance confirmado y preparación sin porcentaje conocido. La animación
+          se detiene fuera de pantalla y respeta movimiento reducido. Datos
+          ficticios para revisar la primitiva. Capturas Linux de 1J pendientes.
+        </p>
+        <div className="instrument-preview-grid">
+          <InstrumentPanel
+            as="section"
+            headingLevel={3}
+            label={{ children: "Importación de biblioteca" }}
+          >
+            <div className="progress-preview-reading">
+              <Readout>{Math.round(importProgress * 24)} / 24 álbumes</Readout>
+              <span className="text-right">
+                <Readout>{Math.round(importProgress * 100)} %</Readout>
+              </span>
+            </div>
+            <ProgressHairline
+              label="Importación de biblioteca"
+              value={importProgress}
+              valueText={`${Math.round(importProgress * 24)} / 24 álbumes`}
+            />
+            <div className="readout-preview-actions">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  setImportProgress((value) => Math.min(1, value + 0.25))
+                }
+              >
+                Avanzar 25 %
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setImportProgress(0)}
+              >
+                Reiniciar progreso
+              </Button>
+            </div>
+            <p className="admin-baseline-note mt-5">
+              Trazo de 2 px. El cero y el final conservan su valor real.
+            </p>
+          </InstrumentPanel>
+          <InstrumentPanel
+            as="section"
+            headingLevel={3}
+            label={{ children: "Preparación de audio" }}
+          >
+            <div className="progress-preview-reading">
+              <StatusDot
+                tone={preparingAudio ? "on" : "off"}
+                label={preparingAudio ? "Preparando" : "Completado"}
+              />
+            </div>
+            <ProgressHairline
+              label="Preparación de audio"
+              thickness={1}
+              value={preparingAudio ? undefined : 1}
+              valueText={
+                preparingAudio ? "Esperando confirmación" : "Completado"
+              }
+            />
+            <div className="readout-preview-actions">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPreparingAudio((value) => !value)}
+              >
+                {preparingAudio ? "Completar preparación" : "Volver a preparar"}
+              </Button>
+            </div>
+            <p className="admin-baseline-note mt-5">
+              Trazo de 1 px. Bloque del 36 %; queda estático cuando se reduce el
+              movimiento. El porcentaje aparece cuando conocemos el resultado.
+            </p>
+          </InstrumentPanel>
+        </div>
+      </section>
       <footer>
         <MonoLabel
           meta={[
@@ -1045,7 +1140,8 @@ function App() {
             "1F publicado",
             "1G publicado",
             "1H publicado",
-            "1I en revisión",
+            "1I publicado",
+            "1J en revisión",
           ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>

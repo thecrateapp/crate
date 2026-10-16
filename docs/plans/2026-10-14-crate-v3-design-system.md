@@ -1147,6 +1147,10 @@ interface ProgressHairlineProps {
 - Determinate: `role="progressbar"`, fill via `--p` ref write, `scaleX`.
 - Indeterminate: the site Roadmap "building" bar (a 36% block moving over 2.4 s), only while
   visible and motion allowed; a static 36% block otherwise.
+- The range exposed to assistive technology is 0–100; finite values are clamped to 0–1 for
+  the fill. Omitted/non-finite values stay indeterminate, without `aria-valuenow`.
+- Default thickness is 2px. IntersectionObserver and the shared motion gate control CSS motion;
+  no observer support means a static block. No JavaScript animation loop or polling is needed.
 - Replaces shadcn `progress`, ad-hoc bars and in-panel spinners.
 
 ### 2.4 Shared lib modules

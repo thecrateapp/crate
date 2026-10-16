@@ -339,7 +339,8 @@ Task 0.11 is complete: 31 reviewed Linux PNGs and green comparison/full frontend
 (run `38808354069`). Task 1.0 is published at Checkpoint 1F (`6e793ebd`, Linux images `82f14594`); capture review,
 comparison/full frontend CI (`38860652793`) and the local route walkthrough are complete.
 InstrumentPanel 1.7 is published at 1G (`473604f7`); Meter 1.8 at 1H (`6a5b3366`, Linux images
-`ef5e7f52`). Readout 1.9 is the current local checkpoint. Smart Mix and Phase 0
+`ef5e7f52`). Readout 1.9 is published (`a80f396b`, Linux images `dd71eb72`);
+ProgressHairline 1.10 is the current local checkpoint. Smart Mix and Phase 0
 gates remain separate: runtime qualification 0.15 and device QA are pending; production measurement
 0.14 is needed before the wheel and requires assignment.
 
@@ -1353,7 +1354,7 @@ Comparison/full frontend CI passes in run `38869556811`.
 
 ### Task 1.9: `Readout` with first adopters
 
-**Local status / Checkpoint 1I:** shared primitive and both real EQ adopters implemented; mockup
+**Published status / Checkpoint 1I:** shared primitive and both real EQ adopters implemented; mockup
 <http://127.0.0.1:5186/#readout> retains the earlier checkpoints. Visible previews leave the stable
 sr-only status untouched until commit. Interrupted manual previews yield to committed external
 mode changes. Shared 4 / Listen 9 / Admin 7 focused tests and preview 33 / Admin 18 / Listen 40 browser checks
@@ -1361,7 +1362,8 @@ pass; spec/quality reviews approve. All 3,937 frontend unit tests, types/lints/b
 budgets pass; full results are recorded in the handover.
 Diego approved 1I on 2026-10-16 and authorised commit/push, Linux CI captures and continuation to
 ProgressHairline 1.10. Published `a80f396b`; Linux run `38871597394` passes with 36 reviewed PNGs
-(33 identical, two EQ headers changed, one new GenreEqEditor scene). Comparison CI is the next gate.
+(33 identical, two EQ headers changed, one new GenreEqEditor scene), imported in `dd71eb72`.
+Comparison/full frontend CI passes in run `38872274120`.
 
 **Files:**
 
@@ -1381,6 +1383,18 @@ Commit: `feat(ui): add Readout for live text that never reflows`.
 
 ### Task 1.10: `ProgressHairline` with first adopters
 
+**Local status / Checkpoint 1J:** primitive and three planned callsites implemented, with the
+persistent mockup at <http://127.0.0.1:5186/#progreso>. Known values use a ref-written scale; unknown
+values keep the 36% block static unless onscreen and motion is allowed. Tasks retains its existing
+stream/server percentage and explanatory text. ScanProgress is migrated and unit-tested but has
+no active production consumer; do not invent a route for this task. Upload preserves chunk-count
+callbacks and adds confirmed byte progress per file after successful chunks. Direct fetch uploads
+remain indeterminate because that transport has no byte telemetry. Tests-first and focused checks
+pass, along with all 3,962 unit tests and preview 35 / Admin 20 / Listen 42 browser checks.
+Spec/quality reviews and all type/lint/build/bundle/tooling gates pass; results are in the handover.
+Diego approved 1J on 2026-10-16 and authorised commit/push, Linux CI captures and continuation to
+the shared toaster configuration (Task 1.11). Publication/capture QA is in progress.
+
 **Files:**
 
 - Create: `app/shared/ui/primitives/ProgressHairline.tsx`, test `ProgressHairline.test.tsx`
@@ -1389,7 +1403,12 @@ Commit: `feat(ui): add Readout for live text that never reflows`.
 - Modify (Admin): `app/ui/src/pages/Tasks.tsx` (task progress), `app/ui/src/components/scanner/ScanProgress.tsx`; drop the `shadcn/progress` re-export from `app/ui/src/components/ui/index.ts` if it is now unused
 - Modify (Listen): `app/listen/src/pages/Upload.tsx` (per-file byte progress)
 - Test: `app/ui/src/components/scanner/ScanProgress.test.tsx` (new if missing), `app/listen/src/pages/Upload.test.tsx`
+- Test: `app/ui/src/pages/Tasks.test.tsx` exercises real snapshot/SSE progress without a new stream;
+  `tests/admin-e2e/progress-hairline.spec.ts` and `tests/listen-visual/upload-progress.spec.ts`
+  add desktop/mobile layout and real-control checks, with four captures for the next Linux review.
 - Modify: `scripts/design-system/drift-budget.json`: lower `directShadcnImports` if it drops; never raise it
+  - Current inventory scans Listen/shared only: removing the two Admin imports and unused barrel
+    does not change its measured 96. Leave that ceiling and inventory scope unchanged in 1J.
 
 **Steps:**
 

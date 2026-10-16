@@ -10,6 +10,7 @@
 @source "../../app/shared/ui/primitives/InstrumentPanel.tsx";
 @source "../../app/shared/ui/primitives/Meter.tsx";
 @source "../../app/shared/ui/primitives/Readout.tsx";
+@source "../../app/shared/ui/primitives/ProgressHairline.tsx";
 @source "../../app/shared/ui/primitives/Switch.tsx";
 @source "../../app/listen/src/components/settings/SettingsPrimitives.tsx";
 @source "../../app/shared/ui/primitives/HairlineList.tsx";
@@ -23,6 +24,15 @@
   background: var(--surface-canvas);
   color: var(--text-primary);
   scroll-behavior: smooth;
+}
+.progress-preview-reading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+  min-height: 24px;
 }
 * {
   box-sizing: border-box;

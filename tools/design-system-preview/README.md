@@ -200,4 +200,28 @@ end a pending manual preview. All 3,937 frontend unit tests, types/lints/builds/
 budgets pass; spec/quality reviews approve. Full results are in the handover.
 Diego approved 1I on 2026-10-16 and authorised publication/Linux captures and ProgressHairline 1.10.
 Published `a80f396b`; 36 Linux images from run `38871597394` are reviewed/imported (33 unchanged,
-two EQ headers changed, one new editor scene). Comparison CI is pending; preserve this specimen.
+two EQ headers changed, one new editor scene), published in `dd71eb72`. Comparison/full frontend
+CI passes in run `38872274120`; preserve this specimen.
+
+## ProgressHairline / Checkpoint 1J
+
+Open <http://127.0.0.1:5186/#progreso>. Actual components show 1/2px traces, confirmed progress
+with advance/reset controls and an indeterminate preparation that can be completed/restarted.
+The 36% block follows the pinned site's 2.4s easing while onscreen and motion is allowed; it stays
+static with reduced motion or unavailable observation. All data is fictional and prior examples remain.
+
+The two new browser checks verify physical thickness/scale, width, overflow, completion/reset and
+OS/Crate/intersection motion gates at desktop and 390px. `checkpoint-1j.png` attachments are advisory.
+The percentage text aligns with the full track's right edge while keeping Readout's reserve;
+the tests measure the actual text boundary at 50% and 75%, including Diego's alignment correction.
+Real Tasks and Upload browser checks add four captures for the next approved Linux run. Scanner
+progress is unit-tested; its existing component has no production route to capture in this tree.
+Uploads show confirmed file bytes only for successful chunks; direct fetch requests remain
+indeterminate rather than estimating a percentage. Existing upload requests and task streams remain.
+
+All 3,962 unit tests, 35 cumulative preview checks, Admin 20 and Listen 42 browser checks pass
+(four existing Listen skips). All type/lint/build/bundle/tooling gates and spec/quality reviews pass;
+full results are in the handover. Capture the pending file queue rather than the tall Upload page
+to keep fixed mobile chrome outside the focused progress image.
+Diego approved 1J on 2026-10-16 and authorised publication/Linux captures and shared toasts 1.11.
+Publication and canonical capture QA are in progress; preserve this specimen.

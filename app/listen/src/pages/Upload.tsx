@@ -11,6 +11,7 @@ import {
 } from "@crate/ui/icons";
 import { notify } from "@crate/ui/lib/notify";
 import { Button } from "@crate/ui/shadcn/button";
+import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
 
 import { ApiError, api } from "@/lib/api";
 import { formatBytes } from "@/lib/utils";
@@ -37,6 +38,13 @@ interface UploadProgress {
 interface UploadMusicFilesOptions {
   chunkedThresholdBytes?: number;
   onProgress?: (progress: UploadProgress) => void;
+  onFileProgress?: (progress: FileUploadProgress) => void;
+}
+
+interface FileUploadProgress {
+  fileIndex: number;
+  loadedBytes: number;
+  totalBytes: number;
 }
 
 const CHUNKED_UPLOAD_THRESHOLD_BYTES = 80 * 1024 * 1024;
@@ -56,6 +64,7 @@ function directUpload(files: File[]): Promise<UploadResponse> {
 async function chunkedUpload(
   files: File[],
   onProgress?: (progress: UploadProgress) => void,
+  onFileProgress?: (progress: FileUploadProgress) => void,
 ): Promise<UploadResponse> {
   const init = await api<ChunkedUploadInitResponse>(
     "/api/acquisition/upload/chunked",
@@ -74,6 +83,10 @@ async function chunkedUpload(
     0,
   );
   let done = 0;
+
+  files.forEach((file, fileIndex) => {
+    onFileProgress?.({ fileIndex, loadedBytes: 0, totalBytes: file.size });
+  });
 
   for (const [fileIndex, file] of files.entries()) {
     const chunkCount = Math.max(1, Math.ceil(file.size / init.chunk_size));
@@ -97,6 +110,7 @@ async function chunkedUpload(
         formData,
       );
       done += 1;
+      onFileProgress?.({ fileIndex, loadedBytes: end, totalBytes: file.size });
       onProgress?.({ done, total: totalChunks });
     }
   }
@@ -114,7 +128,7 @@ export function uploadMusicFiles(
   const threshold =
     options.chunkedThresholdBytes ?? CHUNKED_UPLOAD_THRESHOLD_BYTES;
   if (totalFileBytes(files) > threshold) {
-    return chunkedUpload(files, options.onProgress);
+    return chunkedUpload(files, options.onProgress, options.onFileProgress);
   }
   return directUpload(files);
 }
@@ -137,6 +151,9 @@ export function Upload() {
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(
     null,
   );
+  const [fileProgress, setFileProgress] = useState<
+    Record<number, FileUploadProgress>
+  >({});
 
   const totalBytes = useMemo(
     () => files.reduce((sum, file) => sum + file.size, 0),
@@ -152,9 +169,15 @@ export function Upload() {
 
     setSubmitting(true);
     setUploadProgress(null);
+    setFileProgress({});
     try {
       const response = await uploadMusicFiles(files, {
         onProgress: setUploadProgress,
+        onFileProgress: (progress) =>
+          setFileProgress((current) => ({
+            ...current,
+            [progress.fileIndex]: progress,
+          })),
       });
       setLastUpload(response);
       notify.success(t("upload.toasts.queued"));
@@ -164,6 +187,7 @@ export function Upload() {
     } finally {
       setSubmitting(false);
       setUploadProgress(null);
+      setFileProgress({});
     }
   }
 
@@ -199,6 +223,7 @@ export function Upload() {
                 multiple
                 accept=".flac,.mp3,.m4a,.ogg,.opus,.wav,.aac,.alac,.zip,audio/*,.zip"
                 className="hidden"
+                disabled={submitting}
                 onChange={handleFileChange}
               />
             </label>
@@ -219,6 +244,7 @@ export function Upload() {
                   </div>
                   <button
                     type="button"
+                    disabled={submitting}
                     onClick={() => setFiles([])}
                     className="link-meta text-xs"
                   >
@@ -226,28 +252,47 @@ export function Upload() {
                   </button>
                 </div>
                 <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
-                  {files.map((file) => (
+                  {files.map((file, index) => (
                     <div
                       key={`${file.name}-${file.size}-${file.lastModified}`}
-                      className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-text-primary/75"
+                      className="space-y-2 rounded-xl px-3 py-2 text-sm text-text-primary/75"
                     >
-                      {file.name.toLowerCase().endsWith(".zip") ? (
-                        <Archive
-                          size={CRATE_ICON_SIZE.xs}
-                          className="shrink-0 text-accent-action"
+                      <div className="flex items-center gap-3">
+                        {file.name.toLowerCase().endsWith(".zip") ? (
+                          <Archive
+                            size={CRATE_ICON_SIZE.xs}
+                            className="shrink-0 text-accent-action"
+                          />
+                        ) : (
+                          <Music
+                            size={CRATE_ICON_SIZE.xs}
+                            className="shrink-0 text-accent-action"
+                          />
+                        )}
+                        <span className="min-w-0 flex-1 truncate">
+                          {file.name}
+                        </span>
+                        <span className="text-xs text-text-primary/40">
+                          {fileProgress[index]
+                            ? `${formatBytes(fileProgress[index].loadedBytes)} / ${formatBytes(file.size)}`
+                            : formatBytes(file.size)}
+                        </span>
+                      </div>
+                      {submitting ? (
+                        <ProgressHairline
+                          label={file.name}
+                          value={
+                            fileProgress[index] && file.size > 0
+                              ? fileProgress[index].loadedBytes / file.size
+                              : undefined
+                          }
+                          valueText={
+                            fileProgress[index]
+                              ? `${formatBytes(fileProgress[index].loadedBytes)} / ${formatBytes(file.size)}`
+                              : undefined
+                          }
                         />
-                      ) : (
-                        <Music
-                          size={CRATE_ICON_SIZE.xs}
-                          className="shrink-0 text-accent-action"
-                        />
-                      )}
-                      <span className="min-w-0 flex-1 truncate">
-                        {file.name}
-                      </span>
-                      <span className="text-xs text-text-primary/40">
-                        {formatBytes(file.size)}
-                      </span>
+                      ) : null}
                     </div>
                   ))}
                 </div>

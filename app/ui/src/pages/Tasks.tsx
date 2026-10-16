@@ -36,7 +36,7 @@ import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { Button } from "@crate/ui/shadcn/button";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Input } from "@crate/ui/shadcn/input";
-import { Progress } from "@crate/ui/shadcn/progress";
+import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
 import { useTaskEvents } from "@/hooks/use-task-events";
 import { api } from "@/lib/api";
 import {
@@ -467,7 +467,13 @@ function formatBytes(bytes: number | null | undefined) {
   }`;
 }
 
-function ProgressSummary({ progress }: { progress: TaskProgress | string }) {
+function ProgressSummary({
+  progress,
+  active,
+}: {
+  progress: TaskProgress | string;
+  active: boolean;
+}) {
   if (typeof progress === "string") {
     return progress ? (
       <div className="text-xs text-white/40">{progress}</div>
@@ -486,7 +492,11 @@ function ProgressSummary({ progress }: { progress: TaskProgress | string }) {
   if (total > 0) {
     return (
       <div className="space-y-2">
-        <Progress value={percent} className="h-1.5" />
+        <ProgressHairline
+          label="Task progress"
+          value={percent / 100}
+          valueText={`${done}/${total} (${percent}%)`}
+        />
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/40">
           <div className="flex flex-wrap items-center gap-2">
             {progress.phase ? (
@@ -517,17 +527,17 @@ function ProgressSummary({ progress }: { progress: TaskProgress | string }) {
     );
   }
 
-  if (progress.step)
-    return (
-      <div className="text-xs text-white/40">
-        Step: {String(progress.step).replace(/_/g, " ")}
-      </div>
-    );
-  if (progress.message)
-    return (
-      <div className="text-xs text-white/40">{String(progress.message)}</div>
-    );
-  return null;
+  const description = progress.step
+    ? `Step: ${String(progress.step).replace(/_/g, " ")}`
+    : String(progress.message ?? progress.phase ?? "");
+  return description ? (
+    <div className="space-y-2">
+      {active ? (
+        <ProgressHairline label="Task progress" valueText={description} />
+      ) : null}
+      <div className="text-xs text-white/40">{description}</div>
+    </div>
+  ) : null;
 }
 
 const EVENT_BADGE_COLORS: Record<string, string> = {
@@ -1238,7 +1248,10 @@ function ActiveTaskCard({
           </div>
         </div>
 
-        <ProgressSummary progress={task.progress} />
+        <ProgressSummary
+          progress={task.progress}
+          active={!["completed", "failed", "cancelled"].includes(liveStatus)}
+        />
         {latestMessage ? (
           <div
             className={cn("text-xs", done ? status.iconClass : "text-white/45")}

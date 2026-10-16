@@ -9,7 +9,6 @@ export * from "@crate/ui/shadcn/dialog";
 export * from "@crate/ui/shadcn/dropdown-menu";
 export * from "@crate/ui/shadcn/input";
 export * from "@crate/ui/shadcn/popover";
-export * from "@crate/ui/shadcn/progress";
 export * from "@crate/ui/shadcn/scroll-area";
 export * from "@crate/ui/shadcn/select";
 export * from "@crate/ui/shadcn/separator";

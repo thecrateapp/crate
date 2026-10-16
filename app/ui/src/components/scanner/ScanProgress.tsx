@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Check, Circle, Loader2 } from "lucide-react";
-import { Progress } from "@crate/ui/shadcn/progress";
+import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { cn } from "@/lib/utils";
 
@@ -56,7 +56,7 @@ export function ScanProgress({ progress }: ScanProgressProps) {
   const percent =
     progress.artists_total > 0
       ? Math.round((progress.artists_done / progress.artists_total) * 100)
-      : 0;
+      : undefined;
 
   const [startedAt] = useState(Date.now);
   const [now, setNow] = useState(Date.now);
@@ -79,10 +79,14 @@ export function ScanProgress({ progress }: ScanProgressProps) {
     <div className="space-y-4">
       {/* Progress bar */}
       <div>
-        <Progress value={percent} className="h-2.5" />
+        <ProgressHairline
+          label="Library scan"
+          value={percent === undefined ? undefined : percent / 100}
+          valueText={`${progress.artists_done}/${progress.artists_total}`}
+        />
         <p className="text-sm text-muted-foreground mt-1.5">
-          Scanning artist {progress.artists_done}/{progress.artists_total} (
-          {percent}%)
+          Scanning artist {progress.artists_done}/{progress.artists_total}
+          {percent === undefined ? "" : ` (${percent}%)`}
         </p>
       </div>
 
@@ -126,7 +130,7 @@ export function ScanProgress({ progress }: ScanProgressProps) {
             className={cn(
               "text-xs",
               count > 0
-                ? ISSUE_COLORS[type] ?? "text-orange-400 border-orange-400/40"
+                ? (ISSUE_COLORS[type] ?? "text-orange-400 border-orange-400/40")
                 : "text-muted-foreground border-border",
             )}
           >
@@ -137,7 +141,7 @@ export function ScanProgress({ progress }: ScanProgressProps) {
 
       {/* Time estimate */}
       <p className="text-xs text-muted-foreground">
-        {percent >= 90
+        {percent !== undefined && percent >= 90
           ? "Almost done..."
           : remainingMin > 0
             ? `~${remainingMin} min remaining`
