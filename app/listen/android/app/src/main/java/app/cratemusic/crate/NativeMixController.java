@@ -31,7 +31,9 @@ final class NativeMixController {
     private boolean enabled;
     private boolean repeatOne;
     private boolean handoffComplete;
+    static final long STANDBY_RETRY_MS = 10_000L;
     private boolean standbyPreparationFailed;
+    private long standbyFailureSeenAtMs = -1L;
     private long standbyPreparedCueMs;
     private long executionId;
     private float observedProgress = -1.0f;
@@ -77,6 +79,7 @@ final class NativeMixController {
             ? 0
             : Math.max(0, Math.min(requestedIndex, queue.size() - 1));
         standbyPreparationFailed = false;
+        standbyFailureSeenAtMs = -1L;
         standbyDeck.releasePreparedSource();
         if (queue.isEmpty()) {
             activeDeck.releasePreparedSource();
@@ -111,6 +114,7 @@ final class NativeMixController {
             queue.addAll(tracks);
         }
         standbyPreparationFailed = false;
+        standbyFailureSeenAtMs = -1L;
         standbyDeck.releasePreparedSource();
         if (queue.isEmpty()) {
             activeDeck.releasePreparedSource();
@@ -135,6 +139,7 @@ final class NativeMixController {
         }
         logicalIndex = currentIndex;
         standbyPreparationFailed = false;
+        standbyFailureSeenAtMs = -1L;
         standbyDeck.releasePreparedSource();
         prepareStandby();
     }
@@ -146,6 +151,7 @@ final class NativeMixController {
     void setEnabled(boolean requestedEnabled) {
         enabled = requestedEnabled;
         standbyPreparationFailed = false;
+        standbyFailureSeenAtMs = -1L;
         if (!enabled) {
             cancel("disabled");
             standbyDeck.releasePreparedSource();
@@ -165,6 +171,7 @@ final class NativeMixController {
     void setRepeatOne(boolean requestedRepeatOne) {
         repeatOne = requestedRepeatOne;
         standbyPreparationFailed = false;
+        standbyFailureSeenAtMs = -1L;
         if (repeatOne) {
             cancel("repeat_one");
             standbyDeck.releasePreparedSource();
@@ -251,6 +258,7 @@ final class NativeMixController {
             if (deck == standbyDeck) {
                 standbyDeck.releasePreparedSource();
                 standbyPreparationFailed = true;
+                standbyFailureSeenAtMs = -1L;
                 listener.onFailed("standby_deck_error");
             }
             return false;
@@ -262,6 +270,7 @@ final class NativeMixController {
         if (deck == mixIncomingDeck) {
             if (!handoffComplete) {
                 standbyPreparationFailed = true;
+                standbyFailureSeenAtMs = -1L;
             }
             cancel(handoffComplete ? "active_deck_error" : "incoming_deck_error");
         }
@@ -327,8 +336,18 @@ final class NativeMixController {
         return logicalIndex;
     }
 
-    void prepareStandbyAt(long incomingCueMs) {
-        if (activePlan != null || standbyPreparationFailed || !canMixNext()) {
+    void prepareStandbyAt(long incomingCueMs, long nowMs) {
+        if (standbyPreparationFailed) {
+            if (standbyFailureSeenAtMs < 0L) {
+                standbyFailureSeenAtMs = nowMs;
+            }
+            if (nowMs - standbyFailureSeenAtMs < STANDBY_RETRY_MS) {
+                return;
+            }
+            standbyPreparationFailed = false;
+            standbyFailureSeenAtMs = -1L;
+        }
+        if (activePlan != null || !canMixNext()) {
             return;
         }
         NativeTrack incoming = queue.get(logicalIndex + 1);
@@ -413,10 +432,12 @@ final class NativeMixController {
             standbyPreparedCueMs = cueMs;
             standbyDeck.setVolume(0.0f);
             standbyPreparationFailed = false;
+            standbyFailureSeenAtMs = -1L;
             return true;
         } catch (RuntimeException error) {
             standbyDeck.releasePreparedSource();
             standbyPreparationFailed = true;
+            standbyFailureSeenAtMs = -1L;
             listener.onFailed("standby_prepare_failed");
             return false;
         }

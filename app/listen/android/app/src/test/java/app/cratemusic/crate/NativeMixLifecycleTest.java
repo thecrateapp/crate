@@ -183,20 +183,54 @@ public class NativeMixLifecycleTest {
     }
 
     @Test
-    public void standbyDeckErrorStopsRetryingUntilTheQueueChanges() {
+    public void standbyDeckErrorRetriesAfterTheBackoff() {
         controller.onDeckError(deckB);
         int preparations = countCalls(deckB, "prepare:");
 
         assertFalse(controller.beginTransition(plan()));
-        controller.prepareStandbyAt(0L);
+        controller.prepareStandbyAt(0L, 1_000L);
+        controller.prepareStandbyAt(
+            0L,
+            1_000L + NativeMixController.STANDBY_RETRY_MS - 1L
+        );
 
         assertNull(deckB.preparedTrack);
         assertEquals(preparations, countCalls(deckB, "prepare:"));
         assertEquals(1, listener.failures);
 
+        controller.prepareStandbyAt(
+            0L,
+            1_000L + NativeMixController.STANDBY_RETRY_MS
+        );
+
+        assertEquals("two", deckB.preparedTrack.id);
+        assertEquals(preparations + 1, countCalls(deckB, "prepare:"));
+    }
+
+    @Test
+    public void standbyDeckErrorStillRecoversWhenTheQueueChanges() {
+        controller.onDeckError(deckB);
+
         controller.updateQueue(queue, "one");
 
         assertEquals("two", deckB.preparedTrack.id);
+    }
+
+    @Test
+    public void repeatedStandbyErrorsWaitAFullBackoffEachTime() {
+        controller.onDeckError(deckB);
+        controller.prepareStandbyAt(0L, 0L);
+        controller.prepareStandbyAt(0L, NativeMixController.STANDBY_RETRY_MS);
+        int preparations = countCalls(deckB, "prepare:");
+
+        controller.onDeckError(deckB);
+        controller.prepareStandbyAt(0L, NativeMixController.STANDBY_RETRY_MS + 1L);
+        controller.prepareStandbyAt(
+            0L,
+            2 * NativeMixController.STANDBY_RETRY_MS
+        );
+
+        assertEquals(preparations, countCalls(deckB, "prepare:"));
     }
 
     @Test

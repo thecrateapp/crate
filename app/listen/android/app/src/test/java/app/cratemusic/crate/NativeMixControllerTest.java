@@ -81,8 +81,8 @@ public class NativeMixControllerTest {
         controller.setQueue(queue, 0, true);
         controller.setEnabled(true);
 
-        controller.prepareStandbyAt(8_000L);
-        controller.prepareStandbyAt(8_000L);
+        controller.prepareStandbyAt(8_000L, 0L);
+        controller.prepareStandbyAt(8_000L, 0L);
 
         assertEquals("two", deckB.preparedTrack.id);
         assertEquals(8_000L, deckB.positionMs);
@@ -94,7 +94,7 @@ public class NativeMixControllerTest {
         deckB.autoReady = false;
         controller.setQueue(queue, 0, true);
         controller.setEnabled(true);
-        controller.prepareStandbyAt(8_000L);
+        controller.prepareStandbyAt(8_000L, 0L);
         NativeTransitionPlan plan = NativeTransitionPlan.safeFallback(
             "one",
             "two",
@@ -121,7 +121,7 @@ public class NativeMixControllerTest {
     public void standbyWithTooLittleBufferIsNotReady() {
         controller.setQueue(queue, 0, true);
         controller.setEnabled(true);
-        controller.prepareStandbyAt(8_000L);
+        controller.prepareStandbyAt(8_000L, 0L);
         deckB.bufferedAheadMs = 300L;
 
         assertFalse(controller.isStandbyReadyAt(8_000L, 1_000L));

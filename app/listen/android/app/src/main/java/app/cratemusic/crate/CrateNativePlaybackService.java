@@ -1696,7 +1696,10 @@ public class CrateNativePlaybackService extends MediaSessionService {
         @Nullable NativeTransitionPlan plan
     ) {
         if (plan != null) {
-            mixController.prepareStandbyAt(plan.incomingCueMs);
+            mixController.prepareStandbyAt(
+                plan.incomingCueMs,
+                SystemClock.elapsedRealtime()
+            );
         }
         return NativeMixTrigger.evaluate(
             player.isPlaying(),
