@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from "react";
 
 import { Switch } from "@crate/ui/primitives/Switch";
+import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 
 export function Section({
   title,
@@ -12,15 +13,12 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="settings-section rounded-panel p-5 sm:p-6">
-      <div className="mb-5">
-        <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
-        {description ? (
-          <p className="mt-1 text-sm text-text-muted">{description}</p>
-        ) : null}
-      </div>
+    <InstrumentPanel as="section" headingLevel={2} label={{ children: title }}>
+      {description ? (
+        <p className="mb-5 text-sm text-text-muted">{description}</p>
+      ) : null}
       <div className="space-y-5">{children}</div>
-    </section>
+    </InstrumentPanel>
   );
 }
 

@@ -7,6 +7,9 @@
 @source "../../app/shared/ui/primitives/MonoLabel.tsx";
 @source "../../app/shared/ui/primitives/StatusDot.tsx";
 @source "../../app/shared/ui/primitives/StatNumber.tsx";
+@source "../../app/shared/ui/primitives/InstrumentPanel.tsx";
+@source "../../app/shared/ui/primitives/Switch.tsx";
+@source "../../app/listen/src/components/settings/SettingsPrimitives.tsx";
 @source "../../app/shared/ui/primitives/HairlineList.tsx";
 @source "../../app/shared/ui/primitives/CrateBadge.tsx";
 @source "../../app/shared/ui/domain/genres/GenrePill.tsx";
@@ -769,6 +772,18 @@ footer p {
   border-top: 1px solid var(--border-quiet);
   scroll-margin-top: 30px;
 }
+.instrument-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 40px;
+  margin-top: 30px;
+}
+.instrument-preview-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
 .admin-audio-target a,
 .admin-audio-target img {
   display: block;
@@ -816,6 +831,9 @@ footer p {
   height: auto;
 }
 @media (max-width: 600px) {
+  .instrument-preview-grid {
+    grid-template-columns: 1fr;
+  }
   .admin-baseline-feature {
     padding-top: 38px;
   }

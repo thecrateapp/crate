@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -15,13 +15,20 @@ describe("settings primitives", () => {
       </Section>,
     );
 
+    const section = screen.getByRole("region", { name: "Playback" });
+    expect(section.tagName).toBe("SECTION");
+    expect(section).toHaveClass(
+      "border-t",
+      "border-border-quiet",
+      "@container",
+    );
     expect(
-      screen.getByRole("heading", { name: "Playback" }),
+      within(section).getByRole("heading", { level: 2, name: "Playback" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Tune your listening experience."),
+      within(section).getByText("Tune your listening experience."),
     ).toBeInTheDocument();
-    expect(screen.getByText("Controls")).toBeInTheDocument();
+    expect(within(section).getByText("Controls")).toBeInTheDocument();
   });
 
   it("reports numeric range changes", () => {

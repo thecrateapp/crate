@@ -336,8 +336,9 @@ QA separately. Documents are tracked, the internal clone exists and Bricolage is
 **Current order:** 1A–1C and provisional 1D are approved/pushed. Further focus-fade visual
 polishing is deferred. Diego approved publication of 1E, its Linux capture run and continuation.
 Task 0.11 is complete: 31 reviewed Linux PNGs and green comparison/full frontend CI on `cf477986`
-(run `38808354069`). Task 1.0 is implemented locally at Checkpoint 1F for review; its own Linux
-captures and remaining manual route QA still precede InstrumentPanel 1.7. Smart Mix and Phase 0
+(run `38808354069`). Task 1.0 is published at Checkpoint 1F (`6e793ebd`, Linux images `82f14594`); capture review,
+comparison/full frontend CI (`38860652793`) and the local route walkthrough are complete.
+InstrumentPanel 1.7 is implemented locally at Checkpoint 1G and stops for visual review. Smart Mix and Phase 0
 gates remain separate: runtime qualification 0.15 and device QA are pending; production measurement
 0.14 is needed before the wheel and requires assignment.
 
@@ -995,11 +996,21 @@ run `38808354069` pass; Task 0.11 is complete before the separate 1F Admin chang
 
 ### Checkpoint 1F — Admin card contrast
 
-Task 1.0 is implemented locally at two callsites. Review actual before/after local renders at
-<http://127.0.0.1:5186/#contraste-admin>; canonical 1E references remain unchanged. Admin 248 unit
-checks, 14 browser checks and preview 26 pass, with spec/quality review and unchanged bundle
-budget. Stop for Diego's review. Publication, two new Linux scene captures/diff review and remaining
-manual route QA precede Task 1.0 completion and InstrumentPanel 1.7. Details are in the handover.
+Task 1.0 is published as `6e793ebd`, with reviewed canonical images in `82f14594`.
+The 31 prior Linux PNGs are unchanged; two new scenes cover the legacy KPI grid and crop modal.
+Full comparison/frontend CI passes in run `38860652793`. The local route walkthrough is complete,
+with the pre-existing Artist alias defect and deeper-state limits recorded in the handover.
+Review the retained local before/after examples at <http://127.0.0.1:5186/#contraste-admin>.
+
+### Checkpoint 1G — InstrumentPanel
+
+Task 1.7 is implemented locally with Listen Settings Section and Admin System Resources as first
+adopters. Review <http://127.0.0.1:5186/#paneles>, including the corrected inherited Settings box
+and spacing. Shared 744, Admin 252, Listen 2,854 and Desktop 50 unit tests pass; four existing
+Listen skips remain. Preview 28, Admin browser 15 and Listen smoke 34 / four skips pass; spec and
+quality reviews pass. Details and budgets are in the handover. Diego approved the corrected visual
+checkpoint on 2026-10-16 and authorised publication, Linux capture/review and continuation to Meter
+1.8. Canonical capture/diff and comparison CI remain to be completed.
 
 Only primitives and helpers that both apps import directly in the same change.
 
@@ -1030,10 +1041,11 @@ Their Linux baselines and the route walkthrough belong to this task's own visual
 `tests/admin-e2e/card-contrast.spec.ts` and the persistent 1F before/after preview. Tests reproduced
 0px borders before the fix; Admin 248 unit / 14 browser and preview 26 pass afterwards. Types,
 lint, builds and the 532,480 B budget pass (515,384 B initial JS gzip). Spec/quality review passes.
-Diego approved commit/push and the Linux capture run on 2026-10-16. Pending: canonical Linux
-capture/review of these new states and the
-remaining manual route walkthrough. Logs and non-sidebar/detail/editor routes remain unqualified;
-24 sidebar destinations were visited, including some loading states. **Task 1.0 is not closed.**
+Diego approved publication and continuation on 2026-10-16. Source `6e793ebd` and reviewed Linux
+images `82f14594` are published. Capture run `38859757212` and full comparison CI `38860652793`
+pass. The local walkthrough surveyed all 34 route patterns, including Logs and real entity detail;
+the existing Artist-alias defect and untested deeper/permission states are recorded in the handover.
+**Task 1.0's contrast, capture/comparison and route-walk requirements are complete.**
 
 **Why:** `d9df9d51` changed `--crate-token-surface-card-solid` from `#16161e` to `#0d0e14`, about
 1.07:1 against the `#0a0a0f` canvas (`crate-v3-analysis/v3-state.md:322`). Admin uses `bg-card`,
@@ -1263,6 +1275,16 @@ for Diego to review the percentage-bearing component. Its commit/push was author
 
 ### Task 1.7: `InstrumentPanel` with first adopters in both apps
 
+**Local status / Checkpoint 1G:** implemented after 1F's Linux comparison and local route walk.
+Props-only shared primitive and both real adopters are in place. Remove the obsolete
+`.settings-section` fill/full-border recipe with its last caller; retain the real Settings controls,
+descriptions and accessible section names. Tests reproduce the inherited CSS and assert transparent
+sections with only a top rule at desktop/mobile widths. The primitive leaves block margins to its
+parent; a real Admin browser regression verifies the 24px gap before Metric Streams. Actual checks
+are in the handover.
+Diego approved the corrected checkpoint on 2026-10-16 and authorised commit/push, canonical Linux
+capture/review and continuation to 1.8. Capture/diff review and comparison CI remain pending.
+
 **Files:**
 
 - Create: `app/shared/ui/primitives/InstrumentPanel.tsx`, test `InstrumentPanel.test.tsx` (DS §2.3)
@@ -1274,6 +1296,7 @@ for Diego to review the percentage-bearing component. Its commit/push was author
 - Test:
   - `app/listen/src/pages/Settings.test.tsx`
   - `app/ui/src/pages/SystemHealth.test.tsx`: new page test, using `renderWithAdminProviders` from `app/ui/src/test/render-with-admin-providers.tsx`
+  - `tests/admin-e2e/instrument-panel.spec.ts`: real Resources keeps the page's 24px gap before Metric Streams
 
 **Steps:**
 

@@ -24,6 +24,7 @@ import {
 } from "@/components/admin/ops-surfaces";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { CrateChip } from "@crate/ui/primitives/CrateBadge";
+import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { useApi } from "@/hooks/use-api";
 import { taskLabel, useTaskCatalog } from "@/lib/task-catalog";
 
@@ -950,7 +951,9 @@ export function SystemHealth() {
         : "Health is degraded enough to warrant immediate triage on latency, queue pressure or database usage.";
 
   const runningTasks = tasks.length;
-  const queueDepth = queueTs.length ? queueTs[queueTs.length - 1]?.max ?? 0 : 0;
+  const queueDepth = queueTs.length
+    ? (queueTs[queueTs.length - 1]?.max ?? 0)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -1134,11 +1137,19 @@ export function SystemHealth() {
       />
 
       {system ? (
-        <OpsPanel
-          icon={HardDrive}
-          title="Resources"
-          description="Storage pressure, database pool use and analysis backlog surfaced as operational cards."
+        <InstrumentPanel
+          label={{ children: "Resources" }}
+          headingLevel={2}
+          summary={
+            system.disk?.music
+              ? `Music volume uses ${system.disk.music.used_gb} of ${system.disk.music.total_gb} GB.`
+              : undefined
+          }
         >
+          <p className="mb-5 text-sm text-muted-foreground">
+            Storage pressure, database pool use and analysis backlog surfaced as
+            operational cards.
+          </p>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {system.disk?.music ? (
               <ResourceCard
@@ -1353,7 +1364,7 @@ export function SystemHealth() {
               </ResourceCard>
             ) : null}
           </div>
-        </OpsPanel>
+        </InstrumentPanel>
       ) : null}
 
       <OpsPanel

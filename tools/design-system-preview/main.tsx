@@ -20,6 +20,11 @@ import {
   SelectItem,
 } from "@crate/ui/shadcn/select";
 import { StatNumber } from "@crate/ui/primitives/StatNumber";
+import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
+import {
+  Section,
+  ToggleRow,
+} from "../../app/listen/src/components/settings/SettingsPrimitives";
 import adminTrackReadoutReference from "./references/admin-track-readout.png";
 import "./style.css";
 
@@ -82,6 +87,8 @@ const artistGenreProfile: GenreProfileItem[] = [
 ];
 
 function App() {
+  const [panelLive, setPanelLive] = useState(true);
+  const [normalization, setNormalization] = useState(false);
   const [focusActions, setFocusActions] = useState(0);
   const [search, setSearch] = useState("");
   const [focusGenre, setFocusGenre] = useState("jazz");
@@ -115,7 +122,7 @@ function App() {
           crate<span className="version">v3</span>
         </a>
         <MonoLabel
-          meta={["Checkpoint 1F", "Contornos de Admin"]}
+          meta={["Checkpoint 1G", "InstrumentPanel"]}
           className="masthead-meta"
         />
         <a className="jump" href="#primitivas">
@@ -733,7 +740,7 @@ function App() {
           </div>
         </div>
         <p className="admin-baseline-note">
-          Comparación local. Capturas de Linux del cambio pendientes.
+          Comparación local. Capturas de Linux del cambio verificadas.
         </p>
         <p className="admin-baseline-note">
           Ajuste provisional de contraste. El diseño final de Audio Profile es
@@ -807,6 +814,77 @@ function App() {
           ))}
         </div>
       </section>
+      <section
+        id="paneles"
+        className="admin-baseline-feature"
+        aria-label="Checkpoint 1G, InstrumentPanel"
+      >
+        <div className="specimen-heading">
+          <div>
+            <MonoLabel size="eyebrow" accent="08">
+              Checkpoint 1G · En revisión
+            </MonoLabel>
+            <h2>Una estructura común para los paneles.</h2>
+          </div>
+        </div>
+        <p className="admin-baseline-note">
+          InstrumentPanel real y la sección de Settings que ya lo utiliza. Una
+          regla, etiquetas y estado; el contenido conserva su propia estructura.
+          Datos ficticios para revisar el componente. Capturas Linux pendientes.
+        </p>
+        <div className="instrument-preview-grid">
+          <InstrumentPanel
+            label={{ children: "Resources" }}
+            headingLevel={3}
+            meta="Actualizado hace 12 s"
+            status={
+              <StatusDot
+                tone={panelLive ? "on" : "off"}
+                label={panelLive ? "En vivo" : "En pausa"}
+              />
+            }
+            summary="280 GB de música y 12 pistas pendientes."
+          >
+            <div className="instrument-preview-values">
+              <StatNumber value="280" unit="GB" label="Música" size="md" />
+              <StatNumber value="12" label="Pendientes" size="md" />
+            </div>
+            <p className="admin-baseline-note mt-5">
+              El estado se anuncia por separado de las mediciones.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-5"
+              onClick={() => setPanelLive((live) => !live)}
+            >
+              {panelLive ? "Pausar panel" : "Reanudar panel"}
+            </Button>
+          </InstrumentPanel>
+          <Section
+            title="Reproducción de ejemplo"
+            description="Preferencias del reproductor."
+          >
+            <ToggleRow
+              label="Normalizar volumen"
+              description="Control real de Settings con estado local de ejemplo."
+              checked={normalization}
+              onChange={setNormalization}
+            />
+          </Section>
+          <InstrumentPanel
+            as="section"
+            label={{ children: "Panel sin regla" }}
+            headingLevel={3}
+            ruled={false}
+          >
+            <p className="admin-baseline-note">
+              Variante sin separador superior para una sección que ya tiene su
+              propia división.
+            </p>
+          </InstrumentPanel>
+        </div>
+      </section>
       <footer>
         <MonoLabel
           meta={[
@@ -814,6 +892,7 @@ function App() {
             "1D provisional",
             "1E publicado",
             "1F publicado",
+            "1G en revisión",
           ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>

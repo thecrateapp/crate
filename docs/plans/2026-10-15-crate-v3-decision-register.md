@@ -236,3 +236,30 @@ On 2026-10-16 Diego explicitly authorised commit/push of Checkpoint 1F, its Linu
 and continuation to InstrumentPanel with the persistent mockup and review checkpoints. This
 supersedes the local-only publication notes above, without advancing the deferred TrackReadout
 or globally deleting Admin icons. Task 1.0 visual/route QA still precedes production adoption in 1.7.
+
+Checkpoint 1F was published as `6e793ebd`, followed by reviewed Linux images in `82f14594`.
+Recording run `38859757212` produced 33 PNGs (31 unchanged, two new); full comparison/frontend
+CI `38860652793` passes. The local 34-pattern route walkthrough is recorded with deeper-state
+limits and the pre-existing Artist-alias shadowing issue, already assigned to 3.2.
+
+Checkpoint 1G implements InstrumentPanel with real Settings Section and Admin Resources adopters.
+Diego spotted text close to the Settings frame; spec review identified its inherited full-border
+and fill recipe. Remove that unused recipe with its last class consumer; keep the open top-rule
+panel contract and add spacing within the demo composition. Browser checks cover the actual
+Section's transparent fill/zero side and bottom borders on desktop/mobile. Code/spec reviews
+pass; this is a local review diff, without 1G publication or canonical capture approval yet.
+
+The real Admin view also exposed the new figure's `m-0` overriding parent `space-y-6`.
+InstrumentPanel resets inline margins only (`mx-0`), leaving block spacing to the page.
+A browser regression reproduced the collapsed gap and verifies 24px before Metric Streams.
+
+Diego also identified a 6px rule-to-heading mismatch in the Resources specimen. Its unstyled
+status wrapper inherited a taller line box, shifting the shared header baseline. Use MonoLabel
+with a flex wrapper for the isolated live status; retain the 22px top padding. Desktop/mobile
+browser assertions now compare actual heading offsets; the desktop case reproduced the defect
+before the fix, and both pass afterward with matching 22px offsets.
+
+On 2026-10-16 Diego approved Checkpoint 1G with the corrected spacing and explicitly authorised
+commit/push, Linux CI captures and continuation to Meter (Task 1.8). Keep extending the persistent
+mockup and stop at the next visual checkpoint for review. This supersedes the local-only approval
+notes above without authorising a merge, release or deployment.

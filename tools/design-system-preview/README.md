@@ -107,7 +107,8 @@ The 1E gallery remains the committed Linux reference; it passes comparison CI in
 
 Local comparison PNGs are optional, ignored review assets under
 `.artifacts/admin-contrast/{before,after}/`. A clean clone displays explicit missing-image
-placeholders until they are supplied. The before images were preserved before adding the borders.
+placeholders until they are supplied. The before images were preserved before adding the borders. Canonical 1F captures are now imported and comparison CI passes in
+run `38860652793`; these optional comparison assets remain advisory local renders.
 Regenerate advisory after images from the current real components with:
 
 ```bash
@@ -120,8 +121,9 @@ Do not overwrite the preserved before images with renders of the changed compone
 open deterministic analysis data and a synthetic crop image, then cancel without submitting an
 upload. They check actual rendered borders against the quiet token.
 
-The local preview and its 26 checks do not close 1F Linux image review or Task 1.0's remaining
-manual route qualification. Stop for review before publication and before InstrumentPanel 1.7.
+The 1F canonical Linux review and comparison CI are complete, along with the local route
+walkthrough recorded in the handover. The optional local comparison images remain advisory.
+The current InstrumentPanel 1G checkpoint below awaits its own visual review and publication.
 
 ### Audio Profile target clarified — 2026-10-16
 
@@ -136,3 +138,26 @@ Admin V3 removes almost all icons, including redundant icons beside text actions
 Task 1b.8 plans the reviewed migration and limited functional exceptions. Listen/desktop icons
 remain under their existing convention. The mockup retains the 1E Linux references and 1F local
 comparisons without presenting either as the final Audio Profile design.
+
+## InstrumentPanel / Checkpoint 1G
+
+Open <http://127.0.0.1:5186/#paneles>. The specimen imports actual InstrumentPanel, the real Listen
+Settings Section/ToggleRow, StatNumber and StatusDot. It shows a figure with readings, technical
+metadata and a live/pause status; a working Settings switch; and a named section without a rule.
+All specimen values are fictional and local. Resources/Settings are the first real app adopters.
+
+Panels are open, with a top rule and typography. The old Settings fill/full-border recipe was
+removed after spec review and Diego's spacing feedback. The preview checks computed transparency
+and absence of side/bottom borders on the actual Section, plus mobile wrapping, status changes,
+headings, the switch and overflow. Readings stay outside the polite status region. Compositions
+leave space between measurements, explanatory text and controls. The primitive preserves its
+parent's vertical spacing; a real Admin browser regression verifies the Resources/Metric Streams
+24px gap so removing the old box does not collapse neighbouring sections.
+The status slot shares the header's MonoLabel metrics in a flex wrapper, so it does not raise
+the title baseline. Desktop/mobile checks compare rule-to-heading offsets; both remain 22px.
+
+The cumulative browser suite has 28 checks. Two cases attach advisory `checkpoint-1g.png` images
+under the ignored `.artifacts/design-system-preview/` output (desktop and 390px); they are not
+canonical baselines. 1F is published with 33 reviewed Linux PNGs and green comparison CI in run
+`38860652793`. Its local before/after gallery remains explicitly local. 1G publication and Linux
+capture/diff review await the next visual checkpoint; preserve all earlier specimens.

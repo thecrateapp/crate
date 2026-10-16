@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -73,7 +73,9 @@ describe("Settings", () => {
     expect(screen.getByText("Enlaces rápidos")).toBeInTheDocument();
     expect(screen.getByText("OpenSubsonic")).toBeInTheDocument();
     expect(container.querySelector(".settings-header")).toBeInTheDocument();
-    expect(container.querySelector(".settings-section")).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Reproducción" }),
+    ).toBeInTheDocument();
   });
 
   it("does not show the appearance settings while the feature is disabled", () => {
@@ -82,6 +84,30 @@ describe("Settings", () => {
     expect(
       screen.queryByRole("heading", { name: "Appearance" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("keeps the real playback controls inside a named instrument section", () => {
+    renderWithListenProviders(<Settings />, { locale: "en" });
+
+    const playback = screen.getByRole("region", { name: "Playback" });
+    expect(playback.tagName).toBe("SECTION");
+    expect(playback).toHaveClass(
+      "border-t",
+      "border-border-quiet",
+      "@container",
+    );
+    expect(
+      within(playback).getByRole("heading", { level: 2, name: "Playback" }),
+    ).toBeInTheDocument();
+    expect(
+      within(playback).getByText(
+        "These preferences shape how the player behaves between tracks.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(playback).getByRole("radio", { name: /Auto \(recommended\)/i }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(within(playback).getByText("Crossfade")).toBeInTheDocument();
   });
 
   it("changes and stores the selected Listen language", async () => {

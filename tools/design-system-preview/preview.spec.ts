@@ -1,4 +1,10 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type Locator,
+  type Page,
+  type TestInfo,
+} from "@playwright/test";
 
 async function settleFocusRing(target: Locator) {
   await target.evaluate(async (element) => {
@@ -104,7 +110,7 @@ async function expectAdminContrastGallery(page: Page) {
   ).toBeVisible();
   await expect(
     gallery.getByText(
-      "Comparación local. Capturas de Linux del cambio pendientes.",
+      "Comparación local. Capturas de Linux del cambio verificadas.",
       { exact: true },
     ),
   ).toBeVisible();
@@ -508,5 +514,161 @@ test.describe("touch layout", () => {
         () => document.documentElement.scrollWidth > innerWidth,
       ),
     ).toBe(false);
+  });
+});
+
+async function expectInstrumentPanelCheckpoint(page: Page, info: TestInfo) {
+  await page.goto("/#paneles");
+  await page.evaluate(() => document.fonts.ready);
+  const checkpoint = page.locator("#paneles");
+  await expect(
+    checkpoint.getByRole("heading", {
+      level: 2,
+      name: "Una estructura común para los paneles.",
+      exact: true,
+    }),
+  ).toBeVisible();
+
+  const resources = checkpoint.getByRole("figure", {
+    name: "280 GB de música y 12 pistas pendientes.",
+    exact: true,
+  });
+  await expect(
+    resources.getByRole("heading", {
+      level: 3,
+      name: "Resources",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    resources.getByText("Actualizado hace 12 s", { exact: true }),
+  ).toBeVisible();
+  await expect(resources).toHaveCSS("border-top-width", "1px");
+  await expect(resources).toHaveCSS("border-top-style", "solid");
+  await expect(resources).toHaveCSS("container-type", "inline-size");
+  await expect(resources).toHaveCSS("border-top-left-radius", "0px");
+  await expect(resources).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+
+  const status = resources.locator('[aria-live="polite"]');
+  await expect(status).toHaveCount(1);
+  await expect(status).toHaveText("En vivo");
+  await expect(status.getByRole("button")).toHaveCount(0);
+  for (const metric of ["280", "12"]) {
+    await expect(resources.getByText(metric, { exact: true })).toBeVisible();
+    await expect(status.getByText(metric, { exact: true })).toHaveCount(0);
+  }
+  const pause = checkpoint.getByRole("button", {
+    name: "Pausar panel",
+    exact: true,
+  });
+  await expect(
+    status.getByRole("button", { name: "Pausar panel", exact: true }),
+  ).toHaveCount(0);
+  await pause.click();
+  await expect(status).toHaveText("En pausa");
+  const resume = checkpoint.getByRole("button", {
+    name: "Reanudar panel",
+    exact: true,
+  });
+  await expect(resume).toBeVisible();
+  for (const metric of ["280", "12"]) {
+    await expect(resources.getByText(metric, { exact: true })).toBeVisible();
+  }
+  await resume.click();
+  await expect(status).toHaveText("En vivo");
+
+  const playback = checkpoint.getByRole("region", {
+    name: "Reproducción de ejemplo",
+    exact: true,
+  });
+  await expect(
+    playback.getByRole("heading", {
+      level: 2,
+      name: "Reproducción de ejemplo",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    playback.getByText("Preferencias del reproductor.", { exact: true }),
+  ).toBeVisible();
+  const headingOffsets = await Promise.all(
+    [resources, playback].map((panel) =>
+      panel.evaluate((element) => {
+        const heading = element.querySelector("h2, h3");
+        if (!heading) throw new Error("Expected an instrument panel heading");
+        return (
+          heading.getBoundingClientRect().top -
+          element.getBoundingClientRect().top -
+          parseFloat(getComputedStyle(element).borderTopWidth)
+        );
+      }),
+    ),
+  );
+  expect(Math.abs(headingOffsets[0]! - headingOffsets[1]!)).toBeLessThanOrEqual(
+    0.5,
+  );
+  await expect(playback).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  for (const side of ["right", "bottom", "left"]) {
+    await expect(playback).toHaveCSS(`border-${side}-width`, "0px");
+  }
+  const normalization = playback.getByRole("switch", {
+    name: "Normalizar volumen",
+    exact: true,
+  });
+  const initialState = await normalization.getAttribute("aria-checked");
+  expect(["true", "false"]).toContain(initialState);
+  await normalization.click();
+  await expect(normalization).toHaveAttribute(
+    "aria-checked",
+    initialState === "true" ? "false" : "true",
+  );
+
+  const unruled = checkpoint.getByRole("region", {
+    name: "Panel sin regla",
+    exact: true,
+  });
+  await expect(
+    unruled.getByRole("heading", {
+      level: 3,
+      name: "Panel sin regla",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(unruled).toHaveCSS("border-top-width", "0px");
+  await expect(unruled).not.toHaveClass(/(?:^|\s)border-t(?:\s|$)/);
+  expect(
+    await checkpoint.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
+
+  const screenshot = info.outputPath("checkpoint-1g.png");
+  await checkpoint.screenshot({ path: screenshot, animations: "disabled" });
+  await info.attach("Checkpoint 1G", {
+    path: screenshot,
+    contentType: "image/png",
+  });
+}
+
+test("keeps the instrument panel checkpoint accessible and interactive", async ({
+  page,
+}, info) => {
+  await expectInstrumentPanelCheckpoint(page, info);
+});
+
+test.describe("instrument panel touch layout", () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+
+  test("keeps the instrument panels usable at 390px without horizontal overflow", async ({
+    page,
+  }, info) => {
+    await expectInstrumentPanelCheckpoint(page, info);
   });
 });

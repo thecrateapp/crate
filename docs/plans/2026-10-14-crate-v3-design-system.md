@@ -1075,6 +1075,8 @@ interface InstrumentPanelProps {
   (`container-type: inline-size`), header `flex flex-wrap items-baseline justify-between gap-x-6
 gap-y-2`, then children. Children are styled narrow-first (1.3.3) so the panel still works where
   container queries are missing.
+- The primitive resets inline figure margins only; the page or composition owns block spacing.
+  Do not use `m-0` to cancel a parent's `space-y-*` gap between panels.
 - The status slot only changes on state transitions (not per frame) so `aria-live` stays quiet.
 - Replaces Admin `OpsPanel`, `Card` panels, Listen `SettingsPrimitives.Section`, Stats cards.
 - Tests: summary label, ruled toggle, status region `aria-live`, heading level.
