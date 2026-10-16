@@ -125,7 +125,9 @@ def test_operation_catalog_describes_real_tools_and_only_supported_repairs(
             operations = {item["name"]: item for item in payload["data"]["operations"]}
             advertised = {tool.name for tool in (await client.list_tools()).tools}
             assert {
-                name for name, item in operations.items() if item["status"] == "enabled"
+                name
+                for name, item in operations.items()
+                if item["status"] in {"enabled", "unavailable"}
             } == advertised
             assert NEW_READS <= operations.keys()
             assert INSTANCE_ACTIONS <= operations.keys()
@@ -133,7 +135,7 @@ def test_operation_catalog_describes_real_tools_and_only_supported_repairs(
                 "disabled" if enabled == "false" else "denied"
             )
             assert operations["run_health_check"]["status"] == (
-                "enabled" if enabled == "true" else "disabled"
+                "unavailable" if enabled == "true" else "disabled"
             )
             checks = {item["check_type"]: item for item in payload["data"]["checks"]}
             assert checks.keys() == REPAIR_CATALOG_BY_CHECK.keys()

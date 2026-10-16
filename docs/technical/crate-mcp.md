@@ -21,6 +21,8 @@ sources:
     app/crate/db/repositories/agent_task_control.py,
     app/crate/db/repositories/runtime_policy.py,
     app/crate/mcp/server.py,
+    app/crate/mcp/contract.py,
+    app/crate/mcp/telemetry.py,
     app/crate/mcp/auth.py,
     app/crate/mcp/oauth.py,
     app/crate/mcp/oauth_config.py,
@@ -77,7 +79,8 @@ OAuth/service credentials, integration management and exact human approval share
 plan/job engine. Phase 4 extends it with selected checks, quality, repairs, metadata, enrichment,
 analysis, indexed-album sync and metadata portability. Phase 5 adds scoped instance operations,
 schedules and revisioned runtime policy. Phase 6 adds private editorial plans, exact system-playlist
-publication and a versioned client skill. Final rollout and assisted shows remain later phases.
+publication and a versioned client skill. Phase 7 provides the [distribution contract and
+acceptance/rollout evidence](crate-mcp-distribution.md). Assisted shows remain phase 8.
 Deployment and action flags remain disabled by default.
 
 ## Connection and deployment
@@ -94,7 +97,7 @@ producer. Existing migrations must be applied before issuing credentials. Keepin
 disabled leaves the endpoint unavailable and does not start its health snapshot producer.
 Actions additionally require `CRATE_MCP_ACTIONS_ENABLED=true` in the API and maintenance worker.
 Both flags default to false; granting an action scope alone does not enable actions.
-Apply migrations through 115 before using the current catalog. Migration 114 extends the existing
+Apply migrations through 116 before using the current catalog. Migration 114 extends the existing
 plan/job tables and adds private artifacts and DSP generation/claim provenance; it does not create
 a second agent execution engine.
 
@@ -274,7 +277,7 @@ Input schemas reject unknown arguments; filters are limited to the supported fie
 | `list_jobs`             | `ops.jobs.read`                                                                               | Optional `states`, allowlisted `types`, `limit`, `cursor`. Returns sanitized task history.                                                                                       |
 | `get_job`               | `ops.jobs.read`                                                                               | `job_id`. Returns the safe fields of one task without raw parameters or results.                                                                                                 |
 | `read_diagnostics`      | `ops.logs.read` for `worker_logs`; `ops.status.read` for `worker_status` or `analysis_status` | Required `source`; optional `limit`. `worker_logs` also accepts `task_id`, `since` and `until`.                                                                                  |
-| `get_operation_catalog` | Any granted scope                                                                             | No arguments. Lists implemented tools with enabled/denied/disabled status, limits and the execution readiness of all 17 repair checks. Discovery grants no additional authority. |
+| `get_operation_catalog` | Any granted scope                                                                             | No arguments. Returns contract version, schema fingerprints, enabled/denied/disabled/unavailable status, worker readiness evidence, limits and support for all 17 repair checks. Discovery grants no additional authority. |
 | `get_plan`              | The stored plan's operation grant                                                             | One `plan_id`. Reads a plan belonging to this principal and exact delegated authorization context, including accepted scopes. Current credentials and grants are rechecked.      |
 | `get_library_quality`   | `library.health.read`                                                                         | Optional enumerated `category`, `limit` (1–100) and version-bound `cursor`. Reads worker-produced quality evidence and snapshot age/invalidation metadata. No scan or refresh.   |
 

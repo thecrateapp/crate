@@ -102,9 +102,21 @@ _LIMITS = {
 def get_operation_catalog(principal: AgentPrincipal) -> dict:
     from crate.agent_operation_catalog import OPERATIONS
     from crate.mcp.tools import ACTION_CATALOG, CATALOG, _allowed
+    from crate.mcp.contract import (
+        CONTRACT_VERSION,
+        contract_metadata,
+        schema_fingerprint,
+        worker_readiness,
+    )
 
     operations = []
-    for name, (_, grant, _) in (CATALOG | ACTION_CATALOG).items():
+    readiness = (
+        worker_readiness()
+        if actions_enabled()
+        and any(_allowed(principal, name) for name in ACTION_CATALOG)
+        else None
+    )
+    for name, (model, grant, _) in (CATALOG | ACTION_CATALOG).items():
         action = name in ACTION_CATALOG
         limits = {
             **(
@@ -131,10 +143,26 @@ def get_operation_catalog(principal: AgentPrincipal) -> dict:
             if allowed
             else "denied"
         )
+        if status == "enabled" and action and readiness and readiness["missing"]:
+            status = "unavailable"
         operations.append(
             {
                 "name": name,
                 "status": status,
+                "contract_version": CONTRACT_VERSION,
+                "input_schema_sha256": schema_fingerprint(model),
+                "readiness": readiness
+                if action and allowed and actions_enabled()
+                else {
+                    "status": status,
+                    "missing": []
+                    if status == "enabled"
+                    else [
+                        "actions_disabled"
+                        if status == "disabled"
+                        else "required_grants"
+                    ],
+                },
                 "required_grants": grants,
                 **(
                     {
@@ -238,6 +266,7 @@ def get_operation_catalog(principal: AgentPrincipal) -> dict:
         "availability": "available",
         "source": "agent_operation_catalog",
         "data": {
+            "contract": contract_metadata(),
             "operations": operations,
             "checks": checks,
             "metadata_presets": presets,

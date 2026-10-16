@@ -9,6 +9,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from crate.agent_access import actions_enabled
 from crate.mcp.auth import AgentAuth
 from crate.mcp.tools import call_tool, list_tools
+from crate.mcp.contract import CONTRACT_VERSION
 
 
 def transport_security_settings():
@@ -36,7 +37,7 @@ def transport_security_settings():
 def create_mcp_server():
     server = Server(
         "Crate",
-        version="1",
+        version=CONTRACT_VERSION,
         on_list_tools=list_tools,
         on_call_tool=call_tool,
         instructions=(

@@ -1,7 +1,7 @@
 # Crate MCP — Feature Implementation Plan
 
 > **For agents:** REQUIRED SUB-SKILL: Use viterbit:executing-plans to implement this plan task-by-task.
-> **Estado: plan aprobado por Diego el 2026-10-16. Fases 0–5 publicadas en PR #292 (último corte 1a81543e); fase 6 implementada y validada localmente en la misma rama. Fases 7–8 pendientes. Rama feat/crate_mcp. Despliegue y activación pendientes.**
+> **Estado: plan aprobado por Diego el 2026-10-16. Fases 0–6 publicadas en PR #292 (corte e5f12533, CI completo verde); fase 7 implementada y en validación/revisión en la misma rama. Fase 8 pendiente. Rama feat/crate_mcp. Despliegue y activación pendientes.**
 
 **Goal:** Entregar el MCP remoto completo de Crate para diagnóstico, mantenimiento de biblioteca, operaciones y creación de playlists editoriales, con permisos, planes revisables, auditoría, gestión en Admin y una skill editorial distribuible. Incluye el alta manual/asistida de shows añadida como fase 8. El piloto es el primer incremento de la feature.
 
@@ -389,6 +389,8 @@ Crear propuestos: /Users/diego/.codex/worktrees/crate-mcp/musicdock/app/crate/ag
 **Gate fase 6:** crear y editar una editorial desde un agente remoto, con selección publicada igual al plan, sin pérdida de overrides, sin creación pública durante preparación, sin duplicados por replay y con revisión concurrente detectada. La skill resuelve los seis encargos evaluados dentro de sus permisos.
 
 **Fase 7 — cierre de la feature y distribución**
+
+**Corte Linux 2026-10-16:** contrato 1.0.0 distribuible (49 herramientas, 28 scopes), catálogo con evidencia de readiness y versiones/fingerprints, saturación local rechazada sin cola de espera, métricas acotadas sin contenido sensible y runner de evaluación reproducible. Matriz focalizada: 24 casos de contratos/Redis/reconexión y recuperación en proceso nuevo; 14 casos de workflows con PostgreSQL real, SDK/Authlib y proveedores simulados; una medición pareada con 48K tracks. Evidencia y límites en [distribución](../technical/crate-mcp-distribution.md). El presupuesto de producción y la validación de clientes/proxy reales siguen siendo gates previos al rollout; las suites completas esperan al final de fase 8. La fase 7 no declara completa la feature ni autoriza activar flags.
 
 Entregar documentación de conexión remota/OAuth, scopes, catálogo completo y versiones, códigos de error, aprobaciones, trabajos largos, límites y semántica de cancelación. MCP tool contract versionado, cambios aditivos por defecto, deprecaciones documentadas y negociación de protocolo con el SDK. get_operation_catalog devuelve versión de contrato, operaciones disponibles por permisos/política y motivos de indisponibilidad; no anunciar como habilitado un handler sin readiness.
 

@@ -1,9 +1,12 @@
 from crate.agent_library_operations import execute_operation_job
 from crate.agent_operation_catalog import public_operation_result
+from crate.mcp.telemetry import record_job_result
 
 
 def _handle_agent_maintenance(task_id: str, params: dict, config: dict) -> dict:
-    return public_operation_result(execute_operation_job(task_id, config))
+    result = execute_operation_job(task_id, config)
+    record_job_result(result)
+    return public_operation_result(result)
 
 
 def _handle_agent_control(task_id: str, params: dict, config: dict) -> dict:
@@ -15,7 +18,9 @@ def _handle_agent_control(task_id: str, params: dict, config: dict) -> dict:
         raise DiagnosticError(
             "FORBIDDEN", "Control worker accepts only job cancellation"
         )
-    return public_operation_result(execute_operation_job(task_id, config))
+    result = execute_operation_job(task_id, config)
+    record_job_result(result)
+    return public_operation_result(result)
 
 
 AGENT_LIBRARY_TASK_HANDLERS = {

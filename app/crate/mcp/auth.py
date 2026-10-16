@@ -9,6 +9,7 @@ from starlette.responses import JSONResponse
 from crate.db.repositories.agent_credentials import resolve_credential
 from crate.mcp.oauth import CrateTokenVerifier
 from crate.mcp.oauth_config import oauth_enabled, oauth_settings
+from crate import metrics
 
 
 class AgentAuth:
@@ -35,6 +36,7 @@ class AgentAuth:
                 try:
                     authenticated = await self.backend.authenticate(request)
                 except Exception:  # noqa: BLE001 — fail closed without exposing backend errors.
+                    metrics.record_later("mcp.auth.unavailable", 1)
                     response = JSONResponse(
                         {"error": "AUTH_UNAVAILABLE"}, status_code=503
                     )
@@ -45,6 +47,7 @@ class AgentAuth:
                     principal = (user.access_token.claims or {}).get("agent_principal")
                     scope["auth"], scope["user"] = credentials, user
         if principal is None:
+            metrics.record_later("mcp.auth.denied", 1)
             challenge = 'Bearer realm="crate-mcp"'
             if oauth_enabled():
                 challenge += (

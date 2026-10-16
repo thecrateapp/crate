@@ -3,6 +3,7 @@
 import json
 from functools import partial
 from uuid import UUID
+from time import perf_counter
 
 import anyio
 import mcp.types as types
@@ -319,6 +320,7 @@ def _catalog():
 
 
 _execution_limiter = anyio.CapacityLimiter(8)
+_request_limiter = anyio.CapacityLimiter(8)
 
 
 def _scope(name, arguments):
@@ -496,7 +498,7 @@ def _result(payload, error=False):
     )
 
 
-async def call_tool(context, params):
+async def _call_tool(context, params):
     try:
         principal = _principal(context)
         if params.name not in _catalog():
@@ -522,10 +524,19 @@ async def call_tool(context, params):
                 "FORBIDDEN", "Integration is not permitted to perform this operation"
             )
         trace_id = context.request.scope.get("trace_id")
-        data = await anyio.to_thread.run_sync(
-            partial(_execute, principal, params.name, arguments, trace_id),
-            limiter=_execution_limiter,
-        )
+        try:
+            _request_limiter.acquire_nowait()
+        except anyio.WouldBlock:
+            raise DiagnosticError(
+                "RATE_LIMITED", "Local MCP capacity reached", 1
+            ) from None
+        try:
+            data = await anyio.to_thread.run_sync(
+                partial(_execute, principal, params.name, arguments, trace_id),
+                limiter=_execution_limiter,
+            )
+        finally:
+            _request_limiter.release()
         return _result(data)
     except DiagnosticError as error:
         return _result(
@@ -558,3 +569,17 @@ async def call_tool(context, params):
             },
             True,
         )
+
+
+async def call_tool(context, params):
+    from crate.mcp.telemetry import record_tool_result
+
+    started = perf_counter()
+    result = await _call_tool(context, params)
+    record_tool_result(
+        params.name,
+        (perf_counter() - started) * 1000,
+        result.structured_content or {},
+        len(result.model_dump_json().encode()),
+    )
+    return result

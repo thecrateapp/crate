@@ -355,6 +355,17 @@ class DiagnosticsInput(ClosedInput):
             "worker.resource.defer_seconds",
             "worker.resource.load_ratio",
             "worker.resource.memory_available_percent",
+            "mcp.tool.latency_ms",
+            "mcp.tool.response_bytes",
+            "mcp.tool.denied",
+            "mcp.tool.rate_limited",
+            "mcp.tool.conflict",
+            "mcp.tool.deduplicated",
+            "mcp.job.verification_failed",
+            "mcp.job.failed",
+            "mcp.job.completed",
+            "mcp.auth.denied",
+            "mcp.auth.unavailable",
         ]
         | None
     ) = None
