@@ -301,7 +301,7 @@ export function ArtistHeroSection({
                 href={upcomingShow.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-orange-500/10 border border-orange-500/20 text-orange-300 hover:bg-orange-500/20 transition-colors text-xs mb-2"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-accent-action/10 border border-accent-action/20 text-accent-action-hi hover:bg-accent-action/20 transition-colors text-xs mb-2"
               >
                 <Calendar size={13} />
                 <span className="font-medium">
@@ -312,7 +312,7 @@ export function ArtistHeroSection({
                     year: "numeric",
                   })}
                 </span>
-                <span className="text-orange-300/70">
+                <span className="text-accent-action-hi/70">
                   {upcomingShow.venue}
                   {upcomingShow.city
                     ? ` — ${[upcomingShow.city, upcomingShow.country]
@@ -442,7 +442,7 @@ export function ArtistHeroSection({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-amber-400 hover:bg-amber-500/10"
+                  className="text-state-warning-text hover:bg-state-warning/10"
                   onClick={onRepair}
                 >
                   <Wrench size={14} className="mr-1" />{" "}
@@ -455,12 +455,7 @@ export function ArtistHeroSection({
                 </Button>
               ) : null}
               {canDelete && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-red-400 hover:bg-red-500/10"
-                  onClick={onDelete}
-                >
+                <Button size="sm" variant="outline" onClick={onDelete}>
                   <Trash2 size={14} className="mr-1" /> Delete
                 </Button>
               )}

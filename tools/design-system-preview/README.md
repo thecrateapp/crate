@@ -453,3 +453,22 @@ still separated the independently animated head and beam. `PlayerProgressBeam` n
 edge in both real player consumers. The point is 4 px idle / 6 px engaged, the trail envelope 8 px,
 and the core stays 1–2 px. The two regressions now sample real rAF frames during continuous forward,
 reverse and repeated drags, seeks and live ticks without pausing or changing animation clocks.
+
+
+## Admin status colour / Checkpoint 1T — local review
+
+Diego approved 1S on 2026-10-16; it is published as `124b36a8`. That supersedes the local-only
+1S stops above. The next stop is **1T**, before commit/push or Task 1b.7.
+
+Open <http://127.0.0.1:5186/#estado-admin>. Real Admin OpsStatTile, SeverityMeter and IssueList
+show active, waiting, failure and neutral severity/risk/log readings. The shared StatusDot state
+control and ConfirmDialog are interactive; the trigger is neutral and only its confirmation is
+destructive. The sample action updates fictional local text. It makes no API requests and writes
+no preferences. Existing specimens, including the approved Listen play/ring and seek beam, remain.
+
+Focused browser checks use `status-colour-checkpoint.spec.ts` with `--workers=1`, at desktop and
+390 px touch widths: real colour values, words and neutral segments, keyboard selection, focus
+return/cancel/confirm, actual 8 px field gap, overflow and no API/storage writes. Their captures
+are advisory ignored artifacts. Do not regenerate the 33 canonical 1M captures or dispatch full
+CI while iterating. Canonical Linux recording/comparison, real-data Admin geometry, native/AT QA
+and the unavailable `app/web@258bbaee` fidelity comparison remain pending.

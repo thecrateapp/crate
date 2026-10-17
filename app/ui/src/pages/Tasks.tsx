@@ -1,3 +1,4 @@
+import { SeverityMeter } from "@/components/admin/status-indicators";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -218,30 +219,30 @@ const STATUS_META: Record<
   running: {
     icon: Loader2,
     label: "Running",
-    pill: "border-cyan-400/25 bg-cyan-400/10 text-cyan-100",
+    pill: "border-accent-action/25 bg-accent-action/10 text-accent-action-hi",
     iconClass: "text-primary",
-    cardClass: "border-cyan-400/12 bg-cyan-400/[0.04]",
+    cardClass: "border-accent-action/12 bg-accent-action/[0.04]",
   },
   pending: {
     icon: Clock,
     label: "Pending",
-    pill: "border-amber-500/25 bg-amber-500/10 text-amber-100",
-    iconClass: "text-amber-200",
-    cardClass: "border-amber-500/12 bg-amber-500/[0.04]",
+    pill: "border-state-warning/25 bg-state-warning/10 text-state-warning-text",
+    iconClass: "text-state-warning-text",
+    cardClass: "border-state-warning/12 bg-state-warning/[0.04]",
   },
   completed: {
     icon: CheckCircle2,
     label: "Completed",
-    pill: "border-emerald-500/25 bg-emerald-500/10 text-emerald-200",
-    iconClass: "text-emerald-200",
+    pill: "border-accent-action/25 bg-accent-action/10 text-accent-action-hi",
+    iconClass: "text-accent-action-hi",
     cardClass: "border-white/8 bg-black/15",
   },
   failed: {
     icon: XCircle,
     label: "Failed",
-    pill: "border-red-500/25 bg-red-500/10 text-red-100",
-    iconClass: "text-red-200",
-    cardClass: "border-red-500/12 bg-red-500/[0.04]",
+    pill: "border-state-warning/25 bg-state-warning/10 text-state-warning-text",
+    iconClass: "text-state-warning-text",
+    cardClass: "border-state-warning/12 bg-state-warning/[0.04]",
   },
   cancelled: {
     icon: Ban,
@@ -270,55 +271,55 @@ const POOL_META: Record<
 > = {
   fast: {
     label: "Fast",
-    tone: "border-emerald-500/20 bg-emerald-500/[0.05]",
-    accent: "text-emerald-200",
+    tone: "border-accent-action/20 bg-accent-action/[0.05]",
+    accent: "text-accent-action-hi",
   },
   default: {
     label: "Default",
-    tone: "border-cyan-400/20 bg-cyan-400/[0.05]",
-    accent: "text-cyan-100",
+    tone: "border-accent-action/20 bg-accent-action/[0.05]",
+    accent: "text-accent-action-hi",
   },
   heavy: {
     label: "Heavy",
-    tone: "border-amber-500/20 bg-amber-500/[0.05]",
-    accent: "text-amber-100",
+    tone: "border-border-quiet/20 bg-surface-card/[0.05]",
+    accent: "text-text-secondary",
   },
   maintenance: {
     label: "Maintenance",
-    tone: "border-lime-400/20 bg-lime-400/[0.05]",
-    accent: "text-lime-100",
+    tone: "border-accent-action/20 bg-accent-action/[0.05]",
+    accent: "text-accent-action-hi",
   },
   playback: {
     label: "Playback",
-    tone: "border-sky-400/20 bg-sky-400/[0.05]",
-    accent: "text-sky-100",
+    tone: "border-accent-action/20 bg-accent-action/[0.05]",
+    accent: "text-accent-action-hi",
   },
 };
 
 const FAMILY_META: Record<string, { label: string; chip: string }> = {
   repair: {
     label: "Repair",
-    chip: "border-amber-500/20 bg-amber-500/[0.06] text-amber-100",
+    chip: "border-border-quiet/20 bg-surface-card/[0.06] text-text-secondary",
   },
   acquisition: {
     label: "Acquisition",
-    chip: "border-fuchsia-400/20 bg-fuchsia-400/[0.06] text-fuchsia-100",
+    chip: "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi",
   },
   analysis: {
     label: "Analysis",
-    chip: "border-cyan-400/20 bg-cyan-400/[0.05] text-cyan-100",
+    chip: "border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi",
   },
   sync: {
     label: "Sync",
-    chip: "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100",
+    chip: "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi",
   },
   enrichment: {
     label: "Enrichment",
-    chip: "border-violet-400/20 bg-violet-400/[0.06] text-violet-100",
+    chip: "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi",
   },
   playback: {
     label: "Playback",
-    chip: "border-sky-400/20 bg-sky-400/[0.05] text-sky-100",
+    chip: "border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi",
   },
   other: {
     label: "Other",
@@ -543,19 +544,21 @@ function ProgressSummary({
 }
 
 const EVENT_BADGE_COLORS: Record<string, string> = {
-  info: "bg-blue-500/10 text-blue-400 border-blue-500/30",
-  warning: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
-  warn: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
-  error: "bg-red-500/10 text-red-400 border-red-500/30",
   item: "bg-slate-500/10 text-slate-300 border-slate-500/30",
-  artist_enriched: "bg-green-500/10 text-green-400 border-green-500/30",
+  artist_enriched:
+    "bg-accent-action/10 text-accent-action-hi border-accent-action/30",
   artist_skipped: "bg-zinc-500/10 text-zinc-400 border-zinc-500/30",
   track_analyzed: "bg-primary/10 text-primary border-primary/30",
-  album_matched: "bg-purple-500/10 text-purple-400 border-purple-500/30",
-  cover_found: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
-  cover_applied: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
-  new_release_found: "bg-orange-500/10 text-orange-400 border-orange-500/30",
-  step_done: "bg-indigo-500/10 text-indigo-400 border-indigo-500/30",
+  album_matched:
+    "bg-accent-action/10 text-accent-action-hi border-accent-action/30",
+  cover_found:
+    "bg-accent-action/10 text-accent-action-hi border-accent-action/30",
+  cover_applied:
+    "bg-accent-action/10 text-accent-action-hi border-accent-action/30",
+  new_release_found:
+    "bg-accent-action/10 text-accent-action-hi border-accent-action/30",
+  step_done:
+    "bg-accent-action/10 text-accent-action-hi border-accent-action/30",
 };
 
 function eventMessage(event: { type: string; data?: Record<string, unknown> }) {
@@ -667,14 +670,18 @@ function LiveTaskEvents({ taskId }: { taskId: string }) {
               second: "2-digit",
             })}
           </span>
-          <CrateChip
-            className={
-              EVENT_BADGE_COLORS[event.type] ||
-              "border-white/10 bg-white/[0.04] text-white/60"
-            }
-          >
-            {event.type.replace(/_/g, " ")}
-          </CrateChip>
+          {["info", "warning", "warn", "error"].includes(event.type) ? (
+            <SeverityMeter level={event.type} label={event.type} />
+          ) : (
+            <CrateChip
+              className={
+                EVENT_BADGE_COLORS[event.type] ||
+                "border-white/10 bg-white/[0.04] text-white/60"
+              }
+            >
+              {event.type.replace(/_/g, " ")}
+            </CrateChip>
+          )}
           <span className="text-white/70">{eventMessage(event)}</span>
         </div>
       ))}
@@ -727,14 +734,18 @@ function TaskEventLog({
               second: "2-digit",
             })}
           </span>
-          <CrateChip
-            className={
-              EVENT_BADGE_COLORS[event.type] ||
-              "border-white/10 bg-white/[0.04] text-white/60"
-            }
-          >
-            {event.type.replace(/_/g, " ")}
-          </CrateChip>
+          {["info", "warning", "warn", "error"].includes(event.type) ? (
+            <SeverityMeter level={event.type} label={event.type} />
+          ) : (
+            <CrateChip
+              className={
+                EVENT_BADGE_COLORS[event.type] ||
+                "border-white/10 bg-white/[0.04] text-white/60"
+              }
+            >
+              {event.type.replace(/_/g, " ")}
+            </CrateChip>
+          )}
           <span className="text-white/70">{eventMessage(event)}</span>
         </div>
       ))}
@@ -876,7 +887,7 @@ function WorkerControlPanel({
           <Button
             size="sm"
             variant="outline"
-            className="gap-2 text-red-200"
+            className="gap-2 "
             onClick={cancelAll}
           >
             <Ban size={14} />
@@ -956,7 +967,7 @@ function WorkerControlPanel({
           className={cn(
             "rounded-md border px-4 py-3 text-sm",
             dbHeavyGate.blocking
-              ? "border-amber-500/20 bg-amber-500/[0.06] text-amber-50"
+              ? "border-state-warning/20 bg-state-warning/[0.06] text-state-warning-text"
               : hasQueuedDbHeavy
                 ? "border-white/10 bg-black/15 text-white/80"
                 : "border-white/8 bg-black/15 text-white/65",
@@ -966,7 +977,9 @@ function WorkerControlPanel({
             <Zap
               size={14}
               className={
-                dbHeavyGate.blocking ? "text-amber-200" : "text-white/45"
+                dbHeavyGate.blocking
+                  ? "text-state-warning-text"
+                  : "text-white/45"
               }
             />
             <span className="font-medium">DB-heavy gate</span>
@@ -996,12 +1009,12 @@ function WorkerControlPanel({
 }
 
 function variantStatusClass(status: string) {
-  if (status === "ready")
-    return "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100";
+  if (status === "ready" || status === "running")
+    return "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi";
   if (status === "failed")
-    return "border-red-500/20 bg-red-500/[0.08] text-red-100";
-  if (status === "pending" || status === "running")
-    return "border-amber-500/20 bg-amber-500/[0.06] text-amber-100";
+    return "border-state-warning/20 bg-state-warning/[0.08] text-state-warning-text";
+  if (status === "pending")
+    return "border-state-warning/20 bg-state-warning/[0.06] text-state-warning-text";
   return "border-white/10 bg-white/[0.04] text-white/60";
 }
 
@@ -1049,7 +1062,7 @@ function PlaybackDeliveryPanel({
           <CrateChip
             className={
               (runtime?.active ?? 0) > 0
-                ? "border-sky-400/25 bg-sky-400/10 text-sky-100"
+                ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
                 : undefined
             }
           >
@@ -1062,7 +1075,7 @@ function PlaybackDeliveryPanel({
             <CrateChip>{stats?.pending_unassigned} unassigned</CrateChip>
           ) : null}
           {(stats?.pending_stale ?? 0) > 0 ? (
-            <CrateChip className="border-amber-400/25 bg-amber-400/10 text-amber-100">
+            <CrateChip className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
               {stats?.pending_stale} stale
             </CrateChip>
           ) : null}
@@ -1240,7 +1253,7 @@ function ActiveTaskCard({
             <Button
               size="sm"
               variant="outline"
-              className="gap-2 text-red-200"
+              className="gap-2 "
               onClick={onCancel}
               disabled={Boolean(done)}
             >
@@ -1305,8 +1318,8 @@ function HistoryTaskRow({
         status.cardClass,
         highlightMeta?.cardClass,
         highlightStatus && "ring-1",
-        highlightStatus === "completed" && "ring-emerald-500/35",
-        highlightStatus === "failed" && "ring-red-500/35",
+        highlightStatus === "completed" && "ring-accent-action/35",
+        highlightStatus === "failed" && "ring-state-warning/35",
         highlightStatus === "cancelled" && "ring-white/20",
       )}
     >
@@ -1326,7 +1339,7 @@ function HistoryTaskRow({
               {familyMeta.label}
             </CrateChip>
             {needsAttention ? (
-              <CrateChip className="border-amber-500/20 bg-amber-500/[0.06] text-amber-100">
+              <CrateChip className="border-state-warning/20 bg-state-warning/[0.06] text-state-warning-text">
                 Needs attention
               </CrateChip>
             ) : null}
@@ -1408,10 +1421,10 @@ function HistoryTaskRow({
 
           {task.error ? (
             <div>
-              <div className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-red-200">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-state-warning-text">
                 Error
               </div>
-              <pre className="overflow-x-auto rounded-sm border border-red-500/12 bg-red-500/[0.05] p-3 text-xs text-red-100">
+              <pre className="overflow-x-auto rounded-sm border border-state-warning/12 bg-state-warning/[0.05] p-3 text-xs text-state-warning-text">
                 {task.error}
               </pre>
             </div>
@@ -1901,11 +1914,11 @@ export function Tasks() {
         <CratePill icon={CheckCircle2}>
           {tasks.filter((task) => task.status === "completed").length} completed
         </CratePill>
-        <CratePill className="border-red-500/25 bg-red-500/10 text-red-100">
+        <CratePill className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
           {tasks.filter((task) => task.status === "failed").length} failed
         </CratePill>
         {stats.needsAttention > 0 ? (
-          <CratePill className="border-amber-500/25 bg-amber-500/10 text-amber-100">
+          <CratePill className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
             {stats.needsAttention} need attention
           </CratePill>
         ) : null}

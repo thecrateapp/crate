@@ -253,7 +253,7 @@ export function Trash() {
             </Button>
             <Button
               type="button"
-              variant="destructive"
+              variant="outline"
               disabled={
                 loading ||
                 items.length === 0 ||
@@ -332,7 +332,7 @@ export function Trash() {
                     <Button
                       type="button"
                       size="sm"
-                      variant="destructive"
+                      variant="outline"
                       disabled={busyPath !== null || bulkDeleting}
                       onClick={() => setDeleteTarget(item)}
                     >

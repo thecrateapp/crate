@@ -1,4 +1,4 @@
-import { Badge } from "@crate/ui/shadcn/badge";
+import { SeverityMeter } from "../admin/status-indicators";
 
 interface Issue {
   type: string;
@@ -15,13 +15,7 @@ interface IssueListProps {
 }
 
 function severityBadge(severity: string) {
-  const map: Record<string, string> = {
-    critical: "bg-red-500 text-white",
-    high: "bg-orange-500 text-white",
-    medium: "bg-yellow-500 text-black",
-    low: "bg-secondary text-muted-foreground",
-  };
-  return <Badge className={map[severity] || map.low}>{severity}</Badge>;
+  return <SeverityMeter level={severity} label={severity} />;
 }
 
 export function IssueList({ issues }: IssueListProps) {
@@ -54,7 +48,7 @@ export function IssueList({ issues }: IssueListProps) {
               <div className="flex justify-between items-start">
                 <div>
                   <div className="text-sm">{issue.description}</div>
-                  <div className="text-sm text-green-500 mt-1">
+                  <div className="text-sm text-accent-action-hi mt-1">
                     {issue.suggestion}
                   </div>
                 </div>

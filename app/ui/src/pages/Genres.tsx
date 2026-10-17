@@ -165,10 +165,7 @@ interface TaxonomyTree {
 interface TaxonomyNodeProposal {
   source_kind?: "taxonomy_node" | "raw_genre";
   recommended_action?:
-    | "create_node"
-    | "alias_existing"
-    | "delete_marginal"
-    | "needs_review";
+    "create_node" | "alias_existing" | "delete_marginal" | "needs_review";
   recommended_target_slug?: string | null;
   description: string;
   aliases: string[];
@@ -326,7 +323,7 @@ function TaxonomyRelationField({
           </Button>
         </div>
 
-        <div className="rounded-md border border-white/10 bg-black/30 p-2 transition focus-within:border-cyan-400/40">
+        <div className="rounded-md border border-white/10 bg-black/30 p-2 transition focus-within:border-accent-action/40">
           {value.length > 0 ? (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {value.map((slug) => {
@@ -335,13 +332,15 @@ function TaxonomyRelationField({
                   <Badge
                     key={`${config.key}-${slug}`}
                     variant="outline"
-                    className="gap-1 border-cyan-400/20 bg-cyan-400/10 pr-1 text-[10px] text-cyan-100"
+                    className="gap-1 border-accent-action/20 bg-accent-action/10 pr-1 text-[10px] text-accent-action-hi"
                   >
                     <span>{option?.name ?? slug}</span>
-                    <span className="font-mono text-cyan-100/45">{slug}</span>
+                    <span className="font-mono text-accent-action-hi/45">
+                      {slug}
+                    </span>
                     <button
                       type="button"
-                      className="rounded-full p-0.5 text-cyan-100/55 transition hover:bg-white/10 hover:text-white"
+                      className="rounded-full p-0.5 text-accent-action-hi/55 transition hover:bg-white/10 hover:text-white"
                       aria-label={`Remove ${slug}`}
                       onClick={() => removeSlug(slug)}
                     >
@@ -380,7 +379,7 @@ function TaxonomyRelationField({
                   <button
                     key={option.slug}
                     type="button"
-                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs text-white/70 transition hover:bg-cyan-400/10 hover:text-cyan-100"
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs text-white/70 transition hover:bg-accent-action/10 hover:text-accent-action-hi"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => addSlug(option.slug)}
                   >
@@ -397,8 +396,8 @@ function TaxonomyRelationField({
       </div>
 
       {stagedProposal ? (
-        <div className="mt-2 rounded-md border border-cyan-400/15 bg-cyan-400/[0.04] px-2.5 py-2 text-[11px] text-white/45">
-          <span className="font-semibold text-cyan-200">
+        <div className="mt-2 rounded-md border border-accent-action/15 bg-accent-action/[0.04] px-2.5 py-2 text-[11px] text-white/45">
+          <span className="font-semibold text-accent-action-hi">
             AI {Math.round(stagedProposal.confidence * 100)}%
           </span>
           {stagedProposal.reasoning
@@ -555,7 +554,7 @@ function TaxonomyNodeEditorialEditor({
   const node = useMemo(
     () =>
       canonicalSlug
-        ? data?.nodes.find((item) => item.slug === canonicalSlug) ?? null
+        ? (data?.nodes.find((item) => item.slug === canonicalSlug) ?? null)
         : null,
     [canonicalSlug, data?.nodes],
   );
@@ -794,10 +793,10 @@ function TaxonomyNodeEditorialEditor({
             </div>
 
             {proposal ? (
-              <div className="space-y-3 rounded-lg border border-cyan-400/15 bg-cyan-400/[0.04] p-4 text-xs text-white/55">
+              <div className="space-y-3 rounded-lg border border-accent-action/15 bg-accent-action/[0.04] p-4 text-xs text-white/55">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+                    <Badge className="border-accent-action/20 bg-accent-action/10 text-accent-action-hi">
                       {proposalActionLabel(proposal.recommended_action)}
                     </Badge>
                     {proposal.recommended_target_slug ? (
@@ -808,7 +807,7 @@ function TaxonomyNodeEditorialEditor({
                   </div>
                   <Button
                     size="sm"
-                    className="bg-cyan-400 text-black hover:bg-cyan-300"
+                    className="bg-accent-action text-black hover:bg-accent-action-hover"
                     disabled={
                       savingKey === "apply" ||
                       proposal.recommended_action === "needs_review" ||
@@ -890,7 +889,7 @@ function TaxonomyNodeEditorialEditor({
                 ) : null}
               </div>
             ) : (
-              <div className="rounded-md border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+              <div className="rounded-md border border-state-warning/20 bg-state-warning/10 p-4 text-sm text-state-warning-text">
                 This genre is unmapped. Run inference to get a reviewable
                 proposal with local artists, albums, and alias/delete guidance.
               </div>
@@ -901,7 +900,7 @@ function TaxonomyNodeEditorialEditor({
             Loading taxonomy node...
           </div>
         ) : !node ? (
-          <div className="rounded-md border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+          <div className="rounded-md border border-state-warning/20 bg-state-warning/10 p-4 text-sm text-state-warning-text">
             Canonical node not found in the taxonomy tree.
           </div>
         ) : (
@@ -940,7 +939,7 @@ function TaxonomyNodeEditorialEditor({
                   Save node
                 </Button>
                 <Button
-                  variant="destructive"
+                  variant="outline"
                   size="sm"
                   className="text-xs"
                   disabled={savingKey === "delete-node"}
@@ -967,7 +966,7 @@ function TaxonomyNodeEditorialEditor({
                     />
                   ) : (
                     <div className="flex h-full flex-col items-center justify-center gap-2 bg-[radial-gradient(circle_at_30%_20%,rgba(34,211,238,0.18),transparent_38%),linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.015))] text-center">
-                      <Tag size={20} className="text-cyan-300/70" />
+                      <Tag size={20} className="text-accent-action-hi/70" />
                       <span className="text-[11px] font-medium text-white/45">
                         No genre cover
                       </span>
@@ -980,7 +979,7 @@ function TaxonomyNodeEditorialEditor({
                       aspect={2}
                       onUploaded={refreshCover}
                       label="Edit cover"
-                      className="absolute inset-0 z-10 flex items-end justify-center gap-1.5 bg-black/0 p-3 text-xs font-semibold text-white/0 transition hover:bg-black/35 hover:text-white/85 focus-visible:bg-black/35 focus-visible:text-cyan-100"
+                      className="absolute inset-0 z-10 flex items-end justify-center gap-1.5 bg-black/0 p-3 text-xs font-semibold text-white/0 transition hover:bg-black/35 hover:text-white/85 focus-visible:bg-black/35 focus-visible:text-accent-action-hi"
                     />
                   ) : null}
                 </div>
@@ -997,7 +996,7 @@ function TaxonomyNodeEditorialEditor({
                       setDescriptionDraft(event.target.value)
                     }
                     rows={5}
-                    className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/75 transition focus:border-cyan-400/40"
+                    className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/75 transition focus:border-accent-action/40"
                     placeholder="Short editorial description for this genre."
                   />
                 </label>
@@ -1007,7 +1006,7 @@ function TaxonomyNodeEditorialEditor({
                     type="checkbox"
                     checked={topLevelDraft}
                     onChange={(event) => setTopLevelDraft(event.target.checked)}
-                    className="h-3.5 w-3.5 accent-cyan-400"
+                    className="h-3.5 w-3.5 accent-accent-action"
                   />
                   Top-level genre
                 </label>
@@ -1015,8 +1014,8 @@ function TaxonomyNodeEditorialEditor({
             </div>
 
             {proposal ? (
-              <div className="rounded-lg border border-cyan-400/15 bg-cyan-400/[0.04] p-3 text-xs text-white/55">
-                <div className="font-semibold uppercase tracking-[0.16em] text-cyan-200">
+              <div className="rounded-lg border border-accent-action/15 bg-accent-action/[0.04] p-3 text-xs text-white/55">
+                <div className="font-semibold uppercase tracking-[0.16em] text-accent-action-hi">
                   AI proposal staged
                 </div>
                 {proposal.reasoning ? (
@@ -1362,7 +1361,7 @@ function GenreList() {
         <CrateChip
           className={
             (unmappedGenres?.length || 0) > 0
-              ? "border-amber-500/25 bg-amber-500/10 text-amber-100"
+              ? "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
               : undefined
           }
         >
@@ -1372,8 +1371,8 @@ function GenreList() {
           <CrateChip
             className={
               invalidTaxonomy.invalid_count > 0
-                ? "border-amber-500/25 bg-amber-500/10 text-amber-100"
-                : "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
+                ? "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
+                : "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
             }
           >
             {invalidTaxonomy.invalid_count > 0
@@ -1452,8 +1451,8 @@ function GenreList() {
                       <div
                         className={`h-full rounded-full ${
                           source.source === "flat"
-                            ? "bg-amber-400/70"
-                            : "bg-cyan-400/80"
+                            ? "bg-text-subtle/40"
+                            : "bg-accent-action/80"
                         }`}
                         style={{ width: `${Math.min(source.percent, 100)}%` }}
                       />
@@ -1540,7 +1539,7 @@ function GenreList() {
                   onClick={() => setHideEmpty(!hideEmpty)}
                   className={`rounded-full border px-3 py-1.5 text-[11px] font-medium transition ${
                     hideEmpty
-                      ? "border-cyan-400/50 bg-cyan-400/15 text-cyan-200"
+                      ? "border-accent-action/50 bg-accent-action/15 text-accent-action-hi"
                       : "border-white/10 bg-white/5 text-white/60 hover:border-white/20 hover:text-white"
                   }`}
                 >
@@ -1569,27 +1568,27 @@ function GenreList() {
           </div>
 
           {canCurateGenres && !!invalidTaxonomy?.invalid_count && (
-            <div className="rounded-md border border-amber-500/20 bg-[linear-gradient(135deg,rgba(245,158,11,0.16),rgba(120,53,15,0.08))] p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
+            <div className="rounded-md border border-state-warning/20 bg-state-warning/10 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
               <div className="mb-3 flex items-center gap-2">
-                <AlertTriangle size={16} className="text-amber-300" />
+                <AlertTriangle size={16} className="text-state-warning-text" />
                 <div className="font-semibold text-foreground">
                   Taxonomy cleanup recommended
                 </div>
                 <Badge
                   variant="outline"
-                  className="border-amber-500/30 bg-amber-500/10 text-amber-100"
+                  className="border-state-warning/30 bg-state-warning/10 text-state-warning-text"
                 >
                   {invalidTaxonomy.invalid_count} invalid nodes
                 </Badge>
                 <Badge
                   variant="outline"
-                  className="border-amber-500/30 bg-black/10 text-amber-50"
+                  className="border-state-warning/30 bg-black/10 text-state-warning-text"
                 >
                   {invalidTaxonomy.alias_count} aliases
                 </Badge>
                 <Badge
                   variant="outline"
-                  className="border-amber-500/30 bg-black/10 text-amber-50"
+                  className="border-state-warning/30 bg-black/10 text-state-warning-text"
                 >
                   {invalidTaxonomy.edge_count} edges
                 </Badge>
@@ -1602,7 +1601,7 @@ function GenreList() {
                 {invalidTaxonomy.items.map((item) => (
                   <div
                     key={`invalid-taxonomy-${item.slug}`}
-                    className="rounded-md border border-amber-500/20 bg-black/10 px-3 py-2"
+                    className="rounded-md border border-state-warning/20 bg-black/10 px-3 py-2"
                   >
                     <div className="truncate text-sm font-medium text-foreground">
                       {item.name || item.slug}
@@ -1627,15 +1626,18 @@ function GenreList() {
           ) : (
             <>
               {(unmappedGenres?.length || 0) > 0 && (
-                <div className="rounded-md border border-amber-500/20 bg-[linear-gradient(135deg,rgba(245,158,11,0.15),rgba(120,53,15,0.08))] p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
+                <div className="rounded-md border border-state-warning/20 bg-state-warning/10 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
                   <div className="mb-3 flex items-center gap-2">
-                    <AlertTriangle size={16} className="text-amber-300" />
+                    <AlertTriangle
+                      size={16}
+                      className="text-state-warning-text"
+                    />
                     <div className="font-semibold text-foreground">
                       Needs taxonomy mapping
                     </div>
                     <Badge
                       variant="outline"
-                      className="border-amber-500/30 bg-amber-500/10 text-amber-100"
+                      className="border-state-warning/30 bg-state-warning/10 text-state-warning-text"
                     >
                       {unmappedGenres!.length}
                     </Badge>
@@ -1648,7 +1650,7 @@ function GenreList() {
                     {unmappedGenres!.slice(0, 12).map((genre) => (
                       <div
                         key={`unmapped-${genre.slug}`}
-                        className="flex items-center justify-between rounded-md border border-amber-500/20 bg-black/10 px-3 py-2 text-left transition-colors hover:bg-black/20"
+                        className="flex items-center justify-between rounded-md border border-state-warning/20 bg-black/10 px-3 py-2 text-left transition-colors hover:bg-black/20"
                       >
                         <button
                           type="button"
@@ -1666,14 +1668,14 @@ function GenreList() {
                         <div className="flex items-center gap-2">
                           <Badge
                             variant="outline"
-                            className="border-amber-500/30 text-amber-100"
+                            className="border-state-warning/30 text-state-warning-text"
                           >
                             unmapped
                           </Badge>
                           {canCurateGenres ? (
                             <button
                               type="button"
-                              className="rounded-md p-1 text-white/30 transition hover:bg-red-500/10 hover:text-red-200"
+                              className="rounded-md p-1 text-white/30 transition "
                               onClick={(event) => {
                                 event.stopPropagation();
                                 setDeleteTarget(genre);
@@ -1713,7 +1715,7 @@ function GenreList() {
                       className={`group overflow-hidden rounded-md border bg-black/20 p-4 text-left shadow-[0_16px_36px_rgba(0,0,0,0.16)] transition-colors hover:bg-white/[0.04] ${
                         g.mapped
                           ? "border-white/8 hover:border-primary/30"
-                          : "border-amber-500/30"
+                          : "border-state-warning/30"
                       }`}
                     >
                       <div className="mb-2 flex items-start justify-between gap-2">
@@ -1732,7 +1734,7 @@ function GenreList() {
                             className={
                               g.mapped
                                 ? "border-primary/30 bg-primary/10 text-primary"
-                                : "border-amber-500/30 bg-amber-500/10 text-amber-100"
+                                : "border-state-warning/30 bg-state-warning/10 text-state-warning-text"
                             }
                           >
                             {g.mapped ? "mapped" : "unmapped"}
@@ -1740,7 +1742,7 @@ function GenreList() {
                           {canCurateGenres ? (
                             <button
                               type="button"
-                              className="rounded-md p-1 text-white/25 opacity-0 transition hover:bg-red-500/10 hover:text-red-200 group-hover:opacity-100 focus:opacity-100"
+                              className="rounded-md p-1 text-white/25 opacity-0 transition group-hover:opacity-100 focus:opacity-100"
                               onClick={(event) => {
                                 event.stopPropagation();
                                 setDeleteTarget(g);
@@ -2014,7 +2016,7 @@ function GenreView({ slug }: { slug: string }) {
                     icon={AlertTriangle}
                   />
                   <Button
-                    variant="destructive"
+                    variant="outline"
                     size="sm"
                     onClick={() => setDeleteGenreOpen(true)}
                   >
@@ -2041,8 +2043,8 @@ function GenreView({ slug }: { slug: string }) {
         <CrateChip
           className={
             genre.mapped
-              ? "border-cyan-400/25 bg-cyan-400/10 text-cyan-100"
-              : "border-amber-500/25 bg-amber-500/10 text-amber-100"
+              ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
+              : "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
           }
         >
           {genre.mapped ? "Mapped" : "Unmapped"}
@@ -2089,7 +2091,7 @@ function GenreView({ slug }: { slug: string }) {
                   href={`https://musicbrainz.org/genre/${genre.musicbrainz_mbid}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="font-mono text-[11px] text-cyan-300/70 transition-colors hover:text-cyan-200"
+                  className="font-mono text-[11px] text-accent-action-hi/70 transition-colors hover:text-accent-action-hi"
                 >
                   {genre.musicbrainz_mbid}
                 </a>
@@ -2102,7 +2104,7 @@ function GenreView({ slug }: { slug: string }) {
                   href={genre.wikidata_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-cyan-300/70 transition-colors hover:text-cyan-200"
+                  className="text-accent-action-hi/70 transition-colors hover:text-accent-action-hi"
                 >
                   {genre.wikidata_url.split("/").pop()}
                 </a>

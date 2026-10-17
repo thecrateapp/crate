@@ -435,7 +435,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                   className={cn(
                     "crate-form-field rounded-md border px-2 py-2",
                     previewRole
-                      ? "border-cyan-400/25 bg-cyan-400/10"
+                      ? "border-accent-action/25 bg-accent-action/10"
                       : "border-white/8 bg-black/15",
                   )}
                 >
@@ -447,7 +447,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                       <button
                         type="button"
                         onClick={clearPreview}
-                        className="text-[10px] font-medium text-cyan-200/75 hover:text-cyan-100"
+                        className="text-[10px] font-medium text-accent-action-hi/75 hover:text-accent-action-hi"
                       >
                         Clear
                       </button>

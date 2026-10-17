@@ -62,11 +62,7 @@ const EMPTY_RELEASES: Release[] = [];
 
 type ViewMode = "timeline" | "grid";
 type StatusFilter =
-  | "all"
-  | "detected"
-  | "downloading"
-  | "downloaded"
-  | "upcoming";
+  "all" | "detected" | "downloading" | "downloaded" | "upcoming";
 
 function releaseArtistHref(release: Release) {
   if (release.artist_id == null) return undefined;
@@ -127,7 +123,7 @@ function ReleaseMeta({ release }: { release: Release }) {
         <CrateChip>{release.release_type}</CrateChip>
       ) : null}
       {release.quality ? (
-        <CrateChip className="border-emerald-500/25 bg-emerald-500/10 text-emerald-200">
+        <CrateChip className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
           {release.quality}
         </CrateChip>
       ) : null}
@@ -151,7 +147,7 @@ function ReleaseActions({
 }) {
   if (release.status === "downloaded") {
     return (
-      <CrateChip className="border-emerald-500/25 bg-emerald-500/10 text-emerald-200">
+      <CrateChip className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
         Downloaded
       </CrateChip>
     );
@@ -179,7 +175,7 @@ function ReleaseActions({
       {onDismiss ? (
         <ActionIconButton
           variant="card"
-          tone="danger"
+          tone="default"
           onClick={() => onDismiss(release.id)}
           title="Dismiss release"
         >
@@ -302,7 +298,7 @@ function ReleaseGridCard({
             <CrateChip active>Downloading</CrateChip>
           ) : null}
           {release.status === "downloaded" ? (
-            <CrateChip className="border-emerald-500/25 bg-emerald-500/10 text-emerald-200">
+            <CrateChip className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
               Downloaded
             </CrateChip>
           ) : null}
@@ -353,7 +349,7 @@ function ReleaseGridCard({
           {release.status === "detected" && onDismiss ? (
             <ActionIconButton
               variant="card"
-              tone="danger"
+              tone="default"
               onClick={() => onDismiss(release.id)}
               title="Dismiss release"
             >

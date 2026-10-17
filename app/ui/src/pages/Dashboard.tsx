@@ -93,22 +93,22 @@ function prettifyHealthType(checkType: string | null | undefined): string {
 function attentionToneClasses(tone: AttentionTone): string {
   switch (tone) {
     case "danger":
-      return "border-red-500/20 bg-red-500/10";
+      return "border-state-warning/20 bg-state-warning/10";
     case "warning":
-      return "border-amber-500/20 bg-amber-500/10";
+      return "border-state-warning/20 bg-state-warning/10";
     default:
-      return "border-cyan-500/20 bg-cyan-500/10";
+      return "border-accent-action/20 bg-accent-action/10";
   }
 }
 
 function attentionChipClasses(tone: AttentionTone): string {
   switch (tone) {
     case "danger":
-      return "border-red-500/25 bg-red-500/10 text-red-200";
+      return "border-state-warning/25 bg-state-warning/10 text-state-warning-text";
     case "warning":
-      return "border-amber-500/25 bg-amber-500/10 text-amber-200";
+      return "border-state-warning/25 bg-state-warning/10 text-state-warning-text";
     default:
-      return "border-cyan-500/25 bg-cyan-500/10 text-cyan-200";
+      return "border-accent-action/25 bg-accent-action/10 text-accent-action-hi";
   }
 }
 
@@ -388,8 +388,8 @@ export function Dashboard() {
           icon={Database}
           className={
             systems?.postgres
-              ? "border-green-500/25 bg-green-500/10 text-green-300"
-              : "border-red-500/25 bg-red-500/10 text-red-300"
+              ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
+              : "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
           }
         >
           PostgreSQL {systems?.postgres ? "online" : "offline"}
@@ -398,8 +398,8 @@ export function Dashboard() {
           icon={Eye}
           className={
             systems?.watcher
-              ? "border-green-500/25 bg-green-500/10 text-green-300"
-              : "border-red-500/25 bg-red-500/10 text-red-300"
+              ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
+              : "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
           }
         >
           Watcher {systems?.watcher ? "online" : "offline"}
@@ -408,8 +408,8 @@ export function Dashboard() {
           icon={Stethoscope}
           className={
             totalHealthIssues > 0
-              ? "border-amber-500/25 bg-amber-500/10 text-amber-200"
-              : "border-green-500/25 bg-green-500/10 text-green-300"
+              ? "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
+              : "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
           }
         >
           {totalHealthIssues > 0
@@ -526,8 +526,8 @@ export function Dashboard() {
               ))}
             </div>
           ) : (
-            <div className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-4 py-5 text-sm shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
-              <div className="flex items-center gap-2 text-emerald-200">
+            <div className="rounded-md border border-accent-action/20 bg-accent-action/10 px-4 py-5 text-sm shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
+              <div className="flex items-center gap-2 text-accent-action-hi">
                 <CheckCircle2 size={16} />
                 <span className="font-medium">
                   {emptyStateTitle(
@@ -537,7 +537,7 @@ export function Dashboard() {
                   )}
                 </span>
               </div>
-              <div className="mt-2 text-emerald-100/75">
+              <div className="mt-2 text-accent-action-hi/75">
                 No urgent blockers surfaced in health, task failures or queue
                 pressure. The pipe looks calm.
               </div>
@@ -571,7 +571,7 @@ export function Dashboard() {
                 </span>
               </div>
               {dbHeavyGate?.blocking ? (
-                <div className="mt-1 text-xs text-amber-200">
+                <div className="mt-1 text-xs text-state-warning-text">
                   Queued heavy work is waiting on the current heavy task to
                   finish.
                 </div>
@@ -656,11 +656,11 @@ export function Dashboard() {
                   runningTasks.slice(0, 6).map((task) => (
                     <div
                       key={task.id}
-                      className="flex items-center gap-3 rounded-md border border-cyan-500/15 bg-cyan-500/10 px-3 py-3 text-sm"
+                      className="flex items-center gap-3 rounded-md border border-accent-action/15 bg-accent-action/10 px-3 py-3 text-sm"
                     >
                       <Loader2
                         size={14}
-                        className="animate-spin text-cyan-300 shrink-0"
+                        className="animate-spin text-accent-action-hi shrink-0"
                       />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-white">
@@ -700,12 +700,12 @@ export function Dashboard() {
                       {task.status === "completed" ? (
                         <CheckCircle2
                           size={14}
-                          className="shrink-0 text-emerald-300"
+                          className="shrink-0 text-accent-action-hi"
                         />
                       ) : task.status === "failed" ? (
                         <AlertTriangle
                           size={14}
-                          className="shrink-0 text-red-300"
+                          className="shrink-0 text-state-warning-text"
                         />
                       ) : (
                         <Clock size={14} className="shrink-0 text-white/45" />
@@ -1031,7 +1031,7 @@ export function Dashboard() {
                           className="rounded-md border border-white/8 bg-white/[0.04] px-3 py-3"
                         >
                           <div className="flex flex-wrap items-center gap-2">
-                            <CrateChip className="border-cyan-500/20 bg-cyan-500/10 text-cyan-200">
+                            <CrateChip className="border-accent-action/20 bg-accent-action/10 text-accent-action-hi">
                               {event.event_type || "unknown"}
                             </CrateChip>
                             <span className="text-[11px] text-white/35">
@@ -1256,9 +1256,9 @@ export function Dashboard() {
             </div>
 
             {isAdmin ? (
-              <Card className="border-red-500/20 bg-red-500/[0.06]">
+              <Card className="border-state-warning/20 bg-state-warning/[0.06]">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm text-red-100">
+                  <CardTitle className="text-sm text-state-warning-text">
                     Danger zone
                   </CardTitle>
                 </CardHeader>
@@ -1274,7 +1274,6 @@ export function Dashboard() {
                     </Button>
                     <Button
                       variant="outline"
-                      className="border-red-500/30 text-red-200 hover:bg-red-500/10"
                       onClick={() => setShowWipeConfirm(true)}
                     >
                       <Trash2 size={14} className="mr-1" />

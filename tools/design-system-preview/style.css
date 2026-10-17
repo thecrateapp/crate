@@ -10,6 +10,11 @@
 @source "./tabs-checkpoint.tsx";
 @source "./states-checkpoint.tsx";
 @source "./tracks-checkpoint.tsx";
+@source "./status-colour-checkpoint.tsx";
+@source "../../app/ui/src/components/admin/ops-surfaces.tsx";
+@source "../../app/ui/src/components/admin/status-indicators.tsx";
+@source "../../app/ui/src/components/scanner/IssueList.tsx";
+
 @source "../../app/listen/src/components/player/bar/PlayerSeekBarVariants.tsx";
 @source "../../app/listen/src/components/player/bar/PlayerProgressBeam.tsx";
 @source "../../app/listen/src/components/player/bar/player-seek-bar-model.ts";
@@ -957,9 +962,40 @@ footer p {
 }
 @source "../../app/shared/ui/primitives/FormField.tsx";
 
-.state-preview-reserved { min-block-size: 340px; }
-.state-preview-route { min-block-size: 120px; }
+.state-preview-reserved {
+  min-block-size: 340px;
+}
+.state-preview-route {
+  min-block-size: 120px;
+}
 
-#pistas { scroll-margin-top: 32px; }
-#pistas .specimen-heading h2 { overflow-wrap: normal; }
-@media (max-width:760px) { #pistas .specimen-heading { display: block; } #pistas .specimen-heading h2 { font-size: 2.5rem; } #pistas .specimen-heading > p { margin-top: 24px; } }
+#pistas {
+  scroll-margin-top: 32px;
+}
+#pistas .specimen-heading h2 {
+  overflow-wrap: normal;
+}
+@media (max-width: 760px) {
+  #pistas .specimen-heading {
+    display: block;
+  }
+  #pistas .specimen-heading h2 {
+    font-size: 2.5rem;
+  }
+  #pistas .specimen-heading > p {
+    margin-top: 24px;
+  }
+}
+
+#estado-admin .specimen-heading {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) 2fr;
+  gap: 32px;
+  align-items: end;
+}
+@media (max-width: 759px) {
+  #estado-admin .specimen-heading {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+}

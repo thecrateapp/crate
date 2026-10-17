@@ -226,7 +226,7 @@ export function ArtistHeroArtworkEditor({
           size: sourceFiles[active]?.size,
           lastModified: sourceFiles[active]?.lastModified,
         }
-      : profile?.revision ?? fallbackSource,
+      : (profile?.revision ?? fallbackSource),
   });
   useEffect(() => {
     previewRequestRef.current += 1;
@@ -797,7 +797,7 @@ export function ArtistHeroArtworkEditor({
                 {profile && activeCompositionEnabled ? (
                   <Button
                     variant="outline"
-                    className="w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    className="w-full border-border-quiet/40 text-text-secondary hover:bg-surface-control/10 hover:text-text-secondary"
                     disabled={processing || uploading}
                     onClick={() => setDeleteComposition(active)}
                   >

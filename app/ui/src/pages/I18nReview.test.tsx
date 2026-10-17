@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -72,9 +72,9 @@ const qualityReport = {
   sourceVersion: "sha256:test",
   generatedAt: "2026-07-05T10:08:00+00:00",
   locales: ["es"],
-  issueCount: 1,
+  issueCount: 2,
   errorCount: 1,
-  warningCount: 0,
+  warningCount: 1,
   issues: [
     {
       severity: "error",
@@ -84,6 +84,16 @@ const qualityReport = {
       message: "Translation value is empty.",
       source: null,
       value: "",
+      file: null,
+    },
+    {
+      severity: "warning",
+      code: "stale_translation",
+      locale: "es",
+      key: "nav.collection",
+      message: "Translation needs review.",
+      source: null,
+      value: "Coleccion",
       file: null,
     },
   ],
@@ -234,6 +244,11 @@ describe("I18nReview", () => {
       await screen.findByRole("button", { name: /Review es/i }),
     ).toBeInTheDocument();
     expect(screen.getAllByText("2 strings").length).toBeGreaterThan(0);
+    expect(
+      screen
+        .getAllByText("Needs review")
+        .some((node) => node.className.includes("text-state-warning-text")),
+    ).toBe(true);
 
     await user.click(screen.getByRole("button", { name: /Review es/i }));
 
@@ -244,6 +259,19 @@ describe("I18nReview", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("settings.profile.bio")).toBeInTheDocument();
     expect(screen.getByText("Translation value is empty.")).toBeInTheDocument();
+    for (const [code, severity, active] of [
+      ["empty_value", "error", 3],
+      ["stale_translation", "warning", 2],
+    ] as const) {
+      const issue = screen.getByText(code).parentElement!;
+      expect(within(issue).getByText(severity)).toHaveClass(
+        "text-text-secondary",
+      );
+      expect(issue.querySelectorAll('[data-active="true"]')).toHaveLength(
+        active,
+      );
+      expect(issue.className).not.toMatch(/state-warning/);
+    }
 
     await user.click(screen.getByRole("button", { name: "Publish bundle" }));
 

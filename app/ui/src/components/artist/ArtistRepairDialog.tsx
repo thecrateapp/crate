@@ -1,3 +1,4 @@
+import { SeverityMeter } from "@/components/admin/status-indicators";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -93,9 +94,11 @@ interface ItemRunState {
 
 function runStateTone(runState: ItemRunState["state"]): string {
   if (runState === "success")
-    return "border-emerald-500/20 bg-emerald-500/[0.08]";
-  if (runState === "error") return "border-red-500/20 bg-red-500/[0.08]";
-  if (runState === "running") return "border-cyan-500/20 bg-cyan-500/[0.06]";
+    return "border-accent-action/20 bg-accent-action/[0.08]";
+  if (runState === "error")
+    return "border-state-warning/20 bg-state-warning/[0.08]";
+  if (runState === "running")
+    return "border-accent-action/20 bg-accent-action/[0.06]";
   return "border-white/8 bg-panel-surface/80";
 }
 
@@ -123,23 +126,12 @@ const CHECK_LABELS: Record<string, string> = {
   artist_layout_fix: "Artist layout fix",
 };
 
-const SEVERITY_TONES: Record<string, string> = {
-  critical: "border-red-500/25 bg-red-500/10 text-red-100",
-  high: "border-orange-500/25 bg-orange-500/10 text-orange-100",
-  medium: "border-amber-500/25 bg-amber-500/10 text-amber-100",
-  low: "border-white/10 bg-white/[0.04] text-white/60",
-};
-
-const RISK_TONES: Record<string, string> = {
-  safe: "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100",
-  caution: "border-amber-500/20 bg-amber-500/[0.06] text-amber-100",
-  destructive: "border-red-500/20 bg-red-500/[0.08] text-red-100",
-};
-
 const SCOPE_TONES: Record<string, string> = {
-  db: "border-cyan-400/20 bg-cyan-400/[0.05] text-cyan-100",
-  filesystem: "border-fuchsia-400/20 bg-fuchsia-400/[0.05] text-fuchsia-100",
-  hybrid: "border-violet-400/20 bg-violet-400/[0.06] text-violet-100",
+  db: "border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi",
+  filesystem:
+    "border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi",
+  hybrid:
+    "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi",
 };
 
 function checkLabel(check: string) {
@@ -382,9 +374,9 @@ export function ArtistRepairDialog({
       .toLowerCase();
     const latestMessageLooksSuccessful = Boolean(
       latestEventMessage &&
-        /repair complete:|revalidation complete:|task completed|no open issues remaining/i.test(
-          latestEventMessage,
-        ),
+      /repair complete:|revalidation complete:|task completed|no open issues remaining/i.test(
+        latestEventMessage,
+      ),
     );
     const success =
       doneStatus === "completed" ||
@@ -394,8 +386,7 @@ export function ArtistRepairDialog({
         doneStatus !== "cancelled");
     const errorMessage = done.error || latestEventMessage || "Task failed";
     const revalidation = done.result?.revalidation as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     const remainingIssues = Number(revalidation?.issue_count ?? NaN);
     const successMessage =
       latestEventMessage ||
@@ -581,7 +572,7 @@ export function ArtistRepairDialog({
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
           <div className="flex flex-wrap items-center gap-2">
             <CrateChip>{plan?.total ?? 0} issues</CrateChip>
-            <CrateChip className="border-cyan-400/20 bg-cyan-400/[0.05] text-cyan-100">
+            <CrateChip className="border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi">
               {plan?.executable ?? 0} executable
             </CrateChip>
             <CrateChip>{plan?.manual_only ?? 0} manual</CrateChip>
@@ -641,10 +632,10 @@ export function ArtistRepairDialog({
             <div
               className={`rounded-md border px-4 py-3 text-sm ${
                 done?.status === "failed"
-                  ? "border-red-500/20 bg-red-500/[0.08] text-red-100"
+                  ? "border-state-warning/20 bg-state-warning/[0.08] text-state-warning-text"
                   : done?.status === "completed"
-                    ? "border-emerald-500/20 bg-emerald-500/[0.08] text-emerald-100"
-                    : "border-cyan-500/20 bg-cyan-500/[0.06] text-cyan-100"
+                    ? "border-accent-action/20 bg-accent-action/[0.08] text-accent-action-hi"
+                    : "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -665,14 +656,12 @@ export function ArtistRepairDialog({
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
             </div>
           ) : plan && plan.items.length === 0 ? (
-            <div className="rounded-md border border-emerald-500/15 bg-emerald-500/[0.06] px-4 py-5 text-sm text-emerald-100">
+            <div className="rounded-md border border-accent-action/15 bg-accent-action/[0.06] px-4 py-5 text-sm text-accent-action-hi">
               No open repair issues for this artist.
             </div>
           ) : (
             <div className="space-y-3">
               {(plan?.items ?? []).map((item) => {
-                const severityTone =
-                  SEVERITY_TONES[item.severity || "low"] || SEVERITY_TONES.low;
                 const detailsSummary = issueDetailsSummary(item.details);
                 const itemKey = repairItemKey(item);
                 const planItemId = repairPlanItemId(item);
@@ -696,7 +685,7 @@ export function ArtistRepairDialog({
                               aria-label={`Select ${checkLabel(
                                 item.check_type,
                               )}`}
-                              className="h-4 w-4 rounded border-white/20 bg-black/25 accent-cyan-400"
+                              className="h-4 w-4 rounded border-white/20 bg-black/25 accent-accent-action"
                               checked={isSelected}
                               disabled={runningAll || runningItemKey != null}
                               onChange={() => toggleSelected(item)}
@@ -705,28 +694,25 @@ export function ArtistRepairDialog({
                         ) : null}
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <CratePill className={severityTone}>
-                              {item.severity || "low"}
-                            </CratePill>
+                            <SeverityMeter
+                              level={item.severity || "low"}
+                              label={item.severity || "low"}
+                            />
                             <CratePill>{checkLabel(item.check_type)}</CratePill>
                             <CratePill
                               className={
                                 item.executable
-                                  ? "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100"
+                                  ? "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi"
                                   : "border-white/10 bg-white/[0.04] text-white/50"
                               }
                             >
                               {supportLabel(item.support)}
                             </CratePill>
                             {riskLabel(item.risk) ? (
-                              <CratePill
-                                className={
-                                  RISK_TONES[item.risk || "caution"] ||
-                                  RISK_TONES.caution
-                                }
-                              >
-                                {riskLabel(item.risk)}
-                              </CratePill>
+                              <SeverityMeter
+                                level={item.risk}
+                                label={riskLabel(item.risk) || "Unknown"}
+                              />
                             ) : null}
                             {scopeLabel(item.scope) ? (
                               <CratePill
@@ -739,7 +725,7 @@ export function ArtistRepairDialog({
                               </CratePill>
                             ) : null}
                             {item.fs_write ? (
-                              <CratePill className="border-cyan-400/20 bg-cyan-400/[0.05] text-cyan-100">
+                              <CratePill className="border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi">
                                 Filesystem
                               </CratePill>
                             ) : null}
@@ -755,7 +741,7 @@ export function ArtistRepairDialog({
                             </div>
                           ) : null}
                           {item.requires_confirmation ? (
-                            <div className="mt-2 text-xs text-amber-200/80">
+                            <div className="mt-2 text-xs text-state-warning-text/80">
                               Review before applying: this fix can change
                               existing library state.
                             </div>
@@ -770,10 +756,10 @@ export function ArtistRepairDialog({
                             <div
                               className={`mt-2 text-xs ${
                                 runState.state === "error"
-                                  ? "text-red-200"
+                                  ? "text-state-warning-text"
                                   : runState.state === "success"
-                                    ? "text-emerald-200"
-                                    : "text-cyan-100"
+                                    ? "text-accent-action-hi"
+                                    : "text-accent-action-hi"
                               }`}
                             >
                               {runState.message}
@@ -843,11 +829,11 @@ export function ArtistRepairDialog({
                     : "No executable fixes available right now"}
               </div>
               {pendingRunSummary ? (
-                <div className="rounded-md border border-amber-500/20 bg-amber-500/[0.08] px-3 py-3 text-xs text-amber-100">
-                  <div className="font-medium text-amber-50">
+                <div className="rounded-md border border-state-warning/20 bg-state-warning/[0.08] px-3 py-3 text-xs text-state-warning-text">
+                  <div className="font-medium text-state-warning-text">
                     Confirm risky repair
                   </div>
-                  <div className="mt-1 text-amber-100/85">
+                  <div className="mt-1 text-state-warning-text/85">
                     This will run {pendingRunSummary.total} selected fix
                     {pendingRunSummary.total === 1 ? "" : "es"} for {artistName}
                     . {pendingRunSummary.risky} need confirmation,{" "}
@@ -867,7 +853,7 @@ export function ArtistRepairDialog({
                     </Button>
                     <Button
                       size="sm"
-                      variant="destructive"
+                      variant="outline"
                       className="gap-2"
                       onClick={() => {
                         if (!pendingRun) return;

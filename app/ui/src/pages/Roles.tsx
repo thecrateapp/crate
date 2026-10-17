@@ -52,7 +52,7 @@ export function Roles() {
     <div className="space-y-6">
       <section className="rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/12 text-primary shadow-[0_18px_40px_rgba(6,182,212,0.14)]">
+          <div className="flex h-12 w-12 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary shadow-none">
             <ShieldCheck size={22} />
           </div>
           <div>
@@ -129,7 +129,7 @@ export function Roles() {
               key={group}
               className="rounded-md border border-white/8 bg-black/15 p-4"
             >
-              <div className="mb-3 text-xs uppercase tracking-[0.16em] text-cyan-200">
+              <div className="mb-3 text-xs uppercase tracking-[0.16em] text-accent-action-hi">
                 {group}
               </div>
               <div className="flex flex-wrap gap-1.5">

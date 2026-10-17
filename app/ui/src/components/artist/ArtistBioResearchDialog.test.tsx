@@ -234,17 +234,17 @@ describe("ArtistBioResearchDialog", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Review changes" }));
 
     expect(screen.getByTestId("bio-change-added")).toHaveClass(
-      "text-state-success-text",
+      "text-accent-action-hi",
     );
     expect(screen.getByTestId("bio-change-removed")).toHaveClass(
-      "text-state-danger-text",
+      "text-state-warning-text",
       "line-through",
     );
     expect(screen.getByTestId("bio-change-updated")).toHaveTextContent(
       "The band formed in 1995.",
     );
     expect(screen.getByText("The band formed in 1994.")).toHaveClass(
-      "text-state-danger-text",
+      "text-state-warning-text",
       "line-through",
     );
     expect(screen.getByTestId("bio-change-updated")).toHaveClass(

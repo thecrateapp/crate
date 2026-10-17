@@ -188,3 +188,13 @@ it("keeps the semantic management table and shows only existing Camelot analysis
     "download",
   );
 });
+
+it("marks synced lyrics as available rather than waiting", () => {
+  render(
+    <TrackTable
+      tracks={[{ ...track, lyrics: { has_synced: true } }]}
+      artist="Converge"
+    />,
+  );
+  expect(screen.getByText("SYNCED")).toHaveClass("text-accent-action-hi");
+});

@@ -44,7 +44,7 @@ export function FederationOverview() {
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <p>{status.data.approved_peer_count} approved peers</p>
-              <p className="text-amber-300">
+              <p className="text-state-warning-text">
                 {status.data.pending_pairing_count} pending pairings
               </p>
             </CardContent>

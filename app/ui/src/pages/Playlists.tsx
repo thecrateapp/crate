@@ -195,14 +195,14 @@ function getGenerationChip(status?: string) {
   }
   if (status === "queued") {
     return (
-      <CrateChip className="border-amber-400/25 bg-amber-400/10 text-[11px] text-amber-200">
+      <CrateChip className="border-state-warning/25 bg-state-warning/10 text-[11px] text-state-warning-text">
         Queued
       </CrateChip>
     );
   }
   if (status === "failed") {
     return (
-      <CrateChip className="border-red-400/25 bg-red-500/10 text-[11px] text-red-200">
+      <CrateChip className="border-state-warning/25 bg-state-warning/10 text-[11px] text-state-warning-text">
         Failed
       </CrateChip>
     );
@@ -371,7 +371,7 @@ export function Playlists() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/12 text-primary shadow-[0_18px_40px_rgba(6,182,212,0.14)]">
+              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary shadow-none">
                 <Layers3 size={22} />
               </div>
               <div>
@@ -607,7 +607,7 @@ export function Playlists() {
                   </ActionIconButton>
                   <ActionIconButton
                     variant="row"
-                    tone="danger"
+                    tone="default"
                     className="h-8 w-8"
                     onClick={() => setDeleteTarget(playlist)}
                   >
@@ -914,7 +914,7 @@ function CreateSmartPlaylistPanel({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/12 text-primary">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary">
                 <Sparkles size={18} />
               </div>
               <div>
@@ -1050,7 +1050,7 @@ function CreateSmartPlaylistPanel({
                     </CrateChip>
                     <ActionIconButton
                       variant="row"
-                      tone="danger"
+                      tone="default"
                       className="h-8 w-8"
                       onClick={() => removeRule(index)}
                       disabled={rules.length === 1}

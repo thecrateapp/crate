@@ -140,12 +140,7 @@ interface UserSession {
   device_model?: string | null;
   device_fingerprint?: string | null;
   activity_state?:
-    | "active"
-    | "recent"
-    | "history"
-    | "expired"
-    | "revoked"
-    | null;
+    "active" | "recent" | "history" | "expired" | "revoked" | null;
   is_active?: boolean | null;
   is_recent?: boolean | null;
 }
@@ -251,7 +246,7 @@ function RolePicker({
             onClick={() => onChange(toggleRole(value, option.value))}
             className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
               active
-                ? "border-cyan-400/35 bg-cyan-400/12 text-cyan-200"
+                ? "border-accent-action/35 bg-accent-action/12 text-accent-action-hi"
                 : "border-white/10 bg-white/[0.03] text-white/50 hover:border-white/20 hover:text-white/80"
             } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
           >
@@ -364,15 +359,17 @@ function activityLabel(status: string) {
 }
 
 function activityBadgeClass(status: string) {
-  if (status === "inactive") return "border-amber-400/25 text-amber-300";
-  if (status === "never_active") return "border-white/10 text-white/45";
-  return "border-green-400/20 text-green-300";
+  if (status === "inactive") return "border-border-quiet text-text-subtle";
+  if (status === "never_active") return "border-border-quiet text-text-subtle";
+  return "border-accent-action/20 text-accent-action-hi";
 }
 
 function statusBadgeClass(status: string) {
-  if (status === "active") return "border-green-400/20 text-green-300";
-  if (status === "suspended") return "border-amber-400/25 text-amber-300";
-  if (status === "deleted") return "border-red-400/25 text-red-300";
+  if (status === "active")
+    return "border-accent-action/20 text-accent-action-hi";
+  if (status === "suspended")
+    return "border-state-warning/25 text-state-warning-text";
+  if (status === "deleted") return "border-border-quiet text-text-subtle";
   return "border-white/10 text-white/55";
 }
 
@@ -462,19 +459,22 @@ function getSessionStatus(session: UserSession) {
       return {
         key: "expired",
         label: "Expired",
-        className: "border-amber-500/25 bg-amber-500/10 text-amber-200",
+        className:
+          "border-state-warning/25 bg-state-warning/10 text-state-warning-text",
       };
     case "active":
       return {
         key: "active",
         label: "Active now",
-        className: "border-green-500/25 bg-green-500/10 text-green-300",
+        className:
+          "border-accent-action/25 bg-accent-action/10 text-accent-action-hi",
       };
     case "recent":
       return {
         key: "recent",
         label: "Recent",
-        className: "border-cyan-400/25 bg-cyan-400/10 text-cyan-200",
+        className:
+          "border-accent-action/25 bg-accent-action/10 text-accent-action-hi",
       };
     default:
       return {
@@ -591,7 +591,7 @@ function UserPresence({
         icon={Activity}
         className={
           user.online_now
-            ? "border-green-500/25 bg-green-500/10 text-green-300"
+            ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
             : "border-white/10 bg-white/[0.04] text-white/55"
         }
       >
@@ -605,7 +605,7 @@ function UserPresence({
         icon={Headphones}
         className={
           user.listening_now
-            ? "border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
+            ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
             : "border-white/10 bg-white/[0.04] text-white/55"
         }
       >
@@ -645,7 +645,7 @@ function CurrentTrackLine({ track }: { track?: CurrentTrack | null }) {
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-sm text-white/65">
-      <Music size={14} className="text-cyan-300" />
+      <Music size={14} className="text-accent-action-hi" />
       <span className="text-white/82">{track.title}</span>
       {track.artist ? (
         <>
@@ -864,7 +864,7 @@ export function Users() {
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/12 text-primary shadow-[0_18px_40px_rgba(6,182,212,0.14)]">
+              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary shadow-none">
                 <UserRound size={22} />
               </div>
               <div>
@@ -883,7 +883,7 @@ export function Users() {
                 icon={Activity}
                 className={
                   counts.online > 0
-                    ? "border-green-500/25 bg-green-500/10 text-green-300"
+                    ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
                     : undefined
                 }
               >
@@ -893,7 +893,7 @@ export function Users() {
                 icon={Headphones}
                 className={
                   counts.listening > 0
-                    ? "border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
+                    ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
                     : undefined
                 }
               >
@@ -1168,7 +1168,6 @@ export function Users() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="border-red-500/25 text-red-300 hover:bg-red-500/10 hover:text-red-200"
                           onClick={() => setDeleteTarget(user)}
                           disabled={userStatus(user) === "deleted"}
                         >
@@ -1656,7 +1655,7 @@ function UserDetailDialog({
                               placeholder="Reason for suspension/deletion"
                             />
                             {statusDraft !== "active" ? (
-                              <p className="text-xs text-amber-200/75">
+                              <p className="text-xs text-state-warning-text/75">
                                 Saving this status revokes open sessions and
                                 blocks future login/refresh attempts.
                               </p>
@@ -1725,8 +1724,8 @@ function UserDetailDialog({
                       </div>
                     </div>
                     {detail.current_track ? (
-                      <div className="rounded-md border border-cyan-400/15 bg-cyan-400/8 p-3">
-                        <div className="mb-1 text-[11px] uppercase tracking-[0.12em] text-cyan-100/70">
+                      <div className="rounded-md border border-accent-action/15 bg-accent-action/8 p-3">
+                        <div className="mb-1 text-[11px] uppercase tracking-[0.12em] text-accent-action-hi/70">
                           {detail.listening_now
                             ? "Currently playing"
                             : "Latest track"}
@@ -1841,7 +1840,7 @@ function UserDetailDialog({
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   {source.online + source.connected > 0 ? (
-                                    <CrateChip className="border-green-500/25 bg-green-500/10 text-green-300 text-[11px]">
+                                    <CrateChip className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi text-[11px]">
                                       {source.online + source.connected} active
                                     </CrateChip>
                                   ) : null}
@@ -1868,7 +1867,7 @@ function UserDetailDialog({
                       </div>
                     ) : null}
                     {staleOpenCount > 0 ? (
-                      <div className="rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-100/80">
+                      <div className="rounded-md border border-state-warning/20 bg-state-warning/10 p-3 text-sm text-state-warning-text/80">
                         {staleOpenCount} open session
                         {staleOpenCount === 1 ? "" : "s"} look stale or
                         historical. They remain valid records, but they are not
@@ -2384,8 +2383,8 @@ function InviteUserDialog({
           </div>
 
           {invite ? (
-            <div className="rounded-md border border-cyan-400/20 bg-cyan-400/8 p-3">
-              <div className="text-xs uppercase tracking-[0.12em] text-cyan-100/70">
+            <div className="rounded-md border border-accent-action/20 bg-accent-action/8 p-3">
+              <div className="text-xs uppercase tracking-[0.12em] text-accent-action-hi/70">
                 Invite link
               </div>
               <div className="mt-2 break-all rounded-md border border-white/8 bg-black/25 p-3 font-mono text-xs text-white/72">

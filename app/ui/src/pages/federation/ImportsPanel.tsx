@@ -70,7 +70,7 @@ export function ImportsPanel({ canManage }: { canManage: boolean }) {
                         </Button>
                         <Button
                           size="sm"
-                          variant="destructive"
+                          variant="outline"
                           onClick={() => void decide(item.request_id, "deny")}
                         >
                           Reject
@@ -104,7 +104,7 @@ export function ImportsPanel({ canManage }: { canManage: boolean }) {
                     </div>
                   </dl>
                   {item.failure_reason ? (
-                    <p className="text-xs text-red-300">
+                    <p className="text-xs text-state-warning-text">
                       {item.failure_reason}
                     </p>
                   ) : null}

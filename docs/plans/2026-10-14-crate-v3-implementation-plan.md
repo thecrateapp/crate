@@ -3,7 +3,7 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Published checkpoints through 1R are recorded in the handover; preserve the next 1S review stop.
+> Diego's go-ahead. Published checkpoints through 1S are recorded in the handover; preserve the next 1T review stop.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -1739,6 +1739,21 @@ Test: `TrackList.test.tsx`, `lists.test.tsx`, `TrackRow.test.tsx`, `AlbumCard.te
 Commit: `feat(ui): restyle track rows and media grids`.
 
 ### Task 1b.6: Admin status colour
+
+**Linux checkpoint 1T, 2026-10-16 — local review.** Diego approved 1S and authorised
+commit/push (`124b36a8`, verified at origin), then this task. Admin state colours now follow
+meaning: accent for active/success, amber plus words for waiting/failure/review, neutral for
+inactive/missing and descriptive metadata. Severity/risk/log levels use the Admin-local neutral
+three-segment `SeverityMeter` plus a word. Destructive triggers are neutral; only shared
+ConfirmDialog owns the destructive confirmation button. The source policy has no exceptions.
+The persistent specimen at `#estado-admin` renders real OpsStatTile, SeverityMeter, IssueList
+and ConfirmDialog with fictional data. Icons remain for 1b.8.
+
+Diego's iteration instruction overrides the capture re-recording step below: do not regenerate
+local canonical baselines or dispatch full CI here. Focused consumer checks and advisory preview
+captures support this local review; canonical Linux CI record/import/comparison and native/AT
+QA remain pending. Stop at 1T before commit/push or 1b.7. Final checks and limitations are in the
+handover. The earlier 1S local-only note is superseded by its publication record.
 
 **Files:**
 

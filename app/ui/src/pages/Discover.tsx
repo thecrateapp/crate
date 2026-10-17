@@ -91,10 +91,10 @@ interface InsightsData {
 }
 
 function completionTone(pct: number) {
-  if (pct >= 100) return "bg-emerald-500";
+  if (pct >= 100) return "bg-accent-action";
   if (pct > 75) return "bg-primary";
-  if (pct > 50) return "bg-amber-400";
-  return "bg-red-400";
+  if (pct > 50) return "bg-state-warning";
+  return "bg-state-warning";
 }
 
 function OpportunityCard({ artist }: { artist: ArtistCompleteness }) {

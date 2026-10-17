@@ -77,7 +77,7 @@ export function PeersPanel({ canManage }: { canManage: boolean }) {
                       ) : null}
                       <Button
                         size="sm"
-                        variant="destructive"
+                        variant="outline"
                         onClick={() =>
                           void mutate(
                             `/api/admin/federation/nodes/${peer.node_uid}/disable`,

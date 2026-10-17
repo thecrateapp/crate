@@ -59,7 +59,7 @@ export function ArtistShowsSection({
             href={show.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-4 p-3 rounded-md border border-amber-500/10 hover:border-amber-500/20 transition-[border-color,background-color] hover:bg-card/80 group"
+            className="flex items-center gap-4 p-3 rounded-md border border-accent-action/10 hover:border-accent-action/20 transition-[border-color,background-color] hover:bg-card/80 group"
           >
             <div className="w-12 h-12 rounded-md overflow-hidden flex-shrink-0 bg-secondary">
               <img
@@ -79,7 +79,10 @@ export function ArtistShowsSection({
                 </span>
               </div>
               <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5">
-                <MapPin size={10} className="text-amber-400/60 flex-shrink-0" />
+                <MapPin
+                  size={10}
+                  className="text-accent-action-hi/60 flex-shrink-0"
+                />
                 <span>{show.venue}</span>
                 <span className="text-muted-foreground/40">&middot;</span>
                 <span>{location}</span>
@@ -97,7 +100,7 @@ export function ArtistShowsSection({
               )}
             </div>
 
-            <div className="text-right flex-shrink-0 text-amber-400">
+            <div className="text-right flex-shrink-0 text-accent-action-hi">
               <div className="text-xs font-semibold">{dateStr}</div>
               {show.price_range && (
                 <div className="text-[10px] text-muted-foreground">
@@ -111,13 +114,13 @@ export function ArtistShowsSection({
               {show.status === "onsale" && (
                 <Badge
                   variant="outline"
-                  className="text-[9px] px-1 py-0 border-amber-500/30 text-amber-400"
+                  className="text-[9px] px-1 py-0 border-accent-action/30 text-accent-action-hi"
                 >
                   On Sale
                 </Badge>
               )}
-              <span className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-amber-500/10">
-                <ExternalLink size={14} className="text-amber-400" />
+              <span className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-accent-action/10">
+                <ExternalLink size={14} className="text-accent-action-hi" />
               </span>
             </div>
           </a>

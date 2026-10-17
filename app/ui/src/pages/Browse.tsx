@@ -593,7 +593,6 @@ export function Browse() {
             <Button
               size="sm"
               variant="outline"
-              className="text-red-500 border-red-500/30"
               onClick={() => setShowBatchDelete(true)}
             >
               <Trash2 size={13} className="mr-1" /> Delete

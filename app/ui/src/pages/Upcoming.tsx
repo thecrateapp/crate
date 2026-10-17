@@ -297,7 +297,7 @@ export function Upcoming() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/12 text-primary shadow-[0_18px_40px_rgba(6,182,212,0.14)]">
+              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary shadow-none">
                 <Calendar size={22} />
               </div>
               <div>
@@ -312,7 +312,7 @@ export function Upcoming() {
             </div>
             <div className="flex flex-wrap gap-2">
               <CrateChip active>{releaseCount} releases</CrateChip>
-              <CrateChip className="border-amber-500/25 bg-amber-500/10 text-amber-200">
+              <CrateChip className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
                 {showCount} shows
               </CrateChip>
               <CrateChip icon={Clock}>{upcoming.length} upcoming</CrateChip>
@@ -594,7 +594,7 @@ function EventCard({
         "group relative overflow-hidden rounded-md border p-3.5 transition-[background-color,border-color,box-shadow] duration-200",
         "bg-white/[0.04] shadow-[0_18px_48px_rgba(0,0,0,0.22)] backdrop-blur-xl hover:bg-white/[0.07]",
         item.tidal_url
-          ? "border-primary/25 shadow-[0_0_22px_rgba(6,182,212,0.15)]"
+          ? "border-primary/25 shadow-none"
           : "border-white/10 hover:border-white/20",
       )}
       onClick={onClick}
@@ -629,7 +629,7 @@ function EventCard({
           )}
           {item.status === "downloaded" && (
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-              <Check size={16} className="text-green-400" />
+              <Check size={16} className="text-accent-action-hi" />
             </div>
           )}
         </div>
@@ -708,7 +708,7 @@ function EventCard({
             )}
           {onDismiss && item.release_id && item.status === "detected" && (
             <ActionIconButton
-              tone="danger"
+              tone="default"
               onClick={(e) => {
                 e.stopPropagation();
                 onDismiss(item.release_id!);
@@ -881,8 +881,8 @@ function CalendarPill({
           className={cn(
             "w-full truncate rounded-md px-2 py-1 text-left text-[10px] transition-colors",
             isShow
-              ? "bg-amber-500/15 text-amber-200 hover:bg-amber-500/25"
-              : "bg-primary/15 text-cyan-200 hover:bg-primary/25",
+              ? "bg-accent-action/15 text-accent-action-hi hover:bg-accent-action/25"
+              : "bg-primary/15 text-accent-action-hi hover:bg-primary/25",
           )}
         >
           {item.artist}
@@ -897,7 +897,7 @@ function CalendarPill({
             <div className="px-3 pb-3">
               <button
                 onClick={onShowClick}
-                className="w-full text-center text-xs text-amber-400 hover:text-amber-300 transition-colors py-1.5 rounded-md bg-amber-500/5 hover:bg-amber-500/10"
+                className="w-full text-center text-xs text-accent-action-hi hover:text-accent-action-hi transition-colors py-1.5 rounded-md bg-accent-action/5 hover:bg-accent-action/10"
               >
                 View full details
               </button>
@@ -1006,7 +1006,7 @@ function ReleasePopoverContent({
             </div>
           )}
         {item.status === "downloaded" && (
-          <CrateChip className="border-green-500/25 bg-green-500/10 text-green-300">
+          <CrateChip className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
             Downloaded
           </CrateChip>
         )}

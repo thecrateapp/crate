@@ -1,7 +1,7 @@
 # Crate v3 design system
 
-Current implementation: checkpoints through 1R are approved and published (`093dcb1f`);
-Task 1b.5 / 1S is local on Linux at `#pistas`, awaiting Diego's review before publication or 1b.6.
+Current implementation: checkpoints through 1S are approved and published (`124b36a8`);
+Task 1b.6 / 1T is local on Linux at `#estado-admin`, awaiting Diego's review before publication or 1b.7.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
 `/Users/diego/Code/crate-v3`, branch `feat/crate_v3`. The handover owns implementation/QA status.
@@ -4204,3 +4204,22 @@ Where the Status differs from the Default (D3, D18, D29, D38), the Status wins.
 | D41 | Visual identity                                                                                                                                                                                                                                                                                                                                               | Crate v3 only; retire complete themes/skins/modes/overrides, preserving design tokens and accessibility/motion                                                                                                                                                                                                                       | amended and accepted 2026-10-15 (PD53); plan 1.13 pending                                                                                                                    |
 | D42 | `StatusDot on` hue                                                                                                                                                                                                                                                                                                                                            | Fixed Crate v3 brand accent; shape and word distinguish state without hue                                                                                                                                                                                                                                                            | amended 2026-10-15 with PD53; no alternate accent variants                                                                                                                   |
 | D43 | Stack sampler placement (4.22): (a) a daemon thread in crate-api behind a Redis leader lock, or (b) crate-worker behind a read-only docker-socket-proxy                                                                                                                                                                                                       | (a): crate-api already mounts the socket and runs the Stack actions, so (b) only pays off if the actions move behind the proxy too and the API drops the socket; (a) keeps the sampler off the event loop with per-call timeouts and a budget. Plan Task 5.5's files follow the answer                                               | decided 2026-10-15: (a) (PD54)                                                                                                                                               |
+
+
+## Linux implementation note — 1T / Admin status colour, 2026-10-16
+
+Admin now maps active/completed/in-library readings to `accent-action-hi`, waiting/review/stale/
+failed readings to `state-warning*` with words, and off/never-active/missing data to neutral roles.
+Provider links, release types, audio quality, shows and task families do not imply warnings.
+The Admin-local `SeverityMeter` renders three neutral segments and a word for severity, repair
+risk and log levels; its segments are decorative (`aria-hidden`). Health, artist repair,
+scanner issues, logs, task log events, playlist-refinement issues and translation-quality issues
+use it. Aggregate operational failure/waiting counts retain amber state semantics.
+
+Destructive triggers use neutral controls. Danger remains inside the shared ConfirmDialog's
+actual confirmation action. `status-colour-policy.test.ts` rejects chromatic utility families,
+legacy green/red semantic aliases, direct destructive props and local identifier-bound variants/
+icon tones outside ConfirmDialog. Its allowlist is empty. This is a source-policy guard, not a
+proof of arbitrary runtime prop or CSS data flow; consumer tests cover representative meaning.
+Icon retirement and page geometry remain their later tasks. The real-component specimen is at
+`#estado-admin`; advisory Chromium captures do not replace canonical Linux CI or native/AT QA.

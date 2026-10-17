@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@crate/ui/lib/cn";
 
 type OpsTone = "default" | "primary" | "success" | "warning" | "danger";
 
@@ -10,31 +10,31 @@ function toneClasses(tone: OpsTone) {
     case "primary":
       return {
         iconWrap:
-          "border-cyan-400/20 bg-cyan-400/12 text-primary shadow-[0_18px_40px_rgba(6,182,212,0.14)]",
-        value: "text-white",
+          "border-accent-action/20 bg-accent-action/12 text-primary shadow-none",
+        value: "text-text-primary",
       };
     case "success":
       return {
         iconWrap:
-          "border-emerald-400/20 bg-emerald-400/12 text-emerald-300 shadow-[0_18px_40px_rgba(16,185,129,0.14)]",
-        value: "text-emerald-200",
+          "border-accent-action/20 bg-accent-action/12 text-accent-action-hi shadow-none",
+        value: "text-accent-action-hi",
       };
     case "warning":
       return {
         iconWrap:
-          "border-amber-400/20 bg-amber-400/12 text-amber-200 shadow-[0_18px_40px_rgba(245,158,11,0.14)]",
-        value: "text-amber-100",
+          "border-state-warning/20 bg-state-warning/12 text-state-warning-text shadow-none",
+        value: "text-state-warning-text",
       };
     case "danger":
       return {
         iconWrap:
-          "border-red-400/20 bg-red-500/12 text-red-200 shadow-[0_18px_40px_rgba(239,68,68,0.14)]",
-        value: "text-red-100",
+          "border-state-warning/20 bg-state-warning/12 text-state-warning-text shadow-none",
+        value: "text-state-warning-text",
       };
     default:
       return {
         iconWrap: "border-white/10 bg-white/[0.05] text-white/65",
-        value: "text-white",
+        value: "text-text-primary",
       };
   }
 }
@@ -64,7 +64,7 @@ export function OpsPageHero({
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/12 text-primary shadow-[0_18px_40px_rgba(6,182,212,0.14)]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary shadow-none">
               <Icon size={22} />
             </div>
             <div>

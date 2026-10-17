@@ -1,3 +1,4 @@
+import { SeverityMeter } from "@/components/admin/status-indicators";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -133,17 +134,17 @@ function statusLabel(status: string) {
 }
 
 function statusBadgeClass(status: string) {
-  if (status === "needs_review") {
-    return "border-cyan-400/30 bg-cyan-400/10 text-cyan-200";
+  if (status === "needs_review" || status === "pending") {
+    return "border-state-warning/25 bg-state-warning/10 text-state-warning-text";
   }
-  if (status === "published") {
-    return "border-emerald-400/25 bg-emerald-400/10 text-emerald-200";
+  if (status === "published" || status === "drafting_ai") {
+    return "border-accent-action/25 bg-accent-action/10 text-accent-action-hi";
   }
   if (status === "rejected") {
-    return "border-red-400/25 bg-red-400/10 text-red-200";
+    return "border-state-warning/25 bg-state-warning/10 text-state-warning-text";
   }
   if (status === "manual_required") {
-    return "border-amber-400/25 bg-amber-400/10 text-amber-200";
+    return "border-state-warning/25 bg-state-warning/10 text-state-warning-text";
   }
   return "border-white/10 bg-white/5 text-white/65";
 }
@@ -488,7 +489,7 @@ export function I18nReview() {
       <section className="rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
         <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
-            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-md border border-cyan-400/25 bg-cyan-400/10 text-cyan-200">
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-md border border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
               <Languages size={21} />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-white">
@@ -529,8 +530,8 @@ export function I18nReview() {
               className={cn(
                 "rounded-md border px-3 py-2 text-sm font-semibold transition-colors",
                 activeTab === tab.id
-                  ? "border-cyan-400/35 bg-cyan-400/12 text-cyan-100"
-                  : "border-white/10 bg-white/[0.03] text-white/58 hover:border-cyan-400/25 hover:text-cyan-100",
+                  ? "border-accent-action/35 bg-accent-action/12 text-accent-action-hi"
+                  : "border-white/10 bg-white/[0.03] text-white/58 hover:border-accent-action/25 hover:text-accent-action-hi",
               )}
             >
               {tab.label}
@@ -642,7 +643,7 @@ function OverviewSection({
       {loading ? (
         <LoadingBlock />
       ) : error ? (
-        <div className="p-5 text-sm text-red-200">{error}</div>
+        <div className="p-5 text-sm text-state-warning-text">{error}</div>
       ) : (
         <div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">
           {localeHealth.map((health) => (
@@ -786,10 +787,10 @@ function BundlesSection({
       {loading ? (
         <LoadingBlock />
       ) : error ? (
-        <div className="p-5 text-sm text-red-200">{error}</div>
+        <div className="p-5 text-sm text-state-warning-text">{error}</div>
       ) : bundles.length === 0 ? (
         <div className="flex min-h-56 flex-col items-center justify-center gap-3 px-6 text-center">
-          <CheckCircle2 size={30} className="text-emerald-300/80" />
+          <CheckCircle2 size={30} className="text-accent-action-hi/80" />
           <div>
             <p className="font-semibold text-white">No bundles match filters</p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -812,7 +813,7 @@ function BundlesSection({
                 onClick={() => void onSelectBundle(bundle)}
                 className={cn(
                   "block w-full px-5 py-4 text-left transition-colors hover:bg-white/[0.04]",
-                  selected && "bg-cyan-400/[0.06]",
+                  selected && "bg-accent-action/[0.06]",
                 )}
               >
                 <div className="flex items-start justify-between gap-4">
@@ -971,7 +972,7 @@ function EditorSection({
                   key={key}
                   className="grid grid-cols-[minmax(0,0.24fr)_minmax(0,0.24fr)_minmax(0,0.36fr)_auto] items-start gap-4 px-4 py-3 text-sm"
                 >
-                  <code className="break-words font-mono text-xs text-cyan-100/80">
+                  <code className="break-words font-mono text-xs text-accent-action-hi/80">
                     {key}
                   </code>
                   <span className="break-words text-white/38">
@@ -984,7 +985,7 @@ function EditorSection({
                       onChange={(event) =>
                         onDraftChange(key, event.target.value)
                       }
-                      className="min-h-16 w-full resize-y rounded-md border border-white/10 bg-black/18 px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-white/28 focus:border-cyan-400/45"
+                      className="min-h-16 w-full resize-y rounded-md border border-white/10 bg-black/18 px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-white/28 focus:border-accent-action/45"
                     />
                     <div className="flex flex-wrap gap-2">
                       <Button
@@ -1031,7 +1032,7 @@ function EditorSection({
                   Exported JSON
                 </h3>
               </div>
-              <pre className="max-h-72 overflow-auto p-4 text-xs text-cyan-50/82">
+              <pre className="max-h-72 overflow-auto p-4 text-xs text-accent-action-hi/82">
                 {exportedJson}
               </pre>
             </div>
@@ -1076,8 +1077,8 @@ function QualityIssues({
           variant="outline"
           className={
             issues.length > 0
-              ? "border-red-400/25 bg-red-400/10 text-red-200"
-              : "border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
+              ? "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
+              : "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
           }
         >
           {issues.length > 0 ? "Needs work" : "Clean"}
@@ -1095,18 +1096,17 @@ function QualityIssues({
               className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[minmax(0,0.3fr)_minmax(0,0.7fr)]"
             >
               <div className="min-w-0">
-                <Badge
-                  variant="outline"
-                  className={
-                    issue.severity === "error"
-                      ? "border-red-400/25 bg-red-400/10 text-red-200"
-                      : "border-amber-400/25 bg-amber-400/10 text-amber-200"
-                  }
-                >
-                  {issue.code}
-                </Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <SeverityMeter
+                    level={issue.severity}
+                    label={issue.severity}
+                  />
+                  <code className="font-mono text-meta text-text-secondary">
+                    {issue.code}
+                  </code>
+                </div>
                 {issue.key ? (
-                  <code className="mt-2 block truncate font-mono text-xs text-cyan-100/80">
+                  <code className="mt-2 block truncate font-mono text-xs text-accent-action-hi/80">
                     {issue.key}
                   </code>
                 ) : null}
@@ -1132,7 +1132,7 @@ function MessageStatusBadge({
     return (
       <Badge
         variant="outline"
-        className="border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
+        className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
       >
         ok
       </Badge>
@@ -1149,8 +1149,8 @@ function MessageStatusBadge({
       variant="outline"
       className={
         status === "stale" || status === "missing"
-          ? "border-amber-400/25 bg-amber-400/10 text-amber-200"
-          : "border-red-400/25 bg-red-400/10 text-red-200"
+          ? "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
+          : "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
       }
     >
       {status}
@@ -1207,7 +1207,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-9 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-white outline-none transition-colors hover:border-cyan-400/25 focus:border-cyan-400/45"
+        className="h-9 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-white outline-none transition-colors hover:border-accent-action/25 focus:border-accent-action/45"
       >
         {options.map((option) => (
           <option

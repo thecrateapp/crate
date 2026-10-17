@@ -286,8 +286,8 @@ export function Setup() {
           {/* Step 3: Done */}
           {step === 3 && (
             <div className="text-center">
-              <div className="w-16 h-16 rounded-md bg-green-500/10 flex items-center justify-center mx-auto mb-4">
-                <Check size={32} className="text-green-500" />
+              <div className="w-16 h-16 rounded-md bg-accent-action/10 flex items-center justify-center mx-auto mb-4">
+                <Check size={32} className="text-accent-action-hi" />
               </div>
               <h2 className="text-lg font-bold mb-2">You're all set!</h2>
               <p className="text-sm text-muted-foreground mb-6">

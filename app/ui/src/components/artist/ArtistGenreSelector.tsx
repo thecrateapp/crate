@@ -131,7 +131,7 @@ export function ArtistGenreSelector({
               Loading taxonomy...
             </p>
           ) : error ? (
-            <p className="px-3 py-5 text-sm text-red-300">
+            <p className="px-3 py-5 text-sm text-state-warning-text">
               Failed to load taxonomy.
             </p>
           ) : filteredNodes.length ? (

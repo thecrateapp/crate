@@ -651,7 +651,7 @@ export function SplitAlbumDialog({
           </div>
 
           {selectsEveryTrack ? (
-            <div className="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+            <div className="rounded-md border border-state-warning/20 bg-state-warning/10 px-3 py-2 text-sm text-state-warning-text">
               Leave at least one track in the source album. Use album move/merge
               when the whole album belongs somewhere else.
             </div>
@@ -1150,7 +1150,7 @@ export function Album() {
           <Button
             size="sm"
             variant="outline"
-            className="border-green-500/30 text-green-500 hover:bg-green-500/10"
+            className="border-accent-action/30 text-accent-action-hi hover:bg-accent-action/10"
             onClick={findMatches}
             disabled={matching}
           >
@@ -1192,7 +1192,6 @@ export function Album() {
           <Button
             size="sm"
             variant="outline"
-            className="border-red-500/30 text-red-400 hover:text-red-300 hover:bg-red-500/10"
             onClick={() => setShowDeleteConfirm(true)}
           >
             <Trash2 size={14} className="mr-1" /> Delete

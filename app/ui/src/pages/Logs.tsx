@@ -1,3 +1,5 @@
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
+import { SeverityMeter } from "@/components/admin/status-indicators";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -63,30 +65,6 @@ const KNOWN_CATEGORIES = [
   "system",
 ];
 
-const LEVEL_META: Record<string, { dot: string; text: string; pill: string }> =
-  {
-    error: {
-      dot: "bg-red-400",
-      text: "text-red-100",
-      pill: "border-red-500/25 bg-red-500/10 text-red-100",
-    },
-    warn: {
-      dot: "bg-amber-400",
-      text: "text-amber-100",
-      pill: "border-amber-500/25 bg-amber-500/10 text-amber-100",
-    },
-    info: {
-      dot: "bg-cyan-400",
-      text: "text-white/80",
-      pill: "border-cyan-400/25 bg-cyan-400/10 text-cyan-100",
-    },
-    debug: {
-      dot: "bg-white/25",
-      text: "text-white/55",
-      pill: "border-white/10 bg-white/[0.04] text-white/55",
-    },
-  };
-
 function formatLogTimestamp(ts: string) {
   try {
     const date = new Date(ts);
@@ -130,7 +108,7 @@ function WorkerTile({
       className={cn(
         "rounded-md border bg-black/20 p-3 text-left transition-colors",
         active
-          ? "border-cyan-400/25 bg-cyan-400/10"
+          ? "border-accent-action/25 bg-accent-action/10"
           : "border-white/8 hover:border-white/16 hover:bg-white/[0.04]",
       )}
     >
@@ -143,15 +121,10 @@ function WorkerTile({
             {worker.log_count} log lines seen
           </div>
         </div>
-        <CrateChip
-          className={
-            online
-              ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
-              : ""
-          }
-        >
-          {online ? "Online" : "Idle"}
-        </CrateChip>
+        <StatusDot
+          tone={online ? "on" : "off"}
+          label={online ? "Online" : "Idle"}
+        />
       </div>
       <div className="mt-3 text-xs text-white/35">
         Last seen {timeAgo(worker.last_seen)}
@@ -162,27 +135,22 @@ function WorkerTile({
 
 function LogRow({ entry }: { entry: LogEntry }) {
   const level = entry.level.toLowerCase();
-  const meta = LEVEL_META[level] ?? LEVEL_META.info!;
+  const messageTone =
+    level === "debug" ? "text-text-muted" : "text-text-secondary";
   const metadata = metadataPreview(entry.metadata);
 
   return (
     <div
       className={cn(
         "grid gap-3 border-b border-white/6 px-4 py-3 font-mono text-[11px] transition-colors hover:bg-white/[0.03] md:grid-cols-[78px_68px_minmax(0,1fr)]",
-        level === "error" && "bg-red-500/[0.04]",
       )}
     >
       <div className="text-white/25 tabular-nums">
         {formatLogTimestamp(entry.created_at)}
       </div>
-      <div className="flex items-center gap-2">
-        <span className={cn("h-2 w-2 rounded-full", meta.dot)} />
-        <span className={cn("uppercase tracking-[0.12em]", meta.text)}>
-          {level}
-        </span>
-      </div>
+      <SeverityMeter level={level} label={level} />
       <div className="min-w-0 space-y-1">
-        <div className={cn("break-words leading-5", meta.text)}>
+        <div className={cn("break-words leading-5", messageTone)}>
           {entry.message}
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[10px] text-white/35">
@@ -372,12 +340,12 @@ export function Logs() {
           {summary.onlineWorkers}/{workers.length} workers online
         </CratePill>
         {summary.errors > 0 ? (
-          <CratePill className="border-red-500/25 bg-red-500/10 text-red-100">
+          <CratePill className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
             {summary.errors} errors
           </CratePill>
         ) : null}
         {summary.warnings > 0 ? (
-          <CratePill className="border-amber-500/25 bg-amber-500/10 text-amber-100">
+          <CratePill className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
             {summary.warnings} warnings
           </CratePill>
         ) : null}
@@ -515,8 +483,8 @@ export function Logs() {
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/6 px-4 py-3">
             <div className="flex flex-wrap items-center gap-2">
               {level ? (
-                <CrateChip className={LEVEL_META[level]?.pill}>
-                  {level}
+                <CrateChip>
+                  <SeverityMeter level={level} label={level} />
                 </CrateChip>
               ) : null}
               {category ? <CrateChip>{category}</CrateChip> : null}

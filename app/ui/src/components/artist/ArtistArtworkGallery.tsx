@@ -376,7 +376,7 @@ export function ArtistArtworkGallery({
                   <Button
                     type="button"
                     size="icon"
-                    variant="destructive"
+                    variant="outline"
                     aria-label={`Delete ${asset.label}`}
                     className="absolute right-2 top-2 z-10 h-9 w-9 shadow-lg"
                     disabled={busy !== null}

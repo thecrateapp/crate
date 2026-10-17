@@ -77,6 +77,7 @@ import "./style.css";
 import { FormsCheckpoint } from "./forms-checkpoint";
 import { SelectionCheckpoint } from "./selection-checkpoint";
 import { TabsCheckpoint } from "./tabs-checkpoint";
+import { StatusColourCheckpoint } from "./status-colour-checkpoint";
 import { TracksCheckpoint } from "./tracks-checkpoint";
 import { StatesCheckpoint } from "./states-checkpoint";
 
@@ -1626,6 +1627,7 @@ function App() {
       <TabsCheckpoint />
       <StatesCheckpoint />
       <TracksCheckpoint />
+      <StatusColourCheckpoint />
       <AppModal
         open={sampleModalOpen}
         onClose={() => setSampleModalOpen(false)}
@@ -1704,6 +1706,7 @@ function App() {
             "1Q publicado",
             "1R publicado",
             "1S publicado",
+            "1T publicado",
           ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>

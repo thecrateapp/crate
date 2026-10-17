@@ -85,7 +85,11 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
   if (loading)
     return <p className="text-sm text-white/45">Loading directories…</p>;
   if (error)
-    return <p className="text-sm text-red-400">Could not load directories.</p>;
+    return (
+      <p className="text-sm text-state-warning-text">
+        Could not load directories.
+      </p>
+    );
 
   return (
     <div className="space-y-4">
@@ -159,7 +163,7 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
                     </div>
                   </dl>
                   {subscription.last_error_code ? (
-                    <p className="mt-2 text-xs text-red-400">
+                    <p className="mt-2 text-xs text-state-warning-text">
                       {subscription.last_error_code}:{" "}
                       {subscription.last_error_detail}
                     </p>
@@ -210,7 +214,7 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
                     </Button>
                     <Button
                       size="sm"
-                      variant="destructive"
+                      variant="outline"
                       onClick={() => {
                         if (
                           !window.confirm("Delete this directory subscription?")
@@ -285,7 +289,7 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
                         ) : null}
                       </div>
                       {candidate.metadata_json.approved_peer_diff ? (
-                        <div className="mt-2 rounded-lg bg-amber-500/10 p-2 text-xs text-amber-300">
+                        <div className="mt-2 rounded-lg bg-state-warning/10 p-2 text-xs text-state-warning-text">
                           Descriptor changed. Review URL/key differences before
                           approving.
                         </div>

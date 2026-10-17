@@ -290,8 +290,8 @@ function ReviewChanges({ result }: { result: ResearchResult }) {
   return (
     <div className="space-y-3" data-testid="artist-bio-review-changes">
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-muted">
-        <span className="text-state-success-text">Added</span>
-        <span className="text-state-danger-text">Removed</span>
+        <span className="text-accent-action-hi">Added</span>
+        <span className="text-state-warning-text">Removed</span>
         <span className="text-state-warning-text">Updated</span>
       </div>
       <div className="space-y-2 text-sm leading-relaxed">
@@ -307,19 +307,19 @@ function ReviewChanges({ result }: { result: ResearchResult }) {
                 className="rounded-md border border-state-warning bg-state-warning/5 p-3"
               >
                 {change.previous_text ? (
-                  <p className="text-state-danger-text line-through">
+                  <p className="text-state-warning-text line-through">
                     {change.previous_text}
                   </p>
                 ) : null}
-                <p className="mt-1 text-state-success-text">{change.text}</p>
+                <p className="mt-1 text-accent-action-hi">{change.text}</p>
               </div>
             );
           }
           const className =
             change.status === "added"
-              ? "text-state-success-text"
+              ? "text-accent-action-hi"
               : change.status === "removed"
-                ? "text-state-danger-text line-through"
+                ? "text-state-warning-text line-through"
                 : "text-text-secondary-strong";
           return (
             <p
@@ -492,7 +492,7 @@ function ResearchDialogBody({
       {error ? (
         <div
           role="alert"
-          className="flex items-start gap-3 rounded-lg border border-state-danger/25 bg-state-danger/5 p-4 text-sm text-state-danger-text"
+          className="flex items-start gap-3 rounded-lg border border-state-warning/25 bg-state-warning/5 p-4 text-sm text-state-warning-text"
         >
           <AlertTriangle size={17} className="mt-0.5 shrink-0" />
           <div className="space-y-2">

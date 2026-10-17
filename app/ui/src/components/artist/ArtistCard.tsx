@@ -83,7 +83,7 @@ export function ArtistCard({
         ) : null}
         {hasIssues ? (
           <div className="absolute right-2 top-2 z-10">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md border border-amber-400/20 bg-amber-500/12 text-amber-300">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md border border-state-warning/20 bg-state-warning/12 text-state-warning-text">
               <Wrench size={13} />
             </div>
           </div>

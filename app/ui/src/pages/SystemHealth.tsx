@@ -293,7 +293,7 @@ function ChartTooltip({
 }) {
   return (
     <div className="min-w-[180px] rounded-sm border border-white/10 bg-panel-surface/95 px-3 py-3 text-xs text-white shadow-[0_18px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-      <div className="text-[10px] uppercase tracking-[0.14em] text-cyan-200/65">
+      <div className="text-[10px] uppercase tracking-[0.14em] text-accent-action-hi/65">
         Metric slice
       </div>
       <div className="mt-2 font-medium text-white">{title}</div>
@@ -315,16 +315,16 @@ function ChartTooltip({
 function HealthSignal({ score, summary }: { score: number; summary: string }) {
   const color =
     score >= 80
-      ? "text-emerald-300"
+      ? "text-accent-action-hi"
       : score >= 50
-        ? "text-amber-200"
-        : "text-red-200";
+        ? "text-state-warning-text"
+        : "text-state-warning-text";
   const bg =
     score >= 80
-      ? "border-emerald-400/25 bg-emerald-500/[0.08]"
+      ? "border-accent-action/25 bg-accent-action/[0.08]"
       : score >= 50
-        ? "border-amber-400/25 bg-amber-500/[0.08]"
-        : "border-red-400/25 bg-red-500/[0.08]";
+        ? "border-state-warning/25 bg-state-warning/[0.08]"
+        : "border-state-warning/25 bg-state-warning/[0.08]";
 
   return (
     <div
@@ -593,10 +593,10 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
                 const isSlow = route.p95 >= 1000;
                 const isVerySlow = route.p95 >= 3000 || route.error_rate > 0.01;
                 const barColor = isVerySlow
-                  ? "bg-red-400"
+                  ? "bg-state-warning"
                   : isSlow
-                    ? "bg-amber-400"
-                    : "bg-cyan-400";
+                    ? "bg-state-warning"
+                    : "bg-accent-action";
 
                 return (
                   <div
@@ -643,9 +643,9 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
                       <span
                         className={`text-sm font-medium tabular-nums ${
                           isVerySlow
-                            ? "text-red-100"
+                            ? "text-state-warning-text"
                             : isSlow
-                              ? "text-amber-100"
+                              ? "text-state-warning-text"
                               : "text-white/80"
                         }`}
                       >
@@ -659,7 +659,7 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
                       <span
                         className={`text-sm font-medium tabular-nums ${
                           route.error_rate > 0
-                            ? "text-red-100"
+                            ? "text-state-warning-text"
                             : "text-white/65"
                         }`}
                       >
@@ -696,24 +696,24 @@ function PlaybackTranscodingOverview({
   const runtime = delivery?.runtime;
   const variantsTotal = Math.max(1, stats?.variants ?? 0);
   const statuses = [
-    { label: "Ready", value: stats?.ready ?? 0, color: "bg-emerald-400" },
-    { label: "Running", value: stats?.running ?? 0, color: "bg-cyan-400" },
+    { label: "Ready", value: stats?.ready ?? 0, color: "bg-accent-action" },
+    { label: "Running", value: stats?.running ?? 0, color: "bg-accent-action" },
     {
       label: "Active pending",
       value: stats?.pending_active ?? stats?.pending ?? 0,
-      color: "bg-amber-400",
+      color: "bg-state-warning",
     },
     {
       label: "Unassigned",
       value: stats?.pending_unassigned ?? 0,
-      color: "bg-yellow-300",
+      color: "bg-state-warning",
     },
     {
       label: "Stale pending",
       value: stats?.pending_stale ?? 0,
-      color: "bg-orange-500",
+      color: "bg-state-warning",
     },
-    { label: "Failed", value: stats?.failed ?? 0, color: "bg-red-400" },
+    { label: "Failed", value: stats?.failed ?? 0, color: "bg-state-warning" },
     { label: "Missing", value: stats?.missing ?? 0, color: "bg-white/35" },
   ];
   const completed = completedSummary?.count ?? 0;
@@ -855,11 +855,12 @@ function PlaybackTranscodingOverview({
                     </div>
                     <CrateChip
                       className={
-                        variant.status === "ready"
-                          ? "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100"
+                        variant.status === "ready" ||
+                        variant.status === "running"
+                          ? "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi"
                           : variant.status === "failed"
-                            ? "border-red-500/20 bg-red-500/[0.08] text-red-100"
-                            : "border-amber-500/20 bg-amber-500/[0.06] text-amber-100"
+                            ? "border-state-warning/20 bg-state-warning/[0.08] text-state-warning-text"
+                            : "border-state-warning/20 bg-state-warning/[0.06] text-state-warning-text"
                       }
                     >
                       {variant.status}
@@ -1020,7 +1021,7 @@ export function SystemHealth() {
           <CrateChip
             className={
               Number(errorRate) > 1
-                ? "border-red-500/25 bg-red-500/10 text-red-100"
+                ? "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
                 : undefined
             }
           >
@@ -1050,8 +1051,8 @@ export function SystemHealth() {
             icon={Gauge}
             className={
               system.resource_pressure.allowed
-                ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-100"
-                : "border-amber-500/25 bg-amber-500/10 text-amber-100"
+                ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
+                : "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
             }
           >
             {system.resource_pressure.allowed ? "Batch open" : "Batch deferred"}
@@ -1174,9 +1175,9 @@ export function SystemHealth() {
                   max={system.disk.music.total_gb}
                   color={
                     system.disk.music.percent > 90
-                      ? "bg-red-500"
+                      ? "bg-state-warning"
                       : system.disk.music.percent > 75
-                        ? "bg-amber-500"
+                        ? "bg-state-warning"
                         : "bg-primary"
                   }
                   label={`${system.disk.music.free_gb} GB free`}
@@ -1195,9 +1196,9 @@ export function SystemHealth() {
                   max={system.disk.data.total_gb}
                   color={
                     system.disk.data.percent > 90
-                      ? "bg-red-500"
+                      ? "bg-state-warning"
                       : system.disk.data.percent > 75
-                        ? "bg-amber-500"
+                        ? "bg-state-warning"
                         : "bg-primary"
                   }
                   label={`${system.disk.data.free_gb} GB free`}
@@ -1219,7 +1220,7 @@ export function SystemHealth() {
                   max={system.db_pool.size}
                   color={
                     system.db_pool.checked_out >= system.db_pool.size
-                      ? "bg-red-500"
+                      ? "bg-state-warning"
                       : "bg-primary"
                   }
                   label={`${system.db_pool.checked_in} idle, ${system.db_pool.checked_out} active`}
@@ -1283,7 +1284,7 @@ export function SystemHealth() {
                   color={
                     system.resource_pressure.allowed
                       ? "bg-primary"
-                      : "bg-amber-500"
+                      : "bg-state-warning"
                   }
                   label={
                     system.resource_pressure.reason
@@ -1341,7 +1342,7 @@ export function SystemHealth() {
                   max={Math.max(1, system.media_worker.max_active ?? 1)}
                   color={
                     system.media_worker.pending > 0
-                      ? "bg-amber-500"
+                      ? "bg-state-warning"
                       : "bg-primary"
                   }
                   label={`${

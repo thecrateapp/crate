@@ -20,18 +20,22 @@ import {
 
 function markerIcon(group: MapUserGroup): L.DivIcon {
   const primaryUser = group.users[0]!;
-  const color = primaryUser.now_playing
-    ? "#06b6d4"
+  const color =
+    primaryUser.now_playing || primaryUser.online
+      ? "var(--accent-action-hi)"
+      : "var(--text-subtle)";
+  const state = primaryUser.now_playing
+    ? "Playing"
     : primaryUser.online
-      ? "#22c55e"
-      : "#6b7280";
+      ? "Online"
+      : "Offline";
   const label = group.users.length > 1 ? String(group.users.length) : "";
 
   return L.divIcon({
     className: "",
     iconSize: [30, 30],
     iconAnchor: [15, 15],
-    html: `<div style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:999px;background:${color};border:3px solid #0a0a14;box-shadow:0 0 12px ${color}66;color:#0a0a14;font-size:11px;font-weight:800">${label}</div>`,
+    html: `<div role="img" aria-label="${state}" style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:999px;background:${color};border:3px solid var(--surface-canvas);box-shadow:0 0 12px color-mix(in srgb,${color} 40%,transparent);color:var(--surface-canvas);font-size:11px;font-weight:800">${label}</div>`,
   });
 }
 
@@ -50,12 +54,12 @@ function activityLabel(user: MapUser) {
 
 function activityClass(user: MapUser) {
   if (user.activity_status === "inactive") {
-    return "border-amber-400/25 bg-amber-400/10 text-amber-200";
+    return "border-border-quiet bg-surface-card text-text-subtle";
   }
   if (user.activity_status === "never_active") {
     return "border-white/10 bg-white/5 text-white/50";
   }
-  return "border-green-400/25 bg-green-400/10 text-green-200";
+  return "border-accent-action/25 bg-accent-action/10 text-accent-action-hi";
 }
 
 function statusLabel(status?: string | null) {
@@ -142,7 +146,7 @@ function UserDetails({
           {statusLabel(user.status)}
         </span>
         {user.online ? (
-          <span className="inline-flex items-center rounded-md border border-green-400/25 bg-green-400/10 px-1.5 py-0.5 text-green-200">
+          <span className="inline-flex items-center rounded-md border border-accent-action/25 bg-accent-action/10 px-1.5 py-0.5 text-accent-action-hi">
             Online
           </span>
         ) : null}
@@ -169,8 +173,8 @@ function UserDetails({
       </div>
 
       {track ? (
-        <div className="rounded-md border border-cyan-400/15 bg-cyan-400/8 p-2 text-xs">
-          <div className="mb-1 flex items-center gap-1 text-[10px] uppercase tracking-[0.12em] text-cyan-100/60">
+        <div className="rounded-md border border-accent-action/15 bg-accent-action/8 p-2 text-xs">
+          <div className="mb-1 flex items-center gap-1 text-[10px] uppercase tracking-[0.12em] text-accent-action-hi/60">
             <Headphones size={10} />
             {user.listening_now ? "Currently playing" : "Latest track"}
           </div>
@@ -248,10 +252,10 @@ export function UserMap({
         </div>
         <div className="flex flex-wrap gap-2 text-[11px] text-white/45">
           <span className="inline-flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full bg-green-400" /> Online
+            <span className="h-2 w-2 rounded-full bg-accent-action" /> Online
           </span>
           <span className="inline-flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full bg-cyan-400" /> Listening
+            <span className="h-2 w-2 rounded-full bg-accent-action" /> Listening
           </span>
           <span className="inline-flex items-center gap-1">
             <span className="h-2 w-2 rounded-full bg-gray-500" /> Offline

@@ -99,7 +99,7 @@ export function ArtistRow({
           </div>
         )}
         {hasIssues ? (
-          <div className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-md bg-amber-500/12 text-amber-300">
+          <div className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-md bg-state-warning/12 text-state-warning-text">
             <Wrench size={10} />
           </div>
         ) : null}

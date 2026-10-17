@@ -322,12 +322,12 @@ const STATUS_ICONS: Record<string, typeof Loader2> = {
   failed: XCircle,
 };
 const STATUS_COLORS: Record<string, string> = {
-  downloading: "text-blue-500",
-  queued: "text-yellow-500",
-  processing: "text-blue-500",
-  wishlist: "text-pink-500",
-  completed: "text-green-500",
-  failed: "text-red-500",
+  downloading: "text-accent-action-hi",
+  queued: "text-state-warning-text",
+  processing: "text-accent-action-hi",
+  wishlist: "text-accent-action-hi",
+  completed: "text-accent-action-hi",
+  failed: "text-state-warning-text",
 };
 
 // Session persistence helpers — survive navigation, cleared on tab close
@@ -650,7 +650,7 @@ export function DownloadPage() {
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/12 text-primary shadow-[0_18px_40px_rgba(6,182,212,0.14)]">
+              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary shadow-none">
                 <Download size={22} />
               </div>
               <div>
@@ -667,8 +667,8 @@ export function DownloadPage() {
               <CrateChip
                 className={
                   tidalAuthenticated
-                    ? "border-green-500/25 bg-green-500/10 text-green-300"
-                    : "border-red-500/25 bg-red-500/10 text-red-300"
+                    ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
+                    : "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
                 }
               >
                 Tidal {tidalAuthenticated ? "connected" : "disconnected"}
@@ -676,7 +676,7 @@ export function DownloadPage() {
               <CrateChip
                 className={
                   activeQueue.length > 0
-                    ? "border-blue-500/25 bg-blue-500/10 text-blue-300"
+                    ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
                     : ""
                 }
               >
@@ -1178,7 +1178,7 @@ export function DownloadPage() {
                 Import to library
               </Button>
               {uploadTaskId && (
-                <div className="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-300">
+                <div className="rounded-md border border-accent-action/20 bg-accent-action/10 px-3 py-2 text-sm text-accent-action-hi dark:text-accent-action-hi">
                   Upload queued as task{" "}
                   <span className="font-mono">{uploadTaskId}</span>
                 </div>
@@ -1216,7 +1216,7 @@ export function DownloadPage() {
                 </Button>
                 <Button
                   size="sm"
-                  variant="destructive"
+                  variant="outline"
                   onClick={async () => {
                     await api(
                       "/api/acquisition/queue/cleanup-incomplete",
@@ -1255,7 +1255,7 @@ export function DownloadPage() {
                         {d.filename || d.album}
                       </div>
                       <div className="text-xs text-muted-foreground flex items-center gap-2">
-                        <Badge className="bg-purple-500/10 text-purple-400 border-0 text-[10px] px-1 py-0">
+                        <Badge className="bg-accent-action/10 text-accent-action-hi border-0 text-[10px] px-1 py-0">
                           SLSK
                         </Badge>
                         <span>from {d.username}</span>
@@ -1267,7 +1267,7 @@ export function DownloadPage() {
                       {d.progress > 0 && d.progress < 100 && (
                         <div className="h-1 bg-secondary rounded-md mt-1 overflow-hidden">
                           <div
-                            className="h-full bg-purple-500 rounded-md transition-[width,background-color]"
+                            className="h-full bg-accent-action rounded-md transition-[width,background-color]"
                             style={{ width: `${d.progress}%` }}
                           />
                         </div>
@@ -1276,7 +1276,7 @@ export function DownloadPage() {
                     {d.progress >= 100 && (
                       <CheckCircle2
                         size={16}
-                        className="text-green-500 flex-shrink-0"
+                        className="text-accent-action-hi flex-shrink-0"
                       />
                     )}
                     {(d.status.includes("Errored") ||
@@ -1424,11 +1424,11 @@ function QueueRow({
       <CrateChip
         className={
           item.status === "completed"
-            ? "border-green-500/25 bg-green-500/10 text-green-300"
+            ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
             : item.status === "failed"
-              ? "border-red-500/25 bg-red-500/10 text-red-300"
+              ? "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
               : item.status === "wishlist"
-                ? "border-pink-500/25 bg-pink-500/10 text-pink-300"
+                ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
                 : ""
         }
       >
@@ -1449,7 +1449,7 @@ function QueueRow({
       <Button
         variant="ghost"
         size="icon"
-        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+        className="h-7 w-7 text-muted-foreground hover:text-text-secondary"
         aria-label="Remove download"
         onClick={() => onRemove(item.id)}
       >
@@ -1532,7 +1532,9 @@ function TidalArtistBrowser({
           <div className="flex gap-2 text-xs text-muted-foreground">
             <span>{albums.length} albums on Tidal</span>
             {localCount > 0 && (
-              <span className="text-green-400">{localCount} in library</span>
+              <span className="text-accent-action-hi">
+                {localCount} in library
+              </span>
             )}
             {availableCount > 0 && (
               <span className="text-primary">{availableCount} available</span>
@@ -1659,9 +1661,9 @@ function TidalAlbumCard({
       <div
         className={`bg-card border rounded-md overflow-hidden group transition-colors ${
           isLocal && !hasUpgrade
-            ? "border-green-500/20 opacity-50"
+            ? "border-accent-action/20 opacity-50"
             : isLocal && hasUpgrade
-              ? "border-amber-500/30"
+              ? "border-state-warning/30"
               : "border-border hover:border-primary/40"
         }`}
       >
@@ -1682,14 +1684,14 @@ function TidalAlbumCard({
           )}
           {isLocal && !hasUpgrade && (
             <div className="absolute top-2 right-2">
-              <Badge className="bg-green-500/90 text-white text-[10px] px-1.5 py-0">
+              <Badge className="bg-accent-action/90 text-white text-[10px] px-1.5 py-0">
                 <CheckCircle2 size={10} className="mr-0.5" /> In library
               </Badge>
             </div>
           )}
           {hasUpgrade && (
             <div className="absolute top-2 right-2">
-              <Badge className="bg-amber-500/90 text-white text-[10px] px-1.5 py-0">
+              <Badge className="bg-surface-elevated text-text-secondary text-[10px] px-1.5 py-0">
                 <ArrowUp size={10} className="mr-0.5" /> Upgrade available
               </Badge>
             </div>
@@ -1719,7 +1721,7 @@ function TidalAlbumCard({
             <Button
               size="icon"
               variant="ghost"
-              className="h-9 w-9 rounded-full text-white hover:text-pink-400 bg-white/10"
+              className="h-9 w-9 rounded-full text-white hover:text-accent-action-hi bg-white/10"
               onClick={onWishlist}
               title="Wishlist"
             >
@@ -1751,9 +1753,9 @@ function TidalAlbumCard({
                 key={q.label}
                 className={`inline-flex items-center rounded-md border px-1.5 py-0 text-[9px] font-medium leading-relaxed ${
                   q.tier === "hi-res"
-                    ? "border-amber-400/50 text-amber-300 bg-amber-400/10"
+                    ? "border-accent-action/40 text-accent-action-hi bg-accent-action/10"
                     : q.tier === "lossless"
-                      ? "border-cyan-400/40 text-cyan-300 bg-cyan-400/8"
+                      ? "border-accent-action/40 text-accent-action-hi bg-accent-action/8"
                       : q.tier === "high"
                         ? "border-primary/30 text-primary/70"
                         : "border-white/15 text-muted-foreground"
@@ -1900,9 +1902,9 @@ function SlskResultCard({
               <span
                 className={`inline-flex items-center rounded-md border px-1.5 py-0 text-[10px] font-medium leading-relaxed ${
                   r.quality.toLowerCase().includes("flac 24")
-                    ? "border-amber-400/50 text-amber-300 bg-amber-400/10"
+                    ? "border-accent-action/40 text-accent-action-hi bg-accent-action/10"
                     : r.quality.toLowerCase().includes("flac")
-                      ? "border-cyan-400/40 text-cyan-300 bg-cyan-400/8"
+                      ? "border-accent-action/40 text-accent-action-hi bg-accent-action/8"
                       : "border-white/15 text-muted-foreground"
                 }`}
               >
@@ -1915,7 +1917,7 @@ function SlskResultCard({
                 {Math.round(r.totalSize / 1048576)} MB
               </Badge>
               {r.freeSlot && (
-                <Badge className="bg-green-500/10 text-green-400 border-green-500/20 text-[10px] px-1.5 py-0">
+                <Badge className="bg-accent-action/10 text-accent-action-hi border-accent-action/20 text-[10px] px-1.5 py-0">
                   <Zap size={8} className="mr-0.5" /> Free
                 </Badge>
               )}
@@ -1967,9 +1969,9 @@ function SlskResultCard({
                   <span
                     className={`inline-flex items-center rounded-md border px-1.5 py-0 text-[10px] font-medium leading-relaxed ${
                       r.quality.toLowerCase().includes("flac 24")
-                        ? "border-amber-400/50 text-amber-300 bg-amber-400/10"
+                        ? "border-accent-action/40 text-accent-action-hi bg-accent-action/10"
                         : r.quality.toLowerCase().includes("flac")
-                          ? "border-cyan-400/40 text-cyan-300 bg-cyan-400/8"
+                          ? "border-accent-action/40 text-accent-action-hi bg-accent-action/8"
                           : "border-white/15 text-muted-foreground"
                     }`}
                   >

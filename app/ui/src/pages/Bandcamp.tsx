@@ -355,7 +355,7 @@ function ConnectionStatus({
   if (!status?.connected) {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <Badge className="border-amber-400/30 bg-amber-400/10 text-amber-200">
+        <Badge className="border-border-quiet bg-surface-card text-text-subtle">
           Not connected
         </Badge>
         <span className="text-sm text-slate-500">
@@ -366,7 +366,7 @@ function ConnectionStatus({
   }
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Badge className="border-emerald-400/30 bg-emerald-400/10 text-emerald-200">
+      <Badge className="border-accent-action/30 bg-accent-action/10 text-accent-action-hi">
         Connected
       </Badge>
       <span className="text-sm text-slate-300">
@@ -451,7 +451,7 @@ function MatchRow({
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline">{match.entity_type}</Badge>
-          <Badge className="bg-cyan-400/10 text-cyan-200">
+          <Badge className="bg-accent-action/10 text-accent-action-hi">
             {Math.round((match.confidence || 0) * 100)}%
           </Badge>
           <span className="text-xs uppercase tracking-[0.2em] text-slate-500">
@@ -686,8 +686,9 @@ function itemTitle(item: BandcampItem) {
 }
 
 function importStatusClass(status?: string | null) {
-  if (status === "completed") return "bg-emerald-400/10 text-emerald-200";
-  if (status === "failed") return "bg-red-400/10 text-red-200";
-  if (status === "running") return "bg-cyan-400/10 text-cyan-200";
+  if (status === "completed")
+    return "bg-accent-action/10 text-accent-action-hi";
+  if (status === "failed") return "bg-state-warning/10 text-state-warning-text";
+  if (status === "running") return "bg-accent-action/10 text-accent-action-hi";
   return "bg-white/10 text-slate-300";
 }

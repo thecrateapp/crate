@@ -1,3 +1,4 @@
+import { SeverityMeter } from "@/components/admin/status-indicators";
 import { cn } from "@crate/ui/lib/cn";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
@@ -361,14 +362,14 @@ function StatusChip({ status }: { status: string }) {
   }
   if (status === "queued") {
     return (
-      <CrateChip className="border-amber-400/25 bg-amber-400/10 text-[11px] text-amber-200">
+      <CrateChip className="border-state-warning/25 bg-state-warning/10 text-[11px] text-state-warning-text">
         Queued
       </CrateChip>
     );
   }
   if (status === "failed") {
     return (
-      <CrateChip className="border-red-400/25 bg-red-500/10 text-[11px] text-red-200">
+      <CrateChip className="border-state-warning/25 bg-state-warning/10 text-[11px] text-state-warning-text">
         Failed
       </CrateChip>
     );
@@ -976,7 +977,7 @@ export function PlaylistEditor() {
               </div>
 
               {playlist.generation_error ? (
-                <div className="rounded-md border border-red-400/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                <div className="rounded-md border border-state-warning/20 bg-state-warning/10 px-3 py-2 text-sm text-state-warning-text">
                   {playlist.generation_error}
                 </div>
               ) : null}
@@ -1257,7 +1258,7 @@ export function PlaylistEditor() {
                           </CrateChip>
                           <ActionIconButton
                             variant="row"
-                            tone="danger"
+                            tone="default"
                             className="h-8 w-8"
                             onClick={() => removeRule(index)}
                           >
@@ -1638,7 +1639,7 @@ export function PlaylistEditor() {
               </div>
 
               {refineProposal ? (
-                <div className="rounded-md border border-primary/25 bg-primary/[0.06] p-4 shadow-[0_0_40px_rgba(34,211,238,0.08)]">
+                <div className="rounded-md border border-primary/25 bg-primary/[0.06] p-4 shadow-none">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
@@ -1680,9 +1681,10 @@ export function PlaylistEditor() {
                           className="rounded-md border border-white/10 bg-black/20 px-3 py-2"
                         >
                           <div className="flex flex-wrap items-center gap-2">
-                            <CrateChip active className="text-[10px]">
-                              {issue.severity}
-                            </CrateChip>
+                            <SeverityMeter
+                              level={issue.severity}
+                              label={issue.severity}
+                            />
                             <span className="text-sm">{issue.message}</span>
                           </div>
                         </div>
@@ -1763,7 +1765,7 @@ export function PlaylistEditor() {
                         ) : null}
                         <ActionIconButton
                           variant="row"
-                          tone="danger"
+                          tone="default"
                           className="h-8 w-8 opacity-70 hover:opacity-100"
                           onClick={() =>
                             void handleRemoveTrack(track, index + 1)
@@ -1844,7 +1846,7 @@ export function PlaylistEditor() {
                         : ""}
                     </div>
                     {entry.error ? (
-                      <div className="mt-2 text-xs text-red-200">
+                      <div className="mt-2 text-xs text-state-warning-text">
                         {entry.error}
                       </div>
                     ) : null}

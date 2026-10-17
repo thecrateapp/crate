@@ -33,7 +33,11 @@ interface MatchCardProps {
 export function MatchCard({ match, onApply }: MatchCardProps) {
   const sc = match.match_score;
   const scoreColor =
-    sc >= 70 ? "text-green-500" : sc >= 40 ? "text-yellow-500" : "text-red-500";
+    sc >= 70
+      ? "text-accent-action-hi"
+      : sc >= 40
+        ? "text-state-warning-text"
+        : "text-state-warning-text";
 
   return (
     <div className="bg-card border border-border rounded-md p-4 mb-3 hover:border-primary transition-colors">
@@ -54,7 +58,7 @@ export function MatchCard({ match, onApply }: MatchCardProps) {
         <Button
           size="sm"
           variant="outline"
-          className="border-green-500 text-green-500 hover:bg-green-500 hover:text-white"
+          className="border-accent-action text-accent-action-hi hover:bg-accent-action-hover hover:text-white"
           onClick={onApply}
         >
           Apply
@@ -80,7 +84,7 @@ export function MatchCard({ match, onApply }: MatchCardProps) {
                 </TableCell>
                 <TableCell>
                   {p.current_title !== p.new_title ? (
-                    <span className="text-red-500 line-through text-sm">
+                    <span className="text-state-warning-text line-through text-sm">
                       {p.current_title}
                     </span>
                   ) : (
@@ -89,7 +93,7 @@ export function MatchCard({ match, onApply }: MatchCardProps) {
                 </TableCell>
                 <TableCell>
                   {p.current_title !== p.new_title ? (
-                    <span className="text-green-500 text-sm">
+                    <span className="text-accent-action-hi text-sm">
                       {p.new_title}
                     </span>
                   ) : (

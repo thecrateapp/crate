@@ -24,12 +24,17 @@ vi.mock("react-leaflet", () => ({
     children,
     eventHandlers,
     title,
+    icon,
   }: {
     children?: React.ReactNode;
     eventHandlers?: { click?: () => void };
     title?: string;
+    icon?: { html?: string };
   }) => (
     <button type="button" aria-label={title} onClick={eventHandlers?.click}>
+      {icon?.html ? (
+        <span dangerouslySetInnerHTML={{ __html: icon.html }} />
+      ) : null}
       {children}
     </button>
   ),
@@ -101,6 +106,11 @@ describe("UserMap", () => {
     expect(screen.getAllByText("second@example.com").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: /Second/ }));
+    expect(
+      screen
+        .getAllByText("Inactive", { exact: true })
+        .every((node) => !node.className.includes("state-warning")),
+    ).toBe(true);
     await user.click(screen.getByRole("button", { name: "Inspect user" }));
 
     await waitFor(() => {
@@ -123,3 +133,29 @@ describe("UserMap", () => {
     ).toHaveClass("bottom-auto", "left-auto", "right-3", "top-3", "m-0");
   });
 });
+
+it.each([
+  ["Playing", true, true, "var(--accent-action-hi)"],
+  ["Online", true, false, "var(--accent-action-hi)"],
+  ["Offline", false, false, "var(--text-subtle)"],
+] as const)(
+  "renders %s map markers with semantic colour and a state word",
+  (state, online, playing, colour) => {
+    useApiMock.mockReturnValue({
+      data: {
+        users: [
+          {
+            ...users[0]!,
+            online,
+            now_playing: playing ? users[0]!.now_playing : null,
+          },
+        ],
+      },
+      loading: false,
+    });
+    render(<UserMap />);
+    const marker = screen.getByRole("img", { name: state });
+    expect(marker).toHaveStyle({ background: colour });
+    expect(marker.getAttribute("style")).not.toMatch(/#(?:22c55e|06b6d4)/);
+  },
+);

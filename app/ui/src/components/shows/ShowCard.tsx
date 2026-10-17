@@ -394,7 +394,7 @@ function ActionButton({
       {icon}
       {label}
       {href.startsWith("http") ? (
-        <span className="h-[5px] w-[5px] rounded-full bg-green-400" />
+        <span className="h-[5px] w-[5px] rounded-full bg-accent-action" />
       ) : null}
     </a>
   );
@@ -601,7 +601,7 @@ export function ShowCard({
       className={cn(
         "relative w-full overflow-hidden rounded-md border",
         expanded
-          ? "border-primary/20 shadow-[0_12px_40px_rgba(6,182,212,0.10)] transition-[height,border-color,box-shadow] duration-400 ease-out"
+          ? "border-primary/20 shadow-none transition-[height,border-color,box-shadow] duration-400 ease-out"
           : "border-white/[0.06] bg-white/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-primary/15 hover:bg-white/[0.03]",
         className,
       )}

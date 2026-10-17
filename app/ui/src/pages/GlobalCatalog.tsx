@@ -23,10 +23,7 @@ import { api } from "@/lib/api";
 
 interface GlobalCatalogStatus {
   serving_mode:
-    | "global-ready"
-    | "global-refreshing"
-    | "global-degraded"
-    | "local-fallback";
+    "global-ready" | "global-refreshing" | "global-degraded" | "local-fallback";
   state: {
     status: string;
   };
@@ -232,9 +229,9 @@ export function GlobalCatalog() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   {status?.serving_mode === "global-degraded" ? (
-                    <AlertTriangle className="h-4 w-4 text-amber-400" />
+                    <AlertTriangle className="h-4 w-4 text-state-warning-text" />
                   ) : (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                    <CheckCircle2 className="h-4 w-4 text-accent-action-hi" />
                   )}
                   Read model
                 </CardTitle>
@@ -393,7 +390,7 @@ function RunSummary({ run }: { run: GlobalCatalogRun }) {
         <span>Updated {formatNumber(run.canonical_updated)}</span>
       </div>
       {run.error ? (
-        <p className="mt-3 text-sm text-red-300">{run.error}</p>
+        <p className="mt-3 text-sm text-state-warning-text">{run.error}</p>
       ) : null}
     </div>
   );

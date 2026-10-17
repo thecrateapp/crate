@@ -93,6 +93,12 @@ describe("Users", () => {
     expect(screen.getByText("Showing 1-1 of 1 users")).toBeInTheDocument();
     expect(screen.getByText("user-21@example.com")).toBeInTheDocument();
     expect(screen.getByText("Active")).toBeInTheDocument();
+    expect(screen.getByText("Inactive", { exact: true })).toHaveClass(
+      "text-text-subtle",
+    );
+    expect(
+      screen.getByRole("button", { name: "Delete" }).className,
+    ).not.toMatch(/state-warning|destructive/);
   });
 
   it("paginates the rendered users", async () => {

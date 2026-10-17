@@ -231,13 +231,13 @@ function formatBytes(bytes: number | null | undefined) {
 
 function variantTone(status: string) {
   if (status === "ready")
-    return "border-emerald-400/35 bg-emerald-400/10 text-emerald-200";
+    return "border-accent-action/35 bg-accent-action/10 text-accent-action-hi";
   if (status === "failed")
-    return "border-red-400/35 bg-red-500/10 text-red-200";
+    return "border-state-warning/35 bg-state-warning/10 text-state-warning-text";
   if (status === "running")
-    return "border-cyan-400/35 bg-cyan-400/10 text-cyan-200";
+    return "border-accent-action/35 bg-accent-action/10 text-accent-action-hi";
   if (status === "pending")
-    return "border-amber-400/35 bg-amber-400/10 text-amber-200";
+    return "border-state-warning/35 bg-state-warning/10 text-state-warning-text";
   return "border-white/15 bg-white/[0.04] text-white/50";
 }
 
@@ -319,7 +319,7 @@ function TrackVariantBadges({
                   </div>
                 ) : null}
                 {variant.error ? (
-                  <div className="mt-1 line-clamp-2 text-red-200/70">
+                  <div className="mt-1 line-clamp-2 text-state-warning-text/70">
                     {variant.error}
                   </div>
                 ) : null}
@@ -345,9 +345,9 @@ function normalizeLyricsStatus(lyrics: TrackLyricsStatus | undefined) {
 
 function lyricsTone(status: string) {
   if (status === "synced")
-    return "border-amber-300/45 bg-amber-300/10 text-amber-200";
+    return "border-accent-action/40 bg-accent-action/10 text-accent-action-hi";
   if (status === "txt")
-    return "border-cyan-300/40 bg-cyan-300/10 text-cyan-200";
+    return "border-accent-action/40 bg-accent-action/10 text-accent-action-hi";
   return "border-white/10 bg-white/[0.03] text-white/35";
 }
 

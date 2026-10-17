@@ -13,7 +13,9 @@ export function PanelState({
     return <p className="text-sm text-white/45">Loading federation data…</p>;
   if (error)
     return (
-      <p className="text-sm text-red-400">Federation data is unavailable.</p>
+      <p className="text-sm text-state-warning-text">
+        Federation data is unavailable.
+      </p>
     );
   return children;
 }

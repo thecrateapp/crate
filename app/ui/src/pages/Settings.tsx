@@ -58,7 +58,7 @@ import {
 } from "lucide-react";
 
 const CACHE_ACTIONS = [
-  { type: "all", label: "Clear All", variant: "destructive" as const },
+  { type: "all", label: "Clear All", variant: "outline" as const },
   { type: "enrichment", label: "Enrichment", variant: "outline" as const },
   { type: "lastfm", label: "Last.fm", variant: "outline" as const },
   { type: "analytics", label: "Analytics", variant: "outline" as const },
@@ -293,7 +293,7 @@ function FieldRow({
 function StatusDot({ ok }: { ok: boolean }) {
   return (
     <div
-      className={`w-2 h-2 rounded-full ${ok ? "bg-green-500" : "bg-red-500"}`}
+      className={`w-2 h-2 rounded-full ${ok ? "bg-accent-action" : "bg-state-warning"}`}
     />
   );
 }
@@ -349,7 +349,7 @@ function PanelCard({
       <CardHeader className="border-b">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/12 text-primary shadow-[0_16px_32px_rgba(6,182,212,0.14)]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary shadow-none">
               <Icon size={18} />
             </div>
             <div className="space-y-1">
@@ -469,7 +469,7 @@ export function Settings() {
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/12 text-primary shadow-[0_18px_40px_rgba(6,182,212,0.14)]">
+              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary shadow-none">
                 <ShieldCheck size={22} />
               </div>
               <div>
@@ -496,7 +496,7 @@ export function Settings() {
                 icon={Bot}
                 className={
                   settings.telegram?.enabled
-                    ? "border-green-500/25 bg-green-500/10 text-green-300"
+                    ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
                     : undefined
                 }
               >
@@ -563,7 +563,7 @@ export function Settings() {
         <div className="space-y-5">
           <div className="space-y-4">
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/12 text-primary">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary">
                 <CurrentIcon size={18} />
               </div>
               <div>
@@ -912,12 +912,7 @@ function TidalCard() {
                 )}
                 Refresh Token
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-red-400 border-red-400/20 hover:bg-red-400/10"
-                onClick={handleLogout}
-              >
+              <Button variant="outline" size="sm" onClick={handleLogout}>
                 Logout
               </Button>
             </>
@@ -1080,8 +1075,8 @@ function DownloadWindowCard() {
             <Badge
               className={`text-[10px] ${
                 policy.downloads_allowed_now
-                  ? "bg-green-500/10 text-green-300 border-green-500/20"
-                  : "bg-amber-500/10 text-amber-300 border-amber-500/20"
+                  ? "bg-accent-action/10 text-accent-action-hi border-accent-action/20"
+                  : "bg-state-warning/10 text-state-warning-text border-state-warning/20"
               }`}
             >
               {policy.downloads_allowed_now
@@ -1404,7 +1399,7 @@ function EnrichmentSection({
                 onChange={(v) => setDraft((prev) => ({ ...prev, [key]: v }))}
               />
               {draft[key] ? (
-                <CheckCircle2 size={13} className="text-green-500/70" />
+                <CheckCircle2 size={13} className="text-accent-action-hi/70" />
               ) : (
                 <XCircle size={13} className="text-white/20" />
               )}
@@ -1542,7 +1537,7 @@ function EnrichmentSection({
                   type="button"
                   aria-label={`Remove ${ext}`}
                   onClick={() => removeExt(ext)}
-                  className="ml-0.5 hover:text-red-400 transition-colors"
+                  className="ml-0.5 hover:text-state-warning-text transition-colors"
                 >
                   <X size={10} />
                 </button>

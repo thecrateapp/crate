@@ -362,10 +362,10 @@ function NodeDetailPanel({
       )}
 
       {canCurate ? (
-        <div className="space-y-3 rounded-xl border border-cyan-400/15 bg-cyan-400/[0.035] p-3">
+        <div className="space-y-3 rounded-xl border border-accent-action/15 bg-accent-action/[0.035] p-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-accent-action-hi">
                 Editorial node
               </div>
               <p className="mt-1 text-xs text-white/45">
@@ -396,7 +396,7 @@ function NodeDetailPanel({
                 Save node
               </Button>
               <Button
-                variant="destructive"
+                variant="outline"
                 size="sm"
                 className="text-xs"
                 disabled={savingKey === "delete-node"}
@@ -420,7 +420,7 @@ function NodeDetailPanel({
               value={descriptionDraft}
               onChange={(event) => setDescriptionDraft(event.target.value)}
               rows={3}
-              className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/75 outline-none transition focus:border-cyan-400/40"
+              className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/75 outline-none transition focus:border-accent-action/40"
               placeholder="Short editorial description for this genre."
             />
           </label>
@@ -433,13 +433,13 @@ function NodeDetailPanel({
               type="checkbox"
               checked={topLevelDraft}
               onChange={(event) => setTopLevelDraft(event.target.checked)}
-              className="h-3.5 w-3.5 accent-cyan-400"
+              className="h-3.5 w-3.5 accent-accent-action"
             />
             Top-level genre
           </label>
           {proposal ? (
-            <div className="rounded-lg border border-cyan-400/15 bg-black/25 p-3 text-xs text-white/55">
-              <div className="font-semibold uppercase tracking-[0.16em] text-cyan-200">
+            <div className="rounded-lg border border-accent-action/15 bg-black/25 p-3 text-xs text-white/55">
+              <div className="font-semibold uppercase tracking-[0.16em] text-accent-action-hi">
                 AI proposal staged
               </div>
               <p className="mt-1">
@@ -698,13 +698,13 @@ function NodeDetailPanel({
                         [config.key]: event.target.value,
                       }))
                     }
-                    className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 font-mono text-xs text-white/70 outline-none transition focus:border-cyan-400/40"
+                    className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 font-mono text-xs text-white/70 outline-none transition focus:border-accent-action/40"
                     placeholder="comma-separated taxonomy slugs"
                   />
                 </div>
                 {stagedProposal ? (
-                  <div className="mt-2 rounded-md border border-cyan-400/15 bg-cyan-400/[0.04] px-2.5 py-2 text-[11px] text-white/45">
-                    <span className="font-semibold text-cyan-200">
+                  <div className="mt-2 rounded-md border border-accent-action/15 bg-accent-action/[0.04] px-2.5 py-2 text-[11px] text-white/45">
+                    <span className="font-semibold text-accent-action-hi">
                       AI {Math.round(stagedProposal.confidence * 100)}%
                     </span>
                     {stagedProposal.reasoning
@@ -903,7 +903,9 @@ export function GenreTaxonomyTree({
     return set;
   }, [hideEmpty, data, nodeMap]);
 
-  const selectedNode = selectedSlug ? nodeMap.get(selectedSlug) ?? null : null;
+  const selectedNode = selectedSlug
+    ? (nodeMap.get(selectedSlug) ?? null)
+    : null;
 
   const runAction = useCallback(
     (key: string) => {
@@ -1039,7 +1041,7 @@ export function GenreTaxonomyTree({
         <div
           className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition ${
             isSelected
-              ? "border-cyan-400/40 bg-cyan-400/10"
+              ? "border-accent-action/40 bg-accent-action/10"
               : "border-white/6 bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.04]"
           }`}
           style={{ paddingLeft: depth * 16 + 10 }}
@@ -1071,14 +1073,14 @@ export function GenreTaxonomyTree({
                 empty
                   ? "bg-white/15"
                   : hasPreset
-                    ? "bg-cyan-400"
+                    ? "bg-accent-action"
                     : "bg-white/25"
               }`}
             />
             <span
               className={`flex-1 truncate font-medium ${
                 isSelected
-                  ? "text-cyan-100"
+                  ? "text-accent-action-hi"
                   : empty
                     ? "text-white/30"
                     : node.top_level

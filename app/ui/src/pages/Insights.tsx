@@ -125,7 +125,7 @@ function ChartTooltip({
   return (
     <div className="min-w-[220px] rounded-sm border border-white/10 bg-panel-surface/95 px-3 py-3 text-xs text-white shadow-[0_18px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
       {eyebrow ? (
-        <div className="text-[10px] uppercase tracking-[0.14em] text-cyan-200/65">
+        <div className="text-[10px] uppercase tracking-[0.14em] text-accent-action-hi/65">
           {eyebrow}
         </div>
       ) : null}
@@ -162,7 +162,7 @@ function HeroSignalPanel({
 }) {
   return (
     <div className="min-w-[320px] rounded-sm border border-white/10 bg-black/20 p-4 shadow-[0_18px_44px_rgba(0,0,0,0.2)] backdrop-blur-xl">
-      <div className="text-[11px] uppercase tracking-[0.16em] text-cyan-200/70">
+      <div className="text-[11px] uppercase tracking-[0.16em] text-accent-action-hi/70">
         Signal Brief
       </div>
       <div className="mt-3 space-y-3">
@@ -201,7 +201,7 @@ function InsightStoryCard({
       className={cn(
         "rounded-sm border p-4 shadow-[0_18px_44px_rgba(0,0,0,0.16)] backdrop-blur-xl",
         accent === "primary"
-          ? "border-cyan-400/16 bg-cyan-400/[0.08]"
+          ? "border-accent-action/16 bg-accent-action/[0.08]"
           : "border-white/8 bg-black/20",
       )}
     >

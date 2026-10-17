@@ -77,23 +77,23 @@ const STATE_STYLES: Record<
   }
 > = {
   running: {
-    chip: "border-emerald-500/25 bg-emerald-500/10 text-emerald-200",
-    dot: "bg-emerald-400",
+    chip: "border-accent-action/25 bg-accent-action/10 text-accent-action-hi",
+    dot: "bg-accent-action",
     tone: "success",
   },
   restarting: {
-    chip: "border-amber-500/25 bg-amber-500/10 text-amber-100",
-    dot: "bg-amber-400",
+    chip: "border-state-warning/25 bg-state-warning/10 text-state-warning-text",
+    dot: "bg-state-warning",
     tone: "warning",
   },
   exited: {
-    chip: "border-red-500/25 bg-red-500/10 text-red-100",
-    dot: "bg-red-400",
-    tone: "danger",
+    chip: "border-border-quiet bg-surface-card text-text-subtle",
+    dot: "bg-text-subtle",
+    tone: "default",
   },
   dead: {
-    chip: "border-red-500/25 bg-red-500/10 text-red-100",
-    dot: "bg-red-400",
+    chip: "border-state-warning/25 bg-state-warning/10 text-state-warning-text",
+    dot: "bg-state-warning",
     tone: "danger",
   },
 };
@@ -233,7 +233,7 @@ function ServiceCard({
             </ActionIconButton>
             <ActionIconButton
               variant="card"
-              tone={isRunning ? "danger" : "primary"}
+              tone={isRunning ? "default" : "primary"}
               onClick={onToggleState}
               disabled={busy}
               title={isRunning ? "Stop service" : "Start service"}
@@ -571,11 +571,7 @@ export function Stack() {
                 (data?.total ?? 0) - (data?.running ?? 0)
               ).toLocaleString()}
               caption="Exited or unavailable containers"
-              tone={
-                (data?.total ?? 0) - (data?.running ?? 0) > 0
-                  ? "warning"
-                  : "default"
-              }
+              tone="default"
             />
             <OpsStatTile
               icon={ExternalLink}

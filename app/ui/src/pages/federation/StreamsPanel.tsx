@@ -59,7 +59,7 @@ export function StreamsPanel({ canManage }: { canManage: boolean }) {
                 {canManage ? (
                   <Button
                     size="sm"
-                    variant="destructive"
+                    variant="outline"
                     onClick={() => void revoke(ticket.ticket_uid)}
                   >
                     Revoke

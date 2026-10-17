@@ -6,17 +6,18 @@ plan; the status table separates implementation from pending QA.
 Current transfer: **1N–1P are complete in the checkpoint commit
 `feat(ui): unify v3 overlays, controls and field spacing`**. Diego authorised commit/push and
 continuation on Linux; this final publication record supersedes earlier local-only stops below.
-**1R is approved and published as `093dcb1fbfe67d1f994ee49e27aefd802d258c54`.** Task 1b.5 /
-checkpoint 1S is implemented locally at <http://127.0.0.1:5186/#pistas> and stops for Diego's
-review before publication or 1b.6. His review retains the current Listen play/halo/ring and
-luminous seek trail, adapted to V3 with 1–2 px strokes. Resume on Linux with
+**1S is approved and published as `124b36a83a51da46dea137b9b84c00d07060ebd6`.** Task 1b.6 /
+checkpoint 1T is implemented locally at <http://127.0.0.1:5186/#estado-admin> and stops for Diego's
+review before publication or 1b.7. Admin state colour, neutral severity/risk/log meters and
+neutral destructive triggers are the current review. The retained Listen play/halo/ring and
+luminous seek trail from 1S remain intact. Resume on Linux with
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
 Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 
 ## Where the work lives
 
 - Active Linux worktree: `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing branch
-  `feat/crate_v3`, published HEAD `093dcb1fbfe67d1f994ee49e27aefd802d258c54` (1R);
+  `feat/crate_v3`, published HEAD `124b36a83a51da46dea137b9b84c00d07060ebd6` (1S);
   transfer checkpoint `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. Node 22.23.3, root
   dependencies and persistent :5186 preview are prepared. This isolates the MCP agent's
   `/home/diego/Code/Ninja/crate` checkout (`feat/crate_mcp`); leave its files untouched.
@@ -201,7 +202,8 @@ is a token-based chart configuration, not a selectable product skin.
 | 1b.2 / Checkpoints 1O–1P                                     | Complete in the combined publication cut: nine form foundations, 28 short selectors, caller review, Radio debounce and global 8 px field spacing. Focused checks and SPEC/QUALITY pass. Next: 1b.3 / 1Q; Linux continuation instructions are tracked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 1b.3 / Checkpoint 1Q | Approved and published as `e863c227`; focused replay 39 Vitest / three Chromium cases passes. |
 | 1b.4 / Checkpoint 1R | Approved/published as `093dcb1f`; scoped replay 309 Vitest / three Chromium cases passed before publication. |
-| 1b.5 / Checkpoint 1S | Local at `#pistas`, awaiting Diego's review before publication or 1b.6. Track/media/table foundations and retained Listen play/ring/seek trail. Final verification below. |
+| 1b.5 / Checkpoint 1S | Approved/published as `124b36a8`; track/media/table foundations and retained Listen play/ring/seek trail. Pre-publication replay: 31 Vitest / 9 Chromium cases passed. |
+| 1b.6 / Checkpoint 1T | Local at `#estado-admin`, awaiting Diego's review before publication or 1b.7. Admin state colour, neutral severity meters and destructive triggers. Final verification below. |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -1419,3 +1421,103 @@ and smaller point/beam. He explicitly authorised commit/push and continuation to
 keeping :5186 active and stopping for the next review at 1T. This supersedes all local-only
 1S stops above. Publish as `feat(ui): restyle track rows and media grids`; record the resulting
 SHA after publication. No full suite/CI, baseline regeneration, PR, merge/rebase, deploy or release.
+
+
+### Checkpoint 1S publication — 2026-10-16
+
+Approved 1S is committed/pushed as **`124b36a83a51da46dea137b9b84c00d07060ebd6`**
+(`feat(ui): restyle track rows and media grids`). Fresh critical consumer replay passes
+31 Vitest and nine Chromium cases before publication; remote SHA verified. Continue locally
+with Task 1b.6 / checkpoint 1T, preserving the preview and stopping before publication or 1b.7.
+No full suite/CI, baseline recording, PR, merge/rebase, deployment or release was performed.
+
+
+## Checkpoint 1T — Admin status colour, Linux local review, 2026-10-16
+
+Diego approved complete 1S and authorised commit/push plus Task 1b.6. 1S is published as
+`124b36a83a51da46dea137b9b84c00d07060ebd6`; origin was verified at that exact SHA. **1T remains
+local and uncommitted**, awaiting Diego at <http://127.0.0.1:5186/#estado-admin>. Stop before
+publication or Task 1b.7. This record supersedes historical 1S local-only stops above.
+
+Implementation:
+
+- Admin chromatic utility classes and old `state-success*` / `state-danger*` aliases now use
+  accent, warning or neutral roles. Active/success is accent; waiting, stale, review and failure
+  retain explicit words with amber. Inactive/never-active/deleted readings and exited services
+  use neutral roles. Descriptive provider links, release types, shows and quality no longer imply
+  warnings. No dependency, endpoint, permission, callback or subscription changes.
+- New Admin-local `SeverityMeter` uses three neutral decorative segments plus the level/risk
+  word. Health, artist repair, scanner issues, logs, task log levels, playlist refinement and
+  translation-quality issues consume it. Individual translation errors and warnings preserve
+  their distinct level word/meter alongside the issue code. Aggregate operational failure and
+  warning counts retain amber semantics.
+- Destructive/cancel/logout triggers use neutral controls; danger remains on the actual shared
+  ConfirmDialog confirmation button. Existing icons remain for Task 1b.8, not retired here.
+- `status-colour-policy.test.ts` has 20 cases, a production-source scan and zero exceptions.
+  It rejects raw chromatic utility families, legacy success/danger aliases, destructive variants
+  and danger icon tones outside ConfirmDialog, including locally identifier-bound props with
+  lexical shadowing. It is not arbitrary CSS/runtime data-flow analysis. Chart palettes/native
+  surfaces and broad page geometry remain their scheduled work.
+- The persistent `#estado-admin` specimen renders actual Admin OpsStatTile, SeverityMeter and
+  IssueList plus shared StatusDot, SegmentedControl and ConfirmDialog, with fictional local
+  actions. All previous specimens and the approved 1S playback controls remain. Preview-only
+  Tailwind sources and responsive layout cover these real consumers.
+
+Review and verification:
+
+- One read-only code review found three P2 items: custom destructive controls remained amber;
+  some old hues were mechanically mapped against their meaning; translation issue severities
+  became indistinguishable. One fix pass resolved these, plus the P3 indirect-prop guard gap.
+  Representative consumer assertions were seen red before correction and then green. No second
+  reviewer pass is claimed.
+- **185 Vitest tests / 49 affected files pass**, in serial 25/24-file batches with
+  `--maxWorkers=1`. This is the statically resolved affected consumer graph, not the full Admin
+  suite. Source-policy, Ops/meter, real track lyrics, missing release metadata, provider links,
+  user activity/destructive controls, task status and mixed translation severities are covered.
+- Admin strict TypeScript/build, scoped ESLint for 69 changed Admin files, preview strict types/
+  static build, drift (15 metrics within budget), shared layers (0 violations / 141 files) and
+  `git diff --check` pass. Build tooling's existing 500 kB chunk-size advisory remains non-fatal.
+- Admin initial JS **529091 / 532480 B gzip**, +26 B from 1S, with **3389 B** headroom. No production
+  Listen/shared changes in 1T; their 1S measurements remain historical, not new 1T build claims.
+
+The first expanded advisory browser replay passed both new 1T cases and eight 1S cases, but its
+mobile seek guard sampled only ten distinct rounded positions (required >10). Three unchanged
+mobile replays passed, identifying unstable pointer/paint sampling rather than an alignment
+assertion failure. The harness now waits for natural rAF between input steps, without pausing,
+advancing or synchronising animation clocks, and retains the original frame-count/alignment
+thresholds. Six diagnostic runs (1440/390 px, three each) recorded 115–145 frames, 39–60 distinct
+positions and **0 px maximum horizontal/vertical separation**. Frame JSON is saved under ignored
+`.artifacts/review/1t-seek-frame-diagnostics/`. The actual seek UI is unchanged.
+
+Final advisory browser replay and proof are recorded below. The preview remains active at :5186.
+
+Limits: no local canonical recording, baseline updates or full CI/suite were run. The 33 canonical
+PNGs and current manifest remain from 1M. Linux CI record/import/comparison for 1N onward, real-data
+Admin geometry and native/AT QA remain pending. `app/web@258bbaee` stays pinned and unavailable
+locally after the earlier fetch attempt; no substitute reference was used. No PR, merge/rebase,
+deploy, release, Smart Mix integration or 1T publication. The original MCP checkout is untouched.
+
+
+### 1T final verification and stop
+
+The final focused Chromium replay passes **11/11** cases with `--workers=1`: both 1T desktop/
+390 px touch cases plus the nine affected 1S track/media/seek checks. Strict preview types pass
+with Node test types resolved from the existing workspace, without dependency changes. Both final
+seek recordings again report 0 px horizontal/vertical separation. The advisory test is still
+Chromium automation; it does not replace real-device/native playback or AT review.
+
+In-app browser review verified the actual 1T specimen and shared confirmation; Cancel restored
+focus to its neutral trigger. The tab is retained at `?tab=albums&listenTab=history#estado-admin`.
+Proof: ignored `.artifacts/review/checkpoint-1t.png`; final frame records are beside the diagnostic
+samples above. HTTP :5186 returns 200 and the existing preview process remains active.
+
+All 1T source/docs are unstaged and uncommitted. HEAD remains published 1S `124b36a8`. Stop here
+for Diego's review; do not publish 1T or start 1b.7 without his direction.
+
+
+### Checkpoint 1T approval and publication authorisation — 2026-10-17
+
+Diego approved complete 1T and explicitly authorised commit/push and continuation with Task 1b.7.
+This supersedes its local-only stop above. Publish the reviewed status-colour batch, keep :5186
+active, implement skip links locally, and stop at checkpoint 1U before another publication or
+Task 1b.8. Existing canonical/native QA limits remain; no full suites or CI during iteration.

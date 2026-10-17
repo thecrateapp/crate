@@ -33,11 +33,11 @@ const ALL_SCANNERS = [
 ];
 
 const ISSUE_COLORS: Record<string, string> = {
-  nested_library: "text-red-400 border-red-400/40",
-  duplicate_album: "text-orange-400 border-orange-400/40",
-  bad_naming: "text-yellow-400 border-yellow-400/40",
-  mergeable_album: "text-orange-400 border-orange-400/40",
-  incomplete_album: "text-blue-400 border-blue-400/40",
+  nested_library: "text-state-warning-text border-state-warning/40",
+  duplicate_album: "text-state-warning-text border-state-warning/40",
+  bad_naming: "text-state-warning-text border-state-warning/40",
+  mergeable_album: "text-state-warning-text border-state-warning/40",
+  incomplete_album: "text-accent-action-hi border-accent-action/40",
 };
 
 const ISSUE_LABELS: Record<string, string> = {
@@ -101,9 +101,9 @@ export function ScanProgress({ progress }: ScanProgressProps) {
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-[color,background-color,border-color]",
                 isDone &&
-                  "border-l-2 border-l-green-500 border-green-500/30 text-green-400 bg-green-500/5",
+                  "border-l-2 border-l-accent-action border-accent-action/30 text-accent-action-hi bg-accent-action/5",
                 isRunning &&
-                  "border-l-2 border-l-blue-500 border-blue-500/30 text-blue-400 bg-blue-500/5",
+                  "border-l-2 border-l-accent-action border-accent-action/30 text-accent-action-hi bg-accent-action/5",
                 !isDone && !isRunning && "border-border text-muted-foreground",
               )}
             >
@@ -130,7 +130,8 @@ export function ScanProgress({ progress }: ScanProgressProps) {
             className={cn(
               "text-xs",
               count > 0
-                ? (ISSUE_COLORS[type] ?? "text-orange-400 border-orange-400/40")
+                ? (ISSUE_COLORS[type] ??
+                    "text-state-warning-text border-state-warning/40")
                 : "text-muted-foreground border-border",
             )}
           >

@@ -164,7 +164,7 @@ export function TagEditor({
                   type="button"
                   aria-label={`Remove genre ${g}`}
                   onClick={() => removeGenre(g)}
-                  className="hover:text-destructive"
+                  className="hover:text-text-secondary"
                 >
                   <X size={12} />
                 </button>

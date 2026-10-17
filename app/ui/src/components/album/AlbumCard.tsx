@@ -228,9 +228,9 @@ export const AlbumCard = React.memo(function AlbumCard({
                 <span
                   className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium leading-none ${
                     q.tier === "hi-res"
-                      ? "border-amber-400/50 text-amber-300 bg-amber-400/10"
+                      ? "border-accent-action/40 text-accent-action-hi bg-accent-action/10"
                       : q.tier === "lossless"
-                        ? "border-cyan-400/40 text-cyan-300 bg-cyan-400/8"
+                        ? "border-accent-action/40 text-accent-action-hi bg-accent-action/8"
                         : "border-white/15 text-muted-foreground"
                   }`}
                 >

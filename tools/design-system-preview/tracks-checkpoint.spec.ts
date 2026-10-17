@@ -1,3 +1,4 @@
+import { writeFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 for (const width of [1440, 390]) {
   test.describe(`track/media ${width}`, () => {
@@ -386,7 +387,7 @@ test("Listen keeps its layered play, advancing ring and motion preferences", asy
 for (const width of [1440, 390]) {
   test(`progress head follows the beam through uninterrupted dragging at ${width}px`, async ({
     page,
-  }) => {
+  }, info) => {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto("/#pistas");
     const slider = page.getByRole("slider", { name: "Posición de muestra" });
@@ -426,12 +427,23 @@ for (const width of [1440, 390]) {
     });
     await page.mouse.move(box.x + 8, box.y + box.height / 2);
     await page.mouse.down();
+    let previous = 8 / box.width;
     for (const fraction of [0.9, 0.2, 0.8, 0.35, 0.7]) {
-      await page.mouse.move(
-        box.x + box.width * fraction,
-        box.y + box.height / 2,
-        { steps: 8 },
-      );
+      for (let step = 1; step <= 8; step++) {
+        await page.mouse.move(
+          box.x + box.width * (previous + ((fraction - previous) * step) / 8),
+          box.y + box.height / 2,
+        );
+        // Wait for a real paint between inputs so fast CDP delivery cannot coalesce
+        // the entire drag into a few positions. Both animation clocks keep running.
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => resolve()),
+            ),
+        );
+      }
+      previous = fraction;
     }
     expect(Number(await slider.inputValue())).toBeGreaterThan(120);
     await page.mouse.up();
@@ -459,6 +471,21 @@ for (const width of [1440, 390]) {
       recording.running = false;
       cancelAnimationFrame(recording.frame);
       return recording.frames;
+    });
+    const evidence = info.outputPath("natural-seek-frames.json");
+    await writeFile(
+      evidence,
+      JSON.stringify({
+        frames,
+        distinctEdges: new Set(frames.map((frame) => Math.round(frame.end)))
+          .size,
+        maxGap: Math.max(...frames.flatMap((frame) => frame.gaps)),
+        maxVerticalGap: Math.max(...frames.flatMap((frame) => frame.vertical)),
+      }),
+    );
+    await info.attach("natural-seek-frames", {
+      path: evidence,
+      contentType: "application/json",
     });
     expect(frames.length).toBeGreaterThan(30);
     expect(

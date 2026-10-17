@@ -589,3 +589,22 @@ The interaction area remains 40/44 px. Preserve existing seek, Jam and keyboard 
 Natural rAF sampling during uninterrupted/reversing dragging reproduced the old separation.
 The earlier test artificially aligned animation times and missed it; replace that test with
 observations of actual frames. These corrections stay local at 1S, pending Diego's review.
+
+
+## Linux checkpoint 1T — status-colour application, 2026-10-16
+
+Diego approved 1S and authorised publication (`124b36a8`) plus Task 1b.6 locally; 1T is the next
+review/publication stop. PD10(a)/D4 remain settled. Code review identified semantic exceptions
+to the hue codemod: synced lyrics and running delivery are active; translation review is waiting;
+inactive users/exited services and descriptive links/types/shows/quality are neutral or accent,
+not warnings. These are implementation corrections, with representative consumer assertions.
+Severity/error distinctions in translation reports retain both the severity word/neutral meter
+and the issue code. Task logs and playlist refinement follow the same level treatment.
+
+No new dependency, backend/API/permission/subscription behaviour, site pin or release decision.
+Existing Admin icons remain until 1b.8. The source policy has zero exceptions and rejects local
+identifier-bound destructive variants/icon tones as well as literals; it does not claim arbitrary
+runtime data-flow analysis. Actual danger still belongs only to the shared confirmation action.
+Diego's no-baseline/no-full-CI iteration rule overrides this task's historical capture re-record
+instruction. Advisory real-component preview checks support 1T; canonical Linux record/import/
+comparison and native/AT checks remain phase-close work. Stop before 1T publication or 1b.7.

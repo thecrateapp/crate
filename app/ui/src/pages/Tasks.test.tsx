@@ -99,6 +99,14 @@ describe("Tasks progress", () => {
     expect(screen.getByText("Slowdive")).toBeInTheDocument();
     expect(screen.getByText("1.5/s")).toBeInTheDocument();
     expect(screen.getByText("ETA 4s")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Cancel" }).className,
+    ).not.toMatch(/state-warning|destructive/);
+    expect(
+      screen
+        .getAllByText("Running", { exact: true })
+        .some((node) => node.className.includes("text-accent-action-hi")),
+    ).toBe(true);
     act(() =>
       taskStream.onmessage?.(
         new MessageEvent("message", {

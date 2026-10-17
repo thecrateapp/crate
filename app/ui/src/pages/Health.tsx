@@ -1,3 +1,4 @@
+import { SeverityMeter } from "@/components/admin/status-indicators";
 import {
   useCallback,
   useEffect,
@@ -112,30 +113,16 @@ const SEVERITY_ICONS: Record<string, typeof AlertTriangle> = {
   medium: Info,
   low: Info,
 };
-const SEVERITY_COLORS: Record<
-  string,
-  { text: string; border: string; bg: string }
-> = {
-  critical: {
-    text: "text-red-500",
-    border: "border-red-500/30",
-    bg: "bg-red-500/5",
-  },
-  high: {
-    text: "text-orange-500",
-    border: "border-orange-500/30",
-    bg: "bg-orange-500/5",
-  },
-  medium: {
-    text: "text-yellow-500",
-    border: "border-yellow-500/30",
-    bg: "bg-yellow-500/5",
-  },
-  low: {
-    text: "text-muted-foreground",
-    border: "border-border",
-    bg: "bg-card",
-  },
+const NEUTRAL_SEVERITY = {
+  text: "text-text-muted",
+  border: "border-border-quiet",
+  bg: "bg-surface-card",
+};
+const SEVERITY_COLORS: Record<string, typeof NEUTRAL_SEVERITY> = {
+  critical: NEUTRAL_SEVERITY,
+  high: NEUTRAL_SEVERITY,
+  medium: NEUTRAL_SEVERITY,
+  low: NEUTRAL_SEVERITY,
 };
 const SEVERITY_ORDER: Record<string, number> = {
   critical: 0,
@@ -188,22 +175,21 @@ const CHECK_DESCRIPTIONS: Record<string, string> = {
     "Lower quality copies of tracks that already exist in a better format",
 };
 
-const RISK_TONES: Record<string, string> = {
-  safe: "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100",
-  caution: "border-amber-500/20 bg-amber-500/[0.06] text-amber-100",
-  destructive: "border-red-500/20 bg-red-500/[0.08] text-red-100",
-};
-
 const SCOPE_TONES: Record<string, string> = {
-  db: "border-cyan-400/20 bg-cyan-400/[0.05] text-cyan-100",
-  filesystem: "border-fuchsia-400/20 bg-fuchsia-400/[0.05] text-fuchsia-100",
-  hybrid: "border-violet-400/20 bg-violet-400/[0.06] text-violet-100",
+  db: "border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi",
+  filesystem:
+    "border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi",
+  hybrid:
+    "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi",
 };
 
 const REPAIR_OUTCOME_TONES: Record<string, string> = {
-  success: "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100",
-  warning: "border-amber-500/20 bg-amber-500/[0.06] text-amber-100",
-  danger: "border-red-500/20 bg-red-500/[0.08] text-red-100",
+  success:
+    "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi",
+  warning:
+    "border-state-warning/20 bg-state-warning/[0.06] text-state-warning-text",
+  danger:
+    "border-state-warning/20 bg-state-warning/[0.08] text-state-warning-text",
   neutral: "border-white/10 bg-white/[0.04] text-white/70",
 };
 
@@ -244,8 +230,8 @@ function executionLaneTone(entry: RepairCatalogEntry | undefined) {
   if (entry.support === "manual" || !entry.auto_fixable)
     return "border-white/10 bg-white/[0.04] text-white/55";
   if (entry.supports_global_scope)
-    return "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100";
-  return "border-amber-500/20 bg-amber-500/[0.06] text-amber-100";
+    return "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi";
+  return "border-state-warning/20 bg-state-warning/[0.06] text-state-warning-text";
 }
 
 function latestRepairSummary(task: RepairHistoryTask | null) {
@@ -473,8 +459,7 @@ export function Health() {
     if (!activeTaskId || !activeTaskDone) return;
     if (activeTaskDone.status === "completed") {
       const revalidation = activeTaskDone.result?.revalidation as
-        | Record<string, unknown>
-        | undefined;
+        Record<string, unknown> | undefined;
       const remaining = Number(revalidation?.issue_count ?? NaN);
       if (!scanning && Number.isFinite(remaining)) {
         toast.success(
@@ -681,7 +666,7 @@ export function Health() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/12 text-primary shadow-[0_18px_40px_rgba(6,182,212,0.14)]">
+              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary shadow-none">
                 <Stethoscope size={22} />
               </div>
               <div>
@@ -696,11 +681,11 @@ export function Health() {
             </div>
             <div className="flex flex-wrap gap-2">
               {totalOpen > 0 ? (
-                <CrateChip className="border-yellow-500/25 bg-yellow-500/10 text-yellow-200">
+                <CrateChip className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
                   {totalOpen} open issues
                 </CrateChip>
               ) : !loading ? (
-                <CrateChip className="border-green-500/25 bg-green-500/10 text-green-300">
+                <CrateChip className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
                   Healthy
                 </CrateChip>
               ) : null}
@@ -778,8 +763,8 @@ export function Health() {
                       <CrateChip
                         className={
                           latestRemaining > 0
-                            ? "border-amber-500/20 bg-amber-500/[0.06] text-amber-100"
-                            : "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100"
+                            ? "border-state-warning/20 bg-state-warning/[0.06] text-state-warning-text"
+                            : "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi"
                         }
                       >
                         {latestRemaining > 0
@@ -823,36 +808,36 @@ export function Health() {
                 </div>
               </div>
               <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-md border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3">
-                  <div className="text-xs uppercase tracking-[0.12em] text-emerald-200/75">
+                <div className="rounded-md border border-accent-action/20 bg-accent-action/[0.06] px-4 py-3">
+                  <div className="text-xs uppercase tracking-[0.12em] text-accent-action-hi/75">
                     Global batch
                   </div>
-                  <div className="mt-2 text-2xl font-semibold text-emerald-100">
+                  <div className="mt-2 text-2xl font-semibold text-accent-action-hi">
                     {batchReadyCount}
                   </div>
-                  <div className="mt-1 text-xs text-emerald-100/70">
+                  <div className="mt-1 text-xs text-accent-action-hi/70">
                     Checks with open issues that can run safely from Health.
                   </div>
                 </div>
-                <div className="rounded-md border border-amber-500/20 bg-amber-500/[0.06] px-4 py-3">
-                  <div className="text-xs uppercase tracking-[0.12em] text-amber-200/75">
+                <div className="rounded-md border border-state-warning/20 bg-state-warning/[0.06] px-4 py-3">
+                  <div className="text-xs uppercase tracking-[0.12em] text-state-warning-text/75">
                     Artist review
                   </div>
-                  <div className="mt-2 text-2xl font-semibold text-amber-100">
+                  <div className="mt-2 text-2xl font-semibold text-state-warning-text">
                     {artistReviewCount}
                   </div>
-                  <div className="mt-1 text-xs text-amber-100/70">
+                  <div className="mt-1 text-xs text-state-warning-text/70">
                     Checks that need artist-level preview before applying.
                   </div>
                 </div>
-                <div className="rounded-md border border-cyan-400/20 bg-cyan-400/[0.05] px-4 py-3">
-                  <div className="text-xs uppercase tracking-[0.12em] text-cyan-100/75">
+                <div className="rounded-md border border-accent-action/20 bg-accent-action/[0.05] px-4 py-3">
+                  <div className="text-xs uppercase tracking-[0.12em] text-accent-action-hi/75">
                     Healthy checks
                   </div>
-                  <div className="mt-2 text-2xl font-semibold text-cyan-100">
+                  <div className="mt-2 text-2xl font-semibold text-accent-action-hi">
                     {healthyCatalogCount}
                   </div>
-                  <div className="mt-1 text-xs text-cyan-100/70">
+                  <div className="mt-1 text-xs text-accent-action-hi/70">
                     Catalog entries with no currently open issues.
                   </div>
                 </div>
@@ -892,8 +877,8 @@ export function Health() {
                         <CrateChip
                           className={
                             openCount > 0
-                              ? "border-yellow-500/25 bg-yellow-500/10 text-yellow-200"
-                              : "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100"
+                              ? "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
+                              : "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi"
                           }
                         >
                           {openCount > 0 ? `${openCount} open` : "Healthy"}
@@ -903,13 +888,10 @@ export function Health() {
                         <CrateChip className={executionLaneTone(entry)}>
                           {executionLane(entry)}
                         </CrateChip>
-                        <CrateChip
-                          className={
-                            RISK_TONES[entry.risk] || RISK_TONES.caution
-                          }
-                        >
-                          {riskLabel(entry.risk)}
-                        </CrateChip>
+                        <SeverityMeter
+                          level={entry.risk}
+                          label={riskLabel(entry.risk) || "Unknown"}
+                        />
                         <CrateChip
                           className={
                             SCOPE_TONES[entry.scope] || SCOPE_TONES.hybrid
@@ -946,9 +928,9 @@ export function Health() {
         <div className="rounded-md border border-white/10 bg-panel-surface px-6 py-24 text-center shadow-[0_28px_80px_rgba(0,0,0,0.24)]">
           <CheckCircle2
             size={48}
-            className="text-green-500 mx-auto mb-3 opacity-50"
+            className="text-accent-action-hi mx-auto mb-3 opacity-50"
           />
-          <div className="text-lg font-semibold text-green-500">
+          <div className="text-lg font-semibold text-accent-action-hi">
             Library is healthy
           </div>
           <div className="text-sm text-muted-foreground mt-1">
@@ -1001,21 +983,13 @@ export function Health() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-white">{label}</span>
                       <CrateChip>{items.length}</CrateChip>
-                      <CrateChip
-                        className={`${colors.border} ${colors.bg} ${colors.text}`}
-                      >
-                        {severity}
-                      </CrateChip>
+                      <SeverityMeter level={severity} label={severity} />
                       {catalogEntry ? (
                         <>
-                          <CrateChip
-                            className={
-                              RISK_TONES[catalogEntry.risk] ||
-                              RISK_TONES.caution
-                            }
-                          >
-                            {riskLabel(catalogEntry.risk)}
-                          </CrateChip>
+                          <SeverityMeter
+                            level={catalogEntry.risk}
+                            label={riskLabel(catalogEntry.risk) || "Unknown"}
+                          />
                           <CrateChip
                             className={
                               SCOPE_TONES[catalogEntry.scope] ||
@@ -1038,7 +1012,7 @@ export function Health() {
                       </div>
                     ) : null}
                     {catalogEntry?.requires_confirmation ? (
-                      <div className="mt-1 text-xs text-amber-200/80">
+                      <div className="mt-1 text-xs text-state-warning-text/80">
                         Review artist-by-artist before applying this fix.
                       </div>
                     ) : null}
@@ -1051,7 +1025,7 @@ export function Health() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-9 rounded-md border-green-500/30 px-3 text-xs text-green-300 hover:bg-green-500/10"
+                        className="h-9 rounded-md border-accent-action/30 px-3 text-xs text-accent-action-hi hover:bg-accent-action/10"
                         onClick={() =>
                           canRunBulkFix
                             ? setPendingBulkFix({ check, count: fixableCount })
@@ -1195,18 +1169,7 @@ function IssueRow({
 
   return (
     <div className="group flex items-center gap-3 rounded-md border border-white/6 bg-white/[0.04] px-3 py-3 transition-colors hover:bg-white/[0.06]">
-      {/* Severity dot */}
-      <span
-        className={`w-1.5 h-1.5 rounded-md flex-shrink-0 ${
-          issue.severity === "critical"
-            ? "bg-red-500"
-            : issue.severity === "high"
-              ? "bg-orange-500"
-              : issue.severity === "medium"
-                ? "bg-yellow-500"
-                : "bg-muted-foreground/50"
-        }`}
-      />
+      <SeverityMeter level={issue.severity} label={issue.severity} />
 
       {/* Description */}
       <div className="flex-1 min-w-0">
@@ -1217,7 +1180,7 @@ function IssueRow({
           </div>
         )}
         {blockedReason ? (
-          <div className="mt-1 text-[11px] text-amber-200/80">
+          <div className="mt-1 text-[11px] text-state-warning-text/80">
             Automatic cleanup skipped it: {blockedReason}
           </div>
         ) : null}
@@ -1231,11 +1194,10 @@ function IssueRow({
         ))}
         {catalogEntry ? (
           <div className="mt-2 flex flex-wrap gap-2">
-            <CrateChip
-              className={RISK_TONES[catalogEntry.risk] || RISK_TONES.caution}
-            >
-              {riskLabel(catalogEntry.risk)}
-            </CrateChip>
+            <SeverityMeter
+              level={catalogEntry.risk}
+              label={riskLabel(catalogEntry.risk) || "Unknown"}
+            />
             <CrateChip
               className={SCOPE_TONES[catalogEntry.scope] || SCOPE_TONES.hybrid}
             >
@@ -1267,7 +1229,7 @@ function IssueRow({
             e.stopPropagation();
             onResolve();
           }}
-          className="hover:bg-green-500/10 hover:text-green-300"
+          className="hover:bg-accent-action/10 hover:text-accent-action-hi"
           title="Mark as resolved"
         >
           <CheckCircle2 size={13} />

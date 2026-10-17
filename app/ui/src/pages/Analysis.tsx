@@ -148,7 +148,7 @@ function PipelineCoverage({
           <CrateChip className="text-[10px]">{percent}% coverage</CrateChip>
           {active > 0 ? <CrateChip active>{active} active</CrateChip> : null}
           {failed > 0 ? (
-            <CrateChip className="border-red-500/25 bg-red-500/10 text-red-200">
+            <CrateChip className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
               {failed} failed
             </CrateChip>
           ) : null}
@@ -161,7 +161,7 @@ function PipelineCoverage({
             className={cn(
               "h-full rounded-sm transition-[width,background-color] duration-500",
               blocked
-                ? "bg-gradient-to-r from-red-500/60 to-amber-400/70"
+                ? "bg-gradient-to-r from-state-warning/60 to-state-warning/70"
                 : accentClassName.replace("text-", "bg-").replace("/80", ""),
             )}
             style={{ width: `${Math.min(percent, 100)}%` }}
@@ -201,7 +201,7 @@ function MiniMetric({
         className={cn(
           "mt-1 text-sm font-medium",
           tone === "danger"
-            ? "text-red-200"
+            ? "text-state-warning-text"
             : tone === "muted"
               ? "text-white/55"
               : "text-white/85",
@@ -270,8 +270,8 @@ function RecentTrackCard({
                 <CrateChip
                   className={
                     track.has_mood
-                      ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
-                      : "border-amber-500/20 bg-amber-500/10 text-amber-100"
+                      ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
+                      : "border-border-quiet bg-surface-card text-text-subtle"
                   }
                 >
                   {track.has_mood ? "Mood extracted" : "Mood missing"}
@@ -493,8 +493,8 @@ export function Analysis() {
         <CratePill
           className={
             status.chromaprint_available
-              ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-100"
-              : "border-amber-500/25 bg-amber-500/10 text-amber-100"
+              ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
+              : "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
           }
         >
           {status.chromaprint_available ? "Chromaprint ready" : "PCM fallback"}
@@ -503,7 +503,7 @@ export function Analysis() {
           <CratePill icon={Activity}>{metrics.activeJobs} active</CratePill>
         ) : null}
         {metrics.failedJobs > 0 ? (
-          <CratePill className="border-red-500/25 bg-red-500/10 text-red-100">
+          <CratePill className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
             {metrics.failedJobs} failed
           </CratePill>
         ) : null}
@@ -571,13 +571,13 @@ export function Analysis() {
             active={status.bliss_active}
             failed={status.bliss_failed}
             total={status.total}
-            accentClassName="text-emerald-300"
+            accentClassName="text-accent-action-hi"
             emptyLabel="Waiting for tracks"
           />
           <div className="rounded-md border border-white/8 bg-black/20 p-4">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.05] text-sky-300">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.05] text-accent-action-hi">
                   <Fingerprint size={16} />
                 </div>
                 <div className="space-y-1">
@@ -598,8 +598,8 @@ export function Analysis() {
                 <CrateChip
                   className={
                     status.chromaprint_available
-                      ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
-                      : "border-amber-500/20 bg-amber-500/10 text-amber-100"
+                      ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
+                      : "border-border-quiet bg-surface-card text-text-subtle"
                   }
                 >
                   {status.chromaprint_available
@@ -612,7 +612,7 @@ export function Analysis() {
             <div className="space-y-3">
               <div className="h-2 overflow-hidden rounded-sm bg-white/[0.06]">
                 <div
-                  className="h-full rounded-sm bg-sky-400/80 transition-[width,background-color] duration-500"
+                  className="h-full rounded-sm bg-accent-action/80 transition-[width,background-color] duration-500"
                   style={{
                     width: `${Math.min(metrics.fingerprintPercent, 100)}%`,
                   }}
@@ -739,7 +739,7 @@ export function Analysis() {
           <div className="rounded-md border border-white/8 bg-black/20 p-4">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.05] text-violet-200">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.05] text-accent-action-hi">
                   <FileJson size={16} />
                 </div>
                 <div className="space-y-1">
@@ -774,7 +774,7 @@ export function Analysis() {
           <div className="rounded-md border border-white/8 bg-black/20 p-4">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.05] text-emerald-200">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.05] text-accent-action-hi">
                   <Tags size={16} />
                 </div>
                 <div className="space-y-1">
@@ -815,7 +815,7 @@ export function Analysis() {
           <div className="rounded-md border border-white/8 bg-black/20 p-4">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.05] text-sky-200">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.05] text-accent-action-hi">
                   <Archive size={16} />
                 </div>
                 <div className="space-y-1">

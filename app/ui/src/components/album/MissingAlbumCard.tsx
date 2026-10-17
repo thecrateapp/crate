@@ -17,13 +17,6 @@ function hashColor(str: string): string {
   return `hsl(${h}, 30%, 15%)`;
 }
 
-const typeBadgeClass: Record<string, string> = {
-  Album: "border-blue-500/30 text-blue-500",
-  EP: "border-primary/30 text-primary",
-  Single: "border-yellow-500/30 text-yellow-500",
-  Compilation: "border-orange-500/30 text-orange-500",
-};
-
 export function MissingAlbumCard({
   title,
   year,
@@ -52,7 +45,7 @@ export function MissingAlbumCard({
         <span>{year || "?"}</span>
         <Badge
           variant="outline"
-          className={`text-[10px] px-1 py-0 ${typeBadgeClass[type] || ""}`}
+          className="text-[10px] px-1 py-0 border-border-quiet text-text-secondary"
         >
           {type}
         </Badge>
