@@ -24,7 +24,8 @@
 }
 
 .artist-show-prep-surface {
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at top left,
       color-mix(in srgb, var(--accent-action) 14%, transparent),
       transparent 40%
@@ -33,7 +34,8 @@
 }
 
 .upcoming-event-row-atmosphere {
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 16% 20%,
       color-mix(in srgb, var(--accent-action) 22%, transparent),
       transparent 34%
@@ -46,7 +48,8 @@
 }
 
 .upcoming-event-row-scrim {
-  background: linear-gradient(
+  background:
+    linear-gradient(
       90deg,
       color-mix(in srgb, var(--surface-canvas) 96%, transparent),
       color-mix(in srgb, var(--surface-canvas) 78%, transparent) 48%,
@@ -219,7 +222,8 @@
 }
 
 .server-setup-atmosphere {
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 50% -10%,
       color-mix(in srgb, var(--accent-action) 18%, transparent),
       transparent 34%
@@ -232,7 +236,8 @@
 }
 
 .bandcamp-page-surface {
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 18% 18%,
       color-mix(in srgb, var(--accent-action) 18%, transparent),
       transparent 34%
@@ -273,7 +278,8 @@
 }
 
 .lyrics-fullscreen-backdrop {
-  --_lyrics-fullscreen-backdrop: radial-gradient(
+  --_lyrics-fullscreen-backdrop:
+    radial-gradient(
       circle at 18% 20%,
       color-mix(in srgb, var(--accent-action) 20%, transparent),
       transparent 32%
@@ -448,7 +454,8 @@
 
 .home-playback-empty-card {
   border: 1px solid var(--border-quiet);
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at top left,
       color-mix(in srgb, var(--accent-action) 18%, transparent),
       transparent 50%
@@ -462,7 +469,8 @@
 
 .home-replay-card {
   border: 1px solid var(--border-quiet);
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at top left,
       color-mix(in srgb, var(--accent-action) 14%, transparent),
       transparent 42%
@@ -500,7 +508,8 @@
 }
 
 .home-upcoming-feature-glow {
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 18% 20%,
       color-mix(in srgb, var(--accent-action) 34%, transparent),
       transparent 35%
@@ -513,7 +522,8 @@
 }
 
 .home-upcoming-feature-overlay {
-  background: linear-gradient(
+  background:
+    linear-gradient(
       90deg,
       color-mix(in srgb, var(--surface-canvas) 94%, transparent),
       color-mix(in srgb, var(--surface-canvas) 64%, transparent) 48%,
@@ -1075,7 +1085,8 @@
 }
 
 .radio-station-placeholder {
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 30% 20%,
       var(--accent-action-glow-medium),
       transparent 34%
@@ -1129,7 +1140,8 @@
 }
 
 .radio-page-hero-glow {
-  --_radio-hero-glow: radial-gradient(
+  --_radio-hero-glow:
+    radial-gradient(
       circle at 16% 18%,
       color-mix(in srgb, var(--accent-action) 20%, transparent),
       transparent 32%
@@ -1320,7 +1332,8 @@
     color-mix(in srgb, var(--text-primary) 3.5%, transparent) 45%,
     color-mix(in srgb, var(--stats-secondary-accent) 10%, transparent)
   );
-  box-shadow: 0 25px 50px -12px color-mix(in srgb, var(--surface-canvas) 20%, transparent);
+  box-shadow: 0 25px 50px -12px
+    color-mix(in srgb, var(--surface-canvas) 20%, transparent);
 }
 
 .stats-profile-track {
@@ -1341,7 +1354,8 @@
 }
 
 .stats-artist-placeholder {
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 26% 18%,
       color-mix(in srgb, var(--accent-action) 28%, transparent),
       transparent 34%
@@ -1354,7 +1368,8 @@
 }
 
 .stats-artist-overlay {
-  background: linear-gradient(
+  background:
+    linear-gradient(
       90deg,
       color-mix(in srgb, var(--surface-canvas) 92%, transparent),
       color-mix(in srgb, var(--surface-canvas) 46%, transparent) 58%,
@@ -1477,7 +1492,8 @@
 }
 
 .profile-hover-glow {
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 18% 12%,
       color-mix(in srgb, var(--accent-action) 20%, transparent),
       transparent 34%
@@ -1831,7 +1847,8 @@
 }
 
 .explore-feature-card-aura {
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 18% 18%,
       color-mix(in srgb, var(--accent-action) 28%, transparent),
       transparent 38%
@@ -1886,7 +1903,8 @@ button.genre-pill:hover,
 }
 
 .explore-genre-card-overlay-placeholder {
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at var(--explore-card-glow-position) 20%,
       color-mix(in srgb, var(--accent-action) 24%, transparent),
       transparent 36%
@@ -2309,7 +2327,8 @@ button.genre-pill:hover,
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 55%, var(--surface-card)),
+  background:
+    linear-gradient(180deg, transparent 55%, var(--surface-card)),
     linear-gradient(
       180deg,
       transparent 45%,
@@ -2325,7 +2344,8 @@ button.genre-pill:hover,
 
 @media (min-width: 768px) {
   .stats-artist-of-period-photo::after {
-    background: linear-gradient(90deg, transparent 60%, var(--surface-card)),
+    background:
+      linear-gradient(90deg, transparent 60%, var(--surface-card)),
       linear-gradient(
         90deg,
         transparent 35%,
@@ -2648,7 +2668,8 @@ button.genre-pill:hover,
 }
 
 .stats-digging-chapter[data-tone="accent"] {
-  background: radial-gradient(
+  background:
+    radial-gradient(
       circle at 30% 20%,
       color-mix(in srgb, var(--accent-action) 55%, transparent),
       transparent 55%
@@ -2761,7 +2782,8 @@ button.genre-pill:hover,
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 30%, var(--surface-canvas)),
+  background:
+    linear-gradient(180deg, transparent 30%, var(--surface-canvas)),
     linear-gradient(
       90deg,
       color-mix(in srgb, var(--accent-action) 35%, transparent),
@@ -4037,4 +4059,33 @@ button.genre-pill:hover,
 .crate-track-table td.font-mono,
 .crate-track-table .crate-table-number {
   text-align: right;
+}
+
+/* Visible immediately on keyboard focus, above shell navigation and below overlays. */
+.crate-skip-link {
+  position: fixed;
+  z-index: calc(var(--z-sidebar) + 1);
+  top: max(1rem, env(safe-area-inset-top, 0px));
+  left: max(1rem, env(safe-area-inset-left, 0px));
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--accent-action-hi);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  text-decoration: none;
+  transform: translateY(calc(-100% - max(1rem, env(safe-area-inset-top, 0px))));
+}
+
+.crate-skip-link:focus {
+  transform: none;
+}
+
+@media (forced-colors: active) {
+  .crate-skip-link {
+    background: Canvas;
+    color: CanvasText;
+    border-color: CanvasText;
+  }
 }

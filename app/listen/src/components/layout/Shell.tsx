@@ -1,3 +1,5 @@
+import { SkipLink } from "@crate/ui/primitives/SkipLink";
+import { useTranslation } from "react-i18next";
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
@@ -20,6 +22,7 @@ import {
 } from "@/components/layout/use-scrolled-past";
 
 export function Shell({ children }: { children?: ReactNode }) {
+  const { t } = useTranslation();
   const isDesktop = useIsDesktop();
   const location = useLocation();
   const { currentTrack } = usePlayerActions();
@@ -63,6 +66,9 @@ export function Shell({ children }: { children?: ReactNode }) {
 
   return (
     <TransparentHeaderProvider value={register}>
+      <SkipLink targetId="listen-main-content">
+        {t("common.skipToMainContent")}
+      </SkipLink>
       {isDesktop ? (
         <DesktopShell
           children={children}

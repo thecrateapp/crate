@@ -608,3 +608,16 @@ runtime data-flow analysis. Actual danger still belongs only to the shared confi
 Diego's no-baseline/no-full-CI iteration rule overrides this task's historical capture re-record
 instruction. Advisory real-component preview checks support 1T; canonical Linux record/import/
 comparison and native/AT checks remain phase-close work. Stop before 1T publication or 1b.7.
+
+
+## Linux checkpoint 1U — Skip navigation, 2026-10-17
+
+Diego approved and authorised publication of 1T (`5308c391`) and Task 1b.7 locally, with a stop
+at 1U. Shared SkipLink is now used by both app shells; app-local target IDs and translated labels
+are injected. Existing main elements gain id/tabIndex only; no route, permission, player, API,
+subscription or page-layout contract changes. Successful activation preserves query/hash state.
+DS3.10's automatic route-change h1 focus/announcements stay in Tasks3.2/4.1. The 1U specimen uses
+isolated documents with actual SkipLink/main, not nested main landmarks or real app API chrome.
+These choices preserve existing deep-link state and avoid expanding this accessibility task
+into later navigation redesigns. Canonical Linux CI/native/AT gates remain pending; stop before
+1U publication or 1b.8. No new dependency or site-pin change.

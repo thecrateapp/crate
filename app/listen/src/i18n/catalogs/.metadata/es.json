@@ -1455,6 +1455,10 @@
     "sourceHash": "sha256:be09364594c29e70cac457c90ccd0bb7e730aa2dab40d66e91c13cbd7f9cd2b4",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "common.skipToMainContent": {
+    "sourceHash": "sha256:48c23b7a13d5f7a1e7f46d7f953b189856d3f95016d48d860b4570e4ce295581",
+    "reviewedAt": "2026-10-17T16:20:42.129Z"
+  },
   "common.source": {
     "sourceHash": "sha256:210d92c1db682925e2e050d1e2d5202caa6fc60c3dfda45ab0e75d6c7be0dece",
     "reviewedAt": "2026-07-07T15:39:22.141Z"

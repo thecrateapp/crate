@@ -472,3 +472,23 @@ return/cancel/confirm, actual 8 px field gap, overflow and no API/storage writes
 are advisory ignored artifacts. Do not regenerate the 33 canonical 1M captures or dispatch full
 CI while iterating. Canonical Linux recording/comparison, real-data Admin geometry, native/AT QA
 and the unavailable `app/web@258bbaee` fidelity comparison remain pending.
+
+
+## Skip navigation / Checkpoint 1U — local review
+
+Diego approved 1T on 2026-10-17; it is published as `5308c391`. This supersedes its local-only
+stop above. Task1b.7 is local at <http://127.0.0.1:5186/#saltar-contenido>; stop at **1U** before
+commit/push or 1b.8. All earlier specimens remain.
+
+The shared SkipLink appears in both isolated sample documents. Use Mostrar enlace, or enter
+with Tab, then Enter to focus main and Tab to reach its first action. The outer demo button
+waits for the document/link to be ready. Listen's label comes from the real catalogs; actual
+Shell order and focus are covered separately by app tests. The isolated entry avoids nested
+main landmarks and mounts no production API-dependent chrome.
+
+`skip-link-checkpoint.spec.ts --workers=1` covers desktop/390 px layouts, first Tab, Enter,
+subsequent Tab, pointer activation, URL query/hash preservation, forced colours/reduced motion,
+44 px target, no overflow/API errors and both embedded examples. Its PNGs are advisory ignored
+artifacts. The preview static build includes `index.html` and `skip-link-demo.html`. Native/AT,
+cross-engine checks and canonical Linux CI capture/import/comparison remain pending; do not
+regenerate 1M baselines or dispatch full CI during iteration.

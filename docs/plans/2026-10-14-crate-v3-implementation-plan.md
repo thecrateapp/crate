@@ -3,7 +3,7 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Published checkpoints through 1S are recorded in the handover; preserve the next 1T review stop.
+> Diego's go-ahead. Published checkpoints through 1T are recorded in the handover; preserve the next 1U review stop.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -1776,6 +1776,19 @@ Test: the policy; `ADMIN-E2E` with the Admin captures re-recorded and reviewed.
 Commit: `refactor(ui): move Admin status colours onto state tokens`.
 
 ### Task 1b.7: Skip link in both shells
+
+**Linux checkpoint 1U, 2026-10-17 — local review.** Diego approved 1T and authorised publication
+(`5308c391`, verified at origin) plus this task. Both shells now use shared `SkipLink` as their
+first keyboard stop. Admin owns `admin-main-content`; Listen DesktopShell/MobileShell each own
+`listen-main-content`, with `tabIndex={-1}`. Activation focuses the current main without replacing
+search/hash state; native anchor fallback remains if no target exists. All seven Listen catalogs
+include the translated label and source metadata. This is explicit skip navigation only; the
+route-change heading focus/announcement work remains assigned to Tasks 3.2/4.1.
+
+The persistent specimen at `#saltar-contenido` uses isolated demo documents with real shared
+SkipLink/main, avoiding nested main landmarks and API-dependent app chrome. Actual Shell
+integration is covered by the app tests. Keep existing specimens and :5186 active. Stop at 1U
+before publication or Task 1b.8. No local canonical baseline generation or full CI/suite here.
 
 **Files:** `app/ui/src/components/layout/Shell.tsx`, `app/listen/src/components/layout/Shell.tsx` (first focusable element; target `main` with `tabIndex={-1}`); copy in the 7 Listen catalogs.
 

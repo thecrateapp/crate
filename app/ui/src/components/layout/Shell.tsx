@@ -1,3 +1,4 @@
+import { SkipLink } from "@crate/ui/primitives/SkipLink";
 import {
   useState,
   useCallback,
@@ -94,6 +95,7 @@ export function Shell() {
       className="min-h-screen bg-app-surface text-foreground [--sidebar-w:0px]"
       style={shellStyle}
     >
+      <SkipLink targetId="admin-main-content">Skip to main content</SkipLink>
       <div className="hidden md:block">
         <Sidebar />
       </div>
@@ -155,6 +157,8 @@ export function Shell() {
       </div>
 
       <main
+        id="admin-main-content"
+        tabIndex={-1}
         className={`overflow-x-hidden transition-[margin-left] duration-200 ${sidebarWidthClass}`}
       >
         <div

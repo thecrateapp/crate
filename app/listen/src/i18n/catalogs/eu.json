@@ -1,5 +1,6 @@
 {
   "app.name": "Crate",
+  "common.skipToMainContent": "Joan eduki nagusira",
   "common.loading": "Crate kargatzen...",
   "common.retry": "Saiatu berriro",
   "common.cancel": "Utzi",

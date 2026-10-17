@@ -6,18 +6,18 @@ plan; the status table separates implementation from pending QA.
 Current transfer: **1N–1P are complete in the checkpoint commit
 `feat(ui): unify v3 overlays, controls and field spacing`**. Diego authorised commit/push and
 continuation on Linux; this final publication record supersedes earlier local-only stops below.
-**1S is approved and published as `124b36a83a51da46dea137b9b84c00d07060ebd6`.** Task 1b.6 /
-checkpoint 1T is implemented locally at <http://127.0.0.1:5186/#estado-admin> and stops for Diego's
-review before publication or 1b.7. Admin state colour, neutral severity/risk/log meters and
-neutral destructive triggers are the current review. The retained Listen play/halo/ring and
-luminous seek trail from 1S remain intact. Resume on Linux with
+**1T is approved and published as `5308c391c1b0168edebfff58b15e821a1e5a6757`.** Task 1b.7 /
+checkpoint 1U is implemented locally at <http://127.0.0.1:5186/#saltar-contenido> and stops for
+Diego's review before publication or 1b.8. Shared skip navigation in both shells and seven Listen
+translations are the current review. The retained Listen play/halo/ring and luminous seek trail
+from 1S remain intact. Resume on Linux with
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
 Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 
 ## Where the work lives
 
 - Active Linux worktree: `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing branch
-  `feat/crate_v3`, published HEAD `124b36a83a51da46dea137b9b84c00d07060ebd6` (1S);
+  `feat/crate_v3`, published HEAD `5308c391c1b0168edebfff58b15e821a1e5a6757` (1T);
   transfer checkpoint `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. Node 22.23.3, root
   dependencies and persistent :5186 preview are prepared. This isolates the MCP agent's
   `/home/diego/Code/Ninja/crate` checkout (`feat/crate_mcp`); leave its files untouched.
@@ -203,7 +203,8 @@ is a token-based chart configuration, not a selectable product skin.
 | 1b.3 / Checkpoint 1Q | Approved and published as `e863c227`; focused replay 39 Vitest / three Chromium cases passes. |
 | 1b.4 / Checkpoint 1R | Approved/published as `093dcb1f`; scoped replay 309 Vitest / three Chromium cases passed before publication. |
 | 1b.5 / Checkpoint 1S | Approved/published as `124b36a8`; track/media/table foundations and retained Listen play/ring/seek trail. Pre-publication replay: 31 Vitest / 9 Chromium cases passed. |
-| 1b.6 / Checkpoint 1T | Local at `#estado-admin`, awaiting Diego's review before publication or 1b.7. Admin state colour, neutral severity meters and destructive triggers. Final verification below. |
+| 1b.6 / Checkpoint 1T | Approved/published as `5308c391`; pre-publication focused replay: 34 Vitest / 2 Chromium cases pass. Earlier 185-test consumer validation remains recorded below. |
+| 1b.7 / Checkpoint 1U | Local at `#saltar-contenido`; shared first-focus skip link, main targets and seven Listen translations. Awaiting Diego before publication or 1b.8. |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -1521,3 +1522,88 @@ Diego approved complete 1T and explicitly authorised commit/push and continuatio
 This supersedes its local-only stop above. Publish the reviewed status-colour batch, keep :5186
 active, implement skip links locally, and stop at checkpoint 1U before another publication or
 Task 1b.8. Existing canonical/native QA limits remain; no full suites or CI during iteration.
+
+
+## Checkpoint 1U — Skip navigation, Linux local review, 2026-10-17
+
+Diego approved complete 1T and authorised commit/push plus Task 1b.7. 1T is published as
+`5308c391c1b0168edebfff58b15e821a1e5a6757`, verified at origin. Its fresh pre-publication scoped
+replay passed 34 Vitest and two Chromium cases. **1U is local, uncommitted and awaiting review**
+at <http://127.0.0.1:5186/#saltar-contenido>. Stop before publication or Task1b.8.
+
+Shared `SkipLink` is the first keyboard stop in both shells. Admin's existing main gains
+`admin-main-content`; Listen's existing DesktopShell/MobileShell main gains `listen-main-content`.
+All targets use `tabIndex=-1`. The link resolves the current target in its owner document, moves
+focus into main, and leaves query/hash unchanged on successful activation. A missing target
+retains native anchor fallback. The next Tab continues inside content. It has one shared solid
+recipe, immediate focused visibility, existing focus ring, 44px minimum target, safe-area insets,
+stacking above navigation and forced-color borders. No app-specific foundation variants, new
+dependencies, API/player/permission/subscription changes or automatic route-focus behavior.
+
+Listen's new `common.skipToMainContent` label is translated in all seven catalogs. Only that key
+is added to the six non-English metadata files; historical records stay unchanged. The canonical
+site pin remains `258bbaee`, without using a replacement tree. The original MCP checkout is untouched.
+
+The persistent specimen uses real shared SkipLink/main in separate preview documents, with
+fictional chrome. This avoids nested main landmarks and API-dependent app setup. Actual app Shell
+integration is tested separately. The demo's outer button waits for its iframe/link to be ready;
+a first-click browser failure exposed React's deferred initial commit, reproduced by comparing
+readiness, and was fixed with a synchronous fixture commit before load plus a disabled control
+until ready. This changes only preview startup. Existing checkpoints remain on the same page.
+
+Focused verification:
+
+- Shared SkipLink: 2 tests; Admin Shell/Sidebar/CommandPalette:22; Listen Shell/catalogs:57;
+  shared source policies:5; Listen component/token/copy policies:8. **94 cases pass** across
+  the affected files. RED was observed first: shared2, Admin1, Listen9 failures for missing behavior.
+- **27 additional Shell cases pass** using the Desktop config's aliases and a simulated Tauri
+  runtime with the existing renderer fixture. Combined total:121 scoped Vitest cases. This is
+  not the full Desktop suite or a native window/AT run. Commands stayed serial, `--maxWorkers=1`.
+- Strict types pass for Shared UI, Admin, Listen and Desktop; the preview's typed entries/spec
+  pass with existing Node types. Scoped ESLint, export/token/component/copy policies, drift
+  (15 metrics within budget) and shared layers (0 violations across142 files) pass.
+- Admin build/budget: **529225 / 532480 B gzip**, +134B from1T, **3255B** headroom. Listen web
+  build/budget: **199918 / 307200 B gzip**. No dependency or lockfile changes. Static preview
+  builds both entry documents; existing large-chunk advisories are non-fatal.
+- Six advisory browser cases cover both app labels at desktop and390px, keyboard/pointer
+  activation, next Tab, real URL preservation, immediate visibility/44px target, forced colors,
+  reduced motion, no overflow/API errors and both embedded controls. Final replay details below.
+
+One fresh read-only review found no Critical/Important issue. **Minor deferred:** Shell unit tests
+compare `window.location` while their fixture route lives in MemoryRouter, so those assertions
+alone do not exercise the supplied query/hash. The browser tests use real URLs and cover this;
+refine the unit URL fixture in later Shell work. No production defect or second review is claimed.
+
+Decisions: successful skip preserves URL state (one handler to change if wrong); the review uses
+isolated real-component documents (extra preview entry to maintain); automatic route-change h1
+focus/announcements stay in planned Tasks3.2/4.1 (their controller work remains to implement).
+Reviewer-declined runtime checks were performed here where available; native safe-area behavior,
+AT announcements, cross-engine focus and canonical Linux CI QA remain pending. The 33 canonical
+PNGs and current manifest remain from1M. No baselines, full suites/CI, PR, merge/rebase, deploy,
+release, icon migration or 1U publication were performed.
+
+
+### 1U final verification and review stop
+
+The final Chromium replay passes **6/6** cases, `--workers=1`, including390px touch/coarse-pointer
+contexts for both app labels and the specimen's actual8px label/control gap. Strict preview types,
+scoped preview lint, static multi-entry build and i18n check (0 errors/0 warnings) pass after the
+last fixture/type refinements. A locator scoping mistake in the added gap assertion was corrected;
+its successful measurement remains8px. Production shell/link source was unchanged during this.
+
+The in-app browser displays `?tab=albums&listenTab=history#saltar-contenido`; the real Listen
+skip link was visibly focused in its isolated document. Proof is ignored
+`.artifacts/review/checkpoint-1u.png`. HTTP :5186 remains active. Actual OS/native/AT testing is
+still pending; the simulated Desktop renderer checks above do not certify those environments.
+
+All1U files are unstaged/uncommitted. HEAD remains published1T `5308c391`. Keep the preview active
+and stop for Diego here. Do not publish1U or begin1b.8 without his next direction. Generated Admin
+TS build-info was restored to HEAD; no dependency, baseline or manifest changes remain.
+
+
+### Checkpoint 1U approval and publication authorisation — 2026-10-17
+
+Diego approved complete1U and explicitly authorised commit/push plus Task1b.8, keeping :5186
+active and stopping at the next checkpoint. This supersedes its local-only stop above. The next
+stop is1V: the task's mandatory Admin icon inventory and proposed functional exceptions, before
+blanket deletion or a first migration group. Existing scoped/serial/no-baseline validation applies.

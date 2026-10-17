@@ -1,3 +1,4 @@
+import { SkipLinkCheckpoint } from "./skip-link-checkpoint";
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { installFocusRingMotion } from "@crate/ui/lib/focus-ring-motion";
@@ -1628,6 +1629,7 @@ function App() {
       <StatesCheckpoint />
       <TracksCheckpoint />
       <StatusColourCheckpoint />
+      <SkipLinkCheckpoint />
       <AppModal
         open={sampleModalOpen}
         onClose={() => setSampleModalOpen(false)}
@@ -1706,7 +1708,7 @@ function App() {
             "1Q publicado",
             "1R publicado",
             "1S publicado",
-            "1T publicado",
+            "1T publicado · 1U publicado",
           ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>

@@ -1,7 +1,7 @@
 # Crate v3 design system
 
-Current implementation: checkpoints through 1S are approved and published (`124b36a8`);
-Task 1b.6 / 1T is local on Linux at `#estado-admin`, awaiting Diego's review before publication or 1b.7.
+Current implementation: checkpoints through 1T are approved and published (`5308c391`);
+Task 1b.7 / 1U is local on Linux at `#saltar-contenido`, awaiting Diego's review before publication or 1b.8.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
 `/Users/diego/Code/crate-v3`, branch `feat/crate_v3`. The handover owns implementation/QA status.
@@ -4223,3 +4223,17 @@ icon tones outside ConfirmDialog. Its allowlist is empty. This is a source-polic
 proof of arbitrary runtime prop or CSS data flow; consumer tests cover representative meaning.
 Icon retirement and page geometry remain their later tasks. The real-component specimen is at
 `#estado-admin`; advisory Chromium captures do not replace canonical Linux CI or native/AT QA.
+
+
+## Linux implementation note — 1U / Skip navigation, 2026-10-17
+
+Both app shells use shared `primitives/SkipLink.tsx` and the `.crate-skip-link` recipe. It is
+visually outside the viewport until focused, remains first in the keyboard order, and appears
+immediately above shell navigation with a solid token surface and the existing focus ring.
+Safe-area inset placement, a minimum 44 px target and forced-color borders are shared. There is
+no movement animation to delay entry, including reduced motion. Only the translated label and
+target ID differ between consumers. Each real main is focusable programmatically (`tabIndex=-1`)
+and excluded from sequential Tab navigation. Explicit activation retains the URL's query/fragment
+and continues from the content; it does not change automatic route focus or player behavior.
+The real-component specimen is at `#saltar-contenido`, using isolated documents so each example
+has one main and a genuine first keyboard stop. Native/AT and canonical CI QA remain pending.

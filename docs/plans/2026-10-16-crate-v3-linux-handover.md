@@ -4,21 +4,21 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — checkpoint 1T
+## Active Linux workspace — checkpoint 1U
 
 Diego's latest request overrides the clone-only setup below: isolate this work from the
 Crate MCP agent. The managed worktree is `/home/diego/.codex/worktrees/crate-v3-1q/crate`,
 on the existing `feat/crate_v3` branch, tracking `origin/feat/crate_v3`. HEAD is published
-`124b36a83a51da46dea137b9b84c00d07060ebd6` (approved 1S); the original transfer checkpoint
+`5308c391c1b0168edebfff58b15e821a1e5a6757` (approved 1T); the original transfer checkpoint
 `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. The original checkout
 `/home/diego/Code/Ninja/crate` stays on `feat/crate_mcp` with the other agent's changes.
 Do not switch, reset or edit that checkout. No extra clone/worktree is needed to resume.
 
 Node 22.23.3 and root `npm ci` are ready. The live preview remains at
-`http://127.0.0.1:5186/#estado-admin`; it needs no backend. 1S is committed/pushed with Diego's
-approval. Task 1b.6 / checkpoint 1T is local and stops for his review before publication or 1b.7.
+`http://127.0.0.1:5186/#saltar-contenido`; it needs no backend. 1T is committed/pushed with Diego's
+approval on 2026-10-17. Task 1b.7 / checkpoint 1U is local and stops for his review before publication or 1b.8.
 Diego explicitly retained the existing Listen layered play/halo/progress ring and the luminous
-seek trail (2 px, thin 1 px) during review. Do not simplify these into flat controls. Read the final 1T record
+seek trail (2 px, thin 1 px) during review. Do not simplify these into flat controls. Read the final 1U record
 in the main handover for verification and limits. The generic bootstrap below is retained
 for a future fresh machine; it does not replace this active worktree.
 

@@ -45,6 +45,8 @@ export function MobileShell({
         <TopBar hideMobileActions={overlayHeader} />
       </div>
       <main
+        id="listen-main-content"
+        tabIndex={-1}
         className="relative z-0 flex-1 overflow-x-hidden"
         style={{
           paddingBottom: hasTrack

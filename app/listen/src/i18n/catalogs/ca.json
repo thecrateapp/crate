@@ -1,5 +1,6 @@
 {
   "app.name": "Crate",
+  "common.skipToMainContent": "Ves al contingut principal",
   "common.loading": "S'està carregant Crate...",
   "common.retry": "Torna-ho a provar",
   "common.cancel": "Cancel·la",

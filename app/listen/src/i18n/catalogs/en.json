@@ -1,5 +1,6 @@
 {
   "app.name": "Crate",
+  "common.skipToMainContent": "Skip to main content",
   "common.loading": "Loading Crate...",
   "common.retry": "Retry",
   "common.cancel": "Cancel",

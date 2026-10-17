@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { Link, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -420,4 +421,46 @@ describe("Shell", () => {
     expect(container.querySelector(".listen-home-top-scrim")).toBeNull();
     expect(screen.getByTestId("listen-content")).toHaveClass("pt-0");
   });
+});
+
+it.each([false, true])(
+  "keeps skip navigation first and focuses main on desktop=%s",
+  async (isDesktop) => {
+    viewportState.isDesktop = isDesktop;
+    const user = userEvent.setup();
+    renderWithListenProviders(
+      <Shell>
+        <button type="button">First content action</button>
+      </Shell>,
+      { route: "/library?tab=albums#details" },
+    );
+    const link = screen.getByRole("link", { name: "Skip to main content" });
+    const main = screen.getByRole("main");
+    expect(main).toHaveAttribute("tabindex", "-1");
+    expect(link).toHaveAttribute("href", `#${main.id}`);
+    await user.tab();
+    expect(link).toHaveFocus();
+    const url = window.location.href;
+    await user.keyboard("{Enter}");
+    expect(main).toHaveFocus();
+    expect(window.location.href).toBe(url);
+    await user.tab();
+    expect(
+      screen.getByRole("button", { name: "First content action" }),
+    ).toHaveFocus();
+  },
+);
+
+it.each([
+  ["en", "Skip to main content"],
+  ["es", "Saltar al contenido principal"],
+  ["fr", "Aller au contenu principal"],
+  ["de", "Zum Hauptinhalt springen"],
+  ["it", "Vai al contenuto principale"],
+  ["ca", "Ves al contingut principal"],
+  ["eu", "Joan eduki nagusira"],
+] as const)("localizes skip navigation in %s", (locale, label) => {
+  viewportState.isDesktop = false;
+  renderWithListenProviders(<Shell />, { locale });
+  expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
 });
