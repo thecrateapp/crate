@@ -3,9 +3,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { ResponsiveLine } from "@nivo/line";
 import {
   Activity,
-  AlertTriangle,
   Clock,
-  Cpu,
   Database,
   Disc3,
   Gauge,
@@ -13,7 +11,6 @@ import {
   Headphones,
   Radio,
   RefreshCw,
-  Route,
   Zap,
 } from "lucide-react";
 
@@ -542,21 +539,18 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
 
   return (
     <OpsPanel
-      icon={Route}
       title="API Route Latency"
       description="Recent endpoint latency ranked by p95, useful for finding the routes hurting admin and Listen first."
     >
       <div className="space-y-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <OpsStatTile
-            icon={Route}
             label="Measured Routes"
             value={routes.length.toLocaleString()}
             caption={`${totalRequests.toLocaleString()} sampled requests`}
             tone={routes.length > 0 ? "primary" : "default"}
           />
           <OpsStatTile
-            icon={Clock}
             label="Slowest p95"
             value={formatMs(slowest?.p95)}
             caption={
@@ -567,7 +561,6 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
             tone={slowest && slowest.p95 > 1000 ? "warning" : "default"}
           />
           <OpsStatTile
-            icon={Gauge}
             label="Highest p99"
             value={formatMs(highestP99?.p99)}
             caption={
@@ -578,7 +571,6 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
             tone={highestP99 && highestP99.p99 > 3000 ? "warning" : "default"}
           />
           <OpsStatTile
-            icon={AlertTriangle}
             label="Route 5xx"
             value={failing.toLocaleString()}
             caption="Server errors in the sampled window"
@@ -731,14 +723,12 @@ function PlaybackTranscodingOverview({
 
   return (
     <OpsPanel
-      icon={Headphones}
       title="Playback Transcoding"
       description="Cached AAC delivery coverage, playback worker slots and recent transcode health for Listen."
     >
       <div className="space-y-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <OpsStatTile
-            icon={Headphones}
             label="Lossless Coverage"
             value={stats ? `${stats.coverage_percent}%` : "—"}
             caption={
@@ -749,7 +739,6 @@ function PlaybackTranscodingOverview({
             tone={stats && stats.coverage_percent > 0 ? "success" : "default"}
           />
           <OpsStatTile
-            icon={HardDrive}
             label="Cache Size"
             value={formatBytes(stats?.cached_bytes)}
             caption={`${formatBytes(
@@ -757,13 +746,11 @@ function PlaybackTranscodingOverview({
             )} avoided vs source`}
           />
           <OpsStatTile
-            icon={Clock}
             label="Avg Prepare"
             value={avgPrepare}
             caption={`${avgTranscode} worker avg in current metrics window`}
           />
           <OpsStatTile
-            icon={AlertTriangle}
             label="Transcode Failures"
             value={`${failRate.toFixed(0)}%`}
             caption={`${failed} failed / ${completed} completed samples`}
@@ -971,7 +958,6 @@ export function SystemHealth() {
   return (
     <div className="space-y-6">
       <OpsPageHero
-        icon={Activity}
         title="System Health"
         description="Runtime pressure, API performance, queue behavior and infrastructure saturation across the stack."
         actions={
@@ -1063,7 +1049,6 @@ export function SystemHealth() {
       <div className="grid gap-4 xl:grid-cols-[1.2fr_repeat(6,minmax(0,1fr))]">
         <HealthSignal score={score} summary={scoreSummary} />
         <OpsStatTile
-          icon={Activity}
           label="API p95"
           value={summary ? `${summary.api_latency.max.toFixed(0)}ms` : "—"}
           caption={
@@ -1076,7 +1061,6 @@ export function SystemHealth() {
           }
         />
         <OpsStatTile
-          icon={AlertTriangle}
           label="Error Rate"
           value={`${errorRate}%`}
           caption={
@@ -1087,7 +1071,6 @@ export function SystemHealth() {
           tone={Number(errorRate) > 1 ? "danger" : "default"}
         />
         <OpsStatTile
-          icon={Clock}
           label="Slow Requests"
           value={summary ? `${summary.api_slow.count}` : "—"}
           caption={
@@ -1098,7 +1081,6 @@ export function SystemHealth() {
           tone={summary && summary.api_slow.count > 0 ? "warning" : "default"}
         />
         <OpsStatTile
-          icon={Radio}
           label="Home Core Cache"
           value={homeCacheTotal > 0 ? `${homeCacheHitRate.toFixed(0)}%` : "—"}
           caption={
@@ -1109,7 +1091,6 @@ export function SystemHealth() {
           tone="default"
         />
         <OpsStatTile
-          icon={Radio}
           label="Home Endpoint Cache"
           value={
             homeEndpointCacheTotal > 0
@@ -1124,7 +1105,6 @@ export function SystemHealth() {
           tone="default"
         />
         <OpsStatTile
-          icon={Cpu}
           label="Load"
           value={system?.load ? `${system.load.load_1m}` : "—"}
           caption={
@@ -1381,7 +1361,6 @@ export function SystemHealth() {
       ) : null}
 
       <OpsPanel
-        icon={Gauge}
         title="Metric Streams"
         description="Latency, request volume, queue pressure and task execution trends over the selected time window."
       >
@@ -1447,7 +1426,6 @@ export function SystemHealth() {
 
       {tasks.length > 0 ? (
         <OpsPanel
-          icon={Zap}
           title="Running Tasks"
           description="The worker jobs currently in flight, with elapsed time and live progress where available."
         >

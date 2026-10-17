@@ -1,53 +1,28 @@
 import type { ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@crate/ui/lib/cn";
 
 type OpsTone = "default" | "primary" | "success" | "warning" | "danger";
 
-function toneClasses(tone: OpsTone) {
+function valueToneClass(tone: OpsTone) {
   switch (tone) {
-    case "primary":
-      return {
-        iconWrap:
-          "border-accent-action/20 bg-accent-action/12 text-primary shadow-none",
-        value: "text-text-primary",
-      };
     case "success":
-      return {
-        iconWrap:
-          "border-accent-action/20 bg-accent-action/12 text-accent-action-hi shadow-none",
-        value: "text-accent-action-hi",
-      };
+      return "text-accent-action-hi";
     case "warning":
-      return {
-        iconWrap:
-          "border-state-warning/20 bg-state-warning/12 text-state-warning-text shadow-none",
-        value: "text-state-warning-text",
-      };
     case "danger":
-      return {
-        iconWrap:
-          "border-state-warning/20 bg-state-warning/12 text-state-warning-text shadow-none",
-        value: "text-state-warning-text",
-      };
+      return "text-state-warning-text";
     default:
-      return {
-        iconWrap: "border-white/10 bg-white/[0.05] text-white/65",
-        value: "text-text-primary",
-      };
+      return "text-text-primary";
   }
 }
 
 export function OpsPageHero({
-  icon: Icon,
   title,
   description,
   actions,
   children,
   className,
 }: {
-  icon: LucideIcon;
   title: string;
   description: string;
   actions?: ReactNode;
@@ -63,16 +38,11 @@ export function OpsPageHero({
     >
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary shadow-none">
-              <Icon size={22} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-white">
-                {title}
-              </h1>
-              <p className="text-sm text-white/55">{description}</p>
-            </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-white">
+              {title}
+            </h1>
+            <p className="text-sm text-white/55">{description}</p>
           </div>
           {children ? (
             <div className="flex flex-wrap items-center gap-2">{children}</div>
@@ -89,22 +59,18 @@ export function OpsPageHero({
 }
 
 export function OpsStatTile({
-  icon: Icon,
   label,
   value,
   caption,
   tone = "default",
   className,
 }: {
-  icon: LucideIcon;
   label: string;
   value: ReactNode;
   caption?: ReactNode;
   tone?: OpsTone;
   className?: string;
 }) {
-  const toneClass = toneClasses(tone);
-
   return (
     <div
       className={cn(
@@ -112,23 +78,18 @@ export function OpsStatTile({
         className,
       )}
     >
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="crate-form-field">
         <div className="text-[11px] uppercase tracking-[0.12em] text-white/35">
           {label}
         </div>
         <div
           className={cn(
-            "flex h-9 w-9 items-center justify-center rounded-md border",
-            toneClass.iconWrap,
+            "text-xl font-semibold tracking-tight",
+            valueToneClass(tone),
           )}
         >
-          <Icon size={16} />
+          {value}
         </div>
-      </div>
-      <div
-        className={cn("text-xl font-semibold tracking-tight", toneClass.value)}
-      >
-        {value}
       </div>
       {caption ? (
         <div className="mt-1 text-xs text-white/40">{caption}</div>
@@ -138,14 +99,12 @@ export function OpsStatTile({
 }
 
 export function OpsPanel({
-  icon: Icon,
   title,
   description,
   action,
   children,
   className,
 }: {
-  icon: LucideIcon;
   title: string;
   description?: string;
   action?: ReactNode;
@@ -160,18 +119,13 @@ export function OpsPanel({
       )}
     >
       <div className="flex flex-col gap-3 border-b border-white/8 px-4 py-4 md:flex-row md:items-start md:justify-between md:px-5">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-white/70">
-            <Icon size={16} />
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold tracking-tight text-white">
-              {title}
-            </h2>
-            {description ? (
-              <p className="max-w-3xl text-sm text-white/45">{description}</p>
-            ) : null}
-          </div>
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold tracking-tight text-white">
+            {title}
+          </h2>
+          {description ? (
+            <p className="max-w-3xl text-sm text-white/45">{description}</p>
+          ) : null}
         </div>
         {action ? (
           <div className="flex flex-wrap items-center gap-2">{action}</div>

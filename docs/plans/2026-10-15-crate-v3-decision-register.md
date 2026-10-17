@@ -674,3 +674,14 @@ During the same 1X review Diego identified search suggestions behind the AI acti
 stacking context with the common portalled dropdown and its anchored primitive; do not add
 another z-index scale. Replace document-based outside detection so native portal result clicks
 are preserved. This needs only an additive PopoverAnchor export; existing consumers keep their API.
+
+
+### 2026-10-17 — 1X published; 1Y operational headings and readings
+
+Diego approved 1X and authorised commit/push plus the next bounded Admin group, preserving UX
+glyphs and another review stop. 1X is `b628a438` at origin. 1Y retires the decorative icon prop
+from Admin-local OpsPageHero/OpsPanel/OpsStatTile and adapts all 125 page uses and the older 1T
+specimens. The action/children slots keep their behavior and functional glyphs; this approval
+does not cover deleting other page icons. Read-only label/value pairs follow the shared real
+8px `.crate-form-field` contract. No shared or Listen/Desktop contract change is required.
+Review `#superficies-admin`; do not publish 1Y or begin the following group before Diego.

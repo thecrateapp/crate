@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Activity } from "lucide-react";
+
 import { OpsStatTile } from "../../app/ui/src/components/admin/ops-surfaces";
 import { SeverityMeter } from "../../app/ui/src/components/admin/status-indicators";
 import { IssueList } from "../../app/ui/src/components/scanner/IssueList";
@@ -41,21 +41,18 @@ export function StatusColourCheckpoint() {
         aria-label="Indicadores reales de Admin"
       >
         <OpsStatTile
-          icon={Activity}
           label="En servicio"
           value="7/8"
           caption="Servicios activos"
           tone="success"
         />
         <OpsStatTile
-          icon={Activity}
           label="Trabajos fallidos"
           value="1"
           caption="Fallo de muestra; conserva el contexto"
           tone="danger"
         />
         <OpsStatTile
-          icon={Activity}
           label="Pendientes"
           value="3"
           caption="Esperando confirmación"

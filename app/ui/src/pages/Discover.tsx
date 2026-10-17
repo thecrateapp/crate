@@ -348,7 +348,6 @@ function DiscoverView({
   return (
     <div className="space-y-6">
       <OpsPageHero
-        icon={Compass}
         title="Discovery"
         description="A workspace for finding what to import next: incomplete artist catalogues, fresh releases, momentum signals and genres worth expanding."
         actions={
@@ -410,28 +409,24 @@ function DiscoverView({
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <OpsStatTile
-          icon={Search}
           label="Acquisition targets"
           value={summary.opportunityArtists.toLocaleString()}
           caption="Artists with missing catalogue worth filling"
           tone={summary.opportunityArtists > 0 ? "primary" : "default"}
         />
         <OpsStatTile
-          icon={Sparkles}
           label="Detected releases"
           value={summary.detectedReleases.toLocaleString()}
           caption="Albums already found by the radar"
           tone={summary.detectedReleases > 0 ? "success" : "default"}
         />
         <OpsStatTile
-          icon={Compass}
           label="Incomplete artists"
           value={summary.incompleteArtists.toLocaleString()}
           caption={`${summary.totalArtists.toLocaleString()} artists scanned for catalogue gaps`}
           tone={summary.incompleteArtists > 0 ? "warning" : "default"}
         />
         <OpsStatTile
-          icon={TrendingUp}
           label="Trend signals"
           value={(
             trendingArtists.length + momentumAlbums.length
@@ -441,7 +436,6 @@ function DiscoverView({
       </div>
 
       <OpsPanel
-        icon={Search}
         title="Search workspace"
         description="Narrow all discovery panels at once by artist, album or missing-release title."
       >
@@ -460,7 +454,6 @@ function DiscoverView({
       </OpsPanel>
 
       <OpsPanel
-        icon={Download}
         title="Acquisition opportunities"
         description="Artists with enough listener weight and enough missing catalogue to justify a download or curation pass."
       >
@@ -479,7 +472,6 @@ function DiscoverView({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <OpsPanel
-          icon={Sparkles}
           title="Release radar"
           description="Freshly detected albums from your orbit that may deserve immediate acquisition."
           action={
@@ -508,7 +500,6 @@ function DiscoverView({
         </OpsPanel>
 
         <OpsPanel
-          icon={BarChart3}
           title="Genres to expand"
           description="Top genres in your library, useful for spotting where a discovery sweep would most naturally fit."
         >
@@ -533,7 +524,6 @@ function DiscoverView({
 
       <div className="grid gap-6 xl:grid-cols-2">
         <OpsPanel
-          icon={TrendingUp}
           title="Artist momentum"
           description="Popularity leaders in your orbit. Not discovery by itself, but a strong hint for what deserves deeper acquisition."
         >
@@ -560,7 +550,6 @@ function DiscoverView({
         </OpsPanel>
 
         <OpsPanel
-          icon={Disc3}
           title="Album momentum"
           description="Albums already resonating in your world. Handy for deciding which artists deserve more catalogue depth."
         >

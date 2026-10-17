@@ -2,6 +2,7 @@ import {
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -21,6 +22,7 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
   .concat([
     "app/ui/src/components/ui/AIButton.tsx",
     "app/ui/src/components/ui/AdminSelect.tsx",
+    "app/ui/src/components/admin/ops-surfaces.tsx",
   ]);
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
@@ -275,4 +277,99 @@ it("does not extend a UX approval to another glyph or a duplicate callsite", () 
         analyzeSource(path, source).entries,
       ),
     ).toHaveLength(1);
+});
+
+function operationalIconViolations(path: string, source: string) {
+  const tree = ts.createSourceFile(
+    path,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const surfaces = new Set(["OpsPageHero", "OpsPanel", "OpsStatTile"]);
+  const bindings = new Set<string>();
+  for (const node of tree.statements) {
+    if (
+      !ts.isImportDeclaration(node) ||
+      !ts.isStringLiteral(node.moduleSpecifier) ||
+      node.moduleSpecifier.text !== "@/components/admin/ops-surfaces"
+    )
+      continue;
+    const imports = node.importClause?.namedBindings;
+    if (imports && ts.isNamedImports(imports)) {
+      for (const entry of imports.elements) {
+        if (surfaces.has((entry.propertyName ?? entry.name).text))
+          bindings.add(entry.name.text);
+      }
+    } else if (imports && ts.isNamespaceImport(imports)) {
+      for (const surface of surfaces)
+        bindings.add(`${imports.name.text}.${surface}`);
+    }
+  }
+  const found: string[] = [];
+  function visit(node: ts.Node) {
+    if (
+      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+      bindings.has(node.tagName.getText(tree))
+    ) {
+      for (const attr of node.attributes.properties) {
+        if (
+          ts.isJsxSpreadAttribute(attr) ||
+          (ts.isJsxAttribute(attr) && attr.name.getText(tree) === "icon")
+        )
+          found.push(
+            `${path}:${tree.getLineAndCharacterOfPosition(attr.getStart(tree)).line + 1}`,
+          );
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(tree);
+  return found;
+}
+
+function productionTsx(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    return entry.isDirectory()
+      ? productionTsx(path)
+      : entry.name.endsWith(".tsx") && !entry.name.includes(".test.")
+        ? [path]
+        : [];
+  });
+}
+
+describe("Admin operational surface consumer contracts", () => {
+  it("does not pass decorative icons or opaque props to retired operational surfaces", () => {
+    const found = productionTsx(join(repo, "app/ui/src")).flatMap((path) =>
+      operationalIconViolations(path, readFileSync(path, "utf8")),
+    );
+    expect(found).toEqual([]);
+  });
+  it.each([
+    [
+      'import { OpsPanel } from "@/components/admin/ops-surfaces"; const view = <OpsPanel icon={Glyph}/>;',
+      1,
+    ],
+    [
+      'import { OpsPageHero as Hero } from "@/components/admin/ops-surfaces"; const view = <Hero icon={Glyph}/>;',
+      1,
+    ],
+    [
+      'import * as Ops from "@/components/admin/ops-surfaces"; const view = <Ops.OpsStatTile {...props}/>;',
+      1,
+    ],
+    [
+      'import { OpsPanel } from "@/components/admin/ops-surfaces"; const view = <OpsPanel title="Tasks" action={<button>Refresh</button>}>Jobs</OpsPanel>;',
+      0,
+    ],
+  ] as const)(
+    "checks aliases and spreads without banning action slots: %s",
+    (source, count) => {
+      expect(operationalIconViolations("fixture.tsx", source)).toHaveLength(
+        count,
+      );
+    },
+  );
 });

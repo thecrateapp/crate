@@ -2,7 +2,6 @@ import { useMemo, type ReactNode } from "react";
 
 import { ResponsiveBar } from "@nivo/bar";
 import { ResponsiveScatterPlot } from "@nivo/scatterplot";
-import { BarChart3, Disc3, Globe, Sparkles, Trophy, Zap } from "lucide-react";
 
 import {
   OpsPageHero,
@@ -385,7 +384,6 @@ export function Insights() {
     return (
       <div className="space-y-6">
         <OpsPageHero
-          icon={BarChart3}
           title="Insights"
           description="Macro patterns across the library, with a cleaner split between collection shape, standouts and audio signature."
         >
@@ -419,7 +417,6 @@ export function Insights() {
   return (
     <div className="space-y-6">
       <OpsPageHero
-        icon={BarChart3}
         title="Insights"
         description="A macro read on how the library is shaped, where its weight sits, and how much of the collection is analytically mapped."
         actions={<HeroSignalPanel items={heroBriefItems} />}
@@ -437,28 +434,24 @@ export function Insights() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <OpsStatTile
-          icon={Globe}
           label="Countries"
           value={formatNumber(countriesRepresented)}
           caption="Artist origins represented in the library"
           tone="primary"
         />
         <OpsStatTile
-          icon={Disc3}
           label="Decades"
           value={formatNumber(decadesRepresented)}
           caption="Release decades with real catalog density"
           tone="default"
         />
         <OpsStatTile
-          icon={Zap}
           label="Feature Coverage"
           value={`${avgFeatureCoverage}%`}
           caption={`${featureCoverageData.length} analysis signals tracked across the catalog`}
           tone={avgFeatureCoverage >= 70 ? "success" : "warning"}
         />
         <OpsStatTile
-          icon={Trophy}
           label="Standouts Surfaced"
           value={formatNumber(surfacedStandouts)}
           caption={`${formatNumber(
@@ -512,7 +505,6 @@ export function Insights() {
       </div>
 
       <OpsPanel
-        icon={Globe}
         title="Collection Shape"
         description="The broad cultural and catalog footprint of the library: genres, countries and decades."
       >
@@ -668,7 +660,6 @@ export function Insights() {
       </OpsPanel>
 
       <OpsPanel
-        icon={Trophy}
         title="Standouts"
         description="Popularity and catalog depth, using the consolidated scoring model instead of the older Spotify-heavy heuristic."
       >
@@ -861,7 +852,6 @@ export function Insights() {
       </OpsPanel>
 
       <OpsPanel
-        icon={Sparkles}
         title="Audio Signature"
         description="How much of the library is analytically described, and what that description says about its sonic shape."
       >

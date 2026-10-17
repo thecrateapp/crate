@@ -533,7 +533,6 @@ export function NewReleases() {
   return (
     <div className="space-y-6">
       <OpsPageHero
-        icon={Sparkles}
         title="New Releases"
         description="Release radar for library artists, with quick triage for what should land next in Crate."
         actions={
@@ -587,28 +586,24 @@ export function NewReleases() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <OpsStatTile
-          icon={Download}
           label="Needs action"
           value={stats.detected.toLocaleString()}
           caption="Detected releases waiting for a decision"
           tone={stats.detected > 0 ? "primary" : "default"}
         />
         <OpsStatTile
-          icon={Loader2}
           label="Downloading"
           value={stats.downloading.toLocaleString()}
           caption="Acquisition tasks in flight"
           tone={stats.downloading > 0 ? "warning" : "default"}
         />
         <OpsStatTile
-          icon={CheckCircle2}
           label="Downloaded"
           value={stats.downloaded.toLocaleString()}
           caption="Already landed in the library"
           tone={stats.downloaded > 0 ? "success" : "default"}
         />
         <OpsStatTile
-          icon={CalendarDays}
           label="Upcoming"
           value={stats.upcoming.toLocaleString()}
           caption="Future-dated releases still on the radar"
@@ -616,7 +611,6 @@ export function NewReleases() {
       </div>
 
       <OpsPanel
-        icon={Search}
         title="Radar filters"
         description="Search by artist or album, then narrow the radar by acquisition state or release type."
       >
@@ -678,7 +672,6 @@ export function NewReleases() {
       </OpsPanel>
 
       <OpsPanel
-        icon={Sparkles}
         title="Release radar"
         description="Use timeline when you want to triage in date order, or grid when you need a visual scan of artwork and release types."
       >

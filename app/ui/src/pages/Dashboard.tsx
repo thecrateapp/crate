@@ -3,7 +3,6 @@ import { useNavigate } from "react-router";
 import { ResponsiveBar } from "@nivo/bar";
 import { ResponsivePie } from "@nivo/pie";
 import {
-  Activity,
   AlertTriangle,
   ArrowRight,
   CalendarDays,
@@ -11,19 +10,15 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
-  Cpu,
   Database,
   Eye,
-  HardDrive,
   HeartPulse,
   Loader2,
   Music,
-  RadioTower,
   RefreshCw,
   RotateCcw,
   Stethoscope,
   Trash2,
-  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -347,7 +342,6 @@ export function Dashboard() {
   return (
     <div className="space-y-8">
       <OpsPageHero
-        icon={Activity}
         title="Dashboard"
         description="First-glance state of the library, worker queues, and the things that need attention now."
         actions={
@@ -420,7 +414,6 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <OpsStatTile
-          icon={HeartPulse}
           label="Health"
           value={
             totalHealthIssues > 0
@@ -435,7 +428,6 @@ export function Dashboard() {
           tone={totalHealthIssues > 0 ? "warning" : "success"}
         />
         <OpsStatTile
-          icon={Activity}
           label="Pipeline"
           value={`${formatNumber(runningTotal)} running · ${formatNumber(
             queuedTotal,
@@ -444,7 +436,6 @@ export function Dashboard() {
           tone={queuedTotal > 0 || pendingImports > 0 ? "primary" : "default"}
         />
         <OpsStatTile
-          icon={Users}
           label="Activity"
           value={`${formatNumber(
             runtime?.active_users_5m ?? 0,
@@ -458,7 +449,6 @@ export function Dashboard() {
           }
         />
         <OpsStatTile
-          icon={Cpu}
           label="Ops"
           value={opsHealthy ? "Healthy" : "Degraded"}
           caption={
@@ -472,7 +462,6 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.6fr_0.9fr]">
         <OpsPanel
-          icon={AlertTriangle}
           title="Needs Attention"
           description="A short, prioritized queue of the things most worth looking at right now."
           action={
@@ -546,7 +535,6 @@ export function Dashboard() {
         </OpsPanel>
 
         <OpsPanel
-          icon={RadioTower}
           title="Right Now"
           description="Quick operational readout without diving into lower-level diagnostics."
         >
@@ -606,34 +594,29 @@ export function Dashboard() {
       </div>
 
       <OpsPanel
-        icon={Cpu}
         title="Pipeline"
         description="How work is flowing through imports, analysis and background processing right now."
       >
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
           <OpsStatTile
-            icon={HardDrive}
             label="Imports waiting"
             value={formatNumber(pendingImports)}
             caption="Pending queue items not yet landed"
             tone={pendingImports > 0 ? "warning" : "default"}
           />
           <OpsStatTile
-            icon={Activity}
             label="Analysis backlog"
             value={formatNumber(analysisBacklog)}
             caption={`${formatNumber(analysis?.analysis_failed ?? 0)} failed`}
             tone={analysisBacklog > 0 ? "primary" : "default"}
           />
           <OpsStatTile
-            icon={Music}
             label="Bliss backlog"
             value={formatNumber(blissBacklog)}
             caption={`${formatNumber(analysis?.bliss_failed ?? 0)} failed`}
             tone={blissBacklog > 0 ? "primary" : "default"}
           />
           <OpsStatTile
-            icon={Eye}
             label="Fingerprint queue"
             value={formatNumber(fingerprintBacklog)}
             caption={
@@ -735,7 +718,6 @@ export function Dashboard() {
       </OpsPanel>
 
       <OpsPanel
-        icon={Music}
         title="Library Changes"
         description="Recent additions, what is coming up soon, and a compact sense of library footprint."
       >
@@ -945,7 +927,6 @@ export function Dashboard() {
       </OpsPanel>
 
       <OpsPanel
-        icon={Database}
         title="Advanced Diagnostics"
         description="Low-level transport, eventing and collection profiling for deeper debugging. Useful, but intentionally not first in the hierarchy."
         action={
@@ -973,7 +954,6 @@ export function Dashboard() {
                 <CardContent>
                   <div className="grid grid-cols-2 gap-3">
                     <OpsStatTile
-                      icon={Activity}
                       label="Domain sequence"
                       value={formatNumber(domainEvents?.latest_sequence ?? 0)}
                       caption={
@@ -982,7 +962,6 @@ export function Dashboard() {
                       tone={eventing?.redis_connected ? "primary" : "warning"}
                     />
                     <OpsStatTile
-                      icon={Database}
                       label="Stream depth"
                       value={formatNumber(domainEvents?.stream_length ?? 0)}
                       caption={
@@ -992,7 +971,6 @@ export function Dashboard() {
                       }
                     />
                     <OpsStatTile
-                      icon={Clock}
                       label="Pending acks"
                       value={formatNumber(domainEvents?.pending ?? 0)}
                       caption={
@@ -1005,7 +983,6 @@ export function Dashboard() {
                       }
                     />
                     <OpsStatTile
-                      icon={Eye}
                       label="SSE surfaces"
                       value={formatNumber(sseSurfaces.length)}
                       caption={`${formatNumber(

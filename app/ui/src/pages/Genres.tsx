@@ -761,7 +761,6 @@ function TaxonomyNodeEditorialEditor({
   return (
     <>
       <OpsPanel
-        icon={Network}
         title={
           canonicalSlug ? "Editorial Taxonomy Node" : "Unmapped Genre Proposal"
         }
@@ -1214,7 +1213,6 @@ function GenreList() {
     return (
       <div className="space-y-6">
         <OpsPageHero
-          icon={Tag}
           title="Genres"
           description="Taxonomy curation, raw tag cleanup and discovery of the genre graph that organizes the library."
         >
@@ -1228,7 +1226,6 @@ function GenreList() {
   return (
     <div className="space-y-6">
       <OpsPageHero
-        icon={Tag}
         title="Genres"
         description="Taxonomy curation, raw tag cleanup and discovery of the graph that organizes the musical vocabulary of the library."
         actions={
@@ -1384,28 +1381,24 @@ function GenreList() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <OpsStatTile
-          icon={Tag}
           label="Genres"
           value={formatNumber(genres?.length ?? 0)}
           caption="Total nodes available in taxonomy and raw tag space"
           tone="primary"
         />
         <OpsStatTile
-          icon={Users}
           label="Mapped"
           value={formatNumber(mappedCount)}
           caption="Genres already attached to the curated graph"
           tone="default"
         />
         <OpsStatTile
-          icon={AlertTriangle}
           label="Unmapped"
           value={formatNumber(unmappedGenres?.length ?? 0)}
           caption="Detected tags still outside the curated taxonomy"
           tone={(unmappedGenres?.length ?? 0) > 0 ? "warning" : "default"}
         />
         <OpsStatTile
-          icon={Network}
           label="Filtered"
           value={formatNumber(filtered.length)}
           caption={
@@ -1419,7 +1412,6 @@ function GenreList() {
 
       {canCurateGenres && soundHealth ? (
         <OpsPanel
-          icon={Sparkles}
           title="Sound Intelligence"
           description="Effective EQ coverage and taxonomy health, so Smart EQ and discovery do not silently fall back to weak data."
         >
@@ -1463,7 +1455,6 @@ function GenreList() {
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <OpsStatTile
-                icon={Network}
                 label="Taxonomy nodes"
                 value={formatNumber(soundHealth.taxonomy.node_count)}
                 caption={`${formatNumber(
@@ -1474,7 +1465,6 @@ function GenreList() {
                 tone="default"
               />
               <OpsStatTile
-                icon={AlertTriangle}
                 label="Needs mapping"
                 value={formatNumber(soundHealth.taxonomy.unmapped_raw_count)}
                 caption="Raw genre tags not linked to curated taxonomy"
@@ -1485,7 +1475,6 @@ function GenreList() {
                 }
               />
               <OpsStatTile
-                icon={Tag}
                 label="Orphans"
                 value={formatNumber(soundHealth.taxonomy.orphan_count)}
                 caption="Non top-level nodes without a parent relation"
@@ -1494,7 +1483,6 @@ function GenreList() {
                 }
               />
               <OpsStatTile
-                icon={Sparkles}
                 label="Missing copy"
                 value={formatNumber(
                   soundHealth.taxonomy.missing_description_count,
@@ -1514,7 +1502,6 @@ function GenreList() {
       ) : null}
 
       <OpsPanel
-        icon={Search}
         title="Explore Taxonomy"
         description="Search, switch between taxonomy views and work through unmapped or invalid nodes."
       >
@@ -1913,7 +1900,6 @@ function GenreView({ slug }: { slug: string }) {
       </div>
 
       <OpsPageHero
-        icon={Tag}
         title={genre.name}
         description={description}
         actions={
@@ -2058,7 +2044,6 @@ function GenreView({ slug }: { slug: string }) {
       </OpsPageHero>
 
       <OpsPanel
-        icon={Tag}
         title="Genre Context"
         description="Canonical mapping, external references and descriptive context for this node."
       >
@@ -2156,7 +2141,6 @@ function GenreView({ slug }: { slug: string }) {
       {/* Top Artists */}
       {genre.artists.length > 0 && (
         <OpsPanel
-          icon={Users}
           title="Top Artists"
           description="The artists most strongly attached to this genre node."
         >
@@ -2216,7 +2200,6 @@ function GenreView({ slug }: { slug: string }) {
       {/* Albums */}
       {genre.albums.length > 0 && (
         <OpsPanel
-          icon={Disc3}
           title="Albums"
           description="The album surface currently connected to this genre."
         >

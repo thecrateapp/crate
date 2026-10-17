@@ -5,16 +5,12 @@ import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import {
-  AlertTriangle,
-  Bug,
-  Filter,
   Loader2,
   Pause,
   Play,
   RefreshCw,
   ScrollText,
   Search,
-  ShieldAlert,
   Wifi,
 } from "lucide-react";
 
@@ -307,7 +303,6 @@ export function Logs() {
   return (
     <div className="space-y-6">
       <OpsPageHero
-        icon={ScrollText}
         title="Logs"
         description="Live worker stream for enrichment, analysis, sync and system activity. Built for triage, not archaeology."
         actions={
@@ -354,28 +349,24 @@ export function Logs() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <OpsStatTile
-          icon={ShieldAlert}
           label="Errors"
           value={summary.errors.toLocaleString()}
           caption="Filtered lines at error level"
           tone={summary.errors > 0 ? "danger" : "default"}
         />
         <OpsStatTile
-          icon={AlertTriangle}
           label="Warnings"
           value={summary.warnings.toLocaleString()}
           caption="Things worth checking before they hard-fail"
           tone={summary.warnings > 0 ? "warning" : "default"}
         />
         <OpsStatTile
-          icon={Wifi}
           label="Workers online"
           value={summary.onlineWorkers.toLocaleString()}
           caption={`${workers.length.toLocaleString()} known workers`}
           tone={summary.onlineWorkers > 0 ? "success" : "default"}
         />
         <OpsStatTile
-          icon={Bug}
           label="Info / debug"
           value={(
             summary.infos +
@@ -386,7 +377,6 @@ export function Logs() {
       </div>
 
       <OpsPanel
-        icon={Filter}
         title="Filters"
         description="Shape the stream by severity, worker, category or free-text search without losing the live console feel."
       >
@@ -448,7 +438,6 @@ export function Logs() {
       </OpsPanel>
 
       <OpsPanel
-        icon={Wifi}
         title="Worker roster"
         description="Known workers, their recent heartbeat, and a quick way to isolate one noisy process from the rest."
       >
@@ -475,7 +464,6 @@ export function Logs() {
       </OpsPanel>
 
       <OpsPanel
-        icon={ScrollText}
         title="Incident stream"
         description="Newest lines first. The console stays readable even when filtered down to one worker or one category."
       >

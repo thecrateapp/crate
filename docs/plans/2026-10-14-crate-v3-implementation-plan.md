@@ -3,7 +3,7 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Published checkpoints through 1W (`52eaa6a5`) are recorded in the handover; preserve the next 1X review stop.
+> Diego's go-ahead. Published checkpoints through 1X (`b628a438`) are recorded in the handover; preserve the next 1Y review stop.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -1833,6 +1833,17 @@ artwork, routes, 200ms debounce/cache/recents, LLM gating, callbacks and keyboar
 Affected clear/AI/role-select/recent targets are 44px. Diego's follow-up fixes shared Select popper
 viewport clipping without an API change; run shared and Listen selector checks too. Review the
 real controls at `#controles-admin`; stop at 1X before publication or the operations/page groups.
+
+**Linux checkpoint 1Y, 2026-10-17 — operational surface contracts, local review.** Diego approved
+1X, committed/pushed as `b628a438` and verified at origin. Admin-local OpsPageHero, OpsPanel and
+OpsStatTile retire their decorative icon contract and empty icon boxes. All 125 callsites across
+ten pages and the three existing 1T specimens omit the retired prop; titles, values, captions,
+tones, action/children slots, callbacks and page logic remain. Remove only unused Lucide imports;
+page-specific action/row glyphs remain for later bounded groups. Labels/readings use the shared
+8px `.crate-form-field` recipe. Source policy covers the three surfaces and all Admin consumers,
+including aliases/spreads; UX glyphs supplied by action/content slots remain. Review real
+components at `#superficies-admin`; stop at 1Y before publication or the next group. This does
+not finish 1b.8 or the operations/page migrations. Scoped evidence and limits: final handover.
 
 **Files:**
 

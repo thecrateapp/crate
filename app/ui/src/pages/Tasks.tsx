@@ -5,16 +5,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import {
   Activity,
-  AlertTriangle,
   Ban,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   Clock,
   Cpu,
-  Filter,
-  HardDrive,
-  Headphones,
   Loader2,
   Minus,
   Plus,
@@ -22,7 +18,6 @@ import {
   RotateCcw,
   Search,
   Trash2,
-  Wrench,
   Zap,
   XCircle,
 } from "lucide-react";
@@ -1094,7 +1089,6 @@ function PlaybackDeliveryPanel({
 
       <div className="grid gap-3 md:grid-cols-4">
         <OpsStatTile
-          icon={Headphones}
           label="Lossless coverage"
           value={`${stats?.coverage_percent ?? 0}%`}
           caption={`${(stats?.ready_tracks ?? 0).toLocaleString()} of ${(
@@ -1103,14 +1097,12 @@ function PlaybackDeliveryPanel({
           tone={(stats?.coverage_percent ?? 0) > 0 ? "success" : "default"}
         />
         <OpsStatTile
-          icon={CheckCircle2}
           label="Ready variants"
           value={(stats?.ready ?? 0).toLocaleString()}
           caption={`${(stats?.variants ?? 0).toLocaleString()} variant records`}
           tone={(stats?.ready ?? 0) > 0 ? "success" : "default"}
         />
         <OpsStatTile
-          icon={HardDrive}
           label="Cache size"
           value={formatBytes(stats?.cached_bytes)}
           caption={`${formatBytes(
@@ -1118,7 +1110,6 @@ function PlaybackDeliveryPanel({
           )} avoided vs source`}
         />
         <OpsStatTile
-          icon={Clock}
           label="Avg prepare"
           value={avgPrepare}
           caption={`${(
@@ -1875,7 +1866,6 @@ export function Tasks() {
   return (
     <div className="space-y-6">
       <OpsPageHero
-        icon={Activity}
         title="Tasks"
         description="Background orchestration for enrichment, analysis, sync, repair and acquisition jobs across the whole stack."
         actions={
@@ -1926,41 +1916,35 @@ export function Tasks() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <OpsStatTile
-          icon={Activity}
           label="Today"
           value={stats.todayTotal.toLocaleString()}
           caption="Tasks created today"
         />
         <OpsStatTile
-          icon={CheckCircle2}
           label="Completed today"
           value={stats.todayCompleted.toLocaleString()}
           caption="Successful jobs in the current day"
           tone={stats.todayCompleted > 0 ? "success" : "default"}
         />
         <OpsStatTile
-          icon={XCircle}
           label="Failed today"
           value={stats.todayFailed.toLocaleString()}
           caption="Tasks that need operator attention"
           tone={stats.todayFailed > 0 ? "danger" : "default"}
         />
         <OpsStatTile
-          icon={AlertTriangle}
           label="Needs attention"
           value={stats.needsAttention.toLocaleString()}
           caption="Recent failed, cancelled or partially-resolved work"
           tone={stats.needsAttention > 0 ? "warning" : "default"}
         />
         <OpsStatTile
-          icon={Zap}
           label="Success rate"
           value={`${stats.successRate}%`}
           caption="Completed vs failed, same-day only"
           tone={stats.successRate >= 90 ? "success" : "warning"}
         />
         <OpsStatTile
-          icon={Clock}
           label="Avg duration"
           value={`${stats.avgDurationSec}s`}
           caption="Last 20 completed tasks"
@@ -1968,7 +1952,6 @@ export function Tasks() {
       </div>
 
       <OpsPanel
-        icon={Filter}
         title="Task filters"
         description="Slice active and historical tasks by type, final status or free-text search on labels, ids and params."
         action={
@@ -2059,7 +2042,6 @@ export function Tasks() {
       </OpsPanel>
 
       <OpsPanel
-        icon={Cpu}
         title="Worker control"
         description="Queue depth, concurrency slots and quick access to worker logs when orchestration starts to stall."
       >
@@ -2099,7 +2081,6 @@ export function Tasks() {
       </OpsPanel>
 
       <OpsPanel
-        icon={Headphones}
         title="Playback delivery"
         description="Dedicated stream-preparation lane, cached AAC variants and recent transcode outcomes for Listen."
       >
@@ -2112,7 +2093,6 @@ export function Tasks() {
       </OpsPanel>
 
       <OpsPanel
-        icon={Zap}
         title="Running and queued"
         description="Current work in flight, with live event streams for long-running tasks."
       >
@@ -2140,7 +2120,6 @@ export function Tasks() {
       </OpsPanel>
 
       <OpsPanel
-        icon={AlertTriangle}
         title="Needs attention"
         description="Failures, cancelled jobs, and repairs that completed with manual follow-up or partial problems."
       >
@@ -2169,7 +2148,6 @@ export function Tasks() {
       </OpsPanel>
 
       <OpsPanel
-        icon={Wrench}
         title="Recent repair runs"
         description="Latest repair, fix-artist and health-repair jobs, with quick access to item logs and partial failures."
       >
@@ -2198,7 +2176,6 @@ export function Tasks() {
       </OpsPanel>
 
       <OpsPanel
-        icon={Clock}
         title="Task history"
         description="Recent finished jobs, with drill-down access to payloads, results and failure traces."
       >

@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import {
   Activity,
   Archive,
-  AudioWaveform,
   FileInput,
   FileJson,
   Fingerprint,
@@ -376,7 +375,6 @@ export function Analysis() {
   return (
     <div className="space-y-6">
       <OpsPageHero
-        icon={AudioWaveform}
         title="Analysis"
         description="Audio features, similarity vectors and background processing coverage across the whole library."
         actions={
@@ -511,34 +509,29 @@ export function Analysis() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <OpsStatTile
-          icon={Music}
           label="Audio Coverage"
           value={`${metrics.analysisPercent}%`}
           caption={`${status.analysis_done.toLocaleString()} analyzed`}
           tone="primary"
         />
         <OpsStatTile
-          icon={Waves}
           label="Bliss Coverage"
           value={`${metrics.blissPercent}%`}
           caption={`${status.bliss_done.toLocaleString()} vectors`}
         />
         <OpsStatTile
-          icon={Fingerprint}
           label="Fingerprint Coverage"
           value={`${metrics.fingerprintPercent}%`}
           caption={`${status.fingerprint_done.toLocaleString()} tracks fingerprinted`}
           tone={status.chromaprint_available ? "success" : "warning"}
         />
         <OpsStatTile
-          icon={FileJson}
           label="Lyrics Cache"
           value={`${metrics.lyricsPercent}%`}
           caption={`${status.lyrics_found.toLocaleString()} tracks with lyrics`}
           tone="success"
         />
         <OpsStatTile
-          icon={Tags}
           label="Portable Metadata"
           value={`${metrics.portableSidecarPercent}%`}
           caption={`${status.portable_audio_tag_tracks.toLocaleString()} tracks tagged`}
@@ -547,7 +540,6 @@ export function Analysis() {
       </div>
 
       <OpsPanel
-        icon={Gauge}
         title="Pipeline coverage"
         description="Track how far each background pipeline has progressed and spot failures before they rot."
       >
@@ -644,7 +636,6 @@ export function Analysis() {
       </OpsPanel>
 
       <OpsPanel
-        icon={FileJson}
         title="Portable library state"
         description="Lyrics cache, portable sidecars, identity tags and export coverage."
         action={
@@ -852,7 +843,6 @@ export function Analysis() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <OpsPanel
-          icon={Activity}
           title="Recent outputs"
           description="The freshest material that made it through each pipeline, useful when you want to sanity-check the daemon."
         >
@@ -871,7 +861,6 @@ export function Analysis() {
         </OpsPanel>
 
         <OpsPanel
-          icon={Sparkles}
           title="Operator notes"
           description="Quick guidance for what to do next when the coverage numbers are not where you expect them."
         >

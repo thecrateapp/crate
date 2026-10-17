@@ -1,16 +1,16 @@
 # Crate v3 handover
 
-Entry point for agents picking up Crate v3. Revised 2026-10-16. Read this file and the implementation
+Entry point for agents picking up Crate v3. Revised 2026-10-17. Read this file and the implementation
 plan; the status table separates implementation from pending QA.
 
 Current transfer: **1N–1P are complete in the checkpoint commit
 `feat(ui): unify v3 overlays, controls and field spacing`**. Diego authorised commit/push and
 continuation on Linux; this final publication record supersedes earlier local-only stops below.
-**1W is approved and published as `52eaa6a5da3f1acac58850a700947540320feb6f`.** Task 1b.8 /
-checkpoint 1X is the local Admin search/reusable-controls group, reviewable at
-<http://127.0.0.1:5186/#controles-admin>. Stop before publication or the next group.
-Conventional UX glyphs remain; redundant search-result/recent/empty-state and AI action glyphs
-are retired. Diego's Select follow-up also fixes its shared menu/viewport width geometry.
+**1X is approved and published as `b628a43871e346c095b248794f4085d888b19226`.** Task 1b.8 /
+checkpoint 1Y is the local Admin operational-surfaces group, reviewable at
+<http://127.0.0.1:5186/#superficies-admin>. Stop before publication or the next group.
+OpsPageHero/OpsPanel/OpsStatTile retire their decorative icon contract; action/content slots
+preserve behavior and functional UX glyphs. All 125 page uses and three 1T examples are adapted.
 The retained Listen play/halo/ring and luminous seek trail
 from 1S remain intact. Resume on Linux with
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
@@ -19,7 +19,7 @@ Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 ## Where the work lives
 
 - Active Linux worktree: `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing branch
-  `feat/crate_v3`, published HEAD `52eaa6a5da3f1acac58850a700947540320feb6f` (1W);
+  `feat/crate_v3`, published HEAD `b628a43871e346c095b248794f4085d888b19226` (1X);
   transfer checkpoint `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. Node 22.23.3, root
   dependencies and persistent :5186 preview are prepared. This isolates the MCP agent's
   `/home/diego/Code/Ninja/crate` checkout (`feat/crate_mcp`); leave its files untouched.
@@ -209,7 +209,8 @@ is a token-based chart configuration, not a selectable product skin.
 | 1b.7 / Checkpoint 1U | Approved/published as `afed5a3c`; fresh pre-publication replay: 30 scoped Vitest / 6 Chromium cases pass. |
 | 1b.8 / Checkpoint 1V | Approved/published as `cd5bf5e7`; inventory gate complete, historical 1U source snapshot preserved. |
 | 1b.8 / Checkpoint 1W | Approved/published as `52eaa6a5`; navigation glyph retirement, balanced counters, active bar and retained UX. |
-| 1b.8 / Checkpoint 1X | Local search/reusable-controls group at `#controles-admin`; shared Select clipping, portalled dropdown and keyboard repair verified. Stop before publication/next group. |
+| 1b.8 / Checkpoint 1X | Approved/published as `b628a438`; search/reusable controls, Select geometry and portalled keyboard access. |
+| 1b.8 / Checkpoint 1Y | Local operational-surfaces group at `#superficies-admin`; all 125 page uses adapted, UX and 8px field geometry preserved. Stop before publication/next group. |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -1978,3 +1979,74 @@ deferred. Keep all existing canonical evidence and the pinned reference.
   Canonical snapshots/manifest stay 1M. No full suites/full CI or new publication/PR/deployment.
 
 **Stop at 1X for Diego before publication or another group.**
+
+
+## Final Linux record — 1X published; 1Y operational surface contracts (2026-10-17)
+
+This record supersedes the earlier 1X local-only stop. Diego approved 1X and authorised its
+publication plus the next bounded group. Commit `b628a43871e346c095b248794f4085d888b19226`
+(`refactor(ui): retire redundant Admin control icons`) is pushed to `origin/feat/crate_v3`;
+local HEAD and `git ls-remote` agree. Fresh prepublication replay: 27 scoped Vitest + 4 preview
+Chromium tests pass. Checkpoints through 1X remain preserved.
+
+### Scope and contracts — 1Y local
+
+- Admin-local `components/admin/ops-surfaces.tsx`: remove the required `icon` prop, decorative
+  SVGs and empty icon wrappers from OpsPageHero, OpsPanel and OpsStatTile. Preserve title and
+  heading levels, description, data/ReactNode values (including zero), captions, tone, className,
+  actions and child content. Functional loading/disclosure glyphs supplied in slots stay usable.
+- Inspect/adapt **125 callsites in ten pages**: Analysis 10, Dashboard 18, Discover 11, Genres 17,
+  Insights 9, Logs 8, NewReleases 7, Stack 8, SystemHealth 19, Tasks 18. Remove 26 unused Lucide
+  bindings across seven pages; glyphs still used in page-specific actions/rows remain for later
+  groups. AST comparison confirms these ten page bodies are unchanged outside the retired
+  surface icon props/imports: no capability, route, callback, stream or fetching edits.
+- Metric label/value pairs now use `.crate-form-field` for **8 real px**, replacing legacy 12px
+  margin. Captions stay separate and retain their spacing. 1T's success/accent, warning/danger
+  amber and primary/default neutral readings remain. Adapt the three actual older 1T specimens
+  to the retired prop; keep the section mounted with its state controls.
+- Extend `admin-icon-policy.test.ts` to the surface implementation and all production Admin TSX
+  consumers. Tests reject the old icon prop and opaque spreads, including imported aliases and
+  namespace access. Existing 13 UX sites and one shared Select approval do not grow. This checks
+  surface contracts, not completion of every icon on the ten pages.
+- Persistent specimen **`#superficies-admin`** mounts all three real components with fictional
+  readings, a long label, zero, idle/busy refresh and keyboard disclosure. Busy/disclosure controls
+  retain their UX glyphs and 44px targets. The 1X section/footer is marked published. No backend
+  or real operation; all prior checkpoints remain mounted.
+
+### Scoped evidence and limits — 1Y
+
+- RED: hero/stat/panel tests find their former SVGs, source guard finds 8 surface entries and
+  consumer guard finds 125 old props. GREEN after retirement. Preview section absence RED, then
+  real metric geometry RED (12px received vs required 8px), GREEN with the shared field recipe.
+- **64 scoped Vitest cases** pass: surface/slot contracts, icon policy, status-colour policy and
+  existing Tasks/SystemHealth/Genres/Discover consumer tests; `--maxWorkers=1` throughout.
+- **4 new preview Chromium cases** pass (1440/768/390px plus previous-checkpoint preservation),
+  checking text hierarchy, semantic colours, actual 8px geometry, zero/long readings, keyboard,
+  busy/disclosure glyphs, 44px targets, URL parameters, no overflow, no API calls or page errors.
+- **4 actual Admin Chromium cases** pass: Tasks/SystemHealth operational readings at those three
+  widths plus the existing Resources/panel-spacing regression. Fixture-backed production build,
+  no screenshot baseline update; `--workers=1`. **2 affected 1T preview Chromium cases** also
+  pass (1440/390px), keeping the previous state/confirmation checkpoint functional.
+- Admin typecheck, strict preview/spec typecheck, the new actual-Admin spec typecheck, scoped
+  Admin ESLint and changed-code Prettier checks pass. Preview spec's initial readonly-tuple
+  errors were corrected before these final typechecks. The four-entry preview build passes;
+  the existing large-chunk advisory remains. No additional entry or runtime import is added to
+  the production app for the specimen.
+- Admin production build passes; initial JS **526063 / 532480 B gzip**, **6417 B margin**, nine
+  assets, **59 B below 1X**. No dependency, package/lock or shared production contract changes.
+- No Listen/Desktop source edits, main/Smart Mix integration, PR, merge, rebase, deploy, release,
+  full suites/CI or local canonical baseline generation. The 33 PNGs/manifest still belong to 1M.
+  Pinned `app/web@258bbaee` remains unavailable and unchanged; no substitute visual source.
+  Canonical Linux comparison, real-data/full phase QA, native/AT and cross-engine checks remain
+  pending. These Chromium checks and the advisory specimen do not certify those gaps.
+
+Advisory review proof: `.artifacts/review/checkpoint-1y-surfaces.png`; the public preview tab
+is left at `?tab=albums&listenTab=history#superficies-admin`, HTTP 200, server kept active.
+One fresh read-only review of the complete local 1Y diff returned **Critical 0 / Important 0 /
+Minor 0**, ready for Diego's bounded checkpoint review. The reviewer independently replayed 24
+surface/policy cases (already included in the 64 unique cases above), confirmed the consumer AST
+scope and inspected busy/disclosure UX in a separate temporary tab. No file/index/HEAD changes
+or repair pass were required. The reviewer explicitly declined remaining page icons, canonical,
+native/AT, cross-engine/real-data, full-suite/CI and whole-1b.8 completion claims.
+
+**Stop at 1Y for Diego before commit/push or another group.**

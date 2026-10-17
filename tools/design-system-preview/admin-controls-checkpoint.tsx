@@ -9,7 +9,7 @@ export function AdminControlsCheckpoint() {
       <div className="specimen-heading">
         <div>
           <MonoLabel size="eyebrow" accent="25">
-            Checkpoint 1X · En revisión
+            Checkpoint 1X · Publicado
           </MonoLabel>
           <h2>La acción se lee.</h2>
         </div>

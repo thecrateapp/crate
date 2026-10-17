@@ -561,3 +561,18 @@ Keep :5186 alive and stop at 1X for Diego before commit/push or another migratio
 1X's single independent review also covers Tab/Shift+Tab access across the portal, last-result
 exit to the next page control and Escape returning to the field without Shell's blur shortcut
 stealing focus. Keep these regressions in both preview and actual Admin scoped browser runs.
+
+
+## Checkpoint 1Y — reusable operational surfaces
+
+1X is approved/published as `b628a438`. Open <http://127.0.0.1:5186/#superficies-admin> for real
+Admin-local OpsPageHero/OpsPanel/OpsStatTile with fictional data, idle/busy refresh and disclosure.
+Their decorative icon prop is retired across all 125 page uses; page-specific actions/rows remain
+later groups. Slot UX glyphs keep their function and metric labels/readings use `.crate-form-field`
+for real 8px spacing. The existing 1T samples adopt the same contract and stay visible.
+
+Run `admin-ops-checkpoint.spec.ts` and the affected `status-colour-checkpoint.spec.ts` serially
+(`--workers=1`), plus the scoped surface/policy and existing consumer Vitest cases. Actual Admin
+`ops-surfaces.spec.ts` covers Tasks/SystemHealth at three widths; `instrument-panel.spec.ts`
+checks the affected panel spacing. These checks do not regenerate the canonical 1M PNGs/manifest.
+Keep the preview alive and stop at 1Y before commit/push or another migration group.

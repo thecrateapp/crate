@@ -10,8 +10,6 @@ import {
   Search,
   RotateCcw,
   Wifi,
-  AlertTriangle,
-  Package,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -516,7 +514,6 @@ export function Stack() {
   return (
     <div className="space-y-6">
       <OpsPageHero
-        icon={Server}
         title="Stack"
         description="Managed Docker services, their runtime state, and the quickest path to logs or restart when the platform starts wobbling."
         actions={
@@ -542,7 +539,6 @@ export function Stack() {
 
       {!data?.available ? (
         <OpsPanel
-          icon={AlertTriangle}
           title="Docker not available"
           description="The API container cannot see the Docker socket, so stack inspection and service controls are disabled."
         >
@@ -558,14 +554,12 @@ export function Stack() {
         <>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <OpsStatTile
-              icon={Server}
               label="Running services"
               value={(data?.running ?? 0).toLocaleString()}
               caption={`${data?.total ?? 0} managed containers`}
               tone={(data?.running ?? 0) > 0 ? "success" : "default"}
             />
             <OpsStatTile
-              icon={Square}
               label="Stopped services"
               value={(
                 (data?.total ?? 0) - (data?.running ?? 0)
@@ -574,13 +568,11 @@ export function Stack() {
               tone="default"
             />
             <OpsStatTile
-              icon={ExternalLink}
               label="Public routes"
               value={publicRoutes.toLocaleString()}
               caption="Services with an external URL shortcut"
             />
             <OpsStatTile
-              icon={Package}
               label="Visible services"
               value={filteredContainers.length.toLocaleString()}
               caption="Current filtered result set"
@@ -588,7 +580,6 @@ export function Stack() {
           </div>
 
           <OpsPanel
-            icon={Search}
             title="Service filters"
             description="Trim the board by runtime state or by service name, image and port text."
           >
@@ -629,7 +620,6 @@ export function Stack() {
           </OpsPanel>
 
           <OpsPanel
-            icon={Server}
             title="Services"
             description="Service cards keep control actions close to state, while logs expand inline only when you need more detail."
           >

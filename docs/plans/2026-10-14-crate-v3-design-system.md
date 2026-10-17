@@ -1,7 +1,7 @@
 # Crate v3 design system
 
-Current implementation: checkpoints through 1W are approved and published (`52eaa6a5`);
-Task 1b.8 / 1X is the local reusable-controls migration at `#controles-admin`, awaiting Diego before publication or the next group.
+Current implementation: checkpoints through 1X are approved and published (`b628a438`);
+Task 1b.8 / 1Y is the local operational-surfaces migration at `#superficies-admin`, awaiting Diego before publication or the next group.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
 `/Users/diego/Code/crate-v3`, branch `feat/crate_v3`. The handover owns implementation/QA status.
@@ -4271,3 +4271,15 @@ Diego's 1X stacking follow-up moves SearchBar suggestions into the existing shar
 portal, anchored with the standard additive PopoverAnchor export. The input retains focus;
 Radix owns outside/Escape behavior. The field's transform can no longer trap results behind
 later positioned actions. Z-index tokens and existing Popover consumers remain unchanged.
+
+
+## Linux implementation note — 1Y / Admin operational surfaces, 2026-10-17
+
+1X is approved/published as `b628a438`. Admin-local OpsPageHero/OpsPanel/OpsStatTile now use
+headings, labels and readings without a decorative icon prop or placeholder. All 125 uses in
+ten pages are adapted together; page actions/content remain owned by those consumers and keep
+their existing UX. Metric label/readout spacing is the shared `.crate-form-field` 8px contract;
+caption spacing and 1T tone mappings remain. The three older 1T examples use the new contract.
+Real components are mounted at `#superficies-admin`, with idle/busy and disclosure samples.
+This is a bounded contract migration; other page icons are pending. No shared/Listen/Desktop
+API, dependency, canonical capture or pinned-site revision change. Stop for Diego at 1Y.

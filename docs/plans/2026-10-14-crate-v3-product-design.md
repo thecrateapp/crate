@@ -2,8 +2,8 @@
 
 Status: product design, revised 2026-10-15. Canonical clone `/Users/diego/Code/crate-v3`, branch
 `feat/crate_v3`. The handover records implementation and QA status; historical analysis is not a
-current progress report. Checkpoints through 1W are approved and published (`52eaa6a5`).
-Task 1b.8 / checkpoint 1X is the local search/reusable-controls migration at `#controles-admin`, awaiting review before publication or the next group. The final handover supersedes historical local-only notes. Diego's 1S review explicitly
+current progress report. Checkpoints through 1X are approved and published (`b628a438`).
+Task 1b.8 / checkpoint 1Y is the local operational-surfaces migration at `#superficies-admin`, awaiting review before publication or the next group. The final handover supersedes historical local-only notes. Diego's 1S review explicitly
 preserves the current Listen play essence (halo, layers and progress ring) and seek trail,
 adapted to V3 with 1–2 px strokes; see DS §5.5.
 
@@ -3502,3 +3502,13 @@ changed here. Text and markers are proposed for compact controls too; no action 
 proposed permanent exception. Marks, QR, data instruments and the inert Listen hero presentation
 are reviewed as content. Shared adaptations and page migrations remain later reviewable groups;
 Listen's player/navigation essence and all approved checkpoints are preserved. Stop at 1V.
+
+
+## Linux progress — 1Y / operational readings, 2026-10-17
+
+After Diego approved 1X, the next bounded group removes decorative icons from reusable Admin
+page/panel headings and stat tiles. Readings keep their names, captions and semantic tones;
+loading and disclosure UX in consumer slots remains. All ten page consumers adopt the retired
+icon contract together without changing page actions, permissions or streams. Their remaining
+page-specific icons belong to subsequent groups. Review real components in `#superficies-admin`
+and stop before publishing 1Y. Listen/Desktop controls and the current site pin remain intact.
