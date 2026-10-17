@@ -659,3 +659,18 @@ it adopts the existing DS §5.4 2px accent-hi active bar in expanded, compact an
 His palette feedback is addressed with the existing shared focus-inset utility: keyboard focus
 stays visible inside the search field/header. No shared APIs, Listen/Desktop or historical
 checkpoints change. Keep the 1W review stop; no publication or next group is authorised yet.
+
+### 2026-10-17 — 1W published; 1X reusable controls and standard Select geometry
+
+Diego approved/published 1W (`52eaa6a5`) and authorised the next bounded Admin group while
+retaining UX glyphs. 1X removes redundant search-result/recent/empty icons and the AI sparkle;
+search/clear/loading/Select/rating/image UX remains. No shared API opt-out or Listen icon removal.
+His report of clipped source options is a shared Select geometry bug: the inner viewport must
+fit its outer menu instead of forcing the trigger width through an explicit narrower menu.
+Repair that common foundation and verify both consumers. Stop again at 1X before publication
+or operations/page migrations; do not treat group 2 as whole-Admin completion.
+
+During the same 1X review Diego identified search suggestions behind the AI action. Repair the
+stacking context with the common portalled dropdown and its anchored primitive; do not add
+another z-index scale. Replace document-based outside detection so native portal result clicks
+are preserved. This needs only an additive PopoverAnchor export; existing consumers keep their API.

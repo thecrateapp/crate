@@ -1,7 +1,7 @@
 # Crate v3 design system
 
-Current implementation: checkpoints through 1V are approved and published (`cd5bf5e7`);
-Task 1b.8 / 1W is the local first navigation migration at `#navegacion-admin`, awaiting Diego before publication or the next group.
+Current implementation: checkpoints through 1W are approved and published (`52eaa6a5`);
+Task 1b.8 / 1X is the local reusable-controls migration at `#controles-admin`, awaiting Diego before publication or the next group.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
 `/Users/diego/Code/crate-v3`, branch `feat/crate_v3`. The handover owns implementation/QA status.
@@ -4256,3 +4256,18 @@ presentation are content, not blanket action exceptions. No source exception all
 The persistent `#iconos-admin` specimen uses real shared controls and local actions, with searchable
 file counts and review cases. Production entrypoints, icon rendering, tokens/fonts and the site
 pin are unchanged. Stop for Diego at 1V before publication or the first migration group.
+
+## Linux implementation note — 1X / reusable Admin controls, 2026-10-17
+
+1W is published. SearchBar/AIButton retire redundant result/recent/empty/action glyphs while
+retaining functional search/clear/busy feedback, shared Select disclosure/selection and image/rating
+UX. Thirteen actual UX sites and one shared Select consumer are source-policy bounded. Diego's
+clipping report repairs shared popper geometry: width belongs to the menu surface; viewport/rows
+fill that surface, respecting caller width overrides. Default popper width matches the trigger;
+item-aligned mode remains unchanged. No app-specific foundations or API changes. Preview and
+validation/limits are recorded in the final handover; stop for review at 1X.
+
+Diego's 1X stacking follow-up moves SearchBar suggestions into the existing shared dropdown
+portal, anchored with the standard additive PopoverAnchor export. The input retains focus;
+Radix owns outside/Escape behavior. The field's transform can no longer trap results behind
+later positioned actions. Z-index tokens and existing Popover consumers remain unchanged.

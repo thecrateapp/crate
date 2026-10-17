@@ -1,4 +1,5 @@
 import { AdminNavigationCheckpoint } from "./admin-navigation-checkpoint";
+import { AdminControlsCheckpoint } from "./admin-controls-checkpoint";
 import { AdminIconCheckpoint } from "./admin-icon-checkpoint";
 import { SkipLinkCheckpoint } from "./skip-link-checkpoint";
 import React, { useState } from "react";
@@ -1634,6 +1635,7 @@ function App() {
       <SkipLinkCheckpoint />
       <AdminIconCheckpoint />
       <AdminNavigationCheckpoint />
+      <AdminControlsCheckpoint />
       <AppModal
         open={sampleModalOpen}
         onClose={() => setSampleModalOpen(false)}
@@ -1714,7 +1716,8 @@ function App() {
             "1S publicado",
             "1T publicado · 1U publicado",
             "1V publicado",
-            "1W en revisión",
+            "1W publicado",
+            "1X en revisión",
           ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>

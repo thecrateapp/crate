@@ -3,7 +3,7 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Published checkpoints through 1V (`cd5bf5e7`) are recorded in the handover; preserve the next 1W review stop.
+> Diego's go-ahead. Published checkpoints through 1W (`52eaa6a5`) are recorded in the handover; preserve the next 1X review stop.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -1825,6 +1825,14 @@ rail preference. Focus returns from drawer/palette/help. The shared APIs, Listen
 unchanged. SearchBar and the role AdminSelect are explicitly pending nested surfaces, not approval
 for extra decorative glyphs. The live real-component specimen is `#navegacion-admin`; stop at 1W
 before publication or the next group. Relevant scoped tests/build/budget pass; see final handover.
+
+**Linux checkpoint 1X, 2026-10-17 — second bounded group, local review.** 1W is approved/published
+as `52eaa6a5`. SearchBar and AIButton retire redundant result/recent/empty-state and action glyphs;
+functional Search/clear/busy/Select glyphs remain bounded in the expanded source policy. Real
+artwork, routes, 200ms debounce/cache/recents, LLM gating, callbacks and keyboard behavior stay.
+Affected clear/AI/role-select/recent targets are 44px. Diego's follow-up fixes shared Select popper
+viewport clipping without an API change; run shared and Listen selector checks too. Review the
+real controls at `#controles-admin`; stop at 1X before publication or the operations/page groups.
 
 **Files:**
 

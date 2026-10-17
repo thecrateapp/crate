@@ -403,7 +403,7 @@ export function Sidebar({ onNavigate, presentation = "rail" }: SidebarProps) {
                     ]}
                     placeholder="Actual permissions"
                     allowClear={false}
-                    triggerClassName="h-8 w-full min-w-0 max-w-none rounded-md px-2 text-xs"
+                    triggerClassName="min-h-11 w-full min-w-0 max-w-none rounded-md px-2 text-xs"
                     menuClassName="w-[200px]"
                   />
                 </div>

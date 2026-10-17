@@ -6,10 +6,12 @@ plan; the status table separates implementation from pending QA.
 Current transfer: **1N–1P are complete in the checkpoint commit
 `feat(ui): unify v3 overlays, controls and field spacing`**. Diego authorised commit/push and
 continuation on Linux; this final publication record supersedes earlier local-only stops below.
-**1V is approved and published as `cd5bf5e7229a9217694e38dbef3e33b9519d77b0`.** Task 1b.8 /
-checkpoint 1W is the local first Admin navigation migration, reviewable at
-<http://127.0.0.1:5186/#navegacion-admin>. Stop before publication or the next group. Redundant
-page/command glyphs are retired; Diego explicitly retained conventional UX glyphs. The retained Listen play/halo/ring and luminous seek trail
+**1W is approved and published as `52eaa6a5da3f1acac58850a700947540320feb6f`.** Task 1b.8 /
+checkpoint 1X is the local Admin search/reusable-controls group, reviewable at
+<http://127.0.0.1:5186/#controles-admin>. Stop before publication or the next group.
+Conventional UX glyphs remain; redundant search-result/recent/empty-state and AI action glyphs
+are retired. Diego's Select follow-up also fixes its shared menu/viewport width geometry.
+The retained Listen play/halo/ring and luminous seek trail
 from 1S remain intact. Resume on Linux with
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
 Canonical 1N–1P Linux recording/comparison and native QA remain pending.
@@ -17,7 +19,7 @@ Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 ## Where the work lives
 
 - Active Linux worktree: `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing branch
-  `feat/crate_v3`, published HEAD `cd5bf5e7229a9217694e38dbef3e33b9519d77b0` (1V);
+  `feat/crate_v3`, published HEAD `52eaa6a5da3f1acac58850a700947540320feb6f` (1W);
   transfer checkpoint `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. Node 22.23.3, root
   dependencies and persistent :5186 preview are prepared. This isolates the MCP agent's
   `/home/diego/Code/Ninja/crate` checkout (`feat/crate_mcp`); leave its files untouched.
@@ -206,7 +208,8 @@ is a token-based chart configuration, not a selectable product skin.
 | 1b.6 / Checkpoint 1T | Approved/published as `5308c391`; pre-publication focused replay: 34 Vitest / 2 Chromium cases pass. Earlier 185-test consumer validation remains recorded below. |
 | 1b.7 / Checkpoint 1U | Approved/published as `afed5a3c`; fresh pre-publication replay: 30 scoped Vitest / 6 Chromium cases pass. |
 | 1b.8 / Checkpoint 1V | Approved/published as `cd5bf5e7`; inventory gate complete, historical 1U source snapshot preserved. |
-| 1b.8 / Checkpoint 1W | Local first migration at `#navegacion-admin`; text destinations/commands, nine approved UX sites retained. Stop before publication/next group. |
+| 1b.8 / Checkpoint 1W | Approved/published as `52eaa6a5`; navigation glyph retirement, balanced counters, active bar and retained UX. |
+| 1b.8 / Checkpoint 1X | Local search/reusable-controls group at `#controles-admin`; shared Select clipping, portalled dropdown and keyboard repair verified. Stop before publication/next group. |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -1849,3 +1852,129 @@ no full suites/CI or canonical baseline regeneration. Proof: ignored
 `checkpoint-1w-palette-inset-focus.png`. Preview :5186 stays active for review.
 
 **Stop at 1W for Diego before commit/push or another migration group.**
+
+## Final 1W publication / local checkpoint 1X — 2026-10-17
+
+Diego approved 1W and authorised commit/push plus the next Admin icon-retirement group.
+Published `52eaa6a5da3f1acac58850a700947540320feb6f` (`feat(ui): retire redundant Admin
+navigation icons`); exact remote branch SHA verified. Pre-publication focused replay passed
+37 Vitest, 11 Node and 7 preview Chromium cases. No full CI was dispatched; frontend push CI
+is scoped to main. Work stays in the existing isolated worktree; MCP checkout stays untouched.
+
+### 1X scope and contracts
+
+- SearchBar removes User/Disc/Music placeholder glyphs, Clock beside recent text and Library
+  beside the empty-result text. Real artwork stays content. Search, busy spinner and clear X
+  remain individually named/bounded UX sites. Preserve 200ms debounce, lower-case cache,
+  recent storage/migration, canonical routes, keyboard wrapping/Enter/Escape and callback props.
+  Loading gains aria-busy; clear and recent rows now have 44px targets.
+- AIButton removes Sparkles beside the action label. Preserve LLM availability gate, callback
+  and button props, disabled/loading behavior and existing appearance. Its busy spinner remains
+  aria-hidden with aria-busy on the button. Default minimum target is 44px; density overrides
+  remain possible. Its inherited Button spinner is explicitly off after forwarded props,
+  avoiding a second spinner while preserving the public prop contract.
+- Sidebar's role Select now has a 44px trigger. Its shared disclosure/selection/search glyphs
+  are functional UX. The source policy covers SearchBar/AIButton/the AdminSelect reexport as
+  well as the 1W navigation files; it removes both temporary nested deferrals and bounds one
+  reviewed Select consumer plus 13 concrete retained glyph/close sites. Explicitly disabling
+  inherited Button loading after all spreads is checked positively and negatively.
+- Reviewed surrounding controls: shared close/disclosure/selected/radio/loading glyphs, rating
+  value stars and image-edit affordances are UX/content under Diego's latest instruction.
+  MusicContextMenu already renders text actions. No global icon opt-out is needed; later
+  operations/page passed icons remain pending, rather than being granted blanket exceptions.
+
+### Select clipping reported by Diego during 1X
+
+The wide source trigger made the portalled viewport at least as wide as the trigger while
+AdminSelect's outer menu was 240px. Rows and the selected marker were clipped far beyond the
+outer surface. The browser regression failed before repair (row right edge ~1383px versus menu
+~267px). Shared SelectContent now assigns the default popper width to the outer surface;
+caller width overrides still work, and the inner viewport fills the actual menu. This corrects
+one shared foundation for both apps without app-specific variants or public API changes.
+Item-aligned placement is unchanged. Keyboard tests wait for actual option focus before arrow
+navigation; initial tests sent the next key before Radix's deferred focus settled.
+
+### Search dropdown stacking reported by Diego during 1X
+
+The field's existing focus transform isolated the inline AppPopover in a stacking context below
+later positioned AI content, despite its dropdown token. A browser hit-test reproduced the
+third result behind that action. SearchBar now uses the shared Radix Popover portal/dropdown
+layer with a standard additive PopoverAnchor export. The field stays focused, portal width and
+collision positioning follow the anchor, and pointer/keyboard selection remain intact. Radix
+outside/Escape handling replaces the old document mousedown handler, which would incorrectly
+classify portalled results as outside. Anchor clicks stay inside; outside clicks retain their
+own focus. No z-index value or second foundation was invented. The hit-test now passes at
+1440/768/390; native result clicks also navigate through the portal.
+
+### Persistent specimen and verification
+
+`#controles-admin` embeds actual SearchBar, AIButton, LLMStatusProvider and shared AdminSelect
+in an isolated fourth HTML entry. Preview-only API adapters supply results, an empty query
+(`vacio`), explicitly held loading (`espera`) and LLM availability. No backend calls or real
+operations. The 1W section is preserved and marked published. A fixture release button initially
+sat behind its own result popover; it was moved before the field. Geometry checks wait for the
+existing overlay entry animation to settle, rather than weakening the 44px target.
+
+Final scoped validation/review evidence is appended below. No 1X commit/push, full suites/CI,
+canonical baseline regeneration, PR/merge/rebase/deploy/release or Smart Mix. Canonical 33 images
+and manifest remain 1M; native/AT, cross-engine, real-data geometry, canonical Linux capture/import/
+comparison and unavailable pinned app/web@258bbaee fidelity checks remain pending.
+
+### Independent review and bounded keyboard repair — 1X
+
+One fresh read-only reviewer found no Critical/Minor issues and one Important introduced
+regression: after portalling, Tab from the input skipped suggestions and outside-focus dismissal
+closed them. The reviewer verified pointer selection, caller Select width overrides, glyph/policy
+scope and settled anchor width; the apparent 6px offset was the intended 8px viewport collision
+clamp, not broken anchor tracking. No positioning-strategy change was warranted.
+
+One repair pass restores the logical Tab bridge: input→first suggestion, Shift+Tab→input, native
+Tab between suggestions, last Tab→the next page control while dismissing suggestions. Capture at
+portal boundaries avoids Radix FocusScope's internal loop. An internal fallback input ref also
+keeps this behavior when callers omit inputRef. Escape from a suggestion returns focus to the
+field; it consumes that overlay event before Shell's separate Escape-to-blur shortcut. The new
+preview regression failed before the Tab fix and again before the focused Escape repair. The
+real Admin integration then reproduced Shell's blur interaction in both desktop widths; consuming
+the handled overlay event is the bounded fix, leaving the global shortcut unchanged.
+
+The repaired preview cases verify the complete route at 1440/768/390, pointer result navigation,
+layer hit-testing, Select clipping/keyboard selection, 44px targets and the real 8px field gap.
+The production Admin cases also exercise Tab, Shift+Tab and Escape on actual search results.
+No second reviewer loop is used; the covering regression checks verify the single repair pass.
+
+Review rulings: native AT/cross-engine/exhaustive scroll-resize/real-data/canonical fidelity remain
+phase QA, not certification by this checkpoint; wrong assumptions must be caught before phase
+closure/publication to production. Request cancellation and cross-window recents stay baseline
+work outside this icon group; no behavior there was changed. The reviewer did not independently
+rerun suites; the executor records its actual scoped runs/build results below. No Minor items are
+deferred. Keep all existing canonical evidence and the pinned reference.
+
+### Final scoped evidence — 1X
+
+- **41 Admin Vitest cases**: 27 controls/policy cases plus 14 affected existing Playlist/Genres/
+  GenreTaxonomy/GenreEq/ArtistMetadata consumer cases. The 27 control/policy cases pass again
+  after the keyboard repair. Source-policy scope includes the AdminSelect reexport and no
+  remaining temporary nested deferral. Direct runtime glyph bindings in SearchBar/AIButton
+  decrease **10→4**; these are bindings, not a count of visible instances.
+- **31 shared Vitest cases**: Select, AdminSelect, AppPopover and floating-layer governance.
+  **7 Listen selector-policy cases** plus shared/Listen type checks pass. Listen/Desktop source
+  and shared z-index tokens are untouched; the shared fixes are standard geometry/an anchoring
+  export, preserving existing consumer APIs and behavior.
+- **13 preview Chromium cases**: 4 new 1X cases (1440/768/390px and persistent embedding),
+  7 affected 1W navigation cases and 2 affected 1O form cases. Real data adapters produce no
+  backend requests. These cover layer hit-testing and pointer selection, Tab/Shift+Tab/last-row
+  exit/Escape, selected-marker/menu bounds, actual 8px label gap and 44px targets. All workers
+  remain serial. Earlier failing fixture/animation/focus runs are described above.
+- **3 actual Admin Chromium cases** pass at 1440/768/390 after the final repair, including
+  actual result Tab/Shift+Tab/Escape integration with Shell. The preceding 2 desktop failures
+  demonstrated the global blur interaction before the final handled-event fix; they are not
+  omitted. The clean final run exits 0.
+- Admin/shared/Listen/main-preview/Admin-demo types, scoped lint/format, actual Admin build,
+  four-entry static preview build and bundle gate pass. Existing advisory Vite chunk warnings
+  remain. Current initial Admin JavaScript: **526122 / 532480 B gzip**, **6358 B margin**
+  (9 assets; **110 B above 1W**). No package/lock/runtime dependency changes.
+- Advisory in-app evidence: ignored `.artifacts/review/checkpoint-1x-search.png` and
+  `checkpoint-1x-select.png`. Preview HTTP 200, kept active; the 1X tab remains open for Diego.
+  Canonical snapshots/manifest stay 1M. No full suites/full CI or new publication/PR/deployment.
+
+**Stop at 1X for Diego before publication or another group.**

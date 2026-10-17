@@ -16,15 +16,19 @@ import {
 } from "../../../scripts/design-system/admin-icon-inventory.mjs";
 
 const repo = resolve(process.cwd(), "../..");
-const scope = ["Sidebar", "CommandPalette", "Shell"].map(
-  (name) => `app/ui/src/components/layout/${name}.tsx`,
-);
-// These are unmigrated nested surfaces from the approved 1V inventory, not permanent
-// action-icon exceptions. Their one callsite each must not grow; group 2 reviews their
-// redundant glyphs while retaining the functional UX glyphs.
-const pending = new Map([
-  ["app/ui/src/components/layout/Sidebar.tsx:@/components/ui/AdminSelect", 1],
-  ["app/ui/src/components/layout/Shell.tsx:./SearchBar", 1],
+const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
+  .map((name) => `app/ui/src/components/layout/${name}.tsx`)
+  .concat([
+    "app/ui/src/components/ui/AIButton.tsx",
+    "app/ui/src/components/ui/AdminSelect.tsx",
+  ]);
+// Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
+// The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
+const approvedControls = new Map([
+  [
+    "app/ui/src/components/layout/Sidebar.tsx:@/components/ui/AdminSelect",
+    { component: "AdminSelect", limit: 1 },
+  ],
 ]);
 // Diego's 1W steering explicitly retains UX glyphs. Each concrete site remains bounded.
 const approvedUx = new Map([
@@ -39,6 +43,10 @@ const approvedUx = new Map([
     ["@crate/ui/shadcn/overlay-close-button", "OverlayCloseButton"],
   ],
   ["CommandPalette:palette-search", ["lucide-react", "Search"]],
+  ["SearchBar:search-field", ["lucide-react", "Search"]],
+  ["SearchBar:search-loading", ["lucide-react", "Loader2"]],
+  ["SearchBar:search-clear", ["lucide-react", "X"]],
+  ["AIButton:ai-loading", ["lucide-react", "Loader2"]],
   [
     "CommandPalette:palette-close",
     ["@crate/ui/shadcn/overlay-close-button", "OverlayCloseButton"],
@@ -46,7 +54,7 @@ const approvedUx = new Map([
 ]);
 function violations(sources: Map<string, string>, entries: IconEntry[]) {
   const found: string[] = [];
-  const deferred = new Map<string, number>();
+  const controlUses = new Map<string, number>();
   const usedUx = new Set<string>();
   for (const entry of entries.filter((entry) => sources.has(entry.path))) {
     if (entry.kind === "external-visual") continue;
@@ -62,14 +70,12 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
     if (entry.source === "@crate/ui/domain/brand/CrateLogo") continue; // Existing identity asset.
     if (
       entry.path.endsWith("/Shell.tsx") &&
-      ["./Sidebar", "./CommandPalette"].includes(entry.source ?? "")
+      ["./Sidebar", "./CommandPalette", "./SearchBar"].includes(
+        entry.source ?? "",
+      )
     )
       continue; // Checked directly in this scope.
     const key = `${entry.path}:${entry.source}`;
-    if (pending.has(key)) {
-      deferred.set(key, (deferred.get(key) ?? 0) + 1);
-      continue;
-    }
     const source = sources.get(entry.path)!;
     const tree = ts.createSourceFile(
       entry.path,
@@ -98,6 +104,15 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
         (attr) => ts.isJsxAttribute(attr) && attr.name.getText(tree) === name,
       ) as ts.JsxAttribute | undefined;
     const unknownSpread = attrs.some(ts.isJsxSpreadAttribute);
+    const reviewedControl = approvedControls.get(key);
+    if (
+      !unknownSpread &&
+      reviewedControl &&
+      reviewedControl.component === (entry.origin ?? entry.name)
+    ) {
+      controlUses.set(key, (controlUses.get(key) ?? 0) + 1);
+      continue;
+    }
     const marker = prop("data-admin-ux")?.initializer;
     if (marker && ts.isStringLiteral(marker)) {
       const key = `${entry.path.split("/").pop()?.replace(".tsx", "")}:${marker.text}`;
@@ -118,9 +133,15 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
       continue;
     }
     if (
-      !unknownSpread &&
       entry.source === "@crate/ui/shadcn/button" &&
-      !prop("loading")
+      ((!unknownSpread && !prop("loading")) ||
+        (prop("loading")?.initializer?.getText(tree) === "{false}" &&
+          attrs.indexOf(prop("loading")!) >
+            attrs.reduce(
+              (last, attr, index) =>
+                ts.isJsxSpreadAttribute(attr) ? index : last,
+              -1,
+            )))
     )
       continue;
     if (
@@ -133,12 +154,13 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
       continue;
     found.push(entry.id);
   }
-  for (const [key, count] of deferred)
-    if (count > pending.get(key)!) found.push(`${key}: nested surface grew`);
+  for (const [key, count] of controlUses)
+    if (count > approvedControls.get(key)!.limit)
+      found.push(`${key}: reviewed control grew`);
   return found;
 }
 
-describe("Admin icon retirement policy — migrated navigation scope", () => {
+describe("Admin icon retirement policy — migrated navigation and controls", () => {
   it("rejects direct, passed, mapped, dynamic and wrapped glyphs in the migrated files", () => {
     const inventory = buildInventory(repo);
     const sources = new Map(
@@ -214,6 +236,30 @@ describe("Admin icon retirement policy — migrated navigation scope", () => {
       "spinner",
       "close",
     ]);
+  });
+  it("only accepts forwarded Button props when built-in loading is explicitly off after every spread", () => {
+    const path = scope[4]!;
+    for (const [source, count] of [
+      ["<Button {...props} loading={false}/>", 0],
+      ["<Button loading={false} {...props}/>", 1],
+      ["<Button {...props} loading/>", 1],
+    ] as const) {
+      const entry: IconEntry = {
+        id: "forwarded-button",
+        path,
+        line: 1,
+        column: 1,
+        kind: "owned-icon-consumer",
+        name: "Button",
+        source: "@crate/ui/shadcn/button",
+        control: "Button",
+        label: "",
+        snippet: "",
+      };
+      expect(violations(new Map([[path, source]]), [entry])).toHaveLength(
+        count,
+      );
+    }
   });
 });
 

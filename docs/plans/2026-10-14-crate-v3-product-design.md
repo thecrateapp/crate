@@ -2,8 +2,8 @@
 
 Status: product design, revised 2026-10-15. Canonical clone `/Users/diego/Code/crate-v3`, branch
 `feat/crate_v3`. The handover records implementation and QA status; historical analysis is not a
-current progress report. Checkpoints through 1V are approved and published (`cd5bf5e7`).
-Task 1b.8 / checkpoint 1W is the local Sidebar/CommandPalette/Shell migration at `#navegacion-admin`, awaiting review before publication or the next group. The final handover supersedes historical local-only notes. Diego's 1S review explicitly
+current progress report. Checkpoints through 1W are approved and published (`52eaa6a5`).
+Task 1b.8 / checkpoint 1X is the local search/reusable-controls migration at `#controles-admin`, awaiting review before publication or the next group. The final handover supersedes historical local-only notes. Diego's 1S review explicitly
 preserves the current Listen play essence (halo, layers and progress ring) and seek trail,
 adapted to V3 with 1–2 px strokes; see DS §5.5.
 

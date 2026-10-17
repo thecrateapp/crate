@@ -54,6 +54,42 @@ for (const width of [1440, 768]) {
     await expect(palette.getByRole("option").locator("svg")).toHaveCount(0);
     await page.keyboard.press("Escape");
     await expect(collapse).toBeFocused();
+    const search = page.getByRole("textbox", { name: "Search library" });
+    await search.fill("no-match");
+    await expect(
+      page.getByText("No library matches", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("No library matches", { exact: true }).locator("svg"),
+    ).toHaveCount(0);
+    const clear = page.getByRole("button", { name: "Clear search" });
+    const clearBox = await clear.boundingBox();
+    expect(clearBox!.width).toBeGreaterThanOrEqual(44);
+    expect(clearBox!.height).toBeGreaterThanOrEqual(44);
+    await clear.click();
+    await expect(search).toBeFocused();
+    await expect(search).toHaveValue("");
+    await search.press("Escape");
+    await page.route("**/api/search?*", (route) =>
+      route.fulfill({
+        json: {
+          artists: [{ name: "Costa", slug: "costa" }],
+          albums: [],
+          tracks: [],
+        },
+      }),
+    );
+    await search.fill("costa");
+    const result = page.getByRole("button", { name: "Costa Artist artist" });
+    await expect(result).toBeVisible();
+    await search.press("Tab");
+    await expect(result).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(search).toBeFocused();
+    await search.press("Tab");
+    await result.press("Escape");
+    await expect(search).toBeFocused();
+    await expect(result).toHaveCount(0);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,

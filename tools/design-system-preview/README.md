@@ -534,3 +534,30 @@ drawer/help focus, 44px controls, layout, no live API and previous 1U/1V entries
 Admin entry is also checked with existing API fixtures and one Playwright worker. Local images
 are advisory; no canonical 1M baselines or full CI/suites are regenerated. Stop for Diego at 1W
 before publication/next group, keeping :5186 active. Listen/Desktop sources remain untouched.
+
+## Admin reusable controls / Checkpoint 1X — local review
+
+1W is approved/published as `52eaa6a5`. Open <http://127.0.0.1:5186/#controles-admin>.
+The fourth build entry, `admin-controls-demo.html`, mounts actual SearchBar/AIButton,
+LLMStatusProvider and shared AdminSelect. It reuses the preview-only Admin API adapter;
+queries `costa`, `vacio` and `espera` show results, empty and held-loading states. Complete
+held searches with the sample button. AI availability/loading and Select keyboard actions
+are local samples; no backend or real operation is needed.
+
+The source policy now checks the new controls and the AdminSelect reexport, removing the
+1W nested deferrals. Retain functional search/clear/busy/selection UX, shared close/menu/rating/
+image-edit glyphs and real artwork. Retire redundant result/recent/empty/AI action decoration.
+The source Select reproduces Diego's wide-trigger/narrow-menu case: its viewport and selected
+marker now fit the actual outer menu. Search suggestions use the shared portalled dropdown
+layer and an actual anchor; they remain above the AI action and preserve input focus and clicks.
+No z-index token or app-specific foundation was added.
+
+Run the new `admin-controls-checkpoint.spec.ts` and affected `admin-navigation-checkpoint.spec.ts`
+serially (`--workers=1`), plus the affected 1O cases in `preview.spec.ts --grep 'checkpoint 1O keeps fields'`.
+Shared Select/AdminSelect/AppPopover/floating-layers and scoped Admin/Listen tests cover the
+shared follow-ups. Canonical 1M captures remain untouched; these screenshots are advisory.
+Keep :5186 alive and stop at 1X for Diego before commit/push or another migration group.
+
+1X's single independent review also covers Tab/Shift+Tab access across the portal, last-result
+exit to the next page control and Escape returning to the field without Shell's blur shortcut
+stealing focus. Keep these regressions in both preview and actual Admin scoped browser runs.

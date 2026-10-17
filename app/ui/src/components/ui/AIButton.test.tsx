@@ -25,6 +25,7 @@ describe("AIButton", () => {
     expect(
       screen.getByRole("button", { name: /Generate/i }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button").querySelector("svg")).toBeNull();
   });
 
   it("does not render when the LLM is unavailable", () => {
@@ -60,6 +61,11 @@ describe("AIButton", () => {
     render(<AIButton loading>Generate</AIButton>);
     expect(screen.getByRole("button").querySelector("svg")).toHaveClass(
       "animate-spin",
+    );
+    expect(screen.getByRole("button")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("button").querySelector("svg")).toHaveAttribute(
+      "aria-hidden",
+      "true",
     );
   });
 

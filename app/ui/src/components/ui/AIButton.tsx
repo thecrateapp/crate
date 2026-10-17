@@ -1,5 +1,5 @@
 import { type ComponentProps } from "react";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@crate/ui/shadcn/button";
 import { cn } from "@/lib/utils";
 import { useLLMStatus } from "@/hooks/use-llm";
@@ -39,16 +39,21 @@ export function AIButton({
         variant="outline"
         disabled={disabled || loading}
         className={cn(
-          "relative border-primary/45 bg-black/85 text-primary shadow-none hover:border-primary/70 hover:bg-primary/15 hover:text-primary",
+          "relative min-h-11 border-primary/45 bg-black/85 text-primary shadow-none hover:border-primary/70 hover:bg-primary/15 hover:text-primary",
           className,
         )}
         {...props}
+        loading={false}
+        aria-busy={loading || undefined}
       >
         {loading ? (
-          <Loader2 size={13} className="mr-1.5 animate-spin" />
-        ) : (
-          <Sparkles size={13} className="mr-1.5" />
-        )}
+          <Loader2
+            data-admin-ux="ai-loading"
+            aria-hidden="true"
+            size={13}
+            className="mr-1.5 animate-spin"
+          />
+        ) : null}
         {children}
       </Button>
     </div>

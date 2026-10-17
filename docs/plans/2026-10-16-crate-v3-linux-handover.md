@@ -4,25 +4,25 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — checkpoint 1W
+## Active Linux workspace — checkpoint 1X
 
 Diego's latest request overrides the clone-only setup below: isolate this work from the
 Crate MCP agent. The managed worktree is `/home/diego/.codex/worktrees/crate-v3-1q/crate`,
 on the existing `feat/crate_v3` branch, tracking `origin/feat/crate_v3`. HEAD is published
-`cd5bf5e7229a9217694e38dbef3e33b9519d77b0` (approved 1V); the original transfer checkpoint
+`52eaa6a5da3f1acac58850a700947540320feb6f` (approved 1W); the original transfer checkpoint
 `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. The original checkout
 `/home/diego/Code/Ninja/crate` stays on `feat/crate_mcp` with the other agent's changes.
 Do not switch, reset or edit that checkout. No extra clone/worktree is needed to resume.
 
 Node 22.23.3 and root `npm ci` are ready. The live preview remains at
-`http://127.0.0.1:5186/#navegacion-admin`; it needs no backend. 1V is committed/pushed with Diego's
-approval on 2026-10-17. Task 1b.8 / checkpoint 1W is the first local Admin navigation migration;
-stop for his review before publication or the next group. The 1V inventory remains historical.
-Diego explicitly retained conventional UX glyphs (back/forward, collapse/expand, menu/close/search);
-only redundant Admin destination/action/header/metric icons are retired. Nine current UX sites
-are bounded by the new scoped policy test. No shared API or Listen/Desktop source changed.
+`http://127.0.0.1:5186/#controles-admin`; it needs no backend. 1V is committed/pushed with Diego's
+approval on 2026-10-17. 1W is now approved/committed/pushed; Task 1b.8 / checkpoint 1X is
+local: SearchBar/AIButton reusable controls, with UX glyphs retained. Stop for review before
+publication or another group. Its source policy now checks 13 UX glyph/close sites plus one
+shared Select consumer. A shared SelectContent viewport-width correction addresses Diego's
+clipping report; no public API or Listen/Desktop source changes. The 1V inventory stays historical.
 Diego explicitly retained the existing Listen layered play/halo/progress ring and the luminous
-seek trail (2 px, thin 1 px) during review. Do not simplify these into flat controls. Read the final 1W record
+seek trail (2 px, thin 1 px) during review. Do not simplify these into flat controls. Read the final 1X record
 in the main handover for verification and limits. The generic bootstrap below is retained
 for a future fresh machine; it does not replace this active worktree.
 

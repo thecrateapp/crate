@@ -9,7 +9,7 @@ export function AdminNavigationCheckpoint() {
       <div className="specimen-heading">
         <div>
           <MonoLabel size="eyebrow" accent="24">
-            Checkpoint 1W · En revisión
+            Checkpoint 1W · Publicado
           </MonoLabel>
           <h2>Los destinos tienen nombre.</h2>
         </div>
@@ -38,9 +38,9 @@ export function AdminNavigationCheckpoint() {
       </a>
       <p className="mt-4 text-sm text-text-muted">
         Puedes contraer la columna, cambiar de destino, probar la paleta o abrir
-        la ayuda con ?. El buscador y el selector de permisos quedan para su
-        siguiente grupo. Sus glifos funcionales de UX se conservan. La
-        preferencia de anchura se guarda como en Admin.
+        la ayuda con ?. El buscador y el selector de permisos se revisan en 1X.
+        Sus glifos funcionales de UX se conservan. La preferencia de anchura se
+        guarda como en Admin.
       </p>
     </section>
   );
