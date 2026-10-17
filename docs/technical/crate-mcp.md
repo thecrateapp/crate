@@ -758,6 +758,14 @@ The fixture retains its `analysis` default, and the planned-but-not-submitted re
 that legacy call and explicit bliss. The focused run including both fixture-consumer files passed
 98 PostgreSQL-backed cases without skips; targeted Ruff and Pyright passed after this correction.
 
+The metadata conflict regression now covers track, album and artist with a real concurrent update
+to each entity's table. A stale version must return `SOURCE_CHANGED` before invoking the file
+callback or recording an applied-edit audit entry. All three entities' complete metadata state,
+including field locks and manual genres, and the audio bytes must remain as they were after the
+concurrent update. This also exercises the database-only artist branch. All 42 focused cases in
+`test_agent_metadata.py` passed with real PostgreSQL and no skips; targeted Ruff and Pyright passed.
+No runtime behavior changed or full local suite was rerun for this follow-up.
+
 ### Repair readiness and effects
 
 `get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,

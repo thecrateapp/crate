@@ -511,27 +511,74 @@ def test_changed_sources_prevent_writing_approved_metadata(metadata_library, mut
     )
 
 
-def test_database_conflict_does_not_invoke_filesystem_callback(metadata_library):
+@pytest.mark.parametrize(
+    "entity_type,concurrent_update,patch",
+    [
+        pytest.param(
+            "track",
+            "UPDATE library_tracks SET genre='Concurrent genre' WHERE id=:id",
+            {"title": "New title"},
+            id="track",
+        ),
+        pytest.param(
+            "album",
+            "UPDATE library_albums SET genre='Concurrent genre' WHERE id=:id",
+            {"album": "Corrected title"},
+            id="album",
+        ),
+        pytest.param(
+            "artist",
+            "UPDATE library_artists SET bio='Concurrent biography' WHERE id=:id",
+            {"bio": "New biography", "tags": ["post-hardcore"]},
+            id="artist",
+        ),
+    ],
+)
+def test_database_conflict_does_not_invoke_filesystem_callback(
+    metadata_library, entity_type, concurrent_update, patch
+):
     library = metadata_library
-    stale = read_metadata_state("track", library["track_uid"])
+    entity_uid = library[f"{entity_type}_uid"]
+    stale = read_metadata_state(entity_type, entity_uid)
     with transaction_scope() as session:
         session.execute(
-            text("UPDATE library_tracks SET genre='Concurrent genre' WHERE id=:id"),
-            {"id": library["track_id"]},
+            text(concurrent_update),
+            {"id": library[f"{entity_type}_id"]},
         )
+    with read_scope() as session:
+        before = {
+            kind: read_metadata_state(kind, library[f"{kind}_uid"], session=session)
+            for kind in ("artist", "album", "track")
+        }
+    assert metadata_state_version(before[entity_type]) != metadata_state_version(stale)
+    original_audio = library["path"].read_bytes()
 
     def forbidden_callback(state):
         pytest.fail("Filesystem callback ran for a stale database source")
 
     result = apply_metadata_state(
-        "track",
-        library["track_uid"],
+        entity_type,
+        entity_uid,
         expected_version=metadata_state_version(stale),
-        patch={"title": "New title"},
+        patch=patch,
         apply_files=forbidden_callback,
         task_id="stale-db",
+        actor_user_id=library["actor"],
     )
     assert result == {"status": "conflict", "items": [], "code": "SOURCE_CHANGED"}
+    with read_scope() as session:
+        after = {
+            kind: read_metadata_state(kind, library[f"{kind}_uid"], session=session)
+            for kind in ("artist", "album", "track")
+        }
+        assert (
+            session.execute(
+                text("SELECT id FROM audit_log WHERE task_id='stale-db'")
+            ).first()
+            is None
+        )
+    assert after == before
+    assert library["path"].read_bytes() == original_audio
 
 
 def test_authorization_denial_before_effect_preserves_original_audio_and_database(
