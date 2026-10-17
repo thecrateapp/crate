@@ -62,6 +62,17 @@ def _validate_limit(limit):
         )
 
 
+def _validate_string_list(values, name, max_items):
+    if values is not None and (
+        type(values) is not list
+        or len(values) > max_items
+        or any(
+            not isinstance(value, str) or not 1 <= len(value) <= 128 for value in values
+        )
+    ):
+        raise DiagnosticError("INVALID_ARGUMENT", f"Invalid {name} filter")
+
+
 def _sensitive_key(key, value):
     normalized = re.sub(r"[^a-z0-9]", "", str(key).lower())
     if normalized == "authorizationcontext" and isinstance(value, dict):
@@ -101,18 +112,15 @@ def _redact_assignments(value):
                 if remainder and remainder[0] not in ",;}]\r\n":
                     parsed = None
                 if _sensitive_key(key, parsed):
-                    # An unquoted secret may be a passphrase with spaces.
-                    length = len(raw.split("\n", 1)[0].split("\r", 1)[0])
+                    # Unquoted credentials may continue across lines (YAML/PEM).
+                    length = len(raw)
         except (ValueError, RecursionError):
             quoted = re.match(r"'(?:\\.|[^'\\])*(?:'|$)", raw)
-            bare = re.match(r"[^\r\n]*", raw)
             if quoted:
                 length = quoted.end()
-            elif raw.startswith(('"', "[", "{")):
-                # A malformed structured credential has no trustworthy end.
-                length = len(raw)
             else:
-                length = bare.end() if bare else 0
+                # Opaque or malformed credentials have no trustworthy end.
+                length = len(raw)
             parsed = None
         if not _sensitive_key(key, parsed):
             continue
@@ -137,6 +145,8 @@ def _date(value):
 
 def _text(value, limit=2048):
     value = str(value)
+    if len(value) > 8192:
+        return "[redacted-oversized-text]"
     value = re.sub(
         r"(?im)\b(?:authorization|cookie|set-cookie)\s*[:=][^\r\n]*",
         "[redacted-header]",
@@ -598,6 +608,8 @@ def inspect_artist(*, artist_uid=None, name=None, limit=20, principal=None):
 
 def list_jobs(*, states=None, types=None, limit=20, cursor=None):
     _validate_limit(limit)
+    _validate_string_list(states, "states", 7)
+    _validate_string_list(types, "types", 10)
     if types and any(value not in TASK_TYPES for value in types):
         raise DiagnosticError("INVALID_ARGUMENT", "Unknown job type")
     filters = {"states": sorted(states or []), "types": sorted(types or [])}
@@ -650,6 +662,8 @@ def read_diagnostics(
     *, source, task_id=None, since=None, until=None, limit=20, series=None, minutes=60
 ):
     _validate_limit(limit)
+    if not isinstance(source, str):
+        raise DiagnosticError("INVALID_ARGUMENT", "Unknown diagnostic source")
     if source == "metric_series":
         from crate.metrics import query_recent
 
@@ -675,7 +689,12 @@ def read_diagnostics(
             "mcp.auth.denied",
             "mcp.auth.unavailable",
         }
-        if series not in allowed or type(minutes) is not int or not 1 <= minutes <= 100:
+        if (
+            not isinstance(series, str)
+            or series not in allowed
+            or type(minutes) is not int
+            or not 1 <= minutes <= 100
+        ):
             raise DiagnosticError(
                 "INVALID_ARGUMENT",
                 "An enumerated series and bounded minute window are required",

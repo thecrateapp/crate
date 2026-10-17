@@ -814,6 +814,18 @@ consumer files passed 93, without skips, with sequential PostgreSQL-backed integ
 targeted Ruff and Pyright passed. The existing first-item `RESPONSE_TOO_LARGE` contract at 40,000
 bytes remains explicit; evidence rows are not silently skipped. No full local suite was rerun.
 
+The next review extended unquoted credentials to multiline YAML/PEM. When a sensitive assignment
+has no trustworthy structural terminator, sanitization now discards the entire remaining text,
+rather than just its line; well-formed quoted and JSON values retain their boundaries. Job filters
+must be bounded string lists, and diagnostic sources/metric series must be strings before sorting
+or set membership. The initial regression selection failed 20 cases before these fixes. Text over
+8,192 characters is replaced with `[redacted-oversized-text]` before regex/JSON processing, avoiding
+both unbounded sanitization work and disclosure through a clipped credential prefix; ASCII/Unicode
+cases failed before this change. The final 2,048-byte output cap remains. All seven related files
+passed 468 focused cases without skips, with real PostgreSQL integrations; targeted Ruff and
+Pyright passed. Conservative text omission affects sanitized evidence only, preserving stored data
+and the engine's complete private plan documents. No full local suite was rerun.
+
 ### Repair readiness and effects
 
 `get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,

@@ -447,6 +447,11 @@ def test_job_evidence_redacts_nested_prefixed_credentials(monkeypatch, key):
         "secret_key=false private-value",
         "auth_token_value=null private-value",
         "tokens=prefix private-value; other=visible",
+        "token: |\n  private-value\npublic=visible",
+        "token: >-\n  private-value\npublic=visible",
+        "secret_key: !vault |\n  private-value",
+        "private_key=-----BEGIN PRIVATE KEY-----\nprivate-value\n-----END PRIVATE KEY-----",
+        "password=prefix\n  private-value",
     ],
 )
 def test_job_text_redacts_compound_credentials_and_collections(monkeypatch, error):
@@ -490,7 +495,22 @@ def test_job_evidence_preserves_typed_authorization_metadata_without_bypassing_r
     assert result["invalid_id"] == {"authorization_id": "[redacted]"}
     assert result["invalid_context"] == {"authorization_context": "[redacted]"}
     assert "private-value" not in json.dumps(result)
-    assert "public=visible" in result["error"]
+    assert "public=visible" not in result["error"]
+
+
+@pytest.mark.parametrize("prefix", ["x", "é"])
+def test_oversized_evidence_text_is_omitted_before_sanitization(monkeypatch, prefix):
+    monkeypatch.setattr(
+        diagnostics.agent_operations,
+        "read_job",
+        lambda _job_id: {"id": "job-1", "error": prefix * 100000 + " private-value"},
+    )
+
+    result = diagnostics.get_job("job-1")["data"]
+
+    assert result["id"] == "job-1"
+    assert result["error"] == "[redacted-oversized-text]"
+    assert "private-value" not in json.dumps(result)
 
 
 @pytest.mark.parametrize("artist_uid", [0, 1, True, False, [], {}, [ARTIST_UID], 1.5])
@@ -550,6 +570,55 @@ _LIMIT_OPERATIONS = [
         {"source": "metric_series", "series": "worker.task.duration"},
     ),
 ]
+
+
+@pytest.mark.parametrize(
+    "operation,arguments",
+    [
+        ("list_jobs", {"types": 1}),
+        ("list_jobs", {"types": False}),
+        ("list_jobs", {"types": "retry"}),
+        ("list_jobs", {"types": ("retry",)}),
+        ("list_jobs", {"types": [["retry"]]}),
+        ("list_jobs", {"types": [{}]}),
+        ("list_jobs", {"types": [None]}),
+        ("list_jobs", {"types": [True]}),
+        ("list_jobs", {"states": 1}),
+        ("list_jobs", {"states": False}),
+        ("list_jobs", {"states": "running"}),
+        ("list_jobs", {"states": [["running"]]}),
+        ("list_jobs", {"states": [{}]}),
+        ("list_jobs", {"states": [None]}),
+        ("list_jobs", {"states": ["running", 1]}),
+        ("read_diagnostics", {"source": ["worker_logs"]}),
+        ("read_diagnostics", {"source": {}}),
+        ("read_diagnostics", {"source": None}),
+        ("read_diagnostics", {"source": True}),
+        (
+            "read_diagnostics",
+            {"source": "metric_series", "series": ["worker.queue.wait"]},
+        ),
+        ("read_diagnostics", {"source": "metric_series", "series": {}}),
+        ("read_diagnostics", {"source": "metric_series", "series": None}),
+        ("read_diagnostics", {"source": "metric_series", "series": True}),
+    ],
+)
+def test_malformed_diagnostic_filter_types_are_rejected_before_reads(
+    monkeypatch, operation, arguments
+):
+    def forbidden_read(*_args, **_kwargs):
+        pytest.fail("Malformed filters reached an evidence source")
+
+    monkeypatch.setattr(diagnostics.agent_operations, "read_jobs", forbidden_read)
+    monkeypatch.setattr(
+        diagnostics.agent_operations, "read_status_evidence", forbidden_read
+    )
+    monkeypatch.setattr("crate.metrics.query_recent", forbidden_read)
+
+    with pytest.raises(diagnostics.DiagnosticError) as caught:
+        getattr(diagnostics, operation)(**arguments)
+
+    assert caught.value.code == "INVALID_ARGUMENT"
 
 
 @pytest.mark.parametrize("operation,arguments", _LIMIT_OPERATIONS)
