@@ -156,3 +156,18 @@ comparison, real-data geometry, cross-engine/native/assistive-technology QA and 
 the unavailable `app/web@258bbaee` pin remain pending. No replacement reference is substituted.
 
 **Stop at 1V for Diego's inventory/proposal review, before publication or the first migration group.**
+
+
+## Publication and 1W amendment — 2026-10-17
+
+Diego approved/published 1V as `cd5bf5e7` and authorised the Sidebar/CommandPalette/Shell group.
+The JSON inventory and manual cases above remain the original 1U-source review snapshot. Their
+zero-permanent-action-glyph proposal is historical: Diego subsequently retained conventional UX
+glyphs (back/forward, collapse/expand, menu, close, search, etc.). The final decision/handover and
+DS §1.7 supersede the earlier proposal; nine concrete 1W uses are bounded in the source policy.
+
+Do not overwrite the 1V snapshot after migration. Its original `--check` command applies to that
+source base and intentionally becomes stale as sources change. The current migrated scope is
+checked by `app/ui/src/admin-icon-policy.test.ts`, using the live scanner; it covers direct,
+passed/mapped/dynamic and wrapped/library/native-vector routes. The manual-case test now reads
+its exact published 1U source revision, preserving the old review evidence across later groups.

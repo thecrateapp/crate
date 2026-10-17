@@ -4,23 +4,25 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — checkpoint 1V
+## Active Linux workspace — checkpoint 1W
 
 Diego's latest request overrides the clone-only setup below: isolate this work from the
 Crate MCP agent. The managed worktree is `/home/diego/.codex/worktrees/crate-v3-1q/crate`,
 on the existing `feat/crate_v3` branch, tracking `origin/feat/crate_v3`. HEAD is published
-`afed5a3c2174b7ebe39c2f6a6e7fbdbd7212469a` (approved 1U); the original transfer checkpoint
+`cd5bf5e7229a9217694e38dbef3e33b9519d77b0` (approved 1V); the original transfer checkpoint
 `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. The original checkout
 `/home/diego/Code/Ninja/crate` stays on `feat/crate_mcp` with the other agent's changes.
 Do not switch, reset or edit that checkout. No extra clone/worktree is needed to resume.
 
 Node 22.23.3 and root `npm ci` are ready. The live preview remains at
-`http://127.0.0.1:5186/#iconos-admin`; it needs no backend. 1U is committed/pushed with Diego's
-approval on 2026-10-17. Task 1b.8 / checkpoint 1V is a local inventory and stops for his review
-before publication or the first production migration group. See `2026-10-17-crate-v3-admin-icon-inventory.md`;
-no production icons/contracts changed and no permanent action-icon exception is proposed.
+`http://127.0.0.1:5186/#navegacion-admin`; it needs no backend. 1V is committed/pushed with Diego's
+approval on 2026-10-17. Task 1b.8 / checkpoint 1W is the first local Admin navigation migration;
+stop for his review before publication or the next group. The 1V inventory remains historical.
+Diego explicitly retained conventional UX glyphs (back/forward, collapse/expand, menu/close/search);
+only redundant Admin destination/action/header/metric icons are retired. Nine current UX sites
+are bounded by the new scoped policy test. No shared API or Listen/Desktop source changed.
 Diego explicitly retained the existing Listen layered play/halo/progress ring and the luminous
-seek trail (2 px, thin 1 px) during review. Do not simplify these into flat controls. Read the final 1V record
+seek trail (2 px, thin 1 px) during review. Do not simplify these into flat controls. Read the final 1W record
 in the main handover for verification and limits. The generic bootstrap below is retained
 for a future fresh machine; it does not replace this active worktree.
 

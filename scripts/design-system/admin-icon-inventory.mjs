@@ -298,6 +298,16 @@ export function buildInventory(repoRoot = process.cwd()) {
       function refs(node) {
         if (result || ts.isTypeNode(node)) return;
         if (
+          (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+          ["svg", "canvas"].includes(node.tagName.getText(model.tree))
+        ) {
+          result = [
+            portable(relative(root, file)),
+            "native:" + node.tagName.getText(model.tree),
+          ];
+          return;
+        }
+        if (
           ts.isIdentifier(node) &&
           node.text !== name &&
           (model.bindings.has(node.text) || model.declarations.has(node.text))
@@ -341,12 +351,15 @@ export function buildInventory(repoRoot = process.cwd()) {
             const pos = model.tree.getLineAndCharacterOfPosition(
               node.getStart(model.tree),
             );
+            const kind = via.at(-1).startsWith("native:")
+              ? "owned-vector-consumer"
+              : "owned-icon-consumer";
             inherited.push({
-              id: `${path}:${pos.line + 1}:${pos.character + 1}:owned-icon-consumer:${name}`,
+              id: `${path}:${pos.line + 1}:${pos.character + 1}:${kind}:${name}`,
               path,
               line: pos.line + 1,
               column: pos.character + 1,
-              kind: "owned-icon-consumer",
+              kind,
               name,
               source: binding.source,
               via,

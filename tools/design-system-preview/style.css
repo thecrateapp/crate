@@ -6,6 +6,7 @@
 @import "../../app/listen/src/components/player/bar/player-seek-bar.css";
 @source "./main.tsx";
 @source "./admin-icon-checkpoint.tsx";
+@source "./admin-navigation-checkpoint.tsx";
 @source "./forms-checkpoint.tsx";
 @source "./selection-checkpoint.tsx";
 @source "./tabs-checkpoint.tsx";

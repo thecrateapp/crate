@@ -1,0 +1,10 @@
+@import "../../app/ui/src/index.css";
+@source "./admin-navigation-demo.tsx";
+@source "../../app/ui/src";
+html {
+  color-scheme: dark;
+  background: var(--surface-canvas);
+}
+body {
+  margin: 0;
+}

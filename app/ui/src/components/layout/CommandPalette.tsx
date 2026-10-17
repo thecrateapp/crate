@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { Search } from "lucide-react";
+import { OverlayCloseButton } from "@crate/ui/shadcn/overlay-close-button";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Command } from "cmdk";
 import {
@@ -12,38 +14,6 @@ import { albumPagePath, artistPagePath } from "@/lib/library-routes";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTaskCatalog } from "@/lib/task-catalog";
 import { toast } from "sonner";
-import {
-  LayoutDashboard,
-  Library,
-  BarChart3,
-  HeartPulse,
-  Download,
-  ListMusic,
-  ListTodo,
-  Settings,
-  RefreshCw,
-  Stethoscope,
-  Server,
-  User,
-  Disc3,
-  Search,
-  BrainCircuit,
-  Radio,
-  BarChart2,
-  Sparkles,
-  Compass,
-  Archive,
-  FileInput,
-  FileJson,
-  Tags,
-  Calendar,
-  Activity,
-  ScrollText,
-  ShieldCheck,
-  Trash2,
-  HandHeart,
-  type LucideIcon,
-} from "lucide-react";
 
 interface SearchResults {
   artists: { id?: number; entity_uid?: string; slug?: string; name: string }[];
@@ -59,21 +29,6 @@ interface SearchResults {
 }
 
 const COMMAND_FEDERATION_VIEW = ["federation.nodes.view"] as const;
-
-const ACTION_ICONS: Record<string, LucideIcon> = {
-  archive: Archive,
-  brain: BrainCircuit,
-  calendar: Calendar,
-  chart: BarChart2,
-  "file-input": FileInput,
-  "file-json": FileJson,
-  radio: Radio,
-  refresh: RefreshCw,
-  sparkles: Sparkles,
-  stethoscope: Stethoscope,
-  tags: Tags,
-  trash: Trash2,
-};
 
 type ActionOutcome =
   | { kind: "queued" }
@@ -105,6 +60,7 @@ export function matchesCommandQuery(label: string, query: string): boolean {
 }
 
 export function CommandPalette() {
+  const openerRef = useRef<HTMLElement | null>(null);
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const { hasAnyCapability } = useAuth();
@@ -118,12 +74,17 @@ export function CommandPalette() {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        setOpen((o) => !o);
+        if (!open)
+          openerRef.current =
+            document.activeElement instanceof HTMLElement
+              ? document.activeElement
+              : null;
+        setOpen(!open);
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, []);
+  }, [open]);
 
   useEffect(() => {
     if (query.length < 2) {
@@ -175,7 +136,6 @@ export function CommandPalette() {
       id: item.id,
       label: item.label,
       taskLabel: item.task_label,
-      icon: ACTION_ICONS[item.icon] ?? Sparkles,
       run: () =>
         item.body ? api(item.path, "POST", item.body) : api(item.path, "POST"),
     }));
@@ -184,115 +144,96 @@ export function CommandPalette() {
     {
       label: "Dashboard",
       path: "/",
-      icon: LayoutDashboard,
       capabilities: ["admin.access"],
     },
     {
       label: "Browse",
       path: "/browse",
-      icon: Library,
       capabilities: ["library.view"],
     },
     {
       label: "Insights",
       path: "/insights",
-      icon: BarChart3,
       capabilities: ["library.view"],
     },
     {
       label: "Health",
       path: "/health",
-      icon: HeartPulse,
       capabilities: ["library.repair.run"],
     },
     {
       label: "System Health",
       path: "/system",
-      icon: Activity,
       capabilities: ["ops.health.view"],
     },
     {
       label: "Analysis",
       path: "/analysis",
-      icon: BrainCircuit,
       capabilities: ["library.analysis.manage"],
     },
     {
       label: "Tasks",
       path: "/tasks",
-      icon: ListTodo,
       capabilities: ["ops.tasks.manage"],
     },
     {
       label: "Logs",
       path: "/logs",
-      icon: ScrollText,
       capabilities: ["ops.logs.view"],
     },
     {
       label: "Stack",
       path: "/stack",
-      icon: Server,
       capabilities: ["ops.runtime.manage"],
     },
     {
       label: "Federation",
       path: "/federation",
-      icon: Server,
       capabilities: COMMAND_FEDERATION_VIEW,
     },
     {
       label: "Global Catalog",
       path: "/global-catalog",
-      icon: Library,
       capabilities: COMMAND_FEDERATION_VIEW,
     },
     {
       label: "Users",
       path: "/users",
-      icon: User,
       capabilities: ["users.view"],
     },
     {
       label: "Roles",
       path: "/roles",
-      icon: ShieldCheck,
       capabilities: ["roles.view"],
     },
     {
       label: "Acquisition",
       path: "/download",
-      icon: Download,
       capabilities: ["library.import.manage", "library.tidal.manage"],
     },
     {
       label: "Library Trash",
       path: "/trash",
-      icon: Trash2,
       capabilities: ["library.track.remove"],
     },
     {
       label: "Contributions",
       path: "/contributions",
-      icon: HandHeart,
       capabilities: ["library.import.manage"],
     },
     {
       label: "Bandcamp",
       path: "/bandcamp",
-      icon: Archive,
       capabilities: ["library.bandcamp.manage"],
     },
     {
       label: "System Playlists",
       path: "/playlists",
-      icon: ListMusic,
       capabilities: ["curation.playlists.write"],
     },
     {
       label: "Upcoming",
       path: "/upcoming",
-      icon: Calendar,
       capabilities: [
         "curation.shows.write",
         "curation.releases.write",
@@ -302,19 +243,16 @@ export function CommandPalette() {
     {
       label: "New Releases",
       path: "/new-releases",
-      icon: Sparkles,
       capabilities: ["curation.releases.write", "library.tidal.manage"],
     },
     {
       label: "Discovery",
       path: "/discover",
-      icon: Compass,
       capabilities: ["library.view"],
     },
     {
       label: "Settings",
       path: "/settings",
-      icon: Settings,
       capabilities: ["settings.manage"],
     },
   ].filter(
@@ -326,8 +264,9 @@ export function CommandPalette() {
     matchesCommandQuery(`${item.label} ${item.taskLabel}`, query),
   );
   const itemClassName =
-    "flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent";
-  const groupClassName = "text-xs text-muted-foreground px-2 py-1";
+    "flex min-h-11 items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent";
+  const groupClassName =
+    "font-mono text-label uppercase tracking-label text-text-subtle px-2 py-1";
 
   return (
     <Dialog
@@ -339,25 +278,47 @@ export function CommandPalette() {
     >
       <DialogContent
         showCloseButton={false}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          if (openerRef.current?.isConnected) openerRef.current.focus();
+        }}
         className="top-[18vh] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-xl"
       >
         <DialogTitle className="sr-only">Command palette</DialogTitle>
         <DialogDescription className="sr-only">
           Search pages, run actions or find artists and albums.
         </DialogDescription>
-        <Command shouldFilter={false} className="bg-transparent">
+        <Command
+          label="Search commands"
+          shouldFilter={false}
+          className="bg-transparent"
+        >
           <div className="flex items-center border-b border-border px-3">
-            <Search size={16} className="text-muted-foreground shrink-0" />
+            <Search
+              size={16}
+              data-admin-ux="palette-search"
+              aria-hidden="true"
+              className="shrink-0 text-text-muted"
+            />
             <Command.Input
+              aria-label="Search commands"
               value={query}
               onValueChange={setQuery}
               placeholder="Type a command or search..."
-              className="w-full px-3 py-3 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              className="crate-focus-inset w-full px-3 py-3 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               autoFocus
             />
             <kbd className="hidden sm:inline-flex px-1.5 py-0.5 rounded bg-secondary text-[10px] font-mono border border-border text-muted-foreground">
               ESC
             </kbd>
+          </div>
+          <div className="flex justify-end px-3">
+            <OverlayCloseButton
+              className="min-h-11 min-w-11"
+              data-admin-ux="palette-close"
+              aria-label="Close command palette"
+              onClick={close}
+            />
           </div>
           <Command.List className="max-h-[min(60vh,420px)] overflow-y-auto p-2">
             <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
@@ -367,7 +328,6 @@ export function CommandPalette() {
             {visibleActions.length > 0 && (
               <Command.Group heading="Actions" className={groupClassName}>
                 {visibleActions.map((item) => {
-                  const Icon = item.icon;
                   return (
                     <Command.Item
                       key={item.id}
@@ -375,7 +335,6 @@ export function CommandPalette() {
                       onSelect={() => action(item.run, item.label)}
                       className={itemClassName}
                     >
-                      <Icon size={14} className="text-muted-foreground" />
                       {item.label}
                     </Command.Item>
                   );
@@ -392,7 +351,6 @@ export function CommandPalette() {
                     onSelect={() => go(item.path)}
                     className={itemClassName}
                   >
-                    <item.icon size={14} className="text-muted-foreground" />
                     {item.label}
                   </Command.Item>
                 ))}
@@ -416,7 +374,6 @@ export function CommandPalette() {
                     }
                     className={itemClassName}
                   >
-                    <User size={14} className="text-muted-foreground" />
                     {a.name}
                   </Command.Item>
                 ))}
@@ -441,7 +398,6 @@ export function CommandPalette() {
                     }
                     className={itemClassName}
                   >
-                    <Disc3 size={14} className="text-muted-foreground" />
                     {a.artist} — {a.name}
                   </Command.Item>
                 ))}

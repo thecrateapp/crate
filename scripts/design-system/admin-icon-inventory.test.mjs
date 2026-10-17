@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { analyzeSource, buildInventory } from "./admin-icon-inventory.mjs";
 
 const entries = (source) =>
@@ -208,6 +208,8 @@ test("review proposals reference the published source and approve no action exce
       "utf8",
     ),
   );
+  // 1V is a historical 1U source snapshot; later groups keep it intact.
+  const sourceRevision = "afed5a3c2174b7ebe39c2f6a6e7fbdbd7212469a";
   assert.equal(review.proposedRetainedActionGlyphs, 0);
   assert.equal(
     new Set(review.cases.map((item) => item.id)).size,
@@ -215,10 +217,37 @@ test("review proposals reference the published source and approve no action exce
   );
   for (const item of review.cases) {
     assert.equal(
-      readFileSync(item.path, "utf8").split("\n")[item.line - 1].trim(),
+      execFileSync("git", ["show", `${sourceRevision}:${item.path}`], {
+        encoding: "utf8",
+      })
+        .split("\n")
+        [item.line - 1].trim(),
       item.sourceLine,
       item.id,
     );
     assert.ok(item.proposal && item.why && item.sourceLine, item.id);
+  }
+});
+
+test("traces inline vector wrappers as content candidates, separate from glyph-library routes", () => {
+  const root = mkdtempSync(join(tmpdir(), "crate-icon-inventory-"));
+  try {
+    mkdirSync(join(root, "app/ui/src"), { recursive: true });
+    mkdirSync(join(root, "app/shared/ui/primitives"), { recursive: true });
+    writeFileSync(
+      join(root, "app/ui/src/Page.tsx"),
+      'import { VectorButton } from "@crate/ui/primitives/VectorButton"; export const Page = () => <VectorButton/>;',
+    );
+    writeFileSync(
+      join(root, "app/shared/ui/primitives/VectorButton.tsx"),
+      "export const VectorButton = () => <button><svg><path/></svg></button>;",
+    );
+    const wrapped = buildInventory(root).entries.find(
+      (item) => item.name === "VectorButton",
+    );
+    assert.equal(wrapped?.kind, "owned-vector-consumer");
+    assert.ok(wrapped.via.includes("native:svg"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

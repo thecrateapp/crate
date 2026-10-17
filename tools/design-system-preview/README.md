@@ -512,3 +512,25 @@ Focused serial tooling tests cover the scanner and report freshness;
 overflow, URL preservation and no API errors. Local PNGs remain advisory. Canonical 1M captures,
 CI/native/AT and pinned-site fidelity limits remain as documented. Keep all previous specimens,
 the two-entry static build and :5186 active. Stop at 1V before commit/push or migration.
+
+
+## Admin navigation / Checkpoint 1W — local review
+
+1V is approved/published as `cd5bf5e7`. Open <http://127.0.0.1:5186/#navegacion-admin>.
+The isolated `admin-navigation-demo.html` mounts the real Admin Shell/Sidebar/CommandPalette.
+The preview-only Vite resolver supplies local API/ops data and disables live notification effects;
+production Vite and app contracts are unchanged. Auth uses the actual context with fictional
+values. Routes, collapse, role preview, logout result and command actions are sample interactions.
+
+Diego confirmed that UX glyphs stay (back/forward, collapse/expand, menu, close, search, etc.).
+Destination/command/result glyphs are retired. Compact labels remain readable at 144px (expanded
+240px); mobile drawer keeps full labels and its own close. Role Select/SearchBar remain pending
+nested surfaces. Nine approved UX callsites are guarded; branded art/photos remain content.
+
+The static build now contains three entries: the main mockup, skip-link sample and Admin
+navigation sample. Strict types check the main preview under Listen aliases and the Admin demo
+under Admin aliases separately. Focused browser tests cover 1440/768/390px, history, palette,
+drawer/help focus, 44px controls, layout, no live API and previous 1U/1V entries. Real production
+Admin entry is also checked with existing API fixtures and one Playwright worker. Local images
+are advisory; no canonical 1M baselines or full CI/suites are regenerated. Stop for Diego at 1W
+before publication/next group, keeping :5186 active. Listen/Desktop sources remain untouched.

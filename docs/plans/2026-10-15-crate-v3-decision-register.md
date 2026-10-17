@@ -633,3 +633,29 @@ their own action controls still follow Admin's text policy. No new icon allowlis
 migration is included. The proposed first later group is Sidebar/CommandPalette/Shell, with tests
 for permissions, keyboard, collapsed/mobile navigation and unchanged skip links. Stop at 1V
 before publication/first group; this records a proposal, not Diego's approval of its details.
+
+
+## Functional UX glyphs retained — Diego, 2026-10-17 / checkpoint 1W
+
+During the first Admin retirement group Diego clarified: “los iconos de back y forward y demas
+glyphs de UX lo podemos mantener”, then “back nextm collapse, etc”. This supersedes the zero
+permanent-exception proposal in the historical 1V inventory for conventional functional UX.
+Keep back/forward, collapse/expand, menu, close, search and comparable UX affordances. Preserve
+accessible names, keyboard/focus behaviour and 44px targets. Continue retiring redundant Admin
+page/destination/action/header/metric glyphs. Listen/Desktop icons and player essence are unchanged.
+
+The first group's policy bounds nine concrete sites: Shell history-back/history-forward/mobile-
+navigation/help-close; Sidebar sidebar-collapse/sidebar-expand/drawer-close; CommandPalette
+palette-search/palette-close. The existing shared close glyph is reused without changing shared
+contracts; direct Admin UX glyphs remain Lucide. Other nested SearchBar/role-Select surfaces are
+pending migration. A family preference is not a blanket exception for decorative navigation.
+1W remains local for review before publication/another group.
+
+### 2026-10-17 — 1W visual review: current destination and contained focus
+
+Diego requested balanced spacing around navigation counts and a dot/bar to identify the current
+page. 1W retains the boxed count with mono tabular numerals and balanced measured ink spacing;
+it adopts the existing DS §5.4 2px accent-hi active bar in expanded, compact and drawer navigation.
+His palette feedback is addressed with the existing shared focus-inset utility: keyboard focus
+stays visible inside the search field/header. No shared APIs, Listen/Desktop or historical
+checkpoints change. Keep the 1W review stop; no publication or next group is authorised yet.

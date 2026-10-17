@@ -3,7 +3,7 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Published checkpoints through 1U (`afed5a3c`) are recorded in the handover; preserve the next 1V inventory review stop.
+> Diego's go-ahead. Published checkpoints through 1V (`cd5bf5e7`) are recorded in the handover; preserve the next 1W review stop.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -1814,11 +1814,24 @@ Review `#iconos-admin` in the persistent :5186 mockup; stop at 1V before publica
 migration group (proposed: Sidebar/CommandPalette/Shell). Full scoped results/limits are in the
 final handover. This inventory checkpoint does not complete Task 1b.8.
 
+**Linux checkpoint 1W, 2026-10-17 — first migration group, local review.** 1V is approved/published
+as `cd5bf5e7`. Sidebar/CommandPalette/Shell now retire redundant destination, command/result and
+profile/action glyphs, preserving names, capabilities, callbacks, counts and keyboard operation.
+Diego clarified during implementation that conventional UX glyphs remain (back/forward,
+collapse/expand, menu, close, search, etc.). Nine concrete current uses are bounded in
+`admin-icon-policy.test.ts`; the original zero-exception 1V proposal is superseded for these uses.
+The compact text rail is 144px, expanded 240px; drawer layout preserves full labels and its stored
+rail preference. Focus returns from drawer/palette/help. The shared APIs, Listen and Desktop are
+unchanged. SearchBar and the role AdminSelect are explicitly pending nested surfaces, not approval
+for extra decorative glyphs. The live real-component specimen is `#navegacion-admin`; stop at 1W
+before publication or the next group. Relevant scoped tests/build/budget pass; see final handover.
+
 **Files:**
 
 - Inventory `lucide-react` imports, icon props/maps and wrapped/shared icons in `app/ui/src/**`.
   Record every retained functional exception and why text or a simple marker is insufficient.
-  Check existing close/disclosure/playback controls individually; they are not blanket exemptions.
+  Preserve conventional functional UX glyphs under Diego's 2026-10-17 clarification; record actual
+  callsites, accessible names and touch targets. This does not retain redundant page/action icons.
 - Modify `app/ui/src/components/layout/{Sidebar,CommandPalette,Shell}.tsx` and the page/component
   callsites identified by the inventory. Task 3.2 adopts text navigation and reconciles this work;
   each later page task starts with the same policy rather than reintroducing icons.

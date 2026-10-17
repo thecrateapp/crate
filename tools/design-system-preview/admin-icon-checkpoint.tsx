@@ -209,6 +209,11 @@ export function AdminIconCheckpoint() {
           ))}
         </ul>
       </div>
+      <p className="mt-6 text-sm text-text-muted">
+        Tras aprobar 1V, Diego confirmó que se conservan los glifos funcionales
+        de UX, como atrás/adelante y contraer/expandir. Ver el grupo 1W al final
+        de la página.
+      </p>
       <p className="mt-8 text-sm">
         Primer grupo propuesto: Sidebar, CommandPalette y Shell. Después,
         controles compartidos y familias de páginas, cada grupo con sus pruebas

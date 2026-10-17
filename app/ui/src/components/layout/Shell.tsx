@@ -6,8 +6,8 @@ import {
   useEffect,
   type CSSProperties,
 } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router";
 import { ChevronLeft, ChevronRight, Menu } from "lucide-react";
+import { Outlet, useLocation, useNavigate } from "react-router";
 import { VisuallyHidden } from "radix-ui";
 
 import { Button } from "@crate/ui/shadcn/button";
@@ -18,7 +18,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@crate/ui/shadcn/dialog";
-import { Sheet, SheetContent, SheetTitle } from "@crate/ui/shadcn/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+} from "@crate/ui/shadcn/sheet";
 import { useKeyboard } from "@/hooks/use-keyboard";
 import { useNotifications } from "@/hooks/use-notifications";
 
@@ -36,6 +41,7 @@ import {
 export function Shell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const helpOpenerRef = useRef<HTMLElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -54,8 +60,13 @@ export function Shell() {
   }, []);
 
   const showHelp = useCallback(() => {
+    if (helpOpen) return;
+    helpOpenerRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     setHelpOpen(true);
-  }, []);
+  }, [helpOpen]);
 
   useKeyboard({
     onFocusSearch: focusSearch,
@@ -81,8 +92,8 @@ export function Shell() {
   const overlayHeader =
     /^\/artists\/[^/]+\/[^/]+$/.test(location.pathname) ||
     /^\/albums\/[^/]+\/[^/]+$/.test(location.pathname);
-  const sidebarWidthClass = sidebarExpanded ? "md:ml-60" : "md:ml-[4.5rem]";
-  const sidebarLeftClass = sidebarExpanded ? "left-60" : "left-[4.5rem]";
+  const sidebarWidthClass = sidebarExpanded ? "md:ml-60" : "md:ml-36";
+  const sidebarLeftClass = sidebarExpanded ? "left-60" : "left-36";
   const desktopHeaderOffsetClass = overlayHeader ? "md:pt-0" : "md:pt-24";
   const shellStyle = {
     "--sidebar-w": sidebarExpanded
@@ -100,19 +111,24 @@ export function Shell() {
         <Sidebar />
       </div>
 
-      <div className="z-app-header fixed inset-x-0 top-0 flex items-center gap-3 border-b border-white/6 bg-app-surface/75 px-4 py-3 backdrop-blur-xl md:hidden">
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Open navigation"
-          onClick={() => setMobileOpen(true)}
-        >
-          <Menu size={20} />
-        </Button>
-        <div className="text-sm font-bold text-white">Crate Admin</div>
-      </div>
-
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <div className="z-app-header fixed inset-x-0 top-0 flex items-center gap-3 border-b border-white/6 bg-app-surface/75 px-4 py-3 backdrop-blur-xl md:hidden">
+          <SheetTrigger asChild>
+            <Button
+              variant="ghost"
+              className="min-h-11 min-w-11 p-0"
+              aria-label="Open navigation"
+            >
+              <Menu
+                size={20}
+                data-admin-ux="mobile-navigation"
+                aria-hidden="true"
+              />
+            </Button>
+          </SheetTrigger>
+          <div className="text-sm font-bold text-white">Crate Admin</div>
+        </div>
+
         <SheetContent
           side="left"
           className="w-[240px] p-0"
@@ -121,7 +137,10 @@ export function Shell() {
           <VisuallyHidden.Root>
             <SheetTitle>Navigation</SheetTitle>
           </VisuallyHidden.Root>
-          <Sidebar onNavigate={() => setMobileOpen(false)} />
+          <Sidebar
+            presentation="drawer"
+            onNavigate={() => setMobileOpen(false)}
+          />
         </SheetContent>
       </Sheet>
 
@@ -133,24 +152,32 @@ export function Shell() {
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="flex h-10 w-10 items-center justify-center rounded-md bg-black/30 text-white/60 shadow-[0_6px_20px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-colors hover:bg-black/50 hover:text-white"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-md p-0 text-sm text-text-muted transition-colors hover:bg-surface-control hover:text-text-primary"
               aria-label="Go back"
             >
-              <ChevronLeft size={16} />
+              <ChevronLeft
+                size={16}
+                data-admin-ux="history-back"
+                aria-hidden="true"
+              />
             </button>
             <button
               type="button"
               onClick={() => navigate(1)}
-              className="flex h-10 w-10 items-center justify-center rounded-md bg-black/30 text-white/60 shadow-[0_6px_20px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-colors hover:bg-black/50 hover:text-white"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-md p-0 text-sm text-text-muted transition-colors hover:bg-surface-control hover:text-text-primary"
               aria-label="Go forward"
             >
-              <ChevronRight size={16} />
+              <ChevronRight
+                size={16}
+                data-admin-ux="history-forward"
+                aria-hidden="true"
+              />
             </button>
           </div>
 
           <div className="hidden flex-1 lg:block" />
 
-          <div className="pointer-events-auto flex min-w-0 flex-1 items-center gap-3 md:flex-none md:gap-4">
+          <div className="pointer-events-auto flex min-w-0 flex-1 items-center gap-3 md:gap-4 lg:w-[500px] lg:flex-none [&>div]:w-full">
             <SearchBar inputRef={searchInputRef} />
           </div>
         </div>
@@ -179,7 +206,15 @@ export function Shell() {
       <CommandPalette />
 
       <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent
+          data-admin-ux="help-close"
+          className="sm:max-w-sm [&_[data-slot=dialog-close]]:min-h-11 [&_[data-slot=dialog-close]]:min-w-11"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            if (helpOpenerRef.current?.isConnected)
+              helpOpenerRef.current.focus();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Keyboard Shortcuts</DialogTitle>
             <DialogDescription>

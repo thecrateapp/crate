@@ -34,7 +34,10 @@ src/index.css              Imports Poppins, @crate/ui tokens, Tailwind; @source 
 - V3 target: almost all Admin icons are retired, including redundant icons beside labelled
   actions/navigation. Use text, numerals, rules and dots with state words. Only reviewed functional
   exceptions remain, sourced from `lucide-react`; preserve accessible names and keyboard/touch
-  behaviour. The migration is planned in Task 1b.8 / DS §1.7, not completed globally.
+  behaviour. Diego confirmed on 2026-10-17 that conventional UX glyphs stay: back/forward,
+  collapse/expand, menu/close/search, etc. Record actual retained sites in the migrated scope;
+  this does not retain redundant glyphs beside page destinations, labelled actions or metrics.
+  Task 1b.8 / DS §1.7 owns the migration, which is not completed globally.
   Toasts: `toast` from `sonner`.
 - No emojis in UI text.
 

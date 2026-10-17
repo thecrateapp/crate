@@ -1,4 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -169,6 +176,41 @@ beforeEach(() => {
 });
 
 describe("CommandPalette", () => {
+  it("offers named icon-free commands, keyboard selection and an explicit close action", async () => {
+    const user = userEvent.setup();
+    mockAuth(["admin.access", "library.import.manage"]);
+    render(
+      <MemoryRouter>
+        <button>Open focus anchor</button>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+    const anchor = screen.getByRole("button", { name: "Open focus anchor" });
+    anchor.focus();
+    await user.keyboard("{Control>}k{/Control}");
+    const dialog = screen.getByRole("dialog", { name: "Command palette" });
+    const input = within(dialog).getByRole("combobox", {
+      name: "Search commands",
+    });
+    expect(input).toHaveFocus();
+    expect(
+      await within(dialog).findByRole("option", { name: "Sync Library" }),
+    ).toHaveTextContent("Sync Library");
+    expect(dialog.querySelectorAll("svg")).toHaveLength(2);
+    expect(dialog.querySelectorAll('[role="option"] svg')).toHaveLength(0);
+    await user.type(input, "sync lib");
+    await user.keyboard("{ArrowDown}{Enter}");
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith("/api/tasks/sync-library", "POST"),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(anchor).toHaveFocus());
+    await user.keyboard("{Meta>}k{/Meta}");
+    await user.click(
+      screen.getByRole("button", { name: "Close command palette" }),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
   it("filters navigation commands by current capabilities", async () => {
     vi.mocked(useAuth).mockReturnValue({
       user: {

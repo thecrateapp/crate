@@ -1,7 +1,7 @@
 # Crate v3 design system
 
-Current implementation: checkpoints through 1U are approved and published (`afed5a3c`);
-Task 1b.8 / 1V is the local Admin icon inventory at `#iconos-admin`, awaiting Diego before publication or the first migration group.
+Current implementation: checkpoints through 1V are approved and published (`cd5bf5e7`);
+Task 1b.8 / 1W is the local first navigation migration at `#navegacion-admin`, awaiting Diego before publication or the next group.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
 `/Users/diego/Code/crate-v3`, branch `feat/crate_v3`. The handover owns implementation/QA status.
@@ -600,14 +600,17 @@ max(12vh, 96px)` becomes the shell's header height plus 24 px).
 - **Admin V3 is typographic by default** (Diego, 2026-10-16): remove almost all icons, including
   decorative metric/header icons and icons beside labelled navigation or actions. Use text,
   numerals, rules and a dot plus a state word. An icon is a narrowly reviewed functional exception,
-  not the default for navigation or actions; it retains an accessible name, keyboard behaviour
+  not the default for page destinations or labelled actions. Diego confirmed on 2026-10-17 that
+  conventional UX glyphs stay: back/forward, collapse/expand, menu, close, search, etc. Record the
+  concrete retained sites in the migrated scope; each retains an accessible name, keyboard behaviour
   and the coarse-pointer target. `lucide-react` remains the source for any justified Admin exception,
   not a requirement to render an icon. Task 1b.8 owns the inventory and remaining migration.
 - Listen and Desktop retain `@crate/ui/icons` (Solar) sized with `CRATE_ICON_SIZE`; this Admin
   decision does not remove their player/navigation controls. The Linux titlebar must switch from
   undeclared `lucide-react` to `@crate/ui/icons`.
-- Shared components never import an icon set; they take icons as `ReactNode` or
-  `ComponentType<{ size }>` props.
+- Shared domain components take optional icons as `ReactNode` or `ComponentType<{ size }>` props;
+  Admin omits redundant ones. Base UX controls retain their established shared glyphs and app-agnostic
+  contract (for example, the 1N shared close button). Never remove Listen's icons globally.
 - Instruments are typographic: `→`, `·`, CSS dots, rings and triangles. No icon tiles in panel or
   stat headers. Listen may retain icons on actions and navigation; Admin follows the minimal-exception
   rule above.

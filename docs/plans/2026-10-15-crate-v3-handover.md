@@ -6,10 +6,10 @@ plan; the status table separates implementation from pending QA.
 Current transfer: **1N–1P are complete in the checkpoint commit
 `feat(ui): unify v3 overlays, controls and field spacing`**. Diego authorised commit/push and
 continuation on Linux; this final publication record supersedes earlier local-only stops below.
-**1U is approved and published as `afed5a3c2174b7ebe39c2f6a6e7fbdbd7212469a`.** Task 1b.8 /
-checkpoint 1V is the local [Admin icon inventory](2026-10-17-crate-v3-admin-icon-inventory.md),
-reviewable at <http://127.0.0.1:5186/#iconos-admin>. Stop before publication or the first migration
-group. Production icons/contracts have not changed in 1V. The retained Listen play/halo/ring and luminous seek trail
+**1V is approved and published as `cd5bf5e7229a9217694e38dbef3e33b9519d77b0`.** Task 1b.8 /
+checkpoint 1W is the local first Admin navigation migration, reviewable at
+<http://127.0.0.1:5186/#navegacion-admin>. Stop before publication or the next group. Redundant
+page/command glyphs are retired; Diego explicitly retained conventional UX glyphs. The retained Listen play/halo/ring and luminous seek trail
 from 1S remain intact. Resume on Linux with
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
 Canonical 1N–1P Linux recording/comparison and native QA remain pending.
@@ -17,7 +17,7 @@ Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 ## Where the work lives
 
 - Active Linux worktree: `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing branch
-  `feat/crate_v3`, published HEAD `afed5a3c2174b7ebe39c2f6a6e7fbdbd7212469a` (1U);
+  `feat/crate_v3`, published HEAD `cd5bf5e7229a9217694e38dbef3e33b9519d77b0` (1V);
   transfer checkpoint `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. Node 22.23.3, root
   dependencies and persistent :5186 preview are prepared. This isolates the MCP agent's
   `/home/diego/Code/Ninja/crate` checkout (`feat/crate_mcp`); leave its files untouched.
@@ -205,7 +205,8 @@ is a token-based chart configuration, not a selectable product skin.
 | 1b.5 / Checkpoint 1S | Approved/published as `124b36a8`; track/media/table foundations and retained Listen play/ring/seek trail. Pre-publication replay: 31 Vitest / 9 Chromium cases passed. |
 | 1b.6 / Checkpoint 1T | Approved/published as `5308c391`; pre-publication focused replay: 34 Vitest / 2 Chromium cases pass. Earlier 185-test consumer validation remains recorded below. |
 | 1b.7 / Checkpoint 1U | Approved/published as `afed5a3c`; fresh pre-publication replay: 30 scoped Vitest / 6 Chromium cases pass. |
-| 1b.8 / Checkpoint 1V | Local inventory at `#iconos-admin`; 142 files, 25 review cases, zero proposed permanent action-icon exceptions. Stop before publication/first migration group. |
+| 1b.8 / Checkpoint 1V | Approved/published as `cd5bf5e7`; inventory gate complete, historical 1U source snapshot preserved. |
+| 1b.8 / Checkpoint 1W | Local first migration at `#navegacion-admin`; text destinations/commands, nine approved UX sites retained. Stop before publication/next group. |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -1695,3 +1696,156 @@ retirement group: Sidebar, CommandPalette and Shell. The next review stop is che
 before its publication or another migration group. The inventory gate is now approved; its
 historical source snapshot remains the published 1U base. This migration applies only to Admin;
 Listen/Desktop icons and the approved player/play/ring/seek presentation remain unchanged.
+
+
+## Checkpoint 1W — Admin navigation icon retirement, Linux local review, 2026-10-17
+
+Diego approved/published 1V as `cd5bf5e7229a9217694e38dbef3e33b9519d77b0`; origin was verified.
+Its pre-publication scoped replay passed ten Node and two Chromium cases. **1W is local and
+uncommitted**, at <http://127.0.0.1:5186/#navegacion-admin>. Stop for Diego before publishing it or
+starting another group. Task 1b.8 remains in progress; this is its first production group only.
+
+### Latest UX direction overrides the 1V proposal
+
+Diego explicitly clarified that back/forward and other UX glyphs can stay, then named back,
+next and collapse. Conventional functional UX glyphs are retained: history, collapse/expand,
+menu, close, search, etc. This supersedes the historical zero-permanent-exception proposal in
+1V for those controls. Retire redundant Admin destination/action/header/metric glyphs; preserve
+Listen/Desktop icons and the approved play/halo/ring/seek essence. There are no shared API edits.
+
+The scoped source policy bounds these **nine current uses**, with their existing accessible
+names and 44px targets. Reusing an approval marker with a different glyph or duplicate site fails.
+The map lives in `app/ui/src/admin-icon-policy.test.ts`; removals may shrink it. No blanket
+exception is granted to page/destination glyphs. Shared close controls retain their established
+shared glyph; direct Admin controls use Lucide.
+
+| Component / marker | Retained glyph | Purpose and accessible name |
+| --- | --- | --- |
+| Shell / history-back | ChevronLeft | Conventional reverse-history affordance, `Go back` |
+| Shell / history-forward | ChevronRight | Opposite history direction, `Go forward` |
+| Shell / mobile-navigation | Menu | Compact mobile navigation trigger, `Open navigation` |
+| Shell / help-close | Existing shared close | Same 1N overlay close affordance, `Close` |
+| Sidebar / sidebar-collapse | PanelLeftClose | Collapse rail without competing with destination names, `Collapse sidebar` |
+| Sidebar / sidebar-expand | PanelLeftOpen | Restore rail width, `Expand sidebar` |
+| Sidebar / drawer-close | Existing shared close | Dismiss the drawer, `Close navigation` |
+| CommandPalette / palette-search | Search | Identify the command/search field; combobox name `Search commands` |
+| CommandPalette / palette-close | Existing shared close | Explicit pointer/keyboard dismissal, `Close command palette` |
+
+### Result and scope
+
+- Sidebar removes destination icon maps, redundant Bandcamp navigation mark, user fallback glyph
+  and logout glyphs. Full destination names remain in both modes; profile name/photos/initials,
+  logout, section/capability filtering, counters, role preview and callbacks remain. The compact
+  rail is **144px**, expanded **240px**; header/main offsets use the matching widths. Its existing
+  preference key and event stay compatible. The mobile drawer always uses full names/width and
+  does not alter the saved rail mode. All affected controls have at least 44px targets.
+- CommandPalette removes navigation/action icon maps and artist/album-result glyphs. Task catalog
+  contracts, bodies, filtering, capabilities, search debounce and task outcome toasts remain.
+  Its cmdk root now provides the actual generated label used by the combobox's `aria-labelledby`;
+  setting only an input `aria-label` was insufficient. Commands are text with 44px rows. The UX
+  search/close glyphs stay; focus returns to the opener after dismissal.
+- Shell retains history glyphs/callbacks, mobile menu and shared help close, plus 1U's first-focus
+  skip link and main target. The drawer now uses its real SheetTrigger so Escape/close returns
+  focus; palette/help also restore focus. Medium-width header search fits, retaining the existing
+  500px width on larger screens. No guessed history-boundary/forward-stack disable logic was added.
+- Direct runtime glyph bindings across the three files fall from **60 to 6** (Sidebar 28→2,
+  CommandPalette 29→1, Shell 3→3). These are static import bindings, not counts of rendered icons.
+  The nine UX sites include three inherited shared close controls. Source policy covers direct,
+  passed/mapped/dynamic and owned library/native-vector wrappers. The scanner now traces inline
+  vector wrappers too. Its new fixture failed before implementation and passes after it.
+- SearchBar and the role AdminSelect are two explicitly pending nested surfaces. Their single
+  embeddings are bounded, not permanent exceptions for decorative glyphs. Their own group will
+  review redundant glyphs while retaining functional UX. The standard shared Button spinner is
+  only accepted without a loading prop; implicit overlay closes need a concrete UX approval or
+  `showCloseButton={false}`. Branding/photos remain content.
+
+The 1V JSON/manual review snapshots remain byte-for-byte intact at their original 1U base. The
+manual case test reads exact source lines from that published commit. Do not regenerate 1V's
+report after migration: its `--check` command applies to the old source base. The new policy
+checks current sources instead. Only Admin production code changed; Listen/Desktop/shared sources
+and package/lock files are untouched. The original MCP checkout remains untouched.
+
+### Preview and validation
+
+The persistent page retains previous checkpoints and adds an iframe entry with the actual three
+components. Preview-only Vite resolution supplies fictional API/ops values and no live notification
+effects; real AuthContext is given fictional values. The production config is unchanged. The demo
+supports history, collapse, role preview, local logout result and palette actions. The real Admin
+entry is independently exercised with the existing intercepted API fixtures. Neither needs a backend.
+The static preview build contains main, skip-link demo and Admin navigation demo HTML entries.
+
+- **37 scoped Vitest cases**, `--maxWorkers=1`: Sidebar, Shell, CommandPalette and source policy.
+  Original icon/text cases failed before retirement; the revised retained-UX assertions failed
+  before restoring the authorised glyphs. Palette/help focus assertions failed before repair.
+  Capability, route/callback, catalog body/outcome and preference/counter tests pass. The old
+  1U Shell MemoryRouter/browser-URL fixture weakness is fixed by seeding/restoring browser history.
+- **11 serial Node cases** pass, including the new native-vector wrapper fixture. Historical
+  manual cases and prior scanner cases remain covered.
+- **12 preview Chromium cases**, `--workers=1`: 1W at 1440/768/390px and persistent embedding,
+  two 1V inventory cases and six affected 1U skip cases. New real entry proves routes/history,
+  full compact labels, retained UX glyphs, focus/keyboard, 44px targets, fitting search/layout,
+  no overflow/page errors and no live API requests. Initial preview-only failures exposed missing
+  Tailwind Admin source scanning and drawer focus return; both are repaired. No canonical images.
+- **3 production Admin Chromium cases**, `--workers=1`, pass at 1440/768/390px with the existing
+  API interception fixtures: real URL/query/hash skip, history, compact/expanded offsets, full
+  navigation names, retained UX controls, palette focus and mobile dismissal. Advisory captures
+  only. Its first build attempt was stopped by new test typing errors; after repair the scoped
+  build/browser run passed. No unrelated test failure is hidden.
+- Admin types, scoped ESLint/format, strict main-preview and Admin-demo types, production Admin
+  build, three-entry preview build and bundle gate pass. Vite's existing advisory chunk warnings
+  remain. Main-preview types use Listen aliases; Admin-demo types use Admin aliases separately.
+- New measured initial Admin JavaScript is **525989 / 532480 B gzip** (9 assets), **6491 B**
+  headroom; **3236 B less** than 1U's 529225. No runtime dependency was added.
+
+### Independent review and repair — 1W
+
+One fresh read-only review found no Critical/Minor issues and two Important issues, both
+reproduced before repair: the three inherited close targets measured 40px, and pressing `?`
+again while help was open replaced the external focus-return anchor with the modal's Close.
+A single repair pass adds Admin-local 44px sizing without shared API edits and captures the help
+opener only on closed→open. The repeated-`?` unit regression failed before repair; the new
+close geometry browser checks failed before sizing. The final scoped replay passes all 37
+unit cases, 12 preview Chromium cases and 3 real Admin Chromium cases. The browser checks now
+measure drawer/palette/help close targets, including the preview's coarse-pointer 390px case,
+and verify repeated-`?` dismissal restores external focus. Type/lint/build/bundle checks pass
+again after repair. No second review loop was run.
+
+In-app evidence is saved under ignored `.artifacts/review/checkpoint-1w.png` and
+`checkpoint-1w-palette.png`. The persistent `#navegacion-admin` tab stays open and the :5186
+preview remains active. A stale browser error tab from an earlier preview restart was replaced
+with a verified working preview tab; the server is HTTP 200.
+
+No full suites/full CI,
+baseline regeneration, PR/merge/rebase/deploy/release, Smart Mix or 1W publication. Canonical
+33 PNGs/manifest remain 1M. Later Linux capture/import/comparison, real-data geometry, native/AT,
+cross-engine and unavailable pinned `app/web@258bbaee` fidelity checks remain pending.
+
+### Diego's visual follow-up — counters, active destination and palette focus, 2026-10-17
+
+Still local checkpoint 1W. The sidebar counter combined 6px horizontal CSS padding with no
+vertical padding; measured numeral ink had 6px left/right but only 3–4px top/bottom. The two
+navigation counts now use JetBrains Mono tabular numerals, 12px type/14px line-height, and
+balanced visible spacing. Browser tests measure the actual glyph ink against the inside border
+for one- and two-digit values in expanded, compact and drawer navigation, allowing at most
+1.5px variation for glyph bearings/rasterisation. The initial geometry checks failed before repair.
+
+Diego also requested a marker for the current page. Its route now has the DS §5.4 left-hand
+2px `accent-action-hi` bar and primary text, replacing the filled active pill. `aria-current`
+remains supplied by NavLink. Tests verify the marker follows navigation, appears in both rail
+modes and drawer, and disappears from the previous destination.
+
+The command search field's global outline projected 2px beyond its header row. It now uses the
+existing shared `crate-focus-inset` utility so the 2px keyboard focus stays inside the field and
+header. The new overflow regression measured 2px and failed before repair; it passes at all
+three widths. No shared focus rules or other search fields were changed.
+
+Final follow-up replay: **34 affected Vitest**, **7 Admin preview Chromium** (including three new
+geometry/current-destination cases) and **3 actual Admin Chromium** pass, serial workers only.
+Admin/preview types, scoped lint/format, Admin build and three-entry preview build pass. Current
+initial Admin JavaScript: **526012 / 532480 B gzip**, **6468 B margin**. This supersedes the
+pre-follow-up bundle measurement above. Previous unaffected 1U/1V/1W checks remain recorded;
+no full suites/CI or canonical baseline regeneration. Proof: ignored
+`.artifacts/review/checkpoint-1w-counter-active.png` and
+`checkpoint-1w-palette-inset-focus.png`. Preview :5186 stays active for review.
+
+**Stop at 1W for Diego before commit/push or another migration group.**
