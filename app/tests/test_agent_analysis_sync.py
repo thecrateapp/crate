@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import sys
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from threading import Event
+from queue import Queue
+from time import monotonic, sleep
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -329,25 +330,30 @@ class TestAnalysisGenerationFences:
 
     @pytest.mark.parametrize("pipeline", ["analysis", "bliss"])
     def test_result_waiting_for_reset_transaction_cannot_write_new_generation(
-        self, pg_db, pipeline
+        self, pg_db, monkeypatch, pipeline
     ):
+        from crate.db.jobs import analysis_generations
         from crate.db.jobs.agent_analysis import requeue_analysis_targets
         from crate.db.jobs.analysis_claims import claim_track
         from crate.db.queries.agent_analysis import (
             analysis_targets_version,
             read_analysis_targets,
         )
-        from crate.db.tx import transaction_scope
+        from crate.db.tx import read_scope, transaction_scope
 
         track = _seed_track(pg_db, f"concurrent-reset-{pipeline}")
         old_claim = claim_track(f"{pipeline}_state")
         assert old_claim is not None
         state = read_analysis_targets([track["entity_uid"]], [pipeline])
-        started = Event()
+        worker_pids: Queue[int] = Queue()
+        real_lock_processing_rows = analysis_generations.lock_processing_rows
 
-        def finish_old_result():
-            started.set()
-            _store(track, pipeline, claim=old_claim, signature="old-result")
+        def record_worker_connection(current, track_ids, pipelines):
+            current.execute(text("SET LOCAL lock_timeout = '10s'"))
+            worker_pids.put(
+                current.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            )
+            return real_lock_processing_rows(current, track_ids, pipelines)
 
         with ThreadPoolExecutor(max_workers=1) as pool:
             with transaction_scope() as session:
@@ -359,10 +365,44 @@ class TestAnalysisGenerationFences:
                     session=session,
                 )
                 assert reset["status"] == "requeued"
-                completion = pool.submit(finish_old_result)
-                assert started.wait(timeout=2)
-                with pytest.raises(TimeoutError):
-                    completion.result(timeout=0.1)
+                reset_pid = session.execute(
+                    text("SELECT pg_backend_pid()")
+                ).scalar_one()
+                monkeypatch.setattr(
+                    analysis_generations,
+                    "lock_processing_rows",
+                    record_worker_connection,
+                )
+                completion = pool.submit(
+                    _store, track, pipeline, claim=old_claim, signature="old-result"
+                )
+                worker_pid = worker_pids.get(timeout=8)
+                deadline = monotonic() + 8
+                while True:
+                    # Each observation gets a fresh statistics snapshot. The PID
+                    # and blocker prove the real fence query is waiting for this
+                    # reset transaction, rather than merely a slow worker start.
+                    with read_scope() as observer:
+                        blocked = observer.execute(
+                            text(
+                                "SELECT state='active' AND wait_event_type='Lock' "
+                                "AND :reset_pid=ANY(pg_blocking_pids(pid)) "
+                                "AND query LIKE '%FROM track_processing_state%FOR UPDATE%' "
+                                "FROM pg_stat_activity WHERE pid=:worker_pid"
+                            ),
+                            {"reset_pid": reset_pid, "worker_pid": worker_pid},
+                        ).scalar_one_or_none()
+                    if blocked:
+                        break
+                    if completion.done():
+                        completion.result()
+                        pytest.fail(
+                            "Worker completed without waiting for the reset fence"
+                        )
+                    assert monotonic() < deadline, (
+                        "Worker never waited on the reset transaction's processing-row lock"
+                    )
+                    sleep(0.01)
             completion.result(timeout=5)
 
         assert _processing(track["id"], pipeline)["generation"] == 1

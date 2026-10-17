@@ -736,6 +736,14 @@ plan's generations, including after an interrupted response; changed generations
 missing tracks are terminal not-found, and source/signature mismatch is verification failure.
 It reports recorded computation evidence, not a new live filesystem scan during HTTP.
 
+The 2026-10-17 concurrency-test follow-up observes the actual worker backend PID in
+`pg_stat_activity`: its processing-row `FOR UPDATE` must be waiting for the reset transaction,
+identified by `pg_blocking_pids`, before that transaction commits. Separate read scopes avoid
+stale statistics snapshots. A delayed nonlocking worker fails both analysis/bliss variants;
+elapsed time alone cannot satisfy the assertion. All 63 focused cases in
+`test_agent_analysis_sync.py` passed with real PostgreSQL and no skips; targeted Ruff and
+Pyright passed. This follow-up changes test synchronization only.
+
 ### Repair readiness and effects
 
 `get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,
