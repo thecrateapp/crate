@@ -826,6 +826,12 @@ passed 468 focused cases without skips, with real PostgreSQL integrations; targe
 Pyright passed. Conservative text omission affects sanitized evidence only, preserving stored data
 and the engine's complete private plan documents. No full local suite was rerun.
 
+Counter exceptions in text additionally require a trustworthy terminator: a multiline continuation
+cannot inherit the integer exemption. Assignment redaction runs before header masking, preserving
+the sensitive label long enough to consume YAML blocks under Authorization/Cookie/Set-Cookie.
+Six added/strengthened controls failed before these fixes. The final seven-file focused selection
+passed 471 cases without skips; targeted Ruff and Pyright passed.
+
 ### Repair readiness and effects
 
 `get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,

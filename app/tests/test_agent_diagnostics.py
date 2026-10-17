@@ -452,6 +452,9 @@ def test_job_evidence_redacts_nested_prefixed_credentials(monkeypatch, key):
         "secret_key: !vault |\n  private-value",
         "private_key=-----BEGIN PRIVATE KEY-----\nprivate-value\n-----END PRIVATE KEY-----",
         "password=prefix\n  private-value",
+        "Authorization: |\n  private-value",
+        "Cookie: |\n  private-value",
+        "Set-Cookie: >\n  private-value",
     ],
 )
 def test_job_text_redacts_compound_credentials_and_collections(monkeypatch, error):
@@ -544,6 +547,7 @@ def test_credential_counters_preserve_only_nonnegative_integers(monkeypatch, key
             "float": {key: 3.0},
             "empty": {key: None},
             "error": f'{key}=3; secret_key="private-value"',
+            "continuation": f"{key}=3\n  private-value",
         },
     )
 

@@ -108,8 +108,8 @@ def _redact_assignments(value):
             ):
                 raise ValueError
             if not raw.startswith(('"', "[", "{")):
-                remainder = raw[length:].lstrip(" \t")
-                if remainder and remainder[0] not in ",;}]\r\n":
+                remainder = raw[length:].lstrip()
+                if remainder and remainder[0] not in ",;}]":
                     parsed = None
                 if _sensitive_key(key, parsed):
                     # Unquoted credentials may continue across lines (YAML/PEM).
@@ -147,6 +147,7 @@ def _text(value, limit=2048):
     value = str(value)
     if len(value) > 8192:
         return "[redacted-oversized-text]"
+    value = _redact_assignments(value)
     value = re.sub(
         r"(?im)\b(?:authorization|cookie|set-cookie)\s*[:=][^\r\n]*",
         "[redacted-header]",
@@ -156,7 +157,6 @@ def _text(value, limit=2048):
     value = re.sub(
         r"(?i)(bearer\s+|crate_mcp_)[A-Za-z0-9._~+/-]+=*", "[redacted]", value
     )
-    value = _redact_assignments(value)
     value = re.sub(
         r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", "[redacted]", value
     )
