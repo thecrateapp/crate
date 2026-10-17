@@ -1,6 +1,7 @@
 """Exact repair plans operate on canonical persisted issues and frozen sources."""
 
 import copy
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import Mock
 from uuid import uuid4
@@ -9,13 +10,17 @@ import pytest
 from sqlalchemy import text
 
 from crate import agent_repairs as repairs
+from crate import agent_library_operations as operations
+from crate.agent_diagnostics import DiagnosticError
 from crate.db.health import upsert_health_issue
+from crate.db.repositories.agent_credentials import create_credential, revoke_credential
 from crate.db.repositories.agent_repairs import (
     apply_repair_item,
     read_repair_source,
     repair_source_version,
 )
 from crate.db.repositories.field_locks import lock_fields
+from crate.db.repositories.tasks_updates import start_task
 from crate.db.tx import read_scope, transaction_scope
 
 from tests.test_agent_metadata import _flac
@@ -879,14 +884,182 @@ def test_source_version_binds_dependent_row_content_not_just_counts():
     assert repair_source_version(changed) != version
 
 
-def test_missing_or_closed_canonical_issue_is_rejected(repair_world):
+@pytest.mark.parametrize("state", ["missing", "fixed"])
+def test_missing_or_closed_canonical_issue_is_rejected(
+    repair_world, monkeypatch, state
+):
     issue = _issue(repair_world, "stale_tracks")
     with transaction_scope() as session:
         session.execute(
-            text("UPDATE health_issues SET status='fixed' WHERE id=:id"), {"id": issue}
+            text(
+                "DELETE FROM health_issues WHERE id=:id"
+                if state == "missing"
+                else "UPDATE health_issues SET status='fixed' WHERE id=:id"
+            ),
+            {"id": issue},
         )
     with pytest.raises(ValueError, match="no longer open"):
         read_repair_source(issue)
+
+    # Exercise the compiler's fallback with the real query and its completeness guard.
+    fallback = Mock(wraps=repairs.get_open_repair_issues)
+    monkeypatch.setattr(repairs, "get_open_repair_issues", fallback)
+    with pytest.raises(ValueError, match="missing or no longer open"):
+        _plan(repair_world, issue)
+    fallback.assert_called_once_with([issue])
+    assert _one("SELECT COUNT(*) FROM library_tracks") == 1
+    assert _one("SELECT COUNT(*) FROM agent_repair_plans") == 0
+
+
+@pytest.fixture
+def repair_agent_world(repair_world, monkeypatch):
+    monkeypatch.setenv("CRATE_MCP_ENABLED", "true")
+    monkeypatch.setenv("CRATE_MCP_ACTIONS_ENABLED", "true")
+    monkeypatch.setattr("crate.worker_handlers.is_cancelled", lambda _: False)
+    credential = create_credential(
+        "Repair regression agent",
+        {"library.repair.run", "library.health.read"},
+        datetime.now(UTC) + timedelta(hours=1),
+    )
+    return {**repair_world, "principal": credential.principal}
+
+
+@pytest.mark.parametrize("state", ["missing", "fixed"])
+def test_invalid_canonical_issue_preparation_records_source_conflict(
+    repair_agent_world, state
+):
+    world = repair_agent_world
+    issue = _issue(world, "stale_tracks")
+    queued = operations.prepare_operation(
+        world["principal"], "repairs", {"issue_ids": [issue]}, "invalid-issue"
+    )["data"]
+    # Close/remove the canonical issue after admission, before the real worker compiles it.
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "DELETE FROM health_issues WHERE id=:id"
+                if state == "missing"
+                else "UPDATE health_issues SET status='fixed' WHERE id=:id"
+            ),
+            {"id": issue},
+        )
+    start_task(queued["job_id"])
+
+    result = operations.execute_operation_job(queued["job_id"], world["config"])
+
+    assert result["execution"]["status"] == "conflict"
+    assert result["execution"]["error_code"] == "SOURCE_CONFLICT"
+    assert result["verification"]["status"] == "not_required"
+    assert (
+        _one(
+            "SELECT result FROM agent_jobs WHERE task_id=:id", {"id": queued["job_id"]}
+        )
+        == result
+    )
+    assert _one("SELECT COUNT(*) FROM agent_repair_plans") == 0
+    assert _one("SELECT COUNT(*) FROM library_tracks") == 1
+
+
+@pytest.mark.parametrize("revocation", ["credential", "grant"])
+def test_real_repair_authority_denial_inside_effect_boundary_propagates(
+    repair_agent_world, monkeypatch, revocation
+):
+    world = repair_agent_world
+    photo = world["root"] / "Artist" / "artist.jpg"
+    photo.parent.mkdir()
+    photo.write_bytes(b"unchanged approved photo")
+    issue = _issue(world, "has_photo_desync")
+    queued = operations.prepare_operation(
+        world["principal"], "repairs", {"issue_ids": [issue]}, "prepare-photo"
+    )["data"]
+    start_task(queued["job_id"])
+    prepared = operations.execute_operation_job(queued["job_id"], world["config"])
+    assert prepared["execution"]["status"] == "prepared", prepared
+    plan = prepared["plan"]
+    assert plan["executable"] is True
+    queued = operations.apply_operation(
+        world["principal"],
+        "repairs",
+        plan["plan_id"],
+        plan["plan_version"],
+        "apply-photo",
+    )["data"]
+    start_task(queued["job_id"])
+    real_apply = repairs.apply_operation
+    boundaries, propagated = [], []
+    effect = Mock(side_effect=AssertionError("repair ran without current authority"))
+    monkeypatch.setattr(repairs, "apply_repair_item", effect)
+
+    def apply_with_revocation(operation, execution, config, *, task_id, authorize):
+        def revalidate(effect=None):
+            if effect is not None:
+                assert boundaries == ["precheck"]
+                if revocation == "credential":
+                    assert revoke_credential(world["principal"].credential_id)
+                else:
+                    with transaction_scope() as session:
+                        session.execute(
+                            text(
+                                "UPDATE agent_principals SET grants=array_remove(grants,:grant) WHERE id=:id"
+                            ),
+                            {
+                                "id": world["principal"].id,
+                                "grant": "library.repair.run",
+                            },
+                        )
+                boundaries.append("effect")
+            result = authorize(effect)
+            if effect is None:
+                boundaries.append("precheck")
+            return result
+
+        try:
+            return real_apply(
+                operation, execution, config, task_id=task_id, authorize=revalidate
+            )
+        except DiagnosticError as error:
+            propagated.append(error)
+            raise
+
+    monkeypatch.setattr(repairs, "apply_operation", apply_with_revocation)
+
+    result = operations.execute_operation_job(queued["job_id"], world["config"])
+
+    assert boundaries == ["precheck", "effect"]
+    assert len(propagated) == 1 and propagated[0].code == "FORBIDDEN"
+    assert result["execution"]["status"] == "failed"
+    assert result["execution"]["error_code"] == "FORBIDDEN"
+    assert result["verification"]["status"] == "not_required"
+    effect.assert_not_called()
+    assert (
+        _one(
+            "SELECT result FROM agent_jobs WHERE task_id=:id", {"id": queued["job_id"]}
+        )
+        == result
+    )
+    assert (
+        _one(
+            "SELECT details_json->'result' FROM audit_log "
+            "WHERE action='agent.operation.finished' AND details_json->>'job_id'=:id",
+            {"id": queued["job_id"]},
+        )
+        == result
+    )
+    assert (
+        _one("SELECT COUNT(*) FROM audit_log WHERE action='planned_library_repair'")
+        == 0
+    )
+    assert (
+        _one(
+            "SELECT has_photo FROM library_artists WHERE id=:id",
+            {"id": world["artist_id"]},
+        )
+        == 0
+    )
+    assert (
+        _one("SELECT status FROM health_issues WHERE id=:id", {"id": issue}) == "open"
+    )
+    assert photo.read_bytes() == b"unchanged approved photo"
 
 
 def test_photo_postverification_failure_keeps_the_issue_open(repair_world, monkeypatch):

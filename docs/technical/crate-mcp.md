@@ -832,6 +832,38 @@ the sensitive label long enough to consume YAML blocks under Authorization/Cooki
 Six added/strengthened controls failed before these fixes. The final seven-file focused selection
 passed 471 cases without skips; targeted Ruff and Pyright passed.
 
+### Repair review false-positive evidence (2026-10-17)
+
+The persistent review of `91722b295273232df901a1ebd6bf83fd6b1df69c` (20 successful CI
+checks) reported an empty-list `IndexError` and swallowed repair authorization denials. Six
+focused PostgreSQL cases in `app/tests/test_agent_repairs.py` exercise the production paths:
+
+- `test_missing_or_closed_canonical_issue_is_rejected` covers both a deleted issue and a fixed
+  issue. The real compiler reaches its fallback query; `get_open_repair_issues` raises `ValueError`
+  for an incomplete selection before any indexing. It never returns an empty list for these IDs.
+- `test_invalid_canonical_issue_preparation_records_source_conflict` removes/closes the issue
+  after job admission. The real worker persists `conflict` / `SOURCE_CONFLICT`, with verification
+  `not_required`, no published plan and no track deletion.
+- `test_real_repair_authority_denial_inside_effect_boundary_propagates` revokes an actual
+  credential or removes `library.repair.run` after the adapter's preliminary authorization, just
+  before `authorize(effect)` inside its `try`. The worker's production authorizer and repository
+  raise `DiagnosticError(FORBIDDEN)`, which propagates through the adapter. The durable result and
+  finish audit record `failed` / `FORBIDDEN`, with verification `not_required`. The effect callback
+  is not invoked; the photo bytes, database flag and open issue remain unchanged, and no
+  `planned_library_repair` audit is written. This path does not raise `PermissionError`.
+
+Two disposable, in-memory mutation controls demonstrated sensitivity without changing production
+files: returning an empty list instead of the query's `ValueError` failed all four selection/worker
+cases (including the two expected `IndexError`s); adding `DiagnosticError` to the adapter's effect
+exception handler failed both revocation cases because the denial no longer propagated.
+
+Validation: `test_agent_repairs.py`, `test_agent_library_operations.py` and
+`test_repair_selection_contract.py` passed **124 cases without skips**, using Python 3.13 and real
+PostgreSQL. Targeted Ruff/Pyright passed. Dispatch and cancellation polling are isolated test
+doubles; authority checks, revocation, grants, compilation, result persistence and audit use the
+real implementations. No runtime change or full local suite was needed. CI and persistent review
+must be checked against the newly published exact HEAD.
+
 ### Repair readiness and effects
 
 `get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,
