@@ -36,7 +36,12 @@ def audio_extensions() -> set[str]:
 
 
 def is_cancelled(task_id: str) -> bool:
-    """Check if a task has been cancelled."""
+    """Revalidate task authority and report a cooperative stop request.
+
+    Returns True for a cancelled task or a pending cancellation request, without
+    acknowledging worker termination. Agent authority failures and database errors
+    propagate so processing stops without falsely acknowledging cancellation.
+    """
     from crate.db.repositories.agent_task_control import check_task_authority
 
     return check_task_authority(task_id)

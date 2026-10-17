@@ -1119,6 +1119,11 @@ Results retain canonical links and saved-row locks; a network-uncertain request 
 key. Owned private drafts can be resumed, including pending/failed jobs and staged image references.
 A stop request is distinct from the worker's actual acknowledgement.
 
+The bounded selection of up to three images uploads concurrently, preserving source order and
+settling every upload before unlocking a failed attempt. Image rows retain their identity when
+another row is removed. Closing a plan review/apply wait preserves its accepted job and exact
+payload/key for recovery; it does not cancel the server job.
+
 A confirmed terminal preparation failure unlocks the retained draft with a new preparation key;
 an uncertain acceptance retries its original key/job. Changing consolidation IDs, the canonical
 choice or the duplicate selection invalidates the previous plan. Shared artist edits clear stale
@@ -1193,6 +1198,12 @@ acknowledgement, split tours, attendance/reminders and exact approval. SDK trans
 new tool workflow; Admin tests cover manual/assisted review, pending rows, canonical links, uncertain
 retry, both entry pages and the shared operational approval page. The final suite/review gate is
 recorded in the plan when it has actually run.
+
+The 2026-10-17 React review follow-up passed 64 focused Admin tests across seven files and 24
+real-PostgreSQL cancellation/authority cases without skips. React Doctor 0.9.18 reported zero
+errors and zero warnings across the six affected components/pages; targeted ESLint, Admin
+typecheck and Ruff also passed. The `is_cancelled` docstring now states its existing fail-closed
+contract: revoked authority and database errors propagate without acknowledging cancellation.
 
 The fresh final SPEC/QUALITY review reported six P2 findings; each was reproduced before its fix
 with PostgreSQL/Vitest. The final local backend gate ran all 6405 collected cases (the same two

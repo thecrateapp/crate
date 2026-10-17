@@ -108,6 +108,16 @@ function PlanReviewPage({ planId }: { planId?: string }) {
   const reviewed =
     reviewIdentity !== null && reviewedIdentity === reviewIdentity;
   const identities = item?.targets.map(targetIdentity) ?? [];
+  const identitySet = new Set(identities);
+  // Preserve every proposed change, including identical entries, with keys that
+  // do not depend on unrelated rows' positions.
+  const changeOccurrences = new Map<string, number>();
+  const changes = item?.changes.map((change) => {
+    const content = JSON.stringify(change);
+    const occurrence = changeOccurrences.get(content) ?? 0;
+    changeOccurrences.set(content, occurrence + 1);
+    return { change, key: `${content}/${occurrence}` };
+  });
   const complete =
     !!item &&
     !item.truncated &&
@@ -115,21 +125,21 @@ function PlanReviewPage({ planId }: { planId?: string }) {
     item.returned_count === item.target_count &&
     item.targets.length === item.target_count &&
     identities.every(Boolean) &&
-    new Set(identities).size === item.target_count &&
+    identitySet.size === item.target_count &&
     item.changes.length > 0 &&
     item.changes.every((change) => {
       const uid = change.entity_uid ?? change.artist_uid;
-      if (typeof uid === "string") return identities.includes(uid);
+      if (typeof uid === "string") return identitySet.has(uid);
       const exactIdentity = targetIdentity(change);
-      if (exactIdentity) return identities.includes(exactIdentity);
+      if (exactIdentity) return identitySet.has(exactIdentity);
       if (Array.isArray(change.targets) && change.targets.length > 0)
         return change.targets.every(
           (target) =>
             target &&
             typeof target === "object" &&
-            identities.includes(targetIdentity(target)),
+            identitySet.has(targetIdentity(target)),
         );
-      return change.scope === "global" && identities.includes("library:global");
+      return change.scope === "global" && identitySet.has("library:global");
     });
 
   async function decide(decision: "approve" | "reject") {
@@ -277,7 +287,7 @@ function PlanReviewPage({ planId }: { planId?: string }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {item.changes.map((change, index) => {
+                    {changes?.map(({ change, key }) => {
                       const nested = Array.isArray(change.targets)
                         ? change.targets[0]
                         : null;
@@ -292,10 +302,7 @@ function PlanReviewPage({ planId }: { planId?: string }) {
                       );
                       const legacy = item.operation === "repair_photo_flag";
                       return (
-                        <tr
-                          key={`${uid}/${index}`}
-                          className="border-b border-border"
-                        >
+                        <tr key={key} className="border-b border-border">
                           <td className="py-3">
                             <p>{target?.label ?? target?.name ?? uid}</p>
                             <code className="text-xs text-muted-foreground">

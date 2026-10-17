@@ -218,6 +218,7 @@ export function AgentIntegrations() {
     }
   }
   function permissions(selected: string[], update: (value: string[]) => void) {
+    const selectedScopes = new Set(selected);
     return (
       <fieldset className="grid gap-2">
         <legend className="mb-2 text-sm font-medium">Permissions</legend>
@@ -225,7 +226,7 @@ export function AgentIntegrations() {
           <label key={scope} className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
-              checked={selected.includes(scope)}
+              checked={selectedScopes.has(scope)}
               disabled={!can_grant || busy}
               onChange={(event) =>
                 update(

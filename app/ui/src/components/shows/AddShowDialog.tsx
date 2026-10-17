@@ -62,10 +62,7 @@ export function AddShowDialog({ open, onOpenChange, onSaved }: Props) {
   } | null>(null);
 
   useEffect(() => {
-    if (!open && controller.current && pending.current) {
-      controller.current.abort();
-      setPhase("uncertain");
-    }
+    if (!open) controller.current?.abort();
   }, [open]);
   useEffect(() => () => controller.current?.abort(), []);
 
@@ -93,6 +90,10 @@ export function AddShowDialog({ open, onOpenChange, onSaved }: Props) {
     controller.current?.abort();
     const abort = new AbortController();
     controller.current = abort;
+    const stoppedWaiting = () => {
+      if (pending.current === request) setPhase("uncertain");
+    };
+    abort.signal.addEventListener("abort", stoppedWaiting, { once: true });
     setError("");
     setPhase(request.kind === "prepare" ? "preparing" : "applying");
     try {
@@ -102,7 +103,9 @@ export function AddShowDialog({ open, onOpenChange, onSaved }: Props) {
             signal: abort.signal,
           });
       request.jobId = accepted.job_id;
+      abort.signal.throwIfAborted();
       const job = await waitForShowJob(accepted.job_id, abort.signal);
+      abort.signal.throwIfAborted();
       if (request.kind === "prepare") {
         const prepared = job.result?.plan;
         if (job.status !== "completed" || !prepared) {
@@ -125,6 +128,7 @@ export function AddShowDialog({ open, onOpenChange, onSaved }: Props) {
           undefined,
           { signal: abort.signal },
         );
+        abort.signal.throwIfAborted();
         setPlan(complete);
         setPhase("reviewed");
         setChanged(false);
@@ -187,13 +191,17 @@ export function AddShowDialog({ open, onOpenChange, onSaved }: Props) {
         pending.current = null;
         setPhase(plan ? "reviewed" : "editing");
       } else setPhase("uncertain");
+    } finally {
+      abort.signal.removeEventListener("abort", stoppedWaiting);
+      if (controller.current === abort) controller.current = null;
     }
   }
 
+  const selectedIds = new Set(draft.selected);
   function review() {
     if (sourceBusy) return;
     const selected = draft.candidates.filter((candidate) =>
-      draft.selected.includes(candidate.item_id),
+      selectedIds.has(candidate.item_id),
     );
     pending.current = {
       kind: "prepare",
@@ -226,7 +234,7 @@ export function AddShowDialog({ open, onOpenChange, onSaved }: Props) {
     draft.selected.length > 0 &&
     draft.selected.length <= 50 &&
     draft.candidates
-      .filter((candidate) => draft.selected.includes(candidate.item_id))
+      .filter((candidate) => selectedIds.has(candidate.item_id))
       .every(
         (candidate) =>
           candidate.artist_name?.trim() &&
@@ -358,8 +366,8 @@ export function AddShowDialog({ open, onOpenChange, onSaved }: Props) {
               compare the complete source before claiming a whole tour.
             </p>
           ) : null}
-          {warnings.map((warning, index) => (
-            <p key={index} className="text-sm text-muted-foreground">
+          {Array.from(new Set(warnings)).map((warning) => (
+            <p key={warning} className="text-sm text-muted-foreground">
               {warning}
             </p>
           ))}
@@ -392,25 +400,28 @@ export function AddShowDialog({ open, onOpenChange, onSaved }: Props) {
                   (!sharedArtist.trim() && !sharedCountry.trim())
                 }
                 onClick={() => {
-                  setDraft((current) => ({
-                    ...current,
-                    candidates: current.candidates.map((candidate) =>
-                      current.selected.includes(candidate.item_id)
-                        ? {
-                            ...candidate,
-                            ...(sharedArtist.trim()
-                              ? {
-                                  artist_name: sharedArtist.trim(),
-                                  artist_uid: null,
-                                }
-                              : {}),
-                            ...(sharedCountry.trim()
-                              ? { country_code: sharedCountry.trim() }
-                              : {}),
-                          }
-                        : candidate,
-                    ),
-                  }));
+                  setDraft((current) => {
+                    const selected = new Set(current.selected);
+                    return {
+                      ...current,
+                      candidates: current.candidates.map((candidate) =>
+                        selected.has(candidate.item_id)
+                          ? {
+                              ...candidate,
+                              ...(sharedArtist.trim()
+                                ? {
+                                    artist_name: sharedArtist.trim(),
+                                    artist_uid: null,
+                                  }
+                                : {}),
+                              ...(sharedCountry.trim()
+                                ? { country_code: sharedCountry.trim() }
+                                : {}),
+                            }
+                          : candidate,
+                      ),
+                    };
+                  });
                   invalidate();
                 }}
               >

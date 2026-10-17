@@ -1,5 +1,5 @@
 import { screen, waitFor } from "@testing-library/react";
-import { StrictMode } from "react";
+import { StrictMode, useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -65,7 +65,86 @@ async function fillManual() {
   return user;
 }
 
+function ReopenableDialog({ onSaved }: { onSaved: () => void }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <>
+      <button onClick={() => setOpen(true)}>Reopen show draft</button>
+      <AddShowDialog open={open} onOpenChange={setOpen} onSaved={onSaved} />
+    </>
+  );
+}
+
 describe("AddShowDialog", () => {
+  it.each(["prepare", "apply"])(
+    "resumes the same accepted %s job after closing and reopening the dialog",
+    async (kind) => {
+      const original = vi.mocked(api).getMockImplementation()!;
+      let recover = false;
+      let signal: AbortSignal | undefined;
+      vi.mocked(api).mockImplementation(async (...args) => {
+        if (args[0].endsWith(`/jobs/${kind}-1`) && !recover) {
+          signal = args[3]?.signal;
+          return new Promise((_, reject) =>
+            signal?.addEventListener(
+              "abort",
+              () => reject(new DOMException("Closed", "AbortError")),
+              { once: true },
+            ),
+          );
+        }
+        return original(...args);
+      });
+      const saved = vi.fn();
+      renderWithAdminProviders(<ReopenableDialog onSaved={saved} />);
+      const user = await fillManual();
+      await user.click(
+        screen.getByRole("button", { name: "Review selection" }),
+      );
+      if (kind === "apply")
+        await user.click(
+          await screen.findByRole("button", { name: "Save selected shows" }),
+        );
+      await waitFor(() => expect(signal).toBeDefined());
+      await user.click(screen.getAllByRole("button", { name: "Close" })[0]!);
+      expect(signal?.aborted).toBe(true);
+      recover = true;
+      await user.click(
+        screen.getByRole("button", { name: "Reopen show draft" }),
+      );
+      expect(screen.getByLabelText("Artist")).toHaveValue("External Band");
+      expect(screen.getByLabelText("Artist")).toBeDisabled();
+      await user.click(
+        screen.getByRole("button", {
+          name: kind === "prepare" ? "Retry same review" : "Retry same save",
+        }),
+      );
+      if (kind === "prepare") {
+        await screen.findByRole("button", { name: "Save selected shows" });
+        expect(saved).not.toHaveBeenCalled();
+      } else {
+        await screen.findByRole("link", { name: "Open show 7" });
+        expect(saved).toHaveBeenCalledOnce();
+      }
+      expect(
+        vi
+          .mocked(api)
+          .mock.calls.filter(
+            ([url, method]) =>
+              method === "POST" &&
+              url.endsWith(kind === "prepare" ? "/plans" : "/apply"),
+          ),
+      ).toHaveLength(1);
+      await user.click(screen.getAllByRole("button", { name: "Close" })[0]!);
+      await user.click(
+        screen.getByRole("button", { name: "Reopen show draft" }),
+      );
+      expect(
+        screen.queryByRole("button", { name: /Retry same/ }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
   it("restores a source in StrictMode while retaining unsaved edits and canonical saved rows", async () => {
     const original = vi.mocked(api).getMockImplementation()!;
     let restoring = false;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
 import { api } from "@/lib/api";
@@ -33,7 +33,7 @@ export function ShowSourceImport({
   const [method, setMethod] = useState<Method>("ocr");
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
+  const [files, setFiles] = useState<{ id: string; file: File }[]>([]);
   const [storedImages, setStoredImages] = useState<string[]>([]);
   const [availability, setAvailability] = useState<Availability | null>(null);
   const [recent, setRecent] = useState<Recent[]>([]);
@@ -46,12 +46,13 @@ export function ShowSourceImport({
     payload: Record<string, unknown>;
     jobId?: string;
   } | null>(null);
-  const key = useRef(crypto.randomUUID());
+  const key = useRef<string | null>(null);
+  const notifyClosed = useEffectEvent(() => onBusyChange?.(false));
   useEffect(() => {
     if (!open) {
       controller.current?.abort();
       setBusy(false);
-      onBusyChange?.(false);
+      notifyClosed();
       if (pending.current) setUncertain(true);
       return;
     }
@@ -93,7 +94,8 @@ export function ShowSourceImport({
       );
       return;
     }
-    setFiles((current) => [...current, ...incoming]);
+    const added = incoming.map((file) => ({ id: crypto.randomUUID(), file }));
+    setFiles((current) => [...current, ...added]);
     changed();
   }
   async function receive(job: ShowJob) {
@@ -128,20 +130,32 @@ export function ShowSourceImport({
     setStatus("Extracting in the worker; nothing is published…");
     try {
       if (!pending.current) {
+        key.current ??= crypto.randomUUID();
         const imageMode = ["ocr", "ocr_text_llm", "vision"].includes(method);
         const uploads: string[] = !probe && imageMode ? [...storedImages] : [];
-        if (!probe && imageMode)
-          for (const file of files) {
-            const form = new FormData();
-            form.append("file", file);
-            const image = await api<{ upload_id: string }>(
-              "/api/show-imports/uploads",
-              "POST",
-              form,
-              { signal: abort.signal },
-            );
-            uploads.push(image.upload_id);
-          }
+        if (!probe && imageMode) {
+          // At most three images. Settle every upload before unlocking a failed
+          // attempt; preserve source order even when responses arrive out of order.
+          const images = await Promise.allSettled(
+            files.map(({ file }) => {
+              const form = new FormData();
+              form.append("file", file);
+              return api<{ upload_id: string }>(
+                "/api/show-imports/uploads",
+                "POST",
+                form,
+                { signal: abort.signal },
+              );
+            }),
+          );
+          abort.signal.throwIfAborted();
+          uploads.push(
+            ...images.map((image) => {
+              if (image.status === "rejected") throw image.reason;
+              return image.value.upload_id;
+            }),
+          );
+        }
         pending.current = {
           payload: {
             mode: probe ? "probe" : method,
@@ -373,15 +387,17 @@ export function ShowSourceImport({
             </Button>
           </p>
         ) : null}
-        {files.map((file, index) => (
-          <div key={`${file.name}-${index}`} className="text-sm">
+        {files.map(({ id, file }, index) => (
+          <div key={id} className="text-sm">
             {file.name}
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => {
-                setFiles((current) => current.filter((_, i) => i !== index));
+                setFiles((current) =>
+                  current.filter((image) => image.id !== id),
+                );
                 changed();
               }}
             >

@@ -63,6 +63,7 @@ export function ShowImportReview({
   onChange,
   onSelect,
 }: Props) {
+  const selectedIds = new Set(selected);
   const results = new Map(
     outcomes.map((outcome) => [outcome.item_id, outcome]),
   );
@@ -117,7 +118,7 @@ export function ShowImportReview({
                           type="checkbox"
                           disabled={locked}
                           aria-label={`Select show ${index + 1}`}
-                          checked={selected.includes(candidate.item_id)}
+                          checked={selectedIds.has(candidate.item_id)}
                           onChange={(event) =>
                             onSelect(
                               event.target.checked
@@ -149,7 +150,7 @@ export function ShowImportReview({
                             value={candidate[field.key] ?? ""}
                             required={
                               field.key !== "local_time" &&
-                              selected.includes(candidate.item_id)
+                              selectedIds.has(candidate.item_id)
                             }
                             maxLength={
                               field.key === "artist_name" ||

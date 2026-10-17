@@ -34,6 +34,7 @@ export function ShowConsolidationEditor({
   const [duplicates, setDuplicates] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const duplicateIds = new Set(duplicates);
   async function load() {
     onChange();
     const chosen = ids.split(",").map((value) => Number(value.trim()));
@@ -125,7 +126,7 @@ export function ShowConsolidationEditor({
               <label className="ml-3">
                 <input
                   type="checkbox"
-                  checked={duplicates.includes(row.id)}
+                  checked={duplicateIds.has(row.id)}
                   onChange={(event) => {
                     setDuplicates((current) =>
                       event.target.checked
@@ -156,8 +157,7 @@ export function ShowConsolidationEditor({
                 revisions: Object.fromEntries(
                   rows
                     .filter(
-                      (row) =>
-                        row.id === canonical || duplicates.includes(row.id),
+                      (row) => row.id === canonical || duplicateIds.has(row.id),
                     )
                     .map((row) => [String(row.id), row.revision]),
                 ),
