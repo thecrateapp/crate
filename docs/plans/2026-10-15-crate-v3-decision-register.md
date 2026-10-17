@@ -621,3 +621,15 @@ isolated documents with actual SkipLink/main, not nested main landmarks or real 
 These choices preserve existing deep-link state and avoid expanding this accessibility task
 into later navigation redesigns. Canonical Linux CI/native/AT gates remain pending; stop before
 1U publication or 1b.8. No new dependency or site-pin change.
+
+
+## Task 1b.8 inventory gate — checkpoint 1V, 2026-10-17
+
+1U is approved/published (`afed5a3c`). The local [1V inventory](2026-10-17-crate-v3-admin-icon-inventory.md)
+is ready for Diego before deletion. It proposes zero permanent action-glyph exceptions and records
+25 compact/shared/content cases individually. A conditional shared dependency is not a rendered
+icon or an approved exception. Marks, QR, maps/charts and inert Listen hero output are content;
+their own action controls still follow Admin's text policy. No new icon allowlist or production
+migration is included. The proposed first later group is Sidebar/CommandPalette/Shell, with tests
+for permissions, keyboard, collapsed/mobile navigation and unchanged skip links. Stop at 1V
+before publication/first group; this records a proposal, not Diego's approval of its details.

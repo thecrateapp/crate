@@ -3,7 +3,7 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Published checkpoints through 1T are recorded in the handover; preserve the next 1U review stop.
+> Diego's go-ahead. Published checkpoints through 1U (`afed5a3c`) are recorded in the handover; preserve the next 1V inventory review stop.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -1802,6 +1802,17 @@ Commit: `feat(a11y): add a skip link to both shells`.
 figures, mono labels, rules and dots with state words; remove decorative and redundant icons.
 Listen/desktop player and navigation icon policy is unchanged. This is an explicit V3 direction,
 not authorisation to execute a blanket icon deletion before a reviewed inventory.
+
+**Linux checkpoint 1V, 2026-10-17 — inventory review.** Diego approved/published 1U
+(`afed5a3c`, verified at origin). The [1V inventory](2026-10-17-crate-v3-admin-icon-inventory.md)
+indexes 142 production Admin files: 72 with runtime glyph imports, 543 bindings, 625 direct JSX
+sites and passed/mapped/wrapped entry points. Categories overlap and conditional shared routes
+are not counts of visible icons. The reproducible report and 25 individual review cases propose
+zero permanent action-glyph exceptions; marks/QR/instruments/Listen presentation are explicit
+content cases. No production icon removal, shared contract change or policy allowlist yet.
+Review `#iconos-admin` in the persistent :5186 mockup; stop at 1V before publication or the first
+migration group (proposed: Sidebar/CommandPalette/Shell). Full scoped results/limits are in the
+final handover. This inventory checkpoint does not complete Task 1b.8.
 
 **Files:**
 

@@ -6,10 +6,10 @@ plan; the status table separates implementation from pending QA.
 Current transfer: **1N–1P are complete in the checkpoint commit
 `feat(ui): unify v3 overlays, controls and field spacing`**. Diego authorised commit/push and
 continuation on Linux; this final publication record supersedes earlier local-only stops below.
-**1T is approved and published as `5308c391c1b0168edebfff58b15e821a1e5a6757`.** Task 1b.7 /
-checkpoint 1U is implemented locally at <http://127.0.0.1:5186/#saltar-contenido> and stops for
-Diego's review before publication or 1b.8. Shared skip navigation in both shells and seven Listen
-translations are the current review. The retained Listen play/halo/ring and luminous seek trail
+**1U is approved and published as `afed5a3c2174b7ebe39c2f6a6e7fbdbd7212469a`.** Task 1b.8 /
+checkpoint 1V is the local [Admin icon inventory](2026-10-17-crate-v3-admin-icon-inventory.md),
+reviewable at <http://127.0.0.1:5186/#iconos-admin>. Stop before publication or the first migration
+group. Production icons/contracts have not changed in 1V. The retained Listen play/halo/ring and luminous seek trail
 from 1S remain intact. Resume on Linux with
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
 Canonical 1N–1P Linux recording/comparison and native QA remain pending.
@@ -17,7 +17,7 @@ Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 ## Where the work lives
 
 - Active Linux worktree: `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing branch
-  `feat/crate_v3`, published HEAD `5308c391c1b0168edebfff58b15e821a1e5a6757` (1T);
+  `feat/crate_v3`, published HEAD `afed5a3c2174b7ebe39c2f6a6e7fbdbd7212469a` (1U);
   transfer checkpoint `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. Node 22.23.3, root
   dependencies and persistent :5186 preview are prepared. This isolates the MCP agent's
   `/home/diego/Code/Ninja/crate` checkout (`feat/crate_mcp`); leave its files untouched.
@@ -204,7 +204,8 @@ is a token-based chart configuration, not a selectable product skin.
 | 1b.4 / Checkpoint 1R | Approved/published as `093dcb1f`; scoped replay 309 Vitest / three Chromium cases passed before publication. |
 | 1b.5 / Checkpoint 1S | Approved/published as `124b36a8`; track/media/table foundations and retained Listen play/ring/seek trail. Pre-publication replay: 31 Vitest / 9 Chromium cases passed. |
 | 1b.6 / Checkpoint 1T | Approved/published as `5308c391`; pre-publication focused replay: 34 Vitest / 2 Chromium cases pass. Earlier 185-test consumer validation remains recorded below. |
-| 1b.7 / Checkpoint 1U | Local at `#saltar-contenido`; shared first-focus skip link, main targets and seven Listen translations. Awaiting Diego before publication or 1b.8. |
+| 1b.7 / Checkpoint 1U | Approved/published as `afed5a3c`; fresh pre-publication replay: 30 scoped Vitest / 6 Chromium cases pass. |
+| 1b.8 / Checkpoint 1V | Local inventory at `#iconos-admin`; 142 files, 25 review cases, zero proposed permanent action-icon exceptions. Stop before publication/first migration group. |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -1607,3 +1608,90 @@ Diego approved complete1U and explicitly authorised commit/push plus Task1b.8, k
 active and stopping at the next checkpoint. This supersedes its local-only stop above. The next
 stop is1V: the task's mandatory Admin icon inventory and proposed functional exceptions, before
 blanket deletion or a first migration group. Existing scoped/serial/no-baseline validation applies.
+
+
+## Checkpoint 1V — Admin icon inventory, Linux local review, 2026-10-17
+
+Diego approved 1U and authorised commit/push plus Task 1b.8. 1U is published as
+`afed5a3c2174b7ebe39c2f6a6e7fbdbd7212469a`, verified against GitHub's branch ref. The fresh
+pre-publication replay passed **30 Vitest** cases (SkipLink/Admin Shell/Listen Shell) and **6
+Chromium** cases, with one worker. **1V is local and uncommitted**, at
+<http://127.0.0.1:5186/#iconos-admin>. This is the mandatory inventory-first review before any
+production deletion, not completion of the whole Task 1b.8.
+
+The [inventory and proposals](2026-10-17-crate-v3-admin-icon-inventory.md) record 142 production
+Admin TS/TSX/CSS files, 90 with indexed references, 72 with runtime glyph imports and 543 import
+bindings. The report indexes direct JSX (625 sites), expressions, maps/properties, props, dynamic
+slots and specific owned/shared export chains. Counts overlap and conditional routes (707) are
+not visible-icon counts; the document states the syntax-analysis limits. All Admin source files
+and 59 traced owned dependencies carry hashes; the CLI's `--check` rejects stale inventory.
+
+Twenty-five source-located review cases propose text/marker replacements, identify shared close/
+loading/Select contract work, and separate QR, provider/cover marks, charts/maps and inert Listen
+hero presentation as content. **Zero permanent action-glyph exceptions are proposed or approved.**
+No production icon, permission, action or shared API changed; no exception allowlist was created.
+The proposed first subsequent group is Sidebar/CommandPalette/Shell, after Diego reviews 1V.
+Later groups add source-policy/render tests and migrate actual consumers with their contracts.
+
+The persistent mockup adds `#iconos-admin`: real shared Button/StatusDot/StatNumber/Input, local
+fictional actions, bounded searchable file summaries and expandable per-control proposals. All
+previous specimens, the 1U isolated documents, Listen's retained play/halo/ring/seek trail and
+:5186 remain. No API backend is mounted or needed.
+
+Scoped local validation:
+
+- **10 serial Node tests** for scanner behaviour, aliased/type-only imports, maps/props, dynamic
+  slots, raw vectors, external visuals, owned exports, star/cycle handling, CLI freshness,
+  dependency hashes and manual case locations. Original seven-case RED preceded implementation;
+  the star/cycle case also failed before its repair.
+- **8 Chromium cases**, `--workers=1`: two new 1V desktop/390 px cases plus six affected 1U
+  preview/isolated-entry cases. Filtering, pagination, native disclosure/keyboard operation,
+  local actions, actual 8 px field gap, 44 px buttons, query preservation, no overflow/API/page
+  errors, and the retained skip controls pass. The new preview case failed before the section
+  existed. Screenshots are advisory ignored artifacts, never canonical baselines.
+- Strict preview TypeScript, scoped ESLint and two-entry static preview build pass. Vite retains
+  its advisory large-chunk warning for the review-only bundle. Production app bundles were not
+  rebuilt for this tooling/docs-only checkpoint; `app/ui/src`, `app/listen/src`, `app/shared/ui`,
+  package/lock files and the canonical manifest are unchanged relative to published 1U.
+- Admin's last measured bundle remains **529225 / 532480 B gzip** (1U), **3255 B** headroom.
+  No new production imports/dependencies. This is a historical measurement, not a new 1V build.
+
+The single independent read-only review found no critical/important issue; final browser evidence
+and its one minor repair are recorded below. No full suites/full CI or baseline recording were run. Canonical PNGs/manifest remain
+1M; later Linux recording/import/comparison, real-data geometry, cross-engine/native/AT QA and
+the unavailable pinned-site `app/web@258bbaee` comparison remain pending. No replacement pin,
+Smart Mix, PR/merge/rebase/deploy/release or 1V publication. Original MCP checkout untouched.
+
+**Stop at 1V for Diego before publication or the first production migration group.**
+
+
+### 1V final review and stop
+
+The independent read-only reviewer also passed the ten scanner tests, freshness check and both
+new browser cases. It found one minor scanner issue: caching a cycle-dependent negative could
+hide a second consumer imported through another barrel entry point. The strengthened two-entry
+cycle fixture failed before repair; negative results are now left uncached, while positive
+evidence is memoized. All **10 Node cases** pass again and `--check` confirms the actual 1V
+report is unchanged. There was one repair pass and no second review.
+
+Final preview copy uses singular/plural file counts and explicit whitespace in accessible summary
+names; both new Chromium cases pass again. The earlier affected six 1U cases remain green. Strict
+preview types, scoped lint/format and the two-entry static build pass. No production source changed.
+The prior 1U minor Shell MemoryRouter/browser-URL fixture weakness remains deferred to the actual
+Shell migration; real-URL browser cases cover query/hash preservation already.
+
+In-app browser verification filtered `layout/Sidebar`, expanded its native disclosure and showed
+its source categories. The live :5186 tab is kept as the deliverable; advisory screenshot:
+`.artifacts/review/checkpoint-1v.png`. No canonical PNG/manifest changed. Preview responds HTTP200.
+
+**HEAD/origin stay at published 1U `afed5a3c`. 1V is unstaged/uncommitted. Stop for Diego's
+inventory/proposal review before publication or the first production migration group.**
+
+
+### Checkpoint 1V approval and publication authorisation — 2026-10-17
+
+Diego approved complete 1V and explicitly authorised commit/push plus the first Admin icon
+retirement group: Sidebar, CommandPalette and Shell. The next review stop is checkpoint 1W,
+before its publication or another migration group. The inventory gate is now approved; its
+historical source snapshot remains the published 1U base. This migration applies only to Admin;
+Listen/Desktop icons and the approved player/play/ring/seek presentation remain unchanged.

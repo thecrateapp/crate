@@ -1,3 +1,4 @@
+import { AdminIconCheckpoint } from "./admin-icon-checkpoint";
 import { SkipLinkCheckpoint } from "./skip-link-checkpoint";
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -1630,6 +1631,7 @@ function App() {
       <TracksCheckpoint />
       <StatusColourCheckpoint />
       <SkipLinkCheckpoint />
+      <AdminIconCheckpoint />
       <AppModal
         open={sampleModalOpen}
         onClose={() => setSampleModalOpen(false)}
@@ -1709,6 +1711,7 @@ function App() {
             "1R publicado",
             "1S publicado",
             "1T publicado · 1U publicado",
+            "1V publicado",
           ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>

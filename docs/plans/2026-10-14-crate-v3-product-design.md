@@ -2,9 +2,8 @@
 
 Status: product design, revised 2026-10-15. Canonical clone `/Users/diego/Code/crate-v3`, branch
 `feat/crate_v3`. The handover records implementation and QA status; historical analysis is not a
-current progress report. Checkpoints through 1T are approved and published (`5308c391`).
-Task 1b.7 / checkpoint 1U is local on Linux at `#saltar-contenido`, awaiting review before publication or
-1b.8. The final handover supersedes historical local-only notes. Diego's 1S review explicitly
+current progress report. Checkpoints through 1U are approved and published (`afed5a3c`).
+Task 1b.8 / checkpoint 1V is the local Admin icon inventory at `#iconos-admin`, awaiting review before publication or the first migration group. The final handover supersedes historical local-only notes. Diego's 1S review explicitly
 preserves the current Listen play essence (halo, layers and progress ring) and seek trail,
 adapted to V3 with 1–2 px strokes; see DS §5.5.
 
@@ -3493,3 +3492,13 @@ closed by PD4), `[D35]` Generate with AI as a draft (part of PD18 here), `[D37]`
 - Admin Dashboard chapter index (site `Explore` rows).
 - Album energy arc (PD52).
 - Remaining coverage P2 surfaces beyond their recipes (they reuse the recipes, no new primitives).
+
+
+## Linux progress — 1V / Admin typographic inventory, 2026-10-17
+
+The [source inventory and proposals](2026-10-17-crate-v3-admin-icon-inventory.md) are ready for
+Diego's review before icon deletion, as required by Task 1b.8. No production action/capability is
+changed here. Text and markers are proposed for compact controls too; no action glyph has a
+proposed permanent exception. Marks, QR, data instruments and the inert Listen hero presentation
+are reviewed as content. Shared adaptations and page migrations remain later reviewable groups;
+Listen's player/navigation essence and all approved checkpoints are preserved. Stop at 1V.

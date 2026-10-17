@@ -1,7 +1,7 @@
 # Crate v3 design system
 
-Current implementation: checkpoints through 1T are approved and published (`5308c391`);
-Task 1b.7 / 1U is local on Linux at `#saltar-contenido`, awaiting Diego's review before publication or 1b.8.
+Current implementation: checkpoints through 1U are approved and published (`afed5a3c`);
+Task 1b.8 / 1V is the local Admin icon inventory at `#iconos-admin`, awaiting Diego before publication or the first migration group.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
 `/Users/diego/Code/crate-v3`, branch `feat/crate_v3`. The handover owns implementation/QA status.
@@ -9,7 +9,7 @@ Registry and harness references predating Task 1.13 are historical; current cons
 single-identity equivalents without recreating retired exports.
 Historical reports retain their original measurements; they do not certify current test results.
 The single Crate v3 identity is published through Task 1.13 / Checkpoint 1M (`21873d24`).
-Task 1b.5 / Checkpoint 1S is in local review; later checkpoint publication remains gated.
+Later checkpoint publication remains gated by Diego's review.
 
 Visual source of truth: the new site only, `app/web` at the approved git reference:
 
@@ -4237,3 +4237,19 @@ and excluded from sequential Tab navigation. Explicit activation retains the URL
 and continues from the content; it does not change automatic route focus or player behavior.
 The real-component specimen is at `#saltar-contenido`, using isolated documents so each example
 has one main and a genuine first keyboard stop. Native/AT and canonical CI QA remain pending.
+
+
+## Linux implementation note — 1V / Admin icon inventory, 2026-10-17
+
+1U is approved and published as `afed5a3c`. The [1V inventory](2026-10-17-crate-v3-admin-icon-inventory.md)
+implements the inventory-first gate of Task 1b.8, not whole-Admin icon removal. It records direct,
+passed, mapped and owned/shared routes, distinguishes conditional references from rendered glyphs,
+and proposes zero permanent functional action-icon exceptions. Twenty-five source-located cases
+cover text/marker alternatives, shared contract work and content exclusions. The shared loader,
+overlay close and Select indicators still exist; their eventual Admin adaptation needs consumer
+tests without changing Listen globally. Provider/cover marks, QR, charts/maps and inert Listen hero
+presentation are content, not blanket action exceptions. No source exception allowlist is created.
+
+The persistent `#iconos-admin` specimen uses real shared controls and local actions, with searchable
+file counts and review cases. Production entrypoints, icon rendering, tokens/fonts and the site
+pin are unchanged. Stop for Diego at 1V before publication or the first migration group.

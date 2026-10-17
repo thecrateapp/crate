@@ -492,3 +492,23 @@ subsequent Tab, pointer activation, URL query/hash preservation, forced colours/
 artifacts. The preview static build includes `index.html` and `skip-link-demo.html`. Native/AT,
 cross-engine checks and canonical Linux CI capture/import/comparison remain pending; do not
 regenerate 1M baselines or dispatch full CI during iteration.
+
+
+## Admin icon inventory / Checkpoint 1V — local review
+
+Diego approved 1U, published as `afed5a3c` on 2026-10-17. This supersedes its local-only stop above.
+Open <http://127.0.0.1:5186/#iconos-admin>. Task 1b.8 requires this inventory review before deletion;
+1V changes no production icon rendering or shared contract. The proposed first later group is
+Sidebar/CommandPalette/Shell, after Diego's inventory review.
+
+The real shared Button/StatusDot/StatNumber/Input specimens use local fictional callbacks. Search
+142 source files (90 with indexed references; 72 have glyph imports), expand per-file categories
+and inspect 25 compact/shared/content proposals. Static categories overlap and conditional routes
+are not counts of visible icons. Zero permanent action-glyph exceptions are proposed. The full
+report/generator and limitations are in `docs/plans/2026-10-17-crate-v3-admin-icon-inventory.md`.
+
+Focused serial tooling tests cover the scanner and report freshness;
+`admin-icon-checkpoint.spec.ts --workers=1` covers desktop/390 px interactions, actual 8 px field spacing, 44 px controls, keyboard,
+overflow, URL preservation and no API errors. Local PNGs remain advisory. Canonical 1M captures,
+CI/native/AT and pinned-site fidelity limits remain as documented. Keep all previous specimens,
+the two-entry static build and :5186 active. Stop at 1V before commit/push or migration.
