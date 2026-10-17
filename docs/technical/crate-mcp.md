@@ -753,6 +753,11 @@ multi-album results can be partial. All 79 focused cases in `test_agent_analysis
 with real PostgreSQL and no skips, alongside targeted Ruff and Pyright. New fixtures use synthetic
 audio and frozen scanner payloads rather than running DSP. No runtime behavior changed.
 
+CI exposed an existing cross-file fixture consumer that omitted the new pipeline argument.
+The fixture retains its `analysis` default, and the planned-but-not-submitted regression now covers
+that legacy call and explicit bliss. The focused run including both fixture-consumer files passed
+98 PostgreSQL-backed cases without skips; targeted Ruff and Pyright passed after this correction.
+
 ### Repair readiness and effects
 
 `get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,

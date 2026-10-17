@@ -598,7 +598,9 @@ def _authorize(effect=None):
 @pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
 @pytest.mark.parametrize("pipeline", ["analysis", "bliss"])
 class TestExactAnalysisOperations:
-    def _prepare(self, pg_db, tmp_path, *, pipeline, suffix="exact", mode="pending"):
+    def _prepare(
+        self, pg_db, tmp_path, *, pipeline="analysis", suffix="exact", mode="pending"
+    ):
         from crate.agent_analysis import compile_operation
 
         track = _seed_track(pg_db, suffix, library_path=str(tmp_path))

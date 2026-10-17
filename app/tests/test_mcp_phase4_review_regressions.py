@@ -177,19 +177,27 @@ def test_manual_plan_can_be_rejected_but_cannot_be_approved(
     assert decide(human_actor, plan, "rejected")["state"] == "rejected"
 
 
+@pytest.mark.parametrize(
+    "prepare_options,pipeline",
+    [
+        pytest.param({}, "analysis", id="legacy-default"),
+        pytest.param({"pipeline": "bliss"}, "bliss", id="bliss"),
+    ],
+)
 def test_analysis_planned_generation_is_not_submitted_until_it_is_requeued(
-    pg_db, tmp_path
+    pg_db, tmp_path, prepare_options, pipeline
 ):
     from crate.agent_analysis import get_analysis_status
     from tests.test_agent_analysis_sync import (
         TestExactAnalysisOperations as AnalysisFixture,
     )
 
-    _, _, plan = AnalysisFixture()._prepare(pg_db, tmp_path)
+    _, _, plan = AnalysisFixture()._prepare(pg_db, tmp_path, **prepare_options)
     result = get_analysis_status(references=plan["execution"]["references"])
     assert result["status"] == "not_submitted"
     assert result["verification"]["status"] == "not_started"
     assert result["items"][0]["status"] == "not_submitted"
+    assert result["items"][0]["pipeline"] == pipeline
 
 
 def test_sync_does_not_reintroduce_quarantined_albums_into_artist_summary(
