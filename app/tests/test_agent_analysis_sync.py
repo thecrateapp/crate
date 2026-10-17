@@ -18,7 +18,12 @@ from tests.conftest import PG_AVAILABLE
 
 
 def _seed_track(
-    pg_db, suffix: str, *, library_path: str = "/music", album_directory: str = "Album"
+    pg_db,
+    suffix: str,
+    *,
+    library_path: str = "/music",
+    album_directory: str = "Album",
+    album_name: str = "Album",
 ) -> dict:
     from crate.db.tx import transaction_scope
 
@@ -26,14 +31,14 @@ def _seed_track(
     album_path = f"{library_path}/{artist}/{album_directory}"
     pg_db.upsert_artist({"name": artist})
     album_id = pg_db.upsert_album(
-        {"artist": artist, "name": "Album", "path": album_path, "track_count": 1}
+        {"artist": artist, "name": album_name, "path": album_path, "track_count": 1}
     )
     path = f"{album_path}/track.flac"
     pg_db.upsert_track(
         {
             "album_id": album_id,
             "artist": artist,
-            "album": "Album",
+            "album": album_name,
             "filename": "track.flac",
             "title": "Track",
             "path": path,
@@ -591,8 +596,9 @@ def _authorize(effect=None):
 
 
 @pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+@pytest.mark.parametrize("pipeline", ["analysis", "bliss"])
 class TestExactAnalysisOperations:
-    def _prepare(self, pg_db, tmp_path, *, suffix="exact", mode="pending"):
+    def _prepare(self, pg_db, tmp_path, *, pipeline, suffix="exact", mode="pending"):
         from crate.agent_analysis import compile_operation
 
         track = _seed_track(pg_db, suffix, library_path=str(tmp_path))
@@ -604,7 +610,7 @@ class TestExactAnalysisOperations:
             "analysis",
             {
                 "track_uids": [track["entity_uid"]],
-                "pipelines": ["analysis"],
+                "pipelines": [pipeline],
                 "mode": mode,
             },
             config,
@@ -612,13 +618,13 @@ class TestExactAnalysisOperations:
         return track, config, plan
 
     def test_approved_requeue_is_pending_until_current_daemon_result_is_verified(
-        self, pg_db, tmp_path
+        self, pg_db, tmp_path, pipeline
     ):
         from crate.agent_analysis import apply_operation, get_analysis_status
         from crate.analysis_provenance import result_signature, source_identity
         from crate.db.jobs.analysis_claims import claim_track
 
-        track, config, plan = self._prepare(pg_db, tmp_path)
+        track, config, plan = self._prepare(pg_db, tmp_path, pipeline=pipeline)
         unselected = _seed_track(pg_db, "unselected")
         assert plan["document"]["targets"] == [
             {"entity_type": "track", "entity_uid": track["entity_uid"]}
@@ -638,32 +644,36 @@ class TestExactAnalysisOperations:
         references = applied["verification"]["references"]
         assert plan["execution"]["references"] == references
         assert references[0]["generation"] == 1
-        assert _processing(unselected["id"], "analysis")["generation"] == 0
+        assert references[0]["pipeline"] == pipeline
+        assert _processing(unselected["id"], pipeline)["generation"] == 0
         status = get_analysis_status(references=references)
         assert status["status"] == "pending"
         assert status["verification"]["status"] == "pending"
 
         claims = []
         for _ in range(2):
-            claimed = claim_track("analysis_state")
+            claimed = claim_track(f"{pipeline}_state")
             assert claimed is not None
             claims.append(claimed)
         current = next(claim for claim in claims if claim["id"] == track["id"])
         signature = result_signature(
-            "analysis", source_identity(track["path"]), ["librosa"]
+            pipeline,
+            source_identity(track["path"]),
+            ["librosa"] if pipeline == "analysis" else ["crate-cli"],
         )
-        _store(track, "analysis", claim=current, signature=signature)
+        _store(track, pipeline, claim=current, signature=signature)
 
         status = get_analysis_status(references=references)
         assert status["status"] == "completed"
         assert status["verification"]["status"] == "passed"
         assert status["items"][0]["version_evidence"] == "recorded"
+        assert status["items"][0]["pipeline"] == pipeline
         assert status["items"][0]["analysis_version"] == json.loads(signature)
 
-    def test_file_changed_after_plan_does_not_requeue(self, pg_db, tmp_path):
+    def test_file_changed_after_plan_does_not_requeue(self, pg_db, tmp_path, pipeline):
         from crate.agent_analysis import apply_operation
 
-        track, config, plan = self._prepare(pg_db, tmp_path)
+        track, config, plan = self._prepare(pg_db, tmp_path, pipeline=pipeline)
         Path(track["path"]).write_bytes(b"replaced-audio-source")
 
         result = apply_operation(
@@ -675,16 +685,16 @@ class TestExactAnalysisOperations:
         )
 
         assert result["execution"] == {"status": "conflict", "code": "SOURCE_CHANGED"}
-        assert _processing(track["id"], "analysis")["generation"] == 0
+        assert _processing(track["id"], pipeline)["generation"] == 0
 
     def test_state_changed_after_plan_does_not_reset_active_claim(
-        self, pg_db, tmp_path
+        self, pg_db, tmp_path, pipeline
     ):
         from crate.agent_analysis import apply_operation
         from crate.db.jobs.analysis_claims import claim_track
 
-        track, config, plan = self._prepare(pg_db, tmp_path)
-        claimed = claim_track("analysis_state")
+        track, config, plan = self._prepare(pg_db, tmp_path, pipeline=pipeline)
+        claimed = claim_track(f"{pipeline}_state")
         assert claimed is not None
 
         result = apply_operation(
@@ -696,15 +706,15 @@ class TestExactAnalysisOperations:
         )
 
         assert result["execution"]["status"] == "conflict"
-        processing = _processing(track["id"], "analysis")
+        processing = _processing(track["id"], pipeline)
         assert processing["generation"] == 0
         assert processing["claim_token"] == claimed["claim_token"]
         assert processing["state"] == "analyzing"
 
-    def test_authorization_failure_prevents_requeue(self, pg_db, tmp_path):
+    def test_authorization_failure_prevents_requeue(self, pg_db, tmp_path, pipeline):
         from crate.agent_analysis import apply_operation
 
-        track, config, plan = self._prepare(pg_db, tmp_path)
+        track, config, plan = self._prepare(pg_db, tmp_path, pipeline=pipeline)
 
         def denied(effect=None):
             raise PermissionError("Grant revoked")
@@ -718,12 +728,12 @@ class TestExactAnalysisOperations:
                 authorize=denied,
             )
 
-        assert _processing(track["id"], "analysis")["generation"] == 0
+        assert _processing(track["id"], pipeline)["generation"] == 0
 
-    def test_reference_is_superseded_by_later_reset(self, pg_db, tmp_path):
+    def test_reference_is_superseded_by_later_reset(self, pg_db, tmp_path, pipeline):
         from crate.agent_analysis import apply_operation, get_analysis_status
 
-        track, config, plan = self._prepare(pg_db, tmp_path)
+        track, config, plan = self._prepare(pg_db, tmp_path, pipeline=pipeline)
         result = apply_operation(
             "analysis",
             plan["execution"],
@@ -731,7 +741,7 @@ class TestExactAnalysisOperations:
             task_id="analysis-job",
             authorize=_authorize,
         )
-        _requeue(track["id"], "analysis")
+        _requeue(track["id"], pipeline)
 
         status = get_analysis_status(references=result["verification"]["references"])
 
@@ -748,12 +758,12 @@ class TestExactAnalysisOperations:
         ],
     )
     def test_done_requires_recorded_version_and_matching_approved_source(
-        self, pg_db, tmp_path, signature
+        self, pg_db, tmp_path, signature, pipeline
     ):
         from crate.agent_analysis import apply_operation, get_analysis_status
         from crate.db.jobs.analysis_claims import claim_track
 
-        track, config, plan = self._prepare(pg_db, tmp_path)
+        track, config, plan = self._prepare(pg_db, tmp_path, pipeline=pipeline)
         result = apply_operation(
             "analysis",
             plan["execution"],
@@ -761,23 +771,23 @@ class TestExactAnalysisOperations:
             task_id="analysis-job",
             authorize=_authorize,
         )
-        claim = claim_track("analysis_state")
+        claim = claim_track(f"{pipeline}_state")
         assert claim is not None
-        _store(track, "analysis", claim=claim, signature=signature)
+        _store(track, pipeline, claim=claim, signature=signature)
 
         status = get_analysis_status(references=result["verification"]["references"])
 
         assert status["status"] == "failed"
         assert status["items"][0]["status"] == "verification_failed"
 
-    def test_pending_mode_preserves_completed_results(self, pg_db, tmp_path):
+    def test_pending_mode_preserves_completed_results(self, pg_db, tmp_path, pipeline):
         from crate.agent_analysis import apply_operation, compile_operation
 
-        track, config, _plan = self._prepare(pg_db, tmp_path)
-        _store(track, "analysis", claim=None, value=112.0)
+        track, config, _plan = self._prepare(pg_db, tmp_path, pipeline=pipeline)
+        _store(track, pipeline, claim=None, value=112.0)
         plan = compile_operation(
             "analysis",
-            {"track_uids": [track["entity_uid"]], "pipelines": ["analysis"]},
+            {"track_uids": [track["entity_uid"]], "pipelines": [pipeline]},
             config,
         )
         assert plan["document"]["changes"] == []
@@ -792,16 +802,120 @@ class TestExactAnalysisOperations:
 
         assert result["execution"]["status"] == "skipped"
         assert result["verification"]["status"] == "passed"
-        assert _payload(track["id"], "analysis")["shadow_value"] == 112.0
-        assert _processing(track["id"], "analysis")["generation"] == 0
+        assert _payload(track["id"], pipeline)["shadow_value"] == (
+            112.0 if pipeline == "analysis" else [112.0] * 20
+        )
+        assert _processing(track["id"], pipeline)["generation"] == 0
+
+    def test_refresh_of_completed_result_requires_new_generation_and_current_claim(
+        self, pg_db, tmp_path, pipeline
+    ):
+        from crate.agent_analysis import (
+            apply_operation,
+            compile_operation,
+            get_analysis_status,
+        )
+        from crate.analysis_provenance import result_signature, source_identity
+        from crate.db.jobs.analysis_claims import claim_track
+
+        track, config, _initial_plan = self._prepare(pg_db, tmp_path, pipeline=pipeline)
+        old_claim = claim_track(f"{pipeline}_state")
+        assert old_claim is not None
+        signature = result_signature(
+            pipeline,
+            source_identity(track["path"]),
+            ["librosa"] if pipeline == "analysis" else ["crate-cli"],
+        )
+        _store(track, pipeline, claim=old_claim, value=112.0, signature=signature)
+        before = _processing(track["id"], pipeline)
+        old_references = [
+            {
+                "track_uid": track["entity_uid"],
+                "pipeline": pipeline,
+                "generation": before["generation"],
+                "source_version": json.loads(signature)["source_version"],
+            }
+        ]
+        assert before["state"] == "done"
+        assert (
+            get_analysis_status(references=old_references)["verification"]["status"]
+            == "passed"
+        )
+        other_pipeline = "bliss" if pipeline == "analysis" else "analysis"
+        other_before = _processing(track["id"], other_pipeline)
+        plan = compile_operation(
+            "analysis",
+            {
+                "track_uids": [track["entity_uid"]],
+                "pipelines": [pipeline],
+                "mode": "refresh",
+            },
+            config,
+        )
+        assert plan["document"]["risk"] == "caution"
+        assert plan["document"]["impact"]["may_replace_existing_results"] is True
+        assert plan["document"]["changes"] == [
+            {
+                "entity_uid": track["entity_uid"],
+                "pipeline": pipeline,
+                "before": "done",
+                "after": "pending",
+                "generation_before": before["generation"],
+            }
+        ]
+        assert _processing(track["id"], pipeline) == before
+
+        applied = apply_operation(
+            "analysis",
+            plan["execution"],
+            config,
+            task_id="refresh-job",
+            authorize=_authorize,
+        )
+
+        assert applied["execution"]["status"] == "requeued"
+        assert applied["verification"]["status"] == "pending"
+        references = applied["verification"]["references"]
+        assert references == plan["execution"]["references"]
+        assert references[0]["generation"] == before["generation"] + 1
+        assert (
+            get_analysis_status(references=old_references)["items"][0]["status"]
+            == "superseded"
+        )
+        # Cached values stay available, but cannot verify this new generation.
+        _store(track, pipeline, claim=old_claim, value=999.0, signature=signature)
+        pending = _processing(track["id"], pipeline)
+        assert pending["state"] == "pending"
+        assert pending["claim_token"] is None
+        assert pending["pipeline_signature"] is None
+        assert _payload(track["id"], pipeline)["shadow_value"] == (
+            112.0 if pipeline == "analysis" else [112.0] * 20
+        )
+        status = get_analysis_status(references=references)
+        assert status["status"] == "pending"
+        assert status["verification"]["status"] == "pending"
+        assert status["items"][0]["version_evidence"] == "unknown"
+        assert _processing(track["id"], other_pipeline) == other_before
+
+        current = claim_track(f"{pipeline}_state")
+        assert current is not None
+        assert current["generation"] == references[0]["generation"]
+        assert current["claim_token"] != old_claim["claim_token"]
+        _store(track, pipeline, claim=current, value=123.0, signature=signature)
+        status = get_analysis_status(references=references)
+        assert status["status"] == "completed"
+        assert status["verification"]["status"] == "passed"
+        assert _payload(track["id"], pipeline)["shadow_value"] == (
+            123.0 if pipeline == "analysis" else [123.0] * 20
+        )
 
     def test_deleted_track_is_terminal_not_found_for_accepted_generation(
-        self, pg_db, tmp_path
+        self, pg_db, tmp_path, pipeline
     ):
         from crate.agent_analysis import apply_operation, get_analysis_status
         from crate.db.tx import transaction_scope
 
-        track, config, plan = self._prepare(pg_db, tmp_path)
+        track, config, plan = self._prepare(pg_db, tmp_path, pipeline=pipeline)
         result = apply_operation(
             "analysis",
             plan["execution"],
@@ -878,12 +992,16 @@ def _album_for(track: dict) -> dict:
 
 
 def _frozen_scan(
-    directory: Path, artist: str, *, extra_tracks: list[dict] | None = None
+    directory: Path,
+    artist: str,
+    *,
+    extra_tracks: list[dict] | None = None,
+    album_name: str = "Album",
 ) -> dict:
     tracks = [
         {
             "artist": artist,
-            "album": "Album",
+            "album": album_name,
             "filename": "track.flac",
             "title": "Updated Title",
             "path": str(directory / "track.flac"),
@@ -904,7 +1022,7 @@ def _frozen_scan(
     return {
         "artist_payload": {"name": artist},
         "album_payload": {
-            "name": "Album",
+            "name": album_name,
             "path": str(directory),
             "track_count": len(tracks),
             "total_size": sum(t["size"] for t in tracks),
@@ -940,6 +1058,202 @@ class TestExactSyncOperations:
             config,
         )
         return track, album, config, plan
+
+    def _prepare_artist(self, pg_db, tmp_path, monkeypatch):
+        from crate.agent_sync import compile_operation
+        from crate.library_sync import LibrarySync
+
+        first, first_album, config, _album_plan = self._prepare(
+            pg_db, tmp_path, monkeypatch
+        )
+        second = _seed_track(
+            pg_db,
+            "sync",
+            library_path=str(tmp_path),
+            album_directory="00 Second",
+            album_name="00 Second",
+        )
+        second_path = Path(second["path"])
+        second_path.parent.mkdir(parents=True)
+        second_path.write_bytes(b"second-audio-source")
+        albums = [first_album, _album_for(second)]
+        # A real sibling directory must not be discovered by an indexed-only plan.
+        unindexed = Path(first["path"]).parent.parent / "Unindexed" / "track.flac"
+        unindexed.parent.mkdir()
+        unindexed.write_bytes(b"unindexed-audio-source")
+        monkeypatch.setattr(
+            LibrarySync,
+            "prepare_album_sync",
+            lambda _self, directory, artist: _frozen_scan(
+                directory,
+                artist,
+                album_name=directory.name,
+            ),
+        )
+        monkeypatch.setattr(
+            LibrarySync,
+            "sync_artist_dirs",
+            lambda *_args, **_kwargs: pytest.fail(
+                "indexed artist plan widened to filesystem discovery"
+            ),
+        )
+        plan = compile_operation(
+            "library_sync",
+            {"scope": "artist", "entity_uid": first_album["artist_uid"], "limit": 3},
+            config,
+        )
+        return [first, second], albums, config, plan
+
+    def test_artist_sync_applies_all_selected_albums_in_order_without_discovery(
+        self, pg_db, tmp_path, monkeypatch
+    ):
+        from crate.agent_sync import apply_operation
+        from crate.db.queries.agent_sync import list_sync_albums, read_sync_state
+
+        tracks, albums, config, plan = self._prepare_artist(
+            pg_db, tmp_path, monkeypatch
+        )
+        outside = _album_for(_seed_track(pg_db, "outside-artist-sync"))
+        outside_before = read_sync_state(outside["entity_uid"])
+        album_uids = [album["entity_uid"] for album in albums]
+        assert plan["execution"]["scope"] == "artist"
+        assert [
+            album["entity_uid"] for album in plan["execution"]["albums"]
+        ] == album_uids
+        assert plan["document"]["impact"]["albums"] == 2
+        assert plan["document"]["impact"]["tracks"] == 2
+        assert plan["document"]["impact"]["indexed_albums_only"] is True
+        assert {
+            (target["entity_type"], target["entity_uid"])
+            for target in plan["document"]["targets"]
+        } == {
+            ("artist", albums[0]["artist_uid"]),
+            *(("album", album["entity_uid"]) for album in albums),
+            *(("track", track["entity_uid"]) for track in tracks),
+        }
+        before_bytes = [Path(track["path"]).read_bytes() for track in tracks]
+        result = apply_operation(
+            "library_sync",
+            plan["execution"],
+            config,
+            task_id="artist-sync-job",
+            authorize=_authorize,
+        )
+
+        assert result["execution"]["status"] == "completed"
+        assert result["verification"]["status"] == "passed"
+        assert [
+            (item["entity_uid"], item["status"])
+            for item in result["execution"]["items"]
+        ] == [(uid, "applied") for uid in album_uids]
+        for track, album in zip(tracks, albums, strict=True):
+            after = read_sync_state(album["entity_uid"])
+            assert after["album"]["id"] == album["id"]
+            assert after["album"]["entity_uid"] == album["entity_uid"]
+            assert after["tracks"][0]["id"] == track["id"]
+            assert after["tracks"][0]["entity_uid"] == track["entity_uid"]
+            assert after["tracks"][0]["title"] == "Updated Title"
+        assert [
+            album["entity_uid"]
+            for album in list_sync_albums("artist", albums[0]["artist_uid"], limit=3)
+        ] == album_uids
+        assert read_sync_state(outside["entity_uid"]) == outside_before
+        assert [Path(track["path"]).read_bytes() for track in tracks] == before_bytes
+        assert (
+            Path(tracks[0]["path"]).parent.parent / "Unindexed" / "track.flac"
+        ).read_bytes() == b"unindexed-audio-source"
+
+    @pytest.mark.parametrize("conflicting_index", [0, 1])
+    def test_artist_sync_reports_each_conflict_and_preserves_other_album_commits(
+        self, pg_db, tmp_path, monkeypatch, conflicting_index
+    ):
+        from crate.agent_sync import apply_operation
+        from crate.db.queries.agent_sync import read_sync_state
+        from crate.db.tx import transaction_scope
+
+        tracks, albums, config, plan = self._prepare_artist(
+            pg_db, tmp_path, monkeypatch
+        )
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    "UPDATE library_tracks SET title='Concurrent artist sync edit' WHERE id=:id"
+                ),
+                {"id": tracks[conflicting_index]["id"]},
+            )
+        conflict_before = read_sync_state(albums[conflicting_index]["entity_uid"])
+        result = apply_operation(
+            "library_sync",
+            plan["execution"],
+            config,
+            task_id="artist-sync-conflict",
+            authorize=_authorize,
+        )
+
+        assert result["execution"]["status"] == "partial"
+        assert result["verification"]["status"] == "failed"
+        items = result["execution"]["items"]
+        assert [item["entity_uid"] for item in items] == [
+            album["entity_uid"] for album in albums
+        ]
+        assert items[conflicting_index]["status"] == "conflict"
+        assert items[conflicting_index]["code"] == "SOURCE_CHANGED"
+        assert items[1 - conflicting_index]["status"] == "applied"
+        assert (
+            read_sync_state(albums[conflicting_index]["entity_uid"]) == conflict_before
+        )
+        after = read_sync_state(albums[1 - conflicting_index]["entity_uid"])
+        assert after["tracks"][0]["title"] == "Updated Title"
+        assert (
+            after["tracks"][0]["entity_uid"]
+            == tracks[1 - conflicting_index]["entity_uid"]
+        )
+
+    def test_artist_sync_rolls_back_a_failed_album_without_undoing_previous_album(
+        self, pg_db, tmp_path, monkeypatch
+    ):
+        from crate.agent_sync import apply_operation
+        from crate.db.queries.agent_sync import read_sync_state
+        from crate.db.repositories import agent_sync
+
+        _tracks, albums, config, plan = self._prepare_artist(
+            pg_db, tmp_path, monkeypatch
+        )
+        second_before = read_sync_state(albums[1]["entity_uid"])
+        real_upsert = agent_sync.upsert_track
+        written_before_failure = []
+
+        def fail_after_second_album_write(data, **kwargs):
+            result = real_upsert(data, **kwargs)
+            if data["album_id"] == albums[1]["id"]:
+                written_before_failure.append(result)
+                raise ValueError("Injected failure after index write")
+            return result
+
+        monkeypatch.setattr(agent_sync, "upsert_track", fail_after_second_album_write)
+        result = apply_operation(
+            "library_sync",
+            plan["execution"],
+            config,
+            task_id="artist-sync-rollback",
+            authorize=_authorize,
+        )
+
+        assert len(written_before_failure) == 1
+        assert result["execution"]["status"] == "partial"
+        assert result["verification"]["status"] == "failed"
+        assert [
+            (item["entity_uid"], item["status"])
+            for item in result["execution"]["items"]
+        ] == [
+            (albums[0]["entity_uid"], "applied"),
+            (albums[1]["entity_uid"], "conflict"),
+        ]
+        assert read_sync_state(albums[1]["entity_uid"]) == second_before
+        assert (
+            read_sync_state(albums[0]["entity_uid"])["tracks"][0]["title"]
+            == "Updated Title"
+        )
 
     def test_album_sync_preserves_identity_and_does_not_widen_scope(
         self, pg_db, tmp_path, monkeypatch

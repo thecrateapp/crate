@@ -744,6 +744,15 @@ elapsed time alone cannot satisfy the assertion. All 63 focused cases in
 `test_agent_analysis_sync.py` passed with real PostgreSQL and no skips; targeted Ruff and
 Pyright passed. This follow-up changes test synchronization only.
 
+The next coverage follow-up parametrizes exact analysis operations for both analysis and bliss.
+Refresh of a completed result supersedes the old reference, rejects the old claim and remains
+unverified until the new generation completes; prior values remain cached. Artist sync tests cover
+two indexed albums, stable order/identity, exclusions, conflicts in either position and rollback
+inside a failing album while preserving an earlier album's commit. Atomicity is per album;
+multi-album results can be partial. All 79 focused cases in `test_agent_analysis_sync.py` passed
+with real PostgreSQL and no skips, alongside targeted Ruff and Pyright. New fixtures use synthetic
+audio and frozen scanner payloads rather than running DSP. No runtime behavior changed.
+
 ### Repair readiness and effects
 
 `get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,
