@@ -90,7 +90,9 @@ def _safe(value):
     if isinstance(value, dict):
         return {
             key: "[redacted]"
-            if re.sub(r"[^a-z0-9]", "", str(key).lower()) in _CREDENTIAL_KEYS
+            if re.sub(r"[^a-z0-9]", "", str(key).lower()).endswith(
+                tuple(_CREDENTIAL_KEYS)
+            )
             else _safe(item)
             for key, item in value.items()
         }
@@ -606,7 +608,8 @@ def read_diagnostics(
                 "INVALID_ARGUMENT",
                 "An enumerated series and bounded minute window are required",
             )
-        rows = _rows(query_recent(series, minutes=minutes), limit)
+        samples = query_recent(series, minutes=minutes)
+        rows = _rows(samples, limit)
         return _envelope(
             "metric_series",
             {"series": series, "minutes": minutes, "samples": _safe(rows)},
@@ -614,7 +617,7 @@ def read_diagnostics(
             availability="available" if rows else "unavailable",
             reason=None if rows else "No persisted metric samples available",
             returned_count=len(rows),
-            truncated=minutes > len(rows),
+            truncated=len(samples) > len(rows),
             interpretation="Minute aggregates from persisted worker metrics. Missing samples do not imply zero activity or healthy dependencies.",
         )
     if source not in {"worker_logs", "worker_status", "analysis_status"}:
@@ -661,8 +664,23 @@ def read_audit(*, task_id=None, since=None, until=None, limit=20, cursor=None):
         "until": str(_date(until)) if until is not None else None,
     }
     decoded = _decode(cursor, supplied) if cursor else None
+    before = None
     if decoded:
-        since, until = decoded["window"]["since"], decoded["window"]["until"]
+        window = decoded.get("window")
+        before = decoded.get("before")
+        if (
+            not isinstance(window, dict)
+            or not _date(window.get("since"))
+            or not _date(window.get("until"))
+            or not isinstance(before, list)
+            or len(before) != 2
+            or not isinstance(before[0], str)
+            or not _date(before[0])
+            or type(before[1]) is not int
+            or not 1 <= before[1] <= 2**31 - 1
+        ):
+            raise DiagnosticError("INVALID_ARGUMENT", "Invalid audit cursor")
+        since, until = window["since"], window["until"]
     until = _date(until) if until is not None else _now()
     since = (
         _date(since)
@@ -686,7 +704,7 @@ def read_audit(*, task_id=None, since=None, until=None, limit=20, cursor=None):
         task_id=task_id,
         since=since,
         until=until,
-        before=decoded.get("before") if decoded else None,
+        before=before,
         limit=limit + 1,
     )
     selected = _rows(rows, limit)

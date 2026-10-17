@@ -1,5 +1,6 @@
 """Diagnostic decisions preserve evidence age, identity and bounded output."""
 
+import base64
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -390,6 +391,113 @@ def test_diagnostic_redaction_removes_complete_credential_values(
     result = diagnostics.get_job("job-1")
     assert secret not in result["data"]["error"]
     assert "[redacted" in result["data"]["error"]
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "X-Api-Key",
+        "X-Auth-Token",
+        "x_api_key",
+        "xAuthToken",
+        "service_api_key",
+        "client-secret",
+        "Authorization",
+        "api_key",
+    ],
+)
+def test_job_evidence_redacts_nested_prefixed_credentials(monkeypatch, key):
+    secret = "credential-must-stay-private"
+    monkeypatch.setattr(
+        diagnostics.agent_operations,
+        "read_job",
+        lambda _job_id: {
+            "id": "job-1",
+            "result": {"headers": [{key: secret}], "token_count": 3},
+        },
+    )
+
+    result = diagnostics.get_job("job-1")
+
+    assert secret not in json.dumps(result)
+    assert result["data"]["result"]["headers"] == [{key: "[redacted]"}]
+    assert result["data"]["result"]["token_count"] == 3
+
+
+@pytest.mark.parametrize(
+    "count,limit,payload_size,truncated",
+    [
+        pytest.param(30, 20, 0, True, id="row-limit"),
+        pytest.param(3, 20, 0, False, id="sparse-window"),
+        pytest.param(0, 20, 0, False, id="empty-window"),
+        pytest.param(30, 30, 0, False, id="complete-window"),
+        pytest.param(30, 30, 1900, True, id="byte-budget"),
+    ],
+)
+def test_metric_truncation_reflects_omitted_samples(
+    monkeypatch, count, limit, payload_size, truncated
+):
+    samples = [
+        {"timestamp": str(NOW - timedelta(minutes=30 - n)), "label": "x" * payload_size}
+        for n in range(count)
+    ]
+    monkeypatch.setattr("crate.metrics.query_recent", lambda *_args, **_kwargs: samples)
+
+    result = diagnostics.read_diagnostics(
+        source="metric_series", series="worker.task.duration", minutes=30, limit=limit
+    )
+
+    assert result["truncated"] is truncated
+    assert result["returned_count"] == len(result["data"]["samples"])
+    assert (result["returned_count"] < len(samples)) is truncated
+    assert result["availability"] == ("available" if count else "unavailable")
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("before", None),
+        ("before", []),
+        ("before", "invalid"),
+        ("before", {"timestamp": str(NOW), "id": 2}),
+        ("before", [str(NOW)]),
+        ("before", [str(NOW), 2, 3]),
+        ("before", ["invalid-date", 2]),
+        ("before", [None, 2]),
+        ("before", [str(NOW), "invalid-id"]),
+        ("before", [str(NOW), {"id": 2}]),
+        ("before", [str(NOW), True]),
+        ("before", [str(NOW), 2.5]),
+        ("before", [str(NOW), 0]),
+        ("before", [str(NOW), 2**31]),
+        ("window", None),
+        ("window", []),
+        ("window", {}),
+        ("window", {"since": str(NOW)}),
+    ],
+)
+def test_malformed_audit_cursor_is_rejected_before_database_access(
+    monkeypatch, field, value
+):
+    monkeypatch.setattr(
+        diagnostics.agent_operations,
+        "read_audit_rows",
+        lambda **_kwargs: [{"id": 2, "timestamp": NOW}, {"id": 1, "timestamp": NOW}],
+    )
+    cursor = diagnostics.read_audit(limit=1)["next_cursor"]
+    decoded = json.loads(base64.urlsafe_b64decode(cursor))
+    decoded[field] = value
+    malformed = base64.urlsafe_b64encode(json.dumps(decoded).encode()).decode()
+    monkeypatch.setattr(
+        diagnostics.agent_operations,
+        "read_audit_rows",
+        lambda **_kwargs: pytest.fail("Malformed cursor reached the database"),
+    )
+
+    with pytest.raises(diagnostics.DiagnosticError) as caught:
+        diagnostics.read_audit(limit=1, cursor=malformed)
+
+    assert caught.value.code == "INVALID_ARGUMENT"
 
 
 def test_unicode_log_messages_and_response_are_byte_bounded(monkeypatch):

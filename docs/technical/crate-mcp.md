@@ -778,6 +778,17 @@ batch token and four delayed workers without locks (two authority cases and anal
 The two reset variants also passed with lowercase, multiline, aliased SQL and `FOR NO KEY UPDATE`.
 This follow-up changes tests and documentation only; no full local suite was rerun.
 
+The subsequent persistent review prompted diagnostic hardening. Structured credential keys are
+matched by normalized suffix, including prefixed API keys and auth tokens inside nested objects;
+noncredential counters such as `token_count` remain visible. Database evidence queries retain
+their closed projections. Metric truncation now measures omitted samples, including the byte
+budget, rather than missing minute buckets. Audit cursors validate their frozen window and
+timestamp/SERIAL-ID pair before database access, returning `INVALID_ARGUMENT` for malformed
+values. Of 31 added cases, 25 failed before these fixes. The focused diagnostics/instance-operations
+selection passed 171 cases without skips, including real PostgreSQL audit pagination; structured
+credential fixtures use simulated payloads. Targeted Ruff and Pyright passed. No full local suite
+was rerun for these corrections.
+
 ### Repair readiness and effects
 
 `get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,
