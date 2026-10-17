@@ -789,6 +789,19 @@ selection passed 171 cases without skips, including real PostgreSQL audit pagina
 credential fixtures use simulated payloads. Targeted Ruff and Pyright passed. No full local suite
 was rerun for these corrections.
 
+The following hardening implements the remaining redaction and internal-limit recommendations.
+All five diagnostic operations with a `limit` parameter reject nonintegers, booleans and values
+outside 1–100 before any evidence read, independently of MCP validation and the retained SQL caps.
+Credential markers match normalized key substrings, including compounds and plurals; only known
+counter keys containing nonnegative integers are preserved. Text assignments use the same
+classification and consume complete JSON values/collections. If a structured credential is
+malformed or exceeds parser nesting limits, the remaining text is conservatively omitted when
+its boundary cannot be trusted. The initial regression selection failed 88 cases before the fix.
+The focused diagnostics, instance-operations and diagnostic-query selection then passed 285 cases
+without skips, including real PostgreSQL integrations, valid page boundaries and counter types.
+Redaction fixtures use simulated payloads; targeted Ruff and Pyright passed. No full local suite
+was rerun for this follow-up.
+
 ### Repair readiness and effects
 
 `get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,

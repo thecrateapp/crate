@@ -404,6 +404,13 @@ def test_diagnostic_redaction_removes_complete_credential_values(
         "client-secret",
         "Authorization",
         "api_key",
+        "secret_key",
+        "tokens",
+        "auth_token_value",
+        "accessTokenValue",
+        "service_password_hash",
+        "private_keys",
+        "credentials.apiKey.value",
     ],
 )
 def test_job_evidence_redacts_nested_prefixed_credentials(monkeypatch, key):
@@ -422,6 +429,146 @@ def test_job_evidence_redacts_nested_prefixed_credentials(monkeypatch, key):
     assert secret not in json.dumps(result)
     assert result["data"]["result"]["headers"] == [{key: "[redacted]"}]
     assert result["data"]["result"]["token_count"] == 3
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        'secret_key="two words private-value"',
+        "auth_token_value='two words private-value'",
+        "tokens=private-value",
+        'error: {"tokens": ["private-value", {"nested": "other-private-value"}]}',
+        'secret_key="two words private-value',
+        'tokens=["private-value", {"nested": "other-private-value"}',
+        "auth_token_value=Bearer private-value",
+        "tokens=" + "[" * 1100 + '"private-value"' + "]" * 1100,
+    ],
+)
+def test_job_text_redacts_compound_credentials_and_collections(monkeypatch, error):
+    monkeypatch.setattr(
+        diagnostics.agent_operations,
+        "read_job",
+        lambda _job_id: {"id": "job-1", "error": error},
+    )
+
+    result = diagnostics.get_job("job-1")
+
+    assert "private-value" not in result["data"]["error"]
+    assert "[redacted" in result["data"]["error"]
+
+
+@pytest.mark.parametrize("key", ["token_count", "input_tokens", "output_tokens"])
+def test_credential_counters_preserve_only_nonnegative_integers(monkeypatch, key):
+    monkeypatch.setattr(
+        diagnostics.agent_operations,
+        "read_job",
+        lambda _job_id: {
+            "counts": {key: 3},
+            "zero": {key: 0},
+            "untrusted": {key: "private-value"},
+            "nested": {key: ["private-value"]},
+            "boolean": {key: True},
+            "negative": {key: -1},
+            "float": {key: 3.0},
+            "empty": {key: None},
+            "error": f'{key}=3; secret_key="private-value"',
+        },
+    )
+
+    result = diagnostics.get_job("job-1")["data"]
+
+    assert result["counts"] == {key: 3}
+    assert result["zero"] == {key: 0}
+    for field in ("untrusted", "nested", "boolean", "negative", "float", "empty"):
+        assert result[field] == {key: "[redacted]"}
+    assert f"{key}=3" in result["error"]
+    assert "private-value" not in json.dumps(result)
+
+
+_LIMIT_OPERATIONS = [
+    ("list_library_issues", {}),
+    ("inspect_artist", {"artist_uid": ARTIST_UID}),
+    ("list_jobs", {}),
+    ("read_audit", {}),
+    ("read_diagnostics", {"source": "worker_logs"}),
+    ("read_diagnostics", {"source": "worker_status"}),
+    ("read_diagnostics", {"source": "analysis_status"}),
+    (
+        "read_diagnostics",
+        {"source": "metric_series", "series": "worker.task.duration"},
+    ),
+]
+
+
+@pytest.mark.parametrize("operation,arguments", _LIMIT_OPERATIONS)
+@pytest.mark.parametrize("limit", [0, -1, 101, 1000000, True, False, 20.0, "20", None])
+def test_application_limits_are_rejected_before_any_evidence_read(
+    monkeypatch, operation, arguments, limit
+):
+    def forbidden_read(*_args, **_kwargs):
+        pytest.fail("Invalid limit reached an evidence source")
+
+    for module, names in (
+        (diagnostics.agent_library, ("read_health_snapshot", "read_artist_evidence")),
+        (
+            diagnostics.agent_operations,
+            (
+                "read_jobs",
+                "read_audit_rows",
+                "read_worker_logs",
+                "read_status_evidence",
+            ),
+        ),
+    ):
+        for name in names:
+            monkeypatch.setattr(module, name, forbidden_read)
+    monkeypatch.setattr("crate.metrics.query_recent", forbidden_read)
+
+    with pytest.raises(diagnostics.DiagnosticError) as caught:
+        getattr(diagnostics, operation)(limit=limit, **arguments)
+
+    assert caught.value.code == "INVALID_ARGUMENT"
+
+
+@pytest.mark.parametrize("operation,arguments", _LIMIT_OPERATIONS)
+@pytest.mark.parametrize("limit", [1, 100])
+def test_application_limit_boundaries_preserve_the_requested_page_size(
+    monkeypatch, operation, arguments, limit
+):
+    calls = []
+
+    def reader(name, result):
+        def read(*_args, **kwargs):
+            calls.append((name, kwargs))
+            return result
+
+        return read
+
+    issues = [issue(1), issue(2)]
+    rows = [{"id": n, "created_at": str(NOW), "timestamp": str(NOW)} for n in (1, 2)]
+    sources = (
+        (diagnostics.agent_library, "read_health_snapshot", snapshot(issues=issues)),
+        (
+            diagnostics.agent_library,
+            "read_artist_evidence",
+            {"artists": [{"entity_uid": ARTIST_UID}], "issues": issues},
+        ),
+        (diagnostics.agent_operations, "read_jobs", rows),
+        (diagnostics.agent_operations, "read_audit_rows", rows),
+        (diagnostics.agent_operations, "read_worker_logs", rows),
+        (diagnostics.agent_operations, "read_status_evidence", {"runtime": []}),
+    )
+    for module, name, result in sources:
+        monkeypatch.setattr(module, name, reader(name, result))
+    monkeypatch.setattr("crate.metrics.query_recent", reader("query_recent", rows))
+
+    result = getattr(diagnostics, operation)(limit=limit, **arguments)
+
+    assert len(calls) == 1
+    if "limit" in calls[0][1]:
+        assert calls[0][1]["limit"] == limit + 1
+    if arguments.get("source") not in {"worker_status", "analysis_status"}:
+        assert result["returned_count"] == min(limit, 2)
 
 
 @pytest.mark.parametrize(

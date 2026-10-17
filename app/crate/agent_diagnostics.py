@@ -32,12 +32,76 @@ _CREDENTIAL_KEYS = frozenset(
         "privatekey",
     }
 )
+_CREDENTIAL_COUNTER_KEYS = frozenset(
+    {
+        "tokencount",
+        "tokenscount",
+        "inputtokens",
+        "outputtokens",
+        "totaltokens",
+        "prompttokens",
+        "completiontokens",
+        "cachedtokens",
+    }
+)
+_ASSIGNMENT_KEY = re.compile(
+    r"(?<![A-Za-z0-9_.-])(?P<key>[A-Za-z0-9_.-]+)[\s\"']*[:=]\s*"
+)
 
 
 class DiagnosticError(Exception):
     def __init__(self, code: str, message: str, retry_after: int | None = None):
         super().__init__(message)
         self.code, self.retry_after = code, retry_after
+
+
+def _validate_limit(limit):
+    if type(limit) is not int or not 1 <= limit <= 100:
+        raise DiagnosticError(
+            "INVALID_ARGUMENT", "Limit must be an integer from 1 to 100"
+        )
+
+
+def _sensitive_key(key, value):
+    normalized = re.sub(r"[^a-z0-9]", "", str(key).lower())
+    if normalized in _CREDENTIAL_COUNTER_KEYS and type(value) is int and value >= 0:
+        return False
+    return any(marker in normalized for marker in _CREDENTIAL_KEYS)
+
+
+def _redact_assignments(value):
+    parts, position = [], 0
+    decoder = json.JSONDecoder()
+    for match in _ASSIGNMENT_KEY.finditer(value):
+        if match.start() < position:
+            continue
+        key = match.group("key")
+        if not _sensitive_key(key, None):
+            continue
+        raw = value[match.end() :]
+        parsed = None
+        try:
+            parsed, length = decoder.raw_decode(raw)
+            if length < len(raw) and not (
+                raw[length].isspace() or raw[length] in ",;}]"
+            ):
+                raise ValueError
+        except (ValueError, RecursionError):
+            quoted = re.match(r"'(?:\\.|[^'\\])*(?:'|$)", raw)
+            bare = re.match(r"[^\s,;\]}]+", raw)
+            if quoted:
+                length = quoted.end()
+            elif raw.startswith(('"', "[", "{")):
+                # A malformed structured credential has no trustworthy end.
+                length = len(raw)
+            else:
+                length = bare.end() if bare else 0
+            parsed = None
+        if not _sensitive_key(key, parsed):
+            continue
+        parts.extend((value[position : match.end()], "[redacted]"))
+        position = match.end() + length
+    return "".join(parts) + value[position:]
 
 
 def _now():
@@ -63,18 +127,9 @@ def _text(value, limit=2048):
     )
     value = re.sub(r"(?i)\bBasic\s+[A-Za-z0-9+/]+=*", "[redacted]", value)
     value = re.sub(
-        r"""(?i)(password|passwd|secret|token|api[_-]?key|authorization|cookie)([\s"']*[:=]\s*)("(?:\\.|[^"\\])*(?:"|$)|'(?:\\.|[^'\\])*(?:'|$))""",
-        r"\1=[redacted]",
-        value,
-    )
-    value = re.sub(
         r"(?i)(bearer\s+|crate_mcp_)[A-Za-z0-9._~+/-]+=*", "[redacted]", value
     )
-    value = re.sub(
-        r"(?i)(password|passwd|secret|token|api[_-]?key|authorization|cookie)([\s\"']*[:=][\s\"']*)[^\s,;\"']+",
-        r"\1=[redacted]",
-        value,
-    )
+    value = _redact_assignments(value)
     value = re.sub(
         r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", "[redacted]", value
     )
@@ -89,11 +144,7 @@ def _safe(value):
         return _text(value)
     if isinstance(value, dict):
         return {
-            key: "[redacted]"
-            if re.sub(r"[^a-z0-9]", "", str(key).lower()).endswith(
-                tuple(_CREDENTIAL_KEYS)
-            )
-            else _safe(item)
+            key: "[redacted]" if _sensitive_key(key, item) else _safe(item)
             for key, item in value.items()
         }
     if isinstance(value, (tuple, list)):
@@ -392,6 +443,7 @@ def list_library_issues(
     cursor=None,
     principal=None,
 ):
+    _validate_limit(limit)
     if artist_uid is not None:
         try:
             artist_uid = str(UUID(artist_uid))
@@ -476,6 +528,7 @@ def list_library_issues(
 
 
 def inspect_artist(*, artist_uid=None, name=None, limit=20, principal=None):
+    _validate_limit(limit)
     if artist_uid:
         try:
             artist_uid = str(UUID(artist_uid))
@@ -527,6 +580,7 @@ def inspect_artist(*, artist_uid=None, name=None, limit=20, principal=None):
 
 
 def list_jobs(*, states=None, types=None, limit=20, cursor=None):
+    _validate_limit(limit)
     if types and any(value not in TASK_TYPES for value in types):
         raise DiagnosticError("INVALID_ARGUMENT", "Unknown job type")
     filters = {"states": sorted(states or []), "types": sorted(types or [])}
@@ -578,6 +632,7 @@ def get_job(job_id):
 def read_diagnostics(
     *, source, task_id=None, since=None, until=None, limit=20, series=None, minutes=60
 ):
+    _validate_limit(limit)
     if source == "metric_series":
         from crate.metrics import query_recent
 
@@ -658,6 +713,7 @@ def read_diagnostics(
 
 
 def read_audit(*, task_id=None, since=None, until=None, limit=20, cursor=None):
+    _validate_limit(limit)
     supplied = {
         "task_id": task_id,
         "since": str(_date(since)) if since is not None else None,
