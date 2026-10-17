@@ -12,6 +12,31 @@ afterEach(() => {
 });
 
 describe("docs app", () => {
+  it("publishes the MCP distribution guide and links back to connection guidance", async () => {
+    window.history.pushState(null, "", "/operations/crate-mcp-distribution");
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Crate MCP distribution and acceptance",
+        level: 1,
+      }),
+    ).toBeTruthy();
+    expect(
+      (
+        screen.getByRole("link", {
+          name: "connection guide",
+        }) as HTMLAnchorElement
+      ).getAttribute("href"),
+    ).toBe("/operations/crate-mcp");
+    expect(
+      (
+        screen.getByRole("link", {
+          name: "distributable JSON contract",
+        }) as HTMLAnchorElement
+      ).getAttribute("href"),
+    ).toMatch(/^\//);
+  });
+
   it("renders the home page", () => {
     render(<App />);
 

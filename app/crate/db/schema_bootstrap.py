@@ -1,5 +1,9 @@
 """Idempotent schema bootstrap for fresh installs and bridge upgrades."""
 
+from crate.db.schema_sections.show_extraction_v119 import (
+    create_show_extraction_v119_schema,
+)
+
 from crate.db.schema_sections import (
     create_acquisition_schema,
     create_activity_schema,
@@ -8,6 +12,19 @@ from crate.db.schema_sections import (
     create_curation_schema,
     create_library_schema,
 )
+from crate.db.schema_sections.agent_access_v109 import create_agent_access_v109_schema
+from crate.db.schema_sections.agent_admin_v113 import create_agent_admin_v113_schema
+from crate.db.schema_sections.agent_library_v114 import create_agent_library_v114_schema
+from crate.db.schema_sections.agent_operations_v115 import (
+    create_agent_operations_v115_schema,
+)
+from crate.db.schema_sections.agent_commands_v111 import (
+    create_agent_commands_v111_schema,
+)
+from crate.db.schema_sections.mcp_oauth_v112 import create_mcp_oauth_v112_schema
+from crate.db.schema_sections.editorial_v116 import create_editorial_v116_schema
+from crate.db.schema_sections.shows_v117 import create_shows_v117_schema
+from crate.db.schema_sections.show_plans_v118 import create_show_plans_v118_schema
 
 
 def create_schema(cur):
@@ -23,7 +40,13 @@ def create_schema(cur):
 
     create_core_schema(cur)
     create_auth_schema(cur)
+    create_agent_access_v109_schema(cur)
+    create_agent_commands_v111_schema(cur)
+    create_mcp_oauth_v112_schema(cur)
+    create_agent_admin_v113_schema(cur)
     create_library_schema(cur)
+    create_agent_library_v114_schema(cur)
+    create_agent_operations_v115_schema(cur)
     cur.execute(
         """
         DELETE FROM stream_variants sv
@@ -52,3 +75,7 @@ def create_schema(cur):
     create_acquisition_schema(cur)
     create_curation_schema(cur)
     create_activity_schema(cur)
+    create_editorial_v116_schema(cur)
+    create_shows_v117_schema(cur)
+    create_show_plans_v118_schema(cur)
+    create_show_extraction_v119_schema(cur)

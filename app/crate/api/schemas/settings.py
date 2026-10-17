@@ -2,21 +2,36 @@
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, RootModel
+from pydantic import BaseModel, ConfigDict, Field, RootModel, StrictInt, model_validator
 
 from crate.api.schemas.common import OkResponse
 
 
 class WorkerSettingsRequest(BaseModel):
-    max_workers: int
+    model_config = ConfigDict(extra="forbid")
+
+    max_workers: StrictInt = Field(ge=1, le=64)
+    expected_revision: StrictInt | None = Field(default=None, ge=0)
 
 
 class CacheClearRequest(BaseModel):
     type: str
 
 
-class ScheduleIntervalsRequest(RootModel[dict[str, int]]):
-    pass
+class ScheduleIntervalsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schedules: dict[str, StrictInt]
+    expected_revision: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_legacy_intervals(cls, value):
+        if isinstance(value, dict) and not (
+            {"schedules", "expected_revision"} & value.keys()
+        ):
+            return {"schedules": value}
+        return value
 
 
 class EnrichmentUpdateRequest(RootModel[dict[str, bool]]):
@@ -53,6 +68,9 @@ class SoulseekSettingsUpdateRequest(BaseModel):
 
 class WorkerSettingsResponse(BaseModel):
     max_workers: int
+    configured_revision: int | None = None
+    effective_revision: int | None = None
+    slot_semantics: str | None = None
 
 
 class LibrarySettingsResponse(BaseModel):
@@ -135,6 +153,11 @@ class ScheduleUpdateResponse(OkResponse):
 
 class SettingsUpdateResponse(OkResponse):
     pass
+
+
+class RuntimeSettingsUpdateResponse(OkResponse):
+    configured_revision: int | str | None = None
+    effective_revision: int | None = None
 
 
 class RemoteScrobblingPreferenceResponse(BaseModel):

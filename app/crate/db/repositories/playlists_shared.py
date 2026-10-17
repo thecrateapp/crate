@@ -46,6 +46,8 @@ def playlist_to_dict(playlist: Any) -> dict | None:
         "track_count": playlist.track_count,
         "total_duration": playlist.total_duration,
         "generation_status": playlist.generation_status,
+        "editorial_revision": playlist.editorial_revision,
+        "generation_epoch": playlist.generation_epoch,
         "generation_error": playlist.generation_error,
         "last_generated_at": playlist.last_generated_at.isoformat()
         if playlist.last_generated_at

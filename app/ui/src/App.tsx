@@ -60,6 +60,16 @@ const Users = lazy(() =>
 const Roles = lazy(() =>
   import("@/pages/Roles").then((m) => ({ default: m.Roles })),
 );
+const AgentIntegrations = lazy(() =>
+  import("@/pages/AgentIntegrations").then((m) => ({
+    default: m.AgentIntegrations,
+  })),
+);
+const AgentPlanReview = lazy(() =>
+  import("@/pages/AgentPlanReview").then((m) => ({
+    default: m.AgentPlanReview,
+  })),
+);
 const DownloadPage = lazy(() =>
   import("@/pages/Download").then((m) => ({ default: m.DownloadPage })),
 );
@@ -144,6 +154,10 @@ function AdminIndex() {
   if (hasCapability("ops.logs.view")) return <Navigate to="/logs" replace />;
   if (hasCapability("ops.health.view"))
     return <Navigate to="/system" replace />;
+  if (hasCapability("agents.integrations.manage"))
+    return <Navigate to="/agent-integrations" replace />;
+  if (hasCapability("agents.plans.review"))
+    return <Navigate to="/agent-plans" replace />;
   if (hasCapability("library.view")) return <Navigate to="/browse" replace />;
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-center">
@@ -178,6 +192,8 @@ const SETTINGS_MANAGE = ["settings.manage"] as const;
 const LIBRARY_ANALYSIS_MANAGE = ["library.analysis.manage"] as const;
 const USERS_VIEW = ["users.view"] as const;
 const ROLES_VIEW = ["roles.view"] as const;
+const AGENT_INTEGRATIONS = ["agents.integrations.manage"] as const;
+const AGENT_PLANS = ["agents.plans.review"] as const;
 const ADMIN_ACCESS = ["admin.access"] as const;
 const RELEASE_CURATION = [
   "curation.releases.write",
@@ -218,6 +234,22 @@ export default function App() {
                 }
               >
                 <Route index element={<AdminIndex />} />
+                <Route
+                  path="agent-integrations"
+                  element={
+                    <RequireCapabilities anyOf={AGENT_INTEGRATIONS}>
+                      <AgentIntegrations />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="agent-plans/:planId?"
+                  element={
+                    <RequireCapabilities anyOf={AGENT_PLANS}>
+                      <AgentPlanReview />
+                    </RequireCapabilities>
+                  }
+                />
                 <Route
                   path="browse"
                   element={

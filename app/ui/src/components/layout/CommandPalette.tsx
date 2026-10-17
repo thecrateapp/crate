@@ -254,6 +254,18 @@ export function CommandPalette() {
       capabilities: ["users.view"],
     },
     {
+      label: "Agent integrations",
+      path: "/agent-integrations",
+      icon: ShieldCheck,
+      capabilities: ["agents.integrations.manage"],
+    },
+    {
+      label: "Agent plans",
+      path: "/agent-plans",
+      icon: ShieldCheck,
+      capabilities: ["agents.plans.review"],
+    },
+    {
       label: "Roles",
       path: "/roles",
       icon: ShieldCheck,

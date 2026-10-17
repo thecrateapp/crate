@@ -1218,6 +1218,9 @@ def test_hard_delete_quarantined_track_deletes_crate_trash_file(tmp_path, monkey
 
 
 def test_hard_delete_all_quarantined_tracks_deletes_audio_only(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.is_cancelled", lambda _task_id: False
+    )
     from crate.worker_handlers.management import (
         _handle_hard_delete_all_quarantined_tracks,
     )

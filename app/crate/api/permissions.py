@@ -7,6 +7,10 @@ from typing import Any, Iterable, Mapping, cast
 from fastapi import HTTPException, Request
 
 ALL_CAPABILITIES: tuple[str, ...] = (
+    "agents.integrations.manage",
+    "agents.activity.view",
+    "agents.plans.review",
+    "agents.plans.approve",
     "admin.access",
     "ops.health.view",
     "ops.logs.view",

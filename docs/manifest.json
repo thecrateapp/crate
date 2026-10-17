@@ -207,6 +207,24 @@
     "order": 150
   },
   {
+    "sourcePath": "docs/technical/crate-mcp.md",
+    "route": "/operations/crate-mcp",
+    "section": "operations",
+    "title": "Crate MCP",
+    "summary": "Connect remote agents with OAuth, scoped maintenance and exact human plan review.",
+    "keywords": ["mcp", "agents", "diagnostics", "credentials", "maintenance"],
+    "order": 170
+  },
+  {
+    "sourcePath": "docs/technical/crate-mcp-distribution.md",
+    "route": "/operations/crate-mcp-distribution",
+    "section": "operations",
+    "title": "Crate MCP distribution and acceptance",
+    "summary": "Versioned contracts, reproducible evaluation and staged rollout evidence.",
+    "keywords": ["mcp", "oauth", "contract", "evaluation", "rollout"],
+    "order": 171
+  },
+  {
     "sourcePath": "docs/technical/storage-retention.md",
     "route": "/operations/storage-retention",
     "section": "operations",

@@ -12,6 +12,17 @@ class _LoopExit(BaseException):
 
 
 class TestAnalysisDaemonUnit:
+    @pytest.fixture(autouse=True)
+    def stable_source_identity(self, monkeypatch):
+        import crate.analysis_daemon as analysis_daemon
+
+        monkeypatch.setattr(
+            analysis_daemon,
+            "source_identity",
+            lambda _path: {"size": 1000, "mtime_ns": 1},
+            raising=False,
+        )
+
     def test_analysis_daemon_marks_done_for_valid_result(self, monkeypatch):
         import crate.analysis_daemon as analysis_daemon
 
@@ -27,17 +38,21 @@ class TestAnalysisDaemonUnit:
         monkeypatch.setattr(
             analysis_daemon,
             "_mark_failed",
-            lambda track_id, state: calls["failed"].append((track_id, state)),
+            lambda track_id, state, **_kwargs: calls["failed"].append(
+                (track_id, state)
+            ),
         )
         monkeypatch.setattr(
             analysis_daemon,
             "_release_claims",
-            lambda track_ids, state: calls["released"].append((track_ids, state)),
+            lambda track_ids, state, **_kwargs: calls["released"].append(
+                (track_ids, state)
+            ),
         )
         monkeypatch.setattr(
             analysis_daemon,
             "_store_analysis_results",
-            lambda results: calls["stored"].extend(results),
+            lambda results, **_kwargs: calls["stored"].extend(results),
         )
         monkeypatch.setitem(
             sys.modules,
@@ -101,17 +116,21 @@ class TestAnalysisDaemonUnit:
         monkeypatch.setattr(
             analysis_daemon,
             "_mark_failed",
-            lambda track_id, state: calls["failed"].append((track_id, state)),
+            lambda track_id, state, **_kwargs: calls["failed"].append(
+                (track_id, state)
+            ),
         )
         monkeypatch.setattr(
             analysis_daemon,
             "_release_claims",
-            lambda track_ids, state: calls["released"].append((track_ids, state)),
+            lambda track_ids, state, **_kwargs: calls["released"].append(
+                (track_ids, state)
+            ),
         )
         monkeypatch.setattr(
             analysis_daemon,
             "_store_analysis_results",
-            lambda results: calls["stored"].extend(results),
+            lambda results, **_kwargs: calls["stored"].extend(results),
         )
         monkeypatch.setitem(
             sys.modules,
@@ -154,17 +173,21 @@ class TestAnalysisDaemonUnit:
         monkeypatch.setattr(
             analysis_daemon,
             "_mark_failed",
-            lambda track_id, state: calls["failed"].append((track_id, state)),
+            lambda track_id, state, **_kwargs: calls["failed"].append(
+                (track_id, state)
+            ),
         )
         monkeypatch.setattr(
             analysis_daemon,
             "_release_claims",
-            lambda track_ids, state: calls["released"].append((track_ids, state)),
+            lambda track_ids, state, **_kwargs: calls["released"].append(
+                (track_ids, state)
+            ),
         )
         monkeypatch.setattr(
             analysis_daemon,
             "_store_bliss_vectors",
-            lambda batch: calls["stored"].append(batch),
+            lambda batch, **_kwargs: calls["stored"].append(batch),
         )
         monkeypatch.setitem(
             sys.modules,
@@ -212,17 +235,21 @@ class TestAnalysisDaemonUnit:
         monkeypatch.setattr(
             analysis_daemon,
             "_mark_failed",
-            lambda track_id, state: calls["failed"].append((track_id, state)),
+            lambda track_id, state, **_kwargs: calls["failed"].append(
+                (track_id, state)
+            ),
         )
         monkeypatch.setattr(
             analysis_daemon,
             "_release_claims",
-            lambda track_ids, state: calls["released"].append((track_ids, state)),
+            lambda track_ids, state, **_kwargs: calls["released"].append(
+                (track_ids, state)
+            ),
         )
         monkeypatch.setattr(
             analysis_daemon,
             "_store_bliss_vectors",
-            lambda batch: calls["stored"].append(batch),
+            lambda batch, **_kwargs: calls["stored"].append(batch),
         )
         monkeypatch.setitem(
             sys.modules,

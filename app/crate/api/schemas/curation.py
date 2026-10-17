@@ -21,6 +21,7 @@ class CreateSystemPlaylistRequest(BaseModel):
     smart_rules: dict[str, Any] | None = None
     is_curated: bool = True
     is_active: bool = True
+    auto_refresh_enabled: bool = True
     curation_key: str | None = None
     featured_rank: int | None = None
     category: str | None = None
@@ -83,6 +84,8 @@ class PlaylistRefinementActionResponse(BaseModel):
 
 
 class RefineSystemPlaylistResponse(BaseModel):
+    proposal_id: str
+    editorial_revision: int
     summary: str
     issues: list[PlaylistRefinementIssueResponse] = Field(default_factory=list)
     actions: list[PlaylistRefinementActionResponse] = Field(default_factory=list)
@@ -90,8 +93,10 @@ class RefineSystemPlaylistResponse(BaseModel):
 
 
 class ApplyPlaylistRefinementRequest(BaseModel):
-    actions: list[PlaylistRefinementActionResponse] = Field(default_factory=list)
-    action_ids: list[str] | None = None
+    proposal_id: str = Field(
+        pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    )
+    action_ids: list[str] = Field(default_factory=list, max_length=100)
 
 
 class ApplyPlaylistRefinementResponse(OkResponse):
@@ -143,8 +148,11 @@ class SystemPlaylistEditorSnapshotResponse(BaseModel):
     snapshot: SnapshotMetadataResponse | None = None
 
 
-class SystemPlaylistGenerateResponse(SystemPlaylistDetailResponse):
-    generated_track_count: int
+class SystemPlaylistGenerateResponse(BaseModel):
+    ok: bool
+    task_id: str
+    generation_status: str
+    deduplicated: bool
 
 
 class CuratedPlaylistSummaryResponse(PlaylistSummaryResponse):

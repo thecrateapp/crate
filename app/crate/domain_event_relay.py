@@ -29,6 +29,15 @@ def relay_domain_events(
         event_uid = str(event["event_uid"])
         try:
             stream_id, sequence = publish_outbox_event(event)
+            payload = event.get("payload_json") or {}
+            if (
+                event.get("event_type") == "ui.invalidate"
+                and isinstance(payload, dict)
+                and payload.get("source") == "show_write"
+            ):
+                from crate.api.cache_events import broadcast_committed_invalidation
+
+                broadcast_committed_invalidation(payload.get("scope", ""))
             mark_outbox_delivered(
                 event_uid,
                 stream_id,

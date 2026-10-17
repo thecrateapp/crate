@@ -71,14 +71,37 @@ def _handle_compute_analytics(task_id: str, params: dict, config: dict) -> dict:
 
     p = TaskProgress(phase="analytics", phase_count=2)
 
+    class CancellationObserved(Exception):
+        pass
+
     def _progress(data):
+        if is_cancelled(task_id):
+            raise CancellationObserved()
         p.done = data.get("artists_done", p.done)
         p.total = data.get("artists_total", p.total)
         p.item = data.get("artist", p.item)
         emit_progress(task_id, p)
 
     emit_progress(task_id, p, force=True)
-    data = compute_analytics(lib, exts, progress_callback=_progress, incremental=True)
+    if is_cancelled(task_id):
+        return {
+            "status": "cancelled",
+            "execution": {"status": "cancelled", "effects": "not_started"},
+        }
+    try:
+        data = compute_analytics(
+            lib, exts, progress_callback=_progress, incremental=True
+        )
+    except CancellationObserved:
+        return {
+            "status": "cancelled",
+            "execution": {"status": "partial", "phase": "analytics"},
+        }
+    if is_cancelled(task_id):
+        return {
+            "status": "cancelled",
+            "execution": {"status": "partial", "phase": "analytics"},
+        }
     set_cache("analytics", data, ttl=3600)
 
     p.phase = "stats"
@@ -90,6 +113,15 @@ def _handle_compute_analytics(task_id: str, params: dict, config: dict) -> dict:
     artists = albums = tracks = total_size = 0
     formats: dict[str, int] = {}
     for artist_dir in lib.iterdir():
+        if is_cancelled(task_id):
+            return {
+                "status": "cancelled",
+                "execution": {
+                    "status": "partial",
+                    "analytics_cache_updated": True,
+                    "artists_scanned": artists,
+                },
+            }
         if not artist_dir.is_dir() or artist_dir.name.startswith("."):
             continue
         artists += 1
@@ -453,6 +485,8 @@ def _chunk_coordinator(
     )
 
     for index, chunk in enumerate(chunks):
+        if is_cancelled(task_id):
+            break
         create_task(
             chunk_task_type,
             {"artists": chunk, "chunk_index": index, "total_chunks": len(chunks)},

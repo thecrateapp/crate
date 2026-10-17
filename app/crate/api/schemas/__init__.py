@@ -1,6 +1,34 @@
 # ruff: noqa: F401
 """Response-oriented Pydantic models for the HTTP API contract."""
 
+from crate.api.schemas.show_imports import (
+    ShowCandidate,
+    ShowConsolidationInput,
+    ShowExtractionInput,
+    ShowExtractionRequest,
+    ShowImportSelection,
+    ShowPlanApplyInput,
+    ShowAcceptedJob,
+    ShowJobState,
+    ShowPlanEvidence,
+)
+
+from crate.api.schemas.agents import (
+    AgentCollectionResponse,
+    AgentCredentialSecretResponse,
+    CredentialExpiry,
+    IntegrationCreate,
+    IntegrationUpdate,
+    OAuthClientCreate,
+    OAuthClientUpdate,
+    PlanDecision,
+)
+from crate.api.schemas.mcp_oauth import (
+    MCPAuthorizationServerMetadata,
+    MCPOAuthErrorResponse,
+    MCPOAuthTokenResponse,
+    MCPProtectedResourceMetadata,
+)
 from crate.api.schemas.acquisition import (
     AcquisitionDownloadRequest,
     AcquisitionDownloadResponse,
@@ -29,6 +57,8 @@ from crate.api.schemas.analytics import (
     InsightsResponse,
     MissingAlbumsResponse,
     QualityReportResponse,
+    QualityRefreshRequest,
+    QualityRefreshResponse,
     RecentAlbumResponse,
     RecentTaskSummaryResponse,
     RunningTaskResponse,
@@ -398,6 +428,27 @@ from crate.api.schemas.utility import (
 )
 
 __all__ = [
+    "ShowCandidate",
+    "ShowConsolidationInput",
+    "ShowExtractionInput",
+    "ShowExtractionRequest",
+    "ShowImportSelection",
+    "ShowPlanApplyInput",
+    "ShowAcceptedJob",
+    "ShowJobState",
+    "ShowPlanEvidence",
+    "AgentCollectionResponse",
+    "AgentCredentialSecretResponse",
+    "CredentialExpiry",
+    "IntegrationCreate",
+    "IntegrationUpdate",
+    "OAuthClientCreate",
+    "OAuthClientUpdate",
+    "PlanDecision",
+    "MCPAuthorizationServerMetadata",
+    "MCPOAuthErrorResponse",
+    "MCPOAuthTokenResponse",
+    "MCPProtectedResourceMetadata",
     "AcquisitionDownloadRequest",
     "AcquisitionDownloadResponse",
     "AcquisitionQueueItemResponse",
@@ -582,6 +633,8 @@ __all__ = [
     "PortableRehydrateRequest",
     "ProcessingSettingsResponse",
     "QualityReportResponse",
+    "QualityRefreshRequest",
+    "QualityRefreshResponse",
     "OrganizeApplyErrorResponse",
     "OrganizeApplyRequest",
     "OrganizeApplyResponse",

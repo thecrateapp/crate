@@ -189,6 +189,18 @@ const navItems = [
     capabilities: ["users.view"],
   },
   {
+    to: "/agent-integrations",
+    icon: ShieldCheck,
+    label: "Agent integrations",
+    capabilities: ["agents.integrations.manage"],
+  },
+  {
+    to: "/agent-plans",
+    icon: ShieldCheck,
+    label: "Agent plans",
+    capabilities: ["agents.plans.review"],
+  },
+  {
     to: "/roles",
     icon: ShieldCheck,
     label: "Roles",

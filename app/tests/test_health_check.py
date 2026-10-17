@@ -1,7 +1,7 @@
 """Tests for library health checks."""
 
-from pathlib import Path
 import tempfile
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 
@@ -360,7 +360,12 @@ class TestHasPhotoDesync:
             # No photo files created
 
             mock_rows = [
-                {"name": "Band", "folder_name": "Band", "has_photo": True},
+                {
+                    "name": "Band",
+                    "folder_name": "Band",
+                    "has_photo": True,
+                    "entity_uid": "10000000-0000-0000-0000-000000000001",
+                },
             ]
 
             with patch(
@@ -384,7 +389,12 @@ class TestHasPhotoDesync:
             (band_dir / "artist.jpg").write_bytes(b"\xff\xd8")
 
             mock_rows = [
-                {"name": "Band", "folder_name": "Band", "has_photo": True},
+                {
+                    "name": "Band",
+                    "folder_name": "Band",
+                    "has_photo": True,
+                    "entity_uid": "10000000-0000-0000-0000-000000000001",
+                },
             ]
 
             with patch(

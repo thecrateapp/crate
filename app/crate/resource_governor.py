@@ -8,12 +8,14 @@ syncs, exports, analysis and audio fingerprinting.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime
 import logging
 import os
 import shutil
 import time
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 
 log = logging.getLogger(__name__)
 
@@ -33,6 +35,9 @@ RESOURCE_GOVERNED_TASK_TYPES = frozenset(
         "fix_issues",
         "generate_cast_spectrum",
         "health_check",
+        "quality_check",
+        "agent_maintenance",
+        "show_extract",
         "library_pipeline",
         "library_sync",
         "materialize_artwork_variants",
@@ -41,6 +46,7 @@ RESOURCE_GOVERNED_TASK_TYPES = frozenset(
         "rebuild_library",
         "rehydrate_portable_metadata",
         "repair",
+        "prepare_library_repairs",
         "repair_artwork_variants",
         "resolve_duplicates",
         "scan",
@@ -121,6 +127,59 @@ DEFAULT_MAINTENANCE_WINDOW_START = "02:00"
 DEFAULT_MAINTENANCE_WINDOW_END = "07:00"
 DEFAULT_FINGERPRINT_WINDOW_LIMIT = 1000
 
+_CURRENT_POLICY: ContextVar[dict | None] = ContextVar(
+    "resource_governor_runtime_policy", default=None
+)
+_POLICY_FIELDS = {
+    "CRATE_RESOURCE_MAX_LOAD_RATIO": "max_load_ratio",
+    "CRATE_RESOURCE_MAX_IOWAIT_PERCENT": "max_iowait_percent",
+    "CRATE_RESOURCE_MAX_SWAP_PERCENT": "max_swap_percent",
+    "CRATE_RESOURCE_MIN_SWAP_USED_MB": "min_swap_used_mb",
+    "CRATE_RESOURCE_MIN_MEMORY_AVAILABLE_PERCENT": "min_memory_available_percent",
+    "CRATE_RESOURCE_MAX_ACTIVE_USERS": "max_active_users",
+    "CRATE_RESOURCE_MAX_ACTIVE_STREAMS": "max_active_streams",
+    "CRATE_RESOURCE_DEFER_SECONDS": "defer_seconds",
+    "CRATE_MAINTENANCE_WINDOW_FINGERPRINT_LIMIT": "fingerprint_window_limit",
+}
+
+
+@contextmanager
+def _runtime_policy_scope() -> Iterator[dict | None]:
+    active = _CURRENT_POLICY.get()
+    if active is not None:
+        yield active
+        return
+    try:
+        from crate.db.repositories.runtime_policy import read_runtime_policy_state
+
+        state = read_runtime_policy_state(include_adoptions=False)
+    except Exception:
+        state = {"unavailable": True}
+    token = _CURRENT_POLICY.set(state)
+    try:
+        yield state
+    finally:
+        _CURRENT_POLICY.reset(token)
+
+
+def _record_policy_use(component, state):
+    if state is not None:
+        try:
+            from crate.db.repositories.runtime_policy import record_runtime_adoption
+
+            record_runtime_adoption(
+                component, state["configured_revision"], state["policy_hash"]
+            )
+        except Exception:
+            log.debug("Could not persist runtime adoption evidence", exc_info=True)
+
+
+def _policy_value(name):
+    state = _CURRENT_POLICY.get()
+    if state is not None and name in _POLICY_FIELDS:
+        return state["policy"]["governor"][_POLICY_FIELDS[name]]
+    return None
+
 
 @dataclass(slots=True)
 class ResourceSnapshot:
@@ -142,6 +201,8 @@ class ResourceDecision:
     defer_seconds: int = DEFAULT_DEFER_SECONDS
     snapshot: ResourceSnapshot | None = None
     window: dict | None = None
+    policy_revision: int | None = None
+    policy_hash: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -158,6 +219,17 @@ def is_governed_task(task_type: str) -> bool:
 
 
 def should_defer_task(task_type: str, params: dict | None = None) -> ResourceDecision:
+    with _runtime_policy_scope() as state:
+        if state is not None and state.get("unavailable"):
+            return ResourceDecision(allowed=False, reason="runtime policy unavailable")
+        decision = _should_defer_task(task_type, params)
+        if state is not None:
+            decision.policy_revision = state["configured_revision"]
+            decision.policy_hash = state["policy_hash"]
+        return decision
+
+
+def _should_defer_task(task_type: str, params: dict | None = None) -> ResourceDecision:
     params = params or {}
     if params.get("ignore_resource_governor"):
         return ResourceDecision(allowed=True)
@@ -176,6 +248,33 @@ def should_defer_task(task_type: str, params: dict | None = None) -> ResourceDec
 
 
 def evaluate_maintenance_window(*, task_type: str = "background") -> ResourceDecision:
+    with _runtime_policy_scope() as state:
+        if state is not None and state.get("unavailable"):
+            return ResourceDecision(allowed=False, reason="runtime policy unavailable")
+        if state is not None:
+            from crate.runtime_policy_contract import window_status
+
+            window = window_status(state["policy"]["maintenance_window"])
+            allowed = window["in_window"]
+            decision = ResourceDecision(
+                allowed=allowed,
+                reason=""
+                if allowed
+                else f"outside maintenance window {window['start']}-{window['end']}",
+                defer_seconds=DEFAULT_DEFER_SECONDS
+                if allowed
+                else max(1, window["seconds_until_start"]),
+                window=window,
+                policy_revision=state["configured_revision"],
+                policy_hash=state["policy_hash"],
+            )
+        else:
+            decision = _evaluate_maintenance_window(task_type=task_type)
+        _record_policy_use("maintenance_window", state)
+        return decision
+
+
+def _evaluate_maintenance_window(*, task_type: str = "background") -> ResourceDecision:
     if not _maintenance_window_enabled():
         return ResourceDecision(allowed=True)
 
@@ -215,6 +314,22 @@ def evaluate_maintenance_window(*, task_type: str = "background") -> ResourceDec
 
 
 def evaluate_resources(
+    *, label: str = "background", listener_sensitive: bool = True
+) -> ResourceDecision:
+    with _runtime_policy_scope() as state:
+        if state is not None and state.get("unavailable"):
+            return ResourceDecision(allowed=False, reason="runtime policy unavailable")
+        decision = _evaluate_resources(
+            label=label, listener_sensitive=listener_sensitive
+        )
+        if state is not None:
+            decision.policy_revision = state["configured_revision"]
+            decision.policy_hash = state["policy_hash"]
+        _record_policy_use("governor", state)
+        return decision
+
+
+def _evaluate_resources(
     *, label: str = "background", listener_sensitive: bool = True
 ) -> ResourceDecision:
     if not _enabled():
@@ -404,11 +519,17 @@ def wait_while_pressured(
 
 
 def _enabled() -> bool:
+    state = _CURRENT_POLICY.get()
+    if state is not None:
+        return state["policy"]["governor"]["enabled"]
     raw = os.environ.get("CRATE_RESOURCE_GOVERNOR_ENABLED", "true")
     return raw.strip().lower() not in {"0", "false", "no", "off"}
 
 
 def _maintenance_window_enabled() -> bool:
+    state = _CURRENT_POLICY.get()
+    if state is not None:
+        return state["policy"]["maintenance_window"]["enabled"]
     raw = os.environ.get("CRATE_MAINTENANCE_WINDOW_ENABLED", "false")
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
@@ -524,6 +645,9 @@ def _coerce_int(value, default: int) -> int:
 
 
 def _int_setting(name: str, default: int) -> int:
+    policy_value = _policy_value(name)
+    if policy_value is not None:
+        return int(policy_value)
     raw = os.environ.get(name)
     if raw is None:
         return default
@@ -534,6 +658,9 @@ def _int_setting(name: str, default: int) -> int:
 
 
 def _nonnegative_int_setting(name: str, default: int) -> int:
+    policy_value = _policy_value(name)
+    if policy_value is not None:
+        return int(policy_value)
     raw = os.environ.get(name)
     if raw is None:
         return default
@@ -544,6 +671,9 @@ def _nonnegative_int_setting(name: str, default: int) -> int:
 
 
 def _float_setting(name: str, default: float) -> float:
+    policy_value = _policy_value(name)
+    if policy_value is not None:
+        return float(policy_value)
     raw = os.environ.get(name)
     if raw is None:
         return default

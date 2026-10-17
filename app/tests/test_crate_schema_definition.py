@@ -4,7 +4,6 @@ from importlib import import_module
 from pathlib import Path
 
 from alembic.script import ScriptDirectory
-
 from crate.db.schema_sections.curation_crates import create_crates_schema
 
 
@@ -95,7 +94,12 @@ def test_crate_migration_follows_the_current_main_head() -> None:
     assert scripts.get_revision("106").down_revision == "105"
     assert scripts.get_revision("107").down_revision == "106"
     assert scripts.get_revision("108").down_revision == "107"
-    assert scripts.get_heads() == ["108"]
+    assert scripts.get_revision("109").down_revision == "108"
+    assert scripts.get_revision("110").down_revision == "109"
+    assert scripts.get_revision("111").down_revision == "110"
+    assert scripts.get_revision("112").down_revision == "111"
+    assert scripts.get_revision("113").down_revision == "112"
+    assert scripts.get_heads() == ["119"]
 
 
 def test_crate_bootstrap_includes_presentation_settings() -> None:

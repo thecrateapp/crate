@@ -211,39 +211,6 @@ def build_playlist_refinement_proposal(
     }
 
 
-def apply_playlist_refinement_actions(
-    *,
-    playlist_id: int,
-    actions: list[dict],
-    selected_action_ids: set[str] | None,
-    user_id: int | None = None,
-) -> int:
-    from crate.db.repositories.playlists_tracks import remove_playlist_track
-
-    selected = [
-        action
-        for action in actions
-        if selected_action_ids is None or str(action.get("id")) in selected_action_ids
-    ]
-    remove_positions = sorted(
-        {
-            int(action["position"])
-            for action in selected
-            if action.get("type") == "remove_track" and action.get("position")
-        },
-        reverse=True,
-    )
-    for position in remove_positions:
-        remove_playlist_track(
-            playlist_id,
-            position,
-            record_exclusion=True,
-            excluded_by_user_id=user_id,
-        )
-    return len(remove_positions)
-
-
 __all__ = [
-    "apply_playlist_refinement_actions",
     "build_playlist_refinement_proposal",
 ]

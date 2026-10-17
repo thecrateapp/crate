@@ -136,7 +136,12 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "library_sync": TaskPoolConfig("maintenance", 2, 3600, 0),
     "library_pipeline": TaskPoolConfig("maintenance", 2, 7200, 0),
     "health_check": TaskPoolConfig("maintenance", 2, 1500, 0),
+    "quality_check": TaskPoolConfig("maintenance", 2, 1800, 0),
+    "show_extract": TaskPoolConfig("maintenance", 2, 180, 0),
+    "agent_maintenance": TaskPoolConfig("maintenance", 2, 1800, 0),
+    "agent_control": TaskPoolConfig("fast", 0, 60, 0),
     "repair": TaskPoolConfig("maintenance", 2, 3600, 0),
+    "prepare_library_repairs": TaskPoolConfig("maintenance", 0, 1800, 0),
     "repair_duplicate_tracks": TaskPoolConfig("maintenance", 2, 3600, 0),
     "compute_analytics": TaskPoolConfig("maintenance", 2, 600, 0),
     "check_new_releases": TaskPoolConfig("maintenance", 2, 7200, 1),
@@ -342,55 +347,42 @@ def _is_download_allowed() -> bool:
     Each condition is independently toggleable. If all are disabled,
     downloads run immediately (default behavior).
     """
-    from crate.db.cache_settings import get_setting
+    from crate.db.repositories.runtime_policy import (
+        read_runtime_policy_state,
+        record_runtime_adoption,
+    )
+    from crate.runtime_policy_contract import download_policy_status
 
-    # Time window check
-    if get_setting("download_window_enabled", "false") == "true":
-        if not _is_in_time_window():
+    try:
+        state = read_runtime_policy_state(include_adoptions=False)
+        decision = download_policy_status(
+            state["policy"],
+            active_users=_count_active_users(),
+            active_streams=_count_active_streams(),
+        )
+        if not decision["signals_available"]:
             return False
-
-    # Active users check
-    max_users_str = get_setting("download_max_active_users", "0") or "0"
-    max_users = int(max_users_str) if max_users_str.isdigit() else 0
-    if max_users > 0:
-        active = _count_active_users()
-        if active >= max_users:
-            return False
-
-    # Active streams check
-    max_streams_str = get_setting("download_max_active_streams", "0") or "0"
-    max_streams = int(max_streams_str) if max_streams_str.isdigit() else 0
-    if max_streams > 0:
-        streams = _count_active_streams()
-        if streams >= max_streams:
-            return False
-
-    return True
+        record_runtime_adoption(
+            "download_window", state["configured_revision"], state["policy_hash"]
+        )
+        return decision["downloads_allowed_now"]
+    except Exception:
+        log.warning("Download policy unavailable; deferring download", exc_info=True)
+        return False
 
 
 def _is_in_time_window() -> bool:
-    from crate.db.cache_settings import get_setting
+    from crate.db.repositories.runtime_policy import read_runtime_policy_state
+    from crate.runtime_policy_contract import window_status
 
-    start_str = get_setting("download_window_start", "02:00") or "02:00"
-    end_str = get_setting("download_window_end", "07:00") or "07:00"
     try:
-        from datetime import datetime, timezone
-
-        now = datetime.now(timezone.utc)
-        hour, minute = map(int, start_str.split(":"))
-        start_minutes = hour * 60 + minute
-        hour, minute = map(int, end_str.split(":"))
-        end_minutes = hour * 60 + minute
-        current_minutes = now.hour * 60 + now.minute
-        if start_minutes <= end_minutes:
-            return start_minutes <= current_minutes < end_minutes
-        else:
-            return current_minutes >= start_minutes or current_minutes < end_minutes
-    except (ValueError, TypeError):
-        return True
+        state = read_runtime_policy_state(include_adoptions=False)
+        return window_status(state["policy"]["download_window"])["in_window"]
+    except Exception:
+        return False
 
 
-def _count_active_users() -> int:
+def _count_active_users() -> int | None:
     """Count users actually listening (play events in the last 5 minutes).
 
     NOT based on session last_seen_at — that fires on every heartbeat
@@ -403,10 +395,10 @@ def _count_active_users() -> int:
         return count_recent_active_users(window_minutes=5)
     except Exception:
         log.debug("Active users count failed", exc_info=True)
-        return 0
+        return None
 
 
-def _count_active_streams() -> int:
+def _count_active_streams() -> int | None:
     """Count distinct streams in the last 3 minutes (tracks being played).
 
     Uses recent ``user_play_events`` as a best-effort playback signal.
@@ -419,27 +411,21 @@ def _count_active_streams() -> int:
         return count_recent_streams(window_minutes=3)
     except Exception:
         log.debug("Active streams count failed", exc_info=True)
-        return 0
+        return None
 
 
 def _ms_until_download_window() -> int:
     """Milliseconds until the next download window opens (or 5 min if user-gated)."""
-    from crate.db.cache_settings import get_setting
+    from crate.db.repositories.runtime_policy import read_runtime_policy_state
+    from crate.runtime_policy_contract import window_status
 
-    if get_setting("download_window_enabled", "false") == "true":
-        start_str = get_setting("download_window_start", "02:00") or "02:00"
-        try:
-            from datetime import datetime, timezone, timedelta
-
-            now = datetime.now(timezone.utc)
-            hour, minute = map(int, start_str.split(":"))
-            target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-            if target <= now:
-                target += timedelta(days=1)
-            delta = target - now
-            return int(delta.total_seconds() * 1000)
-        except (ValueError, TypeError):
-            pass
+    try:
+        state = read_runtime_policy_state(include_adoptions=False)
+        window = window_status(state["policy"]["download_window"])
+        if not window["in_window"]:
+            return max(1000, window["seconds_until_start"] * 1000)
+    except Exception:
+        log.debug("Cannot inspect next download window", exc_info=True)
     # If deferred by active users/streams, retry in 5 minutes
     return DOWNLOAD_WINDOW_RETRY_MS
 
@@ -574,6 +560,7 @@ def _execute_task(task_type: str, task_id: str):
     from crate.config import load_config
     from crate.db.queries.tasks import get_task
     from crate.db.repositories.tasks import fail_or_retry_task, start_task, update_task
+    from crate.db.repositories.task_control import acknowledge_cancellation
     from crate.resource_governor import record_decision, should_defer_task
     from crate.worker import TASK_HANDLERS, _is_cancelled
 
@@ -583,6 +570,7 @@ def _execute_task(task_type: str, task_id: str):
         return
     if task.get("status") == "cancelled":
         log.info("Task %s already cancelled, skipping", task_id)
+        _try_fan_in_parent(task, task_type, task_id)
         return
 
     handler = TASK_HANDLERS.get(task_type)
@@ -639,9 +627,9 @@ def _execute_task(task_type: str, task_id: str):
             and not _is_in_time_window()
         ):
             reason.append("outside download window")
-        if active_users > 0:
+        if active_users and active_users > 0:
             reason.append(f"{active_users} active user(s)")
-        if active_streams > 0:
+        if active_streams and active_streams > 0:
             reason.append(f"{active_streams} active stream(s)")
         reason_str = ", ".join(reason) or "conditions not met"
         log.info(
@@ -676,7 +664,13 @@ def _execute_task(task_type: str, task_id: str):
     # receive a redispatch for a stale pending task; only the first worker that
     # flips pending -> running is allowed to execute the handler.
     worker_id = f"{os.uname().nodename}:{os.getpid()}:{threading.get_ident()}"
-    started = start_task(task_id, worker_id=worker_id)
+    policy_claim = {}
+    if getattr(resource_decision, "policy_revision", None) is not None:
+        policy_claim = {
+            "expected_policy_revision": resource_decision.policy_revision,
+            "expected_policy_hash": resource_decision.policy_hash,
+        }
+    started = start_task(task_id, worker_id=worker_id, **policy_claim)
     if not started:
         fresh = get_task(task_id)
         if fresh and fresh.get("status") in {
@@ -694,9 +688,10 @@ def _execute_task(task_type: str, task_id: str):
                 fresh.get("status"),
             )
         else:
-            log.warning(
-                "Task %s (%s) could not be started; skipping", task_id, task_type
-            )
+            actor = _actors.get(task_type)
+            if fresh and fresh.get("status") == "pending" and actor:
+                actor.send_with_options(args=(task_id,), delay=TASK_REQUEUE_DELAY_MS)
+            log.info("Task %s (%s) waiting for runtime admission", task_id, task_type)
         if is_db_heavy:
             _release_db_heavy_lock(task_id)
         if is_download:
@@ -726,11 +721,43 @@ def _execute_task(task_type: str, task_id: str):
         log.debug("Queue wait recording failed", exc_info=True)
 
     try:
-        config = load_config()
-        result = handler(task_id, task.get("params", {}), config)
+        from crate.agent_diagnostics import DiagnosticError
+        from crate.db.repositories.agent_task_control import check_task_authority
 
-        if _is_cancelled(task_id):
-            log.info("Task %s was cancelled during execution", task_id)
+        authority_failed = False
+        if task.get("origin") == "agent":
+            try:
+                check_task_authority(task_id)
+            except DiagnosticError as error:
+                from crate.db.repositories.agent_requests import fail_job
+
+                result = fail_job(task_id, error.code, str(error))
+                authority_failed = True
+        if not authority_failed:
+            config = load_config()
+            result = handler(task_id, task.get("params", {}), config)
+
+        if not authority_failed and _is_cancelled(task_id):
+            if isinstance(result, dict) and result.get("_delegated"):
+                update_task(task_id, status="delegated", result=result)
+            acknowledged = acknowledge_cancellation(
+                task_id, result if isinstance(result, dict) else None
+            )
+            if acknowledged:
+                from crate.db.events import _publish_to_redis
+
+                _publish_to_redis(
+                    task_id,
+                    "task_done",
+                    {
+                        "type": "task_done",
+                        "status": acknowledged["status"],
+                        "task_type": task_type,
+                    },
+                    "",
+                )
+                _try_fan_in_parent(task, task_type, task_id)
+            log.info("Task %s observed cancellation request", task_id)
         elif isinstance(result, dict) and result.get("_delegated"):
             # Coordinator dispatched sub-tasks — don't mark completed yet.
             # The last child to finish will complete this task.
@@ -743,6 +770,9 @@ def _execute_task(task_type: str, task_id: str):
                     "artists": result.get("artists", 0),
                 },
             )
+            from crate.worker_handlers.analysis import _try_complete_parent
+
+            _try_complete_parent(task_id, task_type)
             log.info(
                 "Task %s (%s) delegated to %d chunks",
                 task_id,

@@ -16,10 +16,12 @@ def get_upcoming_shows(
     limit: int = 200,
 ) -> list[dict]:
     today = datetime.now(timezone.utc).date()
-    conditions = ["date >= :today", "status != 'cancelled'"]
+    conditions = ["date >= :today", "status != 'cancelled'", "merged_into_id IS NULL"]
     params: dict[str, object] = {"today": today, "lim": limit * 5}
     if artist_name:
-        conditions.append("artist_name = :artist_name")
+        conditions.append(
+            "(artist_name = :artist_name OR :artist_name = ANY(COALESCE(lineup, ARRAY[]::text[])))"
+        )
         params["artist_name"] = artist_name
     if city:
         conditions.append("LOWER(city) = LOWER(:city)")
@@ -76,6 +78,7 @@ def get_upcoming_shows_near(
                     ELSE NULL END AS distance_km
                 FROM shows
                 WHERE date >= :today
+                  AND merged_into_id IS NULL
                   AND status != 'cancelled'
                   AND latitude IS NOT NULL
                   AND longitude IS NOT NULL
@@ -119,13 +122,22 @@ def get_all_shows(limit: int = 500) -> list[dict]:
     with read_scope() as session:
         rows = (
             session.execute(
-                text("SELECT * FROM shows ORDER BY date DESC LIMIT :lim"),
+                text(
+                    "SELECT * FROM shows WHERE merged_into_id IS NULL ORDER BY date DESC LIMIT :lim"
+                ),
                 {"lim": limit},
             )
             .mappings()
             .all()
         )
-    return [dict(row) for row in rows]
+    return [
+        {
+            key: value
+            for key, value in row.items()
+            if key not in {"field_provenance", "identity_key"}
+        }
+        for row in rows
+    ]
 
 
 def get_upcoming_show_counts() -> dict:
@@ -133,7 +145,7 @@ def get_upcoming_show_counts() -> dict:
         row = (
             session.execute(
                 text(
-                    "SELECT COUNT(*)::INTEGER AS c FROM shows WHERE date >= CURRENT_DATE"
+                    "SELECT COUNT(*)::INTEGER AS c FROM shows WHERE date >= CURRENT_DATE AND merged_into_id IS NULL"
                 )
             )
             .mappings()
@@ -143,7 +155,7 @@ def get_upcoming_show_counts() -> dict:
         row = (
             session.execute(
                 text(
-                    "SELECT COUNT(*)::INTEGER AS c FROM shows WHERE date >= CURRENT_DATE AND (source = 'lastfm' OR source = 'both')"
+                    "SELECT COUNT(*)::INTEGER AS c FROM shows WHERE date >= CURRENT_DATE AND merged_into_id IS NULL AND (source = 'lastfm' OR source = 'both')"
                 )
             )
             .mappings()

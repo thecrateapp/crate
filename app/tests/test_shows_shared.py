@@ -28,7 +28,7 @@ def test_show_dedupe_key_ignores_source_specific_ids():
     assert show_dedupe_key(first) == show_dedupe_key(second)
 
 
-def test_dedupe_show_rows_merges_semantic_duplicates():
+def test_dedupe_show_rows_preserves_distinct_persisted_ids_for_explicit_consolidation():
     rows = [
         {
             "id": 101,
@@ -61,9 +61,10 @@ def test_dedupe_show_rows_merges_semantic_duplicates():
 
     deduped = dedupe_show_rows(rows)
 
-    assert len(deduped) == 1
-    assert deduped[0]["source"] == "both"
+    assert len(deduped) == 2
+    assert [row["id"] for row in deduped] == [101, 202]
+    assert deduped[0]["source"] == "ticketmaster"
     assert deduped[0]["url"] == "https://tickets.example.test/high-vis"
-    assert deduped[0]["lastfm_url"] == "https://last.fm/event/xyz"
-    assert deduped[0]["lastfm_attendance"] == 4200
-    assert deduped[0]["lineup"] == ["High Vis", "Smashing Pumpkins"]
+    assert deduped[1]["lastfm_url"] == "https://last.fm/event/xyz"
+    assert deduped[1]["lastfm_attendance"] == 4200
+    assert deduped[1]["lineup"] == ["High Vis", "Smashing Pumpkins"]

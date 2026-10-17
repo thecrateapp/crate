@@ -42,6 +42,8 @@ export const ADMIN_CONSOLE_ENTRY_CAPABILITIES = [
   "audit.view",
   "users.view",
   "roles.view",
+  "agents.integrations.manage",
+  "agents.plans.review",
   "library.metadata.write",
   "library.analysis.manage",
   "library.track.remove",

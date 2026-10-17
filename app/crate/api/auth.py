@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from threading import RLock
 from typing import Literal, TypedDict, overload
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+from uuid import UUID
 
 import jwt
 import requests
@@ -1424,6 +1425,19 @@ _AUTH_ADMIN_RESPONSES = merge_responses(
 # ── Middleware ───────────────────────────────────────────────────
 
 
+def _is_agent_resource(path: str) -> bool:
+    path = path.rstrip("/")
+    if path == "/mcp":
+        return True
+    if not path.startswith("/mcp/artifacts/"):
+        return False
+    identifier = path.removeprefix("/mcp/artifacts/")
+    try:
+        return str(UUID(identifier)) == identifier.lower()
+    except ValueError:
+        return False
+
+
 class AuthMiddleware:
     """Resolve auth via Bearer header, query param, or cookie (in that order).
 
@@ -1478,6 +1492,16 @@ class AuthMiddleware:
         )
 
     async def resolve_user(self, request: Request) -> dict | None:
+        # Machine credentials never participate in the human fallback chain.
+        if _is_agent_resource(request.url.path) or any(
+            "crate_mcp_" in value
+            for value in [
+                request.headers.get("Authorization", ""),
+                *request.query_params.values(),
+                *request.cookies.values(),
+            ]
+        ):
+            return None
         user = None
 
         # 1. Bearer token auth (primary for all clients)
@@ -1560,6 +1584,19 @@ class AuthMiddleware:
             return
 
         request = Request(scope, receive=receive)
+        if not _is_agent_resource(request.url.path) and any(
+            "crate_mcp_" in value
+            for value in [
+                request.headers.get("Authorization", ""),
+                *request.query_params.values(),
+                *request.cookies.values(),
+            ]
+        ):
+            response = JSONResponse(
+                {"error": "MCP_CREDENTIAL_WRONG_RESOURCE"}, status_code=401
+            )
+            await response(scope, receive, send)
+            return
         scope.setdefault("state", {})
         scope["state"]["user"] = await self.resolve_user(request)
         await self.app(scope, receive, send)

@@ -28,6 +28,7 @@ TEXT_FIELDS = {"genre", "artist", "album", "title", "format", "audio_key"}
 
 SORT_MAP: dict[str, str] = {
     "random": "RANDOM()",
+    "least_played": "COALESCE(play_stats.play_count, 0) ASC, t.id ASC",
     "popularity": (
         "CASE WHEN t.popularity_score IS NULL AND t.lastfm_playcount IS NULL "
         "AND t.lastfm_listeners IS NULL AND t.popularity IS NULL "
@@ -44,9 +45,16 @@ SORT_MAP: dict[str, str] = {
     "title": "t.title ASC",
 }
 
+LEAST_PLAYED_JOIN = """LEFT JOIN (
+    SELECT track_entity_uid, SUM(play_count) AS play_count
+    FROM user_track_stats WHERE stat_window='all_time' AND track_entity_uid IS NOT NULL
+    GROUP BY track_entity_uid
+) play_stats ON play_stats.track_entity_uid=t.entity_uid"""
+
 
 __all__ = [
     "FIELD_COLUMNS",
     "SORT_MAP",
     "TEXT_FIELDS",
+    "LEAST_PLAYED_JOIN",
 ]

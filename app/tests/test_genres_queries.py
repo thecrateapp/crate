@@ -690,6 +690,16 @@ class TestGenresLibraryDetail:
                 )
             )
 
+        with transaction_scope() as session:
+            session.execute(
+                text("""INSERT INTO shows(artist_name,lineup,venue,city,latitude,longitude,date,status,created_at,updated_at)
+              VALUES('External Headliner',ARRAY['Detail Artist'],'Lineup Room','Berlin',52.520,13.405,CURRENT_DATE+10,'onsale',NOW(),NOW())""")
+            )
+            session.execute(
+                text("""INSERT INTO shows(artist_name,venue,city,latitude,longitude,date,status,merged_into_id,created_at,updated_at)
+              SELECT 'Detail Artist','Consolidated Copy','Berlin',52.520,13.405,CURRENT_DATE+1,'onsale',id,NOW(),NOW() FROM shows WHERE venue='Near Room'""")
+            )
+
         shows = get_genre_upcoming_shows(
             "post-punk",
             latitude=52.52,
@@ -701,6 +711,7 @@ class TestGenresLibraryDetail:
         assert [show["artist_name"] for show in shows] == [
             "Detail Artist",
             "Secondary Detail Artist",
+            "External Headliner",
         ]
         assert shows[0]["venue"] == "Near Room"
 

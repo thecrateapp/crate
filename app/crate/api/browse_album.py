@@ -1120,7 +1120,7 @@ def api_download_album(request: Request, artist: str, album: str):
     if not album_dir:
         return Response(status_code=404)
 
-    tmp_dir = Path(tempfile.mkdtemp(prefix="crate-album-download."))
+    tmp_dir = Path(tempfile.mkdtemp(prefix="crate-album-download.")).resolve()
     zip_path = tmp_dir / "album.zip"
 
     exts = extensions()

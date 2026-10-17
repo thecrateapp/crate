@@ -21,3 +21,5 @@ dramatiq[redis]>=1.17
 device-detector>=5.0,<6.5
 casbin>=1.37
 sentry-sdk[fastapi]>=2.60,<3
+mcp==2.3.0
+Authlib==1.9.1
