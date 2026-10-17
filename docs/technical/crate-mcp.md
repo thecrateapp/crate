@@ -766,6 +766,18 @@ concurrent update. This also exercises the database-only artist branch. All 42 f
 `test_agent_metadata.py` passed with real PostgreSQL and no skips; targeted Ruff and Pyright passed.
 No runtime behavior changed or full local suite was rerun for this follow-up.
 
+The next test-review follow-up checks that accepted batch completion clears `claim_token` and
+records `done`. Reset lock observation no longer matches SQL text: backend PID, active state,
+lock wait and `pg_blocking_pids` identify the waiting transaction. Authority/revocation and
+effect/finalization tests use the supported caller-owned `session=` transaction contract, record
+the real backend PIDs and require an observed blocker before releasing the effect. Deadlines
+only bound failures; elapsed time cannot prove exclusion. All 116 focused PostgreSQL cases in
+`test_agent_analysis_sync.py` and `test_agent_library_operations.py` passed without skips, with
+targeted Ruff and Pyright passing. Disposable negative controls failed as expected for a retained
+batch token and four delayed workers without locks (two authority cases and analysis/bliss reset).
+The two reset variants also passed with lowercase, multiline, aliased SQL and `FOR NO KEY UPDATE`.
+This follow-up changes tests and documentation only; no full local suite was rerun.
+
 ### Repair readiness and effects
 
 `get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,

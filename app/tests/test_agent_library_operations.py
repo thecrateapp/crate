@@ -3,9 +3,11 @@
 import copy
 import json
 import sys
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
+from queue import Queue
 from threading import Event
+from time import monotonic, sleep
 from types import ModuleType
 from uuid import uuid4
 
@@ -23,7 +25,7 @@ from crate.db.repositories import mcp_oauth as oauth_store
 from crate.db.repositories.agent_credentials import revoke_credential
 from crate.db.repositories.auth_user_roles import set_user_roles
 from crate.db.repositories.tasks_updates import start_task
-from crate.db.tx import transaction_scope
+from crate.db.tx import read_scope, transaction_scope
 
 from tests.agent_command_fixtures import UID, OTHER_UID, change, other_principal, scalar
 from tests.test_agent_plan_approvals import decide
@@ -132,6 +134,38 @@ def _running(world, plan=None):
     queued = _apply(world, plan)
     start_task(queued["job_id"])
     return queued, plan
+
+
+def _with_backend_pid(pids: Queue[int], operation, *args):
+    with transaction_scope() as session:
+        session.execute(text("SET LOCAL lock_timeout = '10s'"))
+        pids.put(session.execute(text("SELECT pg_backend_pid()")).scalar_one())
+        return operation(*args, session=session)
+
+
+def _assert_backend_waits_for(future, worker_pid: int, blocker_pid: int):
+    deadline = monotonic() + 8
+    while True:
+        # Read scopes keep PostgreSQL statistics fresh. Only an actual lock wait
+        # on the effect's backend satisfies this assertion, regardless of SQL text.
+        with read_scope() as observer:
+            blocked = observer.execute(
+                text(
+                    "SELECT state='active' AND wait_event_type='Lock' "
+                    "AND :blocker_pid=ANY(pg_blocking_pids(pid)) "
+                    "FROM pg_stat_activity WHERE pid=:worker_pid"
+                ),
+                {"blocker_pid": blocker_pid, "worker_pid": worker_pid},
+            ).scalar_one_or_none()
+        if blocked:
+            return
+        if future.done():
+            future.result()
+            pytest.fail("Operation completed without waiting for the effect's lock")
+        assert monotonic() < deadline, (
+            "Operation never waited for the effect's backend to release its lock"
+        )
+        sleep(0.01)
 
 
 def test_prepare_admits_a_durable_worker_job_without_compiling_in_request(
@@ -565,30 +599,40 @@ def test_current_authority_holds_revocation_behind_effect_and_blocks_future_effe
     world = operation_world
     queued, _ = _running(world)
     assert jobs.start_operation_effect(queued["job_id"])
-    entered, release, revoking = Event(), Event(), Event()
+    entered, release = Event(), Event()
+    applying_pids: Queue[int] = Queue()
+    revoking_pids: Queue[int] = Queue()
     effects = []
 
     def effect():
         entered.set()
-        assert release.wait(3)
+        assert release.wait(15)
         effects.append("applied")
 
-    def revoke():
-        revoking.set()
-        revoke_credential(world["principal"].credential_id)
-
     with ThreadPoolExecutor(max_workers=2) as pool:
-        applying = pool.submit(jobs.with_operation_authority, queued["job_id"], effect)
-        assert entered.wait(3)
-        revocation = pool.submit(revoke)
-        assert revoking.wait(3)
+        applying = pool.submit(
+            _with_backend_pid,
+            applying_pids,
+            jobs.with_operation_authority,
+            queued["job_id"],
+            effect,
+        )
         try:
-            with pytest.raises(TimeoutError):
-                revocation.result(timeout=0.15)
+            assert entered.wait(8)
+            effect_pid = applying_pids.get(timeout=8)
+            revocation = pool.submit(
+                _with_backend_pid,
+                revoking_pids,
+                revoke_credential,
+                world["principal"].credential_id,
+            )
+            _assert_backend_waits_for(
+                revocation, revoking_pids.get(timeout=8), effect_pid
+            )
         finally:
             release.set()
-        applying.result(timeout=3)
-        revocation.result(timeout=3)
+        applying.result(timeout=5)
+        assert revocation.result(timeout=5) is True
     assert effects == ["applied"]
     with pytest.raises(DiagnosticError) as caught:
         jobs.with_operation_authority(
@@ -605,22 +649,38 @@ def test_running_effect_cannot_lose_its_target_reservation_to_concurrent_finish(
     queued, _ = _running(world)
     assert jobs.start_operation_effect(queued["job_id"])
     entered, release = Event(), Event()
+    applying_pids: Queue[int] = Queue()
+    finishing_pids: Queue[int] = Queue()
 
     def effect():
         entered.set()
-        assert release.wait(3)
+        assert release.wait(15)
 
     result = {
         "execution": {"status": "partial"},
         "verification": {"status": "manual_reconciliation_required"},
     }
     with ThreadPoolExecutor(max_workers=2) as pool:
-        applying = pool.submit(jobs.with_operation_authority, queued["job_id"], effect)
-        assert entered.wait(3)
-        finishing = pool.submit(jobs.finish_operation, queued["job_id"], result)
+        applying = pool.submit(
+            _with_backend_pid,
+            applying_pids,
+            jobs.with_operation_authority,
+            queued["job_id"],
+            effect,
+        )
         try:
-            with pytest.raises(TimeoutError):
-                finishing.result(timeout=0.15)
+            assert entered.wait(8)
+            effect_pid = applying_pids.get(timeout=8)
+            finishing = pool.submit(
+                _with_backend_pid,
+                finishing_pids,
+                jobs.finish_operation,
+                queued["job_id"],
+                result,
+            )
+            _assert_backend_waits_for(
+                finishing, finishing_pids.get(timeout=8), effect_pid
+            )
             assert (
                 scalar(
                     "SELECT status FROM tasks WHERE id=:id", {"id": queued["job_id"]}
@@ -629,8 +689,12 @@ def test_running_effect_cannot_lose_its_target_reservation_to_concurrent_finish(
             )
         finally:
             release.set()
-        applying.result(timeout=3)
-        finishing.result(timeout=3)
+        applying.result(timeout=5)
+        assert finishing.result(timeout=5) == result
+    assert (
+        scalar("SELECT status FROM tasks WHERE id=:id", {"id": queued["job_id"]})
+        == "completed"
+    )
 
 
 def test_target_resolution_batches_track_album_and_artist_into_one_shared_artist_lock(

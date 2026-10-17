@@ -286,7 +286,10 @@ class TestAnalysisGenerationFences:
         assert _payload(stale["id"], "analysis")["shadow_value"] is None
         assert _processing(stale["id"], "analysis")["pipeline_signature"] is None
         assert _payload(valid["id"], "analysis")["shadow_value"] == 144.0
-        assert _processing(valid["id"], "analysis")["pipeline_signature"] == "new"
+        completed = _processing(valid["id"], "analysis")
+        assert completed["state"] == "done"
+        assert completed["pipeline_signature"] == "new"
+        assert completed["claim_token"] is None
 
     def test_forged_claim_with_correct_generation_and_different_token_is_rejected(
         self, pg_db
@@ -392,7 +395,6 @@ class TestAnalysisGenerationFences:
                             text(
                                 "SELECT state='active' AND wait_event_type='Lock' "
                                 "AND :reset_pid=ANY(pg_blocking_pids(pid)) "
-                                "AND query LIKE '%FROM track_processing_state%FOR UPDATE%' "
                                 "FROM pg_stat_activity WHERE pid=:worker_pid"
                             ),
                             {"reset_pid": reset_pid, "worker_pid": worker_pid},
