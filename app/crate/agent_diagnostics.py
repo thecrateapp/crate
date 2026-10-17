@@ -64,6 +64,16 @@ def _validate_limit(limit):
 
 def _sensitive_key(key, value):
     normalized = re.sub(r"[^a-z0-9]", "", str(key).lower())
+    if normalized == "authorizationcontext" and isinstance(value, dict):
+        # This is a public context container; its contents are still sanitized.
+        return False
+    if normalized == "authorizationid" and isinstance(value, (str, UUID)):
+        try:
+            UUID(str(value))
+        except ValueError:
+            pass
+        else:
+            return False
     if normalized in _CREDENTIAL_COUNTER_KEYS and type(value) is int and value >= 0:
         return False
     return any(marker in normalized for marker in _CREDENTIAL_KEYS)
@@ -86,9 +96,16 @@ def _redact_assignments(value):
                 raw[length].isspace() or raw[length] in ",;}]"
             ):
                 raise ValueError
+            if not raw.startswith(('"', "[", "{")):
+                remainder = raw[length:].lstrip(" \t")
+                if remainder and remainder[0] not in ",;}]\r\n":
+                    parsed = None
+                if _sensitive_key(key, parsed):
+                    # An unquoted secret may be a passphrase with spaces.
+                    length = len(raw.split("\n", 1)[0].split("\r", 1)[0])
         except (ValueError, RecursionError):
             quoted = re.match(r"'(?:\\.|[^'\\])*(?:'|$)", raw)
-            bare = re.match(r"[^\s,;\]}]+", raw)
+            bare = re.match(r"[^\r\n]*", raw)
             if quoted:
                 length = quoted.end()
             elif raw.startswith(('"', "[", "{")):
@@ -529,10 +546,10 @@ def list_library_issues(
 
 def inspect_artist(*, artist_uid=None, name=None, limit=20, principal=None):
     _validate_limit(limit)
-    if artist_uid:
+    if artist_uid is not None:
         try:
             artist_uid = str(UUID(artist_uid))
-        except ValueError:
+        except (ValueError, TypeError, AttributeError):
             raise DiagnosticError(
                 "INVALID_ARGUMENT", "artist_uid must be a UUID"
             ) from None

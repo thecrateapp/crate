@@ -802,6 +802,18 @@ without skips, including real PostgreSQL integrations, valid page boundaries and
 Redaction fixtures use simulated payloads; targeted Ruff and Pyright passed. No full local suite
 was rerun for this follow-up.
 
+CI then exposed a delegated-plan consumer whose public `authorization_id` was overredacted.
+The regression was reproduced before allowing only valid UUIDs for that metadata key and object
+containers for `authorization_context`; nested secrets and invalid metadata values remain redacted.
+Unquoted sensitive assignments now consume the rest of their line, including numeric, boolean or
+null-looking prefixes, so passphrase suffixes cannot escape sanitization. Other lines remain
+available. Artist inspection also rejects nontext identities, including falsy values, with
+`INVALID_ARGUMENT` before database access. All 14 added regressions failed before the fixes.
+The four diagnostic/operations/discovery files passed 345 cases and the three approval/Admin/quality
+consumer files passed 93, without skips, with sequential PostgreSQL-backed integration runs;
+targeted Ruff and Pyright passed. The existing first-item `RESPONSE_TOO_LARGE` contract at 40,000
+bytes remains explicit; evidence rows are not silently skipped. No full local suite was rerun.
+
 ### Repair readiness and effects
 
 `get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,

@@ -442,6 +442,11 @@ def test_job_evidence_redacts_nested_prefixed_credentials(monkeypatch, key):
         'tokens=["private-value", {"nested": "other-private-value"}',
         "auth_token_value=Bearer private-value",
         "tokens=" + "[" * 1100 + '"private-value"' + "]" * 1100,
+        "password=correct horse private-value battery staple",
+        "password=123 private-value",
+        "secret_key=false private-value",
+        "auth_token_value=null private-value",
+        "tokens=prefix private-value; other=visible",
     ],
 )
 def test_job_text_redacts_compound_credentials_and_collections(monkeypatch, error):
@@ -455,6 +460,53 @@ def test_job_text_redacts_compound_credentials_and_collections(monkeypatch, erro
 
     assert "private-value" not in result["data"]["error"]
     assert "[redacted" in result["data"]["error"]
+
+
+def test_job_evidence_preserves_typed_authorization_metadata_without_bypassing_redaction(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        diagnostics.agent_operations,
+        "read_job",
+        lambda _job_id: {
+            "authorization_id": ARTIST_UID,
+            "authorization_context": {
+                "authorization_id": ARTIST_UID,
+                "auth_token_value": "private-value",
+            },
+            "invalid_id": {"authorization_id": "private-value"},
+            "invalid_context": {"authorization_context": "private-value"},
+            "error": "password=prefix private-value\npublic=visible",
+        },
+    )
+
+    result = diagnostics.get_job("job-1")["data"]
+
+    assert result["authorization_id"] == ARTIST_UID
+    assert result["authorization_context"] == {
+        "authorization_id": ARTIST_UID,
+        "auth_token_value": "[redacted]",
+    }
+    assert result["invalid_id"] == {"authorization_id": "[redacted]"}
+    assert result["invalid_context"] == {"authorization_context": "[redacted]"}
+    assert "private-value" not in json.dumps(result)
+    assert "public=visible" in result["error"]
+
+
+@pytest.mark.parametrize("artist_uid", [0, 1, True, False, [], {}, [ARTIST_UID], 1.5])
+def test_artist_inspection_rejects_nontext_identity_before_database_access(
+    monkeypatch, artist_uid
+):
+    monkeypatch.setattr(
+        diagnostics.agent_library,
+        "read_artist_evidence",
+        lambda **_kwargs: pytest.fail("Invalid artist identity reached the database"),
+    )
+
+    with pytest.raises(diagnostics.DiagnosticError) as caught:
+        diagnostics.inspect_artist(artist_uid=artist_uid)
+
+    assert caught.value.code == "INVALID_ARGUMENT"
 
 
 @pytest.mark.parametrize("key", ["token_count", "input_tokens", "output_tokens"])
