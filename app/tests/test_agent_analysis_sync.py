@@ -1077,6 +1077,11 @@ class TestExactSyncOperations:
         second_path.parent.mkdir(parents=True)
         second_path.write_bytes(b"second-audio-source")
         albums = [first_album, _album_for(second)]
+        outside = _seed_track(pg_db, "outside-artist-sync", library_path=str(tmp_path))
+        outside_path = Path(outside["path"])
+        outside_path.parent.mkdir(parents=True)
+        outside_path.write_bytes(b"outside-artist-audio")
+        outside_album = _album_for(outside)
         # A real sibling directory must not be discovered by an indexed-only plan.
         unindexed = Path(first["path"]).parent.parent / "Unindexed" / "track.flac"
         unindexed.parent.mkdir()
@@ -1102,7 +1107,7 @@ class TestExactSyncOperations:
             {"scope": "artist", "entity_uid": first_album["artist_uid"], "limit": 3},
             config,
         )
-        return [first, second], albums, config, plan
+        return [first, second], albums, config, plan, outside_album
 
     def test_artist_sync_applies_all_selected_albums_in_order_without_discovery(
         self, pg_db, tmp_path, monkeypatch
@@ -1110,10 +1115,9 @@ class TestExactSyncOperations:
         from crate.agent_sync import apply_operation
         from crate.db.queries.agent_sync import list_sync_albums, read_sync_state
 
-        tracks, albums, config, plan = self._prepare_artist(
+        tracks, albums, config, plan, outside = self._prepare_artist(
             pg_db, tmp_path, monkeypatch
         )
-        outside = _album_for(_seed_track(pg_db, "outside-artist-sync"))
         outside_before = read_sync_state(outside["entity_uid"])
         album_uids = [album["entity_uid"] for album in albums]
         assert plan["execution"]["scope"] == "artist"
@@ -1171,7 +1175,7 @@ class TestExactSyncOperations:
         from crate.db.queries.agent_sync import read_sync_state
         from crate.db.tx import transaction_scope
 
-        tracks, albums, config, plan = self._prepare_artist(
+        tracks, albums, config, plan, _outside = self._prepare_artist(
             pg_db, tmp_path, monkeypatch
         )
         with transaction_scope() as session:
@@ -1216,7 +1220,7 @@ class TestExactSyncOperations:
         from crate.db.queries.agent_sync import read_sync_state
         from crate.db.repositories import agent_sync
 
-        _tracks, albums, config, plan = self._prepare_artist(
+        _tracks, albums, config, plan, _outside = self._prepare_artist(
             pg_db, tmp_path, monkeypatch
         )
         second_before = read_sync_state(albums[1]["entity_uid"])
