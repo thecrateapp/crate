@@ -4,27 +4,30 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — 1AI published; 1AJ New Releases local
+## Active Linux workspace — 1AJ published; 1AK Global Catalog local
 
-Use /home/diego/.codex/worktrees/crate-v3-1q/crate, feat/crate_v3 tracking origin.
-Published HEAD/ref `a304ecf9c41bc254dab98b9f52668e18f4d87852` (1AI), original53177736 ancestor.
-Leave /home/diego/Code/Ninja/crate (feat/crate_mcp) alone. Node22.23.3/dependencies prepared.
+Use /home/diego/.codex/worktrees/crate-v3-1q/crate, existing feat/crate_v3 tracking origin.
+Published HEAD/ref `235b892f5dadab07faf3ae7a1a1727864b7a06c9`(1AJ);53177736 ancestor retained.
+Leave /home/diego/Code/Ninja/crate(feat/crate_mcp) alone. Node22.23.3/dependencies prepared.
 
-Diego approved/published1AI Discovery and authorised one further bounded Admin group preserving
-UX glyphs. Current1AJ changes NewReleases.tsx production presentation only, keeping six marked
-search/loading/dismiss sites; snapshot/SSE/filter/date/capability/task/action/navigation/raw-artwork
-contracts unchanged.18-file policy/62 retained sites. Dismiss reuses shared Button outline/icon;
-labels8px, controls44px. No shared/backend/auth/dependency/Listen change.1b.8/B6/A10/phase6.5 pending.
+Diego approved/published1AJ and authorised another bounded Admin group preserving UX glyphs.
+1AK changes GlobalCatalog.tsx production rendering only: two retained mode-loading sites,
+existing status word/dot in content, shared readouts/8px and44px native local-view controls/fonts.
+19-file policy/64UX sites. Three GETs/limits, capability, POST bodies/handler and formatters stay.
+Actual refetch returns void: POST lock releases while status/runs reads may still be pending;
+preview/tests distinguish enqueue, reads and actual work. No new backend/auth/shared/Listen logic.
 
-Review actual isolated sample http://127.0.0.1:5186/admin-new-releases-demo.html or /#lanzamientos-admin.
-47 scoped Vitest,3preview+1persistent and3builtAdmin Chromium at1440/768/390,2strict TS configs,
-scoped lint/AST pass. InitialJS526574/532480Bgzip,10assets5906Bmargin. Main handover owns final
-build/review/proof and QA limits. Plan:2026-10-18-crate-v3-new-releases-icons.md. Preview service stays active.
+Review http://127.0.0.1:5186/admin-global-catalog-demo.html or /#catalogo-global-admin.42scoped
+Vitest +4preview+3builtAdmin Chromium at1440/768/390 pass; strict TS/lint/AST/Admin and16-entry
+preview builds pass. InitialJS526533/532480Bgzip,5947Bmargin. Generatedcache restored. ActualIAB
+proof .artifacts/review/checkpoint-1ak-global-catalog.jpg. Main handover owns finalreview/QA limits;
+plan2026-10-18-crate-v3-global-catalog-icons.md. Keep preview service active5186.
 
-All prior checkpoints, Timeline retirement/redirect and withdrawn-proposal archive remain intact.
-33 canonicalPNG/manifest stay1M, app/web@258bbaee pin unchanged. No full suites/CI/canonical refresh;
-live integration/real artwork/native/AT/phase QA pending. **Stop1AJ uncommitted for Diego; no next
-group/commit/push/PR/merge/rebase/deploy/release.** Historical bootstrap below does not replace this worktree.
+All earlier checkpoints/Timeline retirement/redirect/withdrawn proposal archive remain. Shared
+Select-label minor deferred from1AJ.33canonicalPNG/manifest stay1M, pin258bbaee unchanged.
+No full suites/CI/canonical refresh. Native/AT/live backend/server auth/phase QA pending;
+1b.8/B17/A24/phase6.7 incomplete. **Stop1AK uncommitted for Diego; no next group, commit/push,
+PR/merge/rebase/deploy/release.** Historical bootstrap below does not replace this worktree.
 
 ## Prepare the checkout
 
@@ -246,3 +249,18 @@ bounded Admin icon group, preserving functional UX glyphs. Previous local-only1A
 superseded. The deferred shared Select label association remains recorded; no unreviewed fix.
 Next checkpoint1AK covers Global Catalog and stops before publication for Diego. No full
 suites/CI/canonical refresh, PR/merge/rebase/deploy/release; prior checkpoints remain intact.
+
+Final1AK fresh review20files/13source hashes matched:Critical0/Important0/Minor1.
+Deferredminor: persistent checkpoint copy says lock lasts until reads finish; actual buttons
+unlock after enqueue. Correct contract/tests/limits and all executor rulings are in mainhandover.
+No repair/re-review; sources frozen, stoplocal1AK with previewactive.
+
+## 1AK approval, requested copy correction and publication — 2026-10-18
+
+Diego approved1AK and explicitly requested correcting its persistent specimen text before
+commit/push, then one further bounded Admin icon group. The stale lock-copy minor is resolved:
+"bloqueo durante el envío y lecturas posteriores asíncronas". The production POST-only lock and
+void-refetch handler remain unchanged. Earlier1AK local/Minor-deferral stops are superseded by
+this instruction. Shared Select label minor from1AJ remains separate and deferred.
+Next stop1AL covers Roles & Permissions; preserve UX, preview and all checkpoints. No full
+suite/CI/canonical refresh, PR/merge/rebase/deploy/release or other checkout.

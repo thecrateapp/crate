@@ -34,6 +34,7 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
     "app/ui/src/pages/Bandcamp.tsx",
     "app/ui/src/pages/Discover.tsx",
     "app/ui/src/pages/NewReleases.tsx",
+    "app/ui/src/pages/GlobalCatalog.tsx",
   ]);
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
@@ -101,6 +102,8 @@ const approvedControls = new Map([
 ]);
 // Diego's 1W steering explicitly retains UX glyphs. Each concrete site remains bounded.
 const approvedUx = new Map([
+  ["GlobalCatalog:catalog-incremental-loading", ["lucide-react", "Loader2"]],
+  ["GlobalCatalog:catalog-full-loading", ["lucide-react", "Loader2"]],
   ["NewReleases:releases-search", ["lucide-react", "Search"]],
   ["NewReleases:releases-loading", ["lucide-react", "Loader2"]],
   ["NewReleases:releases-check-loading", ["lucide-react", "Loader2"]],

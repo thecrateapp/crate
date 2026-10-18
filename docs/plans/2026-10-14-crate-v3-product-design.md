@@ -2,9 +2,9 @@
 
 Status: product design, revised 2026-10-15. Canonical clone `/Users/diego/Code/crate-v3`, branch
 `feat/crate_v3`. The handover records implementation and QA status; historical analysis is not a
-current progress report. Checkpoints through 1AI are approved and published (`a304ecf9`).
-Library Timeline is removed; its old route redirects to Browse. Local 1AJ covers New Releases
-redundant icons with preserved UX glyphs and data/task/stream contracts. Stop for Diego before its commit/push. The final handover and later amendments below
+current progress report. Checkpoints through 1AJ are approved and published (`235b892f`).
+Library Timeline is removed; its old route redirects to Browse. Local 1AK covers Global Catalog
+redundant icons with preserved loading glyphs and data/action contracts. Stop for Diego before its commit/push. The final handover and later amendments below
 supersede earlier provisional stops. Diego's 1S review explicitly
 preserves the current Listen play essence (halo, layers and progress ring) and seek trail,
 adapted to V3 with 1–2 px strokes; see DS §5.5.
@@ -3780,3 +3780,32 @@ bounded Admin icon group, preserving functional UX glyphs. Previous local-only1A
 superseded. The deferred shared Select label association remains recorded; no unreviewed fix.
 Next checkpoint1AK covers Global Catalog and stops before publication for Diego. No full
 suites/CI/canonical refresh, PR/merge/rebase/deploy/release; prior checkpoints remain intact.
+
+## Linux 1AK — bounded Global Catalog icon group (2026-10-18)
+
+1AJ New Releases is approved and published as `235b892f5dadab07faf3ae7a1a1727864b7a06c9`;
+push/remote verified. Diego authorised another bounded Admin group preserving UX glyphs.
+Local1AK changes GlobalCatalog.tsx rendering only: redundant refresh/idle reconciliation and
+read-model title glyphs retire. Retain two marked aria-hidden mode-specific busy glyphs and
+aria-busy buttons. StatusDot with state word lives in content; four existing readings reuse
+OpsStatTile with the standard8px label/value pair. Display/mono/body fonts and44px native controls
+follow existing recipes; view selection stays local (no URL migration or new shared contract).
+
+Three GET URLs/limits25+50, response shapes/formatters, mode POST bodies, capability and handler
+behavior stay unchanged. Real refetch returns void: buttons unlock after enqueue while status/
+runs refresh asynchronously; no worker completion is inferred. Existing zero/unknown/error and
+candidate/run limitations remain; no backend, auth, task polling, SSE, dependency or Listen change.
+This does not complete1b.8, B17/A24/phase6.7 or add duplicate resolution. Actual isolated specimen
+is /admin-global-catalog-demo.html, persistent /#catalogo-global-admin. Prior checkpoints and
+Select-label deferred minor remain; canonical1M/pin258bbaee unchanged. Main handover owns scoped
+verification/review/limits. Stop1AK uncommitted for Diego before publication/next group.
+
+## 1AK approval, requested copy correction and publication — 2026-10-18
+
+Diego approved1AK and explicitly requested correcting its persistent specimen text before
+commit/push, then one further bounded Admin icon group. The stale lock-copy minor is resolved:
+"bloqueo durante el envío y lecturas posteriores asíncronas". The production POST-only lock and
+void-refetch handler remain unchanged. Earlier1AK local/Minor-deferral stops are superseded by
+this instruction. Shared Select label minor from1AJ remains separate and deferred.
+Next stop1AL covers Roles & Permissions; preserve UX, preview and all checkpoints. No full
+suite/CI/canonical refresh, PR/merge/rebase/deploy/release or other checkout.

@@ -1,14 +1,9 @@
 import { useState } from "react";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  DatabaseZap,
-  GitMerge,
-  Loader2,
-  RefreshCw,
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { OpsStatTile } from "@/components/admin/ops-surfaces";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { Button } from "@crate/ui/shadcn/button";
 import {
@@ -23,7 +18,10 @@ import { api } from "@/lib/api";
 
 interface GlobalCatalogStatus {
   serving_mode:
-    "global-ready" | "global-refreshing" | "global-degraded" | "local-fallback";
+    | "global-ready"
+    | "global-refreshing"
+    | "global-degraded"
+    | "local-fallback";
   state: {
     status: string;
   };
@@ -155,7 +153,9 @@ export function GlobalCatalog() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Global Catalog</h1>
+          <h1 className="font-display text-3xl font-bold tracking-tight">
+            Global Catalog
+          </h1>
           <p className="text-sm text-muted-foreground">
             Canonical deduped collection built from local library and trusted
             federated catalogs.
@@ -164,33 +164,41 @@ export function GlobalCatalog() {
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
+            className="min-h-11"
             onClick={() => void refetchStatus()}
             disabled={loading}
           >
-            <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
           <Button
             variant="outline"
+            className="min-h-11"
+            aria-busy={reconciling === "incremental"}
             disabled={!canManage || reconciling !== null}
             onClick={() => void queueReconcile("incremental")}
           >
             {reconciling === "incremental" ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <GitMerge className="mr-2 h-4 w-4" />
-            )}
+              <Loader2
+                aria-hidden="true"
+                data-admin-ux="catalog-incremental-loading"
+                className="mr-2 h-4 w-4 animate-spin"
+              />
+            ) : null}
             Reconcile
           </Button>
           <Button
+            className="min-h-11"
+            aria-busy={reconciling === "full"}
             disabled={!canManage || reconciling !== null}
             onClick={() => void queueReconcile("full")}
           >
             {reconciling === "full" ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <DatabaseZap className="mr-2 h-4 w-4" />
-            )}
+              <Loader2
+                aria-hidden="true"
+                data-admin-ux="catalog-full-loading"
+                className="mr-2 h-4 w-4 animate-spin"
+              />
+            ) : null}
             Full rebuild
           </Button>
         </div>
@@ -199,10 +207,12 @@ export function GlobalCatalog() {
       <div className="flex gap-2 border-b border-white/10">
         {tabs.map((item) => (
           <button
+            type="button"
+            aria-pressed={tab === item.key}
             key={item.key}
-            className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+            className={`min-h-11 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
               tab === item.key
-                ? "border-primary text-primary"
+                ? "border-accent-action-hi text-accent-action-hi"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
             onClick={() => setTab(item.key)}
@@ -214,7 +224,7 @@ export function GlobalCatalog() {
 
       {tab === "overview" ? (
         <div className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <MetricCard label="Artists" value={formatNumber(counts?.artists)} />
             <MetricCard label="Albums" value={formatNumber(counts?.albums)} />
             <MetricCard label="Tracks" value={formatNumber(counts?.tracks)} />
@@ -224,28 +234,24 @@ export function GlobalCatalog() {
             />
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  {status?.serving_mode === "global-degraded" ? (
-                    <AlertTriangle className="h-4 w-4 text-state-warning-text" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4 text-accent-action-hi" />
-                  )}
+                <CardTitle className="font-display text-base">
                   Read model
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
-                <Badge
-                  variant={
-                    status?.serving_mode === "global-ready"
-                      ? "default"
-                      : "secondary"
+                <StatusDot
+                  tone={
+                    status?.serving_mode === "global-degraded"
+                      ? "warn"
+                      : status?.serving_mode === "global-ready"
+                        ? "on"
+                        : "off"
                   }
-                >
-                  {servingModeLabel(status?.serving_mode)}
-                </Badge>
+                  label={servingModeLabel(status?.serving_mode)}
+                />
                 <p className="text-muted-foreground">
                   {servingModeDescription(status?.serving_mode)}
                 </p>
@@ -268,7 +274,9 @@ export function GlobalCatalog() {
 
             <Card className="lg:col-span-2">
               <CardHeader>
-                <CardTitle className="text-base">Last run</CardTitle>
+                <CardTitle className="font-display text-base">
+                  Last run
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {status?.last_run ? (
@@ -287,7 +295,7 @@ export function GlobalCatalog() {
       {tab === "runs" ? (
         <Card>
           <CardHeader>
-            <CardTitle>Reconciliation Runs</CardTitle>
+            <CardTitle className="font-display">Reconciliation Runs</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {runItems.length ? (
@@ -302,7 +310,7 @@ export function GlobalCatalog() {
       {tab === "duplicates" ? (
         <Card>
           <CardHeader>
-            <CardTitle>Duplicate Candidates</CardTitle>
+            <CardTitle className="font-display">Duplicate Candidates</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {duplicateItems.length ? (
@@ -313,12 +321,14 @@ export function GlobalCatalog() {
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">{candidate.entity_type}</Badge>
-                    <span className="font-medium">{candidate.match_key}</span>
+                    <span className="min-w-0 break-all font-mono">
+                      {candidate.match_key}
+                    </span>
                     <span className="text-xs text-muted-foreground">
                       {candidate.source_count} sources
                     </span>
                   </div>
-                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
                     {candidate.sources.map((source) => (
                       <div
                         key={`${source.source_kind}-${
@@ -334,8 +344,12 @@ export function GlobalCatalog() {
                         <div className="font-medium text-foreground">
                           {source.source_kind}
                         </div>
-                        <div>{source.node_uid || source.local_entity_uid}</div>
-                        <div>{source.match_method}</div>
+                        <div className="break-all font-mono">
+                          {source.node_uid || source.local_entity_uid}
+                        </div>
+                        <div className="break-all font-mono">
+                          {source.match_method}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -354,32 +368,23 @@ export function GlobalCatalog() {
 }
 
 function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm font-medium text-muted-foreground">
-          {label}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-      </CardContent>
-    </Card>
-  );
+  return <OpsStatTile label={label} value={value} />;
 }
 
 function RunSummary({ run }: { run: GlobalCatalogRun }) {
   return (
     <div className="rounded-lg border border-white/10 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Badge variant={run.status === "completed" ? "default" : "secondary"}>
             {run.status}
           </Badge>
-          <span className="font-medium">{run.mode}</span>
-          <span className="text-xs text-muted-foreground">{run.run_id}</span>
+          <span className="font-mono">{run.mode}</span>
+          <span className="break-all font-mono text-xs text-muted-foreground">
+            {run.run_id}
+          </span>
         </div>
-        <span className="text-xs text-muted-foreground">
+        <span className="font-mono text-xs text-muted-foreground">
           {formatDate(run.started_at)}
         </span>
       </div>
