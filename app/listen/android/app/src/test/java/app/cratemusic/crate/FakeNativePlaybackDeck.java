@@ -9,6 +9,8 @@ final class FakeNativePlaybackDeck implements NativePlaybackDeck {
     NativeTrack preparedTrack;
     long positionMs;
     float volume = 1.0f;
+    float speed = 1.0f;
+    boolean failSpeed;
     boolean playing;
     boolean released;
     boolean failPreparation;
@@ -80,6 +82,20 @@ final class FakeNativePlaybackDeck implements NativePlaybackDeck {
         calls.add("seek:" + requestedPositionMs);
         positionMs = requestedPositionMs;
         ready = false;
+    }
+
+    @Override
+    public void setSpeed(float requestedSpeed) {
+        calls.add("speed:" + requestedSpeed);
+        if (failSpeed) {
+            throw new IllegalStateException("speed unsupported");
+        }
+        speed = requestedSpeed;
+    }
+
+    @Override
+    public long positionMs() {
+        return positionMs;
     }
 
     @Override

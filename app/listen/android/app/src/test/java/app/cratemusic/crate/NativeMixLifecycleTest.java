@@ -12,6 +12,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import org.junit.Before;
 import org.junit.Test;
 
@@ -309,6 +312,184 @@ public class NativeMixLifecycleTest {
         assertEquals(0.25f, deckB.volume, 0.0001f);
         assertTrue(deckA.playing);
         assertTrue(deckB.playing);
+    }
+
+    private static NativeTransitionPlan beatmatchPlan() {
+        try {
+            JSONObject json = new JSONObject();
+            json.put("plannerVersion", 2);
+            json.put("outgoingTrackId", "one");
+            json.put("incomingTrackId", "two");
+            json.put("mode", "beatmatch");
+            json.put("durationMs", 4000);
+            json.put("outgoingCueMs", 170000);
+            json.put("incomingCueMs", 8000);
+            json.put("incomingTempoRatio", 1.04);
+            json.put("beatPhaseOffsetMs", 100);
+            json.put("handoffProgress", 0.5);
+            json.put("outgoingGainDb", 0.0);
+            json.put("incomingGainDb", 0.0);
+            json.put("curve", "equal-power");
+            json.put("bassHandoff", "balanced");
+            json.put("confidence", 0.9);
+            return NativeTransitionPlan.fromJson(json, "one", "two", 4000L);
+        } catch (JSONException error) {
+            throw new AssertionError(error);
+        }
+    }
+
+    @Test
+    public void beatmatchPreparesAPrerollBeforeThePhaseAlignedCue() {
+        assertEquals(8104L, beatmatchPlan().startIncomingCueMs());
+        assertEquals(8104L - 2600L, beatmatchPlan().prepareIncomingCueMs());
+        assertEquals(0L, plan().startIncomingCueMs());
+        assertEquals(0L, plan().prepareIncomingCueMs());
+    }
+
+    @Test
+    public void prerollStartsTheIncomingDeckMutedAtTheTempoRatio() {
+        preroll();
+
+        assertTrue(controller.isPrerolling());
+        assertTrue(deckB.playing);
+        assertEquals(0.0f, deckB.volume, 0.0f);
+        assertEquals(1.04f, deckB.speed, 0.0001f);
+        assertEquals(1.0f, deckA.speed, 0.0f);
+    }
+
+    @Test
+    public void anInPhasePrerollMixesWithTheTempoRatio() {
+        preroll();
+        alignPositions(0L);
+        controller.correctPhase(0L);
+        controller.correctPhase(20L);
+        controller.correctPhase(40L);
+
+        assertTrue(controller.beginTransition(mixPlan()));
+
+        assertFalse(controller.isPrerolling());
+        assertTrue(controller.isBeatmatching());
+        assertEquals(1.04f, deckB.speed, 0.0001f);
+        assertTrue(deckB.calls.contains("envelope:INCOMING:4160:0.0"));
+    }
+
+    @Test
+    public void anOutOfPhasePrerollMixesAsAdaptive() {
+        preroll();
+        alignPositions(0L);
+        controller.correctPhase(0L);
+        controller.correctPhase(20L);
+        alignPositions(100L);
+        controller.correctPhase(40L);
+
+        assertTrue(controller.beginTransition(mixPlan()));
+
+        assertFalse(controller.isBeatmatching());
+        assertEquals(1.0f, deckB.speed, 0.0f);
+        assertTrue(deckB.calls.contains("envelope:INCOMING:4000:0.0"));
+    }
+
+    @Test
+    public void aBeatmatchPlanWithoutPrerollMixesAsAdaptive() {
+        controller.prepareStandbyAt(8104L, 0L);
+
+        assertTrue(controller.beginTransition(mixPlan()));
+
+        assertFalse(controller.isBeatmatching());
+        assertFalse(deckB.calls.contains("speed:1.04"));
+        assertTrue(deckB.calls.contains("envelope:INCOMING:4000:0.0"));
+    }
+
+    @Test
+    public void prerollCorrectsHarderThanTheAudibleMix() {
+        preroll();
+        alignPositions(50L);
+        controller.correctPhase(0L);
+        assertEquals(1.04f * 1.05f, deckB.speed, 0.0001f);
+
+        alignPositions(30L);
+        controller.correctPhase(100L);
+        assertEquals(1.04f * 1.05f, deckB.speed, 0.0001f);
+
+        alignPositions(0L);
+        controller.correctPhase(1_000L);
+        controller.correctPhase(1_020L);
+        controller.correctPhase(1_040L);
+        assertTrue(controller.beginTransition(mixPlan()));
+        alignPositions(50L);
+        controller.correctPhase(2_000L);
+        controller.correctPhase(2_200L);
+        controller.correctPhase(2_400L);
+
+        assertEquals(50.0f, controller.lastPhaseErrorMs(), 1.0f);
+        assertEquals(1.04f * 1.01f, deckB.speed, 0.0001f);
+    }
+
+    @Test
+    public void completionLeavesTheTempoRestorePending() {
+        preroll();
+        alignPositions(0L);
+        controller.correctPhase(0L);
+        controller.correctPhase(20L);
+        controller.correctPhase(40L);
+        assertTrue(controller.beginTransition(mixPlan()));
+
+        controller.applyProgress(controller.executionId(), 1.0f);
+
+        assertEquals(1.04f, controller.pendingTempoRestoreSpeed(), 0.0001f);
+        controller.clearPendingTempoRestore();
+        assertEquals(1.0f, controller.pendingTempoRestoreSpeed(), 0.0f);
+    }
+
+    @Test
+    public void aPrerolledMixStartsEvenWhenTheDeckDriftedFromItsCue() {
+        preroll();
+        alignPositions(400L);
+        controller.correctPhase(0L);
+
+        assertTrue(controller.isStandbyReadyAt(8104L, 1_000L));
+        assertTrue(controller.beginTransition(mixPlan()));
+        assertFalse(controller.isBeatmatching());
+    }
+
+    @Test
+    public void cancellingThePrerollResetsTheStandby() {
+        preroll();
+
+        controller.cancelPreroll();
+
+        assertFalse(controller.isPrerolling());
+        assertEquals(1.0f, deckB.speed, 0.0f);
+        assertFalse(deckB.playing);
+    }
+
+    @Test
+    public void aDeckThatCannotChangeSpeedDoesNotPreroll() {
+        deckB.failSpeed = true;
+        controller.prepareStandbyAt(beatmatchPlan().prepareIncomingCueMs(), 0L);
+
+        assertFalse(controller.beginPreroll(beatmatchPlan()));
+        assertFalse(controller.isPrerolling());
+    }
+
+    private void preroll() {
+        controller.prepareStandbyAt(beatmatchPlan().prepareIncomingCueMs(), 0L);
+        assertTrue(controller.beginPreroll(beatmatchPlan()));
+    }
+
+    private void alignPositions(long incomingLagMs) {
+        deckA.positionMs = 170000L;
+        deckB.positionMs = 8104L - Math.round(incomingLagMs * 1.04f);
+    }
+
+    private static NativeTransitionPlan mixPlan() {
+        return beatmatchPlan().withTiming(170000L, 8104L, 4000L);
+    }
+
+    private long begin(NativeTransitionPlan transitionPlan) {
+        controller.prepareStandbyAt(transitionPlan.incomingCueMs, 0L);
+        assertTrue(controller.beginTransition(transitionPlan));
+        return controller.executionId();
     }
 
     private long begin() {

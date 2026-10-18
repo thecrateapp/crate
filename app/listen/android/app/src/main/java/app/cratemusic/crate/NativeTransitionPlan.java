@@ -183,6 +183,24 @@ final class NativeTransitionPlan {
         );
     }
 
+    boolean isBeatmatch() {
+        return mode == Mode.BEATMATCH;
+    }
+
+    long startIncomingCueMs() {
+        if (!isBeatmatch()) return incomingCueMs;
+        return incomingCueMs + Math.round(beatPhaseOffsetMs * (double) incomingTempoRatio);
+    }
+
+    long prepareIncomingCueMs() {
+        if (!isBeatmatch()) return incomingCueMs;
+        return Math.max(
+            0L,
+            startIncomingCueMs()
+                - Math.round(NativeMixController.PREROLL_MS * (double) incomingTempoRatio)
+        );
+    }
+
     NativeTransitionPlan withTiming(
         long requestedOutgoingCueMs,
         long requestedIncomingCueMs,

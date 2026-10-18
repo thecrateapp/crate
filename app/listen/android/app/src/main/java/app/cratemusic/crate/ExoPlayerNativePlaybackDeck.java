@@ -1,5 +1,6 @@
 package app.cratemusic.crate;
 
+import androidx.media3.common.PlaybackParameters;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.Player;
@@ -161,6 +162,16 @@ final class ExoPlayerNativePlaybackDeck implements NativePlaybackDeck {
     @Override
     public void seekTo(long positionMs) {
         player.seekTo(Math.max(0L, positionMs));
+    }
+
+    @Override
+    public void setSpeed(float speed) {
+        player.setPlaybackParameters(new PlaybackParameters(speed));
+    }
+
+    @Override
+    public long positionMs() {
+        return Math.max(0L, player.getCurrentPosition());
     }
 
     @Override

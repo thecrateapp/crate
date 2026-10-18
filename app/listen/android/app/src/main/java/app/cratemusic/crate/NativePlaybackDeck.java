@@ -16,6 +16,8 @@ interface NativePlaybackDeck {
     void seekTo(long positionMs);
 
     void setVolume(float volume);
+    void setSpeed(float speed);
+    long positionMs();
 
     void startEnvelope(
         NativeMixAudioProcessor.Role role,
