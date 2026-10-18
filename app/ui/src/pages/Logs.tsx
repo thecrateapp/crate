@@ -4,15 +4,7 @@ import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
-import {
-  Loader2,
-  Pause,
-  Play,
-  RefreshCw,
-  ScrollText,
-  Search,
-  Wifi,
-} from "lucide-react";
+import { Loader2, Pause, Play, Search } from "lucide-react";
 
 import {
   OpsPageHero,
@@ -20,7 +12,7 @@ import {
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
 import { AdminSelect } from "@/components/ui/AdminSelect";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
@@ -288,8 +280,17 @@ export function Logs() {
 
   if (loading && !snapshot) {
     return (
-      <div className="flex justify-center py-16 text-white/45">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+      <div
+        role="status"
+        aria-label="Loading worker logs"
+        aria-busy="true"
+        className="flex justify-center py-16 text-white/45"
+      >
+        <Loader2
+          data-admin-ux="logs-loading"
+          aria-hidden="true"
+          className="h-5 w-5 animate-spin text-primary"
+        />
       </div>
     );
   }
@@ -310,41 +311,46 @@ export function Logs() {
             <Button
               variant="outline"
               size="sm"
-              className="gap-2"
+              className="min-h-11 gap-2"
               onClick={() => setAutoRefresh((current) => !current)}
             >
-              {autoRefresh ? <Pause size={14} /> : <Play size={14} />}
+              {autoRefresh ? (
+                <Pause
+                  data-admin-ux="live-pause"
+                  aria-hidden="true"
+                  size={14}
+                />
+              ) : (
+                <Play
+                  data-admin-ux="live-resume"
+                  aria-hidden="true"
+                  size={14}
+                />
+              )}
               {autoRefresh ? "Pause live" : "Resume live"}
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="gap-2"
+              className="min-h-11 gap-2"
               onClick={() => void fetchSnapshot(true)}
             >
-              <RefreshCw size={14} />
               Refresh
             </Button>
           </>
         }
       >
-        <CrateChip active icon={ScrollText}>
-          {visibleLogs.length} lines
-        </CrateChip>
-        <CratePill icon={Wifi}>
+        <CrateChip active>{visibleLogs.length} lines</CrateChip>
+        <CrateChip>
           {summary.onlineWorkers}/{workers.length} workers online
-        </CratePill>
+        </CrateChip>
         {summary.errors > 0 ? (
-          <CratePill className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
-            {summary.errors} errors
-          </CratePill>
+          <CrateChip tone="warning">{summary.errors} errors</CrateChip>
         ) : null}
         {summary.warnings > 0 ? (
-          <CratePill className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
-            {summary.warnings} warnings
-          </CratePill>
+          <CrateChip tone="warning">{summary.warnings} warnings</CrateChip>
         ) : null}
-        <CratePill>{autoRefresh ? "Live mode" : "Frozen snapshot"}</CratePill>
+        <CrateChip>{autoRefresh ? "Live mode" : "Frozen snapshot"}</CrateChip>
       </OpsPageHero>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -383,14 +389,17 @@ export function Logs() {
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <div className="relative flex-1 min-w-[240px]">
             <Search
+              data-admin-ux="logs-search"
+              aria-hidden="true"
               size={14}
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
             />
             <Input
+              aria-label="Search worker logs"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search messages, workers, task ids or metadata..."
-              className="pl-9"
+              className="min-h-11 pl-9"
             />
           </div>
           <div className="crate-form-field max-w-full">
@@ -420,6 +429,7 @@ export function Logs() {
               label: entry,
             }))}
             searchable
+            triggerClassName="min-h-11"
             searchPlaceholder="Filter categories..."
           />
           <AdminSelect
@@ -432,6 +442,7 @@ export function Logs() {
               count: worker.log_count,
             }))}
             searchable
+            triggerClassName="min-h-11"
             searchPlaceholder="Filter workers..."
           />
         </div>

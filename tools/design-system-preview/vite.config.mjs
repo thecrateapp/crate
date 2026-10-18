@@ -47,6 +47,9 @@ export default defineConfig({
         adminNavigation: fileURLToPath(
           new URL("admin-navigation-demo.html", import.meta.url),
         ),
+        adminOperations: fileURLToPath(
+          new URL("admin-operations-demo.html", import.meta.url),
+        ),
         adminControls: fileURLToPath(
           new URL("admin-controls-demo.html", import.meta.url),
         ),

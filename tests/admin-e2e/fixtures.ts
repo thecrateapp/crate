@@ -16,6 +16,8 @@ const JSON_FIXTURES: Record<string, string> = {
   "/api/admin/llm/status": "llm-status",
   "/api/admin/ops-snapshot": "ops-snapshot",
   "/api/admin/tasks-snapshot": "tasks-snapshot",
+  "/api/admin/logs-snapshot": "logs-snapshot",
+  "/api/admin/stack-snapshot": "stack-snapshot",
   "/api/admin/playback-delivery": "playback-delivery",
   "/api/admin/task-catalog": "task-catalog",
   "/api/settings": "settings",

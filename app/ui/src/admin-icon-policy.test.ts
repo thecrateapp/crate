@@ -23,10 +23,28 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
     "app/ui/src/components/ui/AIButton.tsx",
     "app/ui/src/components/ui/AdminSelect.tsx",
     "app/ui/src/components/admin/ops-surfaces.tsx",
+    "app/ui/src/pages/Logs.tsx",
+    "app/ui/src/pages/Stack.tsx",
   ]);
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
 const approvedControls = new Map([
+  [
+    "app/ui/src/pages/Logs.tsx:@/components/ui/AdminSelect",
+    { component: "AdminSelect", limit: 2 },
+  ],
+  [
+    "app/ui/src/pages/Logs.tsx:@crate/ui/primitives/ErrorState",
+    { component: "ErrorState", limit: 1 },
+  ],
+  [
+    "app/ui/src/pages/Stack.tsx:@crate/ui/primitives/ErrorState",
+    { component: "ErrorState", limit: 1 },
+  ],
+  [
+    "app/ui/src/pages/Stack.tsx:@crate/ui/composites/ConfirmDialog",
+    { component: "ConfirmDialog", limit: 1 },
+  ],
   [
     "app/ui/src/components/layout/Sidebar.tsx:@/components/ui/AdminSelect",
     { component: "AdminSelect", limit: 1 },
@@ -34,6 +52,18 @@ const approvedControls = new Map([
 ]);
 // Diego's 1W steering explicitly retains UX glyphs. Each concrete site remains bounded.
 const approvedUx = new Map([
+  ["Logs:logs-loading", ["lucide-react", "Loader2"]],
+  ["Logs:live-pause", ["lucide-react", "Pause"]],
+  ["Logs:live-resume", ["lucide-react", "Play"]],
+  ["Logs:logs-search", ["lucide-react", "Search"]],
+  ["Stack:stack-loading", ["lucide-react", "Loader2"]],
+  ["Stack:stack-search", ["lucide-react", "Search"]],
+  ["Stack:service-logs-toggle", ["lucide-react", "ChevronDown"]],
+  ["Stack:service-state-loading", ["lucide-react", "Loader2"]],
+  ["Stack:service-stop", ["lucide-react", "Square"]],
+  ["Stack:service-start", ["lucide-react", "Play"]],
+  ["Stack:service-external", ["lucide-react", "ExternalLink"]],
+  ["Stack:service-logs-loading", ["lucide-react", "Loader2"]],
   ["Shell:history-back", ["lucide-react", "ChevronLeft"]],
   ["Shell:history-forward", ["lucide-react", "ChevronRight"]],
   ["Shell:mobile-navigation", ["lucide-react", "Menu"]],
@@ -135,6 +165,13 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
       continue;
     }
     if (
+      !unknownSpread &&
+      entry.source === "@crate/ui/primitives/CrateBadge" &&
+      ["CrateChip", "CratePill"].includes(entry.origin ?? entry.name) &&
+      !prop("icon")
+    )
+      continue; // Shared badges render no glyph without an explicit icon prop.
+    if (
       entry.source === "@crate/ui/shadcn/button" &&
       ((!unknownSpread && !prop("loading")) ||
         (prop("loading")?.initializer?.getText(tree) === "{false}" &&
@@ -162,7 +199,7 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
   return found;
 }
 
-describe("Admin icon retirement policy — migrated navigation and controls", () => {
+describe("Admin icon retirement policy — migrated Admin surfaces", () => {
   it("rejects direct, passed, mapped, dynamic and wrapped glyphs in the migrated files", () => {
     const inventory = buildInventory(repo);
     const sources = new Map(
@@ -372,4 +409,27 @@ describe("Admin operational surface consumer contracts", () => {
       );
     },
   );
+});
+
+it("does not let badge icon props or opaque spreads bypass the migrated page guard", () => {
+  const path = "app/ui/src/pages/Logs.tsx";
+  for (const [source, count] of [
+    ["<CratePill>Live</CratePill>", 0],
+    ["<CratePill icon={Glyph}>Live</CratePill>", 1],
+    ["<CratePill {...props}>Live</CratePill>", 1],
+  ] as const) {
+    const entry: IconEntry = {
+      id: "badge",
+      path,
+      line: 1,
+      column: 1,
+      kind: "owned-icon-consumer",
+      name: "CratePill",
+      source: "@crate/ui/primitives/CrateBadge",
+      control: "CratePill",
+      label: "",
+      snippet: "",
+    };
+    expect(violations(new Map([[path, source]]), [entry])).toHaveLength(count);
+  }
 });

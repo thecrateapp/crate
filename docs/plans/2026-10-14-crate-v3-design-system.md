@@ -1,7 +1,7 @@
 # Crate v3 design system
 
-Current implementation: checkpoints through 1X are approved and published (`b628a438`);
-Task 1b.8 / 1Y is the local operational-surfaces migration at `#superficies-admin`, awaiting Diego before publication or the next group.
+Current implementation: checkpoints through 1Y are approved and published (`ea6ebdc8`);
+Task 1b.8 / 1Z is the local Logs/Stack migration at `#operaciones-admin`, awaiting Diego before publication or the next group.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
 `/Users/diego/Code/crate-v3`, branch `feat/crate_v3`. The handover owns implementation/QA status.
@@ -4283,3 +4283,28 @@ caption spacing and 1T tone mappings remain. The three older 1T examples use the
 Real components are mounted at `#superficies-admin`, with idle/busy and disclosure samples.
 This is a bounded contract migration; other page icons are pending. No shared/Listen/Desktop
 API, dependency, canonical capture or pinned-site revision change. Stop for Diego at 1Y.
+
+
+## Linux implementation note — 1Z / Logs and Stack, 2026-10-17
+
+1Y is approved/published as `ea6ebdc8`. Logs/Stack summary chips and refresh/restart actions are
+textual. Service actions have visible names and 44px targets; their logs disclose with a chevron,
+expanded state and a named region. Search, loading, live pause/resume, service start/stop and
+external-navigation glyphs retain their functional meaning. Read-only service Status/Ports/Public
+route pairs use `.crate-form-field` with real 8px spacing. 1T state/risk tones and all data/stream/
+action logic stay intact. The persistent `#operaciones-admin` specimen mounts the actual pages
+in an isolated fifth preview entry with fictional adapters; no backend or real mutations.
+The live source policy bounds 25 UX sites plus the reviewed shared consumers across migrated
+files. This is two pages, not completion of all operations or 1b.8. Shared and Listen/Desktop
+contracts remain unchanged. Stop for Diego at 1Z; canonical/native/full phase QA is still pending.
+
+Diego's same-checkpoint filter feedback replaces Stack's forced-height CratePill controls with
+shared SegmentedControl radio chips: 32px with a fine pointer, 44px with a coarse pointer, matching
+Logs level filters in height, radius, border, padding and type. Arrow-key selection stays shared.
+
+
+Diego's later 1Z summary-row feedback also unifies the Logs/Stack header status/count labels as
+static `CrateChip` tags. Do not mix them with `CratePill`'s 32/44px control geometry in one summary
+row. Shared tag padding/type/radius remain the defaults (16px rendered height at the default font
+scale); warning tags use the shared warning tone. These labels have no actions or hit targets.
+No shared primitive/API or global sizing rule changes.

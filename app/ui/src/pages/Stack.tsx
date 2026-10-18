@@ -1,15 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  ChevronDown,
   ExternalLink,
   Loader2,
   Play,
-  RefreshCw,
-  Server,
   Square,
-  ScrollText,
   Search,
-  RotateCcw,
-  Wifi,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,11 +21,11 @@ import {
   OpsPanel,
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { Input } from "@crate/ui/shadcn/input";
-import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { Button } from "@crate/ui/shadcn/button";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -196,13 +199,17 @@ function ServiceCard({
   onRestart: () => void;
   onToggleState: () => void;
 }) {
+  const logsId = useId();
   const isRunning = container.state === "running";
   const serviceUrl = getServiceUrl(container.name);
   const hostname = serviceHostname(container.name);
   const state = stateMeta(container.state);
 
   return (
-    <div className="overflow-hidden rounded-md border border-white/8 bg-black/20 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
+    <article
+      aria-label={`Service ${container.name}`}
+      className="overflow-hidden rounded-md border border-white/8 bg-black/20 shadow-[0_16px_36px_rgba(0,0,0,0.16)]"
+    >
       <div className="space-y-4 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-2">
@@ -221,76 +228,110 @@ function ServiceCard({
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            <ActionIconButton
-              variant="card"
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-h-11"
               onClick={onToggleLogs}
-              title={expanded ? "Hide logs" : "Show logs"}
+              aria-label={`${expanded ? "Hide" : "Show"} logs for ${container.name}`}
+              aria-expanded={expanded}
+              aria-controls={logsId}
             >
-              <ScrollText size={15} />
-            </ActionIconButton>
-            <ActionIconButton
-              variant="card"
-              tone={isRunning ? "default" : "primary"}
+              Logs
+              <ChevronDown
+                data-admin-ux="service-logs-toggle"
+                aria-hidden="true"
+                size={15}
+                className={expanded ? "rotate-180" : undefined}
+              />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-h-11"
               onClick={onToggleState}
               disabled={busy}
-              title={isRunning ? "Stop service" : "Start service"}
+              aria-busy={busy || undefined}
+              aria-label={`${isRunning ? "Stop" : "Start"} service ${container.name}`}
             >
               {busy ? (
-                <Loader2 size={15} className="animate-spin" />
+                <Loader2
+                  data-admin-ux="service-state-loading"
+                  aria-hidden="true"
+                  size={15}
+                  className="animate-spin"
+                />
               ) : isRunning ? (
-                <Square size={15} fill="currentColor" />
+                <Square
+                  data-admin-ux="service-stop"
+                  aria-hidden="true"
+                  size={15}
+                  fill="currentColor"
+                />
               ) : (
-                <Play size={15} fill="currentColor" />
+                <Play
+                  data-admin-ux="service-start"
+                  aria-hidden="true"
+                  size={15}
+                  fill="currentColor"
+                />
               )}
-            </ActionIconButton>
-            <ActionIconButton
-              variant="card"
-              tone="default"
+              {isRunning ? "Stop" : "Start"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-h-11"
               onClick={onRestart}
               disabled={busy || !isRunning}
-              title="Restart service"
+              aria-label={`Restart service ${container.name}`}
             >
-              <RotateCcw size={15} />
-            </ActionIconButton>
+              Restart
+            </Button>
             {serviceUrl ? (
               <a
                 href={serviceUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-black/55 text-white/45 shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-md transition-colors hover:bg-black/70 hover:text-white"
-                title="Open service"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border-subtle bg-surface-control px-3 text-sm text-text-primary hover:bg-surface-control-hover"
+                aria-label={`Open service ${container.name}`}
               >
-                <ExternalLink size={15} />
+                Open service
+                <ExternalLink
+                  data-admin-ux="service-external"
+                  aria-hidden="true"
+                  size={15}
+                />
               </a>
             ) : null}
           </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-sm border border-white/6 bg-black/15 p-3">
+          <div className="crate-form-field rounded-sm border border-white/6 bg-black/15 p-3">
             <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">
               Status
             </div>
-            <div className="mt-1 text-sm font-medium text-white/85">
+            <div className="text-sm font-medium text-white/85">
               {container.status}
             </div>
           </div>
-          <div className="rounded-sm border border-white/6 bg-black/15 p-3">
+          <div className="crate-form-field rounded-sm border border-white/6 bg-black/15 p-3">
             <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">
               Ports
             </div>
-            <div className="mt-1 text-sm font-medium text-white/85">
+            <div className="text-sm font-medium text-white/85">
               {container.ports.length > 0
                 ? container.ports.join(", ")
                 : "No exposed ports"}
             </div>
           </div>
-          <div className="rounded-sm border border-white/6 bg-black/15 p-3">
+          <div className="crate-form-field rounded-sm border border-white/6 bg-black/15 p-3">
             <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">
               Public route
             </div>
-            <div className="mt-1 text-sm font-medium text-white/85">
+            <div className="text-sm font-medium text-white/85">
               {hostname ?? "Internal only"}
             </div>
           </div>
@@ -298,14 +339,29 @@ function ServiceCard({
       </div>
 
       {expanded ? (
-        <div className="border-t border-white/8 bg-[#06080c] px-4 py-4">
+        <div
+          id={logsId}
+          role="region"
+          aria-label={`Logs for ${container.name}`}
+          className="border-t border-white/8 bg-[#06080c] px-4 py-4"
+        >
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="text-sm font-medium text-white">Recent logs</div>
             <CrateChip>{container.name}</CrateChip>
           </div>
           {logsLoading ? (
-            <div className="flex items-center gap-2 py-6 text-sm text-white/45">
-              <Loader2 size={14} className="animate-spin text-primary" />
+            <div
+              role="status"
+              aria-label={`Loading logs for ${container.name}`}
+              aria-busy="true"
+              className="flex items-center gap-2 py-6 text-sm text-white/45"
+            >
+              <Loader2
+                data-admin-ux="service-logs-loading"
+                aria-hidden="true"
+                size={14}
+                className="animate-spin text-primary"
+              />
               Loading service logs…
             </div>
           ) : logs?.logs ? (
@@ -324,7 +380,7 @@ function ServiceCard({
           )}
         </div>
       ) : null}
-    </div>
+    </article>
   );
 }
 
@@ -499,8 +555,17 @@ export function Stack() {
 
   if (loading && !data) {
     return (
-      <div className="flex justify-center py-16 text-white/45">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+      <div
+        role="status"
+        aria-label="Loading stack services"
+        aria-busy="true"
+        className="flex justify-center py-16 text-white/45"
+      >
+        <Loader2
+          data-admin-ux="stack-loading"
+          aria-hidden="true"
+          className="h-5 w-5 animate-spin text-primary"
+        />
       </div>
     );
   }
@@ -520,21 +585,20 @@ export function Stack() {
           <Button
             variant="outline"
             size="sm"
-            className="gap-2"
+            className="min-h-11 gap-2"
             onClick={() => void fetchSnapshot(true)}
           >
-            <RefreshCw size={14} />
             Refresh
           </Button>
         }
       >
-        <CrateChip active icon={Server}>
+        <CrateChip active>
           {data?.running ?? 0}/{data?.total ?? 0} running
         </CrateChip>
-        <CratePill icon={Wifi}>{publicRoutes} public routes</CratePill>
-        <CratePill>
+        <CrateChip>{publicRoutes} public routes</CrateChip>
+        <CrateChip>
           {data?.available ? "Docker available" : "Docker unavailable"}
-        </CratePill>
+        </CrateChip>
       </OpsPageHero>
 
       {!data?.available ? (
@@ -586,36 +650,30 @@ export function Stack() {
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="relative flex-1 min-w-[240px]">
                 <Search
+                  data-admin-ux="stack-search"
+                  aria-hidden="true"
                   size={14}
                   className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
                 />
                 <Input
+                  aria-label="Search stack services"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search services, images or ports..."
-                  className="pl-9"
+                  className="min-h-11 pl-9"
                 />
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <CratePill
-                  active={filter === "all"}
-                  onClick={() => setFilter("all")}
-                >
-                  All
-                </CratePill>
-                <CratePill
-                  active={filter === "running"}
-                  onClick={() => setFilter("running")}
-                >
-                  Running
-                </CratePill>
-                <CratePill
-                  active={filter === "stopped"}
-                  onClick={() => setFilter("stopped")}
-                >
-                  Stopped
-                </CratePill>
-              </div>
+              <SegmentedControl
+                as="radio"
+                label="Service state"
+                value={filter}
+                onValueChange={setFilter}
+                items={[
+                  { value: "all", label: "All" },
+                  { value: "running", label: "Running" },
+                  { value: "stopped", label: "Stopped" },
+                ]}
+              />
             </div>
           </OpsPanel>
 

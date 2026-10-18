@@ -3,7 +3,7 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Published checkpoints through 1X (`b628a438`) are recorded in the handover; preserve the next 1Y review stop.
+> Diego's go-ahead. Published checkpoints through 1Y (`ea6ebdc8`) are recorded in the handover; preserve the next 1Z review stop.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -1844,6 +1844,19 @@ page-specific action/row glyphs remain for later bounded groups. Labels/readings
 including aliases/spreads; UX glyphs supplied by action/content slots remain. Review real
 components at `#superficies-admin`; stop at 1Y before publication or the next group. This does
 not finish 1b.8 or the operations/page migrations. Scoped evidence and limits: final handover.
+
+**Linux checkpoint 1Z, 2026-10-17 — Logs/Stack pages, local review.** Diego approved/published 1Y
+as `ea6ebdc8` and authorised the next bounded group with UX glyphs retained. Logs and Stack remove
+redundant refresh/restart/summary decoration. Service actions now have visible text and specific
+accessible names; log disclosure uses a chevron, expanded state and a named region. Retain live
+pause/resume, start/stop, search, loading and external-navigation UX. All 27 helper/action/hook
+bodies are unchanged; no stream, API path, route, capability or action-eligibility edits. New/touched
+action/search/select targets are 44px; service-state chips follow the shared 32px fine-pointer /
+44px coarse-pointer contract. Read-only service fields use `.crate-form-field` at 8px.
+The source policy covers both entire page files and bounds their retained sites/shared consumers.
+Header count/status summaries consistently use static CrateChip tags, without mixed pill sizing.
+Review real pages with fictional adapters at `#operaciones-admin`; stop at 1Z before publication
+or another group. Other operations/settings/library pages and the rest of 1b.8 remain pending.
 
 **Files:**
 

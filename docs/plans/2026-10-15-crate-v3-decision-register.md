@@ -685,3 +685,19 @@ specimens. The action/children slots keep their behavior and functional glyphs; 
 does not cover deleting other page icons. Read-only label/value pairs follow the shared real
 8px `.crate-form-field` contract. No shared or Listen/Desktop contract change is required.
 Review `#superficies-admin`; do not publish 1Y or begin the following group before Diego.
+
+
+### 2026-10-17 — 1Y published; 1Z Logs/Stack controls
+
+Diego approved 1Y and authorised commit/push plus the next bounded group with UX glyphs retained
+and a review stop. 1Y is `ea6ebdc8` at origin. 1Z migrates Logs and Stack only: remove summary and
+labelled refresh/restart decoration, name service controls visibly, and retain conventional live
+pause/resume, service start/stop, disclosure, search, busy and external-navigation glyphs at exact
+reviewed sites. A chevron replaces the decorative logs icon because it communicates expansion.
+This keeps shared contracts, capability gates, streaming, action eligibility and mutation paths.
+The separate planned Stack core-service restrictions are not implemented in this visual group.
+Review `#operaciones-admin`; do not publish 1Z or begin another group before Diego's approval.
+
+Diego's 1Z Service filters feedback also adopts the shared SegmentedControl instead of bespoke
+CratePill selection with forced 44px height. Its 32px fine / 44px coarse geometry and radio/arrow
+semantics match the existing Log level selector; page/service actions and searches remain 44px.

@@ -4,26 +4,31 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — checkpoint 1Y
+## Active Linux workspace — checkpoint 1Z
 
 Diego's latest request overrides the clone-only setup below: isolate this work from the
 Crate MCP agent. The managed worktree is `/home/diego/.codex/worktrees/crate-v3-1q/crate`,
 on the existing `feat/crate_v3` branch, tracking `origin/feat/crate_v3`. HEAD is published
-`b628a43871e346c095b248794f4085d888b19226` (approved 1X); the original transfer checkpoint
+`ea6ebdc809ba3062733b51d04186bd6861b7566f` (approved 1Y); the original transfer checkpoint
 `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. The original checkout
 `/home/diego/Code/Ninja/crate` stays on `feat/crate_mcp` with the other agent's changes.
 Do not switch, reset or edit that checkout. No extra clone/worktree is needed to resume.
 
 Node 22.23.3 and root `npm ci` are ready. The live preview remains at
-`http://127.0.0.1:5186/#superficies-admin`; it needs no backend. Checkpoints through 1X are
-approved/committed/pushed. Task 1b.8 / checkpoint 1Y is local: Admin operational page/panel/stat
-surfaces and their 125 uses across ten pages. Their decorative icon prop is retired; action and
-content slots retain behavior and UX glyphs. Metric labels/readings use the common 8px recipe.
-The source policy checks all Admin surface consumers, with other page-specific icons pending.
-The three previous 1T specimens are adapted and all checkpoints remain visible. Stop at 1Y
-before publication or another group. The 1V inventory stays historical.
+`http://127.0.0.1:5186/#operaciones-admin`; it needs no backend. Checkpoints through 1Y are
+approved/committed/pushed. Task 1b.8 / checkpoint 1Z is local: entire Logs/Stack page files and
+local service/log components. Summary/refresh/restart decoration is retired; named service
+controls preserve search, loading, live pause/resume, start/stop, disclosure and external UX.
+Service read-only fields keep the shared 8px recipe. Service-state chips now match the shared
+32px fine / 44px coarse short-selector contract after Diego's visual feedback. No helper/action/hook, route, stream,
+permission, action-eligibility or shared/Listen/Desktop contract changes. A fifth isolated preview
+entry mounts both real pages with fictional API/stream/action adapters. The source policy now
+bounds 25 UX sites and reviewed shared consumers in migrated files; other page families remain
+pending. Logs/Stack header summaries now use uniform static CrateChip tags after Diego's size
+feedback; the latest follow-up evidence and budget are in the main handover. All earlier specimens and the historical 1V inventory remain. Stop at 1Z before
+publication or another group.
 Diego explicitly retained the existing Listen layered play/halo/progress ring and the luminous
-seek trail (2 px, thin 1 px) during review. Do not simplify these into flat controls. Read the final 1Y record
+seek trail (2 px, thin 1 px) during review. Do not simplify these into flat controls. Read the final 1Z record
 in the main handover for verification and limits. The generic bootstrap below is retained
 for a future fresh machine; it does not replace this active worktree.
 

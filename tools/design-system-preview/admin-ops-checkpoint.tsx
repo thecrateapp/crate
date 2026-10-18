@@ -59,7 +59,7 @@ export function AdminOpsCheckpoint() {
       <div className="specimen-heading">
         <div>
           <MonoLabel size="eyebrow" accent="26">
-            Checkpoint 1Y · En revisión
+            Checkpoint 1Y · Publicado
           </MonoLabel>
           <h2>El dato ocupa su sitio.</h2>
         </div>

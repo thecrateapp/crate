@@ -2,8 +2,8 @@
 
 Status: product design, revised 2026-10-15. Canonical clone `/Users/diego/Code/crate-v3`, branch
 `feat/crate_v3`. The handover records implementation and QA status; historical analysis is not a
-current progress report. Checkpoints through 1X are approved and published (`b628a438`).
-Task 1b.8 / checkpoint 1Y is the local operational-surfaces migration at `#superficies-admin`, awaiting review before publication or the next group. The final handover supersedes historical local-only notes. Diego's 1S review explicitly
+current progress report. Checkpoints through 1Y are approved and published (`ea6ebdc8`).
+Task 1b.8 / checkpoint 1Z is the local Logs/Stack migration at `#operaciones-admin`, awaiting review before publication or the next group. The final handover supersedes historical local-only notes. Diego's 1S review explicitly
 preserves the current Listen play essence (halo, layers and progress ring) and seek trail,
 adapted to V3 with 1–2 px strokes; see DS §5.5.
 
@@ -3512,3 +3512,16 @@ loading and disclosure UX in consumer slots remains. All ten page consumers adop
 icon contract together without changing page actions, permissions or streams. Their remaining
 page-specific icons belong to subsequent groups. Review real components in `#superficies-admin`
 and stop before publishing 1Y. Listen/Desktop controls and the current site pin remain intact.
+
+
+## Linux progress — 1Z / named operational controls, 2026-10-17
+
+After Diego approved/published 1Y, Logs and Stack become the next bounded Admin page group.
+Summary readings and refresh/restart actions retire decoration; service controls gain visible text.
+Conventional live pause/resume, service start/stop, disclosure, search, loading and external-route
+UX stays. Streams, permissions, action eligibility, API paths and confirmation semantics are
+preserved, including the existing shared overlay. Remaining page families still need migration.
+Review the actual pages with fictional data at `#operaciones-admin`; stop before publishing 1Z.
+
+During 1Z review Diego requested the Service filters match the other chips. Use the existing
+shared short selector (32px fine / 44px coarse), with the same all/running/stopped filter values.

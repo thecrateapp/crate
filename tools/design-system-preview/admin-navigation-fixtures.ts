@@ -1,3 +1,4 @@
+import { isOperationPath, operationApi } from "./admin-operations-fixtures";
 // Only the preview Vite config redirects these Admin dependencies here.
 // No network or live notification effects are mounted in the isolated demo.
 export const calls: { path: string; method: string; body: unknown }[] = [];
@@ -19,6 +20,7 @@ export function completeSearch() {
 }
 export async function api(path: string, method = "GET", body?: unknown) {
   calls.push({ path, method, body });
+  if (isOperationPath(path)) return operationApi(path, method);
   if (method !== "GET") return { task_id: "preview-task" };
   if (path === "/api/admin/llm/status")
     return { available: llmAvailable, model: "sample", provider: "sample" };

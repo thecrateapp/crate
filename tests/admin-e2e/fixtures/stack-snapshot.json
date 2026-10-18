@@ -1,0 +1,40 @@
+{
+  "snapshot": {
+    "scope": "ops:stack",
+    "subject_key": "global",
+    "version": 1,
+    "stale": false,
+    "generation_ms": 1
+  },
+  "stack": {
+    "available": true,
+    "total": 3,
+    "running": 2,
+    "containers": [
+      {
+        "id": "sample-worker",
+        "name": "worker",
+        "image": "crate-worker:sample@sha256:sample",
+        "state": "running",
+        "status": "Up 2 hours",
+        "ports": []
+      },
+      {
+        "id": "sample-scanner",
+        "name": "scanner",
+        "image": "crate-scanner:sample",
+        "state": "exited",
+        "status": "Exited (0)",
+        "ports": []
+      },
+      {
+        "id": "sample-tidarr",
+        "name": "tidarr",
+        "image": "tidarr:sample",
+        "state": "running",
+        "status": "Up 3 hours",
+        "ports": ["8686/tcp"]
+      }
+    ]
+  }
+}

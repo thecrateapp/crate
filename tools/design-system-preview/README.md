@@ -576,3 +576,28 @@ Run `admin-ops-checkpoint.spec.ts` and the affected `status-colour-checkpoint.sp
 `ops-surfaces.spec.ts` covers Tasks/SystemHealth at three widths; `instrument-panel.spec.ts`
 checks the affected panel spacing. These checks do not regenerate the canonical 1M PNGs/manifest.
 Keep the preview alive and stop at 1Y before commit/push or another migration group.
+
+
+## Checkpoint 1Z — Logs and Stack
+
+1Y is approved/published as `ea6ebdc8`. Open <http://127.0.0.1:5186/#operaciones-admin>.
+The fifth isolated build entry, `admin-operations-demo.html`, mounts the actual Logs/Stack pages
+and Admin CSS. Switch pages and ready/loading/empty/offline samples. Service actions are held
+locally until “Completar acción de muestra”; there is no backend, real mutation or API/SSE network.
+Only this entry replaces EventSource. The shared preview API delegates only its new operation
+paths; old navigation/control examples remain mounted and tested. All earlier checkpoints stay.
+
+Refresh/restart and summary glyphs retire. Named service actions preserve functional start/stop,
+busy, disclosure and external-navigation UX; Logs retains search/loading/live pause/resume.
+Read-only service fields use the shared 8px recipe. Page/service actions and searches are 44px;
+Service state uses the same shared selector as Log level (32px fine pointer / 44px coarse pointer).
+Run `admin-operations-checkpoint.spec.ts`, then affected `admin-controls-checkpoint.spec.ts` and
+`admin-ops-checkpoint.spec.ts`, serial `--workers=1`. Scoped actual Admin coverage is
+`tests/admin-e2e/operations-icons.spec.ts`, using intercepted fixtures. Do not update canonical
+1M PNGs/manifest locally. Keep :5186 active and stop at 1Z before publication or another group.
+
+
+1Z summary-row follow-up: Logs/Stack header counts/statuses use uniform static CrateChip tags,
+with shared warning tone for incidents. They do not inherit interactive pill touch sizing. The
+four `summary badge geometry` cases check fine/coarse geometry parity and live/frozen state.
+Advisory proof: `.artifacts/review/checkpoint-1z-summary.png`. Stop remains 1Z, unpublished.
