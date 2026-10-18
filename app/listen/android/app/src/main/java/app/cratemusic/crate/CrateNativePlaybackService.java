@@ -26,7 +26,6 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.audio.AudioProcessor;
-import androidx.media3.common.audio.SonicAudioProcessor;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
@@ -659,8 +658,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
                     boolean enableAudioTrackPlaybackParams
                 ) {
                     if (USE_PCM_BUS) {
-                        SonicAudioProcessor resampler = new SonicAudioProcessor();
-                        resampler.setOutputSampleRateHz(PcmBusMixer.SAMPLE_RATE);
+                        AudioProcessor resampler =
+                            new BusResamplerAudioProcessor(PcmBusMixer.SAMPLE_RATE);
                         return new DefaultAudioSink.Builder(context)
                             .setEnableFloatOutput(false)
                             .setEnableAudioTrackPlaybackParams(false)
@@ -1957,9 +1956,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
         }
 
         int outgoingIndex = player.getCurrentMediaItemIndex();
-        NativeTransitionPlan pendingPlan = pendingTransitionPlan();
-        if (pendingPlan == null) return;
-        NativeTransitionPlan plan = pendingPlan.withPrerollRoom(currentTrackDurationMs());
+        NativeTransitionPlan plan = pendingTransitionPlan();
+        if (plan == null) return;
         maybeBeginPreroll(plan);
         if (mixController.isPrerolling()) {
             mixController.correctPhase(nowElapsedMs);
@@ -2084,7 +2082,9 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 "missing_plan"
             );
         }
-        return fallenBackEdge.equals(edgeKey(plan)) ? null : plan;
+        return fallenBackEdge.equals(edgeKey(plan))
+            ? null
+            : plan.withPrerollRoom(currentTrackDurationMs());
     }
 
     private void logMixDiagnostic(String message) {
