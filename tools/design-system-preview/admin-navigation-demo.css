@@ -13,6 +13,7 @@
 @source "./admin-new-releases-demo.tsx";
 @source "./admin-global-catalog-demo.tsx";
 @source "./admin-roles-demo.tsx";
+@source "./admin-users-demo.tsx";
 @source "../../app/ui/src";
 html {
   color-scheme: dark;

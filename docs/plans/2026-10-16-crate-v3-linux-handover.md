@@ -4,32 +4,30 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — 1AK published; 1AL Roles local
+## Active Linux workspace — 1AL published; 1AM Users local
 
-Use /home/diego/.codex/worktrees/crate-v3-1q/crate, existing feat/crate_v3 tracking origin.
-Published HEAD/ref `44d5f16a1eb20d6b7c89e6b22aee768d86c5bac2` (1AK);53177736 ancestor retained.
+Use /home/diego/.codex/worktrees/crate-v3-1q/crate, feat/crate_v3 tracking origin.
+Published HEAD/ref `d72232e9ef581248ae59a1289bd357dec0629db1` (1AL);53177736ancestor retained.
 Leave /home/diego/Code/Ninja/crate(feat/crate_mcp) alone. Node22.23.3/dependencies prepared.
 
-Diego approved/published1AK with the requested Global Catalog specimen-copy correction and
-another bounded Admin group. Local1AL changes Roles.tsx rendering only: no decorative header
-shield, shared typography and8px readouts, wrapping metadata and textual loading status.
-GET/interfaces/state/effect/group order/counts/null/empty and roles.view gates are unchanged.
-Read-only catalog: no edit/create/mutation. Existing rejected-read path has no catch/error
-surface and remains an integration limit.20-file policy/64 retained UX sites; no Roles exception.
+Diego approved/published1AL and authorized the next Admin group. Local1AM implements his accepted
+Users direction: map removed, compact user list with real identity/roles/state/presence, existing
+detail modal and actions. Users.tsx rendering and obsolete map wiring only; no backend query or
+API/capability/action change. Existing unused UserMap sources/utilities remain for later cleanup.
+21-file icon policy/76retained UX sites. Shared8px fields/readouts, existing fonts and controls.
 
-Review http://127.0.0.1:5186/admin-roles-demo.html or /#roles-admin.23scoped Vitest,4preview and
-6builtAdmin Chromium cases pass; strict TS/lint/AST/Admin and17-entry preview builds pass.
-InitialJS526505/532480Bgzip,5975Bmargin; generatedcache restored. ActualIAB proof
-.artifacts/review/checkpoint-1al-roles.jpg. Main handover owns finalreview and QA limits;
-plan2026-10-18-crate-v3-roles-icons.md. Keep preview service active5186.
+Review http://127.0.0.1:5186/admin-users-demo.html or /#usuarios-admin. Actual component with
+fictional response-shaped data, real context value and importer-only API fixture; local pending/
+failure/action/clipboard samples. No backend, real access mutation, delivery or preferences.
+30scoped units +9preview Chromium pass; strict scoped TS and AST182data/type/function declarations/
+67event/state/validation bindings pass. BuiltAdmin6cases and final390px replays pass. Admin/18-entry preview builds/types/lint pass;
+initialJS526482/532480Bgzip (5998Bmargin). Main handover records final review and limits. Keep preview serviceactive5186.
 
-Accepted future Users amendment: remove map, list principal user data/state per row, modal
-for detail. Supersedes older map targets; Users/UserMap source is untouched in1AL.
-All earlier checkpoints/Timeline retirement/redirect/withdrawn proposal archive remain. Shared
-Select-label minor remains deferred from1AJ.33canonicalPNG/manifest stay1M; pin258bbaee unchanged.
-No full suites/CI/canonical refresh. Native/AT/live backend/server auth/phase QA pending;
-1b.8/A19/phase6.6 incomplete. **Stop1AL uncommitted for Diego before next group, commit/push,
-PR/merge/rebase/deploy/release.** Historical bootstrap below does not replace this worktree.
+All earlier checkpoints/Timeline retirement/redirect/archive stay. Shared Select-label minor from
+1AJ is deferred.33canonicalPNG/manifest remain1M, pin258bbaee unchanged. No full suites/CI or
+canonical refresh. Native/AT/live backend/server authorization/finalphase QA pending;
+1b.8/A18/B17/phase6.6 incomplete. **Stop1AM uncommitted for Diego before next group, commit/push,
+PR/merge/rebase/deploy/release.** Historical bootstrap does not replace this worktree.
 
 ## Prepare the checkout
 
@@ -275,3 +273,27 @@ local1AL stops are historical and superseded by this approval. Approved producti
 all13pre-publication source hashes were verified; only specimen/footer publication labels and
 the affected persistent check change for publication. No full suites/CI/canonical refresh,
 PR/merge/rebase/deploy/release. Next stop is1AM, uncommitted for Diego before publication.
+
+### 1AM review steering — larger avatars and wider detail
+
+Diego requests larger user avatars and more viewport width for the detail modal. Row avatars
+are56px, also visible on narrow layouts; detail avatars72px. The old sm:max-w-6xl utility was
+constrained by the shared default md size (560px). Users detail explicitly opts out of that
+size attribute and uses its existing viewport width minus32px, with shared chrome, animation,
+focus trap, close behavior and scroll intact. No new shared variant or other modal change.
+A browser regression assertion observed560px before the fix; final geometry must exceed90%
+of the viewport at1440/768/390. No canonical images are regenerated.
+
+1AM final review: one fresh reviewer, one tested fix pass; actual label gaps8px, nested pending
+sample and accessible password action fixed.30unit/9preview/6builtAdmin plus types/lint/AST/
+builds green. Sticky-header minor and earlier shared Select-label minor remain deferred.
+Main handover has full rulings/costs, evidence and limits. Stop1AM uncommitted for Diego.
+
+### 1AM approval and publication — 2026-10-18
+
+Diego approved the final Users checkpoint, including enlarged avatars and the wider detail
+modal, and explicitly authorized commit/push on feat/crate_v3 and the next bounded Admin
+icon group. Approved source14 hashes match the post-fix freeze. Only publication labels
+change before committing; existing scoped verification and deferred minors remain recorded.
+Next stop is 1AN, uncommitted for review. Preview stays active5186; preserve UX glyphs and
+all prior checkpoints. No PR, merge, rebase, deploy, release or broad CI.

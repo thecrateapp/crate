@@ -20,10 +20,6 @@ vi.mock("@/contexts/AuthContext", () => ({
   }),
 }));
 
-vi.mock("@/components/users/UserMap", () => ({
-  UserMap: () => <div data-testid="user-map" />,
-}));
-
 vi.mock("sonner", () => ({
   toast: {
     error: toastErrorMock,

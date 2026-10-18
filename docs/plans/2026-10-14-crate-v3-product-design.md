@@ -2,9 +2,9 @@
 
 Status: product design, revised 2026-10-15. Canonical clone `/Users/diego/Code/crate-v3`, branch
 `feat/crate_v3`. The handover records implementation and QA status; historical analysis is not a
-current progress report. Checkpoints through 1AK are approved and published (`44d5f16a`).
-Library Timeline is removed; its old route redirects to Browse. Local 1AL covers Roles
-redundant header icon and typography with preserved read-only data and authorization contracts. Stop for Diego before its commit/push. The final handover and later amendments below
+current progress report. Checkpoints through 1AL are approved and published (`d72232e9`).
+Library Timeline is removed; its old route redirects to Browse. Local 1AM covers the Users
+list/map retirement and icons with preserved actual data, capabilities and actions. Stop for Diego before its commit/push. The final handover and later amendments below
 supersede earlier provisional stops. Diego's 1S review explicitly
 preserves the current Listen play essence (halo, layers and progress ring) and seek trail,
 adapted to V3 with 1–2 px strokes; see DS §5.5.
@@ -3858,3 +3858,57 @@ local1AL stops are historical and superseded by this approval. Approved producti
 all13pre-publication source hashes were verified; only specimen/footer publication labels and
 the affected persistent check change for publication. No full suites/CI/canonical refresh,
 PR/merge/rebase/deploy/release. Next stop is1AM, uncommitted for Diego before publication.
+
+## Linux 1AM — Users list and bounded icon group (2026-10-18)
+
+1AL Roles is approved and published as `d72232e9ef581248ae59a1289bd357dec0629db1`;
+Diego explicitly authorized one further Admin group, keeping UX and the preview. Local1AM
+implements his accepted Users amendment: remove the map and repeated large cards, show
+identity/email/roles, account/activity state and presence in a semantic list table, and reuse
+the existing detail modal for secondary data/actions. On narrow layouts presence moves under
+the identity; state and Inspect/Delete stay available. No unavailable data or new endpoint.
+
+Production scope: Users.tsx rendering plus obsolete map-only wiring. Remove decorative and
+label-redundant glyphs; retain12 individual search/pagination/loading UX sites and shared close/
+confirmation controls. Policy covers21whole files/76retained UX sites. Existing UserMap source
+and utilities are unused by Users and left for later cleanup; no map request/mount remains.
+Bricolage headings, Poppins prose, mono metadata and shared8px readout/form pairs. Native
+buttons>=44px; existing shared selectors preserve32px fine-pointer/44px coarse-pointer recipes.
+
+GET list/detail, ?inspect=, other parameters, filters/search/presence sort/page20, all remaining
+capabilities, abort cleanup and existing role/status/session/password/create/invite/delete
+handlers, validation, payloads, confirmations and feedback remain. No role-preset editor or
+backend/presence-query rewrite. A18/B17/phase6.6/global1b.8 are incomplete. The real standalone
+and persistent specimen use complete fictional responses, actual auth context values and
+importer-only API fixtures; actions/pending/failure/copy are local, with no real access changes,
+mail delivery, clipboard mutation, backend or preferences.
+
+Review /admin-users-demo.html or /#usuarios-admin on the active5186 preview. The handover owns
+validation/bundle/final-review evidence and QA limits. Earlier checkpoints, deferred1AJ shared
+Select-label minor, canonical1M and sitepin258bbaee remain. **Stop1AM uncommitted for Diego**,
+with no next group, full suites/CI/baselines/PR/merge/rebase/deploy/release.
+
+### 1AM review steering — larger avatars and wider detail
+
+Diego requests larger user avatars and more viewport width for the detail modal. Row avatars
+are56px, also visible on narrow layouts; detail avatars72px. The old sm:max-w-6xl utility was
+constrained by the shared default md size (560px). Users detail explicitly opts out of that
+size attribute and uses its existing viewport width minus32px, with shared chrome, animation,
+focus trap, close behavior and scroll intact. No new shared variant or other modal change.
+A browser regression assertion observed560px before the fix; final geometry must exceed90%
+of the viewport at1440/768/390. No canonical images are regenerated.
+
+1AM review closure: one independent complete-diff review and one tested fix pass. Actual
+password/status label gaps now8px; nested sample completion uses the active dialog and pending
+password submit keeps its name.30unit/9preview/6builtAdmin, types/lint/AST/builds pass;
+initialJS526482/532480Bgzip. Deferred minors: sticky table header and earlier1AJ Select label.
+Main handover records every ruling/limit. Previewactive;1AM uncommitted for Diego.
+
+### 1AM approval and publication — 2026-10-18
+
+Diego approved the final Users checkpoint, including enlarged avatars and the wider detail
+modal, and explicitly authorized commit/push on feat/crate_v3 and the next bounded Admin
+icon group. Approved source14 hashes match the post-fix freeze. Only publication labels
+change before committing; existing scoped verification and deferred minors remain recorded.
+Next stop is 1AN, uncommitted for review. Preview stays active5186; preserve UX glyphs and
+all prior checkpoints. No PR, merge, rebase, deploy, release or broad CI.

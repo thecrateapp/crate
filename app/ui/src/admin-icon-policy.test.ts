@@ -36,10 +36,19 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
     "app/ui/src/pages/NewReleases.tsx",
     "app/ui/src/pages/GlobalCatalog.tsx",
     "app/ui/src/pages/Roles.tsx",
+    "app/ui/src/pages/Users.tsx",
   ]);
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
 const approvedControls = new Map([
+  [
+    "app/ui/src/pages/Users.tsx:@crate/ui/shadcn/dialog",
+    { component: "DialogContent", limit: 4 },
+  ],
+  [
+    "app/ui/src/pages/Users.tsx:@crate/ui/composites/ConfirmDialog",
+    { component: "ConfirmDialog", limit: 1 },
+  ],
   [
     "app/ui/src/pages/NewReleases.tsx:@crate/ui/primitives/ErrorState",
     { component: "ErrorState", limit: 1 },
@@ -103,6 +112,18 @@ const approvedControls = new Map([
 ]);
 // Diego's 1W steering explicitly retains UX glyphs. Each concrete site remains bounded.
 const approvedUx = new Map([
+  ["Users:users-list-loading", ["lucide-react", "Loader2"]],
+  ["Users:users-detail-loading", ["lucide-react", "Loader2"]],
+  ["Users:users-roles-loading", ["lucide-react", "Loader2"]],
+  ["Users:users-status-loading", ["lucide-react", "Loader2"]],
+  ["Users:users-revoke-all-loading", ["lucide-react", "Loader2"]],
+  ["Users:users-revoke-loading", ["lucide-react", "Loader2"]],
+  ["Users:users-password-loading", ["lucide-react", "Loader2"]],
+  ["Users:users-create-loading", ["lucide-react", "Loader2"]],
+  ["Users:users-invite-loading", ["lucide-react", "Loader2"]],
+  ["Users:users-search", ["lucide-react", "Search"]],
+  ["Users:users-previous", ["lucide-react", "ChevronLeft"]],
+  ["Users:users-next", ["lucide-react", "ChevronRight"]],
   ["GlobalCatalog:catalog-incremental-loading", ["lucide-react", "Loader2"]],
   ["GlobalCatalog:catalog-full-loading", ["lucide-react", "Loader2"]],
   ["NewReleases:releases-search", ["lucide-react", "Search"]],
