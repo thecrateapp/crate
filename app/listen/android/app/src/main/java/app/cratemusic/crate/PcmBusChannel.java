@@ -7,6 +7,7 @@ final class PcmBusChannel {
     private final AtomicLong consumedFrames = new AtomicLong();
     private volatile boolean playing;
     private volatile float volume = 1.0f;
+    private volatile boolean endOfStream;
 
     PcmBusChannel(int capacityFrames) {
         buffer = new PcmRingBuffer(capacityFrames, PcmBusMixer.CHANNELS);
@@ -18,6 +19,15 @@ final class PcmBusChannel {
 
     void setPlaying(boolean playing) {
         this.playing = playing;
+        if (playing) endOfStream = false;
+    }
+
+    void markEndOfStream() {
+        endOfStream = true;
+    }
+
+    boolean blocksMix() {
+        return playing && !endOfStream && buffer.availableFrames() == 0;
     }
 
     boolean isPlaying() {
@@ -32,12 +42,13 @@ final class PcmBusChannel {
         return consumedFrames.get();
     }
 
-    void flush() {
+    synchronized void flush() {
+        endOfStream = false;
         buffer.clear();
         consumedFrames.set(0L);
     }
 
-    int mixInto(float[] mix, float[] scratch, int frames) {
+    synchronized int mixInto(float[] mix, float[] scratch, int frames) {
         if (!playing) return 0;
         int read = buffer.read(scratch, frames);
         float gain = volume;

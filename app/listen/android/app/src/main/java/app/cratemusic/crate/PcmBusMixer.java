@@ -27,6 +27,9 @@ final class PcmBusMixer {
 
     static int mixBlock(PcmBusChannel[] channels, float[] mix, float[] scratch, int frames) {
         Arrays.fill(mix, 0, frames * CHANNELS, 0.0f);
+        for (PcmBusChannel channel : channels) {
+            if (channel.blocksMix()) return 0;
+        }
         int mixedFrames = 0;
         for (PcmBusChannel channel : channels) {
             mixedFrames = Math.max(mixedFrames, channel.mixInto(mix, scratch, frames));

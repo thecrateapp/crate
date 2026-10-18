@@ -84,7 +84,9 @@ final class PcmBusAudioOutput implements AudioOutput {
     }
 
     @Override
-    public void stop() {}
+    public void stop() {
+        channel.markEndOfStream();
+    }
 
     @Override
     public void release() {

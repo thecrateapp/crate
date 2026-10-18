@@ -40,7 +40,7 @@ final class NativeMixController {
     static final float PHASE_DEADBAND_MS = 4.0f;
     static final float PREROLL_MAX_CORRECTION = 0.10f;
     static final float MIX_MAX_CORRECTION = 0.01f;
-    static final float MAX_START_PHASE_ERROR_MS = 40.0f;
+    static final float MAX_START_PHASE_ERROR_MS = 10.0f;
     static final long SPEED_UPDATE_INTERVAL_MS = 200L;
     static final float SPEED_STEP = 0.001f;
     @Nullable
@@ -247,6 +247,8 @@ final class NativeMixController {
         handoffComplete = false;
         if (prerolled && !beatmatch) {
             mixIncomingDeck.setSpeed(1.0f);
+        } else if (beatmatch && appliedIncomingSpeed != plan.incomingTempoRatio) {
+            mixIncomingDeck.setSpeed(plan.incomingTempoRatio);
         }
         beatmatchSpeed = beatmatch ? plan.incomingTempoRatio : 1.0f;
         appliedIncomingSpeed = beatmatchSpeed;
@@ -369,7 +371,8 @@ final class NativeMixController {
         ) {
             return lastPhaseErrorMs;
         }
-        float maxCorrection = prerolling ? PREROLL_MAX_CORRECTION : MIX_MAX_CORRECTION;
+        if (!prerolling) return lastPhaseErrorMs;
+        float maxCorrection = PREROLL_MAX_CORRECTION;
         float gainPerMs = prerolling ? 1.0f / 1_000.0f : 1.0f / 2_000.0f;
         float correction = Math.abs(filteredPhaseErrorMs) < PHASE_DEADBAND_MS
             ? 0.0f

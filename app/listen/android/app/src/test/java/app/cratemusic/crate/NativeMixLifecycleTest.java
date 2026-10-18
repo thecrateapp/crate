@@ -422,7 +422,7 @@ public class NativeMixLifecycleTest {
         controller.correctPhase(2_400L);
 
         assertEquals(50.0f, controller.lastPhaseErrorMs(), 1.0f);
-        assertEquals(1.04f * 1.01f, deckB.speed, 0.0001f);
+        assertEquals(1.04f, deckB.speed, 0.0001f);
     }
 
     @Test
@@ -467,6 +467,21 @@ public class NativeMixLifecycleTest {
 
         assertFalse(controller.beginPreroll(beatmatchPlan(), 160000L));
         assertFalse(controller.isPrerolling());
+    }
+
+    @Test
+    public void aPlanWithoutPrerollRoomIsShiftedLaterKeepingItsPhase() {
+        NativeTransitionPlan early = beatmatchPlan().withTiming(170000L, 0L, 4000L);
+
+        NativeTransitionPlan shifted = early.withPrerollRoom(240000L);
+
+        long roomMs = Math.round(104L / 1.04);
+        long shiftMs = NativeMixController.PREROLL_MS - roomMs;
+        assertEquals(170000L + shiftMs, shifted.outgoingCueMs);
+        assertEquals(Math.round(shiftMs * 1.04), shifted.incomingCueMs);
+        NativeTransitionPlan roomy = beatmatchPlan();
+        assertSame(roomy, roomy.withPrerollRoom(240000L));
+        assertEquals(170000L, early.withPrerollRoom(175000L).outgoingCueMs);
     }
 
     @Test

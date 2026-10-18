@@ -1583,7 +1583,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private static final long BEATMATCH_LOG_INTERVAL_MS = 500L;
     private long lastBeatmatchLogElapsedMs;
     private static final long TEMPO_RESTORE_MS = 4_000L;
-    private static final long TEMPO_RESTORE_STEP_MS = 100L;
+    private static final long TEMPO_RESTORE_STEP_MS = 500L;
     @Nullable
     private Runnable tempoRestoreTicker;
 
@@ -1957,8 +1957,9 @@ public class CrateNativePlaybackService extends MediaSessionService {
         }
 
         int outgoingIndex = player.getCurrentMediaItemIndex();
-        NativeTransitionPlan plan = pendingTransitionPlan();
-        if (plan == null) return;
+        NativeTransitionPlan pendingPlan = pendingTransitionPlan();
+        if (pendingPlan == null) return;
+        NativeTransitionPlan plan = pendingPlan.withPrerollRoom(currentTrackDurationMs());
         maybeBeginPreroll(plan);
         if (mixController.isPrerolling()) {
             mixController.correctPhase(nowElapsedMs);
