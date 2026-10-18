@@ -485,6 +485,19 @@ public class NativeMixLifecycleTest {
     }
 
     @Test
+    public void prerollHoldsTheCorrectionUntilTheIncomingDeckStartsMoving() {
+        preroll();
+        deckA.positionMs = 168000L;
+        deckB.positionMs = beatmatchPlan().prepareIncomingCueMs();
+
+        controller.correctPhase(0L);
+        controller.correctPhase(300L);
+
+        assertEquals(1.04f, deckB.speed, 0.0001f);
+        assertEquals(0.0f, controller.lastPhaseErrorMs(), 0.0f);
+    }
+
+    @Test
     public void cancellingThePrerollResetsTheStandby() {
         preroll();
 

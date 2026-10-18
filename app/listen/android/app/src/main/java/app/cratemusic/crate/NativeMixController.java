@@ -37,6 +37,8 @@ final class NativeMixController {
     static final long STANDBY_RETRY_MS = 10_000L;
     static final long PREROLL_MS = 2_500L;
     static final long PREROLL_SEEK_TOLERANCE_MS = 20L;
+    static final long PREROLL_STARTED_MS = 5L;
+    private long prerollIncomingStartMs;
     static final float PHASE_DEADBAND_MS = 4.0f;
     static final float PREROLL_MAX_CORRECTION = 0.10f;
     static final float MIX_MAX_CORRECTION = 0.01f;
@@ -295,6 +297,7 @@ final class NativeMixController {
         if (Math.abs(standbyDeck.positionMs() - alignedIncomingMs) > PREROLL_SEEK_TOLERANCE_MS) {
             standbyDeck.seekTo(alignedIncomingMs);
         }
+        prerollIncomingStartMs = standbyDeck.positionMs();
         try {
             standbyDeck.setSpeed(plan.incomingTempoRatio);
         } catch (RuntimeException error) {
@@ -356,8 +359,13 @@ final class NativeMixController {
         boolean prerolling = activePlan == null;
         NativePlaybackDeck outgoingDeck = prerolling ? activeDeck : mixOutgoingDeck;
         NativePlaybackDeck incomingDeck = prerolling ? standbyDeck : mixIncomingDeck;
+        long incomingPositionMs = incomingDeck.positionMs();
+        if (prerolling && incomingPositionMs < prerollIncomingStartMs + PREROLL_STARTED_MS) {
+            inPhaseSamples = 0;
+            return lastPhaseErrorMs;
+        }
         long outgoingElapsedMs = outgoingDeck.positionMs() - phaseOutgoingCueMs;
-        long incomingElapsedMs = incomingDeck.positionMs() - phaseIncomingCueMs;
+        long incomingElapsedMs = incomingPositionMs - phaseIncomingCueMs;
         lastPhaseErrorMs = outgoingElapsedMs - incomingElapsedMs / beatmatchSpeed;
         recentPhaseErrorsMs[phaseSamples % recentPhaseErrorsMs.length] = lastPhaseErrorMs;
         phaseSamples++;
