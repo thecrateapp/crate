@@ -661,6 +661,20 @@ describe("player engine adapter", () => {
       expect(signals[0]?.aborted).toBe(false);
     });
 
+    it("passes the queue context for native background continuation", async () => {
+      apiMock.mockResolvedValue(null);
+
+      const snapshot = await toStartupEngineQueueSnapshot(
+        nativeSnapshotOptions("continuation-context"),
+      );
+
+      expect(snapshot.continuation).toEqual({
+        source: "playlist",
+        preferredDurationMs: 3000,
+        allowBeatmatch: false,
+      });
+    });
+
     it("does not call the planner while the device is offline", async () => {
       vi.stubGlobal("navigator", { ...navigator, onLine: false });
       apiMock.mockResolvedValue(null);

@@ -6,6 +6,7 @@ const nativePlaybackMock = vi.hoisted(() => ({
   drainEvents: vi.fn(),
   setQueue: vi.fn(),
   setTransitionPlans: vi.fn(),
+  setContinuation: vi.fn(),
   appendTracks: vi.fn(),
   insertTrack: vi.fn(),
   removeTrack: vi.fn(),
@@ -27,6 +28,11 @@ const nativePlaybackMock = vi.hoisted(() => ({
 
 vi.mock("@capacitor/core", () => ({
   registerPlugin: () => nativePlaybackMock,
+}));
+
+const continuationTokenMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/playback-continuation", () => ({
+  getPlaybackContinuationToken: continuationTokenMock,
 }));
 
 describe("android native engine flags", () => {
@@ -755,5 +761,76 @@ describe("android native engine flags", () => {
     await expect(statePromise).resolves.toEqual(state);
     expect(nativePlaybackMock.getState).toHaveBeenCalledTimes(4);
     vi.useRealTimers();
+  });
+
+  describe("native continuation", () => {
+    const state = {
+      revision: "queue-rev-1",
+      playbackState: "paused",
+      isPlaying: false,
+      index: 0,
+      positionMs: 0,
+      durationMs: 0,
+      queueSize: 2,
+      crossfadeMs: 12000,
+      eqEnabled: false,
+    };
+    const context = {
+      source: "playlist",
+      preferredDurationMs: 12000,
+      allowBeatmatch: false,
+    };
+
+    async function loadQueue(crossfadeMs: number) {
+      vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+      nativePlaybackMock.getState.mockResolvedValue(state);
+      nativePlaybackMock.setQueue.mockResolvedValue(state);
+      nativePlaybackMock.setContinuation.mockResolvedValue(undefined);
+      continuationTokenMock.mockResolvedValue({
+        token: "crv_continuation",
+        expiresAtMs: 1_800_000_000_000,
+        apiBase: "https://api.example",
+      });
+      const nativeEngineModule = await import("@/lib/android-native-engine");
+      const engine = new nativeEngineModule.AndroidNativeEngine();
+      await engine.loadQueue({
+        revision: "queue-rev-1",
+        tracks: [],
+        currentIndex: 0,
+        positionMs: 0,
+        autoplay: false,
+        repeat: "off",
+        crossfadeMs,
+        volume: 1,
+        continuation: context,
+      });
+    }
+
+    it("hands the continuation token and queue context to the native service", async () => {
+      await loadQueue(12000);
+
+      await vi.waitFor(() =>
+        expect(nativePlaybackMock.setContinuation).toHaveBeenCalledWith({
+          token: "crv_continuation",
+          expiresAtMs: 1_800_000_000_000,
+          apiBase: "https://api.example",
+          ...context,
+        }),
+      );
+      expect(nativePlaybackMock.setQueue.mock.calls[0]![0]).not.toHaveProperty(
+        "continuation",
+      );
+    });
+
+    it("clears native continuation when the queue does not mix", async () => {
+      await loadQueue(0);
+
+      await vi.waitFor(() =>
+        expect(nativePlaybackMock.setContinuation).toHaveBeenCalledWith({
+          token: "",
+        }),
+      );
+      expect(continuationTokenMock).not.toHaveBeenCalled();
+    });
   });
 });

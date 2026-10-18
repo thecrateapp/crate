@@ -61,6 +61,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Predicate;
 
 @UnstableApi
@@ -94,6 +96,15 @@ public class CrateNativePlaybackService extends MediaSessionService {
         }
     };
     private final NativeQueueState queueState = new NativeQueueState();
+    private final NativeContinuationPolicy continuationPolicy =
+        new NativeContinuationPolicy();
+    private final NativeContinuationClient continuationClient =
+        new NativeContinuationClient(NativeContinuationClient.httpTransport());
+    private final ExecutorService continuationExecutor =
+        Executors.newSingleThreadExecutor();
+    @Nullable
+    private NativeContinuationClient.Config continuationConfig;
+    private boolean appInForeground = true;
     private final NativePlaybackTelemetry telemetry =
         new NativePlaybackTelemetry(MAX_BUFFERED_EVENTS);
 
@@ -402,6 +413,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 payload.put("durationMs", safeDuration(player.getDuration()));
                 payload.put("isPlaying", player.isPlaying());
                 emit("trackChanged", payload);
+                maybeRequestContinuation();
                 emitNearQueueEndIfNeeded();
                 syncNativeMixTicker();
             }
@@ -1042,6 +1054,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
     @Override
     public void onDestroy() {
+        continuationExecutor.shutdownNow();
         stopPositionTicker();
         stopNativeMixTicker();
         unregisterNoisyAudioReceiver();
@@ -1202,6 +1215,88 @@ public class CrateNativePlaybackService extends MediaSessionService {
         emitPosition();
         syncPositionTicker();
         syncNativeMixTicker();
+    }
+
+    public void setContinuationConfig(
+        @Nullable NativeContinuationClient.Config config
+    ) {
+        continuationConfig = config;
+        continuationPolicy.reset();
+        maybeRequestContinuation();
+    }
+
+    public void setAppInForeground(boolean foreground) {
+        appInForeground = foreground;
+        if (!foreground) {
+            maybeRequestContinuation();
+        }
+    }
+
+    private void maybeRequestContinuation() {
+        NativeContinuationClient.Config config = continuationConfig;
+        if (player == null) return;
+        int currentIndex = player.getCurrentMediaItemIndex();
+        boolean configured =
+            config != null && config.isUsable(System.currentTimeMillis());
+        int plannedAhead = queueState.serverPlannedEdgesAhead(currentIndex);
+        NativeContinuationPolicy.Window window = continuationPolicy.nextRequest(
+            appInForeground,
+            configured,
+            crossfadeMs > 0,
+            currentIndex,
+            queueState.size(),
+            plannedAhead,
+            SystemClock.elapsedRealtime()
+        );
+        if (window == null) {
+            Log.i(
+                NativeMixAudioProcessor.QOE_TAG,
+                "continuation idle foreground=" + appInForeground
+                    + " configured=" + configured
+                    + " mix=" + (crossfadeMs > 0)
+                    + " index=" + currentIndex
+                    + " size=" + queueState.size()
+                    + " plannedAhead=" + plannedAhead
+            );
+            return;
+        }
+        String revision = queueState.revision();
+        List<NativeTrack> tracks = queueState.snapshot();
+        continuationExecutor.execute(() -> {
+            NativeContinuationClient.Result result = continuationClient.fetchPlans(
+                config,
+                tracks,
+                window.fromIndex,
+                window.edgeCount
+            );
+            mainHandler.post(() -> applyContinuationResult(revision, tracks, result));
+        });
+    }
+
+    private void applyContinuationResult(
+        String revision,
+        List<NativeTrack> tracks,
+        NativeContinuationClient.Result result
+    ) {
+        if (result.outcome == NativeContinuationClient.Outcome.UNAUTHORIZED) {
+            continuationPolicy.onUnauthorized();
+            Log.i(NativeMixAudioProcessor.QOE_TAG, "continuation unauthorized");
+            return;
+        }
+        if (result.outcome == NativeContinuationClient.Outcome.FAILED) {
+            continuationPolicy.onFailure(SystemClock.elapsedRealtime());
+            Log.i(NativeMixAudioProcessor.QOE_TAG, "continuation failed");
+            return;
+        }
+        continuationPolicy.onSuccess();
+        boolean merged = queueState.mergeTransitionPlans(
+            revision,
+            resolveTransitionPlans(tracks, result.plans)
+        );
+        Log.i(
+            NativeMixAudioProcessor.QOE_TAG,
+            "continuation planned=" + result.plans.size() + " merged=" + merged
+        );
     }
 
     public boolean setTransitionPlans(

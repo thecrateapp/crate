@@ -31,6 +31,7 @@ import {
   type SmartMixPlanInput,
   SmartMixTransitionPlanner,
   subscribeSmartMixCapabilities,
+  transitionSource,
 } from "@/lib/smart-mix";
 
 const smartMixTransitionPlanner = new SmartMixTransitionPlanner(api);
@@ -313,6 +314,13 @@ export async function toStartupEngineQueueSnapshot(
     volume: options.volume,
     pendingTransitionPlans: transitionPlansPromise,
     replanTransitionPlans: nativeTarget ? replanTransitionPlans : undefined,
+    continuation: nativeTarget
+      ? {
+          source: transitionSource(options.playSource, options.shuffle),
+          preferredDurationMs: options.crossfadeMs,
+          allowBeatmatch: planInput.capabilities.androidBeatmatch,
+        }
+      : undefined,
   };
 }
 

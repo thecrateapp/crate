@@ -164,6 +164,56 @@ public class NativeQueueStateTest {
         );
     }
 
+    @Test
+    public void mergingPlansReplacesTheSameEdgeAndKeepsTheRest() {
+        NativeQueueState state = new NativeQueueState();
+        state.replace(
+            "revision-1",
+            Arrays.asList(track("one"), track("two"), track("three")),
+            Arrays.asList(
+                NativeTransitionPlan.safeFallback("one", "two", 4000L, "planner_timeout"),
+                NativeTransitionPlan.safeFallback("two", "three", 4000L, "low_confidence")
+            )
+        );
+
+        assertFalse(
+            state.mergeTransitionPlans(
+                "stale",
+                Arrays.asList(NativeTransitionPlan.safeFallback("one", "two", 4000L, "x"))
+            )
+        );
+        assertTrue(
+            state.mergeTransitionPlans(
+                "revision-1",
+                Arrays.asList(
+                    NativeTransitionPlan.safeFallback("one", "two", 4000L, "low_confidence")
+                )
+            )
+        );
+
+        assertEquals("low_confidence", state.transitionPlanFor("one", "two").fallbackReason);
+        assertEquals("low_confidence", state.transitionPlanFor("two", "three").fallbackReason);
+    }
+
+    @Test
+    public void countsOnlyServerPlannedEdgesAheadOfTheCurrentTrack() {
+        NativeQueueState state = new NativeQueueState();
+        state.replace(
+            "revision-1",
+            Arrays.asList(track("one"), track("two"), track("three"), track("four")),
+            Arrays.asList(
+                NativeTransitionPlan.safeFallback("one", "two", 4000L, "low_confidence"),
+                NativeTransitionPlan.safeFallback("two", "three", 4000L, null),
+                NativeTransitionPlan.safeFallback("three", "four", 4000L, "planner_timeout")
+            )
+        );
+
+        assertEquals(2, state.serverPlannedEdgesAhead(0));
+        assertEquals(1, state.serverPlannedEdgesAhead(1));
+        assertEquals(0, state.serverPlannedEdgesAhead(2));
+        assertEquals(0, state.serverPlannedEdgesAhead(3));
+    }
+
     private static NativeTrack track(String id) {
         return new NativeTrack(
             id,

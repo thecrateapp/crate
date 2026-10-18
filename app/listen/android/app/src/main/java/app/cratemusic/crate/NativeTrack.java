@@ -6,6 +6,7 @@ import java.util.UUID;
 
 final class NativeTrack {
     final String id;
+    final String entityUid;
     final String url;
     final String authorization;
     final String title;
@@ -29,7 +30,36 @@ final class NativeTrack {
         long durationMs,
         @Nullable float[] eqGains
     ) {
+        this(
+            id,
+            "",
+            url,
+            authorization,
+            title,
+            artist,
+            album,
+            artwork,
+            artworkAuthorization,
+            durationMs,
+            eqGains
+        );
+    }
+
+    NativeTrack(
+        String id,
+        String entityUid,
+        String url,
+        String authorization,
+        String title,
+        String artist,
+        String album,
+        String artwork,
+        String artworkAuthorization,
+        long durationMs,
+        @Nullable float[] eqGains
+    ) {
         this.id = valueOrDefault(id, UUID.randomUUID().toString());
+        this.entityUid = valueOrDefault(entityUid, "");
         this.url = valueOrDefault(url, "");
         this.authorization = valueOrDefault(authorization, "");
         this.title = valueOrDefault(title, "Unknown");

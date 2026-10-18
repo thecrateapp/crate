@@ -53,6 +53,12 @@ export interface EngineTransitionPlan {
   fallbackReason?: string;
 }
 
+export interface EngineContinuationContext {
+  source: string;
+  preferredDurationMs: number;
+  allowBeatmatch: boolean;
+}
+
 export interface EngineQueueSnapshot {
   revision: string;
   tracks: EngineTrack[];
@@ -67,6 +73,7 @@ export interface EngineQueueSnapshot {
   replanTransitionPlans?: (
     currentIndex?: number,
   ) => Promise<EngineTransitionPlan[] | undefined>;
+  continuation?: EngineContinuationContext;
 }
 
 export interface EngineState extends NativeEventMetadata {

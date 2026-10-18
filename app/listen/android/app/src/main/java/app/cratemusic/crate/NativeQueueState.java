@@ -71,6 +71,51 @@ final class NativeQueueState {
         return true;
     }
 
+    boolean mergeTransitionPlans(
+        String requestedRevision,
+        List<NativeTransitionPlan> plans
+    ) {
+        if (
+            requestedRevision == null ||
+            requestedRevision.isEmpty() ||
+            !revision.equals(requestedRevision)
+        ) {
+            return false;
+        }
+        for (NativeTransitionPlan plan : plans) {
+            transitionPlans.removeIf(
+                existing ->
+                    existing.outgoingTrackId.equals(plan.outgoingTrackId) &&
+                    existing.incomingTrackId.equals(plan.incomingTrackId)
+            );
+            transitionPlans.add(plan);
+        }
+        return true;
+    }
+
+    int serverPlannedEdgesAhead(int currentIndex) {
+        int planned = 0;
+        for (int index = currentIndex; index >= 0 && index + 1 < tracks.size(); index++) {
+            NativeTransitionPlan plan = transitionPlanFor(
+                tracks.get(index).id,
+                tracks.get(index + 1).id
+            );
+            if (plan == null || isClientFallback(plan.fallbackReason)) break;
+            planned++;
+        }
+        return planned;
+    }
+
+    private static boolean isClientFallback(@Nullable String fallbackReason) {
+        return (
+            "planner_timeout".equals(fallbackReason) ||
+            "planner_unavailable".equals(fallbackReason) ||
+            "capability_unavailable".equals(fallbackReason) ||
+            "offline".equals(fallbackReason) ||
+            "missing_plan".equals(fallbackReason)
+        );
+    }
+
     @Nullable
     NativeTransitionPlan transitionPlanFor(
         String outgoingTrackId,

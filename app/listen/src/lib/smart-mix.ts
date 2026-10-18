@@ -588,7 +588,7 @@ function engineTransitionPlan(
   };
 }
 
-function transitionSource(
+export function transitionSource(
   playSource: PlaySource | null,
   shuffle: boolean,
 ): "album" | "playlist" | "radio" | "shuffle" | "infinite" | "manual" {

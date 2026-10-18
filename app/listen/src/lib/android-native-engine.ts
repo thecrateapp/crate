@@ -6,6 +6,7 @@ import {
 
 import { isAndroidNative } from "@/lib/capacitor-runtime";
 import type {
+  EngineContinuationContext,
   EngineEventListener,
   EngineEventMap,
   EngineEventName,
@@ -20,6 +21,7 @@ import {
   beginNativePlaybackIntent,
   cancelNativePlaybackRecoveryIntent,
 } from "@/lib/native-playback-intent";
+import { getPlaybackContinuationToken } from "@/lib/playback-continuation";
 import {
   getSmartMixCapabilities,
   keepServerPlans,
@@ -72,6 +74,15 @@ type CrateNativePlaybackPlugin = {
     revision: string;
     transitionPlans: EngineTransitionPlan[];
   }): Promise<{ accepted: boolean }>;
+  setContinuation(
+    options:
+      | { token: "" }
+      | ({
+          token: string;
+          apiBase: string;
+          expiresAtMs: number;
+        } & EngineContinuationContext),
+  ): Promise<void>;
   appendTracks(options: {
     revision: string;
     tracks: EngineTrack[];
@@ -200,12 +211,18 @@ export class AndroidNativeEngine implements PlaybackEngine {
     | undefined;
   private planInstallGeneration = 0;
   private installedPlans: EngineTransitionPlan[] = [];
+  private continuationContext: EngineContinuationContext | undefined;
 
   constructor() {
     subscribeSmartMixCapabilities(() => {
       void this.applySmartMixPreference();
       this.replanForCapabilities();
     });
+    if (typeof window !== "undefined") {
+      window.addEventListener("crate:app-resumed", () => {
+        void this.configureContinuation();
+      });
+    }
   }
 
   planAhead(currentIndex: number): void {
@@ -322,11 +339,16 @@ export class AndroidNativeEngine implements PlaybackEngine {
     if (snapshot.autoplay) {
       await this.ensureNotificationPermission();
     }
-    const { pendingTransitionPlans, replanTransitionPlans, ...queue } =
-      snapshot;
+    const {
+      pendingTransitionPlans,
+      replanTransitionPlans,
+      continuation,
+      ...queue
+    } = snapshot;
     this.queueRevision = queue.revision;
     this.replanTransitionPlans = replanTransitionPlans;
     this.installedPlans = [];
+    this.continuationContext = continuation;
     this.queueMixRequested = queue.crossfadeMs > 0;
     this.appliedCrossfadeMs = effectiveNativeCrossfadeMs(queue.crossfadeMs);
     const pendingGeneration = ++this.planInstallGeneration;
@@ -342,7 +364,30 @@ export class AndroidNativeEngine implements PlaybackEngine {
       );
     }
     this.replanForCapabilities();
+    void this.configureContinuation();
     return state;
+  }
+
+  private async configureContinuation(): Promise<void> {
+    const context = this.continuationContext;
+    try {
+      if (
+        !context ||
+        !this.queueMixRequested ||
+        (typeof navigator !== "undefined" && navigator.onLine === false)
+      ) {
+        await nativePlayback.setContinuation({ token: "" });
+        return;
+      }
+      const continuationToken = await getPlaybackContinuationToken();
+      if (context !== this.continuationContext) return;
+      await nativePlayback.setContinuation({
+        ...continuationToken,
+        ...context,
+      });
+    } catch (error) {
+      console.warn("[native-playback] continuation not configured:", error);
+    }
   }
 
   private async installTransitionPlans(

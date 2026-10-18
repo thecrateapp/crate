@@ -299,6 +299,33 @@ public class CrateNativePlaybackPlugin extends Plugin {
         }
     }
 
+    @PluginMethod
+    public void setContinuation(PluginCall call) {
+        if (!ensureService(call)) return;
+        NativeContinuationClient.Config config =
+            NativeContinuationClient.Config.fromJson(call.getData());
+        runOnMain(call, () -> {
+            service.setContinuationConfig(config);
+            call.resolve();
+        });
+    }
+
+    @Override
+    protected void handleOnStart() {
+        super.handleOnStart();
+        if (service != null) {
+            service.setAppInForeground(true);
+        }
+    }
+
+    @Override
+    protected void handleOnStop() {
+        super.handleOnStop();
+        if (service != null) {
+            service.setAppInForeground(false);
+        }
+    }
+
     @Override
     protected void handleOnDestroy() {
         if (service != null) {
@@ -374,6 +401,7 @@ public class CrateNativePlaybackPlugin extends Plugin {
         if (track == null) throw new JSONException("Missing track");
         return new NativeTrack(
             track.optString("id", ""),
+            track.optString("entityUid", ""),
             track.optString("url", ""),
             track.optString("authorization", ""),
             track.optString("title", "Unknown"),
