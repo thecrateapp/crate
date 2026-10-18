@@ -18,7 +18,7 @@ icon-restyle proposal is withdrawn, not approved/published. Page/lazy/menu remov
 /timeline redirects to Browse with its library.view gate. The old specimen URL redirects to
 <http://127.0.0.1:5186/#cronologia-admin>, now a retirement record without a Timeline iframe.
 Review navigation at <http://127.0.0.1:5186/admin-navigation-demo.html>. The obsolete StatStrip
-reference is corrected; **1AH Bandcamp is approved and published as `58b2695b39bbd91c477a968192ff74332a220e71`.** **1AI Discovery is approved and published as `a304ecf9c41bc254dab98b9f52668e18f4d87852`.** **1AJ New Releases is approved and published as `235b892f5dadab07faf3ae7a1a1727864b7a06c9`.** **1AK Global Catalog is approved and published as `44d5f16a1eb20d6b7c89e6b22aee768d86c5bac2`.** **1AL Roles is approved and published as `d72232e9ef581248ae59a1289bd357dec0629db1`.** Local1AM implements the accepted Users list/modal amendment and icon retirement, preserving actual data/capabilities/actions.
+reference is corrected; **1AH Bandcamp is approved and published as `58b2695b39bbd91c477a968192ff74332a220e71`.** **1AI Discovery is approved and published as `a304ecf9c41bc254dab98b9f52668e18f4d87852`.** **1AJ New Releases is approved and published as `235b892f5dadab07faf3ae7a1a1727864b7a06c9`.** **1AK Global Catalog is approved and published as `44d5f16a1eb20d6b7c89e6b22aee768d86c5bac2`.** **1AL Roles is approved and published as `d72232e9ef581248ae59a1289bd357dec0629db1`.** **1AM Users is approved and published as `b0f20194fb364e24cd3edb18e9b1c6084cb34f96`.** Local1AN is Translations rendering/icon retirement; stop uncommitted for Diego.
 
 Published **1AD Health** context: Diego approved the issue-queue sketch and explicitly authorised
 its implementation on 2026-10-18.
@@ -4139,3 +4139,118 @@ icon group. Approved source14 hashes match the post-fix freeze. Only publication
 change before committing; existing scoped verification and deferred minors remain recorded.
 Next stop is 1AN, uncommitted for review. Preview stays active5186; preserve UX glyphs and
 all prior checkpoints. No PR, merge, rebase, deploy, release or broad CI.
+
+### 1AM published; 1AN Translations local — 2026-10-18
+
+Diego approved1AM, including larger avatars and the viewport-wide User Detail modal.
+Published1AM is `b0f20194fb364e24cd3edb18e9b1c6084cb34f96`, origin/feat/crate_v3 matches.
+Publication-only label regression passed1case; approved14source hashes matched before publish.
+Previous local1AM stop is superseded by that explicit approval. Deferred Users sticky-header
+and shared Select-label minors remain; no hidden fixes were included in publication.
+
+Next bounded group1AN is actual Admin Translations (I18nReview.tsx), admin.access gated through
+App and Sidebar. CommandPalette maintains a separate list without a Translations entry;
+leave that inherited navigation scope unchanged. Profile
+redirects to Users and was not restyled. Remove redundant Languages/Clock/RefreshCw/CheckCircle2/
+XCircle glyphs in headings, states and labelled actions. Preserve8concrete Loader2 UX sites;
+whole-file policy now22files/84UX sites. Inventory /icon/i matches the boolean aiConfigured:
+a single exact page/component/prop/initializer exception is bounded and negative-tested.
+No shared foundation variant, dependency, Listen/backend/auth/capability/API change.
+
+Bricolage headings, Poppins body and JetBrains metadata; actual8px native-filter, editor-field
+and metadata readouts through crate-form-field. Editor rows stack on narrow screens, action
+buttons wrap and remain44px minimum. Original tab state/native-select and all request/effect/
+filter/sort/count/payload/validation/disable/feedback contracts remain; phase6.8 page-tab/URL
+adoption is separate. Correct inherited Import/Export prose to describe the existing Editor
+export and unavailable import, without adding tooling.
+
+Review http://127.0.0.1:5186/admin-translations-demo.html or persistent /#traducciones-admin.
+Real page, importer-only API fixture, full fictional response data; manual loading, failures,
+AI-draft/save/publish/reject/export and dev-workspace JSON simulation. Only the specimen's exact
+Listen dev-catalog fetch URLs are intercepted locally; no real dev catalog, backend, auth,
+external traffic, preferences or translation files. BuiltAdmin checks use actual route and
+boundary fixtures; no real publishing occurs. Existing1AM and all previous checkpoints remain.
+
+Evidence before final review:28scoped Vitest/3files (new3, existing8, policy17);5preview and
+3builtAdmin Chromium cases at1440/768/390, workers1. Strict scoped unit/preview TS, Admin build/
+types, scopedESLint, AST70data/type/function declarations and33event/state/validation bindings
+unchanged,19-entry preview build and diffcheck pass. InitialJS526475/532480Bgzip,9assets,
+6005Bmargin (7B below1AM526482). Tracked buildcache restored. Logs .artifacts/review/1an-\*.
+Browser RED detected inherited4px Meta margin (12px actual), corrected to8px. Browser export
+assertion caught a specimen-only regex capture error (undefined key), fixed to preserve actual
+edited key. No production handler was altered to satisfy fixtures. Existing chunk/NO_COLOR
+warnings only. One fresh complete-pending-diff review and actual IAB proof follow.
+
+Keep preview serviceactive5186. Canonical33PNG/manifest remain1M and app/web@258bbaee pinned.
+No broad suites/CI/baselines/native/live server certification. A21/phase6.8 and global1b.8 remain
+pending. **Stop1AN uncommitted for Diego before next group, commit/push, PR/merge/rebase/deploy/
+release.** Historical local stops above are superseded only by their recorded user approvals.
+
+### 1AN final independent review, tested boundary fix and review stop
+
+One fresh gpt-6-astra high read-only review checked all20pending files, including9untracked,
+and all13source hashes; each matched. Report .artifacts/review/1an-final-review.md:
+Critical0/Important1/Minor1. Executor keeps Important severity: an environment override could
+bypass the specimen interceptor and reach a real Listen dev catalog. One tested fix pass,
+no re-review: derive exact simulated catalog endpoints from the same effective
+VITE_LISTEN_DEV_ORIGIN/default and trailing-slash normalization as the actual unchanged page.
+New boundary tests observe RED2fail/1pass (alternate localhost and path-prefixed origin escaped
+to the mocked original503), then GREEN3/3 proving both GET and PATCH stay simulated and other
+resources retain original fetch. No real server/file was contacted or changed by those tests.
+
+Final evidence:31scoped Vitest/4files,5finalpreview Chromium cases, strict scoped TS and scoped
+ESLint pass.19-entry preview rebuild passes. Earlier3builtAdmin Chromium and Admin build/types/
+AST70declarations/33bindings/bundle526475/532480Bgzip remain applicable: production source did
+not change in the fix pass.6005Bmargin,9initialassets. Only specimen interceptor changed plus
+one boundary regression file; final pending21files/14source hashes saved separately from the
+original reviewed13hash freeze. All checks serial; final logs 1an-review-{origin-red,unit,types,
+lint,preview,preview-build,format}.log. ActualIAB editor proof checkpoint-1an-translations.jpg.
+Preview serviceactive5186. No further implementation or publication after this closure.
+
+New Minor deferred: French fictional summary/detail reports2messages but contains1editor row.
+This is a specimen discrepancy, not a production-data change. Earlier Users sticky-header and
+shared Select-label minors also remain deferred. Full phase/native/live QA and global1b.8/A21/
+phase6.8 are not completed. **Stop1AN uncommitted for Diego on published1AM b0f20194.**
+
+Executor rulings on all reviewer-declined behaviors (in addition to ledgered task rulings):
+
+1. URL tabs/arrow-key tab navigation/shared adoption: preserve the inherited local contract
+   for this bounded rendering group; phase6.8 remains responsible. Cost if wrong: incomplete
+   inherited tab keyboard/URL behavior remains until that migration; no conformance claim.
+2. CommandPalette omission/Profile redirect: preserve existing navigation; Translations remains
+   available through the gated Sidebar/route. Cost if wrong: palette discovery remains absent.
+3. English source/quality interpretation/server publish validation: retain actual unchanged
+   data and validation contracts, including Source unavailable. Cost if wrong: existing missing
+   source/quality interpretation and live enforcement limitations remain.
+4. Concurrent detail/save races and unsaved edits: preserve handler/effect bodies/dependencies.
+   Cost if wrong: inherited races/refetch losses remain; this checkpoint does not certify them.
+5. Full AI job progress/quality recompute/publication timestamps in specimens: simulate request
+   boundaries only. Cost if wrong: local completion is not evidence of real workers or quality.
+6. Workspace writes in built static preview: preserve actual productionDEV guard; active Vite
+   development specimen and boundary tests exercise simulation. Cost if wrong: static specimen
+   intentionally lacks workspace actions, with no claim of catalog-writing functionality there.
+7. Future aiConfigured values: accept only existing typed Boolean/state binding at exact site;
+   changing its meaning requires policy review. Cost if wrong: future identifier reassignment
+   could evade this syntactic false-positive exception; current source/type/audit show none.
+8. Earlier Users stickyheader/Selectlabel: keep deferred and out of current source. Cost if
+   wrong: their known accessibility/layout limitations remain for a separate consumer change.
+9. Native/AT/non-Chromium/live servers/broad suites/CI/canonical refresh: honor scoped checkpoint
+   validation. Cost if wrong: those device/integration/release properties remain unverified.
+10. A21/phase6.8/global1b.8 completion: claim only bounded1AN rendering/icon retirement. Cost if
+    wrong: remaining page, product and phase integration work still needs implementation/QA.
+
+Task rulings retained: active Translations chosen because Profile redirects (another group
+waits); preserve legacy tabs/selectors/async contracts (inherited limitations remain); stop and
+retain evidence instead of generic commit/fullsuite/cleanup (phase readiness pending); exact
+boolean inventory exception (future channel must be reviewed); review pending full diff and
+manifest instead of empty committed range (untracked scope guarded by hashes/manifests).
+
+### 1AN approval, French count correction and publication — 2026-10-18
+
+Diego approved1AN and explicitly requested correction of the French fixture counter before
+commit/push and the next bounded Admin group. Approved14hashes matched before changes.
+French summary and detail now report1message, matching their actual single editor row;
+fixture coherence regression observed RED1fail/3pass before correction. No production-data
+or action change. Publication labels updated; next stop1AO uncommitted, UX/preview retained.
+This resolves the French specimen Minor; earlier Users stickyheader/Selectlabel minors remain.
+No PR/merge/rebase/deploy/release, broadCI or canonical refresh.

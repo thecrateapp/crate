@@ -14,6 +14,13 @@ export default defineConfig({
       resolveId(source, importer) {
         if (!importer?.includes("/app/ui/") || !source.startsWith("@/")) return;
         if (
+          importer.endsWith("/app/ui/src/pages/I18nReview.tsx") &&
+          source === "@/lib/api"
+        )
+          return fileURLToPath(
+            new URL("admin-translations-fixtures.ts", import.meta.url),
+          );
+        if (
           importer.endsWith("/app/ui/src/pages/Users.tsx") &&
           source === "@/lib/api"
         )
@@ -150,6 +157,9 @@ export default defineConfig({
         ),
         adminContributions: fileURLToPath(
           new URL("admin-contributions-demo.html", import.meta.url),
+        ),
+        adminTranslations: fileURLToPath(
+          new URL("admin-translations-demo.html", import.meta.url),
         ),
         adminUsers: fileURLToPath(
           new URL("admin-users-demo.html", import.meta.url),

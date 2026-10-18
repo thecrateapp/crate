@@ -2,14 +2,7 @@ import { SeverityMeter } from "@/components/admin/status-indicators";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  CheckCircle2,
-  Clock,
-  Languages,
-  Loader2,
-  RefreshCw,
-  XCircle,
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@crate/ui/shadcn/badge";
@@ -485,14 +478,11 @@ export function I18nReview() {
     : [];
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <section className="rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
         <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
-            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-md border border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
-              <Languages size={21} />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">
+            <h1 className="font-display text-2xl font-bold tracking-tight text-white">
               Listen Translations
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
@@ -503,14 +493,18 @@ export function I18nReview() {
           <Button
             variant="outline"
             size="sm"
+            className="min-h-11"
             onClick={loadReviewData}
             disabled={loading}
           >
             {loading ? (
-              <Loader2 size={15} className="animate-spin" />
-            ) : (
-              <RefreshCw size={15} />
-            )}
+              <Loader2
+                data-admin-ux="translations-refresh"
+                aria-hidden="true"
+                size={15}
+                className="animate-spin"
+              />
+            ) : null}
             Refresh
           </Button>
         </div>
@@ -528,7 +522,7 @@ export function I18nReview() {
               aria-selected={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                "rounded-md border px-3 py-2 text-sm font-semibold transition-colors",
+                "min-h-11 rounded-md border px-3 py-2 text-sm font-semibold transition-colors",
                 activeTab === tab.id
                   ? "border-accent-action/35 bg-accent-action/12 text-accent-action-hi"
                   : "border-white/10 bg-white/[0.03] text-white/58 hover:border-accent-action/25 hover:text-accent-action-hi",
@@ -630,7 +624,9 @@ function OverviewSection({
       <div className="border-b border-white/8 px-5 py-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-white">Locale health</h2>
+            <h2 className="font-display text-sm font-semibold text-white">
+              Locale health
+            </h2>
             <p className="mt-1 text-xs text-muted-foreground">
               {needsReviewCount} draft{needsReviewCount === 1 ? "" : "s"} ·{" "}
               {requestCount} request{requestCount === 1 ? "" : "s"}
@@ -654,7 +650,7 @@ function OverviewSection({
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-xl font-bold text-white">
+                  <div className="font-display text-xl font-bold text-white">
                     {health.locale}
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
@@ -680,7 +676,7 @@ function OverviewSection({
               <Button
                 variant="outline"
                 size="sm"
-                className="mt-4 w-full"
+                className="mt-4 min-h-11 w-full"
                 aria-label={`Draft missing/stale with AI for ${health.locale}`}
                 disabled={
                   !aiConfigured ||
@@ -693,7 +689,12 @@ function OverviewSection({
                 }}
               >
                 {draftBusyLocale === health.locale ? (
-                  <Loader2 size={15} className="animate-spin" />
+                  <Loader2
+                    data-admin-ux="translations-draft"
+                    aria-hidden="true"
+                    size={15}
+                    className="animate-spin"
+                  />
                 ) : null}
                 Draft missing/stale with AI
               </Button>
@@ -741,12 +742,14 @@ function BundlesSection({
       <div className="border-b border-white/8 px-5 py-4">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-white">Bundles</h2>
+            <h2 className="font-display text-sm font-semibold text-white">
+              Bundles
+            </h2>
             <p className="mt-1 text-xs text-muted-foreground">
               {bundles.length} bundle{bundles.length === 1 ? "" : "s"} in view
             </p>
           </div>
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]">
             <FilterSelect
               label="Locale"
               value={localeFilter}
@@ -790,7 +793,6 @@ function BundlesSection({
         <div className="p-5 text-sm text-state-warning-text">{error}</div>
       ) : bundles.length === 0 ? (
         <div className="flex min-h-56 flex-col items-center justify-center gap-3 px-6 text-center">
-          <CheckCircle2 size={30} className="text-accent-action-hi/80" />
           <div>
             <p className="font-semibold text-white">No bundles match filters</p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -819,7 +821,7 @@ function BundlesSection({
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-lg font-bold text-white">
+                      <span className="font-display text-lg font-bold text-white">
                         {bundle.locale}
                       </span>
                       <Badge
@@ -838,11 +840,10 @@ function BundlesSection({
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <div className="text-sm font-semibold text-white">
+                    <div className="font-display text-sm font-semibold text-white">
                       {bundle.messageCount} strings
                     </div>
                     <div className="mt-2 inline-flex items-center gap-1 text-[11px] text-white/35">
-                      <Clock size={12} />
                       {request?.client ?? "admin"}
                     </div>
                   </div>
@@ -894,51 +895,68 @@ function EditorSection({
       <div className="border-b border-white/8 px-5 py-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-white">Editor</h2>
+            <h2 className="font-display text-sm font-semibold text-white">
+              Editor
+            </h2>
             <p className="mt-1 text-xs text-muted-foreground">
               Preview bundle copy and review quality before publish.
             </p>
           </div>
           {selectedBundle ? (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="sm"
+                className="min-h-11"
                 onClick={() => void onExportBundle()}
                 disabled={exportBusy}
               >
                 {exportBusy ? (
-                  <Loader2 size={15} className="animate-spin" />
+                  <Loader2
+                    data-admin-ux="translations-export"
+                    aria-hidden="true"
+                    size={15}
+                    className="animate-spin"
+                  />
                 ) : null}
                 Export JSON
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
+                className="min-h-11"
                 onClick={() => void onReviewAction("reject")}
                 disabled={
                   !!actionBusy || selectedBundle.status !== "needs_review"
                 }
               >
                 {actionBusy === "reject" ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : (
-                  <XCircle size={15} />
-                )}
+                  <Loader2
+                    data-admin-ux="translations-reject"
+                    aria-hidden="true"
+                    size={15}
+                    className="animate-spin"
+                  />
+                ) : null}
                 Reject bundle
               </Button>
               <Button
                 size="sm"
+                className="min-h-11"
                 onClick={() => void onReviewAction("publish")}
                 disabled={
                   !!actionBusy || selectedBundle.status !== "needs_review"
                 }
               >
                 {actionBusy === "publish" ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : (
-                  <CheckCircle2 size={15} />
-                )}
+                  <Loader2
+                    data-admin-ux="translations-publish"
+                    aria-hidden="true"
+                    data-testid="translations-publish-progress"
+                    size={15}
+                    className="animate-spin"
+                  />
+                ) : null}
                 Publish bundle
               </Button>
             </div>
@@ -960,7 +978,7 @@ function EditorSection({
           <QualityIssues report={qualityReport} />
 
           <div className="overflow-hidden rounded-md border border-white/8">
-            <div className="grid grid-cols-[minmax(0,0.24fr)_minmax(0,0.24fr)_minmax(0,0.36fr)_auto] gap-4 border-b border-white/8 bg-white/[0.03] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/35">
+            <div className="hidden grid-cols-[minmax(0,0.24fr)_minmax(0,0.24fr)_minmax(0,0.36fr)_auto] gap-4 font-mono md:grid border-b border-white/8 bg-white/[0.03] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/35">
               <span>Key</span>
               <span>English source</span>
               <span>Translation</span>
@@ -970,16 +988,23 @@ function EditorSection({
               {messageRows.map(([key, value]) => (
                 <div
                   key={key}
-                  className="grid grid-cols-[minmax(0,0.24fr)_minmax(0,0.24fr)_minmax(0,0.36fr)_auto] items-start gap-4 px-4 py-3 text-sm"
+                  className="grid grid-cols-1 md:grid-cols-[minmax(0,0.24fr)_minmax(0,0.24fr)_minmax(0,0.36fr)_auto] items-start gap-4 px-4 py-3 text-sm"
                 >
-                  <code className="break-words font-mono text-xs text-accent-action-hi/80">
+                  <code className="break-all font-mono text-xs text-accent-action-hi/80">
                     {key}
                   </code>
                   <span className="break-words text-white/38">
                     Source unavailable
                   </span>
-                  <div className="space-y-2">
+                  <div className="crate-form-field min-w-0">
+                    <label
+                      htmlFor={`translation-${key}`}
+                      className="font-mono text-meta text-text-muted"
+                    >
+                      Translation
+                    </label>
                     <textarea
+                      id={`translation-${key}`}
                       aria-label={`Translation for ${key}`}
                       value={value}
                       onChange={(event) =>
@@ -991,12 +1016,18 @@ function EditorSection({
                       <Button
                         variant="outline"
                         size="sm"
+                        className="min-h-11"
                         aria-label={`Save ${key}`}
                         onClick={() => void onSaveMessage(key)}
                         disabled={savingKey === key}
                       >
                         {savingKey === key ? (
-                          <Loader2 size={15} className="animate-spin" />
+                          <Loader2
+                            data-admin-ux="translations-save"
+                            aria-hidden="true"
+                            size={15}
+                            className="animate-spin"
+                          />
                         ) : null}
                         Save
                       </Button>
@@ -1004,12 +1035,18 @@ function EditorSection({
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="min-h-11"
                           aria-label={`Save ${key} to workspace JSON`}
                           onClick={() => void onSaveWorkspaceMessage(key)}
                           disabled={workspaceSavingKey === key}
                         >
                           {workspaceSavingKey === key ? (
-                            <Loader2 size={15} className="animate-spin" />
+                            <Loader2
+                              data-admin-ux="translations-workspace-save"
+                              aria-hidden="true"
+                              size={15}
+                              className="animate-spin"
+                            />
                           ) : null}
                           Save to workspace JSON
                         </Button>
@@ -1028,7 +1065,7 @@ function EditorSection({
           {exportedJson ? (
             <div className="overflow-hidden rounded-md border border-white/8 bg-black/18">
               <div className="border-b border-white/8 px-4 py-3">
-                <h3 className="text-sm font-semibold text-white">
+                <h3 className="font-display text-sm font-semibold text-white">
                   Exported JSON
                 </h3>
               </div>
@@ -1040,7 +1077,6 @@ function EditorSection({
         </div>
       ) : (
         <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 px-6 text-center">
-          <Languages size={32} className="text-white/25" />
           <div>
             <p className="font-semibold text-white">
               Select a bundle to review
@@ -1066,7 +1102,9 @@ function QualityIssues({
     <div className="overflow-hidden rounded-md border border-white/8 bg-white/[0.03]">
       <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3">
         <div>
-          <h3 className="text-sm font-semibold text-white">Quality issues</h3>
+          <h3 className="font-display text-sm font-semibold text-white">
+            Quality issues
+          </h3>
           <p className="mt-1 text-xs text-muted-foreground">
             {report
               ? `${report.errorCount} errors · ${report.warningCount} warnings`
@@ -1101,7 +1139,7 @@ function QualityIssues({
                     level={issue.severity}
                     label={issue.severity}
                   />
-                  <code className="font-mono text-meta text-text-secondary">
+                  <code className="break-all font-mono text-meta text-text-secondary">
                     {issue.code}
                   </code>
                 </div>
@@ -1162,23 +1200,24 @@ function ImportExportSection() {
   return (
     <Card className="gap-0 overflow-hidden p-0">
       <div className="border-b border-white/8 px-5 py-4">
-        <h2 className="text-sm font-semibold text-white">Import / Export</h2>
+        <h2 className="font-display text-sm font-semibold text-white">
+          Import / Export
+        </h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          JSON bundle tools will land with inline editing.
+          Import availability and the existing JSON export flow.
         </p>
       </div>
       <div className="grid gap-3 p-5 md:grid-cols-2">
         <div className="rounded-md border border-white/8 bg-white/[0.03] p-4">
           <p className="font-semibold text-white">Import JSON</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Draft creation stays on the existing review flow until import
-            actions are wired.
+            JSON import is not available. Review existing drafts in Bundles.
           </p>
         </div>
         <div className="rounded-md border border-white/8 bg-white/[0.03] p-4">
           <p className="font-semibold text-white">Export bundle</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Published and draft bundle export is reserved for the next API cut.
+            Select a bundle in Bundles, then use Export JSON in Editor.
           </p>
         </div>
       </div>
@@ -1201,19 +1240,19 @@ function FilterSelect({
 }) {
   return (
     <label className="crate-form-field">
-      <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-white/35">
+      <span className="block font-mono text-meta uppercase tracking-[0.12em] text-text-muted">
         {label}
       </span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-9 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-white outline-none transition-colors hover:border-accent-action/25 focus:border-accent-action/45"
+        className="h-11 min-w-0 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground transition-colors"
       >
         {options.map((option) => (
           <option
             key={option}
             value={option}
-            className="bg-[#101014] text-white"
+            className="bg-card text-foreground"
           >
             {formatOption(option)}
           </option>
@@ -1226,7 +1265,7 @@ function FilterSelect({
 function HealthMetric({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-md border border-white/6 bg-black/10 px-2 py-2">
-      <div className="font-semibold text-white">
+      <div className="font-mono font-semibold text-white">
         {value} {label}
         {value === 1 ? "" : "s"}
       </div>
@@ -1236,19 +1275,28 @@ function HealthMetric({ label, value }: { label: string; value: number }) {
 
 function LoadingBlock() {
   return (
-    <div className="flex min-h-56 items-center justify-center text-muted-foreground">
-      <Loader2 size={22} className="animate-spin" />
+    <div
+      role="status"
+      aria-label="Loading translations"
+      className="flex min-h-56 items-center justify-center text-muted-foreground"
+    >
+      <Loader2
+        data-admin-ux="translations-loading"
+        aria-hidden="true"
+        size={22}
+        className="animate-spin"
+      />
     </div>
   );
 }
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-white/8 bg-white/[0.03] px-3 py-2">
-      <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/32">
+    <div className="crate-form-field min-w-0 rounded-md border border-white/8 bg-white/[0.03] px-3 py-2">
+      <div className="font-mono text-meta uppercase tracking-[0.12em] text-text-muted">
         {label}
       </div>
-      <div className="mt-1 truncate text-sm font-semibold text-white">
+      <div className="break-all font-mono text-sm font-semibold text-white">
         {value}
       </div>
     </div>

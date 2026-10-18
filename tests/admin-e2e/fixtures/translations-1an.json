@@ -1,0 +1,119 @@
+{
+  "/api/admin/i18n/listen/requests": {
+    "aiConfigured": true,
+    "requests": [
+      {
+        "id": "request-es",
+        "app": "listen",
+        "locale": "es",
+        "sourceVersion": "sha256:test",
+        "client": "web",
+        "reason": "unsupported-locale",
+        "status": "needs_review",
+        "taskId": "task-es",
+        "createdAt": "2026-07-05T10:00:00+00:00",
+        "updatedAt": "2026-07-05T10:05:00+00:00"
+      }
+    ]
+  },
+  "/api/admin/i18n/listen/bundles": {
+    "bundles": [
+      {
+        "id": "bundle-es",
+        "app": "listen",
+        "locale": "es",
+        "sourceLocale": "en",
+        "sourceVersion": "sha256:test",
+        "bundleVersion": "2026.07.05.1",
+        "status": "needs_review",
+        "messageCount": 2,
+        "createdAt": "2026-10-18T10:00:00Z",
+        "publishedAt": null
+      },
+      {
+        "id": "bundle-fr",
+        "app": "listen",
+        "locale": "fr",
+        "sourceLocale": "en",
+        "sourceVersion": "sha256:test",
+        "bundleVersion": "2026.07.05.2",
+        "status": "published",
+        "messageCount": 1,
+        "createdAt": "2026-07-05T10:06:00+00:00",
+        "publishedAt": "2026-07-05T10:20:00+00:00"
+      }
+    ]
+  },
+  "/api/admin/i18n/listen/bundles/bundle-es": {
+    "id": "bundle-es",
+    "app": "listen",
+    "locale": "es",
+    "sourceLocale": "en",
+    "sourceVersion": "sha256:test",
+    "bundleVersion": "2026.07.05.1",
+    "status": "needs_review",
+    "messageCount": 2,
+    "createdAt": "2026-10-18T10:00:00Z",
+    "publishedAt": null,
+    "messages": {
+      "player.play": "Reproducir",
+      "nav.collection": "Coleccion"
+    }
+  },
+  "/api/admin/i18n/listen/bundles/bundle-fr": {
+    "id": "bundle-fr",
+    "app": "listen",
+    "locale": "fr",
+    "sourceLocale": "en",
+    "sourceVersion": "sha256:test",
+    "bundleVersion": "2026.07.05.2",
+    "status": "published",
+    "messageCount": 1,
+    "createdAt": "2026-07-05T10:06:00+00:00",
+    "publishedAt": "2026-07-05T10:20:00+00:00",
+    "messages": {
+      "player.play": "Lire"
+    }
+  },
+  "/api/admin/i18n/listen/quality?locale=es&source_version=sha256%3Atest": {
+    "schema": "crate.listen.i18n.quality.v1",
+    "sourceVersion": "sha256:test",
+    "generatedAt": "2026-07-05T10:08:00+00:00",
+    "locales": ["es"],
+    "issueCount": 2,
+    "errorCount": 1,
+    "warningCount": 1,
+    "issues": [
+      {
+        "severity": "error",
+        "code": "empty_value",
+        "locale": "es",
+        "key": "settings.profile.bio",
+        "message": "Translation value is empty.",
+        "source": null,
+        "value": "",
+        "file": null
+      },
+      {
+        "severity": "warning",
+        "code": "stale_translation",
+        "locale": "es",
+        "key": "nav.collection",
+        "message": "Translation needs review.",
+        "source": null,
+        "value": "Coleccion",
+        "file": null
+      }
+    ]
+  },
+  "/api/admin/i18n/listen/quality?locale=fr&source_version=sha256%3Atest": {
+    "schema": "crate.listen.i18n.quality.v1",
+    "sourceVersion": "sha256:test",
+    "generatedAt": "2026-07-05T10:08:00+00:00",
+    "locales": ["fr"],
+    "issueCount": 0,
+    "errorCount": 0,
+    "warningCount": 0,
+    "issues": []
+  }
+}

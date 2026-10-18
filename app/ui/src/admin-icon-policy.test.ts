@@ -37,6 +37,7 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
     "app/ui/src/pages/GlobalCatalog.tsx",
     "app/ui/src/pages/Roles.tsx",
     "app/ui/src/pages/Users.tsx",
+    "app/ui/src/pages/I18nReview.tsx",
   ]);
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
@@ -112,6 +113,14 @@ const approvedControls = new Map([
 ]);
 // Diego's 1W steering explicitly retains UX glyphs. Each concrete site remains bounded.
 const approvedUx = new Map([
+  ["I18nReview:translations-refresh", ["lucide-react", "Loader2"]],
+  ["I18nReview:translations-draft", ["lucide-react", "Loader2"]],
+  ["I18nReview:translations-export", ["lucide-react", "Loader2"]],
+  ["I18nReview:translations-reject", ["lucide-react", "Loader2"]],
+  ["I18nReview:translations-publish", ["lucide-react", "Loader2"]],
+  ["I18nReview:translations-save", ["lucide-react", "Loader2"]],
+  ["I18nReview:translations-workspace-save", ["lucide-react", "Loader2"]],
+  ["I18nReview:translations-loading", ["lucide-react", "Loader2"]],
   ["Users:users-list-loading", ["lucide-react", "Loader2"]],
   ["Users:users-detail-loading", ["lucide-react", "Loader2"]],
   ["Users:users-roles-loading", ["lucide-react", "Loader2"]],
@@ -202,9 +211,12 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
   for (const entry of entries.filter((entry) => sources.has(entry.path))) {
     if (entry.kind === "external-visual") continue;
     if (
-      !["glyph-jsx", "owned-icon-consumer", "owned-vector-consumer"].includes(
-        entry.kind,
-      )
+      ![
+        "glyph-jsx",
+        "owned-icon-consumer",
+        "owned-vector-consumer",
+        "icon-prop",
+      ].includes(entry.kind)
     ) {
       found.push(entry.id);
       continue;
@@ -229,6 +241,15 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
     );
     let attributes: ts.JsxAttributes | undefined;
     function visit(node: ts.Node) {
+      if (entry.kind === "icon-prop" && ts.isJsxAttribute(node)) {
+        const pos = tree.getLineAndCharacterOfPosition(node.getStart(tree));
+        if (
+          pos.line + 1 === entry.line &&
+          pos.character + 1 === entry.column &&
+          ts.isJsxAttributes(node.parent)
+        )
+          attributes = node.parent;
+      }
       if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
         const pos = tree.getLineAndCharacterOfPosition(node.getStart(tree));
         if (pos.line + 1 === entry.line && pos.character + 1 === entry.column)
@@ -247,6 +268,21 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
         (attr) => ts.isJsxAttribute(attr) && attr.name.getText(tree) === name,
       ) as ts.JsxAttribute | undefined;
     const unknownSpread = attrs.some(ts.isJsxSpreadAttribute);
+    // Inventory's /icon/i also matches aiConfigured. This reviewed local boolean prop
+    // is not a glyph channel; accept only its original binding at this concrete site.
+    if (
+      entry.kind === "icon-prop" &&
+      entry.path === "app/ui/src/pages/I18nReview.tsx" &&
+      entry.component === "OverviewSection" &&
+      entry.name === "aiConfigured" &&
+      !unknownSpread &&
+      prop("aiConfigured")?.initializer?.getText(tree) === "{aiConfigured}" &&
+      !usedUx.has("I18nReview:boolean-aiConfigured")
+    ) {
+      usedUx.add("I18nReview:boolean-aiConfigured");
+      continue;
+    }
+
     const reviewedControl = approvedControls.get(key);
     if (
       !unknownSpread &&
@@ -317,6 +353,21 @@ describe("Admin icon retirement policy — migrated Admin surfaces", () => {
       scope.map((path) => [path, readFileSync(join(repo, path), "utf8")]),
     );
     expect(violations(sources, inventory.entries)).toEqual([]);
+  });
+  it("does not turn the aiConfigured inventory false positive into an icon channel", () => {
+    const path = "app/ui/src/pages/I18nReview.tsx";
+    for (const source of [
+      "const view = <OverviewSection aiConfigured={SomeIcon}/>;",
+      "const view = <OtherSection aiConfigured={aiConfigured}/>;",
+      "const view = <OverviewSection {...props} aiConfigured={aiConfigured}/>;",
+      "const view = <><OverviewSection aiConfigured={aiConfigured}/><OverviewSection aiConfigured={aiConfigured}/></>;",
+    ])
+      expect(
+        violations(
+          new Map([[path, source]]),
+          analyzeSource(path, source).entries,
+        ).length,
+      ).toBeGreaterThan(0);
   });
   it.each([
     'import { Search as Glyph } from "lucide-react"; const view = <Glyph/>;',

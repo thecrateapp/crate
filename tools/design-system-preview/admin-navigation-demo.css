@@ -22,3 +22,5 @@ html {
 body {
   margin: 0;
 }
+
+@source "./admin-translations-demo.tsx";

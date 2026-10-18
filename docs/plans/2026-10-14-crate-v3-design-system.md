@@ -1,8 +1,8 @@
 # Crate v3 design system
 
-Current implementation: checkpoints through 1AL are approved and published (`d72232e9`).
+Current implementation: checkpoints through 1AM are approved and published (`b0f20194`).
 Published 1AG removes Library Timeline; it is no longer a V3 page target.
-Local 1AM covers Users list/map retirement and icons, preserving actual data, capabilities and actions.
+Local 1AN covers Translations icons, typography and fields, preserving actual data and actions.
 Stop for Diego before commit/push. See the final handover for evidence and limits.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
@@ -4695,3 +4695,85 @@ icon group. Approved source14 hashes match the post-fix freeze. Only publication
 change before committing; existing scoped verification and deferred minors remain recorded.
 Next stop is 1AN, uncommitted for review. Preview stays active5186; preserve UX glyphs and
 all prior checkpoints. No PR, merge, rebase, deploy, release or broad CI.
+
+### 1AM published; 1AN Translations local — 2026-10-18
+
+Diego approved1AM, including larger avatars and the viewport-wide User Detail modal.
+Published1AM is `b0f20194fb364e24cd3edb18e9b1c6084cb34f96`, origin/feat/crate_v3 matches.
+Publication-only label regression passed1case; approved14source hashes matched before publish.
+Previous local1AM stop is superseded by that explicit approval. Deferred Users sticky-header
+and shared Select-label minors remain; no hidden fixes were included in publication.
+
+Next bounded group1AN is actual Admin Translations (I18nReview.tsx), admin.access gated through
+App and Sidebar. CommandPalette maintains a separate list without a Translations entry;
+leave that inherited navigation scope unchanged. Profile
+redirects to Users and was not restyled. Remove redundant Languages/Clock/RefreshCw/CheckCircle2/
+XCircle glyphs in headings, states and labelled actions. Preserve8concrete Loader2 UX sites;
+whole-file policy now22files/84UX sites. Inventory /icon/i matches the boolean aiConfigured:
+a single exact page/component/prop/initializer exception is bounded and negative-tested.
+No shared foundation variant, dependency, Listen/backend/auth/capability/API change.
+
+Bricolage headings, Poppins body and JetBrains metadata; actual8px native-filter, editor-field
+and metadata readouts through crate-form-field. Editor rows stack on narrow screens, action
+buttons wrap and remain44px minimum. Original tab state/native-select and all request/effect/
+filter/sort/count/payload/validation/disable/feedback contracts remain; phase6.8 page-tab/URL
+adoption is separate. Correct inherited Import/Export prose to describe the existing Editor
+export and unavailable import, without adding tooling.
+
+Review http://127.0.0.1:5186/admin-translations-demo.html or persistent /#traducciones-admin.
+Real page, importer-only API fixture, full fictional response data; manual loading, failures,
+AI-draft/save/publish/reject/export and dev-workspace JSON simulation. Only the specimen's exact
+Listen dev-catalog fetch URLs are intercepted locally; no real dev catalog, backend, auth,
+external traffic, preferences or translation files. BuiltAdmin checks use actual route and
+boundary fixtures; no real publishing occurs. Existing1AM and all previous checkpoints remain.
+
+Evidence before final review:28scoped Vitest/3files (new3, existing8, policy17);5preview and
+3builtAdmin Chromium cases at1440/768/390, workers1. Strict scoped unit/preview TS, Admin build/
+types, scopedESLint, AST70data/type/function declarations and33event/state/validation bindings
+unchanged,19-entry preview build and diffcheck pass. InitialJS526475/532480Bgzip,9assets,
+6005Bmargin (7B below1AM526482). Tracked buildcache restored. Logs .artifacts/review/1an-\*.
+Browser RED detected inherited4px Meta margin (12px actual), corrected to8px. Browser export
+assertion caught a specimen-only regex capture error (undefined key), fixed to preserve actual
+edited key. No production handler was altered to satisfy fixtures. Existing chunk/NO_COLOR
+warnings only. One fresh complete-pending-diff review and actual IAB proof follow.
+
+Keep preview serviceactive5186. Canonical33PNG/manifest remain1M and app/web@258bbaee pinned.
+No broad suites/CI/baselines/native/live server certification. A21/phase6.8 and global1b.8 remain
+pending. **Stop1AN uncommitted for Diego before next group, commit/push, PR/merge/rebase/deploy/
+release.** Historical local stops above are superseded only by their recorded user approvals.
+
+### 1AN final independent review, tested boundary fix and review stop
+
+One fresh gpt-6-astra high read-only review checked all20pending files, including9untracked,
+and all13source hashes; each matched. Report .artifacts/review/1an-final-review.md:
+Critical0/Important1/Minor1. Executor keeps Important severity: an environment override could
+bypass the specimen interceptor and reach a real Listen dev catalog. One tested fix pass,
+no re-review: derive exact simulated catalog endpoints from the same effective
+VITE_LISTEN_DEV_ORIGIN/default and trailing-slash normalization as the actual unchanged page.
+New boundary tests observe RED2fail/1pass (alternate localhost and path-prefixed origin escaped
+to the mocked original503), then GREEN3/3 proving both GET and PATCH stay simulated and other
+resources retain original fetch. No real server/file was contacted or changed by those tests.
+
+Final evidence:31scoped Vitest/4files,5finalpreview Chromium cases, strict scoped TS and scoped
+ESLint pass.19-entry preview rebuild passes. Earlier3builtAdmin Chromium and Admin build/types/
+AST70declarations/33bindings/bundle526475/532480Bgzip remain applicable: production source did
+not change in the fix pass.6005Bmargin,9initialassets. Only specimen interceptor changed plus
+one boundary regression file; final pending21files/14source hashes saved separately from the
+original reviewed13hash freeze. All checks serial; final logs 1an-review-{origin-red,unit,types,
+lint,preview,preview-build,format}.log. ActualIAB editor proof checkpoint-1an-translations.jpg.
+Preview serviceactive5186. No further implementation or publication after this closure.
+
+New Minor deferred: French fictional summary/detail reports2messages but contains1editor row.
+This is a specimen discrepancy, not a production-data change. Earlier Users sticky-header and
+shared Select-label minors also remain deferred. Full phase/native/live QA and global1b.8/A21/
+phase6.8 are not completed. **Stop1AN uncommitted for Diego on published1AM b0f20194.**
+
+### 1AN approval, French count correction and publication — 2026-10-18
+
+Diego approved1AN and explicitly requested correction of the French fixture counter before
+commit/push and the next bounded Admin group. Approved14hashes matched before changes.
+French summary and detail now report1message, matching their actual single editor row;
+fixture coherence regression observed RED1fail/3pass before correction. No production-data
+or action change. Publication labels updated; next stop1AO uncommitted, UX/preview retained.
+This resolves the French specimen Minor; earlier Users stickyheader/Selectlabel minors remain.
+No PR/merge/rebase/deploy/release, broadCI or canonical refresh.
