@@ -1,25 +1,15 @@
 import { useMemo, useState, type ReactNode } from "react";
 
 import { ResponsiveLine } from "@nivo/line";
-import {
-  Activity,
-  Clock,
-  Database,
-  Disc3,
-  Gauge,
-  HardDrive,
-  Headphones,
-  Radio,
-  RefreshCw,
-  Zap,
-} from "lucide-react";
 
 import {
   OpsPageHero,
   OpsPanel,
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
-import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
+import { Button } from "@crate/ui/shadcn/button";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { Meter } from "@crate/ui/primitives/Meter";
@@ -327,17 +317,12 @@ function HealthSignal({ score, summary }: { score: number; summary: string }) {
     <div
       className={`rounded-md border px-5 py-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)] ${bg}`}
     >
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-black/20">
-          <Gauge size={20} className={color} />
-        </div>
-        <div>
-          <div className={`text-3xl font-bold tabular-nums ${color}`}>
-            {score}
-          </div>
-          <div className="text-[11px] uppercase tracking-[0.14em] text-white/40">
-            Health Score
-          </div>
+      <div className="crate-form-field">
+        <MonoLabel as="div">Health Score</MonoLabel>
+        <div
+          className={`font-display text-3xl font-bold tabular-nums ${color}`}
+        >
+          {score}
         </div>
       </div>
       <div className="mt-3 text-xs text-white/45">{summary}</div>
@@ -346,24 +331,21 @@ function HealthSignal({ score, summary }: { score: number; summary: string }) {
 }
 
 function ResourceCard({
-  icon: Icon,
   label,
   value,
   children,
 }: {
-  icon: typeof Activity;
   label: string;
   value: string;
   children: ReactNode;
 }) {
   return (
     <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
-      <div className="flex items-center gap-2 text-[11px] text-white/40 uppercase tracking-[0.14em]">
-        <Icon size={12} />
-        {label}
-      </div>
-      <div className="mt-2 text-lg font-semibold text-white tabular-nums">
-        {value}
+      <div className="crate-form-field">
+        <MonoLabel as="div">{label}</MonoLabel>
+        <div className="font-display text-xl font-bold text-text-primary tabular-nums break-words">
+          {value}
+        </div>
       </div>
       <div className="mt-3 space-y-2">{children}</div>
     </div>
@@ -383,9 +365,9 @@ function ProgressBar({
 }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   return (
-    <div className="space-y-1">
+    <div className={label ? "crate-form-field" : undefined}>
       {label ? (
-        <div className="flex min-w-0 justify-between gap-2 text-[11px]">
+        <div className="flex min-w-0 justify-between gap-2 font-mono text-label font-normal">
           <span className="min-w-0 truncate text-white/40">{label}</span>
           <span className="shrink-0 text-white/60 tabular-nums">
             {pct.toFixed(0)}%
@@ -449,7 +431,9 @@ function MetricChart({
   if (!chartData.length) {
     return (
       <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
-        <div className="mb-2 text-sm font-medium text-white">{title}</div>
+        <div className="mb-2 font-display text-xl font-bold text-text-primary">
+          {title}
+        </div>
         <div className="flex h-48 items-center justify-center text-sm text-white/30">
           No data yet
         </div>
@@ -459,7 +443,9 @@ function MetricChart({
 
   return (
     <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
-      <div className="mb-2 text-sm font-medium text-white">{title}</div>
+      <div className="mb-2 font-display text-xl font-bold text-text-primary">
+        {title}
+      </div>
       <div className="h-48">
         <ResponsiveLine
           data={chartData}
@@ -593,9 +579,9 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
                 return (
                   <div
                     key={route.route_id}
-                    className="grid gap-3 px-4 py-3 xl:grid-cols-[minmax(0,1fr)_7rem_7rem_7rem_6rem] xl:items-center"
+                    className="grid grid-cols-2 gap-3 px-4 py-3 xl:grid-cols-[minmax(0,1fr)_7rem_7rem_7rem_6rem] xl:items-center"
                   >
-                    <div className="min-w-0">
+                    <div className="col-span-2 min-w-0 xl:col-span-1">
                       <div className="flex min-w-0 items-center gap-2">
                         <CrateChip className="shrink-0 font-mono">
                           {route.method}
@@ -612,24 +598,24 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
                         />
                       </div>
                     </div>
-                    <div className="flex items-center justify-between gap-3 xl:block">
-                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 xl:block">
+                    <div className="crate-form-field">
+                      <span className="font-mono text-label font-normal uppercase tracking-caps text-text-subtle">
                         Count
                       </span>
                       <span className="text-sm font-medium tabular-nums text-white/75">
                         {route.count.toLocaleString()}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between gap-3 xl:block">
-                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 xl:block">
+                    <div className="crate-form-field">
+                      <span className="font-mono text-label font-normal uppercase tracking-caps text-text-subtle">
                         Avg
                       </span>
                       <span className="text-sm font-medium tabular-nums text-white/75">
                         {formatMs(route.avg)}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between gap-3 xl:block">
-                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 xl:block">
+                    <div className="crate-form-field">
+                      <span className="font-mono text-label font-normal uppercase tracking-caps text-text-subtle">
                         p95 / p99
                       </span>
                       <span
@@ -644,8 +630,8 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
                         {formatMs(route.p95)} · {formatMs(route.p99)}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between gap-3 xl:block">
-                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 xl:block">
+                    <div className="crate-form-field">
+                      <span className="font-mono text-label font-normal uppercase tracking-caps text-text-subtle">
                         5xx
                       </span>
                       <span
@@ -782,7 +768,7 @@ function PlaybackTranscodingOverview({
           <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-medium text-white">
+                <div className="font-display text-xl font-bold text-text-primary">
                   Variant Status
                 </div>
                 <div className="mt-1 text-xs text-white/35">
@@ -810,7 +796,7 @@ function PlaybackTranscodingOverview({
           <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-medium text-white">
+                <div className="font-display text-xl font-bold text-text-primary">
                   Recent Variants
                 </div>
                 <div className="mt-1 text-xs text-white/35">
@@ -961,48 +947,34 @@ export function SystemHealth() {
         title="System Health"
         description="Runtime pressure, API performance, queue behavior and infrastructure saturation across the stack."
         actions={
-          <div className="flex items-center gap-2">
-            <div className="flex items-center rounded-md border border-white/10 bg-black/20 p-0.5 text-xs shadow-[0_12px_28px_rgba(0,0,0,0.18)]">
-              <button
-                type="button"
-                onClick={() => setPeriod("minute")}
-                className={`rounded-sm px-3 py-1.5 transition-colors ${
-                  period === "minute"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-white/50 hover:text-white"
-                }`}
-              >
-                1h
-              </button>
-              <button
-                type="button"
-                onClick={() => setPeriod("hour")}
-                className={`rounded-sm px-3 py-1.5 transition-colors ${
-                  period === "hour"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-white/50 hover:text-white"
-                }`}
-              >
-                24h
-              </button>
-            </div>
-            <ActionIconButton
-              variant="card"
+          <div className="flex flex-wrap items-center gap-2">
+            <SegmentedControl
+              as="radio"
+              label="Metrics window"
+              value={period}
+              onValueChange={setPeriod}
+              items={[
+                { value: "minute", label: "1h" },
+                { value: "hour", label: "24h" },
+              ]}
+            />
+            <Button
+              variant="outline"
+              className="min-h-11"
               onClick={() => refetchDashboard()}
-              title="Refresh metrics"
             >
-              <RefreshCw size={15} />
-            </ActionIconButton>
+              Refresh metrics
+            </Button>
           </div>
         }
       >
-        <CrateChip icon={Activity}>
+        <CrateChip>
           {summary
             ? `${summary.api_requests.count} requests`
             : "Metrics loading"}
         </CrateChip>
-        <CrateChip icon={Zap}>{runningTasks} running tasks</CrateChip>
-        <CrateChip icon={Clock}>{queueDepth} queued depth</CrateChip>
+        <CrateChip>{runningTasks} running tasks</CrateChip>
+        <CrateChip>{queueDepth} queued depth</CrateChip>
         {summary ? (
           <CrateChip
             className={
@@ -1023,18 +995,17 @@ export function SystemHealth() {
           </CrateChip>
         ) : null}
         {playbackDelivery?.stats ? (
-          <CrateChip icon={Headphones}>
+          <CrateChip>
             {playbackDelivery.stats.coverage_percent}% playback coverage
           </CrateChip>
         ) : null}
         {summary?.worker_resource_deferred?.count ? (
-          <CrateChip icon={Gauge}>
+          <CrateChip>
             {summary.worker_resource_deferred.count} batch deferrals
           </CrateChip>
         ) : null}
         {system?.resource_pressure ? (
           <CrateChip
-            icon={Gauge}
             className={
               system.resource_pressure.allowed
                 ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
@@ -1146,7 +1117,6 @@ export function SystemHealth() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {system.disk?.music ? (
               <ResourceCard
-                icon={HardDrive}
                 label="Music Volume"
                 value={`${system.disk.music.used_gb} / ${system.disk.music.total_gb} GB`}
               >
@@ -1167,7 +1137,6 @@ export function SystemHealth() {
 
             {system.disk?.data ? (
               <ResourceCard
-                icon={Database}
                 label="Data Volume"
                 value={`${system.disk.data.used_gb} / ${system.disk.data.total_gb} GB`}
               >
@@ -1188,7 +1157,6 @@ export function SystemHealth() {
 
             {system.db_pool?.size > 0 ? (
               <ResourceCard
-                icon={Database}
                 label="DB Pools"
                 value={`${system.db_pool.checked_out} / ${
                   system.db_pool.size +
@@ -1222,7 +1190,6 @@ export function SystemHealth() {
 
             {system.analysis?.analysis ? (
               <ResourceCard
-                icon={Disc3}
                 label="Analysis"
                 value={`${system.analysis.analysis.done} / ${
                   system.analysis.analysis.done +
@@ -1252,7 +1219,6 @@ export function SystemHealth() {
 
             {system.resource_pressure ? (
               <ResourceCard
-                icon={Gauge}
                 label="Resource Governor"
                 value={system.resource_pressure.allowed ? "Open" : "Deferring"}
               >
@@ -1307,7 +1273,6 @@ export function SystemHealth() {
 
             {system.media_worker ? (
               <ResourceCard
-                icon={Radio}
                 label="Media Worker"
                 value={
                   system.media_worker.redis_connected
@@ -1464,13 +1429,13 @@ export function SystemHealth() {
               return (
                 <div
                   key={task.id}
-                  className="flex items-center gap-3 rounded-md border border-white/8 bg-black/20 px-4 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.12)]"
+                  className="grid min-w-0 grid-cols-2 items-center gap-3 rounded-md border border-white/8 bg-black/20 px-4 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.12)] sm:flex"
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-white">
+                  <div className="col-span-2 min-w-0 flex-1">
+                    <div className="break-words text-sm font-medium text-white">
                       {task.label || taskLabel(task.type)}
                     </div>
-                    <div className="mt-0.5 text-xs text-white/40">
+                    <div className="mt-0.5 break-words text-xs text-white/40">
                       {progress?.phase ? (
                         <span>{String(progress.phase)}</span>
                       ) : null}
@@ -1480,7 +1445,7 @@ export function SystemHealth() {
                     </div>
                   </div>
                   {pct > 0 ? (
-                    <div className="flex w-32 items-center gap-2">
+                    <div className="flex min-w-0 items-center gap-2 sm:w-32 sm:shrink-0">
                       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
                         <div
                           className="h-full rounded-full bg-primary transition-[width,background-color]"
@@ -1492,8 +1457,8 @@ export function SystemHealth() {
                       </span>
                     </div>
                   ) : null}
-                  <div className="flex items-center gap-1 text-[10px] text-white/30">
-                    <Clock size={10} />
+                  <div className="flex items-center justify-self-end gap-1 font-mono text-label font-normal text-text-subtle">
+                    Elapsed
                     <span className="tabular-nums">{elapsedStr}</span>
                   </div>
                   <span className="font-mono text-[10px] text-white/20">

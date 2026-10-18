@@ -4,6 +4,7 @@
 @source "./admin-operations-demo.tsx";
 @source "./admin-analysis-demo.tsx";
 @source "./admin-dashboard-demo.tsx";
+@source "./admin-system-health-demo.tsx";
 @source "../../app/ui/src";
 html {
   color-scheme: dark;

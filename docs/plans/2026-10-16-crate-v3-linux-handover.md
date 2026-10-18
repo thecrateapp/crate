@@ -4,40 +4,35 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — 1AB approved; next bounded group authorised
+## Active Linux workspace — 1AC approved; next bounded group authorised
 
 Use `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing `feat/crate_v3` tracking origin.
-Published HEAD is 1AA `1327270692937896072b3a3c79ad6cef6c1049b3`; original transfer 53177736
-remains an ancestor. Leave `/home/diego/Code/Ninja/crate` (`feat/crate_mcp`) and its agent untouched.
+Published HEAD is 1AB `2d047fecd4721ac4575faadbf9bd8781eec37c5b` (origin verified); original transfer
+53177736 remains an ancestor. Leave `/home/diego/Code/Ninja/crate` (`feat/crate_mcp`) untouched.
 Node 22.23.3 is `/home/diego/.nvm/versions/node/v22.23.3/bin`; dependencies are installed.
 
-Diego approved the simplification analysis and asked to implement three Dashboard blocks using
-only available data, then stop at 1AB before commit. The real page now has report/service state,
-reported work and fresh service interruptions. Source is the existing ops provider. Missing/old
-reports, unknown service/queue data, historical failures and worker availability are distinguished;
-no invented liveness/ETA/rates or new subscriptions/queries. Deadline timeout expires displayed
-data without polling. Tasks/daemon activity use their own reported fields. Maintenance lives in
-a secondary shared dialog, preserving typed actions/endpoints and existing destructive admin gate
-plus matching capabilities. Current scope/details are in the final main handover and
-`2026-10-18-crate-v3-dashboard-implementation.md`. The analysis-only provisional stop is superseded.
+Diego approved/published 1AB and authorised one further icon-retirement group, retaining UX.
+1AC covers SystemHealth and its local resource/score/elapsed presentation. Existing calculations,
+metrics URL/window math, refresh, catalogue, progress, Nivo charts and shared meter are preserved.
+Shared radio chips/text refresh and typographic readings replace redundant glyphs; all vertical
+fields use the real 8 px recipe. Radio chips 32 px fine / 44 px coarse; refresh 44 px. No foundation,
+Listen/Desktop, backend/schema/provider/dependency or other-page workflow changes.
 
-1AB also corrects Ops/Analysis typography to Bricolage/Mono roles, keeping Poppins body/controls,
-8px `.crate-form-field`, 44px targets and native/shared exceptions. Policy covers 11 whole files,
-35 named loading/navigation UX sites plus bounded reviewed shared controls. No shared/Listen/
-Desktop/backend/dependency changes. All prior specimens remain; no baseline updates.
+Review <http://127.0.0.1:5186/admin-system-health-demo.html> or persistent `/#sistema-admin`.
+Activity/pressure use fictional existing-shaped metrics and local feedback; no API/stream.
+All older checkpoints remain, including the published Dashboard/Analysis and their typography.
+Preview service `crate-v3-preview.service` uses this worktree/Node 22, restart-on-failure, only
+loopback :5186. Check `systemctl --user status crate-v3-preview.service`; keep it active.
 
-Review `http://127.0.0.1:5186/admin-dashboard-demo.html` or persistent `/#dashboard-admin`.
-Seven fictional scenarios, real production components and local actions, no backend. Preview
-service `crate-v3-preview.service` uses this worktree/Node22, restart-on-failure, only loopback
-:5186. Check with `systemctl --user status crate-v3-preview.service`; it is active/running HTTP200.
+Current evidence:27 scoped Vitest/four preview Chromium, three strict TS configs and scoped lint pass.
+Admin build/types pass; initial JS 526781 / 532480 B gzip, ten assets,5699 B margin. Four actual Admin Chromium cases and the eight-entry preview build also pass. The one fresh
+read-only review is clean; final evidence and limits are in the main handover. 1AC remains
+uncommitted for Diego. Both advisory screenshots are in .artifacts/review/.
+No full suites/CI, canonical baselines, actual AT/native/other-engine/production QA. 33 PNG/manifest
+remain 1M and site pin 258bbaee unchanged/unavailable. Task 1b.8 and later SystemHealth phase not done.
 
-Current checks: 89 focused Vitest, 11 affected preview and 7 actual Admin Chromium, strict scoped types
-and Admin build pass. Initial JS526461/532480 B gzip, 10 assets, 6019 B margin. Final main handover
-records the accepted producer fixes, their replay, review rulings and limits. Full suites/CI, native/AT/production integration
-and canonical Linux comparison remain pending. 33 canonical PNGs/manifest at 1M and pin 258bbaee intact.
-
-**Diego approved commit/push of 1AB and continuation to the next bounded group. Stop at 1AC
-for review before another commit. No PR, merge, rebase, deploy or release.**
+**Diego approved commit/push of 1AC and one next bounded group. Stop at 1AD before
+commit/push. No PR/merge/rebase/deploy/release.**
 
 Diego explicitly retained Listen's layered play/halo/progress ring and luminous seek trail
 (2px, thin 1px) during 1S review. Preserve them. Shared/Listen/Desktop contracts are unchanged.

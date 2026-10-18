@@ -7,17 +7,16 @@ Current transfer: **1N–1P are complete in the checkpoint commit
 `feat(ui): unify v3 overlays, controls and field spacing`**. Diego authorised commit/push and
 continuation on Linux; this final publication record supersedes earlier local-only stops below.
 **1AA is approved and published as `1327270692937896072b3a3c79ad6cef6c1049b3`.**
-Task 1b.8 / checkpoint **1AB is approved for commit/push by Diego** (2026-10-18).
-Diego approved the three-block Dashboard simplification using only available data. The real page
-now shows report/service state, reported work and current service interruptions. Unknown/stale
-reports remain explicit; worker liveness is not inferred. Library maintenance lives in a secondary
-shared dialog with the original typed confirmations and endpoint capabilities. Admin Ops/Analysis
-font corrections also belong to this pending checkpoint. Review
-<http://127.0.0.1:5186/admin-dashboard-demo.html>; the persistent mockup includes `#dashboard-admin`.
-Read the final implementation/evidence record below and
-[`2026-10-18-crate-v3-dashboard-implementation.md`](2026-10-18-crate-v3-dashboard-implementation.md).
-Diego authorised the next bounded Admin icon group, stopping at 1AC before publication. Earlier provisional/analysis-only stops are
-historical; Diego explicitly authorised this implementation on 2026-10-18.
+**1AB is approved and published as `2d047fecd4721ac4575faadbf9bd8781eec37c5b`.**
+Its three-block Dashboard, producer interpretation fixes and Ops/Analysis typography remain intact.
+Task 1b.8 / checkpoint **1AC System Health is approved for commit/push by Diego** (2026-10-18). It uses the actual page and existing metrics, preserving score/summary calculations,
+queries, refresh, task progress, Nivo and meters. Shared radio chips replace the two-value window;
+text labels/readings replace decorative glyphs and the local ResourceCard icon contract.
+Review <http://127.0.0.1:5186/admin-system-health-demo.html> or persistent `/#sistema-admin`.
+Current scope/evidence/limits follow in the final 1AC record and
+[`2026-10-18-crate-v3-system-health-icons.md`](2026-10-18-crate-v3-system-health-icons.md).
+Earlier provisional/analysis-only/1AB publication stops are historical and superseded by Diego's
+explicit approval and next-group request on 2026-10-18. **Continue one bounded group and stop at 1AD.**
 The retained Listen play/halo/ring and luminous seek trail
 from 1S remain intact. Resume on Linux with
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
@@ -26,7 +25,7 @@ Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 ## Where the work lives
 
 - Active Linux worktree: `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing branch
-  `feat/crate_v3`, published HEAD `1327270692937896072b3a3c79ad6cef6c1049b3` (1AA);
+  `feat/crate_v3`, published HEAD `2d047fecd4721ac4575faadbf9bd8781eec37c5b` (1AB);
   transfer checkpoint `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. Node 22.23.3, root
   dependencies and persistent :5186 preview are prepared. This isolates the MCP agent's
   `/home/diego/Code/Ninja/crate` checkout (`feat/crate_mcp`); leave its files untouched.
@@ -220,7 +219,8 @@ is a token-based chart configuration, not a selectable product skin.
 | 1b.8 / Checkpoint 1Y                                         | Approved/published as `ea6ebdc8`; operational surface contracts and all 125 uses adapted, UX and 8px geometry preserved.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | 1b.8 / Checkpoint 1Z                                         | Approved/published `2efb4754`; Logs/Stack text controls and consistent shared selector/tag geometry.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 1b.8 / Checkpoint 1AA                                        | Approved/published `13272706`; Analysis including latest fingerprint. Final publication record below supersedes older local notes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| 1b.8 / Checkpoint 1AB                                        | Approved for commit/push by Diego on 2026-10-18: three-block Dashboard plus Ops/Analysis fonts. Next bounded Admin icon group authorised; stop at 1AC.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 1b.8 / Checkpoint 1AB                                        | Approved/published `2d047fec`: three-block Dashboard plus Ops/Analysis fonts. Origin SHA verified; scoped publication replay89Vitest/5Chromium green.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 1b.8 / Checkpoint 1AC                                        | Ready for Diego review: System Health icon retirement, shared window/text refresh, 8 px readings and preserved instruments. Independent review clean; uncommitted.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -2520,3 +2520,112 @@ deploy/release, full suites/CI or canonical baseline regeneration is authorised.
 Fresh pre-publication replay: **89 scoped Vitest + five Dashboard Chromium** pass serially
 with one worker. Approved product source is unchanged since the final 1AB build/budget and
 producer-fix evidence. The specimen now says 1AB published; all historical checkpoints remain.
+
+## Final Linux record — 1AB published; 1AC System Health review (2026-10-18)
+
+Diego approved 1AB and authorised commit/push plus one next bounded Admin icon group. It is
+published as **2d047fecd4721ac4575faadbf9bd8781eec37c5b**, `feat(ui): simplify Admin Dashboard into
+three reported-state blocks`, with origin branch SHA verified. The fresh pre-publication replay
+passed 89 Vitest / five Dashboard Chromium. This supersedes all earlier 1AB review/publication stops.
+
+The next group is SystemHealth alone, from the reviewed 1V operations/settings inventory.
+No shared/Listen/Desktop, backend/provider/schema/dependency or other-page workflow changes.
+Task 1b.8 and future SystemHealth Task 3.4 remain incomplete globally. The V3 worktree and preview
+user service remain isolated from the MCP checkout; existing checkpoints/pin/baselines are intact.
+
+1AC removes ten Lucide import bindings, redundant header/resource/score/elapsed glyphs and the
+local ResourceCard icon prop with all six callers. There are no direct retained page glyphs;
+Nivo charts and the shared playback meter remain instruments. No new permanent exception.
+The source policy now covers twelve whole files, still 35 individually bounded UX sites plus
+its existing bounded shared controls. Unmigrated Admin/Listen/Desktop icons are not altered.
+
+Refresh is a visible shared Button. Window 1h/24h uses shared radio chips with named group,
+arrow-key selection and the exact existing minute/60 / hour/1440 query. Chips retain 32 px fine
+pointer / 44 px coarse pointer; refresh is 44 px. The first overly broad 44 px test for all controls
+was corrected to the established shared chip contract, removing an ineffective local override;
+no foundation variant or shared CSS change. Header summaries retain consistent static tags.
+
+Resource/score numerals and local titles use Bricolage; labels/readout metadata use Mono,
+body/refresh Poppins. `.crate-form-field` supplies real 8 px for resource/score, labelled progress,
+and stacked route readings. Mobile route measurements use a compact 2×2 arrangement; long task
+text wraps in a responsive row. Measurement values, expressions, ordering and callback data
+remain. No new metric, health guarantee, inference, stream, polling, endpoint or route.
+
+The AST audit against 2d047fec confirms unchanged helpers, score/summary and other page
+calculations/hooks, route/playback calculations, Nivo series/props and all 13 chart consumers,
+shared meter props, task progress/elapsed calculations, six resource label/value/children
+contracts and refresh callback. Evidence: `.artifacts/review/checkpoint-1ac-contract-audit.txt`.
+Existing SystemHealth score/default/availability semantics are preserved, not independently
+certified by this icon migration; its later product/data phase remains responsible for them.
+
+An eighth isolated persistent entry imports the actual page and redirects only that page's
+useApi/task-catalog dependencies to fictional data. Activity/pressure samples, local query and
+refresh feedback use a new existing-shaped fixture. No API or stream is called by the sample.
+Review `/#sistema-admin` or `admin-system-health-demo.html`; all prior specimens remain, with
+1AB published and 1AC in review. No new backend or actual task action is needed.
+
+Focused evidence so far: 27 Vitest (System Health 11 / policy 16), four preview Chromium cases at
+1440/768/390 including embedding, three strict scoped TS configs and scoped ESLint pass.
+Original RED preceded removal (four failures), and the missing embedding failed before addition.
+One elapsed assertion needed a split-text matcher correction, not a product behavior change.
+All existing meter/partial-payload tests remain green. Final built-Admin checks/review follow.
+Admin build/types pass; initial JS **526781 / 532480 B gzip**, ten assets, **5699 B margin** (+320 B vs 1AB).
+
+Limits: no real runtime/metrics/SSE or worker liveness certification, native/AT/other-engine QA,
+full suites/CI, canonical recording/comparison or replacement of `app/web@258bbaee`. The 33 PNG/
+manifest remain 1M; Linux/native follow-up remains pending. No SmartMix, PR/merge/rebase/deploy/
+release. **Stop at 1AC for Diego before commit/push or another group.**
+
+Final actual Admin replay: **four Chromium cases pass**, including desktop/tablet/mobile,
+unchanged window query and refresh, real 8 px field boxes, instruments and long unbroken mobile
+task/route text. All traffic is intercepted. It serves the already-built Admin with an ignored
+config override, so the build is not repeated. Final lint/types/build/budget remain green;
+preview build and the fresh read-only checkpoint review follow.
+
+The eight-entry preview build passes. Advisory screenshots from public IAB tab2 are saved as
+`.artifacts/review/checkpoint-1ac-system-health.png` (header/metrics) and
+`.artifacts/review/checkpoint-1ac-resources.png` (resources and preserved Nivo charts), without
+canonical capture changes. The public tab is marked deliverable. Source is frozen during the
+one fresh read-only review; final review rulings and service check follow.
+
+### Final 1AC review and stop
+
+The one fresh-context read-only reviewer found **Critical 0 / Important 0 / Minor 0 actionable**
+and considers 1AC ready for Diego's local review. Source/contract and test implementations were
+inspected independently. In a private hidden tab the reviewer exercised arrow selection to
+`hour&minutes=1440`, local Refresh and the pressure sample, then closed that tab; existing user
+tabs were untouched. The reviewer ran no suites/builds and changed no files/index/HEAD.
+No repair pass or second review round is needed; product source remains frozen.
+
+Executor rulings on areas the reviewer declined to certify:
+
+- Existing SystemHealth score/default/health semantics and metric authority stay preserved;
+  later Task 3.4/data work owns improvements. This migration adds no runtime health guarantee.
+- API/SSE integration, worker liveness and runtime capability enforcement need real integration
+  QA. Existing requests and production routing/capabilities are unchanged; this group uses only
+  fictional/intercepted traffic and requires no backend or production operations.
+- Actual AT/native/other-engine and exhaustive mobile QA remain pending. Evidence covers
+  Chromium 1440/768/390 and the long mobile case, not every device or assistive technology.
+- Test/build/budget outcomes are executor-run evidence: 27 Vitest, four preview/four actual Admin
+  Chromium, three strict TS configs, scoped lint and both builds pass. The reviewer inspected
+  their source/evidence without independently replaying them; no duplicated runs are claimed.
+- This is a bounded visual checkpoint, not completed Task 1b.8/3.4, full-phase or merge/release QA.
+  Diego's visual approval remains pending. Final appendices record evidence/status only and were
+  added after the reviewer snapshot; no product source changed afterwards.
+
+Final initial JS remains **526781 / 532480 B gzip**, ten assets, **5699 B margin**. Formatting and
+diff checks pass; known generated tsbuildinfo is restored from HEAD. Preview user service remains
+active/running HTTP200; public SystemHealth tab is marked deliverable, with the two advisory
+proofs above. HEAD/origin remain the published 1AB SHA 2d047fec; all 1AC files stay uncommitted.
+**Stop at 1AC for Diego: no commit/push, another group, full CI/baselines, PR/merge/rebase/deploy/release.**
+
+## 1AC visual approval and publication authorisation — 2026-10-18
+
+Diego approved 1AC and explicitly requested commit/push plus the next bounded Admin icon group,
+retaining UX glyphs, the active preview and a review stop before the next checkpoint publication
+(1AD). This supersedes the previous 1AC publication stop. Approved product source is unchanged;
+only the specimen/status records change before commit. Fresh scoped publication evidence and
+the resulting SHA follow. No full suites/CI, canonical baselines, PR/merge/rebase/deploy/release.
+
+Fresh pre-publication replay: **27 scoped Vitest + four System Health Chromium** pass
+serially with one worker. Approved product source remains unchanged; specimen now says published.

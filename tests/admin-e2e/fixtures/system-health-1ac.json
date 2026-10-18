@@ -1,0 +1,575 @@
+{
+  "summary": {
+    "api_latency": {
+      "count": 120,
+      "avg": 32,
+      "min": 12,
+      "max": 48,
+      "sum": 3840
+    },
+    "api_requests": {
+      "count": 120,
+      "avg": 2,
+      "min": 0,
+      "max": 5,
+      "sum": 120
+    },
+    "api_errors": {
+      "count": 0,
+      "avg": 0,
+      "min": 0,
+      "max": 0,
+      "sum": 0
+    },
+    "api_slow": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "stream_requests": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "stream_latency": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "stream_concurrent": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "stream_transcode_duration": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "stream_transcode_completed": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "stream_transcode_failed": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "home_cache_hit": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "home_cache_miss": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "home_cache_waited": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "home_cache_coalesced": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "home_cache_stale_fallback": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "home_compute_ms": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "home_endpoint_cache_hit": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "home_endpoint_cache_miss": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "home_endpoint_compute_ms": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "worker_resource_deferred": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "worker_resource_defer_seconds": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "worker_resource_load_ratio": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "worker_resource_iowait_percent": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "worker_resource_swap_used_percent": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "media_worker_completed": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "media_worker_failed": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "media_worker_duration": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "media_worker_bytes": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "media_worker_admission_denied": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "media_worker_cache_pruned": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    },
+    "media_worker_cache_bytes_removed": {
+      "count": 10,
+      "avg": 1,
+      "min": 0,
+      "max": 2,
+      "sum": 10
+    }
+  },
+  "system": {
+    "disk": {
+      "music": {
+        "total_gb": 1000,
+        "used_gb": 280,
+        "free_gb": 720,
+        "percent": 28
+      },
+      "data": {
+        "total_gb": 100,
+        "used_gb": 18,
+        "free_gb": 82,
+        "percent": 18
+      }
+    },
+    "db_pool": {
+      "size": 8,
+      "checked_in": 6,
+      "checked_out": 2,
+      "overflow": 0,
+      "total": 8
+    },
+    "analysis": {
+      "analysis": {
+        "pending": 12,
+        "done": 851,
+        "failed": 0
+      },
+      "bliss": {
+        "pending": 6,
+        "done": 857,
+        "failed": 0
+      }
+    },
+    "load": {
+      "load_1m": 1.2,
+      "load_5m": 1.1,
+      "load_15m": 0.9,
+      "cpu_count": 4,
+      "load_percent": 30
+    },
+    "resource_pressure": {
+      "allowed": true,
+      "reason": "Within the reported batch limits",
+      "snapshot": {
+        "cpu_count": 8,
+        "load_1m": 1.4,
+        "load_ratio": 0.175,
+        "iowait_percent": 2,
+        "swap_used_percent": 0,
+        "active_users": 2,
+        "active_streams": 1
+      },
+      "window": {
+        "enabled": true,
+        "start": "00:00",
+        "end": "23:59",
+        "in_window": true
+      }
+    },
+    "media_worker": {
+      "redis_connected": true,
+      "max_active": 2,
+      "active_slots": [
+        {
+          "id": "sample-package"
+        }
+      ],
+      "pending": 0,
+      "consumer_group": "media-worker",
+      "recent_events": [
+        {
+          "id": "sample-event",
+          "event": "package_completed"
+        }
+      ]
+    }
+  },
+  "tasks": [
+    {
+      "id": "sample-system-task",
+      "type": "sync_library",
+      "status": "running",
+      "label": "Library sync",
+      "created_at": "2026-10-18T10:00:00Z",
+      "updated_at": "2026-10-18T10:03:00Z",
+      "progress": "{\"done\": 3, \"total\": 12, \"phase\": \"processing\", \"item\": \"Costa Norte\"}"
+    }
+  ],
+  "playback_delivery": {
+    "stats": {
+      "tracks": 863,
+      "lossless_tracks": 758,
+      "hires_tracks": 269,
+      "variants": 69,
+      "variant_tracks": 51,
+      "ready": 67,
+      "pending": 2,
+      "pending_active": 0,
+      "pending_unassigned": 2,
+      "pending_stale": 0,
+      "running": 0,
+      "failed": 0,
+      "missing": 0,
+      "ready_tracks": 51,
+      "cached_bytes": 277260566,
+      "ready_source_bytes": 2513569607,
+      "estimated_saved_bytes": 2236309041,
+      "coverage_percent": 6.7,
+      "avg_prepare_seconds": 17158.910311238807
+    },
+    "runtime": {
+      "active": 1,
+      "limit": 3
+    },
+    "recent_variants": [
+      {
+        "id": "sample-variant-0",
+        "cache_key": "4fd09b61f312d639053f2c3b904020a0f9274dcd29364a7d8d2124a331c2719e",
+        "track_id": 161,
+        "track_entity_uid": "561f0ab4-ed83-504d-ab03-f000bfce7389",
+        "preset": "balanced",
+        "status": "ready",
+        "delivery_format": "m4a",
+        "delivery_codec": "aac",
+        "delivery_bitrate": 192,
+        "delivery_sample_rate": 48000,
+        "source_format": "flac",
+        "source_bitrate": 3099,
+        "source_sample_rate": 96000,
+        "source_bit_depth": 24,
+        "source_size": 55079905,
+        "bytes": 3487537,
+        "error": null,
+        "task_id": "4feb1b429445",
+        "task_status": "completed",
+        "title": "Marea",
+        "artist": "Costa Norte",
+        "album": "Muestra",
+        "created_at": "2026-10-04T22:37:06.748019Z",
+        "updated_at": "2026-10-08T09:16:18.543342Z",
+        "completed_at": "2026-10-08T09:16:18.543342Z"
+      },
+      {
+        "id": "sample-variant-1",
+        "cache_key": "3f186b36a0142208b52a04ca352ba76e43b7f6b6d6f3daa34bbd34c3eef0ef78",
+        "track_id": 358,
+        "track_entity_uid": "a6235ab4-933e-594f-850b-1f881dc4739a",
+        "preset": "balanced",
+        "status": "ready",
+        "delivery_format": "m4a",
+        "delivery_codec": "aac",
+        "delivery_bitrate": 192,
+        "delivery_sample_rate": 44100,
+        "source_format": "flac",
+        "source_bitrate": 911,
+        "source_sample_rate": 44100,
+        "source_bit_depth": 16,
+        "source_size": 34092728,
+        "bytes": 7355397,
+        "error": null,
+        "task_id": "1c62b6af936e",
+        "task_status": "completed",
+        "title": "Luz de octubre",
+        "artist": "Costa Norte",
+        "album": "Muestra",
+        "created_at": "2026-10-07T15:37:14.053071Z",
+        "updated_at": "2026-10-08T09:16:15.990022Z",
+        "completed_at": "2026-10-08T09:16:15.990022Z"
+      },
+      {
+        "id": "sample-variant-2",
+        "cache_key": "781effa383b47857d1b9042fe241e9a63f1176ea13e847341fd44a07f057e336",
+        "track_id": 164,
+        "track_entity_uid": "824e5c6e-52c7-5ab4-bd04-c924956bfed5",
+        "preset": "balanced",
+        "status": "ready",
+        "delivery_format": "m4a",
+        "delivery_codec": "aac",
+        "delivery_bitrate": 192,
+        "delivery_sample_rate": 48000,
+        "source_format": "flac",
+        "source_bitrate": 3129,
+        "source_sample_rate": 96000,
+        "source_bit_depth": 24,
+        "source_size": 65853055,
+        "bytes": 4108186,
+        "error": null,
+        "task_id": "c4b9d4d18e91",
+        "task_status": "completed",
+        "title": "Costa",
+        "artist": "Costa Norte",
+        "album": "Muestra",
+        "created_at": "2026-10-04T22:37:09.448148Z",
+        "updated_at": "2026-10-08T09:16:11.999644Z",
+        "completed_at": "2026-10-08T09:16:11.999644Z"
+      }
+    ]
+  },
+  "route_latency": [
+    {
+      "route_id": "sample-route",
+      "target": "api",
+      "method": "GET",
+      "path": "/api/sample/library",
+      "count": 120,
+      "sum": 3840,
+      "min": 12,
+      "max": 48,
+      "avg": 32,
+      "p95": 45,
+      "p99": 48,
+      "status_2xx": 120,
+      "status_3xx": 0,
+      "status_4xx": 0,
+      "status_5xx": 0,
+      "status_other": 0,
+      "error_rate": 0
+    }
+  ],
+  "timeseries": {
+    "api.latency": [
+      {
+        "timestamp": "2026-10-10T20:50:00Z",
+        "count": 120,
+        "avg": 32,
+        "min": 12,
+        "max": 48,
+        "sum": 3840
+      },
+      {
+        "timestamp": "2026-10-10T20:51:00Z",
+        "count": 120,
+        "avg": 32,
+        "min": 12,
+        "max": 48,
+        "sum": 3840
+      },
+      {
+        "timestamp": "2026-10-10T20:52:00Z",
+        "count": 120,
+        "avg": 32,
+        "min": 12,
+        "max": 48,
+        "sum": 3840
+      },
+      {
+        "timestamp": "2026-10-10T20:53:00Z",
+        "count": 120,
+        "avg": 32,
+        "min": 12,
+        "max": 48,
+        "sum": 3840
+      },
+      {
+        "timestamp": "2026-10-10T20:54:00Z",
+        "count": 120,
+        "avg": 32,
+        "min": 12,
+        "max": 48,
+        "sum": 3840
+      },
+      {
+        "timestamp": "2026-10-10T20:55:00Z",
+        "count": 120,
+        "avg": 32,
+        "min": 12,
+        "max": 48,
+        "sum": 3840
+      },
+      {
+        "timestamp": "2026-10-10T20:56:00Z",
+        "count": 120,
+        "avg": 32,
+        "min": 12,
+        "max": 48,
+        "sum": 3840
+      },
+      {
+        "timestamp": "2026-10-10T20:57:00Z",
+        "count": 120,
+        "avg": 32,
+        "min": 12,
+        "max": 48,
+        "sum": 3840
+      }
+    ],
+    "api.requests": [
+      {
+        "timestamp": "2026-10-10T20:50:00Z",
+        "count": 120,
+        "avg": 2,
+        "min": 0,
+        "max": 5,
+        "sum": 120
+      },
+      {
+        "timestamp": "2026-10-10T20:51:00Z",
+        "count": 120,
+        "avg": 2,
+        "min": 0,
+        "max": 5,
+        "sum": 120
+      },
+      {
+        "timestamp": "2026-10-10T20:52:00Z",
+        "count": 120,
+        "avg": 2,
+        "min": 0,
+        "max": 5,
+        "sum": 120
+      },
+      {
+        "timestamp": "2026-10-10T20:53:00Z",
+        "count": 120,
+        "avg": 2,
+        "min": 0,
+        "max": 5,
+        "sum": 120
+      },
+      {
+        "timestamp": "2026-10-10T20:54:00Z",
+        "count": 120,
+        "avg": 2,
+        "min": 0,
+        "max": 5,
+        "sum": 120
+      },
+      {
+        "timestamp": "2026-10-10T20:55:00Z",
+        "count": 120,
+        "avg": 2,
+        "min": 0,
+        "max": 5,
+        "sum": 120
+      },
+      {
+        "timestamp": "2026-10-10T20:56:00Z",
+        "count": 120,
+        "avg": 2,
+        "min": 0,
+        "max": 5,
+        "sum": 120
+      },
+      {
+        "timestamp": "2026-10-10T20:57:00Z",
+        "count": 120,
+        "avg": 2,
+        "min": 0,
+        "max": 5,
+        "sum": 120
+      }
+    ]
+  }
+}

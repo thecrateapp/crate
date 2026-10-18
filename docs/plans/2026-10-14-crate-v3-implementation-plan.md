@@ -3,7 +3,7 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Published checkpoints through 1AA (`13272706`) are recorded in the handover. 1AB three-block Dashboard is visually approved for commit/push; continue one bounded Admin icon group and stop at1AC for review.
+> Diego's go-ahead. Published checkpoints through 1AA (`13272706`) are recorded in the handover. 1AB is published as2d047fec. 1AC covers SystemHealth icons/controls locally; stop for review before commit/push.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -5616,3 +5616,15 @@ records model/page tests, preview scenarios and validation. Three regions replac
 composition; available signal limits, freshness, actual task progress and local maintenance
 contracts are explicit. No new backend/provider/subscriptions. Whole 1b.8, future health/governor
 instruments and phase QA are not complete. Stop at 1AB for Diego; final evidence in the handover.
+
+## 2026-10-18 — 1AB published; bounded SystemHealth icon group 1AC
+
+Diego approved1AB, published as `2d047fecd4721ac4575faadbf9bd8781eec37c5b`, and authorised the
+next bounded Admin icon group with UX retained. SystemHealth retires redundant glyphs and its
+local ResourceCard icon prop; shared radio window/text refresh preserve existing queries and
+callbacks. Typographic readings use the shared 8 px recipe, established fonts and responsive
+geometry. Nivo/meter instruments, calculations and data authority stay unchanged. This is
+Task 1b.8 continuation, not completion of SystemHealth Task 3.4, other pages or phase validation.
+The real-page fictional preview is `#sistema-admin`; older checkpoints and the unavailable
+site pin 258bbaee remain. See [execution plan](2026-10-18-crate-v3-system-health-icons.md) and
+final handover for evidence/limits. **1AC stays local for Diego before commit/push/next group.**

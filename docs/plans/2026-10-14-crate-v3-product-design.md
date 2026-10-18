@@ -3580,3 +3580,15 @@ Maintenance moves to a named shared secondary dialog with original typed callbac
 endpoint capabilities; functional loading/close glyphs remain. Admin/Listen identity, 8px/44px
 contracts and prior checkpoints stay intact. See final handover and
 [execution plan](2026-10-18-crate-v3-dashboard-implementation.md). **Stop at 1AB before publication.**
+
+## 2026-10-18 — 1AB published; bounded SystemHealth icon group 1AC
+
+Diego approved1AB, published as `2d047fecd4721ac4575faadbf9bd8781eec37c5b`, and authorised the
+next bounded Admin icon group with UX retained. SystemHealth retires redundant glyphs and its
+local ResourceCard icon prop; shared radio window/text refresh preserve existing queries and
+callbacks. Typographic readings use the shared 8 px recipe, established fonts and responsive
+geometry. Nivo/meter instruments, calculations and data authority stay unchanged. This is
+Task 1b.8 continuation, not completion of SystemHealth Task 3.4, other pages or phase validation.
+The real-page fictional preview is `#sistema-admin`; older checkpoints and the unavailable
+site pin 258bbaee remain. See [execution plan](2026-10-18-crate-v3-system-health-icons.md) and
+final handover for evidence/limits. **1AC stays local for Diego before commit/push/next group.**

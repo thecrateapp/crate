@@ -84,7 +84,7 @@ describe("SystemHealth Resources instrument", () => {
     expect(useApiMock).toHaveBeenCalledWith(
       "/api/admin/metrics/dashboard?period=minute&minutes=60",
     );
-    await user.click(screen.getByRole("button", { name: "24h" }));
+    await user.click(screen.getByRole("radio", { name: "24h" }));
     expect(useApiMock).toHaveBeenLastCalledWith(
       "/api/admin/metrics/dashboard?period=hour&minutes=1440",
     );
@@ -93,6 +93,71 @@ describe("SystemHealth Resources instrument", () => {
     expect(
       within(screen.getByRole("figure")).getByText("280 / 1000 GB"),
     ).toBeInTheDocument();
+  });
+
+  it("names the metrics window and supports arrow selection and a visible refresh action", async () => {
+    const user = userEvent.setup();
+    renderWithAdminProviders(<SystemHealth />, { route: "/system" });
+    const window = screen.getByRole("radiogroup", { name: "Metrics window" });
+    const hour = within(window).getByRole("radio", { name: "1h" });
+    expect(hour).toHaveAttribute("aria-checked", "true");
+    await user.click(hour);
+    await user.keyboard("{ArrowRight}");
+    expect(within(window).getByRole("radio", { name: "24h" })).toHaveFocus();
+    expect(useApiMock).toHaveBeenLastCalledWith(
+      "/api/admin/metrics/dashboard?period=hour&minutes=1440",
+    );
+    await user.keyboard("{ArrowLeft}");
+    expect(hour).toHaveFocus();
+    expect(useApiMock).toHaveBeenLastCalledWith(
+      "/api/admin/metrics/dashboard?period=minute&minutes=60",
+    );
+    const refresh = screen.getByRole("button", { name: "Refresh metrics" });
+    expect(refresh).toHaveTextContent("Refresh metrics");
+    await user.click(refresh);
+    expect(refetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("keeps named measurements and instrument data while retiring page glyphs", () => {
+    useApiMock.mockReturnValue({
+      data: {
+        ...dashboard,
+        playback_delivery: {
+          ...dashboard.playback_delivery,
+          runtime: { active: 1, limit: 3 },
+        },
+        tasks: [
+          {
+            id: "sample-system-task",
+            type: "sync_library",
+            status: "running",
+            created_at: "2026-10-18T10:00:00Z",
+            progress: '{"done":3,"total":12}',
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+    const { container } = renderWithAdminProviders(<SystemHealth />, {
+      route: "/system",
+    });
+    expect(container.querySelector("svg.lucide")).toBeNull();
+    const score = screen.getByText("Health Score").parentElement!;
+    expect(score).toHaveClass("crate-form-field");
+    expect(score.children[0]).toHaveTextContent("Health Score");
+    expect(score.children[1]).toHaveTextContent("100");
+    expect(score.children[1]).toHaveClass("font-display");
+    const volume = screen.getByText("Music Volume").parentElement!;
+    expect(volume).toHaveClass("crate-form-field");
+    expect(volume.children[1]).toHaveTextContent("280 / 1000 GB");
+    expect(
+      screen.getByRole("meter", { name: "Transcode Slots" }),
+    ).toHaveAttribute("aria-valuenow", "1");
+    expect(screen.getByText("Elapsed", { exact: true })).toHaveTextContent(
+      /Elapsed.*\d/,
+    );
   });
 
   it("does not invent a Resources figure while the system payload is absent", () => {
