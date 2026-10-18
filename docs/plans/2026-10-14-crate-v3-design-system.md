@@ -1,7 +1,7 @@
 # Crate v3 design system
 
-Current implementation: checkpoints through 1AC are approved and published (`439b3e78`).
-Local 1AD implements the approved Health issue queue and retires redundant glyphs, preserving UX and existing repair contracts.
+Current implementation: checkpoints through 1AD are approved and published (`5e1d9c8f`).
+1AD is published as 5e1d9c8f. Local 1AE retires redundant Library Trash icons, preserving UX and real task contracts.
 Stop for Diego before commit/push. See the final handover for evidence and limits.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
@@ -4446,3 +4446,21 @@ Existing evidence and product contracts remain; this supersedes its local-only r
 Next group is Library Trash alone: retire redundant header/action glyphs, retain functional
 loading indicators, requests/task tracking and shared confirmations. No phase6.4 data/index/
 pagination work is implied. Keep preview/checkpoints active; stop1AE before commit/push.
+
+## 2026-10-18 — 1AD published; bounded Library Trash group 1AE
+
+Diego approved the corrected 1AD and authorised publication. Commit/push is verified as
+`5e1d9c8f287804a834b3143f6367f7e5a2ef8e31`, feat/crate_v3. This supersedes the former 1AD stop.
+The next bounded group is Library Trash alone: its redundant heading/idle refresh/restore/delete
+icons are retired; four explicit loading sites remain. Existing helpers, worker requests/body,
+task waits, error handling, busy/disabled conditions, route capability gate and both complete
+shared confirmations are unchanged. Text controls use 44 px targets and the existing identity/
+fonts/solid surfaces. No shared foundation, dependency or backend changes in 1AE.
+
+The actual page is in the persistent mockup at `#papelera-admin` / `admin-trash-demo.html`, with
+labelled fictional tracks and local task success/failure/completion. No API/SSE/library operation;
+all previous specimens, including published 1AD, remain. Live policy now covers 14 whole files /
+44 concrete UX sites; the historical 1V inventory remains untouched. This does not complete
+whole Task 1b.8 or phase 6.4's Trash index/pagination/data work. Evidence/review/limits are in the
+main handover and [execution plan](2026-10-18-crate-v3-library-trash-icons.md).
+**Stop at local 1AE for Diego before commit/push or another group. Keep preview :5186 active.**

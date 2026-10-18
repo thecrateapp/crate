@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArchiveRestore, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@crate/ui/shadcn/button";
@@ -222,14 +222,11 @@ export function Trash() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-white/10 bg-card/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
+      <section className="border-b border-border-quiet pb-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
-              <Trash2 size={22} />
-            </div>
             <div>
-              <h1 className="text-3xl font-bold text-foreground">
+              <h1 className="font-display text-3xl font-bold text-text-primary">
                 Library Trash
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -242,18 +239,26 @@ export function Trash() {
             <Button
               type="button"
               variant="outline"
+              className="min-h-11"
               disabled={loading || bulkDeleting}
+              aria-busy={loading}
               onClick={() => void load()}
             >
-              <RefreshCw
-                size={15}
-                className={loading ? "mr-2 animate-spin" : "mr-2"}
-              />
+              {loading ? (
+                <Loader2
+                  data-admin-ux="trash-refresh-loading"
+                  aria-hidden="true"
+                  size={15}
+                  className="mr-2 animate-spin"
+                />
+              ) : null}
               Refresh
             </Button>
             <Button
               type="button"
               variant="outline"
+              className="min-h-11"
+              aria-busy={bulkDeleting}
               disabled={
                 loading ||
                 items.length === 0 ||
@@ -263,20 +268,28 @@ export function Trash() {
               onClick={() => setBulkDeleteOpen(true)}
             >
               {bulkDeleting ? (
-                <Loader2 size={15} className="mr-2 animate-spin" />
-              ) : (
-                <Trash2 size={15} className="mr-2" />
-              )}
+                <Loader2
+                  data-admin-ux="trash-empty-loading"
+                  aria-hidden="true"
+                  size={15}
+                  className="mr-2 animate-spin"
+                />
+              ) : null}
               Empty trash
             </Button>
           </div>
         </div>
       </section>
 
-      <Card className="border-white/10 bg-card/70">
+      <Card className="border-border-quiet bg-card">
         {loading ? (
           <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-            <Loader2 size={16} className="animate-spin" />
+            <Loader2
+              data-admin-ux="trash-list-loading"
+              aria-hidden="true"
+              size={16}
+              className="animate-spin"
+            />
             Loading quarantined tracks...
           </div>
         ) : items.length === 0 ? (
@@ -298,7 +311,7 @@ export function Trash() {
                   key={item.quarantine_path}
                   className="flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between"
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold text-white/90">
                       {displayTitle(item)}
                     </div>
@@ -319,24 +332,29 @@ export function Trash() {
                       type="button"
                       size="sm"
                       variant="outline"
+                      className="min-h-11"
                       disabled={busyPath !== null || bulkDeleting}
+                      aria-busy={busy}
                       onClick={() => void restore(item)}
                     >
                       {busy ? (
-                        <Loader2 size={14} className="mr-2 animate-spin" />
-                      ) : (
-                        <ArchiveRestore size={14} className="mr-2" />
-                      )}
+                        <Loader2
+                          data-admin-ux="trash-row-loading"
+                          aria-hidden="true"
+                          size={14}
+                          className="mr-2 animate-spin"
+                        />
+                      ) : null}
                       Restore
                     </Button>
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
+                      className="min-h-11"
                       disabled={busyPath !== null || bulkDeleting}
                       onClick={() => setDeleteTarget(item)}
                     >
-                      <Trash2 size={14} className="mr-2" />
                       Delete
                     </Button>
                   </div>

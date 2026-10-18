@@ -4,46 +4,38 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — 1AD approved for publication; next stop 1AE
+## Active Linux workspace — 1AD published; 1AE local review
 
-Use `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing `feat/crate_v3` tracking origin.
-Published HEAD is 1AC `439b3e78daf2719d86cee72dd5726f7bc210c504` (origin verified); original transfer
-53177736 remains an ancestor. Leave `/home/diego/Code/Ninja/crate` (`feat/crate_mcp`) untouched.
+Use `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing feat/crate_v3 tracking origin.
+Published HEAD/remote is **5e1d9c8f287804a834b3143f6367f7e5a2ef8e31** (1AD, verified push/ref).
+Original 53177736 remains an ancestor. Leave `/home/diego/Code/Ninja/crate` (feat/crate_mcp) alone.
 Node 22.23.3 is `/home/diego/.nvm/versions/node/v22.23.3/bin`; dependencies are installed.
 
-Diego approved the issue-queue sketch and authorised its implementation, retaining the 1AD
-uncommitted review stop. Health now puts actual recorded problems and resolution controls first;
-activity/catalog/filters are secondary. Empty/no-result/filter/stale/limited states are explicit,
-worst loaded severity controls order and task summaries never turn missing counters into zero.
-The corrected view restores the sketch accents, 1128 px content cap and reviewed typography/
-spacing with one primary next step; all real secondary actions remain.
-The same endpoints, actions, eligibility, scan gate, streams/reconnect/cleanup and confirmation
-flow remain; confirmation copy now separates check-wide scope, loaded cases and recorded counts.
-Only stale metadata assignments are added to existing readers. The approved visual drift
-correction also repairs the shared default-border cascade; no shared JS/API/backend changes.
+Diego approved/published the corrected Health issue queue and authorised the next group.
+1AE is Library Trash alone: redundant header/idle action icons removed, four bounded loading
+sites retained. All helper/request/task/effect/disabled/confirmation code is unchanged; controls
+keep 44 px targets and shared fonts/solid identity. No shared/API/backend/provider work in 1AE.
+The live policy covers 14 whole files / 44 UX sites; original 1V inventory remains unchanged.
 
-Review <http://127.0.0.1:5186/admin-health-demo.html> or persistent `/#salud-admin`.
-The real page uses isolated fictional data/actions; nine sample modes need no API/SSE/library
-operation. Both detail label/component pairs measure 8 px; actions/summaries 44 px, filter pills
-32 px fine / 44 px coarse. Glyph policy stays 13 whole files / 40 retained UX sites.
+Review <http://127.0.0.1:5186/admin-trash-demo.html> or persistent `/#papelera-admin`. Actual Trash
+with labelled fictional tracks, local task success/failure/completion, no API/SSE/library writes.
+Earlier specimens, especially approved 1AD accents/spacing, remain. Sample fields measure 8 px.
 
-Current scoped evidence after visual correction: 55 Health/policy +71 shared Vitest, 30 unique
-Chromium cases (one transient focus failure passed unchanged on replay, then all 9 focus passed),
-three strict TS configs, lint/format, contract audits and Admin/Listen/preview builds pass.
-Admin 526767/532480 B gzip, ten assets, 5713 B margin; Listen 199918/307200 B, 23 assets.
-Final proof/rulings and the focus-test limitation are in the main handover. Generated
-tsbuildinfo restored. 1AD is approved for commit/push; earlier local-only stops are historical. Next group: Library Trash / 1AE.
+Scoped evidence: 26 Vitest, four preview/three built-Admin Chromium, three strict TS configs,
+lint/format/audit, Admin and ten-entry preview builds pass. Admin 526755 / 532480 B gzip,
+ten assets, 5725 B margin (12 B below 1AD). Final review: Critical 0 / Important 0 / Minor 2; proof/rulings are in the main handover.
+Deferred: dedicated bulk cancel/busy/failure tests and technical-line typography (Poppins; paths Mono).
+Known build cache restored. 1AE remains uncommitted; no next group before Diego's review.
 
-Preview service `crate-v3-preview.service` uses this worktree/Node22, restart-on-failure,
-loopback :5186. Keep it active. Other user tabs and previous checkpoints stay intact.
-No full suites/CI/canonical captures or real backend/native/AT/other-engine QA. 33 PNGs/manifest
-remain 1M; pin 258bbaee unchanged/unavailable. Later Health data/instrument tasks and whole 1b.8
-remain pending. **Publish approved 1AD, then stop at 1AE before commit/push or another group. No PR/merge/rebase/deploy/release.**
+Keep `crate-v3-preview.service` active on loopback :5186 (this worktree/Node 22, restart-on-failure).
+No full suites/CI/canonical captures or actual worker/backend/native/AT/other-engine QA. Existing
+Trash list/error/toast semantics and later phase 6.4 index/pagination remain; no data redesign.
+The 33 canonical PNGs/manifest remain 1M; pin 258bbaee unchanged/unavailable. Whole 1b.8 is pending.
+**Stop at 1AE before commit/push or another group; no PR/merge/rebase/deploy/release.**
 
-Diego explicitly retained Listen's layered play/halo/progress ring and luminous seek trail
-(2 px, thin 1 px) during 1S review. Preserve them. Shared/Listen/Desktop contracts are unchanged.
-The generic bootstrap below is retained for a future fresh machine; it does not replace this
-active worktree. Final records supersede historical local-only checkpoint notes.
+Diego retains Listen's layered play/halo/progress ring and luminous seek trail from 1S; preserve
+these. 1AD's approved 1 px accent rail, primary review hierarchy and typography/spacing remain.
+The generic bootstrap below is historical for a fresh machine; it does not replace this worktree.
 
 ## Prepare the checkout
 

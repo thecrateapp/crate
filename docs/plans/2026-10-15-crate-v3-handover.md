@@ -10,16 +10,20 @@ continuation on Linux; this final publication record supersedes earlier local-on
 **1AB is approved and published as `2d047fecd4721ac4575faadbf9bd8781eec37c5b`.**
 Its three-block Dashboard, producer interpretation fixes and Ops/Analysis typography remain intact.
 **1AC System Health is approved and published as `439b3e78daf2719d86cee72dd5726f7bc210c504`.**
-Task 1b.8 / checkpoint **1AD Library Health is approved for commit/push**.
-Diego authorised publication and the next bounded Admin icon group, Library Trash / 1AE.
-Diego approved the issue-queue sketch and explicitly authorised this implementation on 2026-10-18.
+**1AD Library Health is approved and published as `5e1d9c8f287804a834b3143f6367f7e5a2ef8e31`.**
+Task 1b.8 / checkpoint **1AE Library Trash is local for Diego review**, with retained UX and
+unchanged real worker/confirmation contracts. Next stop: 1AE before commit/push.
+Review <http://127.0.0.1:5186/admin-trash-demo.html> or persistent `/#papelera-admin`.
+
+Published **1AD Health** context: Diego approved the issue-queue sketch and explicitly authorised
+its implementation on 2026-10-18.
 The primary view lists recorded problems and opens actual cases/resolution actions. Activity,
 check catalog and filters are secondary; no-data, empty, filtered, stale and limited results stay
 truthful. Functional glyphs, repair eligibility, API/stream/confirmation contracts remain.
 Diego subsequently requested a visual drift correction: accents, primary-action hierarchy,
 reviewed typography and spacing are restored. Only the shared default-border cascade changes;
 no new foundation variant or API change. Read the final visual-correction evidence below.
-Review <http://127.0.0.1:5186/admin-health-demo.html> or persistent `/#salud-admin`.
+Published Health specimen: <http://127.0.0.1:5186/admin-health-demo.html> or persistent `/#salud-admin`.
 The final composition record below and
 [`2026-10-18-crate-v3-health-inbox.md`](2026-10-18-crate-v3-health-inbox.md) supersede the
 historical icon-only and awaiting-sketch-approval stops. **The former 1AD stop is superseded by Diego's publication approval.**
@@ -33,7 +37,7 @@ Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 ## Where the work lives
 
 - Active Linux worktree: `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing branch
-  `feat/crate_v3`, published HEAD `439b3e78daf2719d86cee72dd5726f7bc210c504` (1AC);
+  `feat/crate_v3`, published HEAD `5e1d9c8f287804a834b3143f6367f7e5a2ef8e31` (1AD);
   transfer checkpoint `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. Node 22.23.3, root
   dependencies and persistent :5186 preview are prepared. This isolates the MCP agent's
   `/home/diego/Code/Ninja/crate` checkout (`feat/crate_mcp`); leave its files untouched.
@@ -229,7 +233,8 @@ is a token-based chart configuration, not a selectable product skin.
 | 1b.8 / Checkpoint 1AA                                        | Approved/published `13272706`; Analysis including latest fingerprint. Final publication record below supersedes older local notes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1b.8 / Checkpoint 1AB                                        | Approved/published `2d047fec`: three-block Dashboard plus Ops/Analysis fonts. Origin SHA verified; scoped publication replay89Vitest/5Chromium green.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 1b.8 / Checkpoint 1AC                                        | Approved/published `439b3e78`: System Health icon retirement, shared window/text refresh and preserved instruments. Origin SHA verified; publication replay 27 Vitest / four preview Chromium green.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| 1b.8 / Checkpoint 1AD                                        | Approved by Diego for publication: corrected issue queue, retained UX and real contracts. Commit/push authorised; publication record below. Next bounded group: Library Trash / 1AE.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 1b.8 / Checkpoint 1AD                                        | Approved and published as 5e1d9c8f: corrected issue queue, retained UX and real contracts. Next local group: Library Trash / 1AE.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 1b.8 / Checkpoint 1AE                                        | Local for Diego review: Library Trash icon retirement, real worker/confirmation contracts and retained UX. 26 Vitest / seven Chromium green; 526755 B gzip. No commit/push.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -3015,3 +3020,119 @@ settings inventory. Preserve restore/delete/empty worker requests, task waits, e
 shared confirmations; retain actual loading glyphs and retire redundant header/action glyphs.
 No new trash index, pagination, scan/instrument or backend work; those phase6.4 prerequisites
 remain pending. Keep all earlier specimens and stop at1AE for Diego before publication.
+
+## Final Linux record — 1AD published; 1AE Library Trash local review (2026-10-18)
+
+Diego approved final 1AD, requested commit/push and the next bounded Admin icon group. Published
+commit **5e1d9c8f287804a834b3143f6367f7e5a2ef8e31**, `feat(ui): simplify Library Health into an
+issue queue`, is verified by push and remote ref. The worktree was clean before starting 1AE.
+Original 53177736 remains an ancestor. No rebase/merge/PR/deploy/release or Smart Mix; MCP checkout
+untouched. 1AD metadata now says published; its one embedding check passes after that label change.
+
+Local 1AE covers only production **pages/Trash.tsx**. It removes the decorative header icon and
+idle refresh/restore/delete glyphs; four specifically marked Loader2 sites remain for refresh,
+list, bulk operation and row operation. Main/row controls use the existing shared Button and
+44 px targets. Heading uses Bricolage; paths use Mono and body/technical line retain Poppins. The old
+decorated translucent header is replaced by a quiet rule, and Card uses the shared solid surface.
+No new design-system component/variant, dependency or backend change; 1AD cascade/visuals intact.
+
+AST audit against published source confirms **ten helper/action functions**, the component's
+**13 pre-render declarations/statements**, **three API call expressions/arguments**, **two task
+waits and their 120000/600000 timeouts**, **seven state/effect calls**, **both full shared
+ConfirmDialog JSX blocks**, **four disabled conditions** and **eight inline callbacks unchanged**.
+Restore/hard-delete target the selected quarantine_path with their original reasons; empty uses
+its existing endpoint/body and task result feedback. Busy/confirm/error semantics are preserved;
+aria-busy exposes existing state. App's LIBRARY_TRACK_REMOVE route gate and shared sources stay.
+Live icon policy extends to **14 complete files / 44 UX sites**, with exactly two bounded Trash
+ConfirmDialog uses. Do not regenerate the historical 1V inventory snapshot.
+
+The persistent real-page specimen is `/#papelera-admin` / `/admin-trash-demo.html`. Its exact
+Trash API/tasks imports are redirected only in preview, with labelled fictional files and local
+completion/failure; unknown requests fail closed. It creates no fetch/EventSource or library
+operation. Ready/loading/empty and next-task failure modes keep real controls/confirmations.
+All previous checkpoints remain, including 1AD published. Sample field gap is actual 8 px.
+
+Scoped evidence: **26 Vitest** (nine new control cases + original bulk case + sixteen live
+policy cases), **four preview Chromium and three built-Admin Chromium** at 1440/768/390, serial
+one worker. Four intended unit failures and the missing preview entry were observed RED before
+implementation. Keyboard/cancel focus, exact mutation bodies/paths, task waits/completion/error,
+loading/disabled, real metadata, 44 px controls, no nested controls/overflow or specimen traffic
+pass. Three strict scoped TS configs, scoped ESLint/Prettier, audit, Admin build/types/budget
+and ten-entry preview build pass. Strict TS caught a test-only invalid `exact` option on Testing
+Library role queries and a missing matcher setup in the temporary strict config; both corrected
+without product workaround or looser assertions/timeouts. Known generated tsbuildinfo restored.
+**Initial JS 526755 / 532480 B gzip**, ten assets, **5725 B margin**, 12 B below published 1AD.
+
+Current quarantine-list source and error/toast semantics are preserved; phase 6.4's indexed/
+paginated data model is not implemented here. Real worker/filesystem/backend integration,
+other engines/native/AT/zoom, full phase-close suites/CI and canonical capture/comparison remain
+pending. The 33 canonical PNGs/manifest are still 1M; site pin258bbaee unchanged/unavailable.
+Fresh review, rulings, proof and final service verification follow; no further group is included.
+**Stop at 1AE uncommitted for Diego before publication.**
+
+### 1AE fresh review, executor rulings and final evidence
+
+One fresh read-only review read all 20 pending files (nine untracked) and the plan/spec/evidence.
+Verdict: **ready for Diego visual review, Critical 0 / Important 0 / Minor 2**. No product repair
+or second review loop. This is not publication/merge approval.
+
+Deferred minors:
+
+1. Bulk-specific tests are narrower than originally planned: bulk confirmation/success is
+   covered, individual cancellation focus and restore failure are covered; dedicated bulk
+   cancellation focus, pending aria-busy/loader and bulk failure recovery remain unasserted.
+   The existing bulk implementation/shared confirmation is unchanged, and this gap does not
+   imply a runtime defect; it remains a scoped test follow-up rather than a clean-coverage claim.
+2. Technical-line typography remains inherited Poppins; only paths explicitly use Mono. The
+   earlier evidence wording has been clarified to describe actual source. A broader technical
+   typography migration remains outside the icon group. No production style change for this minor.
+
+Executor rulings on every behavior the reviewer declined to judge:
+
+- Initial-load failure still reports a toast then shows the existing empty fallback; refresh
+  failure still retains earlier items. Preserve this checkpoint's data/error contract; future
+  Trash data UX must distinguish those states. Cost: existing misleading empty/stale presentation
+  is not resolved or certified by this icon group.
+- Refresh remains available during a row task. It is an existing read action, not a new mutation;
+  preserve its disabled condition. Cost: overlapping-read timing is not independently proved.
+- The row's Restore control still carries its loader when individual deletion uses the same
+  busyPath. Preserve existing row-busy presentation rather than adding operation state. Cost:
+  operation-specific progress clarity is deferred.
+- Both void confirmation callbacks still close the shared dialog immediately. Cancel focus is
+  exercised for individual deletion; focus after successful completion/disabled triggers is not
+  independently proved. Preserve shared integration; cost: keyboard completion focus needs QA.
+- Existing truncated paths/metadata, absent suggested-target display and technical-line body
+  typography remain. Real source data is retained, no new loss identified; broader information
+  layout belongs to the page phase. Cost: full visual path/target readability is not certified.
+- Quarantine indexing, pagination, large-library performance and server count semantics remain
+  phase 6.4 prerequisites. No backend/data rewrite or complete-library count claim is added.
+  Cost: mocked small samples do not establish large-library coverage/performance.
+- Worker/filesystem correctness, server permission enforcement and real task transport remain
+  integration QA. Route/navigation capability and request/timeout source are unchanged. Cost:
+  mocked tests cannot certify actual disk effects, authorization or live transport.
+- Other engines, assistive technology, native/zoom, full suites/CI and canonical visual comparison
+  stay pending by the checkpoint validation contract. Cost: current evidence is scoped Chromium,
+  not universal UI/runtime certification. The 33 canonical PNGs/manifest remain 1M, pin unchanged.
+- Live preview and Diego's visual acceptance are the executor/user responsibility. Actual :5186
+  specimen inspected, user service active and entry HTTP200; proof saved and tab marked deliverable.
+  Cost: this establishes local availability/inspection, not Diego's approval or native parity.
+
+Final evidence remains **26 scoped Vitest, four preview + three built-Admin Chromium**, serial
+one worker; three strict configs, scoped lint/format, AST audit and Admin/preview builds/budget
+pass. **526755/532480 B gzip**, ten assets, **5725 B margin** (12 B below 1AD). Generated build
+cache is restored. Final diffs pass whitespace/format checks. No new test run solely for review
+bookkeeping; source was frozen during review, only final records/proof were added.
+
+Advisory proof: `.artifacts/review/checkpoint-1ae-library-trash.jpg` (actual IAB 1310×1424, not a
+canonical baseline). The actual page is open/marked deliverable at
+<http://127.0.0.1:5186/admin-trash-demo.html>; main checkpoint is `/#papelera-admin`. All previous
+specimens, including published Health, remain. HEAD/origin stay **5e1d9c8f**; 1AE is uncommitted.
+**Stop at 1AE for Diego. No further group, commit/push, PR/merge/rebase/deploy/release.**
+
+## 1AE publication approval — 2026-10-18
+
+Diego approved Library Trash and explicitly requested commit/push and the next bounded Admin
+icon group, with functional UX retained. This supersedes every older 1AE local-only stop. The
+reviewed source remains unchanged; preview label/footer now say published. Earlier scoped
+validation and deferred limits remain recorded. Remote publication SHA will be recorded after
+push verification; next implementation stops at 1AF before another commit/push.
