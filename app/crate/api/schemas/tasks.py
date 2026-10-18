@@ -66,8 +66,19 @@ class WorkerRestartResponse(BaseModel):
     status: str
 
 
+class TaskCancellationOutcome(BaseModel):
+    task_id: str
+    status: str | None = None
+    request_state: str
+    cancellation_requested: bool = False
+    affected_children: int = 0
+    error_code: str | None = None
+
+
 class CancelAllTasksResponse(BaseModel):
     cancelled: int
+    skipped: int = 0
+    items: list[TaskCancellationOutcome] = Field(default_factory=list)
 
 
 class WorkerScheduleEntryResponse(BaseModel):

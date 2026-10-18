@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from crate.db.jobs.artist_photo import read_artist_photo
+from crate.db.jobs.artist_photo import read_artist_photo, with_artist_identity
 from crate.health_check import ARTIST_SCOPED_CHECKS, LibraryHealthCheck
 from crate.repair_catalog import REPAIR_CATALOG_BY_CHECK
 
@@ -97,11 +97,15 @@ def apply_operation(
             authorize()
 
         if artist:
-            return checker.run_selected_for_artists(
-                execution["check_types"],
-                [artist["name"]],
-                persist=True,
-                progress_callback=checkpoint,
+            artist_name = artist["name"]
+            return with_artist_identity(
+                artist,
+                lambda: checker.run_selected_for_artists(
+                    execution["check_types"],
+                    [artist_name],
+                    persist=True,
+                    progress_callback=checkpoint,
+                ),
             )
         return checker.run_selected(
             execution["check_types"], persist=True, progress_callback=checkpoint

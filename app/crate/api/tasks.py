@@ -435,17 +435,35 @@ def api_restart_worker(request: Request):
 )
 def api_cancel_all_tasks(request: Request):
     """Cancel all running and pending tasks."""
+    from crate.agent_diagnostics import DiagnosticError
+    from crate.db.repositories.task_control import request_cancellation
+
     _require_task_operator(request)
     running = list_tasks(status="running")
     pending = list_tasks(status="pending")
     cancelled = 0
+    outcomes = []
     for t in running + pending:
-        from crate.db.repositories.task_control import request_cancellation
-
-        request_cancellation(t["id"])
-        cancel_media_worker_job(t["id"])
-        cancelled += 1
-    return {"cancelled": cancelled}
+        try:
+            outcome = request_cancellation(t["id"])
+        except DiagnosticError as error:
+            outcomes.append(
+                {
+                    "task_id": t["id"],
+                    "request_state": "rejected",
+                    "error_code": error.code,
+                }
+            )
+            continue
+        outcomes.append(outcome)
+        if outcome["request_state"] in {"cancelled", "cancellation_requested"}:
+            cancel_media_worker_job(t["id"])
+            cancelled += 1
+    return {
+        "cancelled": cancelled,
+        "skipped": len(outcomes) - cancelled,
+        "items": outcomes,
+    }
 
 
 @router.get(

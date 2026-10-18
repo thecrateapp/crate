@@ -70,9 +70,7 @@ def compile_show_import(candidates: list[dict], source: dict, *, session=None) -
         repeated = {}
         for index, candidate in enumerate(selected):
             for prior in selected[:index]:
-                if identities.identity_base(candidate) != identities.identity_base(
-                    prior
-                ):
+                if str(candidate.get("date")) != str(prior.get("date")):
                     continue
                 comparison = identities._match_rows(
                     candidate, [{**prior, "id": prior["item_id"]}], False
@@ -416,8 +414,37 @@ def _validate_draft_sources(current, candidates, source):
     for candidate in candidates:
         if candidate.get("source_draft_id"):
             evidence = evidence_by_id[candidate["source_draft_id"]]
+            original = next(
+                row
+                for row in evidence["candidates"]
+                if row["item_id"] == candidate["item_id"]
+            )
+            candidate["source_ref"] = original.get("source_ref")
+            candidate["evidence"] = original.get("evidence")
             candidate["extractor"] = evidence.get("extractor")
             candidate["extractor_model"] = evidence.get("model")
+            candidate.pop("source_manifest", None)
+            manifest = evidence.get("source_sets", {}).get(candidate["source_ref"])
+            if manifest is None:
+                manifest = [
+                    {
+                        key: row[key]
+                        for key in (
+                            "source_ref",
+                            "sha256",
+                            "text_sha256",
+                            "modality",
+                            "read",
+                            "extractor",
+                        )
+                        if key in row
+                    }
+                    for row in evidence.get("sources", [])
+                    if row.get("read")
+                    and row.get("source_ref") == candidate["source_ref"]
+                ]
+            if manifest:
+                candidate["source_manifest"] = manifest
 
 
 def _remember_draft_outcomes(current, items, outcomes):
@@ -432,7 +459,9 @@ def _remember_draft_outcomes(current, items, outcomes):
             draft_id, {"id": draft_id, "publication": {}, "candidates": {}}
         )
         group["publication"][candidate["item_id"]] = result_by_id[candidate["item_id"]]
-        group["candidates"][candidate["item_id"]] = candidate
+        group["candidates"][candidate["item_id"]] = {
+            key: value for key, value in candidate.items() if key != "source_manifest"
+        }
     if not groups:
         return
     current.execute(

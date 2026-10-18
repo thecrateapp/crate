@@ -30,6 +30,23 @@ def read_artist_photo(artist_uid: str, *, session=None) -> dict | None:
         return _read(current)
 
 
+def with_artist_identity(expected: dict, effect, *, session=None):
+    """Keep a UID's name/folder stable through a targeted observation and persistence."""
+    with optional_scope(session) as current:
+        row = (
+            current.execute(
+                text("""SELECT entity_uid::text AS artist_uid,name,folder_name,has_photo
+                FROM library_artists WHERE entity_uid=CAST(:uid AS uuid) FOR SHARE"""),
+                {"uid": expected["artist_uid"]},
+            )
+            .mappings()
+            .first()
+        )
+        if row is None or dict(row) != expected:
+            raise ValueError("Artist identity changed after the check plan")
+        return effect()
+
+
 def compare_and_set_artist_photo(
     artist_uid: str,
     *,
@@ -123,4 +140,5 @@ __all__ = [
     "apply_admin_artist_photo",
     "compare_and_set_artist_photo",
     "read_artist_photo",
+    "with_artist_identity",
 ]

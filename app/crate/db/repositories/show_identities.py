@@ -44,6 +44,14 @@ def identity_base(candidate):
     )
 
 
+def _artist_names(candidate):
+    return {
+        normalized
+        for name in [candidate.get("artist_name"), *(candidate.get("lineup") or [])]
+        if (normalized := normalize(name))
+    }
+
+
 def identity_key(candidate):
     if not all(candidate.get(key) for key in ("artist_name", "date", "venue", "city")):
         return None
@@ -91,7 +99,12 @@ def _legacy_id(alias):
 
 
 def _lock_keys(candidate, source):
-    keys = {"show:base:" + identity_base(candidate)}
+    # Every performer shares a lock with sources that choose another headliner
+    # or omit support acts. A partial lineup still requires review after locking.
+    keys = {
+        "show:base:" + artist + "|" + str(candidate.get("date") or "")
+        for artist in _artist_names(candidate)
+    }
     alias = _source_alias(candidate, source)
     if alias:
         keys.add("show:alias:" + alias["provider"] + ":" + alias["event_id"])
@@ -130,10 +143,13 @@ def _rows(current, candidate, source):
         current.execute(
             text("""SELECT * FROM shows WHERE date=CAST(:date AS date)
         AND merged_into_id IS NULL
-        AND lower(regexp_replace(btrim(artist_name),'\\s+',' ','g'))=:artist ORDER BY id"""),
+        AND (lower(regexp_replace(btrim(artist_name),'\\s+',' ','g'))=ANY(:artists)
+            OR EXISTS(SELECT 1 FROM unnest(lineup) AS performer(name)
+                WHERE lower(regexp_replace(btrim(performer.name),'\\s+',' ','g'))=ANY(:artists)))
+        ORDER BY id"""),
             {
                 "date": candidate.get("date"),
-                "artist": normalize(candidate.get("artist_name")),
+                "artists": sorted(_artist_names(candidate)),
             },
         )
         .mappings()
@@ -176,7 +192,13 @@ def _match_rows(candidate, rows, exact) -> dict:
             }
         return {"status": "already_exists", "show": row}
     matches, possible = [], []
+    artists = _artist_names(candidate)
     for row in rows:
+        row_artists = _artist_names(row)
+        if str(candidate.get("date")) != str(row.get("date")) or not (
+            artists & row_artists
+        ):
+            continue
         countries = [
             normalize(value)
             for value in (candidate.get("country_code"), row.get("country_code"))
@@ -207,7 +229,14 @@ def _match_rows(candidate, rows, exact) -> dict:
             and candidate.get("venue")
             and candidate.get("city")
         ):
-            matches.append(row)
+            if (
+                normalize(candidate.get("artist_name"))
+                == normalize(row.get("artist_name"))
+                or artists == row_artists
+            ):
+                matches.append(row)
+            else:
+                possible.append(row)
         elif (
             not candidate.get("venue")
             or not row.get("venue")
@@ -265,7 +294,7 @@ def match_show_candidates(
             keys.append(
                 {
                     "item_id": candidate["item_id"],
-                    "artist": normalize(candidate.get("artist_name")),
+                    "artists": sorted(_artist_names(candidate)),
                     "date": candidate.get("date"),
                     **(alias or {"provider": None, "event_id": None}),
                     "alternate_event_id": _alias_variants(alias)[-1] if alias else None,
@@ -280,7 +309,7 @@ def match_show_candidates(
             }
         )
         statement = """WITH wanted AS (SELECT * FROM jsonb_to_recordset(CAST(:keys AS jsonb))
-                AS w(item_id text,artist text,date date,provider text,event_id text,alternate_event_id text)),
+                AS w(item_id text,artists text[],date date,provider text,event_id text,alternate_event_id text)),
             resolved_aliases AS (
                 SELECT w.item_id,COALESCE(s.merged_into_id,a.show_id) AS show_id
                 FROM wanted w JOIN show_source_aliases a ON a.provider=w.provider AND a.event_id IN (w.event_id,w.alternate_event_id)
@@ -290,7 +319,10 @@ def match_show_candidates(
             LEFT JOIN alias_items a ON a.show_id=s.id WHERE a.show_id IS NOT NULL OR s.id=ANY(:ids)
             OR s.id IN (SELECT merged_into_id FROM shows WHERE id=ANY(:ids))
             OR (s.merged_into_id IS NULL AND EXISTS(SELECT 1 FROM wanted w WHERE s.date=w.date
-                AND lower(regexp_replace(btrim(s.artist_name),'\\s+',' ','g'))=w.artist)) ORDER BY s.id"""
+                AND (lower(regexp_replace(btrim(s.artist_name),'\\s+',' ','g'))=ANY(w.artists)
+                    OR EXISTS(SELECT 1 FROM unnest(s.lineup) AS performer(name)
+                        WHERE lower(regexp_replace(btrim(performer.name),'\\s+',' ','g'))=ANY(w.artists)))))
+            ORDER BY s.id"""
         if lock:
             statement += " FOR UPDATE OF s"
         rows = [
@@ -323,7 +355,8 @@ def match_show_candidates(
                     row
                     for row in rows
                     if row["merged_into_id"] is None
-                    and identity_base(row) == identity_base(candidate)
+                    and str(row["date"]) == str(candidate.get("date"))
+                    and _artist_names(row) & _artist_names(candidate)
                 ]
             results[candidate["item_id"]] = _match_rows(
                 candidate, matches, bool(selected or alias_rows)
@@ -416,16 +449,25 @@ def upsert_canonical_show(
                 "extractor_model": candidate.get("extractor_model"),
             }
         if manual and "lineup" in candidate:
-            lineup = [values["artist_name"], *(candidate.get("lineup") or [])]
+            lineup = [
+                values["artist_name"],
+                candidate.get("artist_name"),
+                *(candidate.get("lineup") or []),
+            ]
         elif provenance.get("lineup", {}).get("provider") in {"manual", "mcp"}:
             lineup = [values["artist_name"], *(values.get("lineup") or [])]
         else:
             lineup = [
                 values["artist_name"],
+                candidate.get("artist_name"),
                 *((existing or {}).get("lineup") or []),
                 *(candidate.get("lineup") or []),
             ]
-        values["lineup"] = list(dict.fromkeys(name for name in lineup if name))
+        unique_lineup = {}
+        for name in lineup:
+            if normalized := normalize(name):
+                unique_lineup.setdefault(normalized, name)
+        values["lineup"] = list(unique_lineup.values())
         values["status"] = values.get("status") or "scheduled"
         values["identity_key"] = identity_key(values)
         collision = (

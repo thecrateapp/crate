@@ -1,6 +1,7 @@
 """Canonical event identity is shared by human, agent and provider writes."""
 
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from queue import Queue
 from threading import Barrier, Event
 
 import pytest
@@ -25,7 +26,7 @@ def candidate(**changes):
     ).model_dump(mode="json", exclude_unset=True)
 
 
-def put(data, provider="manual", event_id=None):
+def put(data, provider="manual", event_id=None, *, session=None):
     from crate.db.repositories.show_identities import upsert_canonical_show
 
     return upsert_canonical_show(
@@ -35,6 +36,7 @@ def put(data, provider="manual", event_id=None):
             "event_id": event_id,
             "actor": "user:1" if provider == "manual" else provider,
         },
+        session=session,
     )
 
 
@@ -76,6 +78,216 @@ def test_manual_and_provider_share_identity_and_preserve_manual_fields(pg_db, fi
     assert actual["tickets_url"] == "https://venue.example/manual"
     assert {"Support", "Primary Band"} <= set(actual["lineup"])
     assert actual["field_provenance"]["local_time"]["provider"] == "manual"
+
+
+@pytest.mark.parametrize("first", ["manual", "ticketmaster"])
+def test_inverted_primary_artists_share_the_same_complete_lineup_identity(pg_db, first):
+    manual = candidate(
+        artist_name="Support", lineup=["Primary Band"], local_time="20:00"
+    )
+    provider = candidate(lineup=["Support"], local_time="20:00")
+    if first == "manual":
+        initial = put(manual)
+        linked = put(provider, "ticketmaster", "inverted-lineup")
+    else:
+        initial = put(provider, "ticketmaster", "inverted-lineup")
+        linked = put(manual)
+    assert linked["show_id"] == initial["show_id"]
+    assert row(initial["show_id"])["artist_name"] == (
+        "Support" if first == "manual" else "Primary Band"
+    )
+    assert set(row(initial["show_id"])["lineup"]) == {"Support", "Primary Band"}
+    with read_scope() as session:
+        assert session.execute(text("SELECT count(*) FROM shows")).scalar_one() == 1
+        assert (
+            session.execute(
+                text(
+                    "SELECT show_id FROM show_source_aliases WHERE event_id='inverted-lineup'"
+                )
+            ).scalar_one()
+            == initial["show_id"]
+        )
+
+
+@pytest.mark.parametrize("lookup", ["single", "batch", "locked_batch"])
+def test_lineup_identity_preview_normalizes_every_artist_and_does_not_write(
+    pg_db, lookup
+):
+    from crate.db.repositories.show_identities import (
+        match_show_candidates,
+        preview_show,
+    )
+    from crate.db.tx import transaction_scope
+
+    saved = put(candidate(lineup=["Support"], local_time="20:00"))
+    selected = candidate(
+        artist_name="SUPPORT",
+        lineup=["primary   band", "support"],
+        local_time="20:00",
+    )
+    if lookup == "single":
+        matched = preview_show(selected, {"provider": "manual"})
+    elif lookup == "locked_batch":
+        with transaction_scope() as session:
+            matched = match_show_candidates([selected], lock=True, session=session)[
+                "date-1"
+            ]
+    else:
+        matched = match_show_candidates([selected])["date-1"]
+    assert matched["status"] == "already_exists"
+    assert matched["show"]["id"] == saved["show_id"]
+    assert row(saved["show_id"])["revision"] == saved["revision"]
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"local_time": "21:00"},
+        {"venue": "Palacio Sur"},
+        {"country_code": "FR"},
+        {"city": "Barcelona"},
+        {"date": "2027-03-03"},
+    ],
+)
+def test_identical_lineups_keep_distinct_sessions_and_locations(pg_db, changes):
+    from crate.db.repositories.show_identities import match_show_candidates
+
+    saved = put(candidate(lineup=["Support"], local_time="20:00"))
+    selected = candidate(
+        artist_name="Support",
+        lineup=["Primary Band"],
+        **{"local_time": "20:00", **changes},
+    )
+    assert match_show_candidates([selected])["date-1"]["status"] == "created"
+    other = put(selected, "ticketmaster", "separate-lineup")
+    assert other["status"] == "created"
+    assert other["show_id"] != saved["show_id"]
+
+
+def test_inverted_lineup_with_unknown_time_requires_choosing_a_session(pg_db):
+    from crate.db.repositories.show_identities import match_show_candidates
+
+    first = put(candidate(lineup=["Support"], local_time="18:00"))
+    second = put(candidate(lineup=["Support"], local_time="21:00"))
+    selected = candidate(artist_name="Support", lineup=["Primary Band"])
+    preview = match_show_candidates([selected])["date-1"]
+    assert preview["status"] == "conflict"
+    assert set(preview["matches"]) == {first["show_id"], second["show_id"]}
+    assert put(selected, "ticketmaster", "unknown-session")["status"] == "conflict"
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"artist_name": "Support", "lineup": []},
+        {"artist_name": "Other Band", "lineup": ["Support"]},
+        {"artist_name": "Support", "lineup": ["Primary Band", "Another Band"]},
+    ],
+)
+def test_partial_lineup_overlap_requires_review_instead_of_merging(pg_db, changes):
+    from crate.db.repositories.show_identities import (
+        match_show_candidates,
+        preview_show,
+    )
+
+    saved = put(candidate(lineup=["Support"], local_time="20:00"))
+    selected = candidate(local_time="20:00", **changes)
+    for matched in (
+        preview_show(selected, {"provider": "manual"}),
+        match_show_candidates([selected])["date-1"],
+        put(selected, "ticketmaster", "partial-lineup"),
+    ):
+        assert matched["status"] == "conflict"
+        assert matched["matches"] == [saved["show_id"]]
+    assert row(saved["show_id"])["lineup"] == ["Primary Band", "Support"]
+    with read_scope() as session:
+        assert session.execute(text("SELECT count(*) FROM shows")).scalar_one() == 1
+        assert (
+            session.execute(
+                text("SELECT count(*) FROM show_source_aliases")
+            ).scalar_one()
+            == 0
+        )
+
+
+@pytest.mark.parametrize("complete", [True, False])
+def test_concurrent_inverted_headliners_serialize_before_matching(
+    pg_db, monkeypatch, complete
+):
+    from crate.db.repositories import show_identities as identities
+    from tests.test_agent_library_operations import (
+        _assert_backend_waits_for,
+        _with_backend_pid,
+    )
+
+    manual_matching, release_manual = Event(), Event()
+    manual_pids, provider_pids = Queue(), Queue()
+    original = identities._match
+
+    def paused_match(current, selected, source):
+        if source["provider"] == "manual":
+            manual_matching.set()
+            assert release_manual.wait(timeout=10)
+        return original(current, selected, source)
+
+    monkeypatch.setattr(identities, "_match", paused_match)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        manual = pool.submit(
+            _with_backend_pid,
+            manual_pids,
+            put,
+            candidate(lineup=["Support"], local_time="20:00"),
+        )
+        assert manual_matching.wait(timeout=5)
+        provider = pool.submit(
+            _with_backend_pid,
+            provider_pids,
+            put,
+            candidate(
+                artist_name="Support",
+                lineup=["Primary Band"] if complete else [],
+                local_time="20:00",
+            ),
+            "ticketmaster",
+            "concurrent-inverted",
+        )
+        try:
+            _assert_backend_waits_for(
+                provider, provider_pids.get(timeout=5), manual_pids.get(timeout=5)
+            )
+        finally:
+            release_manual.set()
+        first, second = manual.result(timeout=10), provider.result(timeout=10)
+    if complete:
+        assert second["show_id"] == first["show_id"]
+    else:
+        assert second["status"] == "conflict"
+        assert second["matches"] == [first["show_id"]]
+    with read_scope() as session:
+        assert session.execute(text("SELECT count(*) FROM shows")).scalar_one() == 1
+
+
+def test_selection_rejects_new_rows_for_the_same_inverted_lineup(pg_db):
+    from crate.db.repositories.show_import_selection import compile_show_import
+
+    prepared = compile_show_import(
+        [
+            candidate(item_id="primary", lineup=["Support"], local_time="20:00"),
+            candidate(
+                item_id="support",
+                artist_name="Support",
+                lineup=["Primary Band"],
+                local_time="20:00",
+            ),
+        ],
+        {"provider": "manual", "actor": "user:1"},
+    )
+    assert prepared["executable"] is False
+    assert {issue["item_id"] for issue in prepared["issues"]} == {"primary", "support"}
+    assert {issue["status"] for issue in prepared["issues"]} == {"conflict"}
+    with read_scope() as session:
+        assert session.execute(text("SELECT count(*) FROM shows")).scalar_one() == 0
 
 
 def test_distinct_sessions_and_ambiguous_unknown_time_are_not_silently_merged(pg_db):

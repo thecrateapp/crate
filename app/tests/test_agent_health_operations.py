@@ -1,6 +1,9 @@
 """Explicit health scopes and quality jobs share the worker-only plan contract."""
 
 from unittest.mock import Mock
+from concurrent.futures import ThreadPoolExecutor
+from queue import Queue
+from threading import Event
 
 import pytest
 
@@ -13,6 +16,10 @@ from crate.health_check import LibraryHealthCheck
 
 from tests.agent_command_fixtures import UID, OTHER_UID, change, scalar
 from tests.agent_command_fixtures import command_world as command_world  # noqa: PLC0414
+from tests.test_agent_library_operations import (
+    _assert_backend_waits_for,
+    _with_backend_pid,
+)
 
 
 def _authorize(effect=None):
@@ -147,6 +154,117 @@ def test_changed_artist_identity_prevents_stale_check_and_persistence(command_wo
             authorize=_authorize,
         )
     assert scalar("SELECT COUNT(*) FROM health_issues") == 0
+
+
+def test_artist_identity_change_after_precheck_cannot_retarget_observations(
+    command_world,
+):
+    world = command_world
+    plan = agent_health.compile_operation(
+        "health_check",
+        {"scope": "artist", "artist_uid": UID, "check_types": ["has_photo_desync"]},
+        world["config"],
+    )
+    replacement = "10000000-0000-0000-0000-000000000003"
+    stale_issue = upsert_health_issue(
+        "has_photo_desync",
+        "low",
+        "Replacement evidence",
+        {"artist": "Echo", "artist_uid": replacement},
+    )
+    changed = False
+
+    def replace_before_effect(effect=None):
+        nonlocal changed
+        if effect is not None and not changed:
+            change(
+                "UPDATE library_artists SET name='Renamed',folder_name='renamed' WHERE entity_uid=:uid",
+                {"uid": UID},
+            )
+            change(
+                "INSERT INTO library_artists(name,entity_uid,folder_name,has_photo) VALUES ('Echo',:uid,'echo',0)",
+                {"uid": replacement},
+            )
+            changed = True
+        return effect() if effect is not None else None
+
+    with pytest.raises(ValueError, match="identity changed"):
+        agent_health.apply_operation(
+            "health_check",
+            plan["execution"],
+            world["config"],
+            task_id="identity-race",
+            authorize=replace_before_effect,
+        )
+    assert changed
+    assert scalar("SELECT COUNT(*) FROM health_issues") == 1
+    assert (
+        scalar("SELECT status FROM health_issues WHERE id=:id", {"id": stale_issue})
+        == "open"
+    )
+
+
+def test_targeted_check_holds_identity_until_observations_are_persisted(
+    command_world, monkeypatch
+):
+    from sqlalchemy import text
+
+    world = command_world
+    plan = agent_health.compile_operation(
+        "health_check",
+        {"scope": "artist", "artist_uid": UID, "check_types": ["has_photo_desync"]},
+        world["config"],
+    )
+    held_pids, changing_pids = Queue(), Queue()
+    entered, release = Event(), Event()
+    hold_identity = agent_health.with_artist_identity
+
+    def tracked_identity(expected, effect):
+        return _with_backend_pid(held_pids, hold_identity, expected, effect)
+
+    monkeypatch.setattr(agent_health, "with_artist_identity", tracked_identity)
+
+    def checkpoint(effect=None):
+        if effect is None:
+            entered.set()
+            assert release.wait(15)
+        return effect() if effect is not None else None
+
+    def rename(*, session):
+        session.execute(
+            text("UPDATE library_artists SET name='Renamed' WHERE entity_uid=:uid"),
+            {"uid": UID},
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        checking = pool.submit(
+            agent_health.apply_operation,
+            "health_check",
+            plan["execution"],
+            world["config"],
+            task_id="held-identity-check",
+            authorize=checkpoint,
+        )
+        try:
+            assert entered.wait(10)
+            changing = pool.submit(_with_backend_pid, changing_pids, rename)
+            _assert_backend_waits_for(
+                changing,
+                changing_pids.get(timeout=5),
+                held_pids.get(timeout=5),
+            )
+        finally:
+            release.set()
+        result = checking.result(timeout=10)
+        changing.result(timeout=10)
+
+    assert result["execution"]["status"] == "completed"
+    assert scalar("SELECT COUNT(*) FROM health_issues") == 1
+    assert scalar("SELECT details_json->>'artist_uid' FROM health_issues") == UID
+    assert (
+        scalar("SELECT name FROM library_artists WHERE entity_uid=:uid", {"uid": UID})
+        == "Renamed"
+    )
 
 
 def test_global_check_runs_only_declared_scanner_and_records_its_coverage(

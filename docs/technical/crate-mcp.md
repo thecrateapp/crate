@@ -864,6 +864,84 @@ doubles; authority checks, revocation, grants, compilation, result persistence a
 real implementations. No runtime change or full local suite was needed. CI and persistent review
 must be checked against the newly published exact HEAD.
 
+### Five confirmed final-review corrections (2026-10-18)
+
+The final review against `main` identified five P2 defects on `36d7aa30`, whose 20 CI checks
+were successful. Each defect was reproduced before its correction:
+
+1. **Editorial approval content.** `AgentPlanReview` consumes the compiler's actual top-level
+   `selection`, metadata, rules, exclusions, source revision, generation epoch and provenance.
+   Review displays every track in order with local/global identity, title, artist, album,
+   duration, selection source and manual lock. Missing/inconsistent content, including duplicate
+   local track identities, disables approval. Policy-only visibility/refresh changes with an
+   empty selection and intentionally empty static playlists remain valid. The displayed data
+   supplements the server's existing exact-plan/version approval and authorization checks.
+2. **Artist health identity.** The worker revalidates the planned artist under `FOR SHARE`
+   before entering the legacy name-based scanner, holding the UID/name/folder/photo state
+   through observation and issue persistence. A rename/replacement between the preliminary
+   read and the effect is rejected; a concurrent database rename waits until observations are
+   persisted against the original UID. This protects database identity, not a filesystem-wide
+   snapshot; repair effects retain their separate fresh-evidence and CAS checks.
+3. **Inverted show headliners.** Simple and batch matching inspect the normalized primary
+   artist plus lineup. All performers share ordered artist/date advisory locks, so two writers
+   selecting opposite headliners cannot create independent rows for the same complete lineup
+   and location/session. Partial overlap with a different primary artist requires review.
+   Distinct dates, sessions and locations remain separate; explicit aliases keep their existing
+   correction/reschedule semantics. The batch compiler also rejects repeated selections within
+   one plan. Existing duplicate database rows are not automatically consolidated.
+4. **Partial bulk cancellation.** `/api/worker/cancel-all` records individual outcomes and
+   continues after `STATE_CONFLICT`, `NOT_FOUND` or `LIMIT_EXCEEDED`. Terminal races count as
+   skipped; only accepted cancellation requests count in the compatible `cancelled` field.
+   `skipped` and `items` are additive response fields. Admin communicates partial results and
+   does not claim that a running worker has acknowledged stopping. The existing bounded task
+   listing remains unchanged.
+5. **Durable source attribution.** Local parsing operates on each consumed text/OCR block,
+   preserving its own upload or URL reference. A model that sees multiple blocks/images uses a
+   server-generated `source-set:sha256:` reference, backed by a compact manifest with original
+   references, hashes, modality and confirmed-read state. Unread URLs/images cannot be claimed
+   as evidence. Draft validation restores the original candidate's reference/evidence and
+   trusted manifest instead of accepting replacements from the editor. The manifest persists
+   inside `show_sources.evidence.candidate` after private draft expiry; raw source text is not
+   duplicated into each candidate. The draft/UI candidate contract remains closed. The global
+   60,000-character/200-candidate limits, one model call, model-selection check and cancellation
+   checkpoints remain in force.
+
+Independent SPEC and QUALITY reviews checked the five corrections. QUALITY found an additional
+provenance edge case: successful vision with `candidates=[]` left its manual fallback without a
+source reference. One-image and two-image worker→draft→manual correction→preview/apply tests
+failed before the minimal fix. They now retain the image references and hashes durably, while
+failed vision remains unconfirmed and existing per-block OCR/text references remain intact.
+Final independent reviews have no outstanding P1/P2 findings.
+
+Focused validation used Python 3.13 and real PostgreSQL, with executions sharing the test
+database run sequentially:
+
+```sh
+cd app
+../.venv/bin/python -m pytest tests/test_tasks_api.py tests/test_agent_health_operations.py tests/test_show_identity.py tests/test_show_import_plans.py tests/test_show_extraction.py tests/test_task_cooperative_cancellation.py tests/test_mcp_shows.py tests/test_show_import_api.py tests/test_show_extraction_jobs.py tests/test_show_extraction_sources.py tests/test_show_llm_budget.py -q
+../.venv/bin/python -m pytest tests/test_show_extraction.py -q
+```
+
+The eleven-file run passed **246 cases**. The extraction file passed **22 cases** after adding
+the five vision edge-case controls: **251 distinct backend cases** passed overall. Both runs
+omitted only the opt-in real-model smoke; no PostgreSQL cases were skipped. In this Linux
+checkout the commands ran in the disposable `crate-show-ocr-test:20261016-make` image with the
+repository dependencies, Docker socket/Testcontainers and Tesseract, since the host virtualenv's
+interpreter path was unavailable. The provenance regressions use simulated OCR/model responses
+and actual draft, plan, worker and database persistence; they do not assess a live model's
+extraction quality. Existing local OCR controls also execute Tesseract.
+
+Admin's two changed test files passed **59 cases** (51 plan-review, 8 tasks). Admin typecheck,
+directed ESLint, Ruff check/format and directed Pyright passed. React Doctor 0.9.18 found no issues
+in the three changed production Admin files after using selection identity/position as row keys.
+Concurrency regressions require
+the expected PostgreSQL backend PID in `pg_blocking_pids` before releasing the held transaction;
+elapsed time alone cannot prove serialization. A disposable in-memory control removing the health
+guard's `FOR SHARE` failed the lock-observation test because the rename completed without waiting.
+No production file was mutated for that control. No full local suite was rerun, migrations were
+not changed and no deployment or flags were activated. CI and persistent review must be read
+against the exact newly published HEAD.
+
 ### Repair readiness and effects
 
 `get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,

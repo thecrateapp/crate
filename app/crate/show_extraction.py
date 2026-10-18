@@ -204,6 +204,74 @@ def _composite(images):
     return output.getvalue()
 
 
+def _source_manifest(sources):
+    return [
+        {
+            key: source[key]
+            for key in (
+                "source_ref",
+                "sha256",
+                "text_sha256",
+                "modality",
+                "read",
+                "extractor",
+            )
+            if key in source
+        }
+        for source in sources
+        if source["read"] and (source.get("text") or source["modality"] == "image")
+    ]
+
+
+def _combined_source_ref(manifest):
+    if not manifest:
+        return None
+    if len(manifest) == 1:
+        return manifest[0]["source_ref"]
+    encoded = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    return "source-set:sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+def _parse_sources(sources):
+    draft = parse_show_text("")
+    raw = ""
+    rows = []
+    truncated = False
+    for source in sources:
+        text = source.get("text", "") if source["read"] else ""
+        separator = "\n" if raw and text else ""
+        remaining = max(0, MAX_TEXT - len(raw) - len(separator))
+        source["text"] = text[:remaining]
+        source["truncated"] = source.get("truncated", False) or len(text) > remaining
+        truncated = truncated or source["truncated"]
+        if not source["text"]:
+            continue
+        source["text_sha256"] = hashlib.sha256(source["text"].encode()).hexdigest()
+        raw += separator + source["text"]
+        parsed = parse_show_text(
+            source["text"], source_ref=source["source_ref"], include_undated=False
+        )
+        remaining_rows = 200 - len(rows)
+        rows.extend(parsed["candidates"][:remaining_rows])
+        truncated = (
+            truncated
+            or parsed["truncated"]
+            or len(parsed["candidates"]) > remaining_rows
+        )
+    manifest = _source_manifest(sources)
+    fallback_ref = _combined_source_ref(manifest)
+    if not rows:
+        rows = parse_show_text(raw, source_ref=fallback_ref)["candidates"]
+    draft.update(
+        raw_text=raw,
+        candidates=rows,
+        sources=sources,
+        source_sets={fallback_ref: manifest} if len(manifest) > 1 else {},
+        truncated=truncated or len(rows) == 200,
+    )
+    return draft
+
+
 def extract_show_candidates(
     source: dict, images: list[dict], *, cancelled=lambda: False
 ) -> dict:
@@ -212,45 +280,63 @@ def extract_show_candidates(
         raise ValueError("CANCELLED")
     if mode == "probe":
         return {"readiness": probe_show_extractors()}
-    texts = [source.get("raw_text", "")]
     warnings = []
     evidence = []
-    truncated = False
+    if source.get("raw_text"):
+        evidence.append(
+            {
+                "source_ref": "pasted-text",
+                "read": True,
+                "modality": "text",
+                "text": source["raw_text"],
+            }
+        )
     if source.get("source_url"):
         from crate.show_url_fetch import fetch_worker_source
 
         page = fetch_worker_source(source["source_url"], cancelled=cancelled)
-        texts.append(page["text"])
-        truncated = page["truncated"]
         if not page["available"]:
             warnings.append(page["warning"])
-        evidence.append({"source_ref": page["source_ref"], "read": page["available"]})
+        evidence.append(
+            {
+                "source_ref": page["source_ref"],
+                "read": page["available"],
+                "modality": "text",
+                "text": page["text"] if page["available"] else "",
+                "truncated": page["truncated"],
+            }
+        )
     if mode in {"ocr", "ocr_text_llm"}:
         for image in images:
             result = recognize_image(image["content"], cancelled=cancelled)
-            texts.append(result["text"])
-            truncated = truncated or result["truncated"]
             evidence.append(
                 {
                     "source_ref": "upload:" + image["id"],
                     "sha256": image["sha256"],
+                    "read": True,
+                    "modality": "text",
                     **{
                         k: result[k]
                         for k in ("engine", "languages", "elapsed_seconds", "extractor")
                     },
                     "text": result["text"],
+                    "truncated": result["truncated"],
                 }
             )
-    raw = "\n".join(value for value in texts if value).strip()
-    draft = parse_show_text(
-        raw,
-        source_ref=source.get("source_url")
-        or ("upload:" + images[0]["id"] if images else "pasted-text"),
-    )
+    if mode == "vision":
+        evidence.extend(
+            {
+                "source_ref": "upload:" + image["id"],
+                "sha256": image["sha256"],
+                "read": False,
+                "modality": "image",
+            }
+            for image in images
+        )
+    draft = _parse_sources(evidence)
+    raw = draft["raw_text"]
     draft.update(
-        sources=evidence,
         warnings=[*draft["warnings"], *warnings],
-        truncated=truncated or draft["truncated"],
         mode=mode,
     )
     if mode in {"vision", "text_llm", "ocr_text_llm"}:
@@ -281,7 +367,7 @@ def extract_show_candidates(
             raise ValueError(
                 "IMAGE_REQUIRED: upload a screenshot; a URL alone is not a viewed image"
             )
-        if mode != "vision" and not raw:
+        if mode != "vision" and not raw.strip():
             raise ValueError("TEXT_REQUIRED: paste text or use a readable image")
         if cancelled():
             raise ValueError("CANCELLED")
@@ -316,6 +402,18 @@ def extract_show_candidates(
                 "The configured model did not return valid candidates. Recognized text is preserved for manual correction; no second model call was made."
             )
             return draft
+        if mode == "vision":
+            for item in evidence:
+                if item["modality"] == "image":
+                    item["read"] = True
+        manifest = _source_manifest(evidence)
+        model_source_ref = _combined_source_ref(manifest)
+        if len(manifest) > 1:
+            draft["source_sets"][model_source_ref] = manifest
+        if mode == "vision" and not extracted.candidates:
+            for candidate in draft["candidates"]:
+                if candidate["source_ref"] is None:
+                    candidate["source_ref"] = model_source_ref
         rows = []
         for candidate in extracted.candidates:
             row = candidate.model_dump(mode="json", exclude_unset=True)
@@ -332,7 +430,7 @@ def extract_show_candidates(
                 row.pop(key, None)
             row.update(
                 item_id=str(uuid4()),
-                source_ref=draft["candidates"][0]["source_ref"],
+                source_ref=model_source_ref,
                 extractor=EXTRACTOR_VERSION,
                 extractor_model=config["model"],
             )

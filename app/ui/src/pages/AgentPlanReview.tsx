@@ -60,6 +60,218 @@ const targetIdentity = (target: {
   return null;
 };
 const valueText = (value: unknown) => JSON.stringify(value, null, 2) ?? "—";
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+const nonemptyText = (value: unknown) =>
+  typeof value === "string" && value.length > 0;
+const nullableText = (value: unknown) =>
+  value === null || typeof value === "string";
+const nullableCount = (value: unknown) =>
+  value === null || (Number.isInteger(value) && Number(value) >= 0);
+
+function completeEditorialContent(item: AgentPlan) {
+  const { metadata, selection, smart_rules: rules } = item;
+  const policyOnly =
+    item.kind === "visibility" || item.kind === "refresh_policy";
+  if (
+    ![
+      "create",
+      "duplicate",
+      "edit",
+      "refine",
+      "regenerate",
+      "visibility",
+      "refresh_policy",
+    ].includes(item.kind ?? "") ||
+    !isRecord(metadata) ||
+    !nonemptyText(metadata.name) ||
+    typeof metadata.description !== "string" ||
+    !nonemptyText(metadata.scope) ||
+    !nonemptyText(metadata.visibility) ||
+    !["static", "smart"].includes(String(metadata.generation_mode)) ||
+    typeof metadata.is_active !== "boolean" ||
+    typeof metadata.auto_refresh_enabled !== "boolean" ||
+    !Array.isArray(selection) ||
+    selection.length > 100 ||
+    !nullableCount(item.source_revision) ||
+    !nullableCount(item.generation_epoch) ||
+    !isRecord(item.provenance) ||
+    !nonemptyText(item.provenance.source) ||
+    !nonemptyText(item.provenance.actor_principal_id) ||
+    !nonemptyText(item.provenance.prepared_by)
+  )
+    return false;
+
+  // Policy changes intentionally omit the existing selection. Legacy smart
+  // rules may also be null; the compiler does not regenerate them in this case.
+  if (
+    metadata.generation_mode === "static"
+      ? rules !== null
+      : !(isRecord(rules) && (policyOnly || Object.keys(rules).length > 0)) &&
+        !(policyOnly && rules === null)
+  )
+    return false;
+
+  const summary = item.changes[0];
+  if (
+    item.changes.length !== 1 ||
+    !summary ||
+    summary.field !== "playlist" ||
+    summary.kind !== item.kind ||
+    !Number.isInteger(summary.track_count) ||
+    Number(summary.track_count) < 0 ||
+    summary.track_count !== item.impact.track_count ||
+    (policyOnly
+      ? selection.length !== 0
+      : selection.length !== summary.track_count) ||
+    (
+      ["name", "description", "scope", "visibility", "generation_mode"] as const
+    ).some((key) => summary[key] !== metadata[key]) ||
+    summary.is_active_after !== metadata.is_active ||
+    summary.auto_refresh_after !== metadata.auto_refresh_enabled
+  )
+    return false;
+
+  if (
+    !Array.isArray(item.new_exclusions) ||
+    item.new_exclusions.length > 100 ||
+    !item.new_exclusions.every(nonemptyText) ||
+    ![item.existing_exclusions, item.copied_exclusions].every(
+      (exclusions) =>
+        Array.isArray(exclusions) &&
+        exclusions.length <= 100 &&
+        exclusions.every(
+          (excluded) =>
+            isRecord(excluded) &&
+            nullableText(excluded.track_uid) &&
+            nullableText(excluded.global_track_uid) &&
+            (nonemptyText(excluded.track_uid) ||
+              nonemptyText(excluded.global_track_uid)),
+        ),
+    )
+  )
+    return false;
+
+  const localUids = selection.flatMap((track) =>
+    isRecord(track) && nonemptyText(track.track_uid) ? [track.track_uid] : [],
+  );
+  return (
+    new Set(localUids).size === localUids.length &&
+    selection.every(
+      (track, index) =>
+        isRecord(track) &&
+        nullableCount(track.row_id) &&
+        nullableText(track.track_uid) &&
+        nullableText(track.global_track_uid) &&
+        (nonemptyText(track.track_uid) ||
+          nonemptyText(track.global_track_uid)) &&
+        nullableText(track.title) &&
+        nullableText(track.artist) &&
+        nullableText(track.album) &&
+        (track.duration === null ||
+          (typeof track.duration === "number" &&
+            Number.isFinite(track.duration) &&
+            track.duration >= 0)) &&
+        track.position === index + 1 &&
+        nonemptyText(track.source) &&
+        typeof track.locked === "boolean",
+    )
+  );
+}
+
+function EditorialReview({ item }: { item: AgentPlan }) {
+  const selection = Array.isArray(item.selection) ? item.selection : [];
+  return (
+    <section aria-label="Complete editorial details" className="space-y-4">
+      <h2 className="font-medium">Editorial playlist content</h2>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <caption className="sr-only">Complete editorial selection</caption>
+          <thead>
+            <tr className="border-b border-border">
+              <th className="py-2">Position</th>
+              <th>Track and identity</th>
+              <th>Artist</th>
+              <th>Album</th>
+              <th>Duration (seconds)</th>
+              <th>Source</th>
+              <th>Lock</th>
+            </tr>
+          </thead>
+          <tbody>
+            {selection.map((track) => (
+              <tr
+                key={
+                  isRecord(track)
+                    ? valueText([
+                        track.position,
+                        track.row_id,
+                        track.track_uid,
+                        track.global_track_uid,
+                      ])
+                    : valueText(track)
+                }
+                className="border-b border-border"
+              >
+                {isRecord(track) ? (
+                  <>
+                    <td className="py-3">{valueText(track.position)}</td>
+                    <td>
+                      <p>{valueText(track.title)}</p>
+                      <pre className="whitespace-pre-wrap break-words text-xs">
+                        {valueText({
+                          row_id: track.row_id,
+                          track_uid: track.track_uid,
+                          global_track_uid: track.global_track_uid,
+                        })}
+                      </pre>
+                    </td>
+                    <td>{valueText(track.artist)}</td>
+                    <td>{valueText(track.album)}</td>
+                    <td>{valueText(track.duration)}</td>
+                    <td>{valueText(track.source)}</td>
+                    <td>
+                      {track.locked === true
+                        ? "Locked"
+                        : track.locked === false
+                          ? "Unlocked"
+                          : "Missing lock state"}
+                    </td>
+                  </>
+                ) : (
+                  <td colSpan={7}>{valueText(track)}</td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {selection.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {item.kind === "visibility" || item.kind === "refresh_policy"
+            ? "This policy change preserves the existing playlist selection."
+            : "The proposed playlist selection is empty."}
+        </p>
+      ) : null}
+      <details open>
+        <summary>Complete metadata, rules, exclusions and provenance</summary>
+        <pre className="mt-2 max-w-full overflow-x-auto whitespace-pre-wrap break-words text-xs">
+          {valueText({
+            kind: item.kind,
+            metadata: item.metadata,
+            smart_rules: item.smart_rules,
+            new_exclusions: item.new_exclusions,
+            existing_exclusions: item.existing_exclusions,
+            copied_exclusions: item.copied_exclusions,
+            source_revision: item.source_revision,
+            generation_epoch: item.generation_epoch,
+            provenance: item.provenance,
+          })}
+        </pre>
+      </details>
+    </section>
+  );
+}
 
 export function AgentPlanReview() {
   const { planId } = useParams();
@@ -140,7 +352,8 @@ function PlanReviewPage({ planId }: { planId?: string }) {
             identitySet.has(targetIdentity(target)),
         );
       return change.scope === "global" && identitySet.has("library:global");
-    });
+    }) &&
+    (item.operation !== "editorial_change" || completeEditorialContent(item));
 
   async function decide(decision: "approve" | "reject") {
     if (
@@ -348,6 +561,9 @@ function PlanReviewPage({ planId }: { planId?: string }) {
                   </tbody>
                 </table>
               </div>
+              {item.operation === "editorial_change" ? (
+                <EditorialReview item={item} />
+              ) : null}
               {item.operation === "repair_photo_flag" ? (
                 <p className="text-sm">
                   Updates the database flag. Image files remain intact. Does not
@@ -425,8 +641,9 @@ function PlanReviewPage({ planId }: { planId?: string }) {
                     )
                   }
                 />
-                I reviewed all {item.changes.length} proposed changes and their
-                effects.
+                {item.operation === "editorial_change"
+                  ? "I reviewed the complete playlist selection, order, rules, exclusions, metadata and effects."
+                  : `I reviewed all ${item.changes.length} proposed changes and their effects.`}
               </label>
               <div className="flex gap-2">
                 <Button

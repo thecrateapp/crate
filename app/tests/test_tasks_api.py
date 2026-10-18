@@ -711,7 +711,16 @@ class TestWorkerCancelAll:
         with (
             patch("crate.api.tasks.list_tasks", side_effect=[running, pending]),
             patch(
-                "crate.db.repositories.task_control.request_cancellation"
+                "crate.db.repositories.task_control.request_cancellation",
+                side_effect=lambda identifier: {
+                    "task_id": identifier,
+                    "status": "running" if identifier == "r1" else "cancelled",
+                    "request_state": "cancellation_requested"
+                    if identifier == "r1"
+                    else "cancelled",
+                    "cancellation_requested": True,
+                    "affected_children": 0,
+                },
             ) as mock_cancel,
             patch("crate.api.tasks.cancel_media_worker_job") as mock_cancel_job,
         ):
@@ -734,6 +743,92 @@ class TestWorkerCancelAll:
         assert resp.status_code == 200
         assert resp.json()["cancelled"] == 0
         mock_cancel.assert_not_called()
+
+    def test_cancel_all_continues_when_a_child_is_finalizing(
+        self, pg_db, test_app, monkeypatch
+    ):
+        from crate.db.queries.tasks import get_task
+        from crate.db.repositories.tasks import create_task, start_task, update_task
+
+        monkeypatch.setattr(
+            "crate.db.repositories.tasks_shared.publish_tasks_surface_signal",
+            lambda: None,
+        )
+        parent = create_task("compute_analytics", dispatch=False)
+        child = create_task("compute_analytics", parent_task_id=parent, dispatch=False)
+        other = create_task("quality_check", dispatch=False)
+        assert start_task(parent) is not None
+        update_task(child, status="completing")
+        with patch("crate.api.tasks.cancel_media_worker_job"):
+            response = test_app.post("/api/worker/cancel-all")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["cancelled"] == 1
+        assert data["skipped"] == 2
+        outcomes = {item["task_id"]: item for item in data["items"]}
+        assert outcomes[parent]["error_code"] == "STATE_CONFLICT"
+        assert outcomes[parent]["request_state"] == "rejected"
+        assert outcomes[child]["error_code"] == "STATE_CONFLICT"
+        assert outcomes[other]["request_state"] == "cancelled"
+        assert get_task(parent)["cancellation_requested_at"] is None
+        assert get_task(child)["status"] == "completing"
+        assert get_task(other)["status"] == "cancelled"
+
+    @pytest.mark.parametrize("code", ["NOT_FOUND", "STATE_CONFLICT", "LIMIT_EXCEEDED"])
+    def test_cancel_all_reports_rejected_items_and_continues(self, test_app, code):
+        from crate.agent_diagnostics import DiagnosticError
+
+        with (
+            patch(
+                "crate.api.tasks.list_tasks",
+                side_effect=[[{"id": "blocked"}], [{"id": "accepted"}]],
+            ),
+            patch(
+                "crate.db.repositories.task_control.request_cancellation",
+                side_effect=[
+                    DiagnosticError(code, "Cancellation cannot be accepted"),
+                    {
+                        "task_id": "accepted",
+                        "status": "running",
+                        "cancellation_requested": True,
+                        "request_state": "cancellation_requested",
+                        "affected_children": 0,
+                    },
+                ],
+            ),
+            patch("crate.api.tasks.cancel_media_worker_job"),
+        ):
+            response = test_app.post("/api/worker/cancel-all")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["cancelled"] == 1 and data["skipped"] == 1
+        assert data["items"][0]["error_code"] == code
+        assert data["items"][1]["status"] == "running"
+        assert data["items"][1]["cancellation_requested"] is True
+
+    def test_cancel_all_does_not_count_a_terminal_race_as_a_new_request(self, test_app):
+        with (
+            patch("crate.api.tasks.list_tasks", side_effect=[[{"id": "done"}], []]),
+            patch(
+                "crate.db.repositories.task_control.request_cancellation",
+                return_value={
+                    "task_id": "done",
+                    "status": "completed",
+                    "request_state": "already_terminal",
+                    "cancellation_requested": False,
+                    "affected_children": 0,
+                },
+            ),
+            patch("crate.api.tasks.cancel_media_worker_job"),
+        ):
+            response = test_app.post("/api/worker/cancel-all")
+
+        assert response.status_code == 200
+        assert response.json()["cancelled"] == 0
+        assert response.json()["skipped"] == 1
+        assert response.json()["items"][0]["request_state"] == "already_terminal"
 
     def test_cancel_all_requires_admin(self, test_app):
         with patch(

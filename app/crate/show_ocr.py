@@ -156,7 +156,9 @@ def recognize_image(data: bytes, *, cancelled=lambda: False, timeout=30) -> dict
             process.wait()
 
 
-def parse_show_text(text: str, *, source_ref: str | None = None) -> dict:
+def parse_show_text(
+    text: str, *, source_ref: str | None = None, include_undated: bool = True
+) -> dict:
     raw = text[:MAX_TEXT]
     rows = []
     for line in raw.splitlines():
@@ -177,7 +179,7 @@ def parse_show_text(text: str, *, source_ref: str | None = None) -> dict:
                 break
         if len(rows) == 200:
             break
-    if not rows:
+    if not rows and include_undated:
         rows = [
             {
                 "item_id": str(uuid4()),

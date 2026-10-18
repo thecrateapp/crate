@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Link, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -83,6 +83,98 @@ function metadataPlan(overrides: Partial<AgentPlan> = {}): AgentPlan {
   });
 }
 
+// Mirrors agent_editorial.compile_operation and the persisted get_plan DTO:
+// changes is a playlist summary; the exact editorial content is top-level.
+function editorialPlan(overrides: Record<string, unknown> = {}) {
+  return {
+    ...plan(),
+    operation: "editorial_change",
+    kind: "edit",
+    risk: "high",
+    targets: [{ entity_type: "playlist", name: "42" }],
+    changes: [
+      {
+        field: "playlist",
+        targets: [{ entity_type: "playlist", name: "42" }],
+        kind: "edit",
+        name: "Night drive",
+        track_count: 2,
+        description: "A complete evening selection",
+        generation_mode: "smart",
+        scope: "system",
+        visibility: "public",
+        is_active_before: true,
+        is_active_after: true,
+        auto_refresh_before: false,
+        auto_refresh_after: false,
+      },
+    ],
+    metadata: {
+      name: "Night drive",
+      description: "A complete evening selection",
+      scope: "system",
+      visibility: "public",
+      generation_mode: "smart",
+      is_active: true,
+      auto_refresh_enabled: false,
+    },
+    selection: [
+      {
+        row_id: null,
+        track_uid: "track-second",
+        global_track_uid: null,
+        title: "Second track",
+        artist: "Second artist",
+        album: "Second album",
+        duration: 240,
+        position: 1,
+        source: "generated",
+        locked: false,
+      },
+      {
+        row_id: 9,
+        track_uid: null,
+        global_track_uid: "global-first",
+        title: "First track",
+        artist: "First artist",
+        album: "First album",
+        duration: null,
+        position: 2,
+        source: "manual",
+        locked: true,
+      },
+    ],
+    smart_rules: {
+      match: "all",
+      rules: [{ field: "genre", op: "eq", value: "Ambient" }],
+      sort: "random",
+      limit: 2,
+    },
+    new_exclusions: ["excluded-new"],
+    existing_exclusions: [
+      { track_uid: "excluded-existing", global_track_uid: null },
+    ],
+    copied_exclusions: [],
+    source_revision: 4,
+    generation_epoch: 2,
+    impact: {
+      playlist_count: 1,
+      track_count: 2,
+      duration_seconds: 240,
+      public_discovery: true,
+      notifications: false,
+      future_refresh_notifications: false,
+    },
+    provenance: {
+      source: "local_library",
+      actor_principal_id: "service-one",
+      prepared_by: "crate_worker",
+    },
+    source_versions: undefined,
+    ...overrides,
+  };
+}
+
 function renderReview(capabilities?: string[]) {
   return renderWithAdminProviders(
     <Routes>
@@ -105,7 +197,15 @@ function renderReview(capabilities?: string[]) {
   );
 }
 
-function exactDecision(item: AgentPlan) {
+function exactDecision(
+  item: Pick<
+    AgentPlan,
+    | "plan_version"
+    | "content_hash"
+    | "policy_revision"
+    | "authorization_context_hash"
+  >,
+) {
   return {
     plan_version: item.plan_version,
     content_hash: item.content_hash,
@@ -120,6 +220,197 @@ beforeEach(() => {
 });
 
 describe("AgentPlanReview", () => {
+  it("reviews the real editorial selection in order with locks, rules, exclusions and metadata", async () => {
+    const user = userEvent.setup();
+    const item = editorialPlan();
+    apiMock.mockResolvedValue(item);
+    renderReview([
+      "agents.plans.review",
+      "agents.plans.approve",
+      "curation.playlists.write",
+    ]);
+
+    const selection = await screen.findByRole("table", {
+      name: "Complete editorial selection",
+    });
+    const rows = within(selection).getAllByRole("row");
+    expect(rows).toHaveLength(3);
+    expect(rows[1]).toHaveTextContent("1");
+    expect(rows[1]).toHaveTextContent("track-second");
+    expect(rows[1]).toHaveTextContent("Second track");
+    expect(rows[1]).toHaveTextContent("Second artist");
+    expect(rows[1]).toHaveTextContent("Second album");
+    expect(rows[1]).toHaveTextContent("240");
+    expect(rows[1]).toHaveTextContent("generated");
+    expect(rows[1]).toHaveTextContent("Unlocked");
+    expect(rows[2]).toHaveTextContent("2");
+    expect(rows[2]).toHaveTextContent("global-first");
+    expect(rows[2]).toHaveTextContent("First track");
+    expect(rows[2]).toHaveTextContent("manual");
+    expect(rows[2]).toHaveTextContent("Locked");
+    const details = screen.getByRole("region", {
+      name: "Complete editorial details",
+    });
+    expect(details).toHaveTextContent("A complete evening selection");
+    expect(details).toHaveTextContent('"generation_mode": "smart"');
+    expect(details).toHaveTextContent('"auto_refresh_enabled": false');
+    expect(details).toHaveTextContent("Ambient");
+    expect(details).toHaveTextContent("excluded-new");
+    expect(details).toHaveTextContent("excluded-existing");
+    expect(details).toHaveTextContent('"source_revision": 4');
+    expect(details).toHaveTextContent('"generation_epoch": 2');
+    expect(details).toHaveTextContent("crate_worker");
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(
+      screen.getByRole("button", { name: "Approve exact plan" }),
+    );
+    expect(apiMock).toHaveBeenCalledWith(
+      `${base}/plan-one/approve`,
+      "POST",
+      exactDecision(item),
+    );
+  });
+
+  it("shows the exact copied exclusions in a duplicate editorial plan", async () => {
+    const item = editorialPlan();
+    apiMock.mockResolvedValue(
+      editorialPlan({
+        kind: "duplicate",
+        changes: [{ ...item.changes[0], kind: "duplicate" }],
+        new_exclusions: [],
+        copied_exclusions: item.existing_exclusions,
+      }),
+    );
+    renderReview();
+    const details = await screen.findByRole("region", {
+      name: "Complete editorial details",
+    });
+    expect(details).toHaveTextContent(
+      '"copied_exclusions": [ { "track_uid": "excluded-existing", "global_track_uid": null } ]',
+    );
+  });
+
+  it.each([
+    ["missing selection", { selection: undefined }],
+    ["selection shorter than the summary", { selection: [] }],
+    ["missing smart rules", { smart_rules: undefined }],
+    ["missing new exclusions", { new_exclusions: undefined }],
+    ["missing existing exclusions", { existing_exclusions: undefined }],
+    ["missing copied exclusions", { copied_exclusions: undefined }],
+    ["missing metadata", { metadata: undefined }],
+    ["missing generation epoch", { generation_epoch: undefined }],
+    ["unknown editorial operation", { kind: "unknown" }],
+    [
+      "missing selected track lock",
+      {
+        selection: editorialPlan().selection.map((track) => ({
+          ...track,
+          locked: undefined,
+        })),
+      },
+    ],
+    [
+      "missing selected track metadata",
+      {
+        selection: editorialPlan().selection.map((track) => ({
+          ...track,
+          title: undefined,
+        })),
+      },
+    ],
+    [
+      "missing selected track identity",
+      {
+        selection: editorialPlan().selection.map((track) => ({
+          ...track,
+          track_uid: null,
+          global_track_uid: null,
+        })),
+      },
+    ],
+    [
+      "incomplete selected order",
+      {
+        selection: editorialPlan().selection.map((track) => ({
+          ...track,
+          position: 1,
+        })),
+      },
+    ],
+    [
+      "duplicate local track identity",
+      {
+        selection: editorialPlan().selection.map((track) => ({
+          ...track,
+          track_uid: "track-second",
+        })),
+      },
+    ],
+  ])(
+    "blocks approval for editorial content with %s",
+    async (_label, invalid) => {
+      const user = userEvent.setup();
+      apiMock.mockResolvedValue(editorialPlan(invalid));
+      renderReview();
+      const approve = await screen.findByRole("button", {
+        name: "Approve exact plan",
+      });
+      await user.click(screen.getByRole("checkbox"));
+      expect(approve).toBeDisabled();
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "complete change list",
+      );
+    },
+  );
+
+  it.each(["visibility", "refresh_policy"])(
+    "allows a real %s editorial plan with an empty selection and existing track count",
+    async (kind) => {
+      const user = userEvent.setup();
+      const item = editorialPlan();
+      apiMock.mockResolvedValue(
+        editorialPlan({
+          kind,
+          changes: [{ ...item.changes[0], kind, track_count: 120 }],
+          selection: [],
+          smart_rules: null,
+          new_exclusions: [],
+          impact: { ...item.impact, track_count: 120, duration_seconds: 0 },
+        }),
+      );
+      renderReview();
+      await screen.findByRole("table", { name: "Complete proposed changes" });
+      await user.click(screen.getByRole("checkbox"));
+      expect(
+        screen.getByRole("button", { name: "Approve exact plan" }),
+      ).toBeEnabled();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    },
+  );
+
+  it("allows a complete static editorial plan with an explicitly empty selection", async () => {
+    const user = userEvent.setup();
+    const item = editorialPlan();
+    apiMock.mockResolvedValue(
+      editorialPlan({
+        changes: [
+          { ...item.changes[0], track_count: 0, generation_mode: "static" },
+        ],
+        metadata: { ...item.metadata, generation_mode: "static" },
+        selection: [],
+        smart_rules: null,
+        new_exclusions: [],
+        impact: { ...item.impact, track_count: 0, duration_seconds: 0 },
+      }),
+    );
+    renderReview();
+    await screen.findByRole("table", { name: "Complete proposed changes" });
+    await user.click(screen.getByRole("checkbox"));
+    expect(
+      screen.getByRole("button", { name: "Approve exact plan" }),
+    ).toBeEnabled();
+  });
+
   it("reviews a repair issue with several exact nested targets and dependent losses", async () => {
     const user = userEvent.setup();
     const trackUid = "20000000-0000-0000-0000-000000000002";
@@ -647,7 +938,6 @@ it.each([
   ["shows_import", "curation.shows.write", "show", "show-a"],
   ["job_cancel", "ops.tasks.manage", "task", "job-a"],
   ["runtime_update", "ops.runtime.manage", "runtime", "instance"],
-  ["editorial_change", "curation.playlists.write", "playlist", "42"],
 ])(
   "approves complete %s plans using the correct domain capability",
   async (operation, capability, kind, name) => {

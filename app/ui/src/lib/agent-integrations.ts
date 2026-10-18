@@ -87,7 +87,50 @@ export interface AgentPlanSummary {
   operation?: string;
 }
 
-export interface AgentPlan extends AgentPlanSummary {
+export interface AgentEditorialContent {
+  kind:
+    | "create"
+    | "duplicate"
+    | "edit"
+    | "refine"
+    | "regenerate"
+    | "visibility"
+    | "refresh_policy";
+  metadata: {
+    name: string;
+    description: string;
+    scope: string;
+    visibility: string;
+    generation_mode: "static" | "smart";
+    is_active: boolean;
+    auto_refresh_enabled: boolean;
+  };
+  selection: {
+    row_id: number | null;
+    track_uid: string | null;
+    global_track_uid: string | null;
+    title: string | null;
+    artist: string | null;
+    album: string | null;
+    duration: number | null;
+    position: number;
+    source: string;
+    locked: boolean;
+  }[];
+  smart_rules: Record<string, unknown> | null;
+  new_exclusions: string[];
+  existing_exclusions: {
+    track_uid: string | null;
+    global_track_uid: string | null;
+  }[];
+  copied_exclusions: AgentEditorialContent["existing_exclusions"];
+  source_revision: number | null;
+  generation_epoch: number | null;
+  provenance: Record<string, unknown>;
+}
+
+export interface AgentPlan
+  extends AgentPlanSummary, Partial<AgentEditorialContent> {
   job_id?: string | null;
   plan_version: string;
   content_hash: string;
@@ -109,7 +152,7 @@ export interface AgentPlan extends AgentPlanSummary {
   changes: Record<string, unknown>[];
   impact: Record<string, unknown>;
   reversibility: string;
-  source_versions: Record<string, unknown>;
+  source_versions?: Record<string, unknown>;
   conflicts?: Record<string, unknown>[];
   executable?: boolean;
   authorization_context: {

@@ -786,12 +786,19 @@ function WorkerControlPanel({
 
   async function cancelAll() {
     try {
-      const response = await api<{ cancelled: number }>(
+      const response = await api<{ cancelled: number; skipped?: number }>(
         "/api/worker/cancel-all",
         "POST",
       );
       await refreshTasks(true);
-      toast.success(`Cancellation requested for ${response.cancelled} tasks`);
+      const message = `Cancellation requested for ${response.cancelled} ${response.cancelled === 1 ? "task" : "tasks"}`;
+      if (response.skipped) {
+        toast.error(
+          `${message}. ${response.skipped} ${response.skipped === 1 ? "task" : "tasks"} could not be cancelled; review current states.`,
+        );
+      } else {
+        toast.success(message);
+      }
     } catch {
       toast.error("Failed to cancel tasks");
     }

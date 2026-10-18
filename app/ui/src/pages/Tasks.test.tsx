@@ -206,4 +206,35 @@ describe("Tasks operational controls", () => {
       ),
     );
   });
+
+  it("reports jobs skipped by cancel-all instead of claiming all requests succeeded", async () => {
+    const user = userEvent.setup();
+    mockSnapshot();
+    const read = apiMock.getMockImplementation()!;
+    apiMock.mockImplementation(async (path, ...args) =>
+      path === "/api/worker/cancel-all"
+        ? {
+            cancelled: 1,
+            skipped: 1,
+            items: [
+              {
+                task_id: "finishing",
+                request_state: "rejected",
+                error_code: "STATE_CONFLICT",
+              },
+            ],
+          }
+        : read(path, ...args),
+    );
+    renderWithAdminProviders(<Tasks />);
+
+    await user.click(await screen.findByRole("button", { name: "Cancel all" }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "Cancellation requested for 1 task. 1 task could not be cancelled; review current states.",
+      ),
+    );
+    expect(toast.success).not.toHaveBeenCalled();
+  });
 });
