@@ -14,6 +14,13 @@ export default defineConfig({
       resolveId(source, importer) {
         if (!importer?.includes("/app/ui/") || !source.startsWith("@/")) return;
         if (
+          importer.endsWith("/app/ui/src/pages/Analysis.tsx") &&
+          ["@/lib/api", "@/contexts/OpsSnapshotContext"].includes(source)
+        )
+          return fileURLToPath(
+            new URL("admin-analysis-fixtures.ts", import.meta.url),
+          );
+        if (
           [
             "@/lib/api",
             "@/contexts/OpsSnapshotContext",
@@ -46,6 +53,9 @@ export default defineConfig({
         main: fileURLToPath(new URL("index.html", import.meta.url)),
         adminNavigation: fileURLToPath(
           new URL("admin-navigation-demo.html", import.meta.url),
+        ),
+        adminAnalysis: fileURLToPath(
+          new URL("admin-analysis-demo.html", import.meta.url),
         ),
         adminOperations: fileURLToPath(
           new URL("admin-operations-demo.html", import.meta.url),

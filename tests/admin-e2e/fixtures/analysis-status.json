@@ -1,0 +1,51 @@
+{
+  "total": 1200,
+  "analysis_done": 900,
+  "analysis_pending": 287,
+  "analysis_active": 10,
+  "analysis_failed": 3,
+  "bliss_done": 600,
+  "bliss_pending": 594,
+  "bliss_active": 5,
+  "bliss_failed": 1,
+  "fingerprint_done": 1100,
+  "fingerprint_pending": 100,
+  "fingerprint_chromaprint": 1050,
+  "fingerprint_pcm": 50,
+  "chromaprint_available": true,
+  "fingerprint_strategy": "chromaprint-v1",
+  "total_albums": 120,
+  "lyrics_cached": 1080,
+  "lyrics_found": 800,
+  "lyrics_missing": 280,
+  "portable_sidecar_albums": 96,
+  "portable_audio_tag_albums": 90,
+  "portable_audio_tag_tracks": 900,
+  "portable_tag_errors": 2,
+  "rich_export_albums": 24,
+  "rich_export_tracks": 240,
+  "last_analyzed": {
+    "title": "Marea",
+    "artist": "Costa Norte",
+    "album": "Luz de octubre",
+    "bpm": 123.4,
+    "audio_key": "Am",
+    "energy": 0.72,
+    "danceability": 0.61,
+    "has_mood": true,
+    "updated_at": "2026-10-18T08:30:00Z"
+  },
+  "last_bliss": {
+    "title": "Horizonte",
+    "artist": "Costa Norte",
+    "album": "Luz de octubre",
+    "updated_at": "2026-10-18T08:31:00Z"
+  },
+  "last_fingerprinted": {
+    "title": "Bruma",
+    "artist": "Costa Norte",
+    "album": "Luz de octubre",
+    "source": "chromaprint-v1",
+    "updated_at": "2026-10-18T08:32:00Z"
+  }
+}

@@ -1,7 +1,7 @@
 # Crate v3 design system
 
 Current implementation: checkpoints through 1Y are approved and published (`ea6ebdc8`);
-Task 1b.8 / 1Z is the local Logs/Stack migration at `#operaciones-admin`, awaiting Diego before publication or the next group.
+1Z is published as `2efb4754`. Task 1b.8 / 1AA is the local Analysis migration at `#analisis-admin`, awaiting Diego before publication or the next group.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
 `/Users/diego/Code/crate-v3`, branch `feat/crate_v3`. The handover owns implementation/QA status.
@@ -4308,3 +4308,35 @@ static `CrateChip` tags. Do not mix them with `CratePill`'s 32/44px control geom
 row. Shared tag padding/type/radius remain the defaults (16px rendered height at the default font
 scale); warning tags use the shared warning tone. These labels have no actions or hit targets.
 No shared primitive/API or global sizing rule changes.
+
+## Linux implementation note — 1AA / Analysis, 2026-10-18
+
+1Z is approved/published as `2efb4754`. Analysis retires redundant action, summary, coverage and
+recent-output icons, including its two local icon-prop contracts and empty icon boxes. Real
+section headings and visible action names carry the hierarchy. Only nine bounded loading sites
+remain: initial loading plus eight action spinners, all hidden from the accessible name; the
+initial state is named and the active button exposes busy state. Actions keep 44px targets.
+Nine header status/count summaries use the same static CrateChip geometry and shared warning
+and accent tones; they are informational, not short selectors. The 22 local mini-metric readings
+join the five existing OpsStatTile readings in the shared 8px `.crate-form-field` recipe.
+Coverage bars, computed values, timestamps, recent-track metadata and all task/provider behavior
+remain intact. Do not substitute later instruments or change the shared badge API in this group.
+The sixth isolated preview entry uses actual Analysis with fictional data/actions and controlled
+states, without API/SSE traffic. Review `#analisis-admin`; stop at 1AA for Diego. Other Admin
+families, canonical/native QA and full phase validation remain pending.
+
+1AA same-checkpoint feedback (2026-10-18): Diego requested removal of Operator notes. Remove
+that static guidance panel and its outer two-column wrapper. Recent outputs spans the available
+width, retaining its two real track cards (two columns at xl, stacked below). No data/action or
+shared component contract change. This supersedes preserving that advisory copy in the first
+1AA review revision.
+
+1AA further feedback (2026-10-18): Recent outputs now includes Last audio fingerprint alongside
+analysis and Bliss, with track/artist/album, the recorded fingerprint timestamp and source
+(Chromaprint or PCM fallback; preserve unknown identifiers, name missing sources). Cards have
+explicit pipeline kinds and article names, so a fingerprint never inherits the Bliss explanation.
+Three columns at xl, stacked below; the panel keeps full width and Operator notes stays removed.
+Older snapshots/no recorded result show the existing empty state. A dated untitled result keeps
+its output with an Untitled track fallback. No raw fingerprint/hash is exposed. The new additive
+backend projection is prepared by the worker, not fetched separately by this UI; shared visual
+contracts and the later TrackReadout plan are unchanged.

@@ -701,3 +701,35 @@ Review `#operaciones-admin`; do not publish 1Z or begin another group before Die
 Diego's 1Z Service filters feedback also adopts the shared SegmentedControl instead of bespoke
 CratePill selection with forced 44px height. Its 32px fine / 44px coarse geometry and radio/arrow
 semantics match the existing Log level selector; page/service actions and searches remain 44px.
+
+### 2026-10-18 — 1Z published; 1AA Analysis
+
+Diego approved 1Z and authorised commit/push plus one further Admin icon group, preserving UX
+glyphs, the preview and the next review stop. 1Z is `2efb4754` at origin. 1AA covers entire
+Analysis and its local components only: remove redundant labelled action/header/coverage/output
+glyphs and private icon props. Retain nine exact Loader2 sites (initial + eight actions), with
+named loading and busy state. Static header summaries use CrateChip consistently with Diego's
+1Z sizing feedback; readonly values use the shared 8px recipe, actions retain 44px targets.
+Five helpers/action functions, both status/metrics memos and eight queue call ASTs are unchanged.
+No provider, API/queue contract, stream, permission, route, shared primitive or Listen/Desktop
+change. Preview data and action adapters are isolated specifically to the Analysis import;
+old action timers cannot change a subsequently selected sample state. This guard belongs only
+to the mockup; production refresh remains 800ms. Review `#analisis-admin`; do not publish 1AA
+or begin another group before Diego's approval. Remaining 1b.8 pages stay pending.
+
+1AA same-checkpoint amendment (2026-10-18): Diego explicitly requested removing Operator notes
+because it adds no value. Remove all four static tips and the enclosing split layout; Recent
+outputs now fills the available width. Both recent-track cards and all queue/snapshot behavior
+remain. Focused content/layout regressions verify absence and full width at 1440/768/390.
+This is a user-directed content change after the first review, not permission to publish 1AA.
+
+1AA further user amendment (2026-10-18): Recent outputs must include audio fingerprints. Since
+the current snapshot only exposes last_analyzed/last_bliss, implement a narrow additive
+last_fingerprinted projection end to end rather than a preview-only sample card. Reuse existing
+library timestamp/source columns; no schema migration, raw hash, new endpoint, poll or stream.
+The existing 120s worker step gathers it off-request; HTTP serves the cached payload. The model
+has an empty default and Admin accepts older snapshots. Preserve all eight queue actions and
+other data calculations. Three explicit result kinds prevent misleading Bliss copy on the new
+card; fingerprint source comes from its own stored result. Later unified recent/instruments and
+other action output histories remain pending. This amendment supersedes the original 1AA
+no-backend-change scope only for this field; publication/next group still requires Diego.

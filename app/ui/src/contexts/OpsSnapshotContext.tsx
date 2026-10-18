@@ -156,6 +156,13 @@ export interface AnalysisStatusSnapshot {
     album?: string;
     updated_at?: string;
   };
+  last_fingerprinted?: {
+    title?: string | null;
+    artist?: string | null;
+    album?: string | null;
+    source?: string | null;
+    updated_at?: string | null;
+  };
 }
 
 export interface OpsDomainEventPreview {

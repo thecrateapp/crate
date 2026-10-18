@@ -9,7 +9,7 @@ export function AdminOperationsCheckpoint() {
       <div className="specimen-heading">
         <div>
           <MonoLabel size="eyebrow" accent="27">
-            Checkpoint 1Z · En revisión
+            Checkpoint 1Z · Publicado
           </MonoLabel>
           <h2>Control con nombre.</h2>
         </div>

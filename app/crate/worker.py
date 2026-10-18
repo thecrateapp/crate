@@ -246,6 +246,28 @@ def _run_periodic_cleanup(config: dict | None = None) -> None:
         _cleanup_federation_imports(config)
 
 
+def _refresh_analysis_runtime_state() -> None:
+    """Publish analysis coverage and latest successful outputs off the HTTP path."""
+    from crate.analysis_daemon import get_analysis_status
+    from crate.db.ops_runtime import set_ops_runtime_state
+    from crate.db.queries.management import (
+        get_last_analyzed_track,
+        get_last_bliss_track,
+        get_last_fingerprinted_track,
+    )
+
+    status = get_analysis_status()
+    set_ops_runtime_state(
+        "analysis_status",
+        {
+            **status,
+            "last_analyzed": get_last_analyzed_track(),
+            "last_bliss": get_last_bliss_track(),
+            "last_fingerprinted": get_last_fingerprinted_track(),
+        },
+    )
+
+
 def _run_service_loop(config: dict, stop_event: threading.Event):
     """Background thread: scheduler checks, watcher, zombie cleanup, import queue."""
     import time as _time
@@ -450,22 +472,7 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
         if now - last_analysis_status_update > 120:
             last_analysis_status_update = now
             try:
-                from crate.analysis_daemon import get_analysis_status
-                from crate.db.ops_runtime import set_ops_runtime_state
-                from crate.db.queries.management import (
-                    get_last_analyzed_track,
-                    get_last_bliss_track,
-                )
-
-                status = get_analysis_status()
-                set_ops_runtime_state(
-                    "analysis_status",
-                    {
-                        **status,
-                        "last_analyzed": get_last_analyzed_track(),
-                        "last_bliss": get_last_bliss_track(),
-                    },
-                )
+                _refresh_analysis_runtime_state()
             except Exception:
                 log.debug("Analysis status refresh failed", exc_info=True)
 

@@ -3,7 +3,7 @@
 Status: product design, revised 2026-10-15. Canonical clone `/Users/diego/Code/crate-v3`, branch
 `feat/crate_v3`. The handover records implementation and QA status; historical analysis is not a
 current progress report. Checkpoints through 1Y are approved and published (`ea6ebdc8`).
-Task 1b.8 / checkpoint 1Z is the local Logs/Stack migration at `#operaciones-admin`, awaiting review before publication or the next group. The final handover supersedes historical local-only notes. Diego's 1S review explicitly
+1Z is published as `2efb4754`. Task 1b.8 / checkpoint 1AA is the local Analysis migration at `#analisis-admin`, awaiting review before publication or the next group. The final handover supersedes historical local-only notes. Diego's 1S review explicitly
 preserves the current Listen play essence (halo, layers and progress ring) and seek trail,
 adapted to V3 with 1–2 px strokes; see DS §5.5.
 
@@ -3525,3 +3525,28 @@ Review the actual pages with fictional data at `#operaciones-admin`; stop before
 
 During 1Z review Diego requested the Service filters match the other chips. Use the existing
 shared short selector (32px fine / 44px coarse), with the same all/running/stopped filter values.
+
+## Linux progress — 1AA / Analysis by name, 2026-10-18
+
+Diego approved 1Z; commit `2efb4754` is verified at origin. Analysis is the next bounded group:
+actions, coverage and recent outputs use text with consistent informational tags. Initial/action
+loading keeps functional glyphs, named state and the existing disabled/recovery behavior. All
+eight task endpoints/payloads, notifications, delayed refresh, metrics and snapshot connection
+ownership stay intact. This is the icon migration, not the later Analysis instrumentation or a
+change to task permissions. The real page is reviewable with fictional data/actions at
+`#analisis-admin`, beside every previous specimen. Stop for Diego at 1AA before publication or
+another group; remaining Admin pages and canonical/native/full phase QA are still pending.
+
+1AA feedback (2026-10-18): Diego considers Operator notes unnecessary; the static panel is
+removed. Recent outputs occupies the full available width and retains both track results.
+The checkpoint remains at review stop; this request does not authorise publication or another group.
+
+1AA further amendment (2026-10-18): Diego requested adding audio fingerprints to Recent outputs.
+The page now shows the latest audio-feature, Bliss and fingerprint track results. Fingerprint
+metadata/date/source comes through `analysis.last_fingerprinted`, produced by the existing 120s
+worker sampler using the stored `audio_fingerprint_computed_at` and source. Its query excludes
+missing/blank or undated fingerprints, does not invent a date from general metadata updates and
+does not expose the hash. API defaults and optional Admin typing preserve old snapshots.
+This one additive projection is implemented early at Diego's request; it does not complete the
+later six-item `analysis.recent`, coverage cadence split, TrackReadout or other Analysis work.
+Remaining action types do not acquire invented recent records in this group. Stay at 1AA review.

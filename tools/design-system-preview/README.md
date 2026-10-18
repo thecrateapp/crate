@@ -601,3 +601,34 @@ Run `admin-operations-checkpoint.spec.ts`, then affected `admin-controls-checkpo
 with shared warning tone for incidents. They do not inherit interactive pill touch sizing. The
 four `summary badge geometry` cases check fine/coarse geometry parity and live/frozen state.
 Advisory proof: `.artifacts/review/checkpoint-1z-summary.png`. Stop remains 1Z, unpublished.
+
+## Analysis / Checkpoint 1AA
+
+1Z is approved and published as `2efb4754`. Review the next bounded Admin page group at
+<http://127.0.0.1:5186/#analisis-admin>, or open its `admin-analysis-demo.html` iframe in a tab.
+This sixth entry mounts actual Analysis and local components with fictional snapshot/action
+adapters; only that page's API/context imports are redirected by the preview config. No backend,
+SSE traffic or real queue submission. All earlier checkpoints remain on the persistent page.
+
+Inspect ready/loading/empty/PCM/missing/unavailable states and all eight text actions. Use
+“Completar acción de muestra” to resolve an action and observe busy/recovery. Old delayed action
+refreshes are isolated from later sample selections. Initial/action spinners remain functional;
+header summaries use consistent static tags and all 27 label/readout pairs have 8px spacing.
+
+Focused checks:
+
+```bash
+npm run design-system:preview:test -- admin-analysis-checkpoint.spec.ts --workers=1
+npm run --workspace=app/ui test -- src/pages/Analysis.test.tsx src/admin-icon-policy.test.ts src/components/admin/ops-surfaces.test.tsx --maxWorkers=1
+npx playwright test --config playwright.admin.config.ts tests/admin-e2e/analysis-icons.spec.ts --workers=1
+```
+
+Stop at 1AA for Diego; do not publish or begin the next group yet. Canonical/native/full phase
+QA remains pending; these tests do not regenerate any baseline.
+
+1AA follow-up: Operator notes is removed; Recent outputs fills the width and shows three named
+result cards (audio features, Bliss, audio fingerprint). Fingerprint fixture Bruma demonstrates
+its recorded date and Chromaprint source; PCM fallback mode changes that result's source too.
+Empty mode clears all three results. The actual worker/API projection is implemented alongside
+the optional Admin type; older snapshots display the empty fingerprint card. No raw hash is shown.
+The wider unified recent/readout work remains for later tasks; 1AA is still local for review.

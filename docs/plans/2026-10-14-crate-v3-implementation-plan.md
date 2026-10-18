@@ -3,7 +3,7 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Published checkpoints through 1Y (`ea6ebdc8`) are recorded in the handover; preserve the next 1Z review stop.
+> Diego's go-ahead. Published checkpoints through 1Z (`2efb4754`) are recorded in the handover; preserve the next 1AA review stop.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -1857,6 +1857,29 @@ The source policy covers both entire page files and bounds their retained sites/
 Header count/status summaries consistently use static CrateChip tags, without mixed pill sizing.
 Review real pages with fictional adapters at `#operaciones-admin`; stop at 1Z before publication
 or another group. Other operations/settings/library pages and the rest of 1b.8 remain pending.
+
+
+**Linux checkpoint 1AA, 2026-10-18 — Analysis page, local review.** Diego approved 1Z and
+it is committed/pushed as `2efb4754` (local/origin SHA verified). The next bounded group covers
+Analysis and its local pipeline, mini-metric and recent-track components. Retire action/header/
+coverage/output decoration and local icon props; preserve the initial loader and eight action
+spinners, with named loading/busy states. All eight queue paths/bodies, notifications, disable/
+recovery behavior, 800ms snapshot refresh, normalization/metrics and shared provider remain intact.
+Nine header summaries consistently use static CrateChip tags; local read-only readings adopt the
+8px `.crate-form-field` recipe and actions have 44px targets. Source policy covers ten migrated
+files, 34 concrete UX sites and bounded shared consumers. A sixth isolated preview entry mounts
+actual Analysis with fictional snapshot/actions at `#analisis-admin`; earlier checkpoints remain.
+Focused checks and both builds pass; Admin initial JS is 526053 / 532480 B gzip (6427 B margin).
+Diego’s same-checkpoint follow-up removes the static Operator notes panel; Recent outputs now
+uses the full available width, preserving both recent-track cards.
+Diego's further follow-up adds the latest audio fingerprint to Recent outputs. The additive
+`last_fingerprinted` projection (track metadata, actual computed timestamp, source; no raw hash)
+is sampled off-request by the existing 120s worker step and declared in the API/optional Admin
+type. Legacy/missing data stays empty. Three named result cards share a full-width panel, with
+three columns at xl. This narrowly advances the data contract at Diego's request; the later
+unified `recent`/TrackReadout work in 3.9a/3.9b remains pending.
+Stop at 1AA for Diego before commit/push or another group. This does not finish 1b.8, the
+operations family or later Analysis instruments. Canonical/native/full phase QA remains pending.
 
 **Files:**
 

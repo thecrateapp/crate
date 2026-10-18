@@ -333,6 +333,10 @@ class BlissTrackSummaryResponse(BaseModel):
     updated_at: datetime | str | None = None
 
 
+class FingerprintTrackSummaryResponse(BlissTrackSummaryResponse):
+    source: str | None = None
+
+
 class AnalysisStatusResponse(BaseModel):
     total: int = 0
     analysis_done: int = 0
@@ -364,6 +368,9 @@ class AnalysisStatusResponse(BaseModel):
     )
     last_bliss: BlissTrackSummaryResponse = Field(
         default_factory=BlissTrackSummaryResponse
+    )
+    last_fingerprinted: FingerprintTrackSummaryResponse = Field(
+        default_factory=FingerprintTrackSummaryResponse
     )
 
 

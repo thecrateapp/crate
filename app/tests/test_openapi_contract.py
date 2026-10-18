@@ -1627,6 +1627,11 @@ def test_openapi_types_management_routes_and_marks_them_authenticated(test_app):
     assert analysis_status_operation["responses"]["200"]["content"]["application/json"][
         "schema"
     ]["$ref"].endswith("/AnalysisStatusResponse")
+    schemas = data["components"]["schemas"]
+    assert schemas["AnalysisStatusResponse"]["properties"]["last_fingerprinted"][
+        "$ref"
+    ].endswith("/FingerprintTrackSummaryResponse")
+    assert "source" in schemas["FingerprintTrackSummaryResponse"]["properties"]
 
     assert audit_log_operation["security"] == [{"cookieAuth": []}, {"bearerAuth": []}]
     assert audit_log_operation["responses"]["200"]["content"]["application/json"][

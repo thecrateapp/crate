@@ -25,10 +25,15 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
     "app/ui/src/components/admin/ops-surfaces.tsx",
     "app/ui/src/pages/Logs.tsx",
     "app/ui/src/pages/Stack.tsx",
+    "app/ui/src/pages/Analysis.tsx",
   ]);
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
 const approvedControls = new Map([
+  [
+    "app/ui/src/pages/Analysis.tsx:@crate/ui/primitives/ErrorState",
+    { component: "ErrorState", limit: 2 },
+  ],
   [
     "app/ui/src/pages/Logs.tsx:@/components/ui/AdminSelect",
     { component: "AdminSelect", limit: 2 },
@@ -52,6 +57,15 @@ const approvedControls = new Map([
 ]);
 // Diego's 1W steering explicitly retains UX glyphs. Each concrete site remains bounded.
 const approvedUx = new Map([
+  ["Analysis:analysis-loading", ["lucide-react", "Loader2"]],
+  ["Analysis:analysis-action-fingerprints", ["lucide-react", "Loader2"]],
+  ["Analysis:analysis-action-popularity", ["lucide-react", "Loader2"]],
+  ["Analysis:analysis-action-bliss", ["lucide-react", "Loader2"]],
+  ["Analysis:analysis-action-analysis", ["lucide-react", "Loader2"]],
+  ["Analysis:analysis-action-lyrics", ["lucide-react", "Loader2"]],
+  ["Analysis:analysis-action-portable", ["lucide-react", "Loader2"]],
+  ["Analysis:analysis-action-rehydrate", ["lucide-react", "Loader2"]],
+  ["Analysis:analysis-action-richExport", ["lucide-react", "Loader2"]],
   ["Logs:logs-loading", ["lucide-react", "Loader2"]],
   ["Logs:live-pause", ["lucide-react", "Pause"]],
   ["Logs:live-resume", ["lucide-react", "Play"]],

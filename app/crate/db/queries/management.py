@@ -1,8 +1,38 @@
 from __future__ import annotations
 
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from crate.db.tx import read_scope
+
+
+def get_last_fingerprinted_track(*, session: Session | None = None) -> dict:
+    """Latest dated fingerprint result; called by the off-request ops sampler."""
+
+    def _impl(current: Session) -> dict:
+        row = (
+            current.execute(
+                text("""
+            SELECT title, artist, album,
+                   audio_fingerprint_source AS source,
+                   audio_fingerprint_computed_at AS updated_at
+            FROM library_tracks
+            WHERE audio_fingerprint IS NOT NULL
+              AND audio_fingerprint <> ''
+              AND audio_fingerprint_computed_at IS NOT NULL
+            ORDER BY audio_fingerprint_computed_at DESC, id DESC
+            LIMIT 1
+        """)
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row else {}
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
 
 
 def get_last_analyzed_track() -> dict:
@@ -259,3 +289,14 @@ def query_metric_rollups(
     with read_scope() as session:
         rows = session.execute(text(query), params).mappings().all()
     return [dict(row) for row in rows]
+
+
+__all__ = [
+    "count_recent_active_users",
+    "count_recent_streams",
+    "get_last_analyzed_track",
+    "get_last_bliss_track",
+    "get_last_fingerprinted_track",
+    "get_storage_v2_status",
+    "query_metric_rollups",
+]

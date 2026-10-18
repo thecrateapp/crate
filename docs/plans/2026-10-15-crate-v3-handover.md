@@ -1,16 +1,17 @@
 # Crate v3 handover
 
-Entry point for agents picking up Crate v3. Revised 2026-10-17. Read this file and the implementation
+Entry point for agents picking up Crate v3. Revised 2026-10-18. Read this file and the implementation
 plan; the status table separates implementation from pending QA.
 
 Current transfer: **1N–1P are complete in the checkpoint commit
 `feat(ui): unify v3 overlays, controls and field spacing`**. Diego authorised commit/push and
 continuation on Linux; this final publication record supersedes earlier local-only stops below.
-**1Y is approved and published as `ea6ebdc809ba3062733b51d04186bd6861b7566f`.** Task 1b.8 /
-checkpoint 1Z is the local Logs/Stack page group, reviewable at
-<http://127.0.0.1:5186/#operaciones-admin>. Stop before publication or the next group.
-Refresh/restart and summary decoration is retired; service controls have visible names and retain
-functional UX glyphs. Streams, actions, routes and shared/Listen/Desktop contracts are intact.
+**1Z is approved and published as `2efb4754f1cf85a265897f3481fabcd835d29991`.** Task 1b.8 /
+checkpoint 1AA is the local Analysis page group, reviewable at
+<http://127.0.0.1:5186/#analisis-admin>. Stop before publication or the next group.
+Analysis actions, summaries, coverage and recent outputs retire redundant decoration; named
+initial/action loading retains functional UX. Queue/snapshot behavior and shared/Listen/Desktop
+contracts are intact. Current scoped evidence and limits are in the final 1AA record below.
 The retained Listen play/halo/ring and luminous seek trail
 from 1S remain intact. Resume on Linux with
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
@@ -19,7 +20,7 @@ Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 ## Where the work lives
 
 - Active Linux worktree: `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing branch
-  `feat/crate_v3`, published HEAD `ea6ebdc809ba3062733b51d04186bd6861b7566f` (1Y);
+  `feat/crate_v3`, published HEAD `2efb4754f1cf85a265897f3481fabcd835d29991` (1Z);
   transfer checkpoint `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. Node 22.23.3, root
   dependencies and persistent :5186 preview are prepared. This isolates the MCP agent's
   `/home/diego/Code/Ninja/crate` checkout (`feat/crate_mcp`); leave its files untouched.
@@ -211,7 +212,8 @@ is a token-based chart configuration, not a selectable product skin.
 | 1b.8 / Checkpoint 1W | Approved/published as `52eaa6a5`; navigation glyph retirement, balanced counters, active bar and retained UX. |
 | 1b.8 / Checkpoint 1X | Approved/published as `b628a438`; search/reusable controls, Select geometry and portalled keyboard access. |
 | 1b.8 / Checkpoint 1Y | Approved/published as `ea6ebdc8`; operational surface contracts and all 125 uses adapted, UX and 8px geometry preserved. |
-| 1b.8 / Checkpoint 1Z | Local Logs/Stack group at `#operaciones-admin`; visible service actions, bounded UX and preserved streams/API behavior. Stop before publication/next group. |
+| 1b.8 / Checkpoint 1Z | Approved/published `2efb4754`; Logs/Stack text controls and consistent shared selector/tag geometry. |
+| 1b.8 / Checkpoint 1AA | Local Analysis group at `#analisis-admin`; text actions/coverage/outputs, bounded loading UX and preserved queue/snapshot contracts. Stop before publication/next group. |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -2180,3 +2182,156 @@ Proof: `.artifacts/review/checkpoint-1z-summary.png`. Preview remains active on 
 sample frozen for comparison. The prior independent review covers its recorded revision; this
 small subsequent consumer-only styling correction has the focused checks above. Keep the 1Z
 review stop: no commit/push or next migration group. Native/canonical/full-phase limits remain.
+
+## Final Linux record — 1Z published; 1AA Analysis page (2026-10-18)
+
+Diego approved 1Z and authorised commit/push plus the next bounded Admin group. Published
+`2efb4754f1cf85a265897f3481fabcd835d29991` (`refactor(ui): retire redundant Admin operations icons`)
+and verified local/origin SHA equality. Fresh pre-publication replay passed 26 scoped Vitest
+and 13 preview Chromium cases. The worktree stays isolated from the MCP checkout. Preview was
+down at turn start; restarted with Node 22.23.3 on :5186, then HTTP/browser verified.
+
+### Scope and contracts — 1AA local
+
+- Entire `app/ui/src/pages/Analysis.tsx` plus its local PipelineCoverage, MiniMetric and
+  RecentTrackCard. Remove redundant action/summary/coverage/output glyphs, private icon props
+  and empty icon boxes. Local section titles become real h3 headings.
+- Retain nine Loader2 sites: named initial loading and eight action spinners, aria-hidden on
+  glyphs and aria-busy on the active action. Text names, shared Button semantics, exclusive
+  disabling, failure recovery and 44px action targets remain.
+- Nine header summaries consistently use static CrateChip (shared warning/accent tone API).
+  The 22 MiniMetric label/value pairs adopt `.crate-form-field` at 8px, alongside five already
+  compliant OpsStatTile readings. No bespoke field margins or shared badge sizing changes.
+- Normalization, percentages, coverage bars, timestamps and recent output metadata are intact.
+  AST audit confirms five helper/action functions, both status/metrics memos and all eight
+  queue calls unchanged against 1Z. Preserve their paths, payloads, toasts and 800ms refresh.
+  Existing OpsSnapshotContext remains the sole provider/stream owner; no provider edits.
+- Source policy now covers ten entire migrated files, 34 exact functional UX sites and bounded
+  shared consumers (two Analysis ErrorState uses added). Original 1V inventory remains historical.
+  No shared, Listen, Desktop, backend, route, capability or dependency change.
+- Sixth isolated preview entry `admin-analysis-demo.html` mounts actual Analysis with local
+  fictional snapshots/actions. Vite redirects only Analysis's API/context imports; older
+  adapters/specimens are preserved. States: ready/loading/empty/PCM/missing/unavailable; action
+  completion is held for inspection. No API/SSE network requests or actual task submission.
+  Sample generations prevent an old queued action refresh from overwriting a later sample.
+
+### Scoped evidence — 1AA
+
+- 39 focused Vitest: Analysis 14, icon policy 16, affected Ops surfaces 9. Eight parameterized
+  action cases cover exact endpoint/body, keyboard dispatch, busy/disable/recovery, notification
+  and the delayed refresh; loading, error/missing retry and empty/fallback/output states covered.
+- Five new preview Chromium cases: persistent embedding/preservation, desktop/tablet/mobile
+  page/actions/states/geometry/no-network, and a deterministic delayed-sample isolation case.
+  One affected previous 1Z embedding case passes. No screenshot baselines in these tests.
+- Three actual Admin Chromium cases (1440/768/390) pass with intercepted fixture traffic:
+  Analysis text/actions/coverage/recent outputs, keyboard queue+refresh, 27 actual 8px pairs,
+  44px buttons and no horizontal overflow. No real mutations or canonical recordings.
+- Admin build/types, preview/demo/actual-spec strict types, scoped ESLint and six-entry preview
+  build pass. Admin initial JS **526039 / 532480 B gzip**, nine assets, **6441 B headroom**
+  (30 B below 1Z). Known Vite large-chunk advisory remains. Generated tracked tsbuildinfo restored.
+- RED→GREEN: initial Analysis/whole-file policy expectations; missing preview section; controlled
+  clock reproduces the preview-only old-refresh race before the generation guard. Initial
+  full-ops fixture type assertion exposed legacy null/type mismatches; unit mocks now supply
+  only the Analysis-owned projection. Explicit sample store typing fixes literal narrowing.
+  One first-load embedding failure coincided with Vite config/optimizer restart; settled replay
+  passes without timeout increases. Subsequent test/build chains are serial with workers=1.
+
+Single fresh read-only review completed: **Critical 0 / Important 0 / Minor 0**; ready for
+Diego's bounded checkpoint review. Reviewer independently inspected source, evidence logs and
+visual/accessibility hierarchy in a private temporary tab, then closed it. No reviewer edits,
+extra tests/builds or Git mutations; no second review round or repair pass was needed.
+
+Advisory proof: `.artifacts/review/checkpoint-1aa-analysis.png` (public persistent preview with
+1AA heading, real actions and metrics). The reviewer did not independently assess this later
+proof/documentation append. The public tab stays at `?tab=albums&listenTab=history#analisis-admin`.
+
+Preview now runs under transient user systemd service **`crate-v3-preview.service`**, independent
+of the command session, with Node22 and `Restart=on-failure`. Its working directory is this V3
+worktree and it binds only 127.0.0.1:5186. Service active/running, HTTP200 and IAB rendering verified.
+Inspect with `systemctl --user status crate-v3-preview.service` and `journalctl --user -u
+crate-v3-preview.service`; restart with `systemctl --user restart crate-v3-preview.service`.
+This is a local process-lifetime measure, not a deployment or CI change.
+
+Review limits accepted within Diego's bounded scope: unchanged task/backend/SSE/permission source
+and intercepted contracts are preservation evidence, not real production integration. Actual AT,
+cross-engine/native, real-data and canonical-reference QA remain open; fixtures are not substitutes.
+Legacy layout/contrast/data behavior outside these icon/field changes is left for planned phases;
+no attributable regression was found. Remaining Admin migrations, later instruments and
+Listen/Desktop stay outside this group. Publication/merge readiness was not assessed; this is
+an uncommitted checkpoint for Diego. The advisory proof/post-review docs are author-verified.
+
+**Limits:** 1AA is one page, not completion of 1b.8 or later Analysis instruments. Native/actual
+screen-reader, other engines, real-data, full phase QA and canonical Linux recording/comparison
+remain pending. The 33 canonical captures/manifest stay at 1M; no baselines or full CI triggered.
+Pinned `app/web@258bbaee` remains unavailable and unchanged; no vnext or substituted pin. Preserve
+Listen's layered play/halo/progress ring and luminous thin seek trail from 1S. No PR, merge,
+rebase, deploy or release. **Stop at 1AA for Diego before commit/push or the next group.**
+
+### Same-checkpoint follow-up — remove Operator notes, 1AA (2026-10-18)
+
+Diego requested deleting Operator notes. The four static guidance cards and their OpsPanel
+retire; the enclosing 1.5fr/1fr split disappears so Recent outputs fills the available width.
+Both recent-track cards keep their existing xl two-column / smaller stacked layout and data.
+No task, snapshot/provider, shared, Listen/Desktop or permission change.
+
+The existing content test first fails on Operator notes still being present, then passes after
+removal. Fresh replay: **30 focused Vitest** (Analysis14 + source policy16) and **three preview
+Chromium** (1440/768/390) pass. The browser cases assert no Operator notes and a Recent outputs
+panel as wide as Pipeline coverage, plus the existing actions/states/8px/44px/no-network checks.
+Admin build/types, preview strict types, scoped lint and diff checks pass. Latest Admin budget:
+**526040 / 532480 B gzip**, nine assets, **6440 B margin** (1 B above the original 1AA build).
+Generated tsbuildinfo restored again. No full suites/CI/canonical baselines or extra reviewer.
+
+Advisory proof: `.artifacts/review/checkpoint-1aa-no-notes.png`; IAB shows the expanded Recent
+outputs and no advisory panel. Public preview service remains active/running on :5186. The
+single fresh review above covers the preceding revision; this small user-directed deletion is
+verified by the focused checks here. **1AA remains local, awaiting Diego; no commit/push/next group.**
+
+### Further follow-up — latest audio fingerprint, 1AA (2026-10-18)
+
+Diego requested audio fingerprints in Recent outputs. This explicitly extends the earlier
+presentation-only scope by one additive projection, `analysis.last_fingerprinted`: title, artist,
+album, source and recorded computed timestamp; never the raw fingerprint/hash.
+
+- `db/queries/management.get_last_fingerprinted_track` reads the newest nonempty, dated stored
+  fingerprint, with deterministic id tie-breaking and optional caller session. No new column or
+  migration. The new library query runs only in the background sampler, at the existing 120s
+  cadence. Existing analysis/bliss reads move into a small worker helper, retaining the same
+  cache key, cadence, error handling and coverage payload. No new HTTP query, endpoint or stream.
+- `AnalysisStatusResponse` declares a defaulted FingerprintTrackSummaryResponse, reused through
+  the existing ops schema; empty payload declares `{}`. Cached/stale snapshot forwarding is
+  unchanged. Admin's field is optional and normalized to empty for old/missing data. The existing
+  GET fallback is not extended with a new library query.
+- Real Analysis and the persistent sample have three named result articles: analysis, Bliss,
+  fingerprint. Explicit local kinds select the appropriate content; no fingerprint gets the
+  Bliss explanation. Known source labels are Chromaprint/PCM fallback, unknown sources remain
+  readable, absent sources are named. A dated result without title shows Untitled track.
+  Full-width panel, xl three columns, smaller stacked layout; Operator notes remains removed.
+- All eight task paths/bodies, queue callbacks, notifications, exclusive disabling/recovery and
+  800ms refresh are preserved. AST audit of existing normalization fields, four helper/action
+  bodies, two memos and eight queue calls passes. Source policy still bounds 34 UX sites.
+  Shared/Listen/Desktop contracts, permissions and providers/connection ownership are unchanged.
+
+Focused evidence after this amendment: **36 Vitest** (Analysis20 + policy16), **five preview**
+and **three actual Admin Chromium** cases pass. **13 pytest** pass: eight query/worker/schema/API/
+snapshot cases (including three real PostgreSQL tests), four relevant DB boundary cases and the
+specific management OpenAPI/security/schema case. Query/schema/empty expectations failed first;
+an extra dated-but-blank fingerprint reproduced a failure before its exclusion. Tests also cover
+source variants, unknown/absent sources, untitled and legacy payloads. Worker publication is
+mocked; a real daemon/SSE/backend deployment is not exercised. Preview stays entirely local.
+
+Admin build/types, preview/demo/spec strict types, scoped frontend lint, Ruff 0.15.22 default CI
+rules/format (`--isolated`, avoiding unrelated user-global rules), Prettier and six-entry preview
+build pass. Broader user-global Ruff initially reported pre-existing import/exception rules plus
+two new issues; the new export ordering/UTC issues were fixed. No repository lint configuration
+was changed. OpenAPI/dependency deprecation and existing duplicate-operation-id warnings remain.
+Latest initial Admin JS: **526053 / 532480 B gzip**, nine assets, **6427 B headroom** (+13 B vs
+notes-removal build). Generated tsbuildinfo restored. Python 3.13.16 test tooling lives only in
+ignored `.artifacts/backend-venv`/python-tools; no requirements/lock or other checkout edits.
+
+Proof: `.artifacts/review/checkpoint-1aa-fingerprint.png`; contract audit:
+`.artifacts/review/checkpoint-1aa-fingerprint-contract-audit.txt`. The earlier fresh review covers
+its recorded revision; this additional user-requested data amendment has the focused evidence
+above and no second review round. Later six-item recent/readout work is still pending; do not
+mark 3.9a/3.9b complete. All previous canonical/native/real-data/full phase QA limits persist.
+**Stop at local 1AA: no commit/push, next group, PR, merge, rebase, deploy or release.**

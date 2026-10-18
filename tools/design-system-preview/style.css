@@ -10,6 +10,7 @@
 @source "./admin-controls-checkpoint.tsx";
 @source "./admin-ops-checkpoint.tsx";
 @source "./admin-operations-checkpoint.tsx";
+@source "./admin-analysis-checkpoint.tsx";
 @source "./forms-checkpoint.tsx";
 @source "./selection-checkpoint.tsx";
 @source "./tabs-checkpoint.tsx";
