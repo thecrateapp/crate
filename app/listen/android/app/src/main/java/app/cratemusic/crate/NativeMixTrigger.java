@@ -51,7 +51,13 @@ final class NativeMixTrigger {
             return new Decision(
                 Action.WAIT,
                 0L,
-                Math.max(ACTIVE_CHECK_MS, Math.min(IDLE_CHECK_MS, untilStartMs))
+                Math.max(
+                    ACTIVE_CHECK_MS,
+                    Math.min(
+                        IDLE_CHECK_MS,
+                        untilStartMs - (plan.isBeatmatch() ? NativeMixController.PREROLL_MS : 0L)
+                    )
+                )
             );
         }
         long startMs = Math.max(cueMs, safePositionMs);

@@ -26,6 +26,7 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.audio.AudioProcessor;
+import androidx.media3.common.audio.SonicAudioProcessor;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
@@ -95,6 +96,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
             syncNativeMixTicker();
         }
     };
+    static final boolean USE_PCM_BUS = true;
+    private final PcmBusMixer pcmBusMixer = new PcmBusMixer();
     private final NativeQueueState queueState = new NativeQueueState();
     private final NativeContinuationPolicy continuationPolicy =
         new NativeContinuationPolicy();
@@ -208,8 +211,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
             summary -> Log.i(NativeMixAudioProcessor.QOE_TAG, summary)
         );
         eqController = new NativeEqController();
-        deckAPlayer = buildPlayer(deckAAudioProcessor);
-        deckBPlayer = buildPlayer(deckBAudioProcessor);
+        deckAPlayer = buildPlayer(deckAAudioProcessor, 0);
+        deckBPlayer = buildPlayer(deckBAudioProcessor, 1);
         configurePhysicalPlayer(deckAPlayer);
         configurePhysicalPlayer(deckBPlayer);
         deckA = new ExoPlayerNativePlaybackDeck(
@@ -644,7 +647,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     private ExoPlayer buildPlayer(
-        NativeMixAudioProcessor audioProcessor
+        NativeMixAudioProcessor audioProcessor,
+        int busChannel
     ) {
         DefaultRenderersFactory renderersFactory =
             new DefaultRenderersFactory(this) {
@@ -654,6 +658,23 @@ public class CrateNativePlaybackService extends MediaSessionService {
                     boolean enableFloatOutput,
                     boolean enableAudioTrackPlaybackParams
                 ) {
+                    if (USE_PCM_BUS) {
+                        SonicAudioProcessor resampler = new SonicAudioProcessor();
+                        resampler.setOutputSampleRateHz(PcmBusMixer.SAMPLE_RATE);
+                        return new DefaultAudioSink.Builder(context)
+                            .setEnableFloatOutput(false)
+                            .setEnableAudioTrackPlaybackParams(false)
+                            .setAudioProcessors(
+                                new AudioProcessor[] { resampler, audioProcessor }
+                            )
+                            .setAudioOutputProvider(
+                                new PcmBusAudioOutputProvider(
+                                    pcmBusMixer,
+                                    pcmBusMixer.channel(busChannel)
+                                )
+                            )
+                            .build();
+                    }
                     return new DefaultAudioSink.Builder(context)
                         .setEnableFloatOutput(enableFloatOutput)
                         .setEnableAudioTrackPlaybackParams(
@@ -1071,6 +1092,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     @Override
     public void onDestroy() {
         continuationExecutor.shutdownNow();
+        pcmBusMixer.release();
         stopPositionTicker();
         stopNativeMixTicker();
         unregisterNoisyAudioReceiver();
@@ -1982,7 +2004,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
         if (boundedPlan.isBeatmatch()) {
             Log.i(
                 NativeMixAudioProcessor.QOE_TAG,
-                "beatmatch start engaged=" + mixController.isBeatmatching()
+                "beatmatch start " + mixController.phaseDebug()
+                    + " engaged=" + mixController.isBeatmatching()
                     + " phaseErrorMs=" + mixController.lastPhaseErrorMs()
                     + " ratio=" + boundedPlan.incomingTempoRatio
             );
@@ -2006,8 +2029,13 @@ public class CrateNativePlaybackService extends MediaSessionService {
         if (positionMs < startsAtMs || positionMs >= cueMs - NativeMixTrigger.START_SAFETY_LEAD_MS) {
             return;
         }
-        if (mixController.beginPreroll(plan)) {
-            logMixDiagnostic("beatmatch preroll edge=" + edgeKey(plan));
+        if (mixController.beginPreroll(plan, positionMs)) {
+            Log.i(
+                NativeMixAudioProcessor.QOE_TAG,
+                "beatmatch preroll " + mixController.phaseDebug()
+                    + " prepareCue=" + plan.prepareIncomingCueMs()
+                    + " effectiveCue=" + cueMs
+            );
         }
     }
 

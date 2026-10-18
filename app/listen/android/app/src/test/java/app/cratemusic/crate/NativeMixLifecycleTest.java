@@ -453,6 +453,23 @@ public class NativeMixLifecycleTest {
     }
 
     @Test
+    public void aLatePrerollSeeksTheIncomingDeckToTheAlignedPosition() {
+        controller.prepareStandbyAt(beatmatchPlan().prepareIncomingCueMs(), 0L);
+
+        assertTrue(controller.beginPreroll(beatmatchPlan(), 169000L));
+
+        assertEquals(8104L - 1040L, deckB.positionMs);
+    }
+
+    @Test
+    public void aPrerollWaitsUntilTheIncomingTrackHasRoomToAlign() {
+        controller.prepareStandbyAt(beatmatchPlan().prepareIncomingCueMs(), 0L);
+
+        assertFalse(controller.beginPreroll(beatmatchPlan(), 160000L));
+        assertFalse(controller.isPrerolling());
+    }
+
+    @Test
     public void cancellingThePrerollResetsTheStandby() {
         preroll();
 
@@ -468,13 +485,13 @@ public class NativeMixLifecycleTest {
         deckB.failSpeed = true;
         controller.prepareStandbyAt(beatmatchPlan().prepareIncomingCueMs(), 0L);
 
-        assertFalse(controller.beginPreroll(beatmatchPlan()));
+        assertFalse(controller.beginPreroll(beatmatchPlan(), 167500L));
         assertFalse(controller.isPrerolling());
     }
 
     private void preroll() {
         controller.prepareStandbyAt(beatmatchPlan().prepareIncomingCueMs(), 0L);
-        assertTrue(controller.beginPreroll(beatmatchPlan()));
+        assertTrue(controller.beginPreroll(beatmatchPlan(), 167500L));
     }
 
     private void alignPositions(long incomingLagMs) {

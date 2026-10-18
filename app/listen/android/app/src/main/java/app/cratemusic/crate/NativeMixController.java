@@ -36,6 +36,7 @@ final class NativeMixController {
     private boolean handoffComplete;
     static final long STANDBY_RETRY_MS = 10_000L;
     static final long PREROLL_MS = 2_500L;
+    static final long PREROLL_SEEK_TOLERANCE_MS = 20L;
     static final float PHASE_DEADBAND_MS = 4.0f;
     static final float PREROLL_MAX_CORRECTION = 0.10f;
     static final float MIX_MAX_CORRECTION = 0.01f;
@@ -265,7 +266,7 @@ final class NativeMixController {
         return true;
     }
 
-    boolean beginPreroll(NativeTransitionPlan plan) {
+    boolean beginPreroll(NativeTransitionPlan plan, long outgoingPositionMs) {
         if (
             activePlan != null ||
             prerollPlan != null ||
@@ -282,13 +283,15 @@ final class NativeMixController {
         if (
             !outgoing.id.equals(plan.outgoingTrackId) ||
             !incoming.id.equals(plan.incomingTrackId) ||
-            !standbyDeck.isReadyAt(
-                incoming,
-                plan.prepareIncomingCueMs(),
-                NativeMixTrigger.STANDBY_BUFFER_MARGIN_MS
-            )
+            !standbyDeck.isReadyFor(incoming)
         ) {
             return false;
+        }
+        long alignedIncomingMs = plan.startIncomingCueMs()
+            - Math.round((plan.outgoingCueMs - outgoingPositionMs) * (double) plan.incomingTempoRatio);
+        if (alignedIncomingMs < 0L) return false;
+        if (Math.abs(standbyDeck.positionMs() - alignedIncomingMs) > PREROLL_SEEK_TOLERANCE_MS) {
+            standbyDeck.seekTo(alignedIncomingMs);
         }
         try {
             standbyDeck.setSpeed(plan.incomingTempoRatio);
@@ -307,6 +310,16 @@ final class NativeMixController {
         inPhaseSamples = 0;
         lastSpeedUpdateMs = Long.MIN_VALUE;
         return true;
+    }
+
+    String phaseDebug() {
+        NativePlaybackDeck outgoingDeck = activePlan == null ? activeDeck : mixOutgoingDeck;
+        NativePlaybackDeck incomingDeck = activePlan == null ? standbyDeck : mixIncomingDeck;
+        return "outPos=" + outgoingDeck.positionMs()
+            + " inPos=" + incomingDeck.positionMs()
+            + " outCue=" + phaseOutgoingCueMs
+            + " inCue=" + phaseIncomingCueMs
+            + " speed=" + beatmatchSpeed;
     }
 
     boolean isPrerolling() {
