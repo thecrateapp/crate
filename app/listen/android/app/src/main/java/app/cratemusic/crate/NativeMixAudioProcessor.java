@@ -6,10 +6,12 @@ import androidx.media3.common.audio.BaseAudioProcessor;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.ShortBuffer;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 final class NativeMixAudioProcessor extends BaseAudioProcessor {
+    private short[] pcm16Scratch = new short[0];
     enum Role {
         OUTGOING,
         INCOMING
@@ -126,15 +128,27 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
                     output.putFloat(clampFloat(sample));
                 }
             }
+        } else if (isUnityGain()) {
+            int bytes = inputBuffer.remaining() - inputBuffer.remaining() % (channelCount * 2);
+            ByteBuffer frames = inputBuffer.slice();
+            frames.limit(bytes);
+            output.put(frames);
         } else {
-            while (inputBuffer.remaining() >= channelCount * 2) {
+            ShortBuffer input = inputBuffer.order(ByteOrder.nativeOrder()).asShortBuffer();
+            int samples = input.remaining() - input.remaining() % channelCount;
+            if (pcm16Scratch.length < samples) pcm16Scratch = new short[samples];
+            input.get(pcm16Scratch, 0, samples);
+            boolean trackLevel = activeEnvelope != NO_ENVELOPE;
+            for (int index = 0; index < samples; index += channelCount) {
                 float gain = gainForNextFrame();
                 for (int channel = 0; channel < channelCount; channel++) {
-                    int sample = Math.round(inputBuffer.getShort() * gain);
-                    trackEnvelopeLevel(Math.abs(sample) / (float) Short.MAX_VALUE);
-                    output.putShort(clampPcm16(sample));
+                    int sample = Math.round(pcm16Scratch[index + channel] * gain);
+                    if (trackLevel) trackEnvelopeLevel(Math.abs(sample) / (float) Short.MAX_VALUE);
+                    pcm16Scratch[index + channel] = clampPcm16(sample);
                 }
             }
+            output.asShortBuffer().put(pcm16Scratch, 0, samples);
+            output.position(samples * 2);
         }
         inputBuffer.position(inputBuffer.limit());
         output.flip();
@@ -146,6 +160,10 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
                 reportEnvelope();
             }
         }
+    }
+
+    private boolean isUnityGain() {
+        return activeEnvelope == NO_ENVELOPE && remainingRampFrames == 0 && currentGain == 1.0f;
     }
 
     void setEnvelopeReporter(EnvelopeReporter reporter) {

@@ -200,4 +200,16 @@ public class PcmBusTest {
         assertEquals(-Short.MAX_VALUE, output[1]);
         assertEquals(16384, output[2]);
     }
+
+    @Test
+    public void anIdleBusPollsLessOftenThanAStarvedOne() {
+        PcmBusChannel first = new PcmBusChannel(8);
+        PcmBusChannel second = new PcmBusChannel(8);
+        PcmBusChannel[] channels = { first, second };
+
+        assertEquals(20L, PcmBusMixer.idleSleepMs(channels));
+
+        second.setPlaying(true);
+        assertEquals(2L, PcmBusMixer.idleSleepMs(channels));
+    }
 }

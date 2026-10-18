@@ -28,10 +28,10 @@ final class PcmRingBuffer {
     int write(float[] source, int frames) {
         int count = Math.min(frames, writableFrames());
         long start = writtenFrames;
-        for (int frame = 0; frame < count; frame++) {
-            int slot = (int) ((start + frame) % capacityFrames) * channels;
-            System.arraycopy(source, frame * channels, samples, slot, channels);
-        }
+        int slot = (int) (start % capacityFrames);
+        int first = Math.min(count, capacityFrames - slot);
+        System.arraycopy(source, 0, samples, slot * channels, first * channels);
+        System.arraycopy(source, first * channels, samples, 0, (count - first) * channels);
         writtenFrames = start + count;
         return count;
     }
@@ -39,10 +39,10 @@ final class PcmRingBuffer {
     int read(float[] destination, int frames) {
         int count = Math.min(frames, availableFrames());
         long start = readFrames;
-        for (int frame = 0; frame < count; frame++) {
-            int slot = (int) ((start + frame) % capacityFrames) * channels;
-            System.arraycopy(samples, slot, destination, frame * channels, channels);
-        }
+        int slot = (int) (start % capacityFrames);
+        int first = Math.min(count, capacityFrames - slot);
+        System.arraycopy(samples, slot * channels, destination, 0, first * channels);
+        System.arraycopy(samples, 0, destination, first * channels, (count - first) * channels);
         readFrames = start + count;
         return count;
     }

@@ -456,6 +456,19 @@ public class NativeMixLifecycleTest {
     }
 
     @Test
+    public void theReportedPhaseErrorIgnoresASingleOutlier() {
+        preroll();
+        controller.scheduleHeldStart();
+        alignPositions(0L);
+        controller.measurePhase();
+        controller.measurePhase();
+        alignPositions(60L);
+        controller.measurePhase();
+
+        assertEquals(0.0f, controller.medianPhaseErrorMs(), 0.5f);
+    }
+
+    @Test
     public void aPrerollThatNeverStartedReleasesTheHeldDeck() {
         preroll();
 

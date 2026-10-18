@@ -397,7 +397,7 @@ final class NativeMixController {
         return lastPhaseErrorMs;
     }
 
-    private float medianPhaseErrorMs() {
+    float medianPhaseErrorMs() {
         int count = Math.min(phaseSamples, recentPhaseErrorsMs.length);
         if (count == 0) return lastPhaseErrorMs;
         float[] samples = Arrays.copyOf(recentPhaseErrorsMs, count);

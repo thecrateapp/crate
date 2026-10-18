@@ -94,6 +94,26 @@ public class NativeMixAudioProcessorTest {
         assertEquals(Short.MAX_VALUE, output);
     }
 
+    @Test
+    public void passesUnityGainAudioThroughUnchanged() throws Exception {
+        NativeMixAudioProcessor processor = new NativeMixAudioProcessor();
+        processor.configure(
+            new AudioProcessor.AudioFormat(48_000, 2, C.ENCODING_PCM_16BIT)
+        );
+        processor.flush();
+        processor.setGainImmediate(1.0f);
+        ByteBuffer input = constantPcm16(3, 2, (short) -1_234);
+
+        processor.queueInput(input);
+        ByteBuffer output = processor.getOutput().order(ByteOrder.nativeOrder());
+
+        assertEquals(0, input.remaining());
+        assertEquals(12, output.remaining());
+        for (int index = 0; index < 6; index++) {
+            assertEquals(-1_234, output.getShort());
+        }
+    }
+
     private static ByteBuffer constantPcm16(
         int frames,
         int channels,

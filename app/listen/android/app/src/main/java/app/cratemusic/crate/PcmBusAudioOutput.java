@@ -21,6 +21,7 @@ final class PcmBusAudioOutput implements AudioOutput {
     private final int sampleRate;
     private final int audioSessionId;
     private final float[] scratch = new float[SCRATCH_FRAMES * PcmBusMixer.CHANNELS];
+    private final short[] pcm16 = new short[SCRATCH_FRAMES * PcmBusMixer.CHANNELS];
 
     PcmBusAudioOutput(
         PcmBusChannel channel,
@@ -49,22 +50,36 @@ final class PcmBusAudioOutput implements AudioOutput {
                 channel.buffer().writableFrames()
             );
             if (frames == 0) return false;
-            for (int frame = 0; frame < frames; frame++) {
-                float left = readSample(source);
-                float right = inputChannels == 1 ? left : readSample(source);
-                for (int extra = 2; extra < inputChannels; extra++) readSample(source);
-                scratch[frame * 2] = left;
-                scratch[frame * 2 + 1] = right;
+            if (encoding == C.ENCODING_PCM_FLOAT) {
+                readFloatFrames(source, frames);
+            } else {
+                readPcm16Frames(source, frames);
             }
             channel.write(scratch, frames);
         }
         return !source.hasRemaining();
     }
 
-    private float readSample(ByteBuffer source) {
-        return encoding == C.ENCODING_PCM_FLOAT
-            ? source.getFloat()
-            : source.getShort() / 32_768.0f;
+    private void readFloatFrames(ByteBuffer source, int frames) {
+        for (int frame = 0; frame < frames; frame++) {
+            float left = source.getFloat();
+            float right = inputChannels == 1 ? left : source.getFloat();
+            for (int extra = 2; extra < inputChannels; extra++) source.getFloat();
+            scratch[frame * 2] = left;
+            scratch[frame * 2 + 1] = right;
+        }
+    }
+
+    private void readPcm16Frames(ByteBuffer source, int frames) {
+        int samples = frames * inputChannels;
+        source.asShortBuffer().get(pcm16, 0, samples);
+        source.position(source.position() + samples * 2);
+        for (int frame = 0; frame < frames; frame++) {
+            int base = frame * inputChannels;
+            float left = pcm16[base] / 32_768.0f;
+            scratch[frame * 2] = left;
+            scratch[frame * 2 + 1] = inputChannels == 1 ? left : pcm16[base + 1] / 32_768.0f;
+        }
     }
 
     @Override

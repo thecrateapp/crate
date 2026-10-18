@@ -300,7 +300,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
                         Log.i(
                             NativeMixAudioProcessor.QOE_TAG,
                             "beatmatch completed ratio=" + activeTransitionPlan.incomingTempoRatio
-                                + " phaseErrorMs=" + mixController.lastPhaseErrorMs()
+                                + " phaseErrorMs=" + mixController.medianPhaseErrorMs()
                         );
                     }
                     startTempoRestore();
@@ -717,7 +717,9 @@ public class CrateNativePlaybackService extends MediaSessionService {
             this,
             renderersFactory,
             mediaSourceFactory
-        ).build();
+        )
+            .experimentalSetDynamicSchedulingEnabled(USE_PCM_BUS)
+            .build();
     }
 
     private void watchDeckErrors(ExoPlayer physicalPlayer, NativePlaybackDeck deck) {

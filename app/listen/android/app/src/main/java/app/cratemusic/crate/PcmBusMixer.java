@@ -60,10 +60,19 @@ final class PcmBusMixer {
         return mixedFrames;
     }
 
+    static long idleSleepMs(PcmBusChannel[] channels) {
+        for (PcmBusChannel channel : channels) {
+            if (channel.isPlaying()) return 2L;
+        }
+        return 20L;
+    }
+
     static void toPcm16(float[] mix, short[] output, int samples) {
         for (int index = 0; index < samples; index++) {
-            float sample = Math.max(-1.0f, Math.min(1.0f, mix[index]));
-            output[index] = (short) Math.round(sample * Short.MAX_VALUE);
+            float sample = mix[index] * Short.MAX_VALUE;
+            if (sample > Short.MAX_VALUE) sample = Short.MAX_VALUE;
+            else if (sample < -Short.MAX_VALUE) sample = -Short.MAX_VALUE;
+            output[index] = (short) (sample + (sample >= 0.0f ? 0.5f : -0.5f));
         }
     }
 
@@ -108,7 +117,7 @@ final class PcmBusMixer {
             busFrames.addAndGet(frames);
             if (frames == 0) {
                 try {
-                    Thread.sleep(2L);
+                    Thread.sleep(idleSleepMs(channels));
                 } catch (InterruptedException error) {
                     return;
                 }
