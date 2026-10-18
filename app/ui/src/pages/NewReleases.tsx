@@ -1,18 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import {
-  CalendarDays,
-  CheckCircle2,
-  Disc3,
-  Download,
-  LayoutGrid,
-  List,
-  Loader2,
-  RefreshCw,
-  Search,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { Loader2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -21,11 +9,11 @@ import {
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
 import { AdminSelect } from "@/components/ui/AdminSelect";
-import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { Button } from "@crate/ui/shadcn/button";
 import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Input } from "@crate/ui/shadcn/input";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { api, apiSseUrl } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
@@ -62,7 +50,11 @@ const EMPTY_RELEASES: Release[] = [];
 
 type ViewMode = "timeline" | "grid";
 type StatusFilter =
-  "all" | "detected" | "downloading" | "downloaded" | "upcoming";
+  | "all"
+  | "detected"
+  | "downloading"
+  | "downloaded"
+  | "upcoming";
 
 function releaseArtistHref(release: Release) {
   if (release.artist_id == null) return undefined;
@@ -154,7 +146,13 @@ function ReleaseActions({
   }
   if (release.status === "downloading") {
     return (
-      <CrateChip active icon={Loader2}>
+      <CrateChip active>
+        <Loader2
+          aria-hidden="true"
+          data-admin-ux="releases-download-loading"
+          size={12}
+          className="animate-spin"
+        />
         Downloading
       </CrateChip>
     );
@@ -165,22 +163,27 @@ function ReleaseActions({
       {release.tidal_url && onDownload ? (
         <Button
           size="sm"
-          className="gap-2"
+          className="min-h-11 gap-2"
           onClick={() => onDownload(release.id)}
         >
-          <Download size={14} />
           Download
         </Button>
       ) : null}
       {onDismiss ? (
-        <ActionIconButton
-          variant="card"
-          tone="default"
+        <Button
+          variant="outline"
+          size="icon"
           onClick={() => onDismiss(release.id)}
           title="Dismiss release"
+          aria-label="Dismiss release"
+          className="h-11 min-h-11 w-11 min-w-11 md:min-h-11 md:min-w-11"
         >
-          <X size={15} />
-        </ActionIconButton>
+          <X
+            size={15}
+            aria-hidden="true"
+            data-admin-ux="releases-timeline-dismiss"
+          />
+        </Button>
       ) : null}
     </div>
   );
@@ -212,9 +215,7 @@ function ReleaseTimelineRow({
               className="h-full w-full object-cover"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <Disc3 size={18} className="text-white/20" />
-            </div>
+            <div className="flex h-full w-full items-center justify-center"></div>
           )}
         </div>
         <div className="min-w-0 flex-1">
@@ -285,9 +286,7 @@ function ReleaseGridCard({
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <Disc3 size={32} className="text-white/20" />
-          </div>
+          <div className="flex h-full w-full items-center justify-center"></div>
         )}
 
         <div className="absolute left-3 top-3">
@@ -339,22 +338,27 @@ function ReleaseGridCard({
           {release.status === "detected" && release.tidal_url && onDownload ? (
             <Button
               size="sm"
-              className="flex-1 gap-2"
+              className="min-h-11 flex-1 gap-2"
               onClick={() => onDownload(release.id)}
             >
-              <Download size={14} />
               Download
             </Button>
           ) : null}
           {release.status === "detected" && onDismiss ? (
-            <ActionIconButton
-              variant="card"
-              tone="default"
+            <Button
+              variant="outline"
+              size="icon"
               onClick={() => onDismiss(release.id)}
               title="Dismiss release"
+              aria-label="Dismiss release"
+              className="h-11 min-h-11 w-11 min-w-11 md:min-h-11 md:min-w-11"
             >
-              <X size={15} />
-            </ActionIconButton>
+              <X
+                size={15}
+                aria-hidden="true"
+                data-admin-ux="releases-grid-dismiss"
+              />
+            </Button>
           ) : null}
         </div>
       </div>
@@ -371,7 +375,6 @@ function EmptyState({
 }) {
   return (
     <div className="rounded-md border border-dashed border-white/10 bg-black/15 px-4 py-16 text-center">
-      <Disc3 size={34} className="mx-auto mb-3 text-white/20" />
       <div className="text-lg font-semibold text-white/80">{title}</div>
       <div className="mx-auto mt-2 max-w-xl text-sm text-white/40">
         {description}
@@ -541,19 +544,19 @@ export function NewReleases() {
               <Button
                 variant={view === "timeline" ? "default" : "ghost"}
                 size="sm"
-                className="h-9 px-3"
+                className="min-h-11 px-3"
+                aria-pressed={view === "timeline"}
                 onClick={() => setView("timeline")}
               >
-                <List size={14} className="mr-1.5" />
                 Timeline
               </Button>
               <Button
                 variant={view === "grid" ? "default" : "ghost"}
                 size="sm"
-                className="h-9 px-3"
+                className="min-h-11 px-3"
+                aria-pressed={view === "grid"}
                 onClick={() => setView("grid")}
               >
-                <LayoutGrid size={14} className="mr-1.5" />
                 Grid
               </Button>
             </div>
@@ -562,26 +565,28 @@ export function NewReleases() {
                 size="sm"
                 onClick={checkNow}
                 disabled={checking}
-                className="gap-2"
+                aria-busy={checking}
+                className="min-h-11 gap-2"
               >
                 {checking ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <RefreshCw size={14} />
-                )}
+                  <Loader2
+                    size={14}
+                    className="animate-spin"
+                    aria-hidden="true"
+                    data-admin-ux="releases-check-loading"
+                  />
+                ) : null}
                 {checking ? "Checking…" : "Check now"}
               </Button>
             ) : null}
           </>
         }
       >
-        <CrateChip active icon={Sparkles}>
-          {releases.length} total
-        </CrateChip>
-        <CratePill icon={Download}>{stats.detected} need action</CratePill>
-        <CratePill icon={Loader2}>{stats.downloading} downloading</CratePill>
-        <CratePill icon={CheckCircle2}>{stats.downloaded} in library</CratePill>
-        <CratePill icon={CalendarDays}>{stats.upcoming} upcoming</CratePill>
+        <CrateChip active>{releases.length} total</CrateChip>
+        <CratePill>{stats.detected} need action</CratePill>
+        <CratePill>{stats.downloading} downloading</CratePill>
+        <CratePill>{stats.downloaded} in library</CratePill>
+        <CratePill>{stats.upcoming} upcoming</CratePill>
       </OpsPageHero>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -614,60 +619,76 @@ export function NewReleases() {
         title="Radar filters"
         description="Search by artist or album, then narrow the radar by acquisition state or release type."
       >
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-          <div className="relative min-w-[260px] flex-1">
-            <Search
-              size={14}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
-            />
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search artist or album..."
-              className="pl-9"
-            />
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
+          <div className="crate-form-field min-w-0 flex-1">
+            <label htmlFor="releases-search">
+              <MonoLabel as="span">Search releases</MonoLabel>
+            </label>
+            <div className="relative">
+              <Search
+                aria-hidden="true"
+                data-admin-ux="releases-search"
+                size={14}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+              />
+              <Input
+                id="releases-search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search artist or album..."
+                className="min-h-11 pl-9"
+              />
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <CratePill
+              className="min-h-11"
               active={statusFilter === "all"}
               onClick={() => setStatusFilter("all")}
             >
               All
             </CratePill>
             <CratePill
+              className="min-h-11"
               active={statusFilter === "detected"}
               onClick={() => setStatusFilter("detected")}
             >
               Needs action
             </CratePill>
             <CratePill
+              className="min-h-11"
               active={statusFilter === "downloading"}
               onClick={() => setStatusFilter("downloading")}
             >
               Downloading
             </CratePill>
             <CratePill
+              className="min-h-11"
               active={statusFilter === "downloaded"}
               onClick={() => setStatusFilter("downloaded")}
             >
               Downloaded
             </CratePill>
             <CratePill
+              className="min-h-11"
               active={statusFilter === "upcoming"}
               onClick={() => setStatusFilter("upcoming")}
             >
               Upcoming
             </CratePill>
           </div>
-          <AdminSelect
-            value={typeFilter}
-            onChange={setTypeFilter}
-            options={typeOptions}
-            placeholder="All types"
-            searchable
-            searchPlaceholder="Filter release types..."
-            triggerClassName="min-w-[170px]"
-          />
+          <label className="crate-form-field">
+            <MonoLabel as="span">Release type</MonoLabel>
+            <AdminSelect
+              value={typeFilter}
+              onChange={setTypeFilter}
+              options={typeOptions}
+              placeholder="All types"
+              searchable
+              searchPlaceholder="Filter release types..."
+              triggerClassName="min-h-11 min-w-[170px]"
+            />
+          </label>
         </div>
       </OpsPanel>
 
@@ -676,8 +697,17 @@ export function NewReleases() {
         description="Use timeline when you want to triage in date order, or grid when you need a visual scan of artwork and release types."
       >
         {loading ? (
-          <div className="flex justify-center py-16 text-white/45">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <div
+            role="status"
+            aria-label="Loading releases"
+            className="flex items-center justify-center gap-2 py-16 text-white/45"
+          >
+            <Loader2
+              aria-hidden="true"
+              data-admin-ux="releases-loading"
+              className="h-5 w-5 animate-spin text-primary"
+            />
+            Loading releases
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState

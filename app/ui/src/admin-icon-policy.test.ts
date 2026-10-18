@@ -33,10 +33,19 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
     "app/ui/src/pages/Contributions.tsx",
     "app/ui/src/pages/Bandcamp.tsx",
     "app/ui/src/pages/Discover.tsx",
+    "app/ui/src/pages/NewReleases.tsx",
   ]);
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
 const approvedControls = new Map([
+  [
+    "app/ui/src/pages/NewReleases.tsx:@crate/ui/primitives/ErrorState",
+    { component: "ErrorState", limit: 1 },
+  ],
+  [
+    "app/ui/src/pages/NewReleases.tsx:@/components/ui/AdminSelect",
+    { component: "AdminSelect", limit: 1 },
+  ],
   [
     "app/ui/src/pages/Discover.tsx:@crate/ui/primitives/ErrorState",
     { component: "ErrorState", limit: 1 },
@@ -92,6 +101,12 @@ const approvedControls = new Map([
 ]);
 // Diego's 1W steering explicitly retains UX glyphs. Each concrete site remains bounded.
 const approvedUx = new Map([
+  ["NewReleases:releases-search", ["lucide-react", "Search"]],
+  ["NewReleases:releases-loading", ["lucide-react", "Loader2"]],
+  ["NewReleases:releases-check-loading", ["lucide-react", "Loader2"]],
+  ["NewReleases:releases-download-loading", ["lucide-react", "Loader2"]],
+  ["NewReleases:releases-timeline-dismiss", ["lucide-react", "X"]],
+  ["NewReleases:releases-grid-dismiss", ["lucide-react", "X"]],
   ["Discover:discovery-search", ["lucide-react", "Search"]],
   ["Discover:discovery-loading", ["lucide-react", "Loader2"]],
   ["Discover:discovery-recompute-loading", ["lucide-react", "Loader2"]],

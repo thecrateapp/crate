@@ -3,8 +3,8 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Published checkpoints through 1AH (`58b2695b`) are recorded in the handover.
-> Local 1AI retires redundant Discovery icons; stop for Diego before commit/push.
+> Diego's go-ahead. Published checkpoints through 1AI (`a304ecf9`) are recorded in the handover.
+> Local 1AJ retires redundant New Releases icons; stop for Diego before commit/push.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -5795,3 +5795,29 @@ feat/crate_v3 branch plus the next bounded Admin icon group, preserving function
 The previous local-only 1AI stops are superseded by this approval. Discovery presentation,
 data/task/navigation contracts and earlier checkpoints remain as reviewed. No full suites/CI,
 canonical refresh, PR/merge/rebase/deploy/release. The next group stops at 1AJ before publication.
+
+## Linux 1AJ — bounded New Releases icon group (2026-10-18)
+
+1AI Discovery is approved and published as `a304ecf9c41bc254dab98b9f52668e18f4d87852`;
+push and remote ref verified. Diego authorised the next bounded group preserving UX glyphs.
+Local 1AJ changes NewReleases.tsx presentation only: remove redundant labelled view/action and
+summary glyphs, cover placeholders and empty illustration. Retain six marked search/loading/
+dismiss sites. Dismiss uses the shared Button outline/icon recipe, retaining X, title, native
+keyboard behavior and callback. Search/type pairs use the shared8px recipe; controls are44px.
+
+Data shaping, raw artwork, canonical links, capabilities, snapshot/SSE lifecycle and action/task
+contracts remain unchanged. Existing global counts, date/upcoming/filter semantics, independent
+loading/error and timeline/grid action eligibility differences are preserved. No invented stages,
+endpoint, backend, shared API, dependency or Listen/Desktop change. This does not complete1b.8,
+ReleaseTimeline/B6/A10/phase6.5. Actual isolated specimen: /admin-new-releases-demo.html and
+persistent /#lanzamientos-admin, with local fixtures/tasks/SSE/assets/capabilities/destinations.
+Evidence, final review and remaining QA are owned by the final handover. Stop1AJ uncommitted
+for Diego; no next group or publication. Canonical1M/pin258bbaee remain unchanged.
+
+## 1AJ approval and publication — 2026-10-18
+
+Diego approved1AJ and explicitly authorised commit/push to feat/crate_v3 plus one further
+bounded Admin icon group, preserving functional UX glyphs. Previous local-only1AJ stops are
+superseded. The deferred shared Select label association remains recorded; no unreviewed fix.
+Next checkpoint1AK covers Global Catalog and stops before publication for Diego. No full
+suites/CI/canonical refresh, PR/merge/rebase/deploy/release; prior checkpoints remain intact.

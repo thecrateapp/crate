@@ -4,33 +4,27 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — 1AH published; 1AI Discovery local
+## Active Linux workspace — 1AI published; 1AJ New Releases local
 
-Use /home/diego/.codex/worktrees/crate-v3-1q/crate, existing feat/crate_v3 tracking origin.
-Published HEAD/ref58b2695b39bbd91c477a968192ff74332a220e71 (1AH); original53177736 ancestor retained.
+Use /home/diego/.codex/worktrees/crate-v3-1q/crate, feat/crate_v3 tracking origin.
+Published HEAD/ref `a304ecf9c41bc254dab98b9f52668e18f4d87852` (1AI), original53177736 ancestor.
 Leave /home/diego/Code/Ninja/crate (feat/crate_mcp) alone. Node22.23.3/dependencies prepared.
 
-Diego approved/published1AH Bandcamp and authorised one bounded next group preserving UX glyphs.
-Current1AI changes only Discover.tsx production rendering: retire redundant actions/summaries/
-artist-album placeholder glyphs; preserve4 search/loading sites, data/task/navigation/asset
-contracts, visible search label/8px pair and44px controls. Policy17 files/56 exact retained sites.
-This does not complete1b.8, B5, A11 or phase6.5; no shared/Listen/backend/permissions change.
+Diego approved/published1AI Discovery and authorised one further bounded Admin group preserving
+UX glyphs. Current1AJ changes NewReleases.tsx production presentation only, keeping six marked
+search/loading/dismiss sites; snapshot/SSE/filter/date/capability/task/action/navigation/raw-artwork
+contracts unchanged.18-file policy/62 retained sites. Dismiss reuses shared Button outline/icon;
+labels8px, controls44px. No shared/backend/auth/dependency/Listen change.1b.8/B6/A10/phase6.5 pending.
 
-Actual isolated sample http://127.0.0.1:5186/admin-discovery-demo.html or /#discovery-admin.
-43 scoped Vitest,4preview+3builtAdmin Chromium at1440/768/390,2strict configs, scoped lint/AST,
-Admin/14-entry preview builds pass. JS526617/532480Bgzip10assets5863Bmargin; generatedcache restored.
-ActualIAB proof .artifacts/review/checkpoint-1ai-discovery.jpg. Final review/limits in main handover.
-Plan docs/plans/2026-10-18-crate-v3-discovery-icons.md. Keep preview service active on5186.
+Review actual isolated sample http://127.0.0.1:5186/admin-new-releases-demo.html or /#lanzamientos-admin.
+47 scoped Vitest,3preview+1persistent and3builtAdmin Chromium at1440/768/390,2strict TS configs,
+scoped lint/AST pass. InitialJS526574/532480Bgzip,10assets5906Bmargin. Main handover owns final
+build/review/proof and QA limits. Plan:2026-10-18-crate-v3-new-releases-icons.md. Preview service stays active.
 
-1AG Library Timeline retirement/redirect and its23-file withdrawn-proposal archive remain.
-All earlier published checkpoints are retained.33 canonicalPNG/manifest stay1M, pin258bbaee
-unchanged. No full suites/CI/canonical refresh. Native/AT/live backend/real assets/phase QA pending.
-**Stop1AI uncommitted for Diego; no next group/commit/push/PR/merge/rebase/deploy/release.**
-Historical bootstrap below does not replace the current worktree.
-
-Final1AI fresh review covered21 pending files/14 source hashes: Critical0/Important0/Minor0.
-No repair/re-review, source frozen. Main handover owns every executor ruling and remaining QA.
-Preview active/HTTP200, original ancestor and published1AH ref retained; no1AI publication.
+All prior checkpoints, Timeline retirement/redirect and withdrawn-proposal archive remain intact.
+33 canonicalPNG/manifest stay1M, app/web@258bbaee pin unchanged. No full suites/CI/canonical refresh;
+live integration/real artwork/native/AT/phase QA pending. **Stop1AJ uncommitted for Diego; no next
+group/commit/push/PR/merge/rebase/deploy/release.** Historical bootstrap below does not replace this worktree.
 
 ## Prepare the checkout
 
@@ -240,3 +234,15 @@ feat/crate_v3 branch plus the next bounded Admin icon group, preserving function
 The previous local-only 1AI stops are superseded by this approval. Discovery presentation,
 data/task/navigation contracts and earlier checkpoints remain as reviewed. No full suites/CI,
 canonical refresh, PR/merge/rebase/deploy/release. The next group stops at 1AJ before publication.
+
+Final1AJ actual fresh review:20files/13source hashes verified; Critical0/Important0/Minor1.
+Minor deferred: shared Select visible "Release type" caption/accessiblename "All types" association.
+Main handover records every executor ruling/limit. No repair/re-review; stoplocal1AJ with previewactive.
+
+## 1AJ approval and publication — 2026-10-18
+
+Diego approved1AJ and explicitly authorised commit/push to feat/crate_v3 plus one further
+bounded Admin icon group, preserving functional UX glyphs. Previous local-only1AJ stops are
+superseded. The deferred shared Select label association remains recorded; no unreviewed fix.
+Next checkpoint1AK covers Global Catalog and stops before publication for Diego. No full
+suites/CI/canonical refresh, PR/merge/rebase/deploy/release; prior checkpoints remain intact.

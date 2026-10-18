@@ -10,6 +10,7 @@
 @source "./admin-contributions-demo.tsx";
 @source "./admin-bandcamp-demo.tsx";
 @source "./admin-discovery-demo.tsx";
+@source "./admin-new-releases-demo.tsx";
 @source "../../app/ui/src";
 html {
   color-scheme: dark;
