@@ -1,18 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import {
-  BarChart3,
-  Compass,
-  Disc3,
-  Download,
-  ExternalLink,
-  Loader2,
-  RefreshCw,
-  Search,
-  Sparkles,
-  TrendingUp,
-  User,
-} from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -24,6 +12,7 @@ import { Button } from "@crate/ui/shadcn/button";
 import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Input } from "@crate/ui/shadcn/input";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useApi } from "@/hooks/use-api";
 import { useTaskPoll } from "@/hooks/use-task-poll";
 import { api } from "@/lib/api";
@@ -125,11 +114,6 @@ function OpportunityCard({ artist }: { artist: ArtistCompleteness }) {
               (event.target as HTMLImageElement).style.display = "none";
             }}
           />
-          <User
-            size={18}
-            className="absolute text-white/25"
-            style={{ display: artist.has_photo ? "none" : undefined }}
-          />
         </div>
 
         <div className="min-w-0 flex-1 space-y-2">
@@ -194,21 +178,19 @@ function OpportunityCard({ artist }: { artist: ArtistCompleteness }) {
           <Button
             size="sm"
             variant="outline"
-            className="gap-2"
+            className="min-h-11 gap-2"
             onClick={() => navigate(href)}
           >
-            <Search size={14} />
             Open artist
           </Button>
         ) : null}
         <Button
           size="sm"
-          className="gap-2"
+          className="min-h-11 gap-2"
           onClick={() =>
             navigate(`/download?q=${encodeURIComponent(artist.artist)}`)
           }
         >
-          <Download size={14} />
           Acquire missing
         </Button>
       </div>
@@ -244,11 +226,7 @@ function ReleaseRadarRow({ release }: { release: Release }) {
             alt=""
             className="h-full w-full object-cover"
           />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <Disc3 size={16} className="text-white/20" />
-          </div>
-        )}
+        ) : null}
       </div>
       <div className="min-w-0 flex-1">
         {albumHref ? (
@@ -355,23 +333,26 @@ function DiscoverView({
             <Button
               variant="outline"
               size="sm"
-              className="gap-2"
+              className="min-h-11 gap-2"
               onClick={refreshAll}
             >
-              <RefreshCw size={14} />
               Refresh
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="gap-2"
+              className="min-h-11 gap-2"
               onClick={recomputeCompleteness}
+              aria-busy={recomputing || completenessTaskId !== null}
               disabled={recomputing || completenessTaskId !== null}
             >
-              {recomputing || completenessTaskId !== null ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <BarChart3 size={14} />
+              {(recomputing || completenessTaskId !== null) && (
+                <Loader2
+                  data-admin-ux="discovery-recompute-loading"
+                  aria-hidden="true"
+                  size={14}
+                  className="animate-spin"
+                />
               )}
               {recomputing || completenessTaskId !== null
                 ? "Recomputing..."
@@ -379,32 +360,30 @@ function DiscoverView({
             </Button>
             <Button
               size="sm"
-              className="gap-2"
+              className="min-h-11 gap-2"
               onClick={checkReleases}
+              aria-busy={checking}
               disabled={checking}
             >
-              {checking ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Sparkles size={14} />
+              {checking && (
+                <Loader2
+                  data-admin-ux="discovery-check-loading"
+                  aria-hidden="true"
+                  size={14}
+                  className="animate-spin"
+                />
               )}
               Check releases
             </Button>
           </>
         }
       >
-        <CrateChip active icon={Compass}>
+        <CrateChip active>
           {summary.opportunityArtists} acquisition targets
         </CrateChip>
-        <CratePill icon={Sparkles}>
-          {summary.detectedReleases} detected releases
-        </CratePill>
-        <CratePill icon={Search}>
-          {summary.incompleteArtists} incomplete artists
-        </CratePill>
-        <CratePill icon={TrendingUp}>
-          {trendingArtists.length} momentum signals
-        </CratePill>
+        <CratePill>{summary.detectedReleases} detected releases</CratePill>
+        <CratePill>{summary.incompleteArtists} incomplete artists</CratePill>
+        <CratePill>{trendingArtists.length} momentum signals</CratePill>
       </OpsPageHero>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -439,17 +418,25 @@ function DiscoverView({
         title="Search workspace"
         description="Narrow all discovery panels at once by artist, album or missing-release title."
       >
-        <div className="relative">
-          <Search
-            size={14}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
-          />
-          <Input
-            value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Search artists, releases or missing albums..."
-            className="pl-9"
-          />
+        <div className="crate-form-field">
+          <label htmlFor="discovery-search">
+            <MonoLabel as="span">Search discovery</MonoLabel>
+          </label>
+          <div className="relative">
+            <Search
+              data-admin-ux="discovery-search"
+              aria-hidden="true"
+              size={14}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+            />
+            <Input
+              id="discovery-search"
+              value={search}
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder="Search artists, releases or missing albums..."
+              className="min-h-11 pl-9"
+            />
+          </div>
         </div>
       </OpsPanel>
 
@@ -458,7 +445,7 @@ function DiscoverView({
         description="Artists with enough listener weight and enough missing catalogue to justify a download or curation pass."
       >
         {opportunityArtists.length > 0 ? (
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             {opportunityArtists.slice(0, 8).map((artist) => (
               <OpportunityCard key={artist.artist} artist={artist} />
             ))}
@@ -470,7 +457,7 @@ function DiscoverView({
         )}
       </OpsPanel>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <OpsPanel
           title="Release radar"
           description="Freshly detected albums from your orbit that may deserve immediate acquisition."
@@ -478,10 +465,9 @@ function DiscoverView({
             <Button
               size="sm"
               variant="outline"
-              className="gap-2"
+              className="min-h-11 gap-2"
               onClick={() => navigate("/new-releases")}
             >
-              <ExternalLink size={14} />
               Open full radar
             </Button>
           }
@@ -522,7 +508,7 @@ function DiscoverView({
         </OpsPanel>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <OpsPanel
           title="Artist momentum"
           description="Popularity leaders in your orbit. Not discovery by itself, but a strong hint for what deserves deeper acquisition."
@@ -763,7 +749,11 @@ export function Discover() {
   if (loading) {
     return (
       <div className="flex justify-center py-16 text-white/45">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+        <Loader2
+          data-admin-ux="discovery-loading"
+          aria-hidden="true"
+          className="h-5 w-5 animate-spin text-primary"
+        />
       </div>
     );
   }

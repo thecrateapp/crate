@@ -32,10 +32,15 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
     "app/ui/src/pages/Trash.tsx",
     "app/ui/src/pages/Contributions.tsx",
     "app/ui/src/pages/Bandcamp.tsx",
+    "app/ui/src/pages/Discover.tsx",
   ]);
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
 const approvedControls = new Map([
+  [
+    "app/ui/src/pages/Discover.tsx:@crate/ui/primitives/ErrorState",
+    { component: "ErrorState", limit: 1 },
+  ],
   [
     "app/ui/src/pages/Trash.tsx:@crate/ui/composites/ConfirmDialog",
     { component: "ConfirmDialog", limit: 2 },
@@ -87,6 +92,10 @@ const approvedControls = new Map([
 ]);
 // Diego's 1W steering explicitly retains UX glyphs. Each concrete site remains bounded.
 const approvedUx = new Map([
+  ["Discover:discovery-search", ["lucide-react", "Search"]],
+  ["Discover:discovery-loading", ["lucide-react", "Loader2"]],
+  ["Discover:discovery-recompute-loading", ["lucide-react", "Loader2"]],
+  ["Discover:discovery-check-loading", ["lucide-react", "Loader2"]],
   ["Bandcamp:bandcamp-sync-loading", ["lucide-react", "Loader2"]],
   ["Bandcamp:bandcamp-backfill-loading", ["lucide-react", "Loader2"]],
   ["Bandcamp:bandcamp-confirm-loading", ["lucide-react", "Loader2"]],

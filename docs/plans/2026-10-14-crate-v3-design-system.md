@@ -2,7 +2,7 @@
 
 Current implementation: checkpoints through 1AF are approved and published (`1b8ab823`).
 Published 1AG removes Library Timeline; it is no longer a V3 page target.
-Local 1AH retires redundant Bandcamp icons, preserving UX glyphs and existing contracts.
+Published 1AH retires Bandcamp icons. Local 1AI covers Discovery, preserving UX glyphs and data/task contracts.
 Stop for Diego before commit/push. See the final handover for evidence and limits.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
@@ -4517,3 +4517,23 @@ No full Bandcamp/A10/phase6.5 instruments or data/error-state rewrite; no shared
 permissions/dependency change. Specimen mounts the real page with isolated fictional data.
 See 2026-10-18-crate-v3-bandcamp-icons.md and final main handover for evidence and limits.
 Stop uncommitted1AH for Diego; no next group or publication. Canonical1M/pin258bbaee preserved.
+
+## Linux 1AI — bounded Discovery icon group (2026-10-18)
+
+Published1AH58b2695b retains Bandcamp contracts/UX. Diego authorised the next bounded group.
+Local1AI changes Discover.tsx presentation only: redundant action/summary/placeholder glyphs
+retired, four search/loading UX sites retained, actual data/task/navigation/image contracts
+unchanged. Visible search label uses existing MonoLabel/Input/8px field recipe;44px action/input
+targets and aria-busy. Source policy17wholefiles/56exactUXsites, bounded shared ErrorState once.
+Real isolated specimen includes local data/task steps/assets/destinations; prior checkpoints
+remain. No full B5/A11/phase6.5 instrument/data migration, shared/API/permission/Listen change.
+See 2026-10-18-crate-v3-discovery-icons.md and final main handover for evidence/review/limits.
+Stop uncommitted1AI for Diego; no next group/publication, canonical1M/pin258bbaee unchanged.
+
+## 1AI approval and publication — 2026-10-18
+
+Diego approved Discovery checkpoint 1AI and explicitly authorised commit/push to the existing
+feat/crate_v3 branch plus the next bounded Admin icon group, preserving functional UX glyphs.
+The previous local-only 1AI stops are superseded by this approval. Discovery presentation,
+data/task/navigation contracts and earlier checkpoints remain as reviewed. No full suites/CI,
+canonical refresh, PR/merge/rebase/deploy/release. The next group stops at 1AJ before publication.

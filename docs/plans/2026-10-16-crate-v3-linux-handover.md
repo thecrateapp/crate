@@ -4,44 +4,33 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — 1AG published; 1AH Bandcamp local
+## Active Linux workspace — 1AH published; 1AI Discovery local
 
 Use /home/diego/.codex/worktrees/crate-v3-1q/crate, existing feat/crate_v3 tracking origin.
-Published HEAD/ref e5b9f087935f790d4ae2d7950dd9d52c59f7e658 (1AG); original53177736 ancestor retained.
+Published HEAD/ref58b2695b39bbd91c477a968192ff74332a220e71 (1AH); original53177736 ancestor retained.
 Leave /home/diego/Code/Ninja/crate (feat/crate_mcp) alone. Node22.23.3/dependencies prepared.
 
-Diego's latest instruction removes Library Timeline after reviewing the local1AG specimen.
-Published 1AG supersedes the preceding icon-only proposal. It deletes pages/Timeline.tsx and lazy import, removes Sidebar destination, and keeps the
-old /timeline alias library.view-protected with Navigate replace to /browse. CommandPalette
-already lacked that destination. No Timeline API fetch or page chunk remains in Admin.
+Diego approved/published1AH Bandcamp and authorised one bounded next group preserving UX glyphs.
+Current1AI changes only Discover.tsx production rendering: retire redundant actions/summaries/
+artist-album placeholder glyphs; preserve4 search/loading sites, data/task/navigation/asset
+contracts, visible search label/8px pair and44px controls. Policy17 files/56 exact retained sites.
+This does not complete1b.8, B5, A11 or phase6.5; no shared/Listen/backend/permissions change.
 
-The old standalone preview URL is a lightweight HTML redirect to /#cronologia-admin. That
-section is now a retirement record without iframe/data/cover module. Real navigation preview:
-http://127.0.0.1:5186/admin-navigation-demo.html. Active PD/phase6.4 withdraw Timeline/A14; do
-not resurrect it. Other release/artist/operational timelines and public /api/timeline remain
-compatible; no backend/data change. Live icon policy returns15 whole files/46 exact sites.
+Actual isolated sample http://127.0.0.1:5186/admin-discovery-demo.html or /#discovery-admin.
+43 scoped Vitest,4preview+3builtAdmin Chromium at1440/768/390,2strict configs, scoped lint/AST,
+Admin/14-entry preview builds pass. JS526617/532480Bgzip10assets5863Bmargin; generatedcache restored.
+ActualIAB proof .artifacts/review/checkpoint-1ai-discovery.jpg. Final review/limits in main handover.
+Plan docs/plans/2026-10-18-crate-v3-discovery-icons.md. Keep preview service active on5186.
 
-Withdrawn1AG proposal/proof/source snapshot: ignored
-.superpowers/sdd/2026-10-18-crate-v3-timeline-removal/withdrawn-1ag/manifest.json (23 files, SHA256).
-Earlier checkpoint captures/records retained. Historical icon plan is explicitly withdrawn;
-replacement plan: docs/plans/2026-10-18-crate-v3-timeline-removal.md. Main handover owns current
-scoped checks/budget/final review and proof; earlier1AG icon evidence is historical, not current.
+1AG Library Timeline retirement/redirect and its23-file withdrawn-proposal archive remain.
+All earlier published checkpoints are retained.33 canonicalPNG/manifest stay1M, pin258bbaee
+unchanged. No full suites/CI/canonical refresh. Native/AT/live backend/real assets/phase QA pending.
+**Stop1AI uncommitted for Diego; no next group/commit/push/PR/merge/rebase/deploy/release.**
+Historical bootstrap below does not replace the current worktree.
 
-Current retirement validation: 31 scoped Vitest, six serial Chromium cases (three preview and
-three built Admin at 1440/768/390), two scoped strict TS configs, scoped lint and both builds.
-Admin initial JS 526680 / 532480 B gzip, 10 assets, 5800 B margin. Generated cache restored.
-Actual IAB retirement/navigation inspected; advisory proof
-`.artifacts/review/checkpoint-1ag-timeline-retired.jpg`. Earlier tab connection-reset state was
-resolved by opening the normal HTTP preview in a fresh tab; service active and HTTP 200 verified.
-Fresh final review covered all 19 pending files and verified the archive: Critical 0,
-Important 0, Minor 1. Deferred stale Timeline StatCard reference in the design-system consumer
-table; explicit retirement amendments prevail. Source frozen; final rulings are in main handover.
-
-Keep crate-v3-preview.service active on127.0.0.1:5186, this worktree/Node22/restart-on-failure.
-No full suites/CI/canonical capture/refresh.33 canonical PNGs/manifest stay1M, pin258bbaee unchanged.
-Native/AT/other engines/live auth/backend/full phase validation remain pending. Preserve1AD
-Health accents and Listen1S playback. **Stop local 1AH uncommitted, no next group/commit/push/PR/merge/
-rebase/deploy/release.** Historical bootstrap below does not replace this worktree.
+Final1AI fresh review covered21 pending files/14 source hashes: Critical0/Important0/Minor0.
+No repair/re-review, source frozen. Main handover owns every executor ruling and remaining QA.
+Preview active/HTTP200, original ancestor and published1AH ref retained; no1AI publication.
 
 ## Prepare the checkout
 
@@ -243,3 +232,11 @@ Only closure records/proof changed afterward. **Stop1AH uncommitted for Diego.**
 Diego approved Bandcamp 1AH and authorised commit/push followed by the next bounded Admin
 icon group. Earlier 1AH local stops are superseded. Keep preview and existing isolated
 worktree; preserve UX glyphs, stop at 1AI before another commit/push.
+
+## 1AI approval and publication — 2026-10-18
+
+Diego approved Discovery checkpoint 1AI and explicitly authorised commit/push to the existing
+feat/crate_v3 branch plus the next bounded Admin icon group, preserving functional UX glyphs.
+The previous local-only 1AI stops are superseded by this approval. Discovery presentation,
+data/task/navigation contracts and earlier checkpoints remain as reviewed. No full suites/CI,
+canonical refresh, PR/merge/rebase/deploy/release. The next group stops at 1AJ before publication.

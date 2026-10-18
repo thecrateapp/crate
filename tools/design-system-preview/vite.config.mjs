@@ -14,6 +14,15 @@ export default defineConfig({
       resolveId(source, importer) {
         if (!importer?.includes("/app/ui/") || !source.startsWith("@/")) return;
         if (
+          importer.endsWith("/app/ui/src/pages/Discover.tsx") &&
+          ["@/lib/api", "@/hooks/use-api", "@/hooks/use-task-poll"].includes(
+            source,
+          )
+        )
+          return fileURLToPath(
+            new URL("admin-discovery-fixtures.ts", import.meta.url),
+          );
+        if (
           importer.endsWith("/app/ui/src/pages/Bandcamp.tsx") &&
           ["@/lib/api", "@/hooks/use-api"].includes(source)
         )
@@ -113,6 +122,9 @@ export default defineConfig({
         ),
         adminContributions: fileURLToPath(
           new URL("admin-contributions-demo.html", import.meta.url),
+        ),
+        adminDiscovery: fileURLToPath(
+          new URL("admin-discovery-demo.html", import.meta.url),
         ),
         adminBandcamp: fileURLToPath(
           new URL("admin-bandcamp-demo.html", import.meta.url),

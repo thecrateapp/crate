@@ -1,0 +1,142 @@
+{
+  "/api/discover/completeness": [
+    {
+      "artist": "Viento Sur",
+      "artist_id": 24,
+      "artist_entity_uid": "sample-artist-24",
+      "artist_slug": "viento-sur",
+      "has_photo": false,
+      "listeners": 800,
+      "local_count": 3,
+      "mb_count": 4,
+      "pct": 75,
+      "missing": [
+        {
+          "title": "Puerto",
+          "type": "album",
+          "year": "2024"
+        }
+      ]
+    },
+    {
+      "artist": "Costa Norte",
+      "artist_id": 23,
+      "artist_entity_uid": "sample-artist-23",
+      "artist_slug": "costa-norte",
+      "has_photo": true,
+      "listeners": 12000,
+      "local_count": 2,
+      "mb_count": 5,
+      "pct": 40,
+      "missing": [
+        {
+          "title": "Mar de invierno",
+          "type": "album",
+          "year": "2020"
+        },
+        {
+          "title": "Arena de muestra",
+          "type": "album",
+          "year": "2021"
+        },
+        {
+          "title": "Horizonte",
+          "type": "album",
+          "year": "2022"
+        },
+        {
+          "title": "Espuma",
+          "type": "album",
+          "year": "2023"
+        }
+      ]
+    },
+    {
+      "artist": "Biblioteca completa",
+      "artist_id": 25,
+      "artist_slug": "completa",
+      "has_photo": false,
+      "listeners": 90000,
+      "local_count": 2,
+      "mb_count": 2,
+      "pct": 100,
+      "missing": []
+    }
+  ],
+  "/api/acquisition/new-releases?status=detected": {
+    "releases": [
+      {
+        "id": 41,
+        "artist_name": "Costa Norte",
+        "artist_id": 23,
+        "artist_slug": "costa-norte",
+        "album_title": "Luz de octubre",
+        "album_id": 41,
+        "album_slug": "luz-de-octubre",
+        "release_date": "2026-10-18",
+        "release_type": "album",
+        "cover_url": "/sample-discovery-cover.svg",
+        "status": "detected",
+        "tracks": 8,
+        "quality": "FLAC"
+      },
+      {
+        "id": 42,
+        "artist_name": "Viento Sur",
+        "album_title": "Marea",
+        "release_date": null,
+        "release_type": null,
+        "cover_url": null,
+        "status": "detected",
+        "tracks": 4,
+        "quality": "FLAC"
+      }
+    ]
+  },
+  "/api/insights": {
+    "popularity": [
+      {
+        "artist": "Costa Norte",
+        "popularity": 80,
+        "listeners": 12000
+      },
+      {
+        "artist": "Viento Sur",
+        "popularity": 25,
+        "listeners": 0
+      }
+    ],
+    "top_albums": [
+      {
+        "album": "Luz de octubre",
+        "artist": "Costa Norte",
+        "listeners": 7500,
+        "popularity": 70,
+        "year": "2026"
+      },
+      {
+        "album": "Puerto",
+        "artist": "Viento Sur",
+        "listeners": 0,
+        "popularity": 35,
+        "year": null
+      }
+    ],
+    "top_genres": [
+      {
+        "genre": "ambient",
+        "artists": 6,
+        "albums": 12
+      }
+    ],
+    "completeness": {
+      "artists_total": 3,
+      "artists_with_photo": 1,
+      "artists_enriched": 2,
+      "albums_total": 7,
+      "albums_with_cover": 4,
+      "tracks_total": 48,
+      "tracks_analyzed": 32
+    }
+  }
+}
