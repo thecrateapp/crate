@@ -2,9 +2,9 @@
 
 Status: product design, revised 2026-10-15. Canonical clone `/Users/diego/Code/crate-v3`, branch
 `feat/crate_v3`. The handover records implementation and QA status; historical analysis is not a
-current progress report. Checkpoints through 1AF are approved and published (`1b8ab823`).
-Approved 1AG removes Library Timeline at Diego's request; its old route redirects to Browse.
-Stop for Diego before commit/push. The final handover and later amendments below
+current progress report. Checkpoints through 1AG are approved and published (`e5b9f087`).
+Library Timeline is removed; its old route redirects to Browse. Local 1AH covers Bandcamp
+redundant icons with preserved UX glyphs. Stop for Diego before its commit/push. The final handover and later amendments below
 supersede earlier provisional stops. Diego's 1S review explicitly
 preserves the current Listen play essence (halo, layers and progress ring) and seek trail,
 adapted to V3 with 1–2 px strokes; see DS §5.5.
@@ -3722,3 +3722,15 @@ chronologies in New Releases, Artist Stats and Settings are distinct product fun
 API compatibility is unchanged; this is an Admin-screen removal, not backend/data deletion.
 The replacement scope/evidence is in 2026-10-18-crate-v3-timeline-removal.md and final handover.
 Stop1AG uncommitted for Diego, no next group/publication or full-suite/CI/baseline work.
+
+## Linux 1AH — bounded Bandcamp icon group (2026-10-18)
+
+Published 1AG e5b9f087 removes Library Timeline and corrects the obsolete StatStrip reference.
+Diego authorised the next bounded group. Local 1AH changes Bandcamp rendering only: retire
+redundant metrics/action icons and private icon props, reuse existing Ops presentation/MonoLabel
+recipes, preserve six marked loading/external UX sites and all eight data/action contracts.
+Source policy16 whole files/52 retained sites. Metric gaps8px, targets44px, existing fonts.
+No full Bandcamp/A10/phase6.5 instruments or data/error-state rewrite; no shared/Listen/backend/
+permissions/dependency change. Specimen mounts the real page with isolated fictional data.
+See 2026-10-18-crate-v3-bandcamp-icons.md and final main handover for evidence and limits.
+Stop uncommitted1AH for Diego; no next group or publication. Canonical1M/pin258bbaee preserved.

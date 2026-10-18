@@ -1,7 +1,8 @@
 # Crate v3 design system
 
 Current implementation: checkpoints through 1AF are approved and published (`1b8ab823`).
-Approved 1AG removes Library Timeline at Diego's request; it is no longer a V3 page target.
+Published 1AG removes Library Timeline; it is no longer a V3 page target.
+Local 1AH retires redundant Bandcamp icons, preserving UX glyphs and existing contracts.
 Stop for Diego before commit/push. See the final handover for evidence and limits.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
@@ -4504,3 +4505,15 @@ Other shared UX glyphs and earlier checkpoints remain. Timeline/A14 is removed f
 phase6.4 targets. Old route/preview links redirect; #cronologia-admin is now a retirement record
 without iframe/data/cover loading. The historical proposal/proof is archived, not shipped.
 See final handover and 2026-10-18-crate-v3-timeline-removal.md;1AG remains local for Diego.
+
+## Linux 1AH — bounded Bandcamp icon group (2026-10-18)
+
+Published 1AG e5b9f087 removes Library Timeline and corrects the obsolete StatStrip reference.
+Diego authorised the next bounded group. Local 1AH changes Bandcamp rendering only: retire
+redundant metrics/action icons and private icon props, reuse existing Ops presentation/MonoLabel
+recipes, preserve six marked loading/external UX sites and all eight data/action contracts.
+Source policy16 whole files/52 retained sites. Metric gaps8px, targets44px, existing fonts.
+No full Bandcamp/A10/phase6.5 instruments or data/error-state rewrite; no shared/Listen/backend/
+permissions/dependency change. Specimen mounts the real page with isolated fictional data.
+See 2026-10-18-crate-v3-bandcamp-icons.md and final main handover for evidence and limits.
+Stop uncommitted1AH for Diego; no next group or publication. Canonical1M/pin258bbaee preserved.

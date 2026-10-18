@@ -13,12 +13,12 @@ Its three-block Dashboard, producer interpretation fixes and Ops/Analysis typogr
 **1AD Library Health is approved and published as `5e1d9c8f287804a834b3143f6367f7e5a2ef8e31`.**
 **1AE Library Trash is approved and published as `638f4b0debe3adcca2b7b31f1b3e89323c58ad7b`.**
 **1AF Contributions is approved and published as `1b8ab82362f696f16ea481b3789436443b199d5d`.**
-**1AG Library Timeline removal is approved for commit/push by Diego (2026-10-18).** The earlier local
+**1AG Library Timeline removal is approved and published as `e5b9f087935f790d4ae2d7950dd9d52c59f7e658`.** The earlier local
 icon-restyle proposal is withdrawn, not approved/published. Page/lazy/menu removed; old
 /timeline redirects to Browse with its library.view gate. The old specimen URL redirects to
 <http://127.0.0.1:5186/#cronologia-admin>, now a retirement record without a Timeline iframe.
 Review navigation at <http://127.0.0.1:5186/admin-navigation-demo.html>. The obsolete StatStrip
-reference is corrected; continuation is authorised through the next bounded Admin group.
+reference is corrected; 1AH Bandcamp is approved for commit/push; loading/external UX glyphs and all data/actions remain.
 
 Published **1AD Health** context: Diego approved the issue-queue sketch and explicitly authorised
 its implementation on 2026-10-18.
@@ -33,7 +33,7 @@ The final composition record below and
 [`2026-10-18-crate-v3-health-inbox.md`](2026-10-18-crate-v3-health-inbox.md) supersede the
 historical icon-only and awaiting-sketch-approval stops. **The former 1AD stop is superseded by Diego's publication approval.**
 Earlier provisional/publication stops are historical and superseded by Diego's approval and
-next-group request on 2026-10-18. **Next stop: 1AH before commit/push or another group.**
+next-group request on 2026-10-18. **Next stop: 1AI before commit/push or another group.**
 The retained Listen play/halo/ring and luminous seek trail
 from 1S remain intact. Resume on Linux with
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
@@ -42,7 +42,7 @@ Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 ## Where the work lives
 
 - Active Linux worktree: `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing branch
-  `feat/crate_v3`, published HEAD `1b8ab82362f696f16ea481b3789436443b199d5d` (1AF);
+  `feat/crate_v3`, published HEAD `e5b9f087935f790d4ae2d7950dd9d52c59f7e658` (1AG);
   transfer checkpoint `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. Node 22.23.3, root
   dependencies and persistent :5186 preview are prepared. This isolates the MCP agent's
   `/home/diego/Code/Ninja/crate` checkout (`feat/crate_mcp`); leave its files untouched.
@@ -241,7 +241,7 @@ is a token-based chart configuration, not a selectable product skin.
 | 1b.8 / Checkpoint 1AD                                        | Approved and published as 5e1d9c8f: corrected issue queue, retained UX and real contracts. Next local group: Library Trash / 1AE.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | 1b.8 / Checkpoint 1AE                                        | Approved/published `638f4b0d`: Library Trash text actions, retained UX and real task/confirmation contracts. Publication replay 26 Vitest / one embedding Chromium pass.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | 1b.8 / Checkpoint 1AF                                        | Approved/published `1b8ab823`: Contributions, retained UX and actual data/routes. Publication replay 26 Vitest / one embedding Chromium pass.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| 1b.8 / Checkpoint 1AG                                        | Replacement scope: Library Timeline retired at Diego's request, old route/preview redirects, A14 withdrawn. Earlier icon proposal archived. Current retirement is local for review; no commit/push.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 1b.8 / Checkpoint 1AG                                        | Replacement scope: Library Timeline retired at Diego's request, old route/preview redirects, A14 withdrawn. Earlier icon proposal archived. Approved and published as e5b9f087; stale StatStrip reference corrected.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -3430,3 +3430,100 @@ record above describes the previous review, not an outstanding item. The retirem
 and footer now say 1AG published. Its compatibility test follows the updated publication label.
 Earlier local stops are superseded by this approval; the next implementation stops at 1AH
 before another commit/push. No full-suite/CI/canonical or release work is authorised.
+
+## Final Linux continuation — 1AG published; 1AH Bandcamp local (2026-10-18)
+
+Diego approved 1AG and explicitly authorised the stale StatStrip correction, commit/push and
+next bounded group. Published commit e5b9f087935f790d4ae2d7950dd9d52c59f7e658,
+`feat(ui): retire Library Timeline from Admin`; push and remote ref verified, clean before 1AH.
+The publication-label change passed its three affected preview cases. Earlier deferred minor
+is corrected; earlier 1AG local stops and icon-only proposal remain historical.
+
+Current 1AH covers **pages/Bandcamp.tsx only in production**, including its private metrics and
+panel rendering. It retires redundant action/stat/brand-pill glyphs and private icon props,
+uses existing OpsPageHero/OpsStatTile/OpsPanel and MonoLabel, and keeps six explicit UX sites:
+three loading (sync/backfill/confirm), three external cues (match/confirmed/radar item). Glyphs
+are aria-hidden. Whole-file policy grows to 16 files / 52 retained sites.
+
+All eight data hooks, raw URLs/query params, refetches, task/match handlers, POSTs, toast text,
+connection eligibility, busy lock, counts, filtering and 5/8-item limits remain. Album/user
+metadata, covers and fallback initials retain their contracts. Typography follows existing
+recipes, metric label/value gaps are real 8px, controls have 44px targets and aria-busy.
+The base content grid uses an explicit zero minimum to fit mobile without hidden overflow.
+No shared/Listen/backend/permission/dependency change, connection/error redesign or full A10/
+phase6.5 migration. Existing absent-read counts, silent read errors and non-link card semantics
+are preserved; this group does not certify successful integration or live service availability.
+
+Real isolated specimen <http://127.0.0.1:5186/admin-bandcamp-demo.html>, persistent
+`/#bandcamp-admin`. Exact Bandcamp importer-only API/hook alias, real shared data-hook factory,
+response-shaped fictional data and deterministic local completion. Four sample states, failed
+POST and local external destinations; no backend/write/Bandcamp request. Existing mockups and
+Timeline retirement record remain. Current plan: 2026-10-18-crate-v3-bandcamp-icons.md.
+
+**Stop at 1AH before commit/push or next group.** Validation/final review closure follows.
+
+### 1AH verification before final review
+
+Observed corrected RED7 expected /23 green for redundant glyphs/display/accessibility. Separate
+label RED1 caught an accidental numeric MonoLabel prefix, corrected to the real count. Initial
+test harness assumptions (unsupported null rejection, combined metadata, direct-vs-hook refetch
+arguments and Testing Library ByRole exact option) were corrected without data/handler changes.
+Actual API rejects Error objects; arbitrary null rejections remain outside this icon contract.
+
+Final named unit gate **40/40 Vitest across three files**:14 Bandcamp,16 source policy,10 affected
+Ops surfaces. **Three preview +three built-Admin Chromium**,1440/768/390, serial workers1. They
+exercise keyboard sync/review, real POST/lock/refetch behavior, sample failure/checking/disconnected/
+empty states, external local destination, actual fonts/8px metrics/44px controls and no overflow.
+The initial390 failure exposed automatic grid minimum widths; explicit grid-cols-1 fixes the
+specimen shell and actual page content. No clipping, arbitrary timeout or forced-click fix.
+
+AST audit against published1AG proves eight hook calls, six complete functions (queue/update/
+itemTitle/importStatus/cover/connection), seven state/refetch declarations, nine onClick
+expressions and every metric-value expression unchanged. Two scoped strict TS configs, scoped
+ESLint, Admin build/types and13-entry preview build pass (12 specimens plus static retired-URL
+redirect). Admin initialJS **526656/532480 B gzip**,10assets, **5824B margin**,24B below1AG.
+Known generated cache restored. Logs `.artifacts/review/1ah-*`; final40unit replay is in plan
+SDD `task-1-tests.log`. No full suite/CI/canonical changes;33PNG/manifest remain1M, pin258bbaee
+unchanged. Live auth/backend/real data/assets, native/AT/zoom/other engines/full phase QA pending.
+
+Actual IAB specimen inspected with real page, fictional candidates, metrics and retained
+external cues. Proof `.artifacts/review/checkpoint-1ah-bandcamp.jpg`,1310×1424. Preview service
+active; final fresh review and executor rulings follow. **Stop1AH uncommitted for Diego.**
+
+### 1AH final review, executor rulings and checkpoint stop
+
+One fresh read-only review inspected all20 pending files, surrounding production consumers,
+test/fixture infrastructure, records, saved verification logs and actual IAB proof. All13
+frozen source hashes match. Verdict: **ready for Diego review; Critical0 / Important0 / Minor0
+requiring action**. No product repair or second review. Reviewer made no changes and ran no
+tests, builds, browser or network operations. This verdict is not publication approval.
+
+Executor rulings on every declined area:
+
+1. Silent read errors and zero/empty loading fallbacks: retain existing hooks/page behavior in this presentation group. Cost: absent or failed reads can still resemble an empty collection; truthful read-state redesign remains separate work.
+2. Clickable cards without destination URLs: retain existing callbacks and URL guards. Cost: a card with no destination can remain focusable without navigating; interaction redesign is not claimed here.
+3. Arbitrary null/non-Error rejection: preserve the actual API Error contract and unchanged handlers. Cost: unsupported custom null rejection can still fail while reading its message; no general rejection-hardening claim.
+4. Confidence meters, connection instruments and detailed rows: retain current information and use existing presentation recipes only. Cost: full A10/phase6.5 Bandcamp design remains incomplete.
+5. Live auth/backend/data/cover delivery: source gates and request contracts stay unchanged; tests use isolated responses. Cost: real integration, permissions, scale and asset transport need live QA.
+6. Native/AT/zoom/other engines: recorded Chromium1440/768/390 plus IAB1310×1424 inspection suffice for this local checkpoint. Cost: broader runtime/accessibility certification remains pending.
+7. Full suites/CI/canonicals/earlier1AG review: honor scoped iteration and preserve approved publication/history. Cost: no phase-close/reference-parity certification; the final review covers1AH only.
+
+Final evidence:40 scoped Vitest,3preview+3built-Admin Chromium, two strict configs, scoped lint/
+AST/format, Admin and13-entry preview builds, initialJS526656/532480B gzip (5824B margin).
+Generated cache restored; source stayed frozen after review, only closure records/proof changed.
+Original53177736 ancestor retained; HEAD/origin remain published1AG e5b9f087. Withdrawn1AG
+archive23SHA256 entries still intact, shared/Listen/canonical source unchanged. Persistent
+mockup inspection verifies1AF specimen,1AG retirement and1AH real iframe/footer status together.
+
+`crate-v3-preview.service` remains active on127.0.0.1:5186, Node22 and this worktree. Standalone
+sample and retired URL respond HTTP200; actual IAB proof
+`.artifacts/review/checkpoint-1ah-bandcamp.jpg` is advisory, not a canonical capture. Review
+<http://127.0.0.1:5186/admin-bandcamp-demo.html> or persistent `/#bandcamp-admin`. **Stop1AH
+uncommitted for Diego: no commit/push, next group, PR/merge/rebase/deploy/release.**
+
+### 1AH approval and publication preparation — 2026-10-18
+
+Diego approved Bandcamp 1AH and authorised commit/push, then one further bounded Admin icon
+group preserving UX glyphs. Specimen/footer publication labels are updated. Earlier local
+stops are historical; next stop is 1AI before another commit/push. Scope and remaining QA
+limits from the final review above remain. No full suites/CI/canonical or release work.

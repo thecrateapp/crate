@@ -3,8 +3,8 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Published checkpoints through 1AF (`1b8ab823`) are recorded in the handover.
-> 1AG now removes Library Timeline at Diego's request; local, no publication approval.
+> Diego's go-ahead. Published checkpoints through 1AG (`e5b9f087`) are recorded in the handover.
+> Local 1AH retires redundant Bandcamp icons; stop for Diego before commit/push.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -5763,3 +5763,15 @@ record at #cronologia-admin. No active iframe/page/data hook/asset resolver rema
 backend /api/timeline is retained for compatibility, no backend/data removal claimed. Published
 checkpoints and original1V inventory remain. Exact scope/evidence/limits: final handover and
 2026-10-18-crate-v3-timeline-removal.md. Stop1AG before commit/push or any further group.
+
+## Linux 1AH — bounded Bandcamp icon group (2026-10-18)
+
+Published 1AG e5b9f087 removes Library Timeline and corrects the obsolete StatStrip reference.
+Diego authorised the next bounded group. Local 1AH changes Bandcamp rendering only: retire
+redundant metrics/action icons and private icon props, reuse existing Ops presentation/MonoLabel
+recipes, preserve six marked loading/external UX sites and all eight data/action contracts.
+Source policy16 whole files/52 retained sites. Metric gaps8px, targets44px, existing fonts.
+No full Bandcamp/A10/phase6.5 instruments or data/error-state rewrite; no shared/Listen/backend/
+permissions/dependency change. Specimen mounts the real page with isolated fictional data.
+See 2026-10-18-crate-v3-bandcamp-icons.md and final main handover for evidence and limits.
+Stop uncommitted1AH for Diego; no next group or publication. Canonical1M/pin258bbaee preserved.

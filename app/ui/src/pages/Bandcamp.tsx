@@ -1,20 +1,14 @@
 import { useCallback, useMemo, useState } from "react";
-import {
-  ArrowUpRight,
-  CheckCircle2,
-  Download,
-  ExternalLink,
-  Heart,
-  Loader2,
-  Radar,
-  RefreshCw,
-  XCircle,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { ArrowUpRight, ExternalLink, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 
-import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
+import {
+  OpsPageHero,
+  OpsPanel,
+  OpsStatTile,
+} from "@/components/admin/ops-surfaces";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Button } from "@crate/ui/shadcn/button";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { CratePill } from "@crate/ui/primitives/CrateBadge";
@@ -148,15 +142,13 @@ export function Bandcamp() {
       {
         label: "Collection",
         value: collection.data?.total ?? 0,
-        icon: Download,
       },
-      { label: "Wishlist", value: wishlist.data?.total ?? 0, icon: Heart },
+      { label: "Wishlist", value: wishlist.data?.total ?? 0 },
       {
         label: "Following",
         value: following.data?.total ?? 0,
-        icon: BandcampLogo,
       },
-      { label: "Radar", value: radar.data?.total ?? 0, icon: Radar },
+      { label: "Radar", value: radar.data?.total ?? 0 },
     ],
     [collection.data, following.data, radar.data, wishlist.data],
   );
@@ -205,34 +197,26 @@ export function Bandcamp() {
 
   return (
     <main className="space-y-8">
-      <section className="relative overflow-hidden rounded-[1.75rem] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_36%),linear-gradient(135deg,rgba(18,18,24,0.96),rgba(10,10,14,0.98))] p-8 shadow-[0_24px_80px_rgba(0,0,0,0.38)]">
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.04))]" />
-        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div className="max-w-3xl space-y-4">
-            <CratePill icon={BandcampLogo}>Bandcamp bridge</CratePill>
-            <div>
-              <h1 className="text-4xl font-black tracking-tight text-white">
-                Support layer for the collection
-              </h1>
-              <p className="mt-2 text-base text-slate-400">
-                Connect purchases, match Bandcamp URLs to Crate entities and
-                import owned releases without making the library messy.
-              </p>
-            </div>
-            <ConnectionStatus status={status.data} loading={status.loading} />
-          </div>
-          <div className="flex flex-wrap gap-3">
+      <OpsPageHero
+        title="Support layer for the collection"
+        description="Connect purchases, match Bandcamp URLs to Crate entities and import owned releases without making the library messy."
+        actions={
+          <>
+            {" "}
             <Button
               onClick={() =>
                 queueTask("/api/bandcamp/me/sync", "Bandcamp sync")
               }
+              aria-busy={busyAction === "Bandcamp sync"}
               disabled={!connected || busyAction !== null}
-              className="gap-2 rounded-full"
+              className="min-h-11 gap-2"
             >
-              {busyAction === "Bandcamp sync" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
+              {busyAction === "Bandcamp sync" && (
+                <Loader2
+                  data-admin-ux="bandcamp-sync-loading"
+                  aria-hidden="true"
+                  className="h-4 w-4 animate-spin"
+                />
               )}
               Sync collection
             </Button>
@@ -241,10 +225,10 @@ export function Bandcamp() {
               onClick={() =>
                 queueTask("/api/bandcamp/me/radar/refresh", "Bandcamp Radar")
               }
+              aria-busy={busyAction === "Bandcamp Radar"}
               disabled={!connected || busyAction !== null}
-              className="gap-2 rounded-full"
+              className="min-h-11 gap-2"
             >
-              <Radar className="h-4 w-4" />
               Refresh Radar
             </Button>
             <Button
@@ -255,32 +239,37 @@ export function Bandcamp() {
                   "Bandcamp URL backfill",
                 )
               }
+              aria-busy={busyAction === "Bandcamp URL backfill"}
               disabled={busyAction !== null}
-              className="gap-2 rounded-full"
+              className="min-h-11 gap-2"
             >
-              {busyAction === "Bandcamp URL backfill" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <ExternalLink className="h-4 w-4" />
+              {busyAction === "Bandcamp URL backfill" && (
+                <Loader2
+                  data-admin-ux="bandcamp-backfill-loading"
+                  aria-hidden="true"
+                  className="h-4 w-4 animate-spin"
+                />
               )}
               Backfill URLs
             </Button>
-          </div>
-        </div>
-      </section>
+          </>
+        }
+      >
+        <CratePill>Bandcamp bridge</CratePill>
+        <ConnectionStatus status={status.data} loading={status.loading} />
+      </OpsPageHero>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {counts.map((count) => (
-          <MetricCard
+          <OpsStatTile
             key={count.label}
             label={count.label}
-            value={count.value}
-            icon={count.icon}
+            value={count.value.toLocaleString()}
           />
         ))}
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(360px,0.8fr)]">
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(360px,0.8fr)]">
         <Panel
           title="Match candidates"
           eyebrow={`${candidateMatches.length} pending`}
@@ -381,30 +370,6 @@ function ConnectionStatus({
   );
 }
 
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-}: {
-  label: string;
-  value: number;
-  icon: LucideIcon | typeof BandcampLogo;
-}) {
-  return (
-    <div className="rounded-3xl border border-white/8 bg-white/[0.035] p-5">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500">
-          {label}
-        </span>
-        <Icon className="h-4 w-4 text-primary" />
-      </div>
-      <div className="mt-5 text-4xl font-black text-white">
-        {value.toLocaleString()}
-      </div>
-    </div>
-  );
-}
-
 function Panel({
   title,
   eyebrow,
@@ -415,15 +380,16 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[1.5rem] border border-white/8 bg-[#121218]/88 p-5 shadow-[0_18px_56px_rgba(0,0,0,0.28)]">
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <h2 className="text-xl font-black text-white">{title}</h2>
-        <span className="text-xs font-bold uppercase tracking-[0.22em] text-primary">
+    <OpsPanel
+      title={title}
+      action={
+        <MonoLabel as="span" className="text-accent-action-hi">
           {eyebrow}
-        </span>
-      </div>
+        </MonoLabel>
+      }
+    >
       {children}
-    </section>
+    </OpsPanel>
   );
 }
 
@@ -458,7 +424,7 @@ function MatchRow({
             {match.source || "sync"}
           </span>
         </div>
-        <h3 className="mt-2 truncate text-base font-bold text-white">
+        <h3 className="font-display mt-2 truncate text-base font-bold text-white">
           {entity}
         </h3>
         <p className="truncate text-sm text-slate-400">{title}</p>
@@ -471,36 +437,43 @@ function MatchRow({
           <Button
             variant="ghost"
             size="sm"
-            className="gap-2 rounded-full"
+            className="min-h-11 gap-2"
             onClick={() =>
               window.open(match.item_url || "", "_blank", "noopener,noreferrer")
             }
           >
-            <ExternalLink className="h-4 w-4" />
+            <ExternalLink
+              data-admin-ux="bandcamp-match-external"
+              aria-hidden="true"
+              className="h-4 w-4"
+            />
             Open
           </Button>
         ) : null}
         <Button
           size="sm"
-          className="gap-2 rounded-full"
+          className="min-h-11 gap-2"
+          aria-busy={busyAction === `confirm:${match.id}`}
           disabled={busyAction !== null}
           onClick={onConfirm}
         >
-          {busyAction === `confirm:${match.id}` ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <CheckCircle2 className="h-4 w-4" />
+          {busyAction === `confirm:${match.id}` && (
+            <Loader2
+              data-admin-ux="bandcamp-confirm-loading"
+              aria-hidden="true"
+              className="h-4 w-4 animate-spin"
+            />
           )}
           Confirm
         </Button>
         <Button
           variant="outline"
           size="sm"
-          className="gap-2 rounded-full"
+          className="min-h-11 gap-2"
+          aria-busy={busyAction === `reject:${match.id}`}
           disabled={busyAction !== null}
           onClick={onReject}
         >
-          <XCircle className="h-4 w-4" />
           Reject
         </Button>
       </div>
@@ -512,7 +485,7 @@ function ConfirmedMatchCard({ match }: { match: BandcampMatch }) {
   return (
     <button
       type="button"
-      className="group min-w-0 rounded-2xl border border-white/8 bg-black/18 p-3 text-left transition hover:border-primary/40 hover:bg-primary/5"
+      className="group min-h-11 min-w-0 rounded-2xl border border-white/8 bg-black/18 p-3 text-left transition hover:border-primary/40 hover:bg-primary/5"
       onClick={() =>
         match.item_url &&
         window.open(match.item_url, "_blank", "noopener,noreferrer")
@@ -522,9 +495,13 @@ function ConfirmedMatchCard({ match }: { match: BandcampMatch }) {
       <div className="mt-3 min-w-0">
         <div className="flex items-center gap-2">
           <Badge variant="outline">{match.entity_type}</Badge>
-          <ArrowUpRight className="h-3.5 w-3.5 text-slate-500 transition group-hover:text-primary" />
+          <ArrowUpRight
+            data-admin-ux="bandcamp-confirmed-external"
+            aria-hidden="true"
+            className="h-3.5 w-3.5 text-slate-500 transition group-hover:text-primary"
+          />
         </div>
-        <h3 className="mt-2 truncate text-sm font-bold text-white">
+        <h3 className="font-display mt-2 truncate text-sm font-bold text-white">
           {match.entity_name || itemTitle(match)}
         </h3>
         <p className="truncate text-xs text-slate-500">{itemTitle(match)}</p>
@@ -547,7 +524,7 @@ function CompactItemList({
         <button
           key={`${item.id}-${item.item_url}`}
           type="button"
-          className="flex w-full items-center gap-3 rounded-2xl border border-white/6 bg-black/16 p-3 text-left transition hover:border-primary/35"
+          className="flex min-h-11 w-full items-center gap-3 rounded-2xl border border-white/6 bg-black/16 p-3 text-left transition hover:border-primary/35"
           onClick={() =>
             item.item_url &&
             window.open(item.item_url, "_blank", "noopener,noreferrer")
@@ -555,14 +532,18 @@ function CompactItemList({
         >
           <ItemCover item={item} />
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-sm font-bold text-white">
+            <h3 className="font-display truncate text-sm font-bold text-white">
               {itemTitle(item)}
             </h3>
             <p className="truncate text-xs text-slate-500">
               {item.artist_name}
             </p>
           </div>
-          <ExternalLink className="h-4 w-4 text-slate-600" />
+          <ExternalLink
+            data-admin-ux="bandcamp-item-external"
+            aria-hidden="true"
+            className="h-4 w-4 text-slate-600"
+          />
         </button>
       ))}
     </div>
@@ -580,7 +561,7 @@ function CompactImportList({ imports }: { imports: BandcampImport[] }) {
         >
           <ItemCover item={item} />
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-sm font-bold text-white">
+            <h3 className="font-display truncate text-sm font-bold text-white">
               {itemTitle(item)}
             </h3>
             <p className="truncate text-xs text-slate-500">
@@ -606,7 +587,7 @@ function AdminCollectionList({ items }: { items: BandcampItem[] }) {
         <button
           key={`${item.user_email}-${item.id}-${item.item_url}`}
           type="button"
-          className="flex w-full items-center gap-3 rounded-2xl border border-white/6 bg-black/16 p-3 text-left transition hover:border-primary/35"
+          className="flex min-h-11 w-full items-center gap-3 rounded-2xl border border-white/6 bg-black/16 p-3 text-left transition hover:border-primary/35"
           onClick={() =>
             item.item_url &&
             window.open(item.item_url, "_blank", "noopener,noreferrer")
@@ -614,7 +595,7 @@ function AdminCollectionList({ items }: { items: BandcampItem[] }) {
         >
           <ItemCover item={item} />
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-sm font-bold text-white">
+            <h3 className="font-display truncate text-sm font-bold text-white">
               {itemTitle(item)}
             </h3>
             <p className="truncate text-xs text-slate-500">

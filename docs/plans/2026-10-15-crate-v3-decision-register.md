@@ -874,3 +874,15 @@ URL only as a redirect to its persistent retirement record. Preserve the withdra
 proof in ignored review storage and historical documentation; no active feature is retained.
 Backend endpoint remains compatible; no API/data removal. Published1AF is1b8ab823. Current1AG
 is the uncommitted retirement, awaiting Diego; no publication or next-group authorization.
+
+## Linux 1AH — bounded Bandcamp icon group (2026-10-18)
+
+Published 1AG e5b9f087 removes Library Timeline and corrects the obsolete StatStrip reference.
+Diego authorised the next bounded group. Local 1AH changes Bandcamp rendering only: retire
+redundant metrics/action icons and private icon props, reuse existing Ops presentation/MonoLabel
+recipes, preserve six marked loading/external UX sites and all eight data/action contracts.
+Source policy16 whole files/52 retained sites. Metric gaps8px, targets44px, existing fonts.
+No full Bandcamp/A10/phase6.5 instruments or data/error-state rewrite; no shared/Listen/backend/
+permissions/dependency change. Specimen mounts the real page with isolated fictional data.
+See 2026-10-18-crate-v3-bandcamp-icons.md and final main handover for evidence and limits.
+Stop uncommitted1AH for Diego; no next group or publication. Canonical1M/pin258bbaee preserved.

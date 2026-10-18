@@ -4,15 +4,14 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — 1AG approved for publication; next stop 1AH
+## Active Linux workspace — 1AG published; 1AH Bandcamp local
 
 Use /home/diego/.codex/worktrees/crate-v3-1q/crate, existing feat/crate_v3 tracking origin.
-Published HEAD/ref1b8ab82362f696f16ea481b3789436443b199d5d (1AF); original53177736 ancestor retained.
+Published HEAD/ref e5b9f087935f790d4ae2d7950dd9d52c59f7e658 (1AG); original53177736 ancestor retained.
 Leave /home/diego/Code/Ninja/crate (feat/crate_mcp) alone. Node22.23.3/dependencies prepared.
 
 Diego's latest instruction removes Library Timeline after reviewing the local1AG specimen.
-This supersedes the preceding icon-only proposal; no1AG approval/publication occurred. Current
-local1AG deletes pages/Timeline.tsx and lazy import, removes Sidebar destination, and keeps the
+Published 1AG supersedes the preceding icon-only proposal. It deletes pages/Timeline.tsx and lazy import, removes Sidebar destination, and keeps the
 old /timeline alias library.view-protected with Navigate replace to /browse. CommandPalette
 already lacked that destination. No Timeline API fetch or page chunk remains in Admin.
 
@@ -41,7 +40,7 @@ table; explicit retirement amendments prevail. Source frozen; final rulings are 
 Keep crate-v3-preview.service active on127.0.0.1:5186, this worktree/Node22/restart-on-failure.
 No full suites/CI/canonical capture/refresh.33 canonical PNGs/manifest stay1M, pin258bbaee unchanged.
 Native/AT/other engines/live auth/backend/full phase validation remain pending. Preserve1AD
-Health accents and Listen1S playback. **Stop1AG uncommitted, no next group/commit/push/PR/merge/
+Health accents and Listen1S playback. **Stop local 1AH uncommitted, no next group/commit/push/PR/merge/
 rebase/deploy/release.** Historical bootstrap below does not replace this worktree.
 
 ## Prepare the checkout
@@ -218,3 +217,29 @@ Diego approved 1AG removal and authorised commit/push, correction of the obsolet
 reference and the next bounded Admin icon group. The reference is corrected. Earlier 1AG
 local-stop notes are historical; stop the next group at 1AH before its commit/push. Keep the
 same worktree and active preview; preserve UX glyphs and all published checkpoints.
+
+## Current 1AH — Bandcamp icon group
+
+1AG commit e5b9f087935f790d4ae2d7950dd9d52c59f7e658 is published; stale StatStrip reference
+corrected. Continue only local 1AH: Bandcamp redundant icons/private metric/header/panel recipes,
+retaining six loading/external UX sites, all eight reads and unchanged action/data contracts.
+Scope policy16 files/52 exact retained sites. Real isolated sample:
+http://127.0.0.1:5186/admin-bandcamp-demo.html or /#bandcamp-admin. Main handover owns final
+evidence/review/limits. Keep Node22, existing worktree and preview service active. Stop before
+1AH commit/push or next group; no full suites/CI/canonical refresh or release operations.
+
+1AH current checks:40 scoped Vitest,3preview+3built-Admin Chromium at1440/768/390, two strict
+configs, scoped lint/AST audit and Admin/13-entry preview builds pass. InitialJS526656/532480B
+gzip,5824B margin. Advisory actualIAB proof `.artifacts/review/checkpoint-1ah-bandcamp.jpg`.
+Native/live integration/phase QA remain pending; main handover owns finalreview/stop.
+
+1AH final fresh review: all20 pending files/13source hashes checked, Critical0/Important0/Minor0
+requiring action. No repair/re-review. Actual persistent mockup inspected with1AF/1AG/1AH status;
+preview active/HTTP200, withdrawn1AG archive23hashes intact, HEAD/origin still published1AG.
+Only closure records/proof changed afterward. **Stop1AH uncommitted for Diego.**
+
+## Latest approval — 1AH
+
+Diego approved Bandcamp 1AH and authorised commit/push followed by the next bounded Admin
+icon group. Earlier 1AH local stops are superseded. Keep preview and existing isolated
+worktree; preserve UX glyphs, stop at 1AI before another commit/push.

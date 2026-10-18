@@ -31,6 +31,7 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
     "app/ui/src/pages/Health.tsx",
     "app/ui/src/pages/Trash.tsx",
     "app/ui/src/pages/Contributions.tsx",
+    "app/ui/src/pages/Bandcamp.tsx",
   ]);
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
@@ -86,6 +87,12 @@ const approvedControls = new Map([
 ]);
 // Diego's 1W steering explicitly retains UX glyphs. Each concrete site remains bounded.
 const approvedUx = new Map([
+  ["Bandcamp:bandcamp-sync-loading", ["lucide-react", "Loader2"]],
+  ["Bandcamp:bandcamp-backfill-loading", ["lucide-react", "Loader2"]],
+  ["Bandcamp:bandcamp-confirm-loading", ["lucide-react", "Loader2"]],
+  ["Bandcamp:bandcamp-match-external", ["lucide-react", "ExternalLink"]],
+  ["Bandcamp:bandcamp-confirmed-external", ["lucide-react", "ArrowUpRight"]],
+  ["Bandcamp:bandcamp-item-external", ["lucide-react", "ExternalLink"]],
   ["Contributions:contributions-refresh-loading", ["lucide-react", "Loader2"]],
   ["Contributions:contributions-list-loading", ["lucide-react", "Loader2"]],
   ["Trash:trash-refresh-loading", ["lucide-react", "Loader2"]],

@@ -14,6 +14,13 @@ export default defineConfig({
       resolveId(source, importer) {
         if (!importer?.includes("/app/ui/") || !source.startsWith("@/")) return;
         if (
+          importer.endsWith("/app/ui/src/pages/Bandcamp.tsx") &&
+          ["@/lib/api", "@/hooks/use-api"].includes(source)
+        )
+          return fileURLToPath(
+            new URL("admin-bandcamp-fixtures.ts", import.meta.url),
+          );
+        if (
           importer.endsWith("/app/ui/src/pages/Contributions.tsx") &&
           source === "@/lib/api"
         )
@@ -106,6 +113,9 @@ export default defineConfig({
         ),
         adminContributions: fileURLToPath(
           new URL("admin-contributions-demo.html", import.meta.url),
+        ),
+        adminBandcamp: fileURLToPath(
+          new URL("admin-bandcamp-demo.html", import.meta.url),
         ),
         retiredTimeline: fileURLToPath(
           new URL("admin-timeline-demo.html", import.meta.url),
