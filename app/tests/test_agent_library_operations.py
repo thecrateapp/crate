@@ -136,6 +136,41 @@ def _running(world, plan=None):
     return queued, plan
 
 
+def _cancel_through_reviewed_plan(world, target_job_id, human_actor):
+    prepared = operations.prepare_operation(
+        world["principal"],
+        "job_cancel",
+        {"job_id": target_job_id, "scope": "own"},
+        "prepare-generic-cancel",
+    )["data"]
+    assert start_task(prepared["job_id"]) is not None
+    control = operations.execute_operation_job(prepared["job_id"], world["config"])
+    assert control["execution"]["status"] == "prepared", control
+    control_plan = control["plan"]
+    assert control_plan["approval_required"] is True
+    with pytest.raises(DiagnosticError) as error:
+        operations.apply_operation(
+            world["principal"],
+            "job_cancel",
+            control_plan["plan_id"],
+            control_plan["plan_version"],
+            "apply-generic-cancel",
+        )
+    assert error.value.code == "APPROVAL_REQUIRED"
+    decide(human_actor, control_plan)
+    accepted = operations.apply_operation(
+        world["principal"],
+        "job_cancel",
+        control_plan["plan_id"],
+        control_plan["plan_version"],
+        "apply-generic-cancel",
+    )["data"]
+    assert start_task(accepted["job_id"]) is not None
+    cancelled = operations.execute_operation_job(accepted["job_id"], world["config"])
+    assert cancelled["execution"]["status"] == "completed", cancelled
+    assert cancelled["execution"]["items"][0]["status"] == "cancelled"
+
+
 def _with_backend_pid(pids: Queue[int], operation, *args):
     with transaction_scope() as session:
         session.execute(text("SET LOCAL lock_timeout = '10s'"))
@@ -240,16 +275,34 @@ def test_reviewed_metadata_values_preserve_long_unicode_content(operation_world)
     )
 
 
-def test_cancelled_prepare_never_observes_the_library(operation_world):
+def test_cancelled_prepare_never_observes_the_library(operation_world, human_actor):
     world = operation_world
     queued = _queued(world)
-    requests.cancel_job(world["principal"], queued["job_id"])
+    with pytest.raises(DiagnosticError) as error:
+        requests.cancel_job(world["principal"], queued["job_id"])
+    assert error.value.code == "NOT_EXECUTABLE"
+    _cancel_through_reviewed_plan(world, queued["job_id"], human_actor)
 
-    result = operations.execute_operation_job(queued["job_id"], world["config"])
-
-    assert result["execution"]["status"] == "cancelled"
+    assert start_task(queued["job_id"]) is None
+    assert (
+        scalar("SELECT status FROM tasks WHERE id=:id", {"id": queued["job_id"]})
+        == "cancelled"
+    )
+    assert (
+        scalar(
+            "SELECT result_json->'execution'->>'effects' FROM tasks WHERE id=:id",
+            {"id": queued["job_id"]},
+        )
+        == "not_started"
+    )
     assert world["adapter"]["compilations"] == []
-    assert scalar("SELECT COUNT(*) FROM agent_repair_plans") == 0
+    assert (
+        scalar(
+            "SELECT COUNT(*) FROM agent_repair_plans WHERE operation=:operation",
+            {"operation": OPERATION},
+        )
+        == 0
+    )
 
 
 def test_over_budget_worker_prepare_returns_failure_without_partial_plan(
@@ -538,12 +591,18 @@ def test_started_effect_ledger_blocks_redelivery_and_requires_reconciliation(
 
 def test_cancellation_of_pending_generic_apply_is_durable_and_prevents_worker_effect(
     operation_world,
+    human_actor,
 ):
     world = operation_world
     plan = _prepared(world)
     queued = _apply(world, plan)
-    cancelled = requests.cancel_job(world["principal"], queued["job_id"])
-    assert cancelled["status"] == "cancelled"
+    with pytest.raises(DiagnosticError) as error:
+        requests.cancel_job(world["principal"], queued["job_id"])
+    assert error.value.code == "NOT_EXECUTABLE"
+    assert plans.get_plan(plan["plan_id"])["state"] == "queued"
+
+    _cancel_through_reviewed_plan(world, queued["job_id"], human_actor)
+    assert start_task(queued["job_id"]) is None
     assert plans.get_plan(plan["plan_id"])["state"] == "cancelled"
     result = operations.execute_operation_job(queued["job_id"], world["config"])
     assert result["execution"]["status"] == "cancelled"

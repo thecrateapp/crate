@@ -1032,6 +1032,21 @@ described above. Directed Ruff check/format and Pyright passed for all fourteen 
 documentation integrity passed for 44 canonical documents. No full local suite was rerun.
 CI and persistent review must be checked against this correction's newly published exact HEAD.
 
+The first correction commit, `3f619f21`, completed persistent review with **no major issues**.
+Its CI exposed an older generic-apply cancellation test still using the legacy pilot endpoint;
+the neighboring focused selection exposed the same assumption for preparation. Both failures
+were reproduced locally. Those tests now use the real `job_cancel` preparation, exact human
+approval and control worker, while explicitly requiring legacy rejection. They verify that a
+cancelled preparation cannot claim/compile or create a metadata plan, and that a cancelled apply
+has a cancelled visible plan and cannot repeat effects. No runtime authorization was relaxed.
+The follow-up selection below passed **162 cases without skips** with real PostgreSQL; its
+counts overlap the earlier 481 and must not be summed. Directed Ruff/Pyright passed. CI and
+persistent review are checked again on the follow-up commit:
+
+```sh
+../.venv/bin/python -m pytest tests/test_agent_library_operations.py tests/test_mcp_operations.py tests/test_agent_job_controls.py -q
+```
+
 ### Repair readiness and effects
 
 `get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,
