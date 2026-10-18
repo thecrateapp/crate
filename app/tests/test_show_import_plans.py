@@ -71,6 +71,25 @@ def scalar(sql):
         return session.execute(text(sql)).scalar_one()
 
 
+def show_records():
+    with read_scope() as session:
+        return {
+            table: [
+                dict(row)
+                for row in session.execute(
+                    text(f"SELECT * FROM {table} ORDER BY {ordering}")
+                ).mappings()
+            ]
+            for table, ordering in (
+                ("shows", "id"),
+                ("show_sources", "id"),
+                ("show_source_aliases", "provider,event_id"),
+                ("user_show_attendance", "id"),
+                ("user_show_reminders", "id"),
+            )
+        }
+
+
 def test_selection_rejects_two_corrections_of_the_same_physical_show(show_world):
     _, original = prepare(show_world)
     _, written = apply(show_world, original)
@@ -213,6 +232,235 @@ def test_changed_show_blocks_entire_exact_selection(show_world):
     _, result = apply(show_world, edited, key="edit-apply")
     assert result["execution"]["status"] == "conflict"
     assert scalar("SELECT count(*) FROM shows") == 1
+
+
+@pytest.mark.parametrize(
+    ("selected_lineup", "provider_lineup"),
+    [
+        (["Support"], ["Support", "Extra support"]),
+        ([], ["Support"]),
+        (["Support", "Extra support"], ["Support"]),
+        (["Support"], ["Support tribute"]),
+    ],
+    ids=["extra-performer", "empty-selection", "missing-performer", "similar-name"],
+)
+def test_creation_plan_rejects_unreviewed_lineup_and_rolls_back_selection(
+    show_world, selected_lineup, provider_lineup
+):
+    from crate.db.repositories.show_imports import read_show_job
+    from crate.db.repositories.shows_attendance import attend_show, create_show_reminder
+    from crate.db.repositories.shows_ticketmaster_upserts import upsert_show
+
+    _, plan = prepare(
+        show_world,
+        candidates=[
+            *items(item_id="other-date", date="2027-03-03"),
+            *items(lineup=selected_lineup),
+        ],
+    )
+    assert plan["executable"] is True
+    assert all(change["before"] == {} for change in plan["changes"])
+    assert plan["changes"][1]["after"]["lineup"] == selected_lineup
+    show_id = upsert_show(
+        "provider-after-preview",
+        "External Band",
+        "2027-03-02",
+        venue="Sala Norte",
+        city="Madrid",
+        country_code="ES",
+        lineup=provider_lineup,
+        tickets_url="https://tickets.example/provider",
+        doors_time="19:00",
+    )
+    assert attend_show(show_world["user"]["id"], show_id)
+    assert create_show_reminder(show_world["user"]["id"], show_id, "day_before")
+    before = show_records()
+    invalidations = scalar(
+        "SELECT count(*) FROM domain_event_outbox WHERE payload_json->>'source'='show_write'"
+    )
+
+    job, result = apply(show_world, plan)
+
+    assert result["execution"]["status"] == "conflict", result
+    assert result["execution"]["error_code"] == "PLAN_STALE"
+    assert result["execution"]["items"] == [
+        {"item_id": item_id, "status": "conflict", "code": "BATCH_NOT_APPLIED"}
+        for item_id in ("other-date", "date-1")
+    ]
+    assert show_records() == before
+    assert (
+        scalar(
+            "SELECT count(*) FROM domain_event_outbox WHERE payload_json->>'source'='show_write'"
+        )
+        == invalidations
+    )
+    replay = operations.apply_operation(
+        show_world["principal"],
+        "shows_import",
+        plan["plan_id"],
+        plan["plan_version"],
+        "apply",
+    )["data"]
+    assert replay["job_id"] == job["job_id"]
+    assert read_show_job(show_world["principal"], job["job_id"])["result"] == result
+    assert show_records() == before
+
+
+@pytest.mark.parametrize(
+    ("selected_artist", "selected_lineup", "provider_artist", "provider_lineup"),
+    [
+        ("External Band", ["Support"], "External Band", ["Support"]),
+        (
+            "External Band",
+            ["Support", "External Band", "Support"],
+            "External Band",
+            ["Support"],
+        ),
+        ("External Band", ["Support"], "Support", ["External Band"]),
+        ("external   BAND", [" SUPPORT "], "External Band", ["Support"]),
+        (" SUPPORT ", [" external   BAND "], "External Band", ["Support"]),
+        ("External Band", None, "External Band", ["Support"]),
+    ],
+    ids=[
+        "identical",
+        "repeated-primary",
+        "inverted-primary",
+        "normalized",
+        "normalized-inverted",
+        "unselected-lineup",
+    ],
+)
+def test_creation_plan_links_same_complete_lineup_and_replays_without_writes(
+    show_world, selected_artist, selected_lineup, provider_artist, provider_lineup
+):
+    from crate.db.repositories.show_imports import read_show_job
+    from crate.db.repositories.shows_attendance import attend_show, create_show_reminder
+    from crate.db.repositories.shows_ticketmaster_upserts import upsert_show
+
+    selection = {"artist_name": selected_artist}
+    if selected_lineup is not None:
+        selection["lineup"] = selected_lineup
+    _, plan = prepare(show_world, candidates=items(**selection))
+    assert plan["executable"] is True
+    assert plan["changes"][0]["before"] == {}
+    show_id = upsert_show(
+        "same-lineup-after-preview",
+        provider_artist,
+        "2027-03-02",
+        venue="Sala Norte",
+        city="Madrid",
+        country_code="ES",
+        lineup=provider_lineup,
+        tickets_url="https://tickets.example/provider",
+        doors_time="19:00",
+    )
+    assert attend_show(show_world["user"]["id"], show_id)
+    assert create_show_reminder(show_world["user"]["id"], show_id, "day_before")
+    before = show_records()
+
+    job, result = apply(show_world, plan)
+
+    assert result["execution"]["status"] == "completed", result
+    assert result["verification"]["status"] == "passed"
+    assert result["execution"]["items"][0]["status"] == "linked_source"
+    assert result["execution"]["items"][0]["show_id"] == show_id
+    saved = show_records()
+    assert len(saved["shows"]) == 1
+    row = saved["shows"][0]
+    assert row["artist_name"] == provider_artist
+    assert {" ".join(name.lower().split()) for name in row["lineup"]} == {
+        "external band",
+        "support",
+    }
+    assert row["revision"] > before["shows"][0]["revision"]
+    assert row["tickets_url"] == "https://tickets.example/provider"
+    assert str(row["doors_time"])[:5] == "19:00"
+    assert (
+        row["field_provenance"]["tickets_url"]
+        == before["shows"][0]["field_provenance"]["tickets_url"]
+    )
+    assert len(saved["show_sources"]) == 2
+    assert saved["show_sources"][0] == before["show_sources"][0]
+    assert saved["show_sources"][1]["provider"] == "manual"
+    for table in ("show_source_aliases", "user_show_attendance", "user_show_reminders"):
+        assert saved[table] == before[table]
+    replay = operations.apply_operation(
+        show_world["principal"],
+        "shows_import",
+        plan["plan_id"],
+        plan["plan_version"],
+        "apply",
+    )["data"]
+    assert replay["job_id"] == job["job_id"]
+    assert read_show_job(show_world["principal"], job["job_id"])["result"] == result
+    assert show_records() == saved
+
+
+@pytest.mark.parametrize(
+    "changed_after_review", [False, True], ids=["approved-removal", "stale-revision"]
+)
+def test_existing_lineup_removal_requires_its_reviewed_revision(
+    show_world, changed_after_review
+):
+    from crate.db.repositories.shows_attendance import attend_show, create_show_reminder
+    from crate.db.repositories.shows_ticketmaster_upserts import upsert_show
+
+    provider = {
+        "venue": "Sala Norte",
+        "city": "Madrid",
+        "country_code": "ES",
+        "lineup": ["Support", "Extra support"],
+        "tickets_url": "https://tickets.example/provider",
+    }
+    show_id = upsert_show("reviewed-lineup", "External Band", "2027-03-02", **provider)
+    assert attend_show(show_world["user"]["id"], show_id)
+    assert create_show_reminder(show_world["user"]["id"], show_id, "day_before")
+    initial = show_records()
+    _, plan = prepare(
+        show_world,
+        candidates=items(
+            existing_show_id=show_id,
+            expected_revision=initial["shows"][0]["revision"],
+            lineup=["Support"],
+        ),
+    )
+    assert plan["executable"] is True
+    assert plan["changes"][0]["before"]["lineup"] == [
+        "External Band",
+        "Support",
+        "Extra support",
+    ]
+    assert plan["changes"][0]["after"]["lineup"] == ["Support"]
+    if changed_after_review:
+        upsert_show(
+            "reviewed-lineup",
+            "External Band",
+            "2027-03-02",
+            **{**provider, "tickets_url": "https://tickets.example/changed"},
+        )
+    before = show_records()
+
+    _, result = apply(show_world, plan)
+
+    saved = show_records()
+    if changed_after_review:
+        assert result["execution"]["status"] == "conflict", result
+        assert result["execution"]["error_code"] == "PLAN_STALE"
+        assert saved == before
+    else:
+        assert result["verification"]["status"] == "passed", result
+        assert result["execution"]["items"][0]["show_id"] == show_id
+        assert saved["shows"][0]["lineup"] == ["External Band", "Support"]
+        assert saved["shows"][0]["revision"] > before["shows"][0]["revision"]
+        assert saved["shows"][0]["tickets_url"] == "https://tickets.example/provider"
+        for table in (
+            "show_source_aliases",
+            "user_show_attendance",
+            "user_show_reminders",
+        ):
+            assert saved[table] == before[table]
+        upsert_show("reviewed-lineup", "External Band", "2027-03-02", **provider)
+        assert show_records()["shows"][0]["lineup"] == ["External Band", "Support"]
 
 
 def test_private_show_job_is_scoped_to_its_current_human_owner(show_world):

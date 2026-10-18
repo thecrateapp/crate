@@ -33,8 +33,10 @@ def apply_sync_album(
     uid = str(UUID(str(album_uid)))
     with optional_scope(session) as current:
         initial = read_sync_state(uid, session=current)
+        # Keep parent updates serialized without blocking centroid FK checks
+        # from a bliss writer that already owns one of this album's tracks.
         current.execute(
-            text("SELECT name FROM library_artists WHERE name=:name FOR UPDATE"),
+            text("SELECT name FROM library_artists WHERE name=:name FOR NO KEY UPDATE"),
             {"name": initial["artist"]["name"]},
         ).scalar_one()
         state = read_sync_state(uid, session=current, locked=True)

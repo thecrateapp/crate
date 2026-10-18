@@ -45,7 +45,8 @@ def _load(current, entity_type: str, entity_uid: str, *, locked: bool) -> dict:
     if entity_type not in _TABLES:
         raise ValueError("Unsupported metadata entity type")
     table = _TABLES[entity_type]
-    # Match sync's parent-first lock order so concurrent edits keep size totals current.
+    # Serialize parent updates with sync, while allowing the KEY SHARE needed
+    # by a concurrent first bliss centroid. Identity changes still conflict.
     if locked and entity_type != "artist":
         parent = (
             "library_albums a"
@@ -57,7 +58,7 @@ def _load(current, entity_type: str, entity_uid: str, *, locked: bool) -> dict:
         current.execute(
             text(
                 f"SELECT ar.id FROM {parent} JOIN library_artists ar ON ar.name=a.artist "
-                f"WHERE {target}.entity_uid=CAST(:uid AS uuid) FOR UPDATE OF ar"
+                f"WHERE {target}.entity_uid=CAST(:uid AS uuid) FOR NO KEY UPDATE OF ar"
             ),
             {"uid": entity_uid},
         ).all()

@@ -705,6 +705,192 @@ def test_quality_retry_plan_reconstructs_global_scope_and_runs_real_quality_hand
     assert row["retry_of"] == original
 
 
+@pytest.fixture
+def raw_task_world(control_world, actor_world, monkeypatch, tmp_path):
+    from crate.db.repositories.runtime_policy import read_runtime_policy_state
+    from crate.resource_governor import ResourceDecision
+
+    state = read_runtime_policy_state()
+    decision = ResourceDecision(
+        allowed=True,
+        policy_revision=state["configured_revision"],
+        policy_hash=state["policy_hash"],
+    )
+    monkeypatch.setattr(
+        "crate.resource_governor.should_defer_task", lambda *_: decision
+    )
+    monkeypatch.setattr(
+        "crate.config.load_config", lambda: {"library_path": str(tmp_path)}
+    )
+    # Keep publication real and force the cache's PostgreSQL storage path.
+    monkeypatch.setattr("crate.db.cache_store.get_redis", lambda: None)
+    monkeypatch.setattr(
+        "crate.analytics.compute_analytics", lambda *_args, **_kwargs: {"bounded": True}
+    )
+    return control_world, actor_world[0]
+
+
+def _approved_raw_task(world, human_actor, operation):
+    if operation == "schedule_run":
+        parameters = {"schedule": "compute_analytics"}
+    else:
+        original = _original(
+            world, task_type="quality_check", params={"scope": "global"}
+        )
+        parameters = {"job_id": original, "scope": "instance"}
+    plan = _prepared(world, operation, parameters)
+    decide(human_actor, plan)
+    arguments = (
+        world["principal"],
+        operation,
+        plan["plan_id"],
+        plan["plan_version"],
+        "apply-raw-task",
+    )
+    accepted = agent_library_operations.apply_operation(*arguments)["data"]
+    assert start_task(accepted["job_id"])
+    result = agent_library_operations.execute_operation_job(accepted["job_id"], {})
+    assert result["execution"]["status"] == "completed", result
+    assert (
+        agent_library_operations.apply_operation(*arguments)["data"]["job_id"]
+        == (accepted["job_id"])
+    )
+    assert (
+        agent_library_operations.execute_operation_job(accepted["job_id"], {}) == result
+    )
+    task = _row(result["execution"]["items"][0]["task_id"])
+    assert task["status"] == "pending"
+    assert task["origin"] == "agent"
+    return task
+
+
+def _raw_effects():
+    with read_scope() as session:
+        cache = dict(
+            session.execute(
+                text("SELECT key,value_json FROM cache WHERE key=ANY(:keys)"),
+                {"keys": ["analytics", "stats"]},
+            ).all()
+        )
+        quality = (
+            session.execute(
+                text("""SELECT version,payload_json,invalidated_at FROM ui_snapshots
+                    WHERE scope='analytics:quality' AND subject_key='global'""")
+            )
+            .mappings()
+            .first()
+        )
+    return {"cache": cache, "quality": dict(quality) if quality else None}
+
+
+def _withdraw_raw_authority(world, monkeypatch, withdrawal):
+    if withdrawal == "credential":
+        revoke_credential(world["principal"].credential_id)
+    elif withdrawal == "actions":
+        monkeypatch.setenv("CRATE_MCP_ACTIONS_ENABLED", "false")
+    elif withdrawal == "endpoint":
+        monkeypatch.setenv("CRATE_MCP_ENABLED", "false")
+
+
+@pytest.mark.parametrize("operation", ["schedule_run", "job_retry"])
+@pytest.mark.parametrize("withdrawal", ["none", "actions", "endpoint", "credential"])
+def test_approved_raw_task_rechecks_flags_and_authority_before_persisting_effects(
+    raw_task_world, human_actor, monkeypatch, operation, withdrawal
+):
+    world, actors = raw_task_world
+    task = _approved_raw_task(world, human_actor, operation)
+    before = _raw_effects()
+    _withdraw_raw_authority(world, monkeypatch, withdrawal)
+
+    try:
+        actors._execute_task(task["type"], task["id"])
+    except DiagnosticError:
+        # A raw task has no agent_jobs row; the generic actor can propagate
+        # its denial after persisting the terminal task failure.
+        assert withdrawal != "none"
+
+    row = _row(task["id"])
+    effects = _raw_effects()
+    assert row["cancellation_acknowledged_at"] is None
+    if withdrawal == "none":
+        assert row["status"] == "completed"
+        if operation == "schedule_run":
+            assert effects["cache"]["analytics"] == {"bounded": True}
+            assert effects["cache"]["stats"]["tracks"] == 0
+        else:
+            assert row["result"]["published"] is True
+            assert effects["quality"]["payload_json"]["ready"] is True
+            assert effects["quality"]["payload_json"]["scanned_tracks"] == 0
+    else:
+        assert effects == before
+        assert row["status"] == "failed"
+        assert row["retry_count"] == 0
+
+
+@pytest.mark.parametrize("withdrawal", ["none", "actions", "endpoint", "credential"])
+def test_raw_analytics_checkpoint_denial_does_not_acknowledge_requested_cancellation(
+    raw_task_world, human_actor, monkeypatch, withdrawal
+):
+    world, actors = raw_task_world
+    task = _approved_raw_task(world, human_actor, "schedule_run")
+    before = _raw_effects()
+
+    def compute(*_args, **_kwargs):
+        request_cancellation(task["id"])
+        _withdraw_raw_authority(world, monkeypatch, withdrawal)
+        return {"must_not_publish": True}
+
+    monkeypatch.setattr("crate.analytics.compute_analytics", compute)
+
+    if withdrawal == "none":
+        actors._execute_task(task["type"], task["id"])
+    else:
+        with pytest.raises(DiagnosticError) as error:
+            actors._execute_task(task["type"], task["id"])
+        assert error.value.code == "FORBIDDEN"
+
+    row = _row(task["id"])
+    assert _raw_effects() == before
+    assert row["cancellation_requested_at"] is not None
+    if withdrawal == "none":
+        assert row["status"] == "cancelled"
+        assert row["cancellation_acknowledged_at"] is not None
+    else:
+        assert row["status"] == "failed"
+        assert row["retry_count"] == 0
+        assert row["cancellation_acknowledged_at"] is None
+        assert (
+            row["result"]["verification"]["status"] == "manual_reconciliation_required"
+        )
+
+
+@pytest.mark.parametrize("origin", ["admin", "scheduler"])
+@pytest.mark.parametrize("task_type", ["compute_analytics", "quality_check"])
+def test_non_agent_raw_task_keeps_running_with_mcp_flags_disabled(
+    raw_task_world, monkeypatch, origin, task_type
+):
+    _world, actors = raw_task_world
+    task_id = create_task(
+        task_type,
+        {"scope": "global"} if task_type == "quality_check" else {},
+        origin=origin,
+        dispatch=False,
+    )
+    monkeypatch.setenv("CRATE_MCP_ENABLED", "false")
+    monkeypatch.setenv("CRATE_MCP_ACTIONS_ENABLED", "false")
+
+    actors._execute_task(task_type, task_id)
+
+    row = _row(task_id)
+    effects = _raw_effects()
+    assert row["status"] == "completed"
+    if task_type == "compute_analytics":
+        assert effects["cache"]["analytics"] == {"bounded": True}
+    else:
+        assert row["result"]["published"] is True
+        assert effects["quality"]["payload_json"]["ready"] is True
+
+
 @pytest.mark.parametrize(
     "params",
     [

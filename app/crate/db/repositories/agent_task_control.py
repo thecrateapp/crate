@@ -1,8 +1,10 @@
 """Closed task controls with retained domain authority and exact ownership."""
 
+import os
+
 from sqlalchemy import text
 
-from crate.agent_access import AgentPrincipal, authorization_context
+from crate.agent_access import AgentPrincipal, actions_enabled, authorization_context
 from crate.agent_diagnostics import DiagnosticError
 from crate.db.repositories import agent_requests as requests
 from crate.db.repositories.task_control import request_cancellation
@@ -249,6 +251,11 @@ def check_task_authority(task_id):
         )
         if row["origin"] != "agent":
             return stopping
+        if (
+            not actions_enabled()
+            or os.environ.get("CRATE_MCP_ENABLED", "false").lower() != "true"
+        ):
+            raise DiagnosticError("FORBIDDEN", "MCP task execution is disabled")
         if not row["origin_context"] or row["origin_principal_id"] is None:
             raise DiagnosticError(
                 "FORBIDDEN", "Agent task has no retained authorization"

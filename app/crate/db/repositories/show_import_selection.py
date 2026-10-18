@@ -197,8 +197,11 @@ def _same_selected_values(candidate, row):
         value = candidate.get(key)
         if value is None:
             continue
-        if key == "lineup":
-            if not set(value) <= set(row.get("lineup") or []):
+        if key in {"artist_name", "lineup"}:
+            if candidate.get("lineup") is not None:
+                if identities._artist_names(candidate) != identities._artist_names(row):
+                    return False
+            elif identities.normalize(value) != identities.normalize(row.get(key)):
                 return False
         elif key == "date":
             if str(value) != str(row[key]):

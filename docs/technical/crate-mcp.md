@@ -1116,6 +1116,63 @@ changed Python files. No full local suite, migration rewrite, deployment or flag
 part of this correction. CI and persistent review must be checked against its newly published
 exact HEAD.
 
+### Three confirmed worker and show corrections (2026-10-18)
+
+A further review of `745f96f0` found three P2 defects, despite its 20 successful CI checks.
+Permanent focused regressions reproduced **14 expected failures** before their respective fixes:
+
+1. **Disable gates on derived worker jobs.** Raw catalog jobs created by an approved
+   `schedule_run` or `job_retry` retain their authorization and now also require both
+   `CRATE_MCP_ENABLED` and `CRATE_MCP_ACTIONS_ENABLED` at worker admission and cooperative
+   checkpoints. Disabling either flag prevents new cache/snapshot publication. Revocation and
+   required grants are still checked; an authority failure during requested cancellation never
+   becomes a successful cancellation acknowledgment. Ordinary Admin/scheduler tasks continue
+   independently of MCP flags. Six regressions failed before this change. Sixteen cases cover
+   approved parent plans, durable replay, raw child tasks, both flags, revocation, requested
+   cancellation and non-agent origins, with actual actors, handlers and PostgreSQL persistence.
+2. **Exact lineup after a creation preview.** If a provider creates the same show between
+   preparation and application, an explicitly selected lineup must still match the complete
+   normalized performer set, including both primary artists. A subset must not authorize
+   deleting an additional performer that was absent from the reviewed `before`. A mismatch
+   conflicts and rolls back the complete selection, including any earlier row in the batch.
+   Equivalent case/whitespace, repeated names and inverted primary artists still deduplicate;
+   omitting lineup preserves the provider's lineup. Explicitly removing an existing performer
+   remains possible with its reviewed revision. Five regressions failed before correction.
+   Twelve cases verify full saved rows, aliases, provenance, attendance/reminders, unselected
+   fields, invalidation, revision conflicts and durable replay without further effects.
+3. **First bliss centroid versus metadata/sync.** Metadata edits and strict album sync retain
+   their parent-first artist lock using `FOR NO KEY UPDATE`. This excludes other parent updates
+   and protects identity while allowing the FK `KEY SHARE` needed by a bliss writer inserting
+   the first artist centroid. Track and album locks remain unchanged; vector, processing state,
+   signature and centroid still commit in one transaction. Three PostgreSQL regressions
+   reproduced actual deadlocks for track metadata, album metadata and strict sync. Nine cases
+   cover first/existing centroids and prove that a concurrent parent folder update must wait
+   until each library writer commits. Metadata can legitimately report `SOURCE_CHANGED` after
+   waiting for the vector write; strict sync excludes DSP fields from its source version.
+
+Concurrency cases require the expected backend PID in `pg_blocking_pids` before releasing the
+writer. Timeouts only bound failures. They use real temporary FLAC files and explicit DSP vectors;
+no live DSP computation or external provider is exercised. Analytics replaces only its expensive
+computation and forces cache persistence through PostgreSQL; quality computes and publishes its
+real metadata-only snapshot. Broker dispatch and progress delivery are simulated. Parent-lock
+coordination here concerns planned metadata and strict sync; legacy scanner transactions are
+not a globally serialized filesystem/database snapshot.
+
+Focused validation passed **561 distinct cases without skips** in two sequential PostgreSQL
+selections (252 and 309 cases):
+
+```sh
+cd app
+../.venv/bin/python -m pytest tests/test_bliss_writer_serialization.py tests/test_mcp_operations.py tests/test_task_control_actor.py tests/test_task_cooperative_cancellation.py tests/test_show_import_plans.py tests/test_show_identity.py -q
+../.venv/bin/python -m pytest tests/test_agent_metadata.py tests/test_agent_analysis_sync.py tests/test_analysis_writer_serialization.py tests/test_analysis_source_fence.py tests/test_agent_sync_identity_regressions.py tests/test_agent_oauth_jobs.py tests/test_agent_job_controls.py tests/test_db_access_boundaries.py tests/test_runtime_boundaries.py -q
+```
+
+Both used Python 3.13 and repository dependencies in the same disposable Linux image with
+PostgreSQL/Testcontainers described above. Directed Ruff check/format and Pyright passed for
+all seven changed Python files. No full local suite, migration, deployment or flag activation
+is part of this correction. Independent SPEC and QUALITY reviews found no remaining P1/P2
+in these changes. CI and persistent review must be checked against the newly published exact HEAD.
+
 ### Repair readiness and effects
 
 `get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,
