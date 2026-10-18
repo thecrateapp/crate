@@ -12,6 +12,9 @@ from crate.db.tx import optional_scope, read_scope, transaction_scope
 
 ACCESS_TOKEN_PREFIX = "crv_"
 ACCESS_TOKEN_TYPE = "virtualdj"
+PLAYBACK_CONTINUATION_TOKEN_TYPE = "playback_continuation"
+PLAYBACK_CONTINUATION_SCOPE = "playback.continuation"
+PLAYBACK_CONTINUATION_TTL = timedelta(hours=12)
 ACCESS_TOKEN_BYTES = 32
 ACCESS_TOKEN_PREFIX_LENGTH = 12
 LAST_USED_UPDATE_INTERVAL = timedelta(minutes=5)
@@ -68,6 +71,8 @@ def _insert_token(
     scopes: list[str],
     expires_at: datetime | None,
     now: datetime,
+    token_type: str = ACCESS_TOKEN_TYPE,
+    session_id: str | None = None,
 ) -> dict[str, Any]:
     secret = _generate_secret()
     token_prefix = secret[:ACCESS_TOKEN_PREFIX_LENGTH]
@@ -77,25 +82,27 @@ def _insert_token(
                 """
                 INSERT INTO user_access_tokens (
                     user_id, name, token_type, token_digest, token_prefix,
-                    scopes, expires_at, created_at
+                    scopes, expires_at, created_at, session_id
                 ) VALUES (
                     :user_id, :name, :token_type, :token_digest, :token_prefix,
-                    CAST(:scopes AS jsonb), :expires_at, :created_at
+                    CAST(:scopes AS jsonb), :expires_at, :created_at,
+                    :session_id
                 )
                 RETURNING id, user_id, name, token_type, token_digest,
                           token_prefix, scopes, expires_at, revoked_at,
-                          created_at, last_used_at
+                          created_at, last_used_at, session_id
                 """
             ),
             {
                 "user_id": user_id,
                 "name": name,
-                "token_type": ACCESS_TOKEN_TYPE,
+                "token_type": token_type,
                 "token_digest": _digest(secret),
                 "token_prefix": token_prefix,
                 "scopes": json.dumps(scopes),
                 "expires_at": expires_at,
                 "created_at": now,
+                "session_id": session_id,
             },
         )
         .mappings()
@@ -128,11 +135,47 @@ def create_access_token(
         )
 
 
+def issue_playback_continuation_token(
+    *,
+    user_id: int,
+    session_id: str,
+    now: datetime | None = None,
+    session=None,
+) -> dict[str, Any]:
+    if not session_id:
+        raise ValueError("A session is required for a continuation token")
+    issued_at = now or datetime.now(timezone.utc)
+    with optional_scope(session) as current:
+        current.execute(
+            text(
+                """
+                DELETE FROM user_access_tokens
+                WHERE session_id = :session_id
+                  AND token_type = :token_type
+                """
+            ),
+            {
+                "session_id": session_id,
+                "token_type": PLAYBACK_CONTINUATION_TOKEN_TYPE,
+            },
+        )
+        return _insert_token(
+            current,
+            user_id=user_id,
+            name="Playback continuation",
+            scopes=[PLAYBACK_CONTINUATION_SCOPE],
+            expires_at=issued_at + PLAYBACK_CONTINUATION_TTL,
+            now=issued_at,
+            token_type=PLAYBACK_CONTINUATION_TOKEN_TYPE,
+            session_id=session_id,
+        )
+
+
 def _token_query(where: str) -> str:
     return f"""
         SELECT t.id, t.user_id, t.name, t.token_type, t.token_digest,
                t.token_prefix, t.scopes, t.expires_at, t.revoked_at,
-               t.created_at, t.last_used_at
+               t.created_at, t.last_used_at, t.session_id
         FROM user_access_tokens AS t
         WHERE {where}
     """
@@ -142,8 +185,17 @@ def get_access_token(user_id: int, token_id: int) -> dict[str, Any] | None:
     with read_scope() as session:
         row = (
             session.execute(
-                text(_token_query("t.user_id = :user_id AND t.id = :token_id")),
-                {"user_id": user_id, "token_id": token_id},
+                text(
+                    _token_query(
+                        "t.user_id = :user_id AND t.id = :token_id"
+                        " AND t.token_type = :token_type"
+                    )
+                ),
+                {
+                    "user_id": user_id,
+                    "token_id": token_id,
+                    "token_type": ACCESS_TOKEN_TYPE,
+                },
             )
             .mappings()
             .first()
@@ -156,7 +208,7 @@ def list_access_tokens(
     *,
     include_revoked: bool = False,
 ) -> list[dict[str, Any]]:
-    conditions = ["t.user_id = :user_id"]
+    conditions = ["t.user_id = :user_id", "t.token_type = :token_type"]
     if not include_revoked:
         conditions.append("t.revoked_at IS NULL")
     with read_scope() as session:
@@ -166,7 +218,7 @@ def list_access_tokens(
                     _token_query(" AND ".join(conditions))
                     + " ORDER BY t.created_at DESC"
                 ),
-                {"user_id": user_id},
+                {"user_id": user_id, "token_type": ACCESS_TOKEN_TYPE},
             )
             .mappings()
             .all()
@@ -339,12 +391,18 @@ def rotate_access_token(user_id: int, token_id: int) -> dict[str, Any]:
                     _token_query(
                         "t.user_id = :user_id"
                         " AND t.id = :token_id"
+                        " AND t.token_type = :token_type"
                         " AND t.revoked_at IS NULL"
                         " AND (t.expires_at IS NULL OR t.expires_at > :now)"
                     )
                     + " FOR UPDATE"
                 ),
-                {"user_id": user_id, "token_id": token_id, "now": now},
+                {
+                    "user_id": user_id,
+                    "token_id": token_id,
+                    "token_type": ACCESS_TOKEN_TYPE,
+                    "now": now,
+                },
             )
             .mappings()
             .first()
@@ -375,10 +433,14 @@ def rotate_access_token(user_id: int, token_id: int) -> dict[str, Any]:
 __all__ = [
     "ACCESS_TOKEN_PREFIX",
     "ACCESS_TOKEN_TYPE",
+    "PLAYBACK_CONTINUATION_SCOPE",
+    "PLAYBACK_CONTINUATION_TOKEN_TYPE",
+    "PLAYBACK_CONTINUATION_TTL",
     "SUPPORTED_ACCESS_TOKEN_SCOPES",
     "create_access_token",
     "get_access_token",
     "get_access_token_by_secret",
+    "issue_playback_continuation_token",
     "list_access_tokens",
     "resolve_access_token",
     "resolve_access_token_by_id",

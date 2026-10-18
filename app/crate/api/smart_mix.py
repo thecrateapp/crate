@@ -7,7 +7,11 @@ from uuid import UUID
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 
-from crate.api.auth import _require_vdj_scope
+from crate.api.auth import (
+    _require_auth,
+    _require_transition_plan_access,
+    _require_vdj_scope,
+)
 from crate.api.openapi_responses import COMMON_ERROR_RESPONSES
 from crate.api.schemas.smart_mix import (
     CompatibilityScoreResponse,
@@ -16,6 +20,7 @@ from crate.api.schemas.smart_mix import (
     MixProfileResponse,
     TransitionContextRequest,
     TransitionEdgeRequest,
+    PlaybackContinuationTokenResponse,
     TransitionPlanBatchRequest,
     TransitionPlanBatchResponse,
     TransitionPlanResponse,
@@ -25,6 +30,7 @@ from crate.db.cache_store import (
     set_smart_mix_plan_caches,
 )
 from crate.db.queries.smart_mix_compatible import get_compatible_track_inputs
+from crate.db.repositories.access_tokens import issue_playback_continuation_token
 from crate.db.repositories.smart_mix import (
     get_track_mix_profile_by_entity_uid,
     get_track_mix_profiles_by_entity_uids,
@@ -126,6 +132,32 @@ def compatible_tracks(
 
 
 @router.post(
+    "/playback/continuation-token",
+    response_model=PlaybackContinuationTokenResponse,
+    responses=COMMON_ERROR_RESPONSES,
+    summary="Issue a session-bound token for native background planning",
+)
+def playback_continuation_token(
+    request: Request,
+) -> PlaybackContinuationTokenResponse:
+    user = _require_auth(request)
+    session_id = user.get("session_id")
+    if user.get("auth_type") == "access_token" or not session_id:
+        raise HTTPException(
+            status_code=403,
+            detail="An interactive session is required",
+        )
+    issued = issue_playback_continuation_token(
+        user_id=user["id"],
+        session_id=str(session_id),
+    )
+    return PlaybackContinuationTokenResponse(
+        token=issued["token"],
+        expires_at=issued["expires_at"],
+    )
+
+
+@router.post(
     "/playback/transition-plans",
     response_model=TransitionPlanBatchResponse,
     response_model_exclude_none=True,
@@ -136,7 +168,7 @@ def transition_plans(
     request: Request,
     payload: TransitionPlanBatchRequest = Body(...),
 ) -> TransitionPlanBatchResponse:
-    _require_vdj_scope(request, "vdj.smart_mix.read")
+    _require_transition_plan_access(request)
     unique_edges = _deduplicate_edges(payload.edges)
     entity_uids = _ordered_entity_uids(unique_edges)
     profiles = get_track_mix_profiles_by_entity_uids(entity_uids)

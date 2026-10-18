@@ -207,11 +207,28 @@ _VDJ_ACCESS_TOKEN_ROUTES: tuple[tuple[frozenset[str], re.Pattern[str]], ...] = t
 )
 
 
+_CONTINUATION_ACCESS_TOKEN_ROUTES: tuple[
+    tuple[frozenset[str], re.Pattern[str]], ...
+] = ((frozenset({"POST"}), re.compile(r"/api/playback/transition-plans")),)
+
+
 def _is_vdj_access_token_request(method: str, path: str) -> bool:
     normalized_method = method.upper()
     return any(
         normalized_method in methods and pattern.fullmatch(path)
         for methods, pattern in _VDJ_ACCESS_TOKEN_ROUTES
+    )
+
+
+def _is_access_token_request(user: dict, method: str, path: str) -> bool:
+    from crate.db.repositories.access_tokens import PLAYBACK_CONTINUATION_TOKEN_TYPE
+
+    if user.get("token_type") != PLAYBACK_CONTINUATION_TOKEN_TYPE:
+        return _is_vdj_access_token_request(method, path)
+    normalized_method = method.upper()
+    return any(
+        normalized_method in methods and pattern.fullmatch(path)
+        for methods, pattern in _CONTINUATION_ACCESS_TOKEN_ROUTES
     )
 
 
@@ -1519,11 +1536,13 @@ class AuthMiddleware:
             str(session_id) if session_id else None,
         )
 
-    def _resolve_access_token_user(self, token: str) -> dict | None:
-        from crate.db.repositories.access_tokens import resolve_access_token
-
-        resolved = resolve_access_token(token)
+    def _access_token_user(self, resolved: dict | None) -> dict | None:
         if not resolved:
+            return None
+        bound_session_id = resolved.get("session_id")
+        if bound_session_id and not self._resolve_session_user(
+            resolved["user_id"], str(bound_session_id)
+        ):
             return None
         return {
             "id": resolved["user_id"],
@@ -1534,26 +1553,19 @@ class AuthMiddleware:
             "session_id": None,
             "auth_type": "access_token",
             "access_token_id": resolved["id"],
+            "token_type": resolved.get("token_type"),
             "scopes": resolved["scopes"],
         }
+
+    def _resolve_access_token_user(self, token: str) -> dict | None:
+        from crate.db.repositories.access_tokens import resolve_access_token
+
+        return self._access_token_user(resolve_access_token(token))
 
     def _resolve_access_token_user_by_id(self, token_id: int) -> dict | None:
         from crate.db.repositories.access_tokens import resolve_access_token_by_id
 
-        resolved = resolve_access_token_by_id(token_id)
-        if not resolved:
-            return None
-        return {
-            "id": resolved["user_id"],
-            "email": resolved["email"],
-            "role": resolved.get("role", "user"),
-            "username": resolved.get("username"),
-            "name": resolved.get("name"),
-            "session_id": None,
-            "auth_type": "access_token",
-            "access_token_id": resolved["id"],
-            "scopes": resolved["scopes"],
-        }
+        return self._access_token_user(resolve_access_token_by_id(token_id))
 
     async def resolve_user(self, request: Request) -> dict | None:
         user = None
@@ -1644,7 +1656,7 @@ class AuthMiddleware:
                 }
 
         if user and user.get("auth_type") == "access_token":
-            if not _is_vdj_access_token_request(request.method, request.url.path):
+            if not _is_access_token_request(user, request.method, request.url.path):
                 return None
         return user
 
@@ -1657,7 +1669,7 @@ class AuthMiddleware:
         scope.setdefault("state", {})
         user = await self.resolve_user(request)
         if user and user.get("auth_type") == "access_token":
-            if not _is_vdj_access_token_request(request.method, request.url.path):
+            if not _is_access_token_request(user, request.method, request.url.path):
                 user = None
         scope["state"]["user"] = user
         await self.app(scope, receive, send)
@@ -1726,6 +1738,29 @@ def _require_vdj_scope(request: Request, scope: str) -> dict:
             detail=f"Access token is missing required scope: {scope}",
         )
     return user
+
+
+def _require_transition_plan_access(request: Request) -> dict:
+    from crate.db.repositories.access_tokens import (
+        PLAYBACK_CONTINUATION_SCOPE,
+        PLAYBACK_CONTINUATION_TOKEN_TYPE,
+    )
+
+    user = _require_auth(request)
+    if (
+        user.get("auth_type") == "access_token"
+        and user.get("token_type") == PLAYBACK_CONTINUATION_TOKEN_TYPE
+    ):
+        if PLAYBACK_CONTINUATION_SCOPE not in set(user.get("scopes") or []):
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Access token is missing required scope: "
+                    f"{PLAYBACK_CONTINUATION_SCOPE}"
+                ),
+            )
+        return user
+    return _require_vdj_scope(request, "vdj.smart_mix.read")
 
 
 # ── Routes ───────────────────────────────────────────────────────

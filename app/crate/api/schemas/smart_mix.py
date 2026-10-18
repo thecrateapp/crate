@@ -190,6 +190,11 @@ class TransitionPlanBatchResponse(SmartMixApiModel):
     plans: list[TransitionPlanResponse]
 
 
+class PlaybackContinuationTokenResponse(SmartMixApiModel):
+    token: str
+    expires_at: datetime = Field(alias="expiresAt")
+
+
 class CompatibilityScoreResponse(SmartMixApiModel):
     planner_version: int = Field(serialization_alias="plannerVersion")
     overall: float = Field(ge=0.0, le=1.0)

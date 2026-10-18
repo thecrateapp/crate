@@ -32,3 +32,7 @@ class UserAccessToken(Base):
         DateTime(timezone=True), nullable=False
     )
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    session_id: Mapped[str | None] = mapped_column(
+        Text,
+        ForeignKey("sessions.id", ondelete="CASCADE"),
+    )
