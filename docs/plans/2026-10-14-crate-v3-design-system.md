@@ -1,7 +1,8 @@
 # Crate v3 design system
 
 Current implementation: checkpoints through 1Y are approved and published (`ea6ebdc8`);
-1Z is published as `2efb4754`. Task 1b.8 / 1AA is the local Analysis migration at `#analisis-admin`, awaiting Diego before publication or the next group.
+1AA is published as `13272706`. Local1AB implements the approved three-block Dashboard and
+Ops/Analysis font corrections, awaiting Diego before commit/push. See the final handover.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
 `/Users/diego/Code/crate-v3`, branch `feat/crate_v3`. The handover owns implementation/QA status.
@@ -975,8 +976,10 @@ interface StatNumberProps {
 #### `HairlineList` / `HairlineRow`
 
 ```ts
-interface HairlineRowProps
-  extends Omit<LiHTMLAttributes<HTMLLIElement>, "children"> {
+interface HairlineRowProps extends Omit<
+  LiHTMLAttributes<HTMLLIElement>,
+  "children"
+> {
   index?: number; // zero-padded mono index, 2.4ch to 3ch
   trailing?: ReactNode; // fixed-ch mono meta or a StatusDot
   muted?: boolean; // title in text-subtle
@@ -4208,7 +4211,6 @@ Where the Status differs from the Default (D3, D18, D29, D38), the Status wins.
 | D42 | `StatusDot on` hue                                                                                                                                                                                                                                                                                                                                            | Fixed Crate v3 brand accent; shape and word distinguish state without hue                                                                                                                                                                                                                                                            | amended 2026-10-15 with PD53; no alternate accent variants                                                                                                                   |
 | D43 | Stack sampler placement (4.22): (a) a daemon thread in crate-api behind a Redis leader lock, or (b) crate-worker behind a read-only docker-socket-proxy                                                                                                                                                                                                       | (a): crate-api already mounts the socket and runs the Stack actions, so (b) only pays off if the actions move behind the proxy too and the API drops the socket; (a) keeps the sampler off the event loop with per-call timeouts and a budget. Plan Task 5.5's files follow the answer                                               | decided 2026-10-15: (a) (PD54)                                                                                                                                               |
 
-
 ## Linux implementation note — 1T / Admin status colour, 2026-10-16
 
 Admin now maps active/completed/in-library readings to `accent-action-hi`, waiting/review/stale/
@@ -4227,7 +4229,6 @@ proof of arbitrary runtime prop or CSS data flow; consumer tests cover represent
 Icon retirement and page geometry remain their later tasks. The real-component specimen is at
 `#estado-admin`; advisory Chromium captures do not replace canonical Linux CI or native/AT QA.
 
-
 ## Linux implementation note — 1U / Skip navigation, 2026-10-17
 
 Both app shells use shared `primitives/SkipLink.tsx` and the `.crate-skip-link` recipe. It is
@@ -4240,7 +4241,6 @@ and excluded from sequential Tab navigation. Explicit activation retains the URL
 and continues from the content; it does not change automatic route focus or player behavior.
 The real-component specimen is at `#saltar-contenido`, using isolated documents so each example
 has one main and a genuine first keyboard stop. Native/AT and canonical CI QA remain pending.
-
 
 ## Linux implementation note — 1V / Admin icon inventory, 2026-10-17
 
@@ -4272,7 +4272,6 @@ portal, anchored with the standard additive PopoverAnchor export. The input reta
 Radix owns outside/Escape behavior. The field's transform can no longer trap results behind
 later positioned actions. Z-index tokens and existing Popover consumers remain unchanged.
 
-
 ## Linux implementation note — 1Y / Admin operational surfaces, 2026-10-17
 
 1X is approved/published as `b628a438`. Admin-local OpsPageHero/OpsPanel/OpsStatTile now use
@@ -4283,7 +4282,6 @@ caption spacing and 1T tone mappings remain. The three older 1T examples use the
 Real components are mounted at `#superficies-admin`, with idle/busy and disclosure samples.
 This is a bounded contract migration; other page icons are pending. No shared/Listen/Desktop
 API, dependency, canonical capture or pinned-site revision change. Stop for Diego at 1Y.
-
 
 ## Linux implementation note — 1Z / Logs and Stack, 2026-10-17
 
@@ -4301,7 +4299,6 @@ contracts remain unchanged. Stop for Diego at 1Z; canonical/native/full phase QA
 Diego's same-checkpoint filter feedback replaces Stack's forced-height CratePill controls with
 shared SegmentedControl radio chips: 32px with a fine pointer, 44px with a coarse pointer, matching
 Logs level filters in height, radius, border, padding and type. Arrow-key selection stays shared.
-
 
 Diego's later 1Z summary-row feedback also unifies the Logs/Stack header status/count labels as
 static `CrateChip` tags. Do not mix them with `CratePill`'s 32/44px control geometry in one summary
@@ -4340,3 +4337,32 @@ Older snapshots/no recorded result show the existing empty state. A dated untitl
 its output with an Untitled track fallback. No raw fingerprint/hash is exposed. The new additive
 backend projection is prepared by the worker, not fetched separately by this UI; shared visual
 contracts and the later TrackReadout plan are unchanged.
+
+## 2026-10-18 — 1AA published; 1AB provisional, typography and Dashboard analysis
+
+1AA is approved/published as 13272706. Local Dashboard icon changes retain loading and disclosure
+UX; data/action/chart contracts remain intact. User font review exposed Poppins inherited by
+Admin Ops headers/labels/numerals and local Analysis. Their existing V3 face hierarchy is now
+applied, with Poppins body/controls and native/shared exceptions preserved. Container-based
+metric columns keep long Mono labels inside their own field, with 8px label/value spacing.
+
+Diego rejected Dashboard's density and asked for analysis. His confirmed priority is checking
+whether the system and its jobs function. See
+[Dashboard simplification analysis](2026-10-18-crate-v3-dashboard-simplification-analysis.md).
+It proposes three information blocks and identifies evidence missing from the current healthy/
+worker/progress summaries. This is a proposal pending review, not an approved change of PD §4.1
+or implementation Task 3.3. **1AB remains provisional; no further product implementation, commit/
+push or next group at this analysis stop.** Final handover records validation and limits.
+
+## 2026-10-18 — approved and locally implemented 1AB composition
+
+Diego approved implementing the three-block Dashboard using only data already available and
+reviewing it before commit. This supersedes the provisional analysis stop: report/service state,
+reported work and fresh offline-service interruptions replace the four-tile/library/diagnostics
+composition. Future health/governor/worker-liveness contracts are not implemented or invented.
+The existing ops provider supplies all values; old/unknown data stays explicit, progress is
+derived only from valid reported fields and a local deadline expires the display without polling.
+Maintenance moves to a named shared secondary dialog with original typed callbacks and matching
+endpoint capabilities; functional loading/close glyphs remain. Admin/Listen identity, 8px/44px
+contracts and prior checkpoints stay intact. See final handover and
+[execution plan](2026-10-18-crate-v3-dashboard-implementation.md). **Stop at 1AB before publication.**

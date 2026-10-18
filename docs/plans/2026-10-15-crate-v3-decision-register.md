@@ -492,7 +492,6 @@ The next task is 1b.3 / proposed checkpoint 1Q, with a review stop before later 
 publication. Follow the tracked Linux bootstrap in `2026-10-16-crate-v3-linux-handover.md`;
 use the existing `feat/crate_v3` remote branch and preserve the persistent component preview.
 
-
 ### Checkpoint 1Q — text tabs and app-local URL state, 2026-10-16
 
 Diego assigned only Task 1b.3 and requested isolation from the agent working on Crate MCP.
@@ -513,13 +512,11 @@ advance to 1b.4, merge/rebase, deploy, release or regenerate canonical baselines
 Focused checks only, with one test/browser worker; full validation remains at phase close.
 Canonical 33 Linux PNGs/1M manifest and pending 1N–1P Linux/native QA remain unchanged.
 
-
 ### Checkpoint 1Q approval — 2026-10-16
 
 Diego approved 1Q and authorised its commit/push and continuation to Task 1b.4, preserving
 the active preview and stopping for review at checkpoint 1R. This supersedes 1Q's local-only
 publication stop above. No CI/baseline update, PR, merge/rebase, deployment or release is implied.
-
 
 ### Checkpoint 1R — states, local review, 2026-10-16
 
@@ -538,7 +535,6 @@ Diego questioned the yellow dot beside the large page error title: “puede que 
 identificador visual, pero no ahi”. Move it into the eyebrow beside `Error de servicio · 503`;
 he confirmed “pefecto, ese es su sitio”. This approves that placement, not the whole 1R checkpoint.
 Keep the title clean; compact error text still uses the shared warning state treatment.
-
 
 ### Checkpoint 1R publication / 1S local review — 2026-10-16
 
@@ -566,7 +562,6 @@ fidelity limit; never substitute current website HEAD or vnext. Stop at 1S befor
 1b.6. The existing 33 canonical PNGs and 1M manifest, Linux comparisons, native QA and phase-close
 validation remain separate.
 
-
 ### 1S review correction — attached seek head, 2026-10-16
 
 Diego observed the progress head moving separately from the luminous beam. The beam animated
@@ -574,7 +569,6 @@ its transform for 150 ms while both head variants changed left position immediat
 existing appearance and geometry, but share the same duration/easing through `motion-duration-fast`.
 Reduced motion must suppress movement transitions on both beam and heads. This is a local 1S
 bugfix, not checkpoint approval or authorisation to publish or continue to 1b.6.
-
 
 ### 1S review correction — one moving beam edge and smaller head, 2026-10-16
 
@@ -589,7 +583,6 @@ The interaction area remains 40/44 px. Preserve existing seek, Jam and keyboard 
 Natural rAF sampling during uninterrupted/reversing dragging reproduced the old separation.
 The earlier test artificially aligned animation times and missed it; replace that test with
 observations of actual frames. These corrections stay local at 1S, pending Diego's review.
-
 
 ## Linux checkpoint 1T — status-colour application, 2026-10-16
 
@@ -609,7 +602,6 @@ Diego's no-baseline/no-full-CI iteration rule overrides this task's historical c
 instruction. Advisory real-component preview checks support 1T; canonical Linux record/import/
 comparison and native/AT checks remain phase-close work. Stop before 1T publication or 1b.7.
 
-
 ## Linux checkpoint 1U — Skip navigation, 2026-10-17
 
 Diego approved and authorised publication of 1T (`5308c391`) and Task 1b.7 locally, with a stop
@@ -622,7 +614,6 @@ These choices preserve existing deep-link state and avoid expanding this accessi
 into later navigation redesigns. Canonical Linux CI/native/AT gates remain pending; stop before
 1U publication or 1b.8. No new dependency or site-pin change.
 
-
 ## Task 1b.8 inventory gate — checkpoint 1V, 2026-10-17
 
 1U is approved/published (`afed5a3c`). The local [1V inventory](2026-10-17-crate-v3-admin-icon-inventory.md)
@@ -633,7 +624,6 @@ their own action controls still follow Admin's text policy. No new icon allowlis
 migration is included. The proposed first later group is Sidebar/CommandPalette/Shell, with tests
 for permissions, keyboard, collapsed/mobile navigation and unchanged skip links. Stop at 1V
 before publication/first group; this records a proposal, not Diego's approval of its details.
-
 
 ## Functional UX glyphs retained — Diego, 2026-10-17 / checkpoint 1W
 
@@ -675,7 +665,6 @@ stacking context with the common portalled dropdown and its anchored primitive; 
 another z-index scale. Replace document-based outside detection so native portal result clicks
 are preserved. This needs only an additive PopoverAnchor export; existing consumers keep their API.
 
-
 ### 2026-10-17 — 1X published; 1Y operational headings and readings
 
 Diego approved 1X and authorised commit/push plus the next bounded Admin group, preserving UX
@@ -685,7 +674,6 @@ specimens. The action/children slots keep their behavior and functional glyphs; 
 does not cover deleting other page icons. Read-only label/value pairs follow the shared real
 8px `.crate-form-field` contract. No shared or Listen/Desktop contract change is required.
 Review `#superficies-admin`; do not publish 1Y or begin the following group before Diego.
-
 
 ### 2026-10-17 — 1Y published; 1Z Logs/Stack controls
 
@@ -733,3 +721,32 @@ other data calculations. Three explicit result kinds prevent misleading Bliss co
 card; fingerprint source comes from its own stored result. Later unified recent/instruments and
 other action output histories remain pending. This amendment supersedes the original 1AA
 no-backend-change scope only for this field; publication/next group still requires Diego.
+
+## 2026-10-18 — 1AA published; 1AB provisional, typography and Dashboard analysis
+
+1AA is approved/published as 13272706. Local Dashboard icon changes retain loading and disclosure
+UX; data/action/chart contracts remain intact. User font review exposed Poppins inherited by
+Admin Ops headers/labels/numerals and local Analysis. Their existing V3 face hierarchy is now
+applied, with Poppins body/controls and native/shared exceptions preserved. Container-based
+metric columns keep long Mono labels inside their own field, with 8px label/value spacing.
+
+Diego rejected Dashboard's density and asked for analysis. His confirmed priority is checking
+whether the system and its jobs function. See
+[Dashboard simplification analysis](2026-10-18-crate-v3-dashboard-simplification-analysis.md).
+It proposes three information blocks and identifies evidence missing from the current healthy/
+worker/progress summaries. This is a proposal pending review, not an approved change of PD §4.1
+or implementation Task 3.3. **1AB remains provisional; no further product implementation, commit/
+push or next group at this analysis stop.** Final handover records validation and limits.
+
+## 2026-10-18 — approved and locally implemented 1AB composition
+
+Diego approved implementing the three-block Dashboard using only data already available and
+reviewing it before commit. This supersedes the provisional analysis stop: report/service state,
+reported work and fresh offline-service interruptions replace the four-tile/library/diagnostics
+composition. Future health/governor/worker-liveness contracts are not implemented or invented.
+The existing ops provider supplies all values; old/unknown data stays explicit, progress is
+derived only from valid reported fields and a local deadline expires the display without polling.
+Maintenance moves to a named shared secondary dialog with original typed callbacks and matching
+endpoint capabilities; functional loading/close glyphs remain. Admin/Listen identity, 8px/44px
+contracts and prior checkpoints stay intact. See final handover and
+[execution plan](2026-10-18-crate-v3-dashboard-implementation.md). **Stop at 1AB before publication.**

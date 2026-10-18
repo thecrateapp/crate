@@ -3,10 +3,11 @@
 Status: product design, revised 2026-10-15. Canonical clone `/Users/diego/Code/crate-v3`, branch
 `feat/crate_v3`. The handover records implementation and QA status; historical analysis is not a
 current progress report. Checkpoints through 1Y are approved and published (`ea6ebdc8`).
-1Z is published as `2efb4754`. Task 1b.8 / checkpoint 1AA is the local Analysis migration at `#analisis-admin`, awaiting review before publication or the next group. The final handover supersedes historical local-only notes. Diego's 1S review explicitly
+1AA is published as `13272706`. Local1AB implements the approved three-block Dashboard and
+Ops/Analysis font corrections, awaiting review before commit/push. The final handover and the
+2026-10-18 composition amendment below supersede the provisional analysis stop. Diego's 1S review explicitly
 preserves the current Listen play essence (halo, layers and progress ring) and seek trail,
 adapted to V3 with 1–2 px strokes; see DS §5.5.
-
 
 Scope: Admin (`app/ui`), Listen (`app/listen`, which also ships as Capacitor iOS/Android and inside the
 Tauri shell `app/listen-desktop`), shared `@crate/ui` (`app/shared/ui`), and the backend work in
@@ -574,6 +575,13 @@ everywhere and are only repeated when a screen deviates.
 **Admin screens (4.1–4.10)**
 
 ### 4.1 Dashboard `/` (P0 · M)
+
+> **Approved composition amendment, 2026-10-18 / 1AB:** Diego approved the three-block
+> operational Dashboard: report/service state, reported work and fresh service interruptions,
+> using only current payloads. See `2026-10-18-crate-v3-dashboard-implementation.md` and the final
+> handover. This supersedes the four-tile/recent-album/diagnostics composition below, retained
+> as historical planning context. It does not claim the future health surface/scan instruments,
+> governor, worker-liveness or other backend prerequisites complete. Stop for visual review at1AB.
 
 - **Purpose**: first-glance operator state; the entry to each chapter.
 - **Focal visual**: a row of four tiles following the site's Inside Crate tile recipe
@@ -1536,11 +1544,7 @@ interface GenreWheelPayload {
     target: string;
     type: RelationType;
     provenance:
-      | "crate-core"
-      | "manual"
-      | "musicbrainz"
-      | "ai_proposal"
-      | "other"; // see Modes
+      "crate-core" | "manual" | "musicbrainz" | "ai_proposal" | "other"; // see Modes
     locked: boolean;
     suppressed: boolean;
     confidence: number;
@@ -3493,7 +3497,6 @@ closed by PD4), `[D35]` Generate with AI as a draft (part of PD18 here), `[D37]`
 - Album energy arc (PD52).
 - Remaining coverage P2 surfaces beyond their recipes (they reuse the recipes, no new primitives).
 
-
 ## Linux progress — 1V / Admin typographic inventory, 2026-10-17
 
 The [source inventory and proposals](2026-10-17-crate-v3-admin-icon-inventory.md) are ready for
@@ -3503,7 +3506,6 @@ proposed permanent exception. Marks, QR, data instruments and the inert Listen h
 are reviewed as content. Shared adaptations and page migrations remain later reviewable groups;
 Listen's player/navigation essence and all approved checkpoints are preserved. Stop at 1V.
 
-
 ## Linux progress — 1Y / operational readings, 2026-10-17
 
 After Diego approved 1X, the next bounded group removes decorative icons from reusable Admin
@@ -3512,7 +3514,6 @@ loading and disclosure UX in consumer slots remains. All ten page consumers adop
 icon contract together without changing page actions, permissions or streams. Their remaining
 page-specific icons belong to subsequent groups. Review real components in `#superficies-admin`
 and stop before publishing 1Y. Listen/Desktop controls and the current site pin remain intact.
-
 
 ## Linux progress — 1Z / named operational controls, 2026-10-17
 
@@ -3550,3 +3551,32 @@ does not expose the hash. API defaults and optional Admin typing preserve old sn
 This one additive projection is implemented early at Diego's request; it does not complete the
 later six-item `analysis.recent`, coverage cadence split, TrackReadout or other Analysis work.
 Remaining action types do not acquire invented recent records in this group. Stay at 1AA review.
+
+## 2026-10-18 — 1AA published; 1AB provisional, typography and Dashboard analysis
+
+1AA is approved/published as 13272706. Local Dashboard icon changes retain loading and disclosure
+UX; data/action/chart contracts remain intact. User font review exposed Poppins inherited by
+Admin Ops headers/labels/numerals and local Analysis. Their existing V3 face hierarchy is now
+applied, with Poppins body/controls and native/shared exceptions preserved. Container-based
+metric columns keep long Mono labels inside their own field, with 8px label/value spacing.
+
+Diego rejected Dashboard's density and asked for analysis. His confirmed priority is checking
+whether the system and its jobs function. See
+[Dashboard simplification analysis](2026-10-18-crate-v3-dashboard-simplification-analysis.md).
+It proposes three information blocks and identifies evidence missing from the current healthy/
+worker/progress summaries. This is a proposal pending review, not an approved change of PD §4.1
+or implementation Task 3.3. **1AB remains provisional; no further product implementation, commit/
+push or next group at this analysis stop.** Final handover records validation and limits.
+
+## 2026-10-18 — approved and locally implemented 1AB composition
+
+Diego approved implementing the three-block Dashboard using only data already available and
+reviewing it before commit. This supersedes the provisional analysis stop: report/service state,
+reported work and fresh offline-service interruptions replace the four-tile/library/diagnostics
+composition. Future health/governor/worker-liveness contracts are not implemented or invented.
+The existing ops provider supplies all values; old/unknown data stays explicit, progress is
+derived only from valid reported fields and a local deadline expires the display without polling.
+Maintenance moves to a named shared secondary dialog with original typed callbacks and matching
+endpoint capabilities; functional loading/close glyphs remain. Admin/Listen identity, 8px/44px
+contracts and prior checkpoints stay intact. See final handover and
+[execution plan](2026-10-18-crate-v3-dashboard-implementation.md). **Stop at 1AB before publication.**

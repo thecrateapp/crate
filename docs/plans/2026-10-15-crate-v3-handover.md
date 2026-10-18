@@ -6,12 +6,18 @@ plan; the status table separates implementation from pending QA.
 Current transfer: **1N–1P are complete in the checkpoint commit
 `feat(ui): unify v3 overlays, controls and field spacing`**. Diego authorised commit/push and
 continuation on Linux; this final publication record supersedes earlier local-only stops below.
-**1Z is approved and published as `2efb4754f1cf85a265897f3481fabcd835d29991`.** Task 1b.8 /
-checkpoint 1AA is the local Analysis page group, reviewable at
-<http://127.0.0.1:5186/#analisis-admin>. Stop before publication or the next group.
-Analysis actions, summaries, coverage and recent outputs retire redundant decoration; named
-initial/action loading retains functional UX. Queue/snapshot behavior and shared/Listen/Desktop
-contracts are intact. Current scoped evidence and limits are in the final 1AA record below.
+**1AA is approved and published as `1327270692937896072b3a3c79ad6cef6c1049b3`.**
+Task 1b.8 / checkpoint **1AB is approved for commit/push by Diego** (2026-10-18).
+Diego approved the three-block Dashboard simplification using only available data. The real page
+now shows report/service state, reported work and current service interruptions. Unknown/stale
+reports remain explicit; worker liveness is not inferred. Library maintenance lives in a secondary
+shared dialog with the original typed confirmations and endpoint capabilities. Admin Ops/Analysis
+font corrections also belong to this pending checkpoint. Review
+<http://127.0.0.1:5186/admin-dashboard-demo.html>; the persistent mockup includes `#dashboard-admin`.
+Read the final implementation/evidence record below and
+[`2026-10-18-crate-v3-dashboard-implementation.md`](2026-10-18-crate-v3-dashboard-implementation.md).
+Diego authorised the next bounded Admin icon group, stopping at 1AC before publication. Earlier provisional/analysis-only stops are
+historical; Diego explicitly authorised this implementation on 2026-10-18.
 The retained Listen play/halo/ring and luminous seek trail
 from 1S remain intact. Resume on Linux with
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
@@ -20,7 +26,7 @@ Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 ## Where the work lives
 
 - Active Linux worktree: `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing branch
-  `feat/crate_v3`, published HEAD `2efb4754f1cf85a265897f3481fabcd835d29991` (1Z);
+  `feat/crate_v3`, published HEAD `1327270692937896072b3a3c79ad6cef6c1049b3` (1AA);
   transfer checkpoint `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. Node 22.23.3, root
   dependencies and persistent :5186 preview are prepared. This isolates the MCP agent's
   `/home/diego/Code/Ninja/crate` checkout (`feat/crate_mcp`); leave its files untouched.
@@ -203,17 +209,18 @@ is a token-based chart configuration, not a selectable product skin.
 | 1.12 / Checkpoint 1L                                         | Published `2c90a6f2`; recording `38883592145` passes with all 43 PNGs byte-identical. Original manifest imported in `bf1fa793`; comparison/full CI passes in `38885478542`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | 1b.1 / Checkpoint 1N                                         | Complete in the combined 1N–1P publication cut authorised by Diego; shared overlays/menus, ConfirmDialog and one close recipe. Focused checks and SPEC/QUALITY pass; new canonical Linux recording/native QA pending.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 1b.2 / Checkpoints 1O–1P                                     | Complete in the combined publication cut: nine form foundations, 28 short selectors, caller review, Radio debounce and global 8 px field spacing. Focused checks and SPEC/QUALITY pass. Next: 1b.3 / 1Q; Linux continuation instructions are tracked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| 1b.3 / Checkpoint 1Q | Approved and published as `e863c227`; focused replay 39 Vitest / three Chromium cases passes. |
-| 1b.4 / Checkpoint 1R | Approved/published as `093dcb1f`; scoped replay 309 Vitest / three Chromium cases passed before publication. |
-| 1b.5 / Checkpoint 1S | Approved/published as `124b36a8`; track/media/table foundations and retained Listen play/ring/seek trail. Pre-publication replay: 31 Vitest / 9 Chromium cases passed. |
-| 1b.6 / Checkpoint 1T | Approved/published as `5308c391`; pre-publication focused replay: 34 Vitest / 2 Chromium cases pass. Earlier 185-test consumer validation remains recorded below. |
-| 1b.7 / Checkpoint 1U | Approved/published as `afed5a3c`; fresh pre-publication replay: 30 scoped Vitest / 6 Chromium cases pass. |
-| 1b.8 / Checkpoint 1V | Approved/published as `cd5bf5e7`; inventory gate complete, historical 1U source snapshot preserved. |
-| 1b.8 / Checkpoint 1W | Approved/published as `52eaa6a5`; navigation glyph retirement, balanced counters, active bar and retained UX. |
-| 1b.8 / Checkpoint 1X | Approved/published as `b628a438`; search/reusable controls, Select geometry and portalled keyboard access. |
-| 1b.8 / Checkpoint 1Y | Approved/published as `ea6ebdc8`; operational surface contracts and all 125 uses adapted, UX and 8px geometry preserved. |
-| 1b.8 / Checkpoint 1Z | Approved/published `2efb4754`; Logs/Stack text controls and consistent shared selector/tag geometry. |
-| 1b.8 / Checkpoint 1AA | Local Analysis group at `#analisis-admin`; text actions/coverage/outputs, bounded loading UX and preserved queue/snapshot contracts. Stop before publication/next group. |
+| 1b.3 / Checkpoint 1Q                                         | Approved and published as `e863c227`; focused replay 39 Vitest / three Chromium cases passes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 1b.4 / Checkpoint 1R                                         | Approved/published as `093dcb1f`; scoped replay 309 Vitest / three Chromium cases passed before publication.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 1b.5 / Checkpoint 1S                                         | Approved/published as `124b36a8`; track/media/table foundations and retained Listen play/ring/seek trail. Pre-publication replay: 31 Vitest / 9 Chromium cases passed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 1b.6 / Checkpoint 1T                                         | Approved/published as `5308c391`; pre-publication focused replay: 34 Vitest / 2 Chromium cases pass. Earlier 185-test consumer validation remains recorded below.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 1b.7 / Checkpoint 1U                                         | Approved/published as `afed5a3c`; fresh pre-publication replay: 30 scoped Vitest / 6 Chromium cases pass.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 1b.8 / Checkpoint 1V                                         | Approved/published as `cd5bf5e7`; inventory gate complete, historical 1U source snapshot preserved.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 1b.8 / Checkpoint 1W                                         | Approved/published as `52eaa6a5`; navigation glyph retirement, balanced counters, active bar and retained UX.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 1b.8 / Checkpoint 1X                                         | Approved/published as `b628a438`; search/reusable controls, Select geometry and portalled keyboard access.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 1b.8 / Checkpoint 1Y                                         | Approved/published as `ea6ebdc8`; operational surface contracts and all 125 uses adapted, UX and 8px geometry preserved.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 1b.8 / Checkpoint 1Z                                         | Approved/published `2efb4754`; Logs/Stack text controls and consistent shared selector/tag geometry.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 1b.8 / Checkpoint 1AA                                        | Approved/published `13272706`; Analysis including latest fingerprint. Final publication record below supersedes older local notes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 1b.8 / Checkpoint 1AB                                        | Approved for commit/push by Diego on 2026-10-18: three-block Dashboard plus Ops/Analysis fonts. Next bounded Admin icon group authorised; stop at 1AC.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -1085,7 +1092,6 @@ Continue with **Task 1b.3 / checkpoint 1Q**, text tabs and app-local URL helpers
 reading order, preview, focused verification, site pin and future review boundaries are in
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
 
-
 ## Checkpoint 1Q — Text tabs and URL helpers, Linux local review, 2026-10-16
 
 **Stop for Diego's review at <http://127.0.0.1:5186/#pestanas>.** No commit/push, later task,
@@ -1156,7 +1162,6 @@ original 1M manifest are unchanged**. Approved CI recording/comparison for 1N–
 1Q's visual approval and the single full validation at development/phase close remain pending.
 Do not advance to Task 1b.4 or publish 1Q until Diego directs continuation.
 
-
 ### Checkpoint 1Q approval and publication authorisation — 2026-10-16
 
 Diego approved 1Q and explicitly requested commit/push, continuation to Task 1b.4,
@@ -1167,7 +1172,6 @@ No PR, merge/rebase, deploy, release, full validation or baseline/CI update is a
 The next block covers shared loading/empty/error states and reserved skeleton geometry.
 Canonical 33 PNGs/1M manifest, pending Linux recording/comparison and native QA remain unchanged.
 
-
 ### Checkpoint 1Q publication — 2026-10-16
 
 The approved cut is committed and pushed as **`e863c22715de39b974fc1cf527003fc498d59215`**
@@ -1176,7 +1180,6 @@ The approved cut is committed and pushed as **`e863c22715de39b974fc1cf527003fc49
 then verified to equal the published SHA after push. The frontend workflow only auto-runs on
 pushes to `main`; no full CI workflow or canonical recording was dispatched for this iteration.
 Continue locally with Task 1b.4 / checkpoint 1R and preserve its review/publication stop.
-
 
 ## Checkpoint 1R — Shared states, Linux local review, 2026-10-16
 
@@ -1264,7 +1267,6 @@ recording/comparison for 1N–1P and later changes, native QA, actual assistive-
 the single full validation at development/phase close remain pending. No canonical recording,
 full CI, PR, merge/rebase, deployment, release or 1R publication was performed.
 
-
 ### Checkpoint 1R approval and publication authorisation — 2026-10-16
 
 Diego approved the complete 1R checkpoint and explicitly requested commit/push, continuation
@@ -1273,7 +1275,6 @@ This supersedes the local-only publication stops above. Publish the reviewed 1R 
 `feat(ui): one set of loading, empty and error states`; resolve its SHA from git log.
 No PR, merge/rebase, deploy, release, full suite/CI or canonical baseline update is authorised.
 
-
 ### Checkpoint 1R publication — 2026-10-16
 
 Approved 1R is committed and pushed as **`093dcb1fbfe67d1f994ee49e27aefd802d258c54`**
@@ -1281,7 +1282,6 @@ Approved 1R is committed and pushed as **`093dcb1fbfe67d1f994ee49e27aefd802d258c
 passed 309 Vitest and three Chromium cases before commit; `git ls-remote` verifies the remote
 branch at this SHA. Continue locally with Task1b.5 / checkpoint1S, keeping :5186 alive and
 stopping for Diego's review before another publication. No full suite/CI or baseline update.
-
 
 ## Checkpoint 1S — Track rows, media and retained playback identity, local review, 2026-10-16
 
@@ -1363,7 +1363,6 @@ for 1N–1P and later changes, native QA and the single full validation at phase
 remain pending. No full CI, canonical baseline regeneration, 1S publication, PR, merge/rebase,
 Smart Mix integration, deployment or release was performed. Await Diego at 1S.
 
-
 ### 1S review follow-up — keep seek head attached, 2026-10-16
 
 Diego reported the progress head moving separately from the beam. The beam interpolated its
@@ -1387,7 +1386,6 @@ local evidence is ignored at `.artifacts/review/checkpoint-1s-attached-head.png`
 1S remains local for Diego's review: no commit/push or 1b.6 advancement. Canonical references,
 the unavailable site pin, native/assistive-technology QA and phase-close validation retain the
 limits above. No full suite, canonical recording or CI run was triggered.
-
 
 ### Latest 1S review correction — common edge, smaller point, 2026-10-16
 
@@ -1423,7 +1421,6 @@ No Admin import/JavaScript change; its last verified 529,065 B / 532,480 B and 3
 No full suite or CI, canonical baseline update, publication or advance beyond 1S. The unavailable
 site pin, canonical/native/assistive-technology QA and phase-close validation limits remain.
 
-
 ### Checkpoint 1S approval and publication authorisation — 2026-10-16
 
 Diego approved the complete 1S checkpoint, including the final common-edge progress correction
@@ -1432,7 +1429,6 @@ keeping :5186 active and stopping for the next review at 1T. This supersedes all
 1S stops above. Publish as `feat(ui): restyle track rows and media grids`; record the resulting
 SHA after publication. No full suite/CI, baseline regeneration, PR, merge/rebase, deploy or release.
 
-
 ### Checkpoint 1S publication — 2026-10-16
 
 Approved 1S is committed/pushed as **`124b36a83a51da46dea137b9b84c00d07060ebd6`**
@@ -1440,7 +1436,6 @@ Approved 1S is committed/pushed as **`124b36a83a51da46dea137b9b84c00d07060ebd6`*
 31 Vitest and nine Chromium cases before publication; remote SHA verified. Continue locally
 with Task 1b.6 / checkpoint 1T, preserving the preview and stopping before publication or 1b.7.
 No full suite/CI, baseline recording, PR, merge/rebase, deployment or release was performed.
-
 
 ## Checkpoint 1T — Admin status colour, Linux local review, 2026-10-16
 
@@ -1507,7 +1502,6 @@ Admin geometry and native/AT QA remain pending. `app/web@258bbaee` stays pinned 
 locally after the earlier fetch attempt; no substitute reference was used. No PR, merge/rebase,
 deploy, release, Smart Mix integration or 1T publication. The original MCP checkout is untouched.
 
-
 ### 1T final verification and stop
 
 The final focused Chromium replay passes **11/11** cases with `--workers=1`: both 1T desktop/
@@ -1524,14 +1518,12 @@ samples above. HTTP :5186 returns 200 and the existing preview process remains a
 All 1T source/docs are unstaged and uncommitted. HEAD remains published 1S `124b36a8`. Stop here
 for Diego's review; do not publish 1T or start 1b.7 without his direction.
 
-
 ### Checkpoint 1T approval and publication authorisation — 2026-10-17
 
 Diego approved complete 1T and explicitly authorised commit/push and continuation with Task 1b.7.
 This supersedes its local-only stop above. Publish the reviewed status-colour batch, keep :5186
 active, implement skip links locally, and stop at checkpoint 1U before another publication or
 Task 1b.8. Existing canonical/native QA limits remain; no full suites or CI during iteration.
-
 
 ## Checkpoint 1U — Skip navigation, Linux local review, 2026-10-17
 
@@ -1591,7 +1583,6 @@ AT announcements, cross-engine focus and canonical Linux CI QA remain pending. T
 PNGs and current manifest remain from1M. No baselines, full suites/CI, PR, merge/rebase, deploy,
 release, icon migration or 1U publication were performed.
 
-
 ### 1U final verification and review stop
 
 The final Chromium replay passes **6/6** cases, `--workers=1`, including390px touch/coarse-pointer
@@ -1609,14 +1600,12 @@ All1U files are unstaged/uncommitted. HEAD remains published1T `5308c391`. Keep 
 and stop for Diego here. Do not publish1U or begin1b.8 without his next direction. Generated Admin
 TS build-info was restored to HEAD; no dependency, baseline or manifest changes remain.
 
-
 ### Checkpoint 1U approval and publication authorisation — 2026-10-17
 
 Diego approved complete1U and explicitly authorised commit/push plus Task1b.8, keeping :5186
 active and stopping at the next checkpoint. This supersedes its local-only stop above. The next
 stop is1V: the task's mandatory Admin icon inventory and proposed functional exceptions, before
 blanket deletion or a first migration group. Existing scoped/serial/no-baseline validation applies.
-
 
 ## Checkpoint 1V — Admin icon inventory, Linux local review, 2026-10-17
 
@@ -1672,7 +1661,6 @@ Smart Mix, PR/merge/rebase/deploy/release or 1V publication. Original MCP checko
 
 **Stop at 1V for Diego before publication or the first production migration group.**
 
-
 ### 1V final review and stop
 
 The independent read-only reviewer also passed the ten scanner tests, freshness check and both
@@ -1695,7 +1683,6 @@ its source categories. The live :5186 tab is kept as the deliverable; advisory s
 **HEAD/origin stay at published 1U `afed5a3c`. 1V is unstaged/uncommitted. Stop for Diego's
 inventory/proposal review before publication or the first production migration group.**
 
-
 ### Checkpoint 1V approval and publication authorisation — 2026-10-17
 
 Diego approved complete 1V and explicitly authorised commit/push plus the first Admin icon
@@ -1703,7 +1690,6 @@ retirement group: Sidebar, CommandPalette and Shell. The next review stop is che
 before its publication or another migration group. The inventory gate is now approved; its
 historical source snapshot remains the published 1U base. This migration applies only to Admin;
 Listen/Desktop icons and the approved player/play/ring/seek presentation remain unchanged.
-
 
 ## Checkpoint 1W — Admin navigation icon retirement, Linux local review, 2026-10-17
 
@@ -1726,17 +1712,17 @@ The map lives in `app/ui/src/admin-icon-policy.test.ts`; removals may shrink it.
 exception is granted to page/destination glyphs. Shared close controls retain their established
 shared glyph; direct Admin controls use Lucide.
 
-| Component / marker | Retained glyph | Purpose and accessible name |
-| --- | --- | --- |
-| Shell / history-back | ChevronLeft | Conventional reverse-history affordance, `Go back` |
-| Shell / history-forward | ChevronRight | Opposite history direction, `Go forward` |
-| Shell / mobile-navigation | Menu | Compact mobile navigation trigger, `Open navigation` |
-| Shell / help-close | Existing shared close | Same 1N overlay close affordance, `Close` |
-| Sidebar / sidebar-collapse | PanelLeftClose | Collapse rail without competing with destination names, `Collapse sidebar` |
-| Sidebar / sidebar-expand | PanelLeftOpen | Restore rail width, `Expand sidebar` |
-| Sidebar / drawer-close | Existing shared close | Dismiss the drawer, `Close navigation` |
-| CommandPalette / palette-search | Search | Identify the command/search field; combobox name `Search commands` |
-| CommandPalette / palette-close | Existing shared close | Explicit pointer/keyboard dismissal, `Close command palette` |
+| Component / marker              | Retained glyph        | Purpose and accessible name                                                |
+| ------------------------------- | --------------------- | -------------------------------------------------------------------------- |
+| Shell / history-back            | ChevronLeft           | Conventional reverse-history affordance, `Go back`                         |
+| Shell / history-forward         | ChevronRight          | Opposite history direction, `Go forward`                                   |
+| Shell / mobile-navigation       | Menu                  | Compact mobile navigation trigger, `Open navigation`                       |
+| Shell / help-close              | Existing shared close | Same 1N overlay close affordance, `Close`                                  |
+| Sidebar / sidebar-collapse      | PanelLeftClose        | Collapse rail without competing with destination names, `Collapse sidebar` |
+| Sidebar / sidebar-expand        | PanelLeftOpen         | Restore rail width, `Expand sidebar`                                       |
+| Sidebar / drawer-close          | Existing shared close | Dismiss the drawer, `Close navigation`                                     |
+| CommandPalette / palette-search | Search                | Identify the command/search field; combobox name `Search commands`         |
+| CommandPalette / palette-close  | Existing shared close | Explicit pointer/keyboard dismissal, `Close command palette`               |
 
 ### Result and scope
 
@@ -1983,7 +1969,6 @@ deferred. Keep all existing canonical evidence and the pinned reference.
 
 **Stop at 1X for Diego before publication or another group.**
 
-
 ## Final Linux record — 1X published; 1Y operational surface contracts (2026-10-17)
 
 This record supersedes the earlier 1X local-only stop. Diego approved 1X and authorised its
@@ -2053,7 +2038,6 @@ or repair pass were required. The reviewer explicitly declined remaining page ic
 native/AT, cross-engine/real-data, full-suite/CI and whole-1b.8 completion claims.
 
 **Stop at 1Y for Diego before commit/push or another group.**
-
 
 ## Final Linux record — 1Y published; 1Z Logs/Stack pages (2026-10-17)
 
@@ -2158,7 +2142,6 @@ Canonical Linux recording/comparison, native/AT, cross-engine, real-data and ful
 pending. No PR, merge, rebase, main/Smart Mix integration, deploy or release.
 
 **Stop at 1Z for Diego before commit/push or another group.**
-
 
 ### Further visual follow-up — uniform summary tags, 1Z
 
@@ -2335,3 +2318,205 @@ its recorded revision; this additional user-requested data amendment has the foc
 above and no second review round. Later six-item recent/readout work is still pending; do not
 mark 3.9a/3.9b complete. All previous canonical/native/real-data/full phase QA limits persist.
 **Stop at local 1AA: no commit/push, next group, PR, merge, rebase, deploy or release.**
+
+## Final Linux record — 1AA published; 1AB provisional / Dashboard analysis (2026-10-18)
+
+Diego approved 1AA and authorised commit/push plus one further Admin icon group. Published
+**1327270692937896072b3a3c79ad6cef6c1049b3**, `feat(ui): simplify Admin analysis and show latest fingerprint`;
+local/remote SHA equality verified. Prepublication replay36Vitest,5preview and8backend cases
+passed, including3realPostgreSQL cases. No PR/merge/rebase/release/deploy.
+
+The next bounded group was Dashboard. Local 1AB removes redundant labelled action/navigation,
+metric, task-status and album fallback/hover glyphs. Retains Loader2 on running tasks and
+ChevronDown/Up on diagnostics:3 exact sites; source policy 37 UX sites across 11 whole files, bounded
+ErrorState/ConfirmDialog consumers and externalNivo content retained. Disclosure adds expanded/
+controls semantics and a hidden controlled region; targets44px, month/day readonly pairs8px.
+No data/action/provider/permission changes. An18-entry structural AST audit confirms all six
+private Dashboard helpers, sync callback, derived data/attention priorities, three Nivo charts,
+queue/navigation/artwork calls, both confirmation contracts and Analysis normalization/memos/
+eight queue calls are unchanged. Audit ignores formatting only and checks matching nodes exist.
+Seventh isolated preview mounts real Dashboard with fictional ops/auth/actions/covers and real
+album route building. No API/SSE traffic. All prior specimens remain.
+
+User typography audit confirmed real drift: OpsPageHero H1 Poppins 24px, OpsPanel H2 Poppins 18px,
+labels/values inherited Poppins; chips already Mono. Fontface imports were present. Admin common
+Ops surfaces now use Bricolage page/subhead/numeral hierarchy and MonoLabel; Analysis local
+headers, metadata and numeric readouts follow the same identity. Poppins body/controls remain.
+The common surface correction reaches 10 Admin page consumers without changing public props or
+workflows. Preview and actual Analysis checks verify 3 faces loaded, computed families per role,
+8px fields and 44px actions. Visual review at 1310px also found the long Chromaprint label
+overflowing its metric; a 1299px browser regression failed before container-based 2/4-column
+grids fixed it. Labels are measured against their padded field, not their own overflowing box.
+No shared/native/Listen/Desktop/fontasset/dependency changes.
+
+Typography TDD initially 2 unit failures and computed H1 Poppins browser failure; Dashboard source/
+UX/semantics expectations failed before removal. Two test harness errors were corrected (wrong
+expected canonical album route and missing auth on rerender), not production contracts. Preview
+replay initially used a locator whose accessible name changed from Show to Hide; corrected
+locator, no timeout increase. Strict types caught sample literal narrowing/empty-record types.
+First actual Admin replay did not start: new Testing Library tests incorrectly used Playwright's
+`exact` role option. Removed unsupported options; subsequent Admin build/types pass.
+
+User then rejected Dashboard's density and requested analysis rather than further UI development.
+He confirmed the purpose: **whether the system and its jobs are functioning**. Read
+`2026-10-18-crate-v3-dashboard-simplification-analysis.md`: diagnosis, proposed state/work/
+intervention hierarchy, destinations for removed content and evidence limits. Existing Healthy
+only checks postgres/watcher; snapshots/slots/updated_at cannot alone prove worker liveness or
+useful progress. Recent task failures have no age/recovery filter; library volume is not severity.
+The plan's four-tile Dashboard remains a historical planned target pending explicit revision;
+this analysis does not approve a new Task 3.3 implementation. **1AB is provisional, uncommitted,
+not formally reviewed or ready for approval; pause further product work at this analysis stop.**
+
+Current scoped evidence: 64 Vitest; 6 Analysis preview (including 1299px); 4 Dashboard preview; 17 prior
+Ops/Logs/Stack preview. Strict demo/preview/spec types, Admin build/types and bundlecheck pass.
+Initial JS 526011/532480 B gzip, 9 assets, 6469 B margin, 42 B below 1AA. Full suites/CI, canonical comparisons
+and actual AT/native/other-engine/production integration remain pending. 33 canonical PNGs/manifest at 1M
+and site pin 258bbaee untouched. Actual Admin replay and final housekeeping status follow.
+
+Final existing-work validation replay: **six actual Admin Chromium cases pass** (Analysis and
+Dashboard at 1440/768/390). This includes real built CSS/fonts, keyboard/disclosure, card spacing,
+art routes and intercepted typed rebuild/wipe requests. They never contact production. The
+seven-entry preview build, scoped ESLint and formatting pass. Known generated tsbuildinfo is
+restored from HEAD; diff check clean. No product changes implementing the new simplification
+proposal were made. No fresh formal 1AB review was dispatched while the user is changing its
+product structure. This is a recorded provisional stop, not a completed checkpoint.
+
+Advisory font proof: `.artifacts/review/checkpoint-1ab-analysis-fonts.png`; 18-contract audit:
+`.artifacts/review/checkpoint-1ab-contract-audit.txt`. IAB tab 2 remains on corrected Analysis and
+marked deliverable; preview service active/running HTTP200. No 1AB commit/push or later group.
+
+## Authoritative 1AB implementation — three-block Dashboard (2026-10-18)
+
+Diego approved implementing the simplification with **only real available data**, keeping the
+preview active and stopping at 1AB before commit. This supersedes the provisional analysis stop
+above. The three-block composition supersedes the earlier four-tile Dashboard target in PD §4.1 /
+Task 3.3; future HealthScanTile, governor/liveness/readout work and backend prerequisites remain
+unimplemented. Task 1b.8 is not globally complete.
+
+Production reads only the existing shared `useOpsSnapshot`; no new HTTP query, provider, stream,
+backend/schema/dependency or polling. Admin-local `dashboard-model.ts` tests and interprets:
+
+- Report built/expiry timestamps, explicit stale flag and refresh error. Missing/invalid/future
+  metadata stays unknown. A cleaned-up local deadline timeout expires an open report even
+  without another render. Stale work counts say Last report; old offline signals are not current
+  interruption alerts. No clock-derived request loop.
+- Explicit PostgreSQL, watcher and Event Redis booleans. Headline is scoped to reported
+  services; unknown signals are not false/zero. Worker availability remains explicitly unreported.
+- All five queue counts only when complete valid nonnegative integers, bounded task rows, safe
+  JSON progress with real done/total or bounded percent, and separate analysis/Bliss active counts.
+  No invented progress, ETA, throughput, stall threshold or global idle from an empty task list.
+- Last dated completed/failed records, excluding invalid/future timestamps. Historical failures
+  remain dated in Work, not asserted as unresolved/current blockers. Full worker slots, imports
+  and DB-heavy admission waits do not create interruptions. Only fresh offline service reports
+  produce attention rows, which move before Work when present.
+
+Shared InstrumentPanel/MonoLabel/ProgressHairline make three quiet regions, with Bricolage
+titles, Poppins body/controls and Mono technical metadata. No KPI mosaic, recent albums/shows,
+charts, footprint or advanced diagnostics. Existing capability-gated System/Stack/Tasks/Analysis
+routes provide detail; `/tasks?task=<encoded-id>` is an existing Tasks consumer contract.
+Maintenance is an explicit secondary AppModal: sync, rebuild and wipe stay accessible. Destructive
+actions preserve the previous admin-only restriction and check `library.maintenance.manage`;
+sync checks `library.import.manage`, matching existing endpoint permission checks. Both original
+ConfirmDialog nodes/callbacks, three mutation calls, sync toasts and shared provider call pass
+a structural audit against HEAD. No permission grants or route additions.
+
+One Dashboard Loader2 site is retained; the retired diagnostics chevrons leave the policy.
+Policy bounds 35 named UX sites across 11 whole files, plus exact shared AppModal/ErrorState/typed
+confirmation callsites. Buttons/links 44px and stacked fields 8px. Earlier Analysis/Ops typography
+corrections remain part of 1AB; long technical metric labels are covered by the prior 1299px case.
+
+Focused evidence so far: **79 Vitest** (model 19, Dashboard 13, icon policy 16, Analysis 21, Ops 10),
+**five Dashboard preview** and **seven actual Admin Chromium** cases pass (Dashboard 3 widths,
+long unbroken mobile data, Analysis 3 widths). Actual Admin build/types pass; strict demo/preview/
+spec TypeScript passes. Model/page expectations were observed RED before implementation; an
+additional stale Work-caption expectation failed then passed. An unsupported Vitest--grep
+invocation was corrected to -t before that RED run; no skipped test is counted as evidence.
+The first progress-history text assertion needed a prefix matcher, not a product change.
+
+The preview has seven explicit fictional states: active, idle, service interruption, expired,
+partial, loading and first-load failure. Actual components and provider-shaped data; all local
+actions are intercepted and no API requests leave the sample. Refresh renews its report.
+
+Latest built initial JS: **526458/532480 B gzip**, 10 assets, **6022 B margin** ( +405 B vs published 1AA).
+Current contract evidence: `.artifacts/review/checkpoint-1ab-simplification-contract-audit.txt`.
+The earlier 18-contract audit describes the pre-simplification revision only; removed Dashboard
+helpers/data/chart markup are intentional approved changes, not claimed unchanged now.
+Final browser replay, lint/preview build and fresh read-only review are recorded next.
+
+Limits: no real production worker/backend/SSE health verification, actual AT/native/other-engine
+or full phase QA. No full suites/CI, canonical PNG/manifest regeneration, alternate site pin,
+SmartMix, PR/merge/rebase/deploy/release. 33 canonical PNGs/manifest remain 1M; `app/web@258bbaee`
+remains unchanged/unavailable. **Stop at 1AB for Diego; no commit/push or another group.**
+
+Final pre-review replay:11affected preview Chromium cases pass (Dashboard5 + Analysis6), seven
+actual Admin Chromium cases pass, scoped lint and strict types pass, Admin/7-entry preview builds
+pass. Scoped lint initially rejected an unnecessary regex escape; equivalent startsWith checks
+replace it,19model cases replay green and final builds/budget pass. Final initialJS526458/532480B
+gzip,10assets,6022Bmargin. Prior browser evidence precedes only that equivalent parser expression
+and documentation formatting. Generated tsbuildinfo restored; diffcheck clean. No further UI
+changes during fresh read-only review.
+
+### 1AB read-only review and producer interpretation repair
+
+The fresh reviewer found no Critical, two Important interpretation issues and one Minor stale
+status-table row. All are accepted. The row now records the implemented three-block checkpoint.
+One bounded RED→GREEN repair pass adds divergent/missing Redis and independent analysis metadata
+regressions: ten new assertions failed before repair, then **89 focused Vitest cases passed**
+(model 26, Dashboard 16, policy 16, Analysis 21, Ops 10). No second review round or new group.
+
+- Event Redis now reads `eventing.domain_events.redis_connected` from the durable domain-event
+  producer, independently of the top-level cache Redis flag. Missing nested data stays unknown;
+  the detail names domain-event delivery. Existing payload/provider/types are unchanged.
+- Analysis respects its producer's own `stale` and `unavailable` markers. Unavailable suppresses
+  counts; stale counts say last reported and out of date. Absent markers, including REST's
+  schema-stripped response, leave section freshness unknown. A fresh outer snapshot cannot
+  promote old counts to current daemon activity. A reported count is never a worker heartbeat.
+
+The reviewer performed source/evidence inspection only, with no tests/builds/browser sessions,
+production access, file/index/HEAD mutations or delegation. Executor rulings on uncertified areas:
+
+- Cached/default PostgreSQL/watcher/Redis flags are only reported connectivity; actual service
+  and worker liveness remain unverified and need producer/phase QA, outside this UI change.
+- Task dates show recorded updates, not useful advancement, stall detection or failure recovery.
+  No added inference, threshold or follow-up implementation is warranted by available data.
+- Shared Ops public props/workflows remain unchanged. Representative Ops surfaces and Analysis
+  geometry have scoped evidence; fresh visual inspection of all ten consumers is not claimed.
+- Chromium supports the nested-dialog contract. Actual AT/native/other-engine verification stays
+  pending; no full-suite replay is justified for this local checkpoint.
+- Current task persistence/emission supplies serialized progress strings. Broad schema permission
+  for structured objects is not a verified current producer path; no speculative parser/API
+  expansion. Unsupported data remains unavailable.
+
+Post-repair Admin build/types and three strict scoped TS configs pass; scoped ESLint passes from
+its Admin config directory. Initial JS is now **526461/532480 B gzip**, ten assets, **6019 B margin**
+(+408 B vs published 1AA). Four actual built-Admin Dashboard Chromium cases pass, including
+cache/event Redis divergence, desktop/tablet/mobile, long mobile text and intercepted maintenance.
+The isolated test config serves the already-built Admin to avoid a redundant build. Its first
+import-based attempt did not inherit Playwright options correctly: baseline guard stopped the
+first run and missing baseURL stopped four navigation cases before rendering. Replacing only
+that ignored harness with explicit original config options and `--update-snapshots=none` fixed
+the harness; no canonical files changed. An initial root ESLint invocation lacked its scoped
+config; the corrected Admin invocation passes. These setup failures are not product test passes.
+
+Final repair validation: five Dashboard preview Chromium cases and the seven-entry preview build
+pass. Together with the unchanged Analysis evidence, checkpoint coverage is **11 preview + seven
+actual Admin Chromium cases**; the final repair replay is Dashboard's five + four. Final contract
+audit still passes. No source edits follow this evidence, only docs/formatting and restoring the
+known generated tsbuildinfo from HEAD. Preview service remains active/running HTTP200 at :5186.
+Advisory visible proof: `.artifacts/review/checkpoint-1ab-dashboard.png`, saved from public IAB tab 2
+and marked deliverable. It shows the three real blocks and explicitly unknown analysis freshness
+for the REST-shaped fixture. This is not a canonical baseline. Execution checklist is complete;
+Diego's visual approval remains pending. **1AB stays uncommitted; no push or next group.**
+
+## 1AB visual approval and publication authorisation — 2026-10-18
+
+Diego approved 1AB and explicitly requested commit/push and the next bounded Admin icon group,
+retaining UX glyphs, the active preview and a review stop at the next checkpoint (1AC). This
+supersedes the 1AB publication stop above. The approved product implementation is unchanged;
+only the specimen/status and publication records change before commit. Fresh scoped publication
+evidence and the resulting SHA will be recorded with the next checkpoint. No PR/merge/rebase,
+deploy/release, full suites/CI or canonical baseline regeneration is authorised.
+
+Fresh pre-publication replay: **89 scoped Vitest + five Dashboard Chromium** pass serially
+with one worker. Approved product source is unchanged since the final 1AB build/budget and
+producer-fix evidence. The specimen now says 1AB published; all historical checkpoints remain.

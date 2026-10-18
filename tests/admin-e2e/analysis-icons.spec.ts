@@ -15,6 +15,33 @@ for (const width of [1440, 768, 390]) {
       await expect(
         main.getByRole("heading", { name: "Analysis", exact: true }),
       ).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      await expect(
+        main.getByRole("heading", { name: "Analysis", exact: true }),
+      ).toHaveCSS("font-family", /Bricolage Grotesque/);
+      await expect(
+        main.getByRole("heading", { name: "Pipeline coverage", exact: true }),
+      ).toHaveCSS("font-family", /Bricolage Grotesque/);
+      await expect(
+        main.getByRole("button", { name: "Refresh", exact: true }),
+      ).toHaveCSS("font-family", /^Poppins/);
+      const loaded = await page.evaluate(() =>
+        Array.from(document.fonts)
+          .filter((face) => face.status === "loaded")
+          .map((face) => face.family),
+      );
+      for (const family of ["Bricolage Grotesque", "JetBrains Mono", "Poppins"])
+        expect(loaded).toContain(family);
+      for (const field of await main.locator(".crate-form-field").all()) {
+        await expect(field.locator(":scope > :first-child")).toHaveCSS(
+          "font-family",
+          /JetBrains Mono/,
+        );
+        await expect(field.locator(":scope > :nth-child(2)")).toHaveCSS(
+          "font-family",
+          /Bricolage Grotesque/,
+        );
+      }
       await expect(main.locator("svg")).toHaveCount(0);
       await expect(
         main.getByText("1,200 tracks", { exact: true }),

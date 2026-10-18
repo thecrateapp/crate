@@ -31,6 +31,30 @@ describe("OpsStatTile status colours", () => {
   );
 });
 
+it("keeps the V3 display/label/readout hierarchy on operational surfaces", () => {
+  render(
+    <>
+      <OpsPageHero title="Analysis" description="Body copy" />
+      <OpsPanel title="Coverage">Content</OpsPanel>
+      <OpsStatTile label="Tracks" value="1,200" />
+    </>,
+  );
+  expect(screen.getByRole("heading", { name: "Analysis" })).toHaveClass(
+    "font-display",
+    "font-extrabold",
+  );
+  expect(screen.getByRole("heading", { name: "Coverage" })).toHaveClass(
+    "font-display",
+    "font-bold",
+  );
+  expect(screen.getByText("Tracks")).toHaveClass("font-mono", "font-normal");
+  expect(screen.getByText("1,200")).toHaveClass("font-display", "tabular-nums");
+  expect(screen.getByText("Body copy")).not.toHaveClass(
+    "font-display",
+    "font-mono",
+  );
+});
+
 describe("Admin operational surfaces without decorative glyphs", () => {
   it("keeps the page heading, description, children and action while removing the hero glyph", async () => {
     const action = vi.fn();

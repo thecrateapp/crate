@@ -91,6 +91,31 @@ const actions = [
   ],
 ] as const;
 describe("Analysis typographic controls", () => {
+  it("distinguishes display titles, numeric readouts and technical labels from body copy", () => {
+    const { container } = renderWithAdminProviders(<Analysis />);
+    for (const title of [
+      "Audio features",
+      "Audio fingerprints",
+      "Lyrics",
+      "Portable metadata",
+      "Rich exports",
+    ])
+      expect(screen.getByRole("heading", { name: title })).toHaveClass(
+        "font-display",
+      );
+    for (const field of container.querySelectorAll(".crate-form-field")) {
+      expect(field.children[0]).toHaveClass("font-mono", "font-normal");
+      expect(field.children[1]).toHaveClass("font-display", "tabular-nums");
+    }
+    const latest = screen.getByRole("article", {
+      name: "Last audio fingerprint",
+    });
+    expect(within(latest).getByRole("heading")).toHaveClass(
+      "font-mono",
+      "font-normal",
+    );
+    expect(within(latest).getByText("Bruma")).toHaveClass("font-display");
+  });
   it("names initial loading and retains its functional glyph", () => {
     snapshot({ data: null, loading: true });
     renderWithAdminProviders(<Analysis />);

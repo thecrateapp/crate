@@ -14,6 +14,13 @@ export default defineConfig({
       resolveId(source, importer) {
         if (!importer?.includes("/app/ui/") || !source.startsWith("@/")) return;
         if (
+          importer.endsWith("/app/ui/src/pages/Dashboard.tsx") &&
+          ["@/lib/api", "@/contexts/OpsSnapshotContext"].includes(source)
+        )
+          return fileURLToPath(
+            new URL("admin-dashboard-fixtures.ts", import.meta.url),
+          );
+        if (
           importer.endsWith("/app/ui/src/pages/Analysis.tsx") &&
           ["@/lib/api", "@/contexts/OpsSnapshotContext"].includes(source)
         )
@@ -56,6 +63,9 @@ export default defineConfig({
         ),
         adminAnalysis: fileURLToPath(
           new URL("admin-analysis-demo.html", import.meta.url),
+        ),
+        adminDashboard: fileURLToPath(
+          new URL("admin-dashboard-demo.html", import.meta.url),
         ),
         adminOperations: fileURLToPath(
           new URL("admin-operations-demo.html", import.meta.url),

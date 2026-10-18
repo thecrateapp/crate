@@ -4,41 +4,40 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — checkpoint 1AA
+## Active Linux workspace — 1AB approved; next bounded group authorised
 
-Diego's latest request overrides the clone-only setup below: isolate this work from the
-Crate MCP agent. The managed worktree is `/home/diego/.codex/worktrees/crate-v3-1q/crate`,
-on the existing `feat/crate_v3` branch, tracking `origin/feat/crate_v3`. HEAD is published
-`2efb4754f1cf85a265897f3481fabcd835d29991` (approved 1Z); the original transfer checkpoint
-`53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. The original checkout
-`/home/diego/Code/Ninja/crate` stays on `feat/crate_mcp` with the other agent's changes.
-Do not switch, reset or edit that checkout. No extra clone/worktree is needed to resume.
+Use `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing `feat/crate_v3` tracking origin.
+Published HEAD is 1AA `1327270692937896072b3a3c79ad6cef6c1049b3`; original transfer 53177736
+remains an ancestor. Leave `/home/diego/Code/Ninja/crate` (`feat/crate_mcp`) and its agent untouched.
+Node 22.23.3 is `/home/diego/.nvm/versions/node/v22.23.3/bin`; dependencies are installed.
 
-Use Node 22.23.3 (`/home/diego/.nvm/versions/node/v22.23.3/bin`); root dependencies are ready.
-The preview was restarted on :5186 and is reviewable at
-`http://127.0.0.1:5186/#analisis-admin`, without backend. Checkpoints through 1Z are approved,
-committed/pushed. Task 1b.8 / checkpoint 1AA is local: whole Analysis page and local components.
-Action/header/coverage/output decoration is retired; nine exact initial/action loading glyphs
-remain, with names and busy state. Readonly values use 8px `.crate-form-field`, actions 44px,
-header summaries uniform static CrateChip tags. Eight queue paths/bodies, 800ms refresh, metrics,
-notifications and existing snapshot provider/stream ownership are preserved. Sixth isolated
-preview entry mounts actual Analysis with fictional data/actions and generation-isolated states.
-Source policy bounds 34 UX sites across ten migrated files; other page families remain pending.
-Diego’s follow-up removes the static Operator notes panel; Recent outputs fills the available
-width. A further user amendment adds last_fingerprinted through the off-request 120s worker
-sampler, API schema/default and optional Admin type. Recent outputs now has three named cards,
-including the real stored fingerprint timestamp/source; older payloads stay empty. No new HTTP
-query, endpoint, stream or schema migration. Latest checks: 36 Vitest, 13 scoped pytest, five
-preview + three actual Admin Chromium cases pass, plus types/lint/format/builds. Full evidence,
-precise changed contracts and review-revision limits are in the final main handover.
+Diego approved the simplification analysis and asked to implement three Dashboard blocks using
+only available data, then stop at 1AB before commit. The real page now has report/service state,
+reported work and fresh service interruptions. Source is the existing ops provider. Missing/old
+reports, unknown service/queue data, historical failures and worker availability are distinguished;
+no invented liveness/ETA/rates or new subscriptions/queries. Deadline timeout expires displayed
+data without polling. Tasks/daemon activity use their own reported fields. Maintenance lives in
+a secondary shared dialog, preserving typed actions/endpoints and existing destructive admin gate
+plus matching capabilities. Current scope/details are in the final main handover and
+`2026-10-18-crate-v3-dashboard-implementation.md`. The analysis-only provisional stop is superseded.
 
-Latest scoped results: 39 Vitest, five new preview Chromium, one previous embedding and three
-actual Admin Chromium cases pass; strict types/scoped lint and both builds pass. Admin budget
-**526053 / 532480 B gzip**, 6427 B margin, nine assets. Single fresh read-only review has no outstanding findings. Preview runs as user service
-`crate-v3-preview.service` (Node22, restart on failure), active/running with HTTP200.
-See final main handover for proof
-and concrete limits. All earlier specimens and historical 1V inventory remain. **Stop at 1AA for
-Diego before commit/push or another group.** No full suites/CI/local canonical baseline updates.
+1AB also corrects Ops/Analysis typography to Bricolage/Mono roles, keeping Poppins body/controls,
+8px `.crate-form-field`, 44px targets and native/shared exceptions. Policy covers 11 whole files,
+35 named loading/navigation UX sites plus bounded reviewed shared controls. No shared/Listen/
+Desktop/backend/dependency changes. All prior specimens remain; no baseline updates.
+
+Review `http://127.0.0.1:5186/admin-dashboard-demo.html` or persistent `/#dashboard-admin`.
+Seven fictional scenarios, real production components and local actions, no backend. Preview
+service `crate-v3-preview.service` uses this worktree/Node22, restart-on-failure, only loopback
+:5186. Check with `systemctl --user status crate-v3-preview.service`; it is active/running HTTP200.
+
+Current checks: 89 focused Vitest, 11 affected preview and 7 actual Admin Chromium, strict scoped types
+and Admin build pass. Initial JS526461/532480 B gzip, 10 assets, 6019 B margin. Final main handover
+records the accepted producer fixes, their replay, review rulings and limits. Full suites/CI, native/AT/production integration
+and canonical Linux comparison remain pending. 33 canonical PNGs/manifest at 1M and pin 258bbaee intact.
+
+**Diego approved commit/push of 1AB and continuation to the next bounded group. Stop at 1AC
+for review before another commit. No PR, merge, rebase, deploy or release.**
 
 Diego explicitly retained Listen's layered play/halo/progress ring and luminous seek trail
 (2px, thin 1px) during 1S review. Preserve them. Shared/Listen/Desktop contracts are unchanged.
@@ -203,7 +202,6 @@ without checking the appropriate app budget.
 The latest local focused results, fixes and final publication pointer are in the main handover.
 Ignored `/tmp` patches, preview advisory PNGs and Mac process IDs are not transferred and must
 not be prerequisites for continuing.
-
 
 ## 1R review readiness
 

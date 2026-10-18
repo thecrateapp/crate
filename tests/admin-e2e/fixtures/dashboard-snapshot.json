@@ -1,0 +1,330 @@
+{
+  "snapshot": {
+    "scope": "ops",
+    "subject_key": "dashboard",
+    "version": 80,
+    "built_at": "2026-10-10T21:00:35.571015Z",
+    "stale_after": "2026-10-10T21:01:35.571015Z",
+    "stale": false,
+    "generation_ms": 239
+  },
+  "status": {
+    "scanning": false,
+    "last_scan": null,
+    "issue_count": 5,
+    "progress": {},
+    "pending_imports": 0,
+    "running_tasks": 1
+  },
+  "stats": {
+    "artists": 29,
+    "albums": 91,
+    "tracks": 863,
+    "formats": {
+      "m4a": 105,
+      "flac": 758
+    },
+    "total_size_gb": 28.08,
+    "last_scan": null,
+    "pending_imports": 2,
+    "pending_tasks": 0,
+    "total_duration_hours": 53.3,
+    "avg_bitrate": 1256352,
+    "top_genres": [
+      {
+        "name": "Screamo, Hardcore Punk",
+        "count": 22
+      },
+      {
+        "name": "Rock",
+        "count": 16
+      },
+      {
+        "name": "Post-Hardcore, Alternative Rock",
+        "count": 13
+      }
+    ],
+    "recent_albums": [
+      {
+        "id": 69,
+        "slug": "costa-norte-luz-de-octubre",
+        "artist": "Costa Norte",
+        "artist_id": 23,
+        "artist_slug": "costa-norte",
+        "name": "Luz de octubre",
+        "display_name": "Luz de octubre",
+        "year": "2026",
+        "updated_at": "2026-10-18T09:00:00Z"
+      },
+      {
+        "id": 68,
+        "slug": "costa-norte-marea",
+        "artist": "Costa Norte",
+        "artist_id": 23,
+        "artist_slug": "costa-norte",
+        "name": "Marea",
+        "display_name": "Marea",
+        "year": "2026",
+        "updated_at": "2026-10-18T09:00:00Z"
+      },
+      {
+        "id": 71,
+        "slug": "costa-norte-horizonte",
+        "artist": "Costa Norte",
+        "artist_id": 23,
+        "artist_slug": "costa-norte",
+        "name": "Horizonte",
+        "display_name": "Horizonte",
+        "year": "2026",
+        "updated_at": "2026-10-18T09:00:00Z"
+      }
+    ],
+    "analyzed_tracks": 758,
+    "avg_album_duration_min": 35.1,
+    "avg_tracks_per_album": 9.5
+  },
+  "analytics": {
+    "computing": false,
+    "formats": {
+      "m4a": 105,
+      "flac": 758
+    },
+    "decades": {
+      "1990s": 3,
+      "2000s": 16,
+      "2010s": 31,
+      "2020s": 40
+    },
+    "top_artists": [
+      {
+        "id": 23,
+        "slug": "costa-norte",
+        "name": "Costa Norte",
+        "albums": 8
+      }
+    ],
+    "bitrates": {
+      "320k": 32,
+      ">320k": 831
+    },
+    "genres": {
+      "Rock": 16,
+      "Post-Punk, Punk Rock": 11,
+      "Screamo, Hardcore Punk": 22,
+      "Post-Hardcore, Alternative Rock": 13
+    },
+    "sizes_by_format_gb": {
+      "m4a": 0.88,
+      "flac": 27.2
+    },
+    "avg_tracks_per_album": 9.5,
+    "total_duration_hours": 53.3
+  },
+  "live": {
+    "engine": "dramatiq",
+    "running_tasks": [
+      {
+        "id": "sample-running",
+        "type": "enrich_artists",
+        "status": "delegated",
+        "pool": "maintenance",
+        "progress": "Costa Norte · 1/2 artistas",
+        "created_at": "2026-10-01T15:19:09.401996+00:00",
+        "started_at": "2026-10-01T15:20:37.639047+00:00",
+        "updated_at": "2026-10-18T09:00:00Z"
+      }
+    ],
+    "pending_tasks": [],
+    "recent_tasks": [
+      {
+        "id": "862ae64c807c",
+        "type": "sync_library",
+        "status": "completed",
+        "updated_at": "2026-10-10T20:55:11.698969+00:00"
+      },
+      {
+        "id": "f99b413f5d56",
+        "type": "compute_bliss",
+        "status": "failed",
+        "updated_at": "2026-10-10T20:49:07.690543+00:00"
+      },
+      {
+        "id": "2a10a0076c09",
+        "type": "enrich_albums",
+        "status": "cancelled",
+        "updated_at": "2026-10-10T20:49:07.563765+00:00"
+      }
+    ],
+    "worker_slots": {
+      "max": 6,
+      "active": 1
+    },
+    "queue_breakdown": {
+      "running": {
+        "fast": 0,
+        "default": 0,
+        "heavy": 0,
+        "maintenance": 1,
+        "playback": 0
+      },
+      "pending": {
+        "fast": 0,
+        "default": 0,
+        "heavy": 0,
+        "maintenance": 0,
+        "playback": 0
+      }
+    },
+    "db_heavy_gate": {
+      "active": 0,
+      "pending": 0,
+      "blocking": false
+    },
+    "systems": {
+      "postgres": true,
+      "watcher": true
+    }
+  },
+  "recent": {
+    "tasks": [],
+    "pending_imports": 0,
+    "last_scan": null
+  },
+  "analysis": {
+    "total": 1200,
+    "analysis_done": 900,
+    "analysis_pending": 287,
+    "analysis_active": 10,
+    "analysis_failed": 3,
+    "bliss_done": 600,
+    "bliss_pending": 594,
+    "bliss_active": 5,
+    "bliss_failed": 1,
+    "fingerprint_done": 1100,
+    "fingerprint_pending": 100,
+    "fingerprint_chromaprint": 1050,
+    "fingerprint_pcm": 50,
+    "chromaprint_available": true,
+    "fingerprint_strategy": "chromaprint-v1",
+    "total_albums": 120,
+    "lyrics_cached": 1080,
+    "lyrics_found": 800,
+    "lyrics_missing": 280,
+    "portable_sidecar_albums": 96,
+    "portable_audio_tag_albums": 90,
+    "portable_audio_tag_tracks": 900,
+    "portable_tag_errors": 2,
+    "rich_export_albums": 24,
+    "rich_export_tracks": 240,
+    "last_analyzed": {
+      "title": "Marea",
+      "artist": "Costa Norte",
+      "album": "Luz de octubre",
+      "bpm": 123.4,
+      "audio_key": "Am",
+      "energy": 0.72,
+      "danceability": 0.61,
+      "has_mood": true,
+      "updated_at": "2026-10-18T08:30:00Z"
+    },
+    "last_bliss": {
+      "title": "Horizonte",
+      "artist": "Costa Norte",
+      "album": "Luz de octubre",
+      "updated_at": "2026-10-18T08:31:00Z"
+    },
+    "last_fingerprinted": {
+      "title": "Bruma",
+      "artist": "Costa Norte",
+      "album": "Luz de octubre",
+      "source": "chromaprint-v1",
+      "updated_at": "2026-10-18T08:32:00Z"
+    }
+  },
+  "health_counts": {
+    "missing_artwork": 3
+  },
+  "upcoming_shows": [
+    {
+      "artist_name": "Costa Norte",
+      "venue": "Sala de muestra",
+      "city": "Madrid",
+      "country": "ES",
+      "date": "2026-11-12"
+    },
+    {
+      "artist_name": "Cauce",
+      "venue": "Foro de muestra",
+      "city": "Valencia",
+      "country": "ES",
+      "date": "2026-11-20"
+    }
+  ],
+  "runtime": {
+    "active_users_5m": 0,
+    "streams_3m": 0
+  },
+  "eventing": {
+    "redis_connected": true,
+    "domain_events": {
+      "redis_connected": true,
+      "stream_key": "crate:domain_events",
+      "consumer_group": "projector",
+      "latest_sequence": 2271,
+      "stream_length": 2271,
+      "pending": 0,
+      "consumers": 1,
+      "lag": 2271,
+      "last_delivered_id": "0-0",
+      "recent_events": [
+        {
+          "id": "1791630835523-0",
+          "event_type": "global_catalog.reconcile.completed",
+          "scope": "global_catalog",
+          "subject_key": "982b75f3-5a6a-4ebc-99c9-392675823524"
+        },
+        {
+          "id": "1791630825505-0",
+          "event_type": "global_catalog.reconcile.started",
+          "scope": "global_catalog",
+          "subject_key": "982b75f3-5a6a-4ebc-99c9-392675823524"
+        },
+        {
+          "id": "1791585920851-0",
+          "event_type": "global_catalog.reconcile.completed",
+          "scope": "global_catalog",
+          "subject_key": "fdd3d195-47a0-426e-923f-c55dca406c6a"
+        }
+      ]
+    },
+    "cache_invalidation": {
+      "redis_connected": true,
+      "events_key": "cache:invalidation:events",
+      "latest_event_id": 270,
+      "retained_events": 270
+    },
+    "sse_surfaces": [
+      {
+        "name": "Global Task Feed",
+        "endpoint": "/api/events",
+        "channel": "crate:sse:global",
+        "mode": "pubsub",
+        "description": "Global status stream for running tasks and scan state."
+      },
+      {
+        "name": "Task Detail Feed",
+        "endpoint": "/api/events/task/{task_id}",
+        "channel": "crate:sse:task:{task_id}",
+        "mode": "pubsub",
+        "description": "Per-task SSE channel for progress and completion events."
+      },
+      {
+        "name": "Cache Invalidation Feed",
+        "endpoint": "/api/cache/events",
+        "channel": "cache:invalidation:events",
+        "mode": "replay",
+        "description": "Replayable invalidation stream keyed by Last-Event-ID."
+      }
+    ]
+  }
+}

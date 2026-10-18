@@ -7,6 +7,7 @@ import {
   OpsPanel,
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import { Button } from "@crate/ui/shadcn/button";
 import {
@@ -108,11 +109,13 @@ function PipelineCoverage({
   const blocked = failed > 0;
 
   return (
-    <div className="rounded-md border border-white/8 bg-black/20 p-4">
+    <div className="@container rounded-md border border-white/8 bg-black/20 p-4">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className="space-y-1">
-            <h3 className="text-sm font-medium text-white">{title}</h3>
+            <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
+              {title}
+            </h3>
             <div className="text-xs text-white/40">
               {total > 0
                 ? `${done.toLocaleString()} of ${total.toLocaleString()} tracks processed`
@@ -142,7 +145,7 @@ function PipelineCoverage({
           />
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 @lg:grid-cols-4">
           <MiniMetric label="Done" value={done.toLocaleString()} />
           <MiniMetric label="Pending" value={pending.toLocaleString()} />
           <MiniMetric label="Active" value={active.toLocaleString()} />
@@ -168,12 +171,10 @@ function MiniMetric({
 }) {
   return (
     <div className="crate-form-field rounded-sm border border-white/6 bg-black/20 px-3 py-2">
-      <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">
-        {label}
-      </div>
+      <MonoLabel as="div">{label}</MonoLabel>
       <div
         className={cn(
-          "text-sm font-medium",
+          "font-display text-base font-bold leading-tight tabular-nums",
           tone === "danger"
             ? "text-state-warning-text"
             : tone === "muted"
@@ -202,12 +203,12 @@ function RecentTrackCard({
   return (
     <article
       aria-label={title}
-      className="rounded-md border border-white/8 bg-black/20 p-4"
+      className="@container rounded-md border border-white/8 bg-black/20 p-4"
     >
       <div className="mb-4 flex items-start gap-3">
         <div className="space-y-1">
-          <h3 className="text-sm font-medium text-white">{title}</h3>
-          <div className="text-xs text-white/40">
+          <MonoLabel as="h3">{title}</MonoLabel>
+          <div className="font-mono text-label font-normal tabular-nums text-text-subtle">
             {formatTimestamp(track.updated_at)}
           </div>
         </div>
@@ -216,7 +217,7 @@ function RecentTrackCard({
       {track.title || (kind === "fingerprint" && track.updated_at) ? (
         <div className="space-y-3">
           <div>
-            <div className="text-base font-semibold tracking-tight text-white">
+            <div className="font-display text-xl font-bold tracking-tight text-text-primary">
               {track.title || "Untitled track"}
             </div>
             <div className="text-sm text-white/45">
@@ -552,11 +553,11 @@ export function Analysis() {
             accentClassName="text-accent-action-hi"
             emptyLabel="Waiting for tracks"
           />
-          <div className="rounded-md border border-white/8 bg-black/20 p-4">
+          <div className="@container rounded-md border border-white/8 bg-black/20 p-4">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-3">
                 <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-white">
+                  <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
                     Audio fingerprints
                   </h3>
                   <div className="text-xs text-white/40">
@@ -594,7 +595,7 @@ export function Analysis() {
                 />
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 @lg:grid-cols-4">
                 <MiniMetric
                   label="Done"
                   value={status.fingerprint_done.toLocaleString()}
@@ -726,11 +727,13 @@ export function Analysis() {
         }
       >
         <div className="grid gap-4 xl:grid-cols-3">
-          <div className="rounded-md border border-white/8 bg-black/20 p-4">
+          <div className="@container rounded-md border border-white/8 bg-black/20 p-4">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
                 <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-white">Lyrics</h3>
+                  <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
+                    Lyrics
+                  </h3>
                   <div className="text-xs text-white/40">
                     {status.lyrics_cached.toLocaleString()} cached lookups
                     across {status.total.toLocaleString()} tracks
@@ -758,11 +761,11 @@ export function Analysis() {
             </div>
           </div>
 
-          <div className="rounded-md border border-white/8 bg-black/20 p-4">
+          <div className="@container rounded-md border border-white/8 bg-black/20 p-4">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
                 <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-white">
+                  <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
                     Portable metadata
                   </h3>
                   <div className="text-xs text-white/40">
@@ -775,7 +778,7 @@ export function Analysis() {
                 {metrics.portableSidecarPercent}% albums
               </CrateChip>
             </div>
-            <div className="grid gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 @lg:grid-cols-4">
               <MiniMetric
                 label="Sidecars"
                 value={status.portable_sidecar_albums.toLocaleString()}
@@ -796,11 +799,11 @@ export function Analysis() {
             </div>
           </div>
 
-          <div className="rounded-md border border-white/8 bg-black/20 p-4">
+          <div className="@container rounded-md border border-white/8 bg-black/20 p-4">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
                 <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-white">
+                  <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
                     Rich exports
                   </h3>
                   <div className="text-xs text-white/40">

@@ -9,7 +9,7 @@ export function AdminAnalysisCheckpoint() {
       <div className="specimen-heading">
         <div>
           <MonoLabel size="eyebrow" accent="28">
-            Checkpoint 1AA · En revisión
+            Checkpoint 1AA · Publicado
           </MonoLabel>
           <h2>La cobertura se lee.</h2>
         </div>
@@ -21,7 +21,8 @@ export function AdminAnalysisCheckpoint() {
       <p className="mt-6 text-sm text-text-muted">
         Solo Admin. Página y componentes reales; snapshot y acciones ficticios,
         sin backend. Revisa las ocho acciones, el estado ocupado, las coberturas
-        y los resultados recientes.
+        y los resultados recientes. Publicado como 13272706. La corrección
+        tipográfica de 1AB está aplicada también a esta página real.
       </p>
       <iframe
         title="Analysis real con datos de muestra"

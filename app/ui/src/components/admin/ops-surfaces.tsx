@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 type OpsTone = "default" | "primary" | "success" | "warning" | "danger";
 
@@ -39,7 +40,7 @@ export function OpsPageHero({
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="space-y-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-white">
+            <h1 className="font-display text-[clamp(2.25rem,4vw,3.75rem)] font-extrabold leading-display tracking-[-0.045em] text-balance text-text-primary">
               {title}
             </h1>
             <p className="text-sm text-white/55">{description}</p>
@@ -74,17 +75,15 @@ export function OpsStatTile({
   return (
     <div
       className={cn(
-        "rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]",
+        "@container rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]",
         className,
       )}
     >
       <div className="crate-form-field">
-        <div className="text-[11px] uppercase tracking-[0.12em] text-white/35">
-          {label}
-        </div>
+        <MonoLabel as="div">{label}</MonoLabel>
         <div
           className={cn(
-            "text-xl font-semibold tracking-tight",
+            "font-display text-numeral-md font-bold leading-none tabular-nums",
             valueToneClass(tone),
           )}
         >
@@ -120,7 +119,7 @@ export function OpsPanel({
     >
       <div className="flex flex-col gap-3 border-b border-white/8 px-4 py-4 md:flex-row md:items-start md:justify-between md:px-5">
         <div className="space-y-1">
-          <h2 className="text-lg font-semibold tracking-tight text-white">
+          <h2 className="font-display text-[clamp(1.25rem,1.7vw,1.6rem)] font-bold leading-[1.1] tracking-tight text-text-primary">
             {title}
           </h2>
           {description ? (

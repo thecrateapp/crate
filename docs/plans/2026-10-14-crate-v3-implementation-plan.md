@@ -3,7 +3,7 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Published checkpoints through 1Z (`2efb4754`) are recorded in the handover; preserve the next 1AA review stop.
+> Diego's go-ahead. Published checkpoints through 1AA (`13272706`) are recorded in the handover. 1AB three-block Dashboard is visually approved for commit/push; continue one bounded Admin icon group and stop at1AC for review.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -1713,7 +1713,6 @@ error identifier sits in its eyebrow, never beside the large title (Diego's revi
 Final focused verification, bundle size and QA limits are recorded in the handover. Stop at
 1R before commit/push or Task 1b.5. No full suites or canonical baseline/CI update in iteration.
 
-
 Commit: `feat(ui): one set of loading, empty and error states`.
 
 ### Task 1b.5: Track rows and media grids
@@ -1857,7 +1856,6 @@ The source policy covers both entire page files and bounds their retained sites/
 Header count/status summaries consistently use static CrateChip tags, without mixed pill sizing.
 Review real pages with fictional adapters at `#operaciones-admin`; stop at 1Z before publication
 or another group. Other operations/settings/library pages and the rest of 1b.8 remain pending.
-
 
 **Linux checkpoint 1AA, 2026-10-18 — Analysis page, local review.** Diego approved 1Z and
 it is committed/pushed as `2efb4754` (local/origin SHA verified). The next bounded group covers
@@ -3334,6 +3332,13 @@ Admin scramble.
    - `chore(ui): delete unrouted Admin pages and dead error state`
 
 ### Task 3.3: Dashboard tiles and the health tile (P0 · M)
+
+> **Approved composition amendment, 2026-10-18 / 1AB:** Diego approved the three-block
+> operational Dashboard: report/service state, reported work and fresh service interruptions,
+> using only current payloads. See `2026-10-18-crate-v3-dashboard-implementation.md` and the final
+> handover. This supersedes the four-tile/recent-album/diagnostics composition below, retained
+> as historical planning context. It does not claim the future health surface/scan instruments,
+> governor, worker-liveness or other backend prerequisites complete. Stop for visual review at1AB.
 
 **Files:**
 
@@ -5589,3 +5594,25 @@ Capture/provenance commit `297daaa1` is pushed. Full Frontend Tests and Linux vi
 pass in [38889352392](https://github.com/thecrateapp/crate/actions/runs/38889352392).
 Next assigned task: 1b.1 / Checkpoint 1N, shared overlays/menus and one ConfirmDialog; preserve
 its visual review/publication stop.
+
+### Linux continuation — provisional 1AB and Dashboard product review, 2026-10-18
+
+1AA is approved/published as 13272706. Local 1AB extends the icon guard to wholeDashboard, retaining
+three concrete loading/disclosureUX sites and its data/actions/charts. Diego's font audit also
+corrects common Admin Ops surfaces and Analysis to Bricolage/Mono roles with Poppins body/controls;
+existing8px/44px contracts remain. Evidence and limits are in the final handover.
+
+Diego then requested a simplification analysis because Dashboard mixes too much information.
+He prioritised knowing whether the system and its jobs work. Read
+[the proposed analysis](2026-10-18-crate-v3-dashboard-simplification-analysis.md). It recommends
+state/freshness, work/progress and actionable current issues; it is not yet an approved change
+of Task 3.3. Stop product work and publication at provisional 1AB; preserve all previous checkpoints.
+
+### 1AB execution approval and local result — 2026-10-18
+
+Diego explicitly approved implementing the Dashboard simplification with only existing real
+data and stopping before commit. [Bounded execution plan](2026-10-18-crate-v3-dashboard-implementation.md)
+records model/page tests, preview scenarios and validation. Three regions replace the older
+composition; available signal limits, freshness, actual task progress and local maintenance
+contracts are explicit. No new backend/provider/subscriptions. Whole 1b.8, future health/governor
+instruments and phase QA are not complete. Stop at 1AB for Diego; final evidence in the handover.

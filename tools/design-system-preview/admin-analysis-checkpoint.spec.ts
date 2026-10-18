@@ -23,9 +23,9 @@ test("1AA retains earlier checkpoints and embeds the actual Analysis page", asyn
   ])
     await expect(page.locator(`#${id}`)).toHaveCount(1);
   await expect(page.locator("footer")).toContainText("1Z publicado");
-  await expect(page.locator("footer")).toContainText("1AA en revisión");
+  await expect(page.locator("footer")).toContainText("1AA publicado");
 });
-for (const width of [1440, 768, 390]) {
+for (const width of [1440, 1299, 768, 390]) {
   test.describe(`Analysis real preview ${width}`, () => {
     test.use({
       viewport: { width, height: 1100 },
@@ -47,6 +47,33 @@ for (const width of [1440, 768, 390]) {
         real.getByRole("heading", { name: "Analysis", exact: true }),
       ).toBeVisible();
       await expect(real.locator("svg")).toHaveCount(0);
+      await page.evaluate(() => document.fonts.ready);
+      await expect(
+        real.getByRole("heading", { name: "Analysis", exact: true }),
+      ).toHaveCSS("font-family", /Bricolage Grotesque/);
+      await expect(
+        real.getByRole("heading", { name: "Pipeline coverage", exact: true }),
+      ).toHaveCSS("font-family", /Bricolage Grotesque/);
+      await expect(
+        real.getByRole("button", { name: "Refresh", exact: true }),
+      ).toHaveCSS("font-family", /^Poppins/);
+      for (const field of await real.locator(".crate-form-field").all()) {
+        await expect(field.locator(":scope > :first-child")).toHaveCSS(
+          "font-family",
+          /JetBrains Mono/,
+        );
+        await expect(field.locator(":scope > :nth-child(2)")).toHaveCSS(
+          "font-family",
+          /Bricolage Grotesque/,
+        );
+      }
+      const loaded = await page.evaluate(() =>
+        Array.from(document.fonts)
+          .filter((face) => face.status === "loaded")
+          .map((face) => face.family),
+      );
+      for (const family of ["Bricolage Grotesque", "JetBrains Mono", "Poppins"])
+        expect(loaded).toContain(family);
       await expect(
         real.getByRole("heading", { name: "Operator notes", exact: true }),
       ).toHaveCount(0);
@@ -109,6 +136,26 @@ for (const width of [1440, 768, 390]) {
       expect(pairs).toHaveLength(27);
       for (const pair of pairs)
         expect(pair).toEqual({ gap: 8, childMargin: "0px" });
+      const labelsFit = await real
+        .locator(".crate-form-field")
+        .evaluateAll((nodes) =>
+          nodes.every((node) => {
+            const label = node.children[0]!;
+            const range = document.createRange();
+            range.selectNodeContents(label);
+            const text = range.getBoundingClientRect(),
+              box = node.getBoundingClientRect(),
+              css = getComputedStyle(node);
+            return (
+              text.left >= box.left + parseFloat(css.paddingLeft) - 0.5 &&
+              text.right <= box.right - parseFloat(css.paddingRight) + 0.5
+            );
+          }),
+        );
+      expect(
+        labelsFit,
+        "technical labels must fit their own metric, including Chromaprint",
+      ).toBe(true);
       const actions = [
         "Refresh",
         "Backfill fingerprints",
