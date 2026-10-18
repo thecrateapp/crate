@@ -83,6 +83,36 @@ function metadataPlan(overrides: Partial<AgentPlan> = {}): AgentPlan {
   });
 }
 
+function analysisPlan(): AgentPlan {
+  return plan({
+    operation: "analysis",
+    risk: "caution",
+    targets: [{ entity_type: "track", entity_uid: uid }],
+    changes: [
+      {
+        entity_uid: uid,
+        pipeline: "analysis",
+        before: "done",
+        after: "pending",
+        generation_before: 3,
+      },
+    ],
+    source_versions: { database: "d".repeat(64), files: [] },
+    impact: {
+      database: true,
+      filesystem: false,
+      audio_read: true,
+      tracks: 1,
+      bytes_scheduled: 1000,
+      pipelines: ["analysis"],
+      completion: "asynchronous_daemon_results",
+      may_replace_existing_results: true,
+    },
+    reversibility:
+      "Existing analysis values remain until a new result commits.",
+  });
+}
+
 // Mirrors agent_editorial.compile_operation and the persisted get_plan DTO:
 // changes is a playlist summary; the exact editorial content is top-level.
 function editorialPlan(overrides: Record<string, unknown> = {}) {
@@ -552,6 +582,47 @@ describe("AgentPlanReview", () => {
     expect(table).toHaveTextContent("New biography");
     expect(
       screen.queryByRole("button", { name: "Approve exact plan" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("allows analysis managers to approve an exact analysis plan", async () => {
+    const user = userEvent.setup();
+    const item = analysisPlan();
+    apiMock.mockResolvedValue(item);
+    renderReview([
+      "agents.plans.review",
+      "agents.plans.approve",
+      "library.analysis.manage",
+    ]);
+    const approve = await screen.findByRole("button", {
+      name: "Approve exact plan",
+    });
+    expect(approve).toBeDisabled();
+    await user.click(screen.getByRole("checkbox"));
+    expect(approve).toBeEnabled();
+    await user.click(approve);
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        `${base}/plan-one/approve`,
+        "POST",
+        exactDecision(item),
+      ),
+    );
+  });
+
+  it("does not grant metadata editors authority to approve analysis", async () => {
+    apiMock.mockResolvedValue(analysisPlan());
+    renderReview([
+      "agents.plans.review",
+      "agents.plans.approve",
+      "library.metadata.write",
+    ]);
+    await screen.findByRole("table", { name: "Complete proposed changes" });
+    expect(
+      screen.queryByRole("button", { name: "Approve exact plan" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Reject plan" }),
     ).not.toBeInTheDocument();
   });
 

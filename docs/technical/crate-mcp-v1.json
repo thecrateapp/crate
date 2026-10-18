@@ -198,7 +198,7 @@
     "editorial.publish": "curation.playlists.write",
     "editorial.read": "curation.playlists.write",
     "editorial.write": "curation.playlists.write",
-    "library.analysis.run": "library.metadata.write",
+    "library.analysis.run": "library.analysis.manage",
     "library.enrichment.run": "library.metadata.write",
     "library.health.read": "library.view",
     "library.health.run": "library.repair.run",

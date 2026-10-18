@@ -18,7 +18,7 @@ OPERATIONS = {
     "repairs": ("library.repair.run", "library.repair.run"),
     "metadata_update": ("library.metadata.write", "library.metadata.write"),
     "enrichment": ("library.enrichment.run", "library.metadata.write"),
-    "analysis": ("library.analysis.run", "library.metadata.write"),
+    "analysis": ("library.analysis.run", "library.analysis.manage"),
     "library_sync": ("library.sync.run", "library.metadata.write"),
     "metadata_export": ("library.metadata.export", "library.metadata.write"),
     "metadata_rehydrate": ("library.metadata.rehydrate", "library.metadata.write"),

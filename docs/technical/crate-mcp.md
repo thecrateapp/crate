@@ -5,7 +5,7 @@ section: operations
 audience: [operator, developer]
 status: canonical
 order: 170
-verified: 2026-10-18
+verified: 2026-10-19
 sources:
   [
     app/crate/agent_operations.py,
@@ -1215,6 +1215,70 @@ changed Python files. Documentation integrity passed for 44 canonical documents;
 review found no P1/P2/P3 in this test-only cut. These tests use deterministic daemon/DSP/provider inputs and simulated
 broker dispatch; no live model or provider was exercised. No full local suite, production code,
 migration or flag was changed. CI and persistent review must be checked on the published exact HEAD.
+
+### Five permission and integration corrections (2026-10-19)
+
+The final review of `11bf314e`, despite its 20 successful CI checks, reproduced five P2 defects.
+Permanent regressions produced **30 expected failures** before correction: 12 for repairs/member
+enrichment, 11 for OAuth and analysis authority, and seven across the two Admin components.
+
+1. **Analysis retains its existing human capability.** `library.analysis.run` requires
+   `library.analysis.manage` for delegated consent, token resolution, worker reauthorization and
+   human plan review. `library.metadata.write` alone is insufficient. The regressions use real
+   persisted roles, a stale admin JWT, an editor denial, a librarian success and an admin-to-editor
+   downgrade at both token and worker boundaries. The generated 1.1.0 catalog changes only this
+   capability mapping; tools, grants and schemas remain the same.
+2. **MusicBrainz members retain the shared object schema.** Scoped enrichment stores bounded
+   `name`, `type`, `begin`, `end` and `attributes` objects instead of strings. Missing optional
+   fields stay absent; empty strings and `end: null` remain distinct. Limits are 100 members,
+   200 characters per string and 50 attributes per relation. Malformed members produce a partial
+   result without replacing persisted metadata. Actual provider-cache adapters, PostgreSQL,
+   audit and both shared graph readers verify the result; populated or manually locked fields
+   retain their policy protection. No live MusicBrainz call is part of this evidence.
+3. **Repairs and bliss use compatible artist locks.** Both the initial repair lock and its locked
+   source reload use `FOR NO KEY UPDATE` for artists. Album and track locks remain `FOR UPDATE`.
+   A destructive artist deletion promotes its artist lock to `FOR UPDATE` after descendant locks
+   and before source CAS/filesystem effects, preventing new FK dependencies during deletion.
+   Real PostgreSQL races cover first/existing centroids, artist/album/track identity changes,
+   and opposite FK behavior after the locked reload for ordinary versus artist-delete repairs.
+   Expected blockers are observed by backend PID. Vector, processing state, signature and
+   centroid still commit atomically; timeouts only bound failures.
+4. **External human login resumes MCP consent.** Google/Apple login may return only to the exact
+   `/oauth/authorize` or `/oauth/connections` path on the configured valid issuer. Authorization
+   requires OAuth enabled; connection management remains available when disabled. Local HTTP
+   requires the existing explicit development opt-in. The provider callback origin and general
+   frontend-origin allowlist remain unchanged. OAuth state and the final query survive byte for
+   byte, including PKCE and client state; `access_expires_at` is not appended to MCP destinations.
+   Callback tests use signed state and JWT expiry with isolated provider/session I/O. Negative
+   cases cover cross-origin, userinfo, port, scheme, subpath, traversal, fragments, controls and
+   invalid issuer configuration.
+5. **Year rules and metadata-only edits agree.** Admin preserves year inputs and range endpoints
+   as text and canonicalizes legacy numeric years for previews or changed rules. Other numeric
+   fields remain numeric. Metadata-only saves omit unchanged rules, preserving legacy definitions
+   without regeneration. Outbound rule edits retain noneditable options such as per-artist limits
+   and deduplication. The server's strict four-digit year contract is unchanged. Component tests
+   cover the emitted requests; actual API/PostgreSQL controls save legacy metadata without
+   resubmitting rules and execute canonical year/range previews against real library rows.
+
+Focused validation passed **331 distinct backend cases without skips** and **61 Admin component
+cases**. Python 3.13 and repository dependencies used the disposable Linux image and sequential
+PostgreSQL/Testcontainers runs. The selections were:
+
+```sh
+cd app
+../.venv/bin/python -m pytest tests/test_mcp_analysis_authority.py tests/test_mcp_login_return.py tests/test_agent_repairs_bliss_serialization.py tests/test_agent_enrichment.py tests/test_playlist_editor_years.py -q
+../.venv/bin/python -m pytest tests/test_agent_repairs.py tests/test_bliss_writer_serialization.py tests/test_agent_oauth_jobs.py tests/test_mcp_oauth_integration.py tests/test_agent_plan_approvals.py tests/test_mcp_distribution.py tests/test_playlist_rule_contract.py -q
+../.venv/bin/python -m pytest tests/test_agent_repairs_bliss_serialization.py::test_non_delete_repair_allows_first_centroid_foreign_key_after_locked_reload tests/test_auth.py -k 'oauth or redirect or non_delete_repair' -q
+```
+
+These runs passed 116, 171 and 44 cases respectively; the last adds one serialization control
+and 43 existing auth cases. The first command preceded that additional serialization test.
+From the repository root, `npm run --workspace=app/ui test -- src/pages/PlaylistEditor.test.tsx src/pages/AgentPlanReview.test.tsx`
+passed all 61 selected cases. Directed Ruff check/format, Pyright, ESLint, Prettier and Admin
+typecheck passed. Documentation integrity passed for 44 canonical documents. Independent SPEC
+and QUALITY reviews found no remaining P1/P2 in this correction. No full local suite, migration,
+production provider/model call, deployment or
+flag activation was performed. CI and persistent review must be checked on the published exact HEAD.
 
 ### Repair readiness and effects
 

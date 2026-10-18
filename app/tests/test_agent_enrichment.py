@@ -1020,3 +1020,185 @@ def test_repository_rejects_unknown_policy_without_a_transaction(
             facets={},
             task_id="policy-rejection",
         )
+
+
+def test_musicbrainz_members_preserve_provider_objects_for_shared_graph_readers(
+    enrichment_artist, monkeypatch
+):
+    from crate import musicbrainz_ext
+    from crate.db.queries.paths_artist_graph_queries import (
+        load_artist_radio_graphs,
+        load_shared_members_graph,
+    )
+
+    member = {
+        "name": "Shared Member",
+        "type": "member of band",
+        "begin": "2000-03",
+        "end": "",
+        "attributes": ["guitar", "vocals"],
+    }
+    members = [member, {"name": "Open-ended Member", "end": None}]
+    payload = {"members": members}
+    # The real cached provider adapter returns these relation objects.
+    monkeypatch.setattr(musicbrainz_ext, "get_cache", lambda *args, **kwargs: payload)
+    monkeypatch.setattr(
+        "crate.agent_enrichment.wait_for_provider_slot", lambda *_: None
+    )
+    with transaction_scope() as current:
+        current.execute(
+            text(
+                "INSERT INTO library_artists(name,members_json) "
+                "VALUES ('Second Band',CAST(:members AS jsonb))"
+            ),
+            {"members": json.dumps([member])},
+        )
+
+    result = _apply(
+        _plan(enrichment_artist, providers=["musicbrainz"], facets=["members"])
+    )
+
+    assert result["execution"]["status"] == "completed", result
+    assert result["verification"]["status"] == "passed", result
+    assert (
+        read_enrichment_state(enrichment_artist["uid"])["artist"]["members_json"]
+        == members
+    )
+    assert load_shared_members_graph()["scoped artist"] == {"second band"}
+    _, _, radio_graph = load_artist_radio_graphs()
+    assert radio_graph["scoped artist"] == {"second band"}
+    with read_scope() as current:
+        audit = current.execute(
+            text(
+                "SELECT details_json FROM audit_log WHERE task_id='scoped-enrichment' "
+                "AND action='scoped_artist_enrichment'"
+            )
+        ).scalar_one()
+    assert audit["facets"][0]["after"] == {"members_json": members}
+
+
+def test_musicbrainz_member_objects_are_bounded_without_inventing_metadata(
+    enrichment_artist, monkeypatch
+):
+    members = [
+        {
+            "name": f"  Member {index} " + "x" * 300,
+            "type": "member of band",
+            "begin": "2000",
+            "end": "",
+            "attributes": [f"role {role} " + "x" * 300 for role in range(60)],
+            "private_blob": "discarded",
+        }
+        for index in range(120)
+    ]
+    members[1] = {"name": "Name only"}
+    monkeypatch.setattr(
+        "crate.agent_enrichment._fetch", lambda *_: {"members": members}
+    )
+
+    result = _apply(
+        _plan(enrichment_artist, providers=["musicbrainz"], facets=["members"])
+    )
+
+    assert result["verification"]["status"] == "passed", result
+    stored = read_enrichment_state(enrichment_artist["uid"])["artist"]["members_json"]
+    assert len(stored) == 100
+    assert stored[0] == {
+        "name": members[0]["name"].strip()[:200],
+        "type": "member of band",
+        "begin": "2000",
+        "end": "",
+        "attributes": [value[:200] for value in members[0]["attributes"][:50]],
+    }
+    assert stored[1] == {"name": "Name only"}
+
+
+@pytest.mark.parametrize(
+    "members",
+    [
+        "Member",
+        ["Member"],
+        [{"type": "member of band"}],
+        [{"name": "  "}],
+        [{"name": 42}],
+        [{"name": "Member", "type": {"unexpected": "object"}}],
+        [{"name": "Member", "begin": ["2000"]}],
+        [{"name": "Member", "attributes": "guitar"}],
+        [{"name": "Member", "attributes": [None]}],
+    ],
+)
+def test_malformed_musicbrainz_members_are_reported_without_replacing_metadata(
+    enrichment_artist, monkeypatch, members
+):
+    from crate.db.queries.paths_artist_graph_queries import load_shared_members_graph
+
+    existing = [{"name": "Reviewed Member", "attributes": ["bass"]}]
+    with transaction_scope() as current:
+        current.execute(
+            text(
+                "UPDATE library_artists SET members_json=CAST(:members AS jsonb) WHERE id=:id"
+            ),
+            {"members": json.dumps(existing), "id": enrichment_artist["id"]},
+        )
+    before = read_enrichment_state(enrichment_artist["uid"])
+    monkeypatch.setattr(
+        "crate.agent_enrichment._fetch", lambda *_: {"members": members}
+    )
+
+    result = _apply(
+        _plan(
+            enrichment_artist,
+            providers=["musicbrainz"],
+            facets=["members"],
+            mode="refresh",
+        )
+    )
+
+    assert result["execution"]["status"] == "partial", result
+    assert result["verification"]["status"] == "partial", result
+    provider = result["execution"]["items"][0]["providers"][0]
+    assert provider["status"] == "failed" and provider["recoverable"] is True
+    assert read_enrichment_state(enrichment_artist["uid"]) == before
+    assert load_shared_members_graph() == {}
+
+
+@pytest.mark.parametrize("field_lock", [None, "members", "members_json"])
+def test_musicbrainz_member_refresh_preserves_populated_or_locked_objects(
+    enrichment_artist, monkeypatch, field_lock
+):
+    existing = [{"name": "Reviewed Member", "begin": "1999", "attributes": ["bass"]}]
+    replacement = [{"name": "Provider Member", "type": "member of band", "end": "2005"}]
+    with transaction_scope() as current:
+        current.execute(
+            text(
+                "UPDATE library_artists SET members_json=CAST(:members AS jsonb) WHERE id=:id"
+            ),
+            {"members": json.dumps(existing), "id": enrichment_artist["id"]},
+        )
+        if field_lock:
+            lock_fields(
+                entity_type="artist",
+                entity_id=enrichment_artist["id"],
+                field_names=[field_lock],
+                session=current,
+            )
+    monkeypatch.setattr(
+        "crate.agent_enrichment._fetch", lambda *_: {"members": replacement}
+    )
+
+    result = _apply(
+        _plan(
+            enrichment_artist,
+            providers=["musicbrainz"],
+            facets=["members"],
+            mode="refresh" if field_lock else "missing",
+        )
+    )
+
+    assert result["verification"]["status"] == "passed", result
+    assert (
+        read_enrichment_state(enrichment_artist["uid"])["artist"]["members_json"]
+        == existing
+    )
+    facets = result["execution"]["items"][0]["providers"][0]["facets"]
+    assert facets[0]["status"] == ("locked" if field_lock else "present")

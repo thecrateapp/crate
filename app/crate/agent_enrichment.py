@@ -163,6 +163,41 @@ def _strings(value, limit=50) -> list[str]:
     )
 
 
+def _musicbrainz_members(value) -> list[dict]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("MusicBrainz returned invalid member relations")
+    members = []
+    for relation in value[:100]:
+        if (
+            not isinstance(relation, dict)
+            or not isinstance(relation.get("name"), str)
+            or not relation["name"].strip()
+        ):
+            raise ValueError("MusicBrainz returned an invalid member name")
+        member = {"name": relation["name"].strip()[:200]}
+        for field in ("type", "begin", "end"):
+            if field not in relation:
+                continue
+            content = relation[field]
+            if field == "end" and content is None:
+                member[field] = None
+            elif isinstance(content, str):
+                member[field] = content.strip()[:200]
+            else:
+                raise ValueError("MusicBrainz returned invalid member metadata")
+        if "attributes" in relation:
+            attributes = relation["attributes"]
+            if not isinstance(attributes, list) or any(
+                not isinstance(attribute, str) for attribute in attributes[:50]
+            ):
+                raise ValueError("MusicBrainz returned invalid member attributes")
+            member["attributes"] = _strings(attributes, 50)
+        members.append(member)
+    return members
+
+
 def _number(value, maximum: int = 2147483647) -> int | None:
     if isinstance(value, bool):
         return None
@@ -406,18 +441,12 @@ def _extract(provider: str, payload) -> dict:
             "ended": _text(payload.get("end_date")),
             "artist_type": _text(payload.get("type")),
         }
-        members = payload.get("members") or []
-        if isinstance(members, list):
-            members = [
-                m["name"]
-                if isinstance(m, dict) and isinstance(m.get("name"), str)
-                else m
-                for m in members[:100]
-            ]
         return {
             "identity": {"fields": fields},
             "urls": {"fields": {"urls_json": _urls(payload.get("urls"))}},
-            "members": {"fields": {"members_json": _strings(members, 100)}},
+            "members": {
+                "fields": {"members_json": _musicbrainz_members(payload.get("members"))}
+            },
         }
     return {
         "biography": {

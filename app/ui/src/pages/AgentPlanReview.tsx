@@ -33,7 +33,7 @@ const operationCapabilities: Record<string, string> = {
   repairs: "library.repair.run",
   metadata_update: "library.metadata.write",
   enrichment: "library.metadata.write",
-  analysis: "library.metadata.write",
+  analysis: "library.analysis.manage",
   library_sync: "library.metadata.write",
   metadata_export: "library.metadata.write",
   metadata_rehydrate: "library.metadata.write",

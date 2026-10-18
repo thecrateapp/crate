@@ -281,6 +281,10 @@ function getOpsForField(field: string) {
   return getFieldType(field) === "text" ? TEXT_OPS : NUMBER_OPS;
 }
 
+function numericRuleInput(field: string, value: string): string | number {
+  return field === "year" ? value : Number(value);
+}
+
 function formatMinutes(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -520,13 +524,31 @@ export function PlaylistEditor() {
   const isSmart = basePlaylist?.is_smart ?? false;
   const persistedSmartRules = basePlaylist?.smart_rules;
   const currentSmartRules = useMemo(
-    () => ({ match, rules, limit, sort }),
-    [limit, match, rules, sort],
+    () => ({
+      ...persistedSmartRules,
+      match,
+      rules: rules.map((rule) =>
+        rule.field === "year"
+          ? {
+              ...rule,
+              value: Array.isArray(rule.value)
+                ? rule.value.map(String)
+                : String(rule.value),
+            }
+          : rule,
+      ),
+      limit,
+      sort,
+    }),
+    [persistedSmartRules, limit, match, rules, sort],
   );
   const smartRulesChanged =
     isSmart &&
-    JSON.stringify(currentSmartRules) !==
-      JSON.stringify(persistedSmartRules ?? null);
+    (match !== (persistedSmartRules?.match || "all") ||
+      limit !== (persistedSmartRules?.limit || 50) ||
+      sort !== (persistedSmartRules?.sort || "random") ||
+      JSON.stringify(rules) !==
+        JSON.stringify(persistedSmartRules?.rules || []));
 
   useEffect(() => {
     if (!isSmart && trackSearchScope === "rules") {
@@ -582,7 +604,7 @@ export function PlaylistEditor() {
         is_curated: isCurated,
       };
       if (isSmart) {
-        body.smart_rules = currentSmartRules;
+        if (smartRulesChanged) body.smart_rules = currentSmartRules;
         body.auto_refresh_enabled = autoRefresh;
       }
       await api(`/api/admin/system-playlists/${id}`, "PUT", body);
@@ -602,6 +624,7 @@ export function PlaylistEditor() {
     isActive,
     isCurated,
     isSmart,
+    smartRulesChanged,
     name,
     currentSmartRules,
     refetch,
@@ -1306,10 +1329,18 @@ export function PlaylistEditor() {
                                   onChange={(event) =>
                                     updateRule(index, {
                                       value: [
-                                        Number(event.target.value),
-                                        Array.isArray(rule.value)
-                                          ? Number(rule.value[1] ?? 0)
-                                          : 0,
+                                        numericRuleInput(
+                                          rule.field,
+                                          event.target.value,
+                                        ),
+                                        numericRuleInput(
+                                          rule.field,
+                                          String(
+                                            Array.isArray(rule.value)
+                                              ? (rule.value[1] ?? "")
+                                              : "",
+                                          ),
+                                        ),
                                       ],
                                     })
                                   }
@@ -1325,10 +1356,18 @@ export function PlaylistEditor() {
                                   onChange={(event) =>
                                     updateRule(index, {
                                       value: [
-                                        Array.isArray(rule.value)
-                                          ? Number(rule.value[0] ?? 0)
-                                          : 0,
-                                        Number(event.target.value),
+                                        numericRuleInput(
+                                          rule.field,
+                                          String(
+                                            Array.isArray(rule.value)
+                                              ? (rule.value[0] ?? "")
+                                              : "",
+                                          ),
+                                        ),
+                                        numericRuleInput(
+                                          rule.field,
+                                          event.target.value,
+                                        ),
                                       ],
                                     })
                                   }
@@ -1357,7 +1396,10 @@ export function PlaylistEditor() {
                                   updateRule(index, {
                                     value:
                                       getFieldType(rule.field) === "number"
-                                        ? Number(event.target.value)
+                                        ? numericRuleInput(
+                                            rule.field,
+                                            event.target.value,
+                                          )
                                         : event.target.value,
                                   })
                                 }
@@ -1528,12 +1570,11 @@ export function PlaylistEditor() {
                 <Button
                   type="button"
                   onClick={handleRefineTracklist}
-                  disabled={
-                    refining ||
-                    (playlist.tracks?.length ?? 0) === 0
-                  }
+                  disabled={refining || (playlist.tracks?.length ?? 0) === 0}
                 >
-                  {refining ? "Preparing refinements..." : "Suggest refinements"}
+                  {refining
+                    ? "Preparing refinements..."
+                    : "Suggest refinements"}
                 </Button>
               </div>
             </CardHeader>

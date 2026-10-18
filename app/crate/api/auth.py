@@ -974,13 +974,35 @@ def _callback_origin(return_to: str | None = None, *, app_id: str | None = None)
     return f"https://admin.{domain}"
 
 
+def _is_mcp_return_to(return_to: str) -> bool:
+    from crate.mcp.oauth_config import oauth_enabled, oauth_settings
+
+    if "#" in return_to or any(
+        ord(char) < 33 or ord(char) == 127 for char in return_to
+    ):
+        return False
+    try:
+        issuer = oauth_settings().issuer
+    except ValueError:
+        return False
+    paths = ["/oauth/connections"]
+    if oauth_enabled():
+        paths.append("/oauth/authorize")
+    return any(
+        return_to == issuer + path or return_to.startswith(issuer + path + "?")
+        for path in paths
+    )
+
+
 def _validate_return_to(return_to: str | None, *, app_id: str | None = None) -> str:
-    """Validate return_to against allowed origins. Returns safe URL or fallback."""
+    """Allow frontend origins and exact configured MCP human destinations."""
     if not return_to:
         return "/"
     if return_to.startswith("cratemusic://"):
         return return_to
     if return_to.startswith("/") and not return_to.startswith("//"):
+        return return_to
+    if _is_mcp_return_to(return_to):
         return return_to
     if return_to.startswith(("http://", "https://")):
         parts = return_to.split("/", 3)
@@ -2642,7 +2664,7 @@ def oauth_callback(
     if safe_return.startswith("http"):
         redirect_url = _post_auth_redirect_url(safe_return, token)
         access_expires_at = _access_expires_at_from_token(token)
-        if access_expires_at:
+        if access_expires_at and not _is_mcp_return_to(safe_return):
             redirect_url = _append_query_param(
                 redirect_url, "access_expires_at", _iso_datetime(access_expires_at)
             )

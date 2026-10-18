@@ -40,12 +40,15 @@ def repair_source_version(source: dict) -> str:
 def _rows(
     current, table: str, where: str, params: dict, *, locked: bool, limit=200
 ) -> list[dict]:
+    # A Bliss writer may own a track while its first centroid needs KEY SHARE
+    # on the artist. Serialize identity edits without blocking that FK check.
+    lock = " FOR NO KEY UPDATE" if table == "library_artists" else " FOR UPDATE"
     # SQL_SAFE: table/where are internal constants or validated PostgreSQL FK metadata.
     rows = list(
         current.execute(
             text(
                 f"SELECT to_jsonb(e) FROM {table} e WHERE {where} LIMIT {limit + 1}"
-                + (" FOR UPDATE" if locked else "")
+                + (lock if locked else "")
             ),
             params,
         ).scalars()
@@ -312,12 +315,23 @@ def apply_repair_item(
             ("library_tracks", initial["tracks"]),
         ):
             if rows:
+                lock = "NO KEY UPDATE" if table == "library_artists" else "UPDATE"
                 current.execute(
                     text(
-                        f"SELECT id FROM {table} WHERE id=ANY(:ids) ORDER BY id FOR UPDATE"
+                        f"SELECT id FROM {table} WHERE id=ANY(:ids) ORDER BY id FOR {lock}"
                     ),
                     {"ids": [row["id"] for row in rows]},
                 ).all()
+        if item["action"] == "delete_artist" and initial["artists"]:
+            # Descendant locks are now held, so a Bliss writer can no longer
+            # wait for this artist while we wait for its track. Block new FK
+            # dependents before the final source CAS and filesystem effects.
+            current.execute(
+                text(
+                    "SELECT id FROM library_artists WHERE id=ANY(:ids) ORDER BY id FOR UPDATE"
+                ),
+                {"ids": [row["id"] for row in initial["artists"]]},
+            ).all()
         source = _load(current, item["issue_id"], locked=True)
         if repair_source_version(source) != item["database_version"]:
             return {"status": "conflict", "code": "SOURCE_CHANGED"}
