@@ -28,7 +28,7 @@ from crate.db.repositories.tasks_updates import start_task
 from crate.db.tx import read_scope, transaction_scope
 
 from tests.agent_command_fixtures import UID, OTHER_UID, change, other_principal, scalar
-from tests.test_agent_plan_approvals import decide
+from tests.agent_plan_support import decide
 from tests.test_mcp_oauth_integration import _code, _exchange
 
 pytest_plugins = [

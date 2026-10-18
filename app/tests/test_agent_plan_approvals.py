@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from tests.agent_command_fixtures import UID, change, observed_plan, scalar
+from tests.agent_plan_support import decide
 from tests.test_agent_admin import ORIGIN, human_token
 
 pytest_plugins = ["tests.agent_command_fixtures", "tests.test_agent_admin"]
@@ -25,21 +26,6 @@ def pending_plan(world):
     )
     _, preview = observed_plan(world)
     return plans.get_plan(preview["plan_id"])
-
-
-def decide(actor, plan, decision="approved", **overrides):
-    args = {
-        key: plan[key]
-        for key in (
-            "plan_version",
-            "content_hash",
-            "policy_revision",
-            "authorization_context_hash",
-        )
-    }
-    return plans.decide_plan(
-        actor, plan["plan_id"], decision=decision, **{**args, **overrides}
-    )
 
 
 def test_default_photo_policy_is_preauthorized_in_single_plan_store(command_world):

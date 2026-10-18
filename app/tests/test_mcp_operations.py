@@ -21,7 +21,7 @@ from crate.db.repositories.tasks import create_task, start_task, update_task
 from crate.db.queries.tasks import get_task
 from crate.db.tx import read_scope, transaction_scope
 
-from tests.test_agent_plan_approvals import decide
+from tests.agent_plan_support import decide
 from tests.test_mcp_actions import PLAN_ID, PLAN_VERSION, _client
 from tests.test_mcp_actions import action_transport as action_transport  # noqa: PLC0414
 from tests.test_task_control_actor import actor_world as actor_world  # noqa: PLC0414
@@ -802,13 +802,27 @@ def test_approved_raw_task_rechecks_flags_and_authority_before_persisting_effect
     before = _raw_effects()
     _withdraw_raw_authority(world, monkeypatch, withdrawal)
 
+    real_check_authority = agent_task_control.check_task_authority
+    denial_codes = []
+
+    def check_authority(task_id):
+        try:
+            return real_check_authority(task_id)
+        except DiagnosticError as error:
+            denial_codes.append(error.code)
+            raise
+
+    monkeypatch.setattr(agent_task_control, "check_task_authority", check_authority)
+
     try:
         actors._execute_task(task["type"], task["id"])
-    except DiagnosticError:
-        # A raw task has no agent_jobs row; the generic actor can propagate
-        # its denial after persisting the terminal task failure.
+    except DiagnosticError as error:
+        # The generic actor's fail_job bridge raises NOT_FOUND for raw tasks
+        # without agent_jobs; terminal task failure is still persisted.
         assert withdrawal != "none"
+        assert error.code == "NOT_FOUND"
 
+    assert denial_codes == ([] if withdrawal == "none" else ["FORBIDDEN"])
     row = _row(task["id"])
     effects = _raw_effects()
     assert row["cancellation_acknowledged_at"] is None

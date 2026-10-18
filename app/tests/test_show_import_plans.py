@@ -163,17 +163,20 @@ def test_human_editor_is_not_a_remote_credential_and_cannot_run_other_operations
 
     principal = show_world["principal"]
     assert principal.id not in {row["principal_id"] for row in list_credentials()}
-    with pytest.raises(DiagnosticError):
+    with pytest.raises(DiagnosticError) as wrong_operation:
         operations.prepare_operation(principal, "metadata_update", {}, "forbidden")
+    assert wrong_operation.value.code == "FORBIDDEN"
     remote = create_credential(
         "Remote", ["library.health.read"], datetime.now(UTC) + timedelta(days=1)
     ).principal
-    with transaction_scope() as session, pytest.raises(DiagnosticError):
-        requests._authorize(
-            session,
-            replace(remote, human_actor_id=show_world["user"]["id"]),
-            {"curation.shows.write"},
-        )
+    with pytest.raises(DiagnosticError) as denied:
+        with transaction_scope() as session:
+            requests._authorize(
+                session,
+                replace(remote, human_actor_id=show_world["user"]["id"]),
+                {"curation.shows.write"},
+            )
+    assert denied.value.code == "FORBIDDEN"
 
 
 def test_worker_rechecks_human_permissions_before_any_show_write(show_world):
@@ -576,7 +579,7 @@ def test_selection_resolves_its_own_duplicate_or_uncertain_sessions(
 def test_show_consolidation_requires_exact_plan_and_human_approval(show_world):
     from crate.db.repositories.show_identities import upsert_canonical_show
     from crate.db.repositories.agent_plans import get_plan
-    from tests.test_agent_plan_approvals import decide
+    from tests.agent_plan_support import decide
 
     original = upsert_canonical_show(
         items(local_time="18:00")[0], {"provider": "manual", "actor": "test"}

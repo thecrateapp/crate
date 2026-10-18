@@ -1197,12 +1197,12 @@ def test_dependent_manifest_above_its_budget_never_produces_a_partial_delete_pla
 
 
 def test_repair_quarantine_never_follows_a_symlink_in_its_destination(
-    repair_world, tmp_path
+    repair_world, tmp_path_factory
 ):
     world = repair_world
     duplicate = _duplicate_track(world)
-    outside = tmp_path / "outside-quarantine"
-    outside.mkdir()
+    outside = tmp_path_factory.mktemp("outside-quarantine")
+    assert not outside.resolve().is_relative_to(world["root"].resolve())
     (world["root"] / ".crate-trash").symlink_to(outside, target_is_directory=True)
     issue = _issue(
         world, "duplicate_tracks", paths=[str(world["path"]), str(duplicate["path"])]
@@ -1212,6 +1212,8 @@ def test_repair_quarantine_never_follows_a_symlink_in_its_destination(
 
     assert plan["document"]["executable"] is False
     assert "Symbolic" in plan["document"]["changes"][0]["reason"]
+    assert (world["root"] / ".crate-trash").is_symlink()
+    assert (world["root"] / ".crate-trash").resolve() == outside.resolve()
     assert duplicate["path"].read_bytes() == b"identical audio"
     assert not list(outside.iterdir())
 

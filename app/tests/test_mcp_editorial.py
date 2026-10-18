@@ -12,7 +12,7 @@ from crate.db.repositories.agent_credentials import create_credential
 from crate.db.repositories.agent_plans import get_plan
 from crate.db.repositories.playlists_detail_reads import get_playlist_tracks
 from crate.db.repositories.tasks_updates import start_task
-from tests.test_agent_plan_approvals import decide
+from tests.agent_plan_support import decide
 from tests.test_mcp_actions import _client
 from tests.test_mcp_actions import action_transport as action_transport  # noqa: PLC0414
 

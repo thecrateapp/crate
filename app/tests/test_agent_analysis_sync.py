@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from pathlib import Path
-from queue import Queue
 from time import monotonic, sleep
 from types import SimpleNamespace
 from uuid import uuid4
@@ -353,12 +353,19 @@ class TestAnalysisGenerationFences:
         old_claim = claim_track(f"{pipeline}_state")
         assert old_claim is not None
         state = read_analysis_targets([track["entity_uid"]], [pipeline])
-        worker_pids: Queue[int] = Queue()
+        wait_timeout = float(os.environ.get("CRATE_TEST_CONCURRENCY_TIMEOUT", "60"))
+        assert wait_timeout >= 1
+        worker_connection: Future[int] = Future()
         real_lock_processing_rows = analysis_generations.lock_processing_rows
 
         def record_worker_connection(current, track_ids, pipelines):
-            current.execute(text("SET LOCAL lock_timeout = '10s'"))
-            worker_pids.put(
+            # PostgreSQL gets half the configurable harness timeout. A timeout
+            # only fails the test; observing the expected blocker proves the wait.
+            current.execute(
+                text("SELECT set_config('lock_timeout', :timeout, true)"),
+                {"timeout": f"{max(1, int(wait_timeout * 500))}ms"},
+            )
+            worker_connection.set_result(
                 current.execute(text("SELECT pg_backend_pid()")).scalar_one()
             )
             return real_lock_processing_rows(current, track_ids, pipelines)
@@ -384,8 +391,19 @@ class TestAnalysisGenerationFences:
                 completion = pool.submit(
                     _store, track, pipeline, claim=old_claim, signature="old-result"
                 )
-                worker_pid = worker_pids.get(timeout=8)
-                deadline = monotonic() + 8
+                ready, _ = wait(
+                    [worker_connection, completion],
+                    timeout=wait_timeout,
+                    return_when=FIRST_COMPLETED,
+                )
+                if completion in ready:
+                    completion.result()
+                    pytest.fail("Worker exited before waiting for the reset fence")
+                assert worker_connection in ready, (
+                    "Worker never reached the processing-row fence"
+                )
+                worker_pid = worker_connection.result()
+                deadline = monotonic() + wait_timeout
                 while True:
                     # Each observation gets a fresh statistics snapshot. The PID
                     # and blocker prove the real fence query is waiting for this
@@ -410,7 +428,7 @@ class TestAnalysisGenerationFences:
                         "Worker never waited on the reset transaction's processing-row lock"
                     )
                     sleep(0.01)
-            completion.result(timeout=5)
+            completion.result(timeout=wait_timeout)
 
         assert _processing(track["id"], pipeline)["generation"] == 1
         assert _processing(track["id"], pipeline)["state"] == "pending"
@@ -499,10 +517,16 @@ def test_daemon_fences_results_with_claim_source_and_actual_signature(
             {"pipeline": name, "source": source, "components": components}
         ),
     )
+
+    def stop_daemon(_seconds):
+        raise _StopDaemon()
+
+    # Keep the real clock API local to this daemon; replacing time.sleep on
+    # the shared module would also affect PostgreSQL and unrelated threads.
     monkeypatch.setattr(
         daemon,
         "time",
-        SimpleNamespace(sleep=lambda _seconds: (_ for _ in ()).throw(_StopDaemon())),
+        SimpleNamespace(**{**vars(daemon.time), "sleep": stop_daemon}),
     )
     if pipeline == "analysis":
         result = {"bpm": 122.0, "_components": ["librosa"]}

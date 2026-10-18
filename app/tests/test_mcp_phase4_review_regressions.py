@@ -25,7 +25,7 @@ from tests.test_agent_library_operations import (
     operation_world as operation_world,
     _prepared,
 )
-from tests.test_agent_plan_approvals import decide
+from tests.agent_plan_support import decide
 from tests.test_agent_metadata_portability import (
     portable_world as portable_world,
     _run_export,

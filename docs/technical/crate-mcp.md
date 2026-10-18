@@ -1173,6 +1173,49 @@ all seven changed Python files. No full local suite, migration, deployment or fl
 is part of this correction. Independent SPEC and QUALITY reviews found no remaining P1/P2
 in these changes. CI and persistent review must be checked against the newly published exact HEAD.
 
+### Test review follow-up (2026-10-18)
+
+Persistent review of `45e67b33` identified four P3 test issues. This follow-up changes test
+coordination and assertions without changing production behavior:
+
+- The analysis/bliss reset race waits for either the worker's backend PID or its completion;
+  an exception before reaching the fence propagates directly. The configurable harness timeout
+  is `CRATE_TEST_CONCURRENCY_TIMEOUT` seconds (default 60, minimum 1), with a PostgreSQL local
+  lock timeout of half that duration (default 30). Startup, lock observation and completion use
+  the harness bound. Success still requires the expected PID waiting on the reset transaction
+  in `pg_blocking_pids`; elapsed time never proves exclusion.
+- The daemon test retains the full clock API in a local copy and replaces only its sleep
+  function. Other threads and PostgreSQL keep the real process-wide clock.
+- The authorization exception crosses `transaction_scope` before `pytest.raises` catches it,
+  allowing rollback. Both human-operation and remote-credential denials must be `FORBIDDEN`.
+- Exact plan approval uses `tests/agent_plan_support.py`; its six consumers no longer import
+  the decision helper from another test module.
+
+Two additional test suggestions were applied: the quarantine symlink now points to a directory
+provably outside the library, and the raw-task regression observes `FORBIDDEN` from the real guard
+invoked by the actor. The latter separately recognizes the existing `NOT_FOUND` propagated by
+the generic actor's agent-job failure bridge for raw tasks without an `agent_jobs` row, and still
+requires a persisted failed task, unchanged effects and no cancellation acknowledgment.
+The proposed permissive failure stub was not adopted: the real `_mark_failed` accepts only two
+positional arguments and keyword-only `claim`. The concurrency barrier is already the worker's
+first instruction with a bounded wait; aborting it after failure would not address the suggested
+pre-barrier failure path.
+
+Focused validation passed **313 distinct cases without skips**, including all six approval-helper
+consumers and the affected analysis, show-import and quarantine cases:
+
+```sh
+cd app
+../.venv/bin/python -m pytest tests/test_agent_analysis_sync.py tests/test_show_import_plans.py tests/test_agent_repairs.py::test_repair_quarantine_never_follows_a_symlink_in_its_destination tests/test_mcp_operations.py tests/test_agent_plan_approvals.py tests/test_mcp_editorial.py tests/test_mcp_phase4_review_regressions.py tests/test_agent_library_operations.py -q
+```
+
+Python 3.13 and repository dependencies ran in the disposable Linux image with real PostgreSQL
+through Testcontainers, sequentially. Directed Ruff check/format and Pyright passed for the nine
+changed Python files. Documentation integrity passed for 44 canonical documents; independent
+review found no P1/P2/P3 in this test-only cut. These tests use deterministic daemon/DSP/provider inputs and simulated
+broker dispatch; no live model or provider was exercised. No full local suite, production code,
+migration or flag was changed. CI and persistent review must be checked on the published exact HEAD.
+
 ### Repair readiness and effects
 
 `get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,
