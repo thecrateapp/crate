@@ -1,6 +1,6 @@
 """Canonical event identity is shared by human, agent and provider writes."""
 
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
 from threading import Barrier, Event
 
@@ -612,6 +612,11 @@ def test_provider_rechecks_a_row_consolidated_between_match_and_lock(
 def test_relation_write_racing_consolidation_reaches_canonical_id(
     pg_db, monkeypatch, action
 ):
+    from tests.test_agent_library_operations import (
+        _assert_backend_waits_for,
+        _with_backend_pid,
+    )
+
     from crate.db.repositories import shows_attendance as attendance
     from crate.db.repositories.auth_user_accounts import create_user
     from crate.db.repositories.show_consolidation import consolidate_shows
@@ -622,10 +627,12 @@ def test_relation_write_racing_consolidation_reaches_canonical_id(
     if action == "unattend":
         attendance.attend_show(user["id"], duplicate["show_id"])
     resolved, release = Event(), Event()
+    writing_pids, merging_pids = Queue(), Queue()
     original = attendance._canonical_id
 
     def pause_after_resolution(session, show_id):
         result = original(session, show_id)
+        writing_pids.put(session.execute(text("SELECT pg_backend_pid()")).scalar_one())
         resolved.set()
         assert release.wait(timeout=10)
         return result
@@ -644,20 +651,24 @@ def test_relation_write_racing_consolidation_reaches_canonical_id(
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         writing = pool.submit(write)
-        assert resolved.wait(timeout=5)
-        merging = pool.submit(
-            consolidate_shows,
-            canonical["show_id"],
-            [duplicate["show_id"]],
-            {
-                str(canonical["show_id"]): canonical["revision"],
-                str(duplicate["show_id"]): duplicate["revision"],
-            },
-        )
         try:
-            merging.result(timeout=0.3)
-        except TimeoutError:
-            pass  # Correct coordination waits until the relation write commits.
+            assert resolved.wait(timeout=5)
+            merging = pool.submit(
+                _with_backend_pid,
+                merging_pids,
+                consolidate_shows,
+                canonical["show_id"],
+                [duplicate["show_id"]],
+                {
+                    str(canonical["show_id"]): canonical["revision"],
+                    str(duplicate["show_id"]): duplicate["revision"],
+                },
+            )
+            _assert_backend_waits_for(
+                merging,
+                merging_pids.get(timeout=5),
+                writing_pids.get(timeout=5),
+            )
         finally:
             release.set()
         assert writing.result(timeout=10) is True
