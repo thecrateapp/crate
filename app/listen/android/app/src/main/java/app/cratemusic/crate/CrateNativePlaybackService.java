@@ -2348,6 +2348,10 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     private boolean applySystemEqualizer(float[] gains) {
+        if (USE_PCM_BUS) {
+            pcmBusMixer.equalizer().setGains(gains);
+            return true;
+        }
         if (
             eqController == null ||
             deckAPlayer == null ||
@@ -2366,6 +2370,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     private void releaseSystemEqualizer() {
+        pcmBusMixer.equalizer().setGains(null);
         if (eqController != null) {
             eqController.releaseAll();
         }

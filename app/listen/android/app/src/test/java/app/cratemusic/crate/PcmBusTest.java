@@ -57,7 +57,7 @@ public class PcmBusTest {
     }
 
     @Test
-    public void theMixerSumsBothDecksAndClampsTheOutput() {
+    public void theMixerSumsBothDecks() {
         PcmBusChannel outgoing = new PcmBusChannel(8);
         PcmBusChannel incoming = new PcmBusChannel(8);
         outgoing.buffer().write(frames(0.4f, 0.4f, 0.8f, 0.8f), 2);
@@ -188,5 +188,16 @@ public class PcmBusTest {
         channel.startAt(10L);
         assertEquals(2, PcmBusMixer.mixBlock(channels, mix, scratch, 2, 0L));
         assertEquals(0L, channel.consumedFrames());
+    }
+
+    @Test
+    public void theBusOutputIsClampedSixteenBitPcm() {
+        short[] output = new short[3];
+
+        PcmBusMixer.toPcm16(frames(1.5f, -1.0f, 0.5f), output, 3);
+
+        assertEquals(Short.MAX_VALUE, output[0]);
+        assertEquals(-Short.MAX_VALUE, output[1]);
+        assertEquals(16384, output[2]);
     }
 }

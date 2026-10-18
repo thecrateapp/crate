@@ -21,10 +21,15 @@ final class PcmBusMixer {
     private final AtomicLong busFrames = new AtomicLong();
     private AudioTrack track;
     private Thread thread;
+    private final PcmBusEqualizer equalizer = new PcmBusEqualizer(SAMPLE_RATE, CHANNELS);
     private volatile boolean running;
 
     PcmBusChannel channel(int index) {
         return channels[index];
+    }
+
+    PcmBusEqualizer equalizer() {
+        return equalizer;
     }
 
     long busFrame() {
@@ -52,10 +57,14 @@ final class PcmBusMixer {
             );
         }
         if (mixedFrames == 0 && scheduled) return frames;
-        for (int index = 0; index < mixedFrames * CHANNELS; index++) {
-            mix[index] = Math.max(-1.0f, Math.min(1.0f, mix[index]));
-        }
         return mixedFrames;
+    }
+
+    static void toPcm16(float[] mix, short[] output, int samples) {
+        for (int index = 0; index < samples; index++) {
+            float sample = Math.max(-1.0f, Math.min(1.0f, mix[index]));
+            output[index] = (short) Math.round(sample * Short.MAX_VALUE);
+        }
     }
 
     synchronized void ensureStarted(int audioSessionId) {
@@ -63,7 +72,7 @@ final class PcmBusMixer {
         int minimumBytes = AudioTrack.getMinBufferSize(
             SAMPLE_RATE,
             AudioFormat.CHANNEL_OUT_STEREO,
-            AudioFormat.ENCODING_PCM_FLOAT
+            AudioFormat.ENCODING_PCM_16BIT
         );
         AudioTrack.Builder builder = new AudioTrack.Builder()
             .setAudioAttributes(
@@ -76,10 +85,10 @@ final class PcmBusMixer {
                 new AudioFormat.Builder()
                     .setSampleRate(SAMPLE_RATE)
                     .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
-                    .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
                     .build()
             )
-            .setBufferSizeInBytes(Math.max(minimumBytes, BLOCK_FRAMES * CHANNELS * 4 * 4))
+            .setBufferSizeInBytes(Math.max(minimumBytes, BLOCK_FRAMES * CHANNELS * 2 * 4))
             .setTransferMode(AudioTrack.MODE_STREAM);
         if (audioSessionId > 0) builder.setSessionId(audioSessionId);
         track = builder.build();
@@ -93,6 +102,7 @@ final class PcmBusMixer {
     private void run() {
         float[] mix = new float[BLOCK_FRAMES * CHANNELS];
         float[] scratch = new float[BLOCK_FRAMES * CHANNELS];
+        short[] output = new short[BLOCK_FRAMES * CHANNELS];
         while (running) {
             int frames = mixBlock(channels, mix, scratch, BLOCK_FRAMES, busFrames.get());
             busFrames.addAndGet(frames);
@@ -104,7 +114,9 @@ final class PcmBusMixer {
                 }
                 continue;
             }
-            int written = track.write(mix, 0, frames * CHANNELS, AudioTrack.WRITE_BLOCKING);
+            equalizer.process(mix, frames);
+            toPcm16(mix, output, frames * CHANNELS);
+            int written = track.write(output, 0, frames * CHANNELS, AudioTrack.WRITE_BLOCKING);
             if (written < 0) {
                 Log.w(NativeMixAudioProcessor.QOE_TAG, "pcm bus write failed=" + written);
             }
