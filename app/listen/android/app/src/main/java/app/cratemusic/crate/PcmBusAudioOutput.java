@@ -56,7 +56,7 @@ final class PcmBusAudioOutput implements AudioOutput {
                 scratch[frame * 2] = left;
                 scratch[frame * 2 + 1] = right;
             }
-            channel.buffer().write(scratch, frames);
+            channel.write(scratch, frames);
         }
         return !source.hasRemaining();
     }

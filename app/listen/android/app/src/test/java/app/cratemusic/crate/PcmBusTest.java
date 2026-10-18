@@ -85,16 +85,20 @@ public class PcmBusTest {
     public void theMixerWaitsForAPlayingChannelUntilItEnds() {
         PcmBusChannel outgoing = new PcmBusChannel(8);
         PcmBusChannel incoming = new PcmBusChannel(8);
-        outgoing.buffer().write(frames(0.4f, 0.4f), 1);
+        outgoing.write(frames(0.4f, 0.4f, 0.4f, 0.4f), 2);
         outgoing.setPlaying(true);
         incoming.setPlaying(true);
         float[] mix = new float[4];
         float[] scratch = new float[4];
         PcmBusChannel[] channels = { outgoing, incoming };
 
-        assertEquals(0, PcmBusMixer.mixBlock(channels, mix, scratch, 2));
+        assertEquals(1, PcmBusMixer.mixBlock(channels, mix, scratch, 1));
+
+        incoming.write(frames(0.2f, 0.2f), 1);
+        PcmBusMixer.mixBlock(channels, mix, scratch, 1);
+        assertEquals(0, PcmBusMixer.mixBlock(channels, mix, scratch, 1));
 
         incoming.markEndOfStream();
-        assertEquals(1, PcmBusMixer.mixBlock(channels, mix, scratch, 2));
+        assertEquals(0, PcmBusMixer.mixBlock(channels, mix, scratch, 1));
     }
 }
