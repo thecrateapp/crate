@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   fixAllMode,
   groupIssuesByArtist,
+  groupHealthIssues,
+  latestRepairSummary,
   type RepairCatalogEntry,
 } from "./Health";
 
@@ -97,5 +99,79 @@ describe("fixAllMode", () => {
       "none",
     );
     expect(fixAllMode(undefined, 5)).toBe("none");
+  });
+});
+
+describe("Health issue queue", () => {
+  it("prioritises a check by its worst loaded issue without losing cases", () => {
+    const groups = groupHealthIssues([
+      { ...issue(1, {}), check_type: "z", severity: "low" },
+      { ...issue(2, {}), check_type: "a", severity: "medium" },
+      { ...issue(3, {}), check_type: "z", severity: "critical" },
+    ]);
+    expect(groups.map(({ check, severity }) => [check, severity])).toEqual([
+      ["z", "critical"],
+      ["a", "medium"],
+    ]);
+    expect(groups[0]!.items.map((i) => i.id)).toEqual([1, 3]);
+  });
+  it("orders equal severities consistently and preserves unknown check/severity values", () => {
+    const groups = groupHealthIssues([
+      { ...issue(1, {}), check_type: "z" },
+      { ...issue(2, {}), check_type: "a" },
+      { ...issue(3, {}), check_type: "future_check", severity: "future_level" },
+    ]);
+    expect(groups.map(({ check, severity }) => [check, severity])).toEqual([
+      ["a", "medium"],
+      ["z", "medium"],
+      ["future_check", "future_level"],
+    ]);
+    expect(groupHealthIssues([])).toEqual([]);
+  });
+});
+
+describe("recorded Health task results", () => {
+  it.each([
+    ["health_check", { issue_count: 0 }, "0 issues found"],
+    ["health_check", { issue_count: 1 }, "1 issue found"],
+    ["health_check", {}, "Result details unavailable"],
+    ["health_check", { issue_count: null }, "Result details unavailable"],
+    ["health_check", { issue_count: -1 }, "Result details unavailable"],
+    ["health_check", { issue_count: true }, "Result details unavailable"],
+    ["health_check", { issue_count: "4" }, "Result details unavailable"],
+    ["repair", { summary: { applied: 0 } }, "0 applied"],
+    ["repair", { summary: { failed: 2 } }, "2 failed"],
+    [
+      "repair",
+      { revalidation: { issue_count: 3 } },
+      "3 open after revalidation",
+    ],
+    ["repair", { summary: { applied: -2 } }, "Result details unavailable"],
+    [
+      "repair",
+      {
+        summary: { applied: 1, skipped: 0, unsupported: 2 },
+        revalidation: { issue_count: 0 },
+      },
+      "1 applied, 2 manual, 0 open after revalidation",
+    ],
+    ["fix_artist", { albums_fixed: 2 }, "2 albums fixed"],
+    ["fix_artist", {}, "Result details unavailable"],
+  ])("uses explicit counters for %s %j", (type, result, expected) => {
+    expect(latestRepairSummary({ type, result, status: "completed" })).toBe(
+      expected,
+    );
+  });
+  it("retains an actual error and does not invent a result for an absent task", () => {
+    expect(
+      latestRepairSummary({
+        type: "repair",
+        status: "failed",
+        error: "Disk unavailable",
+      }),
+    ).toBe("Disk unavailable");
+    expect(latestRepairSummary(null)).toBe(
+      "No repair or health runs recorded yet.",
+    );
   });
 });

@@ -81,9 +81,12 @@ body {
   color-scheme: dark;
 }
 
-/* Default border color */
-* {
-  border-color: var(--color-border);
+/* Beat preflight's reset within base, but yield to component/utility colours. */
+@layer base {
+  :root,
+  :root * {
+    border-color: var(--color-border);
+  }
 }
 
 /* Scrollbars */

@@ -2,10 +2,10 @@
 
 Status: product design, revised 2026-10-15. Canonical clone `/Users/diego/Code/crate-v3`, branch
 `feat/crate_v3`. The handover records implementation and QA status; historical analysis is not a
-current progress report. Checkpoints through 1Y are approved and published (`ea6ebdc8`).
-1AA is published as `13272706`. Local1AB implements the approved three-block Dashboard and
-Ops/Analysis font corrections, awaiting review before commit/push. The final handover and the
-2026-10-18 composition amendment below supersede the provisional analysis stop. Diego's 1S review explicitly
+current progress report. Checkpoints through 1AC are approved and published (`439b3e78`).
+Local 1AD implements the approved Health issue queue and retires redundant glyphs while preserving UX and existing repair
+contracts; stop for Diego before commit/push. The final handover and later amendments below
+supersede earlier provisional stops. Diego's 1S review explicitly
 preserves the current Listen play essence (halo, layers and progress ring) and seek trail,
 adapted to V3 with 1–2 px strokes; see DS §5.5.
 
@@ -622,6 +622,11 @@ everywhere and are only repeated when a screen deviates.
   `admin:live:viewers:governor`).
 
 ### 4.2 01 Health `/health` (P0 · L+)
+
+> **Composition amendment, 2026-10-18 / 1AD:** Diego approved an issue queue as Health's primary
+> view. Activity and check diagnostics are secondary. The HealthScan placement below is historical;
+> future instrumentation must preserve this queue-first composition. Data/event/provider contracts
+> remain planned. See the final amendment and `2026-10-18-crate-v3-health-inbox.md`.
 
 - **Purpose**: see every library check, what it found, what fixes itself and what waits for a
   person; run a scan; fix or review.
@@ -3592,3 +3597,66 @@ Task 1b.8 continuation, not completion of SystemHealth Task 3.4, other pages or 
 The real-page fictional preview is `#sistema-admin`; older checkpoints and the unavailable
 site pin 258bbaee remain. See [execution plan](2026-10-18-crate-v3-system-health-icons.md) and
 final handover for evidence/limits. **1AC stays local for Diego before commit/push/next group.**
+
+## 2026-10-18 — 1AC published; bounded Library Health icon group 1AD
+
+Diego approved 1AC, published as `439b3e78daf2719d86cee72dd5726f7bc210c504`, and authorised
+one next Admin icon group with functional UX retained. Local 1AD covers Health.tsx and its local
+issue/artist headers only. Redundant action/severity/header glyphs become text; three loaders,
+two disclosure chevrons and neutral SeverityMeter instruments remain. Group disclosure and
+sibling actions replace nested buttons, preserving keyboard/focus and action isolation. Text
+actions have 44 px targets; three Repair lanes fields use the actual 8 px recipe with Mono labels,
+Bricolage titles/numerals and Poppins body. Shared filter sizes and all requests/streams/repair
+eligibility/gates/task completion are preserved. No Health data authority redesign is included.
+
+The actual page joins the persistent mockup at `#salud-admin` / `admin-health-demo.html`, using
+isolated fictional API/events and local task completion. All previous checkpoints remain. See
+[execution plan](2026-10-18-crate-v3-library-health-icons.md) and final handover for scoped evidence,
+bundle and limits. This continues Task 1b.8, without completing it or later Health product work.
+**Stop at 1AD before commit/push or another group; no full CI/baselines during iteration.**
+
+## 2026-10-18 — approved Health issue queue implemented locally at 1AD
+
+Diego approved the issue-queue sketch and authorised implementation using only available real
+data, retaining the active preview and an uncommitted 1AD stop. The queue and actual cases/actions
+are primary; task activity, check catalog and filters are secondary disclosures. This supersedes
+HealthScan as the mandatory primary Health visual. Future scan instrumentation may enrich the
+secondary check reference or scan status, preserving the queue-first composition; its data,
+provider/event/pagination/backend prerequisites remain pending and are not silently implemented.
+
+Local Health uses existing counts/runs/catalog/history. It distinguishes loaded/recorded counts,
+no result/no open issues/filter-empty/stale, prioritises worst loaded severity and shows only
+explicit valid task counters. It preserves endpoints, repair/role eligibility, streams and
+confirmation flow. Confirmation copy distinguishes check-wide repair scope, loaded auto-fixable
+cases and recorded open counts; no new data or repair capability is invented. Both detail field gaps are actual
+8 px, fonts/tokens and bounded UX stay shared. Evidence/limits and the final review are in the
+handover and [execution plan](2026-10-18-crate-v3-health-inbox.md). This is a bounded 1AD
+composition amendment, not completed HealthScan/Task 3.6 or whole Task 1b.8/phase QA.
+**Stop at 1AD for Diego before commit/push or another group.**
+
+## 2026-10-18 — 1AD visual fidelity correction, local review
+
+Diego requested recovery of the approved Health sketch's accents, hierarchy and spacing. The
+same real data/actions remain. Health restores a 1128 px content cap, reviewed 36–54 px/700 title,
+27 px/650 section and 23 px/600 issue headings with existing fonts;1 px accent rail, cyan expanded
+state and a primary artist-review action after actual cases. Eligible direct repairs remain
+primary where no artist review is available; metadata/secondary actions stay visible and
+filters share the queue heading row. Actual 8 px fields and 44 px actions remain.
+
+These reviewed domain composition dimensions do not create an app-specific foundation variant
+or change the global type scale. The sole shared CSS change puts the default border colour in
+base, preserving its precedence over preflight but allowing explicit component/utility colours.
+It corrects the grey rail's cause in both Admin and Listen; no caller `!important`, new colour,
+API/provider/backend change or identity/theme branch. Real CSS-entry browser regressions cover
+accent, quiet, transparent and default borders in both apps. Existing repair eligibility/routes,
+callbacks, confirmation, counts and streams are unchanged; see the main handover for audit,
+focused evidence, the recorded transient focus-test failure/replay and remaining QA limits.
+**Stop at 1AD for Diego before commit/push or another group; preview remains active at :5186.**
+
+## 2026-10-18 — 1AD approved; next bounded icon group 1AE
+
+Diego approved Library Health after its visual drift correction and authorised commit/push.
+Existing evidence and product contracts remain; this supersedes its local-only review stop.
+Next group is Library Trash alone: retire redundant header/action glyphs, retain functional
+loading indicators, requests/task tracking and shared confirmations. No phase6.4 data/index/
+pagination work is implied. Keep preview/checkpoints active; stop1AE before commit/push.

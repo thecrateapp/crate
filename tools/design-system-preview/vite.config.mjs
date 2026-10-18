@@ -14,6 +14,13 @@ export default defineConfig({
       resolveId(source, importer) {
         if (!importer?.includes("/app/ui/") || !source.startsWith("@/")) return;
         if (
+          importer.endsWith("/app/ui/src/pages/Health.tsx") &&
+          ["@/lib/api", "@/hooks/use-task-events"].includes(source)
+        )
+          return fileURLToPath(
+            new URL("admin-health-fixtures.ts", import.meta.url),
+          );
+        if (
           importer.endsWith("/app/ui/src/pages/SystemHealth.tsx") &&
           ["@/hooks/use-api", "@/lib/task-catalog"].includes(source)
         )
@@ -76,6 +83,9 @@ export default defineConfig({
         ),
         adminSystemHealth: fileURLToPath(
           new URL("admin-system-health-demo.html", import.meta.url),
+        ),
+        adminHealth: fileURLToPath(
+          new URL("admin-health-demo.html", import.meta.url),
         ),
         adminOperations: fileURLToPath(
           new URL("admin-operations-demo.html", import.meta.url),

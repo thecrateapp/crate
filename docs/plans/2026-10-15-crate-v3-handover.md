@@ -9,14 +9,22 @@ continuation on Linux; this final publication record supersedes earlier local-on
 **1AA is approved and published as `1327270692937896072b3a3c79ad6cef6c1049b3`.**
 **1AB is approved and published as `2d047fecd4721ac4575faadbf9bd8781eec37c5b`.**
 Its three-block Dashboard, producer interpretation fixes and Ops/Analysis typography remain intact.
-Task 1b.8 / checkpoint **1AC System Health is approved for commit/push by Diego** (2026-10-18). It uses the actual page and existing metrics, preserving score/summary calculations,
-queries, refresh, task progress, Nivo and meters. Shared radio chips replace the two-value window;
-text labels/readings replace decorative glyphs and the local ResourceCard icon contract.
-Review <http://127.0.0.1:5186/admin-system-health-demo.html> or persistent `/#sistema-admin`.
-Current scope/evidence/limits follow in the final 1AC record and
-[`2026-10-18-crate-v3-system-health-icons.md`](2026-10-18-crate-v3-system-health-icons.md).
-Earlier provisional/analysis-only/1AB publication stops are historical and superseded by Diego's
-explicit approval and next-group request on 2026-10-18. **Continue one bounded group and stop at 1AD.**
+**1AC System Health is approved and published as `439b3e78daf2719d86cee72dd5726f7bc210c504`.**
+Task 1b.8 / checkpoint **1AD Library Health is approved for commit/push**.
+Diego authorised publication and the next bounded Admin icon group, Library Trash / 1AE.
+Diego approved the issue-queue sketch and explicitly authorised this implementation on 2026-10-18.
+The primary view lists recorded problems and opens actual cases/resolution actions. Activity,
+check catalog and filters are secondary; no-data, empty, filtered, stale and limited results stay
+truthful. Functional glyphs, repair eligibility, API/stream/confirmation contracts remain.
+Diego subsequently requested a visual drift correction: accents, primary-action hierarchy,
+reviewed typography and spacing are restored. Only the shared default-border cascade changes;
+no new foundation variant or API change. Read the final visual-correction evidence below.
+Review <http://127.0.0.1:5186/admin-health-demo.html> or persistent `/#salud-admin`.
+The final composition record below and
+[`2026-10-18-crate-v3-health-inbox.md`](2026-10-18-crate-v3-health-inbox.md) supersede the
+historical icon-only and awaiting-sketch-approval stops. **The former 1AD stop is superseded by Diego's publication approval.**
+Earlier provisional/publication stops are historical and superseded by Diego's approval and
+next-group request on 2026-10-18. **Next stop: 1AE before commit/push or another group.**
 The retained Listen play/halo/ring and luminous seek trail
 from 1S remain intact. Resume on Linux with
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
@@ -25,7 +33,7 @@ Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 ## Where the work lives
 
 - Active Linux worktree: `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing branch
-  `feat/crate_v3`, published HEAD `2d047fecd4721ac4575faadbf9bd8781eec37c5b` (1AB);
+  `feat/crate_v3`, published HEAD `439b3e78daf2719d86cee72dd5726f7bc210c504` (1AC);
   transfer checkpoint `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. Node 22.23.3, root
   dependencies and persistent :5186 preview are prepared. This isolates the MCP agent's
   `/home/diego/Code/Ninja/crate` checkout (`feat/crate_mcp`); leave its files untouched.
@@ -220,7 +228,8 @@ is a token-based chart configuration, not a selectable product skin.
 | 1b.8 / Checkpoint 1Z                                         | Approved/published `2efb4754`; Logs/Stack text controls and consistent shared selector/tag geometry.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 1b.8 / Checkpoint 1AA                                        | Approved/published `13272706`; Analysis including latest fingerprint. Final publication record below supersedes older local notes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1b.8 / Checkpoint 1AB                                        | Approved/published `2d047fec`: three-block Dashboard plus Ops/Analysis fonts. Origin SHA verified; scoped publication replay89Vitest/5Chromium green.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| 1b.8 / Checkpoint 1AC                                        | Ready for Diego review: System Health icon retirement, shared window/text refresh, 8 px readings and preserved instruments. Independent review clean; uncommitted.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 1b.8 / Checkpoint 1AC                                        | Approved/published `439b3e78`: System Health icon retirement, shared window/text refresh and preserved instruments. Origin SHA verified; publication replay 27 Vitest / four preview Chromium green.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 1b.8 / Checkpoint 1AD                                        | Approved by Diego for publication: corrected issue queue, retained UX and real contracts. Commit/push authorised; publication record below. Next bounded group: Library Trash / 1AE.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -2629,3 +2638,380 @@ the resulting SHA follow. No full suites/CI, canonical baselines, PR/merge/rebas
 
 Fresh pre-publication replay: **27 scoped Vitest + four System Health Chromium** pass
 serially with one worker. Approved product source remains unchanged; specimen now says published.
+
+Published 1AC as **`439b3e78daf2719d86cee72dd5726f7bc210c504`**,
+`refactor(ui): retire redundant System Health icons`. HEAD/origin/remote branch agree.
+Approved product source was unchanged during publication. The next authorised group is Library
+Health alone; other Admin pages remain pending.
+
+## Final Linux record — 1AC published; 1AD Library Health review (2026-10-18)
+
+1AD changes only `app/ui/src/pages/Health.tsx` and its local IssueRow/ArtistGroupHeader in
+production. It removes seven redundant Lucide bindings, the severity icon registry, header/empty
+icon boxes and labelled-action decoration. Three named loaders and two disclosure chevrons
+remain, with visible busy state and accessible labels. The source policy now covers **13 whole
+files / 40 individually bounded UX sites**, adding exactly one shared ErrorState and ConfirmDialog
+consumer for Health. Five neutral SeverityMeter instruments remain unchanged.
+
+OpsPageHero replaces the duplicated hero. Labels use JetBrains Mono, titles/readings Bricolage
+Grotesque and body/actions Poppins. Three Repair lanes readings use `.crate-form-field` at actual
+8 px. Text scan/fix/cleanup/dismiss/resolve/repair/task-log and artist-link targets are 44 px;
+existing filter pills retain 32 px fine / 44 px coarse pointer. Responsive issue rows and long
+artist/path text fit the viewport without clipping essential action text.
+
+The former outer group button contained action buttons. Each group now has one named
+Expand/Collapse button with `aria-expanded`/`aria-controls` and a matching named section, beside
+independent text actions. Space expands it; resolve/dismiss/fix/cleanup do not toggle it.
+Confirmation cancel restores focus to Fix all. Existing repair eligibility, paths/body/IDs,
+role gate, empty/health interpretation and task completion behavior are preserved. No new
+runtime/data authority or HealthScanTile contract is claimed.
+
+The structural audit against `439b3e78` confirms unchanged **21 helper/fetch/mutation bodies,
+25 hooks/effects/stream/task-completion bodies, nine API call expressions, nine inline action
+callbacks**, shared ConfirmDialog JSX, five SeverityMeter props and artist path builder. The
+sole removed inline callback is the obsolete header actions `stopPropagation` wrapper: sibling
+controls replace that structure and tests cover action isolation. Health's data/state prefix,
+3s/5s reconnect, cleanup, filtering, notifications and gates are unchanged. Evidence is in
+`.artifacts/review/checkpoint-1ad-contract-audit.txt`.
+
+A ninth isolated preview entry mounts the actual Health page. Only that page's API/task-event
+imports are adapted; EventSource is replaced within the entry. Existing-shaped fictional data
+covers automatic, artist bulk, manual and cleanup lanes. Local Resolve/Dismiss/scan/repair actions,
+confirmation and manual task completion revalidate the page. Five modes cover ready/loading/
+empty/missing catalog/service failure, with a fresh generation on reset. The specimen makes no
+API/SSE calls or production/library changes. All older checkpoints remain. Review
+<http://127.0.0.1:5186/admin-health-demo.html> or persistent `/#salud-admin`.
+
+Scoped verification: **30 Vitest** (nine new component, five existing helper, 16 source-policy),
+**four preview and four built-Admin Chromium** cases at 1440/768/390 plus long mobile text.
+They cover named keyboard disclosure, independent callbacks/correct issue IDs, filter query,
+scan/busy/completion, repair confirmation/focus/routes, prior role gate, loading/empty/retry,
+neutral instruments, fonts, three actual 8 px gaps, target sizes and viewport overflow.
+All built-Admin traffic is intercepted; sample checks reject API traffic and browser errors.
+Initial unit/policy RED and missing embedding RED preceded implementation.
+
+A preview mobile failure exposed an implicit grid track expanding a 390 px viewport to 666 px;
+using document clientWidth exposed it even when innerWidth auto-scaled. The new entry alone now
+uses an explicit min-width-zero single-column grid and region. Four preview cases pass after
+that fix, with no force-click, timeout inflation, global CSS or layer change. A built-Admin
+43.999992 px report for a 44 px target was rounded to 0.01 px in the two new measurement tests;
+all four built cases then passed. A unit rerender missing AuthContext and a typed exact-name
+option were test harness corrections, without production behavior edits.
+
+Admin build/types pass. Initial JS is **526766 / 532480 B gzip**, ten assets, **5714 B margin**,
+15 B less than published 1AC. Final preview build, strict scoped types/lint, fresh independent
+read-only review and advisory screenshot follow in this record as they complete.
+
+Limits: no shared/Listen/Desktop, backend/provider/schema/dependency or other-page workflow
+changes. Existing Health gate/empty interpretation is retained, not redesigned or certified.
+Real API/SSE/runtime/worker integration, native/AT/other-engine QA, full suites/CI and phase-close
+validation remain pending. No local canonical captures: 33 PNGs/manifest remain 1M; pin
+`app/web@258bbaee` stays unchanged/unavailable. Task 1b.8 and later Health phase are not complete.
+**Stop at 1AD uncommitted for Diego. No further group, PR/merge/rebase/deploy/release/Smart Mix.**
+
+The nine-entry preview build, three strict scoped TS configs and scoped ESLint pass. Known
+build-generated `app/ui/tsconfig.tsbuildinfo` was restored from HEAD. No dependency or source
+changes are needed for those checks. Source now freezes for the one fresh read-only review;
+final review rulings and advisory proof will be appended without further product edits.
+
+### 1AD fresh review rulings and one repair pass
+
+The one fresh-context read-only reviewer inspected all tracked/untracked pending implementation,
+tests, fixtures and documentation. It reported **Critical 0 / Important 1 / Minor 1**. The reviewer
+ran no checks, changed no files/index/HEAD and used no user browser tabs. Its initial verdict
+held readiness for the accessible-summary repair; no second review round was requested.
+
+Both findings are accepted and addressed together:
+
+- Important: the short Expand/Collapse accessible name suppressed the metadata-derived summary.
+  `aria-describedby` now links a stable ID on the visible summary, retaining count, severity,
+  risk, scope, checked time and confirmation warning when collapsed or expanded. Explicit word
+  separators and a screen-reader-only singular/plural issue noun keep the count understandable without
+  changing the visible layout. Unit and both browser harnesses assert the accessible description,
+  including the artist review warning. The new assertion first failed with an empty description;
+  its intermediate concatenation failures guided word spacing before the green component run.
+- Minor: the initial fictional health task now supplies its actual four `issue_count`, and local
+  task completion emits a health count or repair `summary.applied` as appropriate, plus remaining
+  issues after revalidation. The sample no longer reports zero found/applied for those operations.
+  A focused preview case first failed on the missing four-issue reading; scan completion and
+  repair completion now assert `4 issues found` and `1 applied, 2 open after revalidation`.
+  This fixes fictional payloads only, without changing production summary/default semantics.
+
+Executor rulings on every area the reviewer declined to certify:
+
+- Existing Health/empty interpretation, permissions and repair eligibility remain preserved;
+  later Health/data work owns redesign or certification. This group adds no health guarantee.
+- Actual API/worker/filesystem/task/SSE and reconnect timing need integration QA. The AST audit
+  still confirms the preserved request/effect/callback contracts; inert or intercepted samples
+  do not prove live execution. No real operation was performed.
+- Actual screen-reader speech, native/other-engine, exhaustive viewport/zoom and subjective
+  approval remain pending. Accessible-description/name/focus checks and sampled Chromium widths
+  support this checkpoint only; Diego owns visual approval.
+- Full suites/CI, canonical screenshot equivalence and the unavailable site pin remain pending.
+  The 33 PNGs/manifest stay at 1M; no new canonical baseline was generated or substituted.
+- Broader Admin retirement and Listen/Desktop behavior are outside this group. Those sources
+  remain untouched; Task 1b.8 and later Health instruments are not globally complete.
+- Bundle is the only newly measured performance evidence. Runtime profiling, deployment and
+  release readiness are not certified or authorised by this checkpoint.
+
+The one repair pass preserves the structural audit: 21 helpers, 25 hooks/effects, nine API calls,
+nine inline callbacks, confirmation, severity props and route builder unchanged. Final replay,
+service/proof status and review stop follow. No further product edits or repeated reviewer round.
+
+### Final 1AD evidence and review stop
+
+After that single review repair pass, **30 scoped Vitest, four preview Chromium and four built-
+Admin Chromium** pass on the final source, serially with one worker. Three strict scoped TS
+configs, scoped ESLint/Prettier, contract audit, Admin build/types and nine-entry preview build
+pass. Final initial JS is **526766 / 532480 B gzip**, ten assets, **5714 B margin**, 15 B below 1AC.
+The final unit result is `checkpoint-1ad-unit-final.log`; the unsuffixed unit log intentionally
+preserves the historical 29/30 AuthProvider harness failure. Both browser logs end in four passes.
+
+Current advisory proofs are `.artifacts/review/checkpoint-1ad-library-health.png` and
+`checkpoint-1ad-library-health-actions.png`, captured after the repairs in public IAB tab2.
+The page visibly shows four found/four open, and the expanded artist group exposes the text
+controls and retained chevron. Tab2 is marked deliverable; other user tabs were untouched.
+Preview service remains active/running, HTTP200 at the Library Health URL; Node22/worktree and
+forwarding remain in place. Generated tsbuildinfo is restored from HEAD. Final formatting/diff
+checks pass. These final evidence/ruling appendices were added after the reviewer snapshot;
+there is no second independent review verdict or unreviewed new product scope.
+
+HEAD/origin remain published **439b3e78** (1AC); all 1AD changes are uncommitted. Both findings
+are addressed and executor verification is green; Diego's visual review is now the next gate.
+**Stop at 1AD: no commit/push, further group, full suites/CI/baselines, PR/merge/rebase/deploy/release.**
+
+## 1AD follow-up — issue-queue sketch requested, 2026-10-18
+
+Diego has not approved 1AD. He dislikes the current Health composition and chose option 1:
+see library problems and how to resolve them. He explicitly requested a sketch before implementation.
+Only the throwaway visual companion is authorised in this follow-up; no product redesign or
+publication is approved. Existing 1AD product source/tests/preview remain intact and uncommitted.
+
+The proposal is a single severity-ordered issue list with a compact last-scan line, a clear next
+action per problem, and expandable case/resolution details. Activity and the check catalog move
+to secondary references. It distinguishes no registered issues from no available check result.
+The standalone Spanish sketch reuses current V3 fonts/tokens/CSS from :5186, with the four existing
+fictional issue cases. Local controls demonstrate disclosure and the two empty/result states.
+No backend, library operation, new dependency, canonical screenshot or test/build suite is involved.
+
+Draft HTML: `.superpowers/brainstorm/873853-1792323386/content/health-inbox-v1.html` (ignored).
+Connection metadata, including its local-only session key, stays in that session's ignored
+`state/server-info`; do not copy the key into tracked docs. The separate public IAB tab5 is marked
+deliverable; existing user tabs and persistent :5186 preview stay intact. Advisory proof is
+`.artifacts/review/health-inbox-sketch-v1.png`. Await Diego's reaction to the sketch before
+writing the final composition/implementation plan or changing Health. No commit/push/next group.
+
+## Authoritative 1AD composition — approved issue queue (2026-10-18)
+
+Diego approved the separate issue-queue sketch and requested implementation using only real
+available data, with the persistent preview active and a 1AD review stop before commit. This
+supersedes the prior sketch-only stop and icon-only composition, without approving publication.
+The existing V3 worktree, branch and pending icon retirement remain; HEAD/origin is still
+439b3e78 (published 1AC). MCP checkout remains untouched.
+
+Production stays in Health.tsx. A flat severity-ordered issue queue replaces the large boxed
+hero/impact/lanes/catalog composition. Each named Review issues button opens actual artist-grouped
+cases and a How to resolve pane containing the existing catalog-driven repair/cleanup controls,
+Resolve/Dismiss and artist repair links. Queue repair is an action label, not a new endpoint.
+Check-level risk/scope are shown once in that pane; issue-specific severity, descriptions,
+cleanup-blocked reason and alternate paths remain. Paths now wrap visibly instead of truncating.
+Activity, available checks and existing type-filter pills live in secondary native disclosures.
+An active filter stays explicit and can be cleared even when no loaded cases match it.
+
+Data authority is intentionally narrow:
+
+- Primary totals come from existing per-check open counts; the endpoint's `total` is loaded row
+  count, not the whole library. The REST/SSE default is 500 rows, max 1000. Loaded/recorded
+  differences are explicit globally and per check. No invented paging or completeness claim.
+- `groupHealthIssues` prioritises the worst severity among all loaded cases in each check,
+  preserves every case and unknown names/levels, then sorts ties deterministically. The caption
+  explicitly says loaded issues; unloaded cases have no fabricated severity.
+- The maximum existing per-check run timestamp is Latest check, not evidence of a full-library
+  scan. No open issues recorded is distinct from No check result available and zero-match filter.
+  Existing snapshot.stale is read at REST/SSE ingestion and shown as recorded data possibly old.
+- Historical activity counters render only valid explicit nonnegative integer values. Zero is
+  shown when supplied; missing/null/invalid values stay unavailable. Completed is a task status,
+  not a healthy-library assertion. Activity history never supplies the primary queue count.
+- Catalog failure still permits issue inspection/Resolve/Dismiss, but promises no automatic or
+  manual repair capability. Capabilities/eligibility are exactly the existing catalog conditions.
+
+The request/stream audit against the saved pre-composition source confirms **20 existing
+helpers/mutations unchanged**, **nine API call expressions/arguments**, **12 effect/query/reference
+calls** (apart from the two stale metadata assignments), **13 existing state initialisers**, all
+**nine existing inline action callbacks**, shared ConfirmDialog behaviour props/flow and artist route builder.
+The only new inline callback clears the existing filter. Issue path/blocked-reason derivation
+is unchanged. Intentional changed presentation helpers are task summary/status and worst-severity
+grouping. Evidence: `.artifacts/review/health-inbox-contract-audit.txt` and its reproducible script.
+No backend, route/capability/provider/schema/dependency/shared/Listen/Desktop changes or new streams.
+
+All five bounded Health loader/disclosure glyph sites remain; the whole-Admin policy is still
+13 files / 40 sites, not whole 1b.8 completion. Bricolage headings, Mono labels/metadata and
+Poppins body/actions use the existing identity. Both Detected cases / How to resolve pairs use
+`.crate-form-field` at actual 8 px; action/summary targets are 44 px, pills remain 32 px fine /
+44 px coarse. MonoLabel's existing div with heading role/level 4 is used without a shared API edit.
+The Admin UI remains English; the separate Spanish sketch is historical brainstorming material.
+
+The persistent entry imports actual Health with its same isolated fictional boundaries. Nine
+modes now include no result, stale, limited and mixed severities. The limited sample preserves
+unloaded counts through local resolve/scan revalidation; completed task counts use recorded
+counts instead of loaded row length. A scoped failing browser case exposed this adapter issue
+before correction. Group/dismiss/repair samples remain local and make no API/SSE/library writes.
+All previous specimens and the :5186 user service are preserved.
+
+Scoped evidence on this source: **54 Vitest** (22 helper / 16 component / 16 source-policy),
+**six preview Chromium + four built-Admin Chromium** pass serially with one worker. Cases cover
+mixed severity, unknown/missing/zero task data, real issue IDs/actions, confirmation/focus, role,
+filter/revalidation/cleanup, actual 8 px, font families, target policy, long mobile text and
+viewport bounds. New helper/page/missing-mode/limited-counter REDs preceded their fixes.
+Playwright summary locators were corrected to include nested metadata; the empty-state assertion
+now targets its heading rather than matching hidden catalog text. No source workaround or extra
+wait/force-click was needed for these harness corrections.
+
+Three strict scoped TS configs, scoped lint/format, Admin build/types, nine-entry preview build
+and budget pass. **Initial JS 526787 / 532480 B gzip**, ten assets, **5693 B margin** (6 B above
+published 1AC; 21 B above the earlier icon-only 1AD). Known generated tsbuildinfo is restored.
+The fresh read-only composition review, advisory proof and final service/status ruling follow.
+
+Limits remain: actual backend/worker/filesystem/SSE timing integration, AT/native/other engines,
+exhaustive viewport/zoom, phase-close/full suites/CI and canonical recording/comparison are pending.
+The 33 canonical PNGs/manifest remain 1M; app/web@258bbaee stays unchanged/unavailable. This adopts
+Health's approved composition, not future HealthScan/live-provider/cursor/pagination/data work.
+**1AD stays uncommitted for Diego. No next group, commit/push, PR/merge/rebase/deploy/release.**
+
+### Fresh composition review, executor rulings and final 1AD stop
+
+The fresh read-only review covered the full pending diff, including ten untracked sources,
+tests and fixtures, against published 1AC. It returned Critical 0 / Important 0 / Minor 2 and
+readiness for Diego's visual review, not publication. One combined repair pass accepted both
+Minor findings: remove the duplicate screen-reader issue age now that the chip is visible at
+all widths, and update guidance to name the current Queue repair control.
+
+Executor ruling on the review's declined repair-completeness area: the preserved confirmation
+copy presented a loaded count as the full batch scope, despite the existing check-wide endpoint.
+That concrete UI claim is Important and belongs to this data-authority change. The same repair
+pass changed only the dialog title/description/consequence: Queue artist repairs now describes
+eligible repairs across the library, separately states the loaded auto-fixable count and the
+recorded open count for that check (or unavailable), and names the filesystem/re-sync consequence
+without using loaded count as total affected. No confirmation callback, request, eligibility,
+worker or target algorithm changed. A new regression with one loaded auto-fixable case and 600
+recorded open cases was observed RED before the fix, then all 54 scoped cases passed. The two
+Minor fixes use existing component/browser/AX evidence; no implementation-mirroring tests added.
+There was no second reviewer loop.
+
+All declined areas have explicit rulings:
+
+- Visual acceptance/sketch fidelity belongs to Diego. Actual :5186 overview and expanded detail
+  were inspected and saved as advisory proof; no visual approval is inferred from unit tests.
+- Backend permissions, worker/filesystem effects, freshness and full library coverage retain
+  existing contracts. Mocked API/catalog and isolated samples do not prove live integration.
+- Live SSE/reconnect races and filtered repair completion remain integration limits. Existing
+  connection/callback source is unchanged (apart from stale metadata); focused tests exercise
+  filtered scan refresh/cleanup, not all real timing combinations.
+- The deliberate keyboard focus destination after removing the last case/group is unproved.
+  Existing removal behaviour is retained; confirm cancellation/focus and correct removal IDs
+  pass, but disappearance focus is reserved for accessibility QA or a targeted follow-up.
+- Screen-reader/native/other-engine and exhaustive viewport/zoom QA remain pending. Chromium
+  covers 1440/768/390, accessible names/keyboard, targets, font families and 8 px measurements.
+- Full suites/CI/canonical capture/site parity remain pending. No canonical baseline was changed;
+  the 33 PNGs/manifest still belong to 1M and app/web@258bbaee is unchanged/unavailable here.
+- Future HealthScan/providers/pagination and actual repair completeness outside loaded results
+  remain pending. Only the misleading UI scope claim was raised and repaired here; no hidden
+  worker outcome or complete scan is certified.
+
+Final post-repair evidence: **54 Vitest + six preview/four built-Admin Chromium**, serial one
+worker; three strict scoped TypeScript configs, scoped lint/format, contract audit, Admin build
+and nine-entry preview build/budget pass. **526787 / 532480 B gzip**, ten initial assets,
+**5693 B margin**. Known generated tsbuildinfo was restored. Only the clarified confirmation copy
+is excluded from the unchanged-props audit; open/change/confirm flow and label remain identical.
+
+Advisory proof (ignored, not canonical):
+`.artifacts/review/checkpoint-1ad-health-inbox.png` and
+`.artifacts/review/checkpoint-1ad-health-inbox-details.png`. The real isolated sample is open and
+marked deliverable at <http://127.0.0.1:5186/admin-health-demo.html>; the user preview service is
+active and the entry returns HTTP 200. All earlier mockup checkpoints are preserved. Production
+uses real existing endpoints; the no-backend specimen deliberately uses labelled fictional data.
+HEAD/origin remain **439b3e78** / feat/crate_v3; no 1AD commit/push or next group.
+**Stop at 1AD for Diego's review before commit.**
+
+## Final current 1AD — visual drift corrected, review before commit (2026-10-18)
+
+Diego authorised correcting the visual drift after comparing the approved sketch with the
+initial composition. This supersedes its earlier visual-readiness claim and style/budget
+measurements. Product/data composition remains the approved issue queue; no 1AD publication
+approval has been given. HEAD/origin are still published 1AC `439b3e78`, branch `feat/crate_v3`.
+
+Restored in actual Health:1 px accent-action detail rail; accent-action-hi expanded disclosure;
+one primary next step per context (existing artist-review link after actual cases, or eligible
+direct repair where no artist-review action is available). Existing secondary mutations remain
+visible with lower weight. Case severity/age share a compact row, Dismiss all shares the repair
+control row, and the existing filter disclosure shares the heading row. Case/repair data,
+recorded/loaded totals, confirmations and all eligibility rules remain. Unlinked cases retain
+their full paths and Resolve/Dismiss without an invented artist-review link.
+
+The reviewed domain composition now uses1128 px maximum content width, 36–54 px/700 Bricolage
+H1, 27 px/650 section and 23 px/600 issue headings, caption body and the existing Poppins/Mono,
+semantic colours and shared Buttons. This applies Diego's approved sketch within Health;
+it does not create a global type-scale change or app-specific foundational component. Detail
+columns have32 px gap and existing `.crate-form-field`8 px spacing, actions 44 px; the narrow
+layout wraps without horizontal overflow. English Admin labels/data-specific copy remain.
+
+The grey rail was not a missing utility: shared typography.css's unlayered universal border
+colour outranked the generated Tailwind utility. The only shared change moves that default to
+base with `:root, :root *` so it beats preflight's later universal reset while yielding to
+component/utility layers. The first base-only trial restored accent but changed the unqualified
+default to currentColor; the new real CSS-entry regression caught this before final correction.
+Actual Admin and Listen CSS now preserve accent, quiet, transparent and default border colours.
+No `!important`, local symptom override, new token/theme/variant or shared JS/API change.
+
+Scoped evidence:
+
+- **55 Health/policy +71 shared Vitest pass**, one worker: existing helpers/mutations, current
+  controls and the added unlinked-case preservation check. Original four colour/hierarchy
+  browser regressions were observed RED before fixing.
+- **30 unique Chromium cases exercised**:8 Health, 2 actual Admin/Listen CSS-entry, 4 Admin control,
+  3 tabs, 9 focus preview cases +4 builtAdmin Health at 1440/768/390. Initial combined preview run:
+  25/26 pass; the existing focus-motion.spec.ts "animates the ring on and fully off with the real
+  Listen search timing" missed the exit animation at line 199. Exact directed replay passed
+  without changes, followed by all9 focus cases passing together. Record this transient failure;
+  do not describe the initial combined pass as clean or infer a proven root cause. No focus
+  animation/test/timeout was modified. All Health/colour/control/tab cases passed on that pass.
+- Three strict scoped TypeScript configs, scoped ESLint/Prettier, both source-contract audits,
+  Admin and Listen builds/types/budgets and nine-entry preview build pass. Admin initial JS
+  **526767/532480 B gzip**, ten assets, **5713 B margin** (20 B below the initial queue composition;
+  14 B below published 1AC). Listen **199918/307200 B**, 23 initial assets. Generated build caches
+  restored from their pre-build tracked contents.
+- `.artifacts/review/health-drift-contract-audit.txt` compares saved pre-drift Health with final:
+  **22 helpers/models, 9 API calls, 12 effect/query/ref calls, 13 state initialisers, 6 repair counter/
+  eligibility declarations, 10 inline callbacks and whole confirmation JSX unchanged**. Artist
+  route builder and canRepair/actual-ID eligibility remain identical. ArtistGroupHeader's JSX
+  presentation intentionally changed to wrap cases before its existing primary repair link;
+  original pre-composition audit now exempts that presentation helper, leaving 19 other helpers.
+
+The actual real-page specimen was compared in IAB at 1310×1424 with the approved sketch. Proof:
+`.artifacts/review/checkpoint-1ad-health-drift-fixed.png` (ignored advisory, not canonical).
+The sample tab is marked deliverable at <http://127.0.0.1:5186/admin-health-demo.html>, user
+service active/HTTP 200; previous specimens and checkpoints remain. Samples remain labelled
+fictional/local, production uses unchanged actual endpoints. No backend or library operations.
+
+Earlier review's declined areas/rulings still apply: live worker/filesystem/permissions/freshness,
+SSE/races, deliberate focus destination after the final case vanishes, screen-reader/native/
+other-engine/zoom, full phase-close/CI and canonical recording/comparison remain pending. No
+claim of future HealthScan/providers/pagination or complete unloaded repairs. The 33 canonical
+PNGs/manifest remain 1M, site pin 258bbaee unchanged/unavailable. No new reviewer loop was opened
+for this bounded user-directed visual correction; audit and direct sketch comparison cover it.
+**Stop at 1AD, uncommitted for Diego. No next group, commit/push, PR/merge/rebase/deploy/release.**
+
+## 1AD approval and publication preparation — 2026-10-18
+
+Diego approved the corrected Library Health checkpoint and explicitly requested commit/push,
+then the next Admin icon group with UX retained. This supersedes every earlier 1AD local-only
+stop; the approved product source and scoped evidence are unchanged. Publication commit:
+`feat(ui): simplify Library Health into an issue queue`, parent439b3e78. Exact published SHA
+will be recorded after verifying the push. The preview's 1AD label/footer now say published.
+No full validation, CI dispatch or canonical baseline update is needed for this metadata change.
+
+The next bounded group is Library Trash alone (`pages/Trash.tsx`), from the reviewed operations/
+settings inventory. Preserve restore/delete/empty worker requests, task waits, errors and both
+shared confirmations; retain actual loading glyphs and retire redundant header/action glyphs.
+No new trash index, pagination, scan/instrument or backend work; those phase6.4 prerequisites
+remain pending. Keep all earlier specimens and stop at1AE for Diego before publication.

@@ -1,0 +1,181 @@
+{
+  "health": {
+    "snapshot": {
+      "scope": "health",
+      "subject_key": "library",
+      "version": 1,
+      "stale": false,
+      "generation_ms": 12
+    },
+    "issues": [
+      {
+        "id": 101,
+        "check_type": "unindexed_files",
+        "severity": "medium",
+        "description": "Sample unindexed files",
+        "details_json": {
+          "artist": "Costa Norte",
+          "path": "/music/Costa Norte/Muestra/101.flac"
+        },
+        "auto_fixable": true,
+        "status": "open",
+        "created_at": "2026-10-18T10:00:00Z",
+        "artist_id": 23,
+        "album_id": 68
+      },
+      {
+        "id": 102,
+        "check_type": "artist_layout_fix",
+        "severity": "high",
+        "description": "Sample artist layout fix",
+        "details_json": {
+          "artist": "Costa Norte",
+          "path": "/music/Costa Norte/Muestra/102.flac"
+        },
+        "auto_fixable": true,
+        "status": "open",
+        "created_at": "2026-10-18T10:00:00Z",
+        "artist_id": 23,
+        "album_id": 68
+      },
+      {
+        "id": 103,
+        "check_type": "tag_mismatch",
+        "severity": "low",
+        "description": "Sample tag mismatch",
+        "details_json": {
+          "artist": "Costa Norte",
+          "path": "/music/Costa Norte/Muestra/103.flac"
+        },
+        "auto_fixable": false,
+        "status": "open",
+        "created_at": "2026-10-18T10:00:00Z",
+        "artist_id": 23,
+        "album_id": 68
+      },
+      {
+        "id": 104,
+        "check_type": "duplicate_tracks",
+        "severity": "medium",
+        "description": "Sample duplicate tracks",
+        "details_json": {
+          "artist": "Costa Norte",
+          "path": "/music/Costa Norte/Muestra/104.flac"
+        },
+        "auto_fixable": true,
+        "status": "open",
+        "created_at": "2026-10-18T10:00:00Z",
+        "artist_id": 23,
+        "album_id": 68
+      }
+    ],
+    "counts": {
+      "unindexed_files": 1,
+      "artist_layout_fix": 1,
+      "tag_mismatch": 1,
+      "duplicate_tracks": 1
+    },
+    "total": 4,
+    "filter": null,
+    "runs": {
+      "unindexed_files": {
+        "last_run_at": "2026-10-18T10:00:00Z",
+        "duration_ms": 12,
+        "issue_count": 1
+      },
+      "artist_layout_fix": {
+        "last_run_at": "2026-10-18T10:00:00Z",
+        "duration_ms": 12,
+        "issue_count": 1
+      },
+      "tag_mismatch": {
+        "last_run_at": "2026-10-18T10:00:00Z",
+        "duration_ms": 12,
+        "issue_count": 1
+      },
+      "duplicate_tracks": {
+        "last_run_at": "2026-10-18T10:00:00Z",
+        "duration_ms": 12,
+        "issue_count": 1
+      }
+    }
+  },
+  "catalog": {
+    "items": [
+      {
+        "check_type": "unindexed_files",
+        "scanner_method": "_check_unindexed_files",
+        "fixer_method": "_fix_unindexed_files",
+        "support": "automatic",
+        "risk": "safe",
+        "scope": "db",
+        "requires_confirmation": false,
+        "supports_batch": true,
+        "supports_artist_scope": true,
+        "supports_global_scope": true,
+        "supports_bulk_fix": false,
+        "auto_fixable": true
+      },
+      {
+        "check_type": "artist_layout_fix",
+        "scanner_method": "_check_artist_layout_fix",
+        "fixer_method": "_fix_artist_layout_fix",
+        "support": "automatic",
+        "risk": "caution",
+        "scope": "hybrid",
+        "requires_confirmation": true,
+        "supports_batch": true,
+        "supports_artist_scope": true,
+        "supports_global_scope": false,
+        "supports_bulk_fix": true,
+        "auto_fixable": true
+      },
+      {
+        "check_type": "tag_mismatch",
+        "scanner_method": "_check_tag_mismatch",
+        "fixer_method": null,
+        "support": "manual",
+        "risk": "caution",
+        "scope": "db",
+        "requires_confirmation": false,
+        "supports_batch": false,
+        "supports_artist_scope": false,
+        "supports_global_scope": false,
+        "supports_bulk_fix": false,
+        "auto_fixable": false
+      },
+      {
+        "check_type": "duplicate_tracks",
+        "scanner_method": "_check_duplicate_tracks",
+        "fixer_method": "_fix_duplicate_tracks",
+        "support": "automatic",
+        "risk": "caution",
+        "scope": "db",
+        "requires_confirmation": false,
+        "supports_batch": true,
+        "supports_artist_scope": true,
+        "supports_global_scope": true,
+        "supports_bulk_fix": false,
+        "auto_fixable": true
+      }
+    ]
+  },
+  "tasks": {
+    "history": [
+      {
+        "id": "sample-health-repair",
+        "type": "health_check",
+        "status": "completed",
+        "error": null,
+        "result": {
+          "issue_count": 4,
+          "revalidation": {
+            "issue_count": 4
+          }
+        },
+        "created_at": "2026-10-18T09:00:00Z",
+        "updated_at": "2026-10-18T10:00:00Z"
+      }
+    ]
+  }
+}
