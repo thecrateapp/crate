@@ -19,7 +19,11 @@ import type {
   EngineRepeatMode,
   EngineTrack,
 } from "@/lib/playback-engine";
-import { getEffectivePlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
+import {
+  getEffectivePlaybackDeliveryPolicy,
+  getInfinitePlaybackPreference,
+} from "@/lib/player-playback-prefs";
+import { continuationDescriptor } from "@/lib/playback-continuation";
 import {
   setPlaybackDeliveryProvenance,
   setPlaybackSession,
@@ -319,6 +323,11 @@ export async function toStartupEngineQueueSnapshot(
           source: transitionSource(options.playSource, options.shuffle),
           preferredDurationMs: options.crossfadeMs,
           allowBeatmatch: planInput.capabilities.androidBeatmatch,
+          delivery: getEffectivePlaybackDeliveryPolicy(),
+          descriptor: continuationDescriptor(options.playSource, {
+            shuffle: options.shuffle,
+            infinite: getInfinitePlaybackPreference(),
+          }),
         }
       : undefined,
   };

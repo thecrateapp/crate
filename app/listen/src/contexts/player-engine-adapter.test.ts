@@ -668,10 +668,11 @@ describe("player engine adapter", () => {
         nativeSnapshotOptions("continuation-context"),
       );
 
-      expect(snapshot.continuation).toEqual({
+      expect(snapshot.continuation).toMatchObject({
         source: "playlist",
         preferredDurationMs: 3000,
         allowBeatmatch: false,
+        descriptor: null,
       });
     });
 

@@ -53,10 +53,28 @@ export interface EngineTransitionPlan {
   fallbackReason?: string;
 }
 
+export type EngineContinuationDescriptor =
+  | { kind: "shaped_radio"; sessionId: string }
+  | {
+      kind: "seeded_radio";
+      seedType: "artist" | "track" | "album" | "playlist" | "home_playlist";
+      seedId: string;
+    };
+
 export interface EngineContinuationContext {
   source: string;
   preferredDurationMs: number;
   allowBeatmatch: boolean;
+  delivery: string;
+  descriptor: EngineContinuationDescriptor | null;
+}
+
+export interface EngineAppendedTrack {
+  sequence: number;
+  id: string;
+  entityUid: string;
+  durationMs: number;
+  source: Record<string, unknown>;
 }
 
 export interface EngineQueueSnapshot {

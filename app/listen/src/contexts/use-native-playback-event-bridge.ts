@@ -177,6 +177,7 @@ type PlaybackStateOptions = {
 };
 
 export interface UseNativePlaybackEventBridgeParams {
+  adoptNativeAppendedTracks?: () => Promise<void>;
   applyNativePosition: (event: EnginePositionEvent) => void;
   applyNativeState: (
     state: EngineState,
@@ -208,6 +209,7 @@ export interface UseNativePlaybackEventBridgeParams {
 }
 
 export function useNativePlaybackEventBridge({
+  adoptNativeAppendedTracks,
   applyNativePosition,
   applyNativeState,
   applyNativeTrackChange,
@@ -426,6 +428,7 @@ export function useNativePlaybackEventBridge({
     (...args: Parameters<typeof handleNativeEvent>) =>
       handleNativeEvent(...args),
   );
+  const onAdoptAppended = useEffectEvent(() => adoptNativeAppendedTracks?.());
   const onReconcile = useEffectEvent(
     (...args: Parameters<typeof reconcileNativePlayback>) =>
       reconcileNativePlayback(...args),
@@ -530,18 +533,25 @@ export function useNativePlaybackEventBridge({
         console.error("[native-player] failed to attach listeners:", error);
       });
 
+    const adoptThenReconcile = () => {
+      void Promise.resolve(onAdoptAppended())
+        .catch((error) => {
+          console.warn("[native-player] appended tracks not adopted:", error);
+        })
+        .then(() => {
+          if (disposed) return;
+          onReconcile({
+            rotateIndexChange: true,
+            passiveLifecycle: true,
+          });
+        });
+    };
     const onNativeResume = () => {
-      onReconcile({
-        rotateIndexChange: true,
-        passiveLifecycle: true,
-      });
+      adoptThenReconcile();
     };
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        onReconcile({
-          rotateIndexChange: true,
-          passiveLifecycle: true,
-        });
+        adoptThenReconcile();
       }
     };
     window.addEventListener("crate:app-resumed", onNativeResume);

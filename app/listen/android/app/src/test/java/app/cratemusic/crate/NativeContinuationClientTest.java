@@ -156,6 +156,96 @@ public class NativeContinuationClientTest {
         assertNull(NativeContinuationClient.Config.fromJson(new JSONObject("{\"token\":\"\"}")));
     }
 
+    private static final NativeContinuationClient.Config REFILL_CONFIG =
+        new NativeContinuationClient.Config(
+            "https://api.example",
+            "crv_continuation",
+            2_000_000L,
+            "radio",
+            12_000L,
+            false,
+            "balanced",
+            true
+        );
+
+    @Test
+    public void asksToContinueAfterTheLastQueuedEntity() throws Exception {
+        JSONObject body = NativeContinuationClient.continuationBody(REFILL_CONFIG, tracks, 10);
+
+        assertEquals("uid-5", body.getString("afterTrackEntityUid"));
+        assertEquals(10, body.getInt("limit"));
+        assertEquals("balanced", body.getString("delivery"));
+        JSONArray recent = body.getJSONArray("recentEntityUids");
+        assertEquals(4, recent.length());
+        assertEquals("uid-5", recent.getString(0));
+        assertEquals("radio", body.getJSONObject("context").getString("source"));
+    }
+
+    @Test
+    public void buildsNativeTracksAndJoinPlansFromAContinuation() throws Exception {
+        String body = new JSONObject()
+            .put(
+                "tracks",
+                new JSONArray().put(
+                    new JSONObject()
+                        .put("id", "uid-6")
+                        .put("entityUid", "uid-6")
+                        .put("url", "/api/tracks/by-entity/uid-6/stream?delivery=balanced")
+                        .put("title", "Six")
+                        .put("artist", "Band")
+                        .put("durationMs", 201_500L)
+                        .put("source", new JSONObject().put("entity_uid", "uid-6"))
+                )
+            )
+            .put(
+                "plans",
+                new JSONArray().put(
+                    new JSONObject()
+                        .put("outgoingTrackEntityUid", "uid-5")
+                        .put("incomingTrackEntityUid", "uid-6")
+                        .put("plannerVersion", 2)
+                        .put("outgoingCueMs", 170_000L)
+                )
+            )
+            .put("exhausted", false)
+            .toString();
+
+        NativeContinuationClient.Continuation continuation =
+            NativeContinuationClient.parseContinuation(body, REFILL_CONFIG, tracks);
+
+        assertEquals(1, continuation.tracks.size());
+        NativeTrack track = continuation.tracks.get(0);
+        assertEquals("uid-6", track.id);
+        assertEquals(
+            "https://api.example/api/tracks/by-entity/uid-6/stream?delivery=balanced",
+            track.url
+        );
+        assertEquals(201_500L, track.durationMs);
+        assertEquals("{\"entity_uid\":\"uid-6\"}", continuation.sources.get(0));
+        assertEquals(1, continuation.plans.size());
+        assertEquals("runtime-5", continuation.plans.get(0).getString("outgoingTrackId"));
+        assertEquals("uid-6", continuation.plans.get(0).getString("incomingTrackId"));
+        assertFalse(continuation.exhausted);
+    }
+
+    @Test
+    public void reportsContinuationFailures() {
+        RecordingTransport transport = new RecordingTransport();
+        NativeContinuationClient client = new NativeContinuationClient(transport);
+
+        transport.response = new NativeContinuationClient.Response(401, "");
+        assertEquals(
+            NativeContinuationClient.Outcome.UNAUTHORIZED,
+            client.fetchContinuation(REFILL_CONFIG, tracks, 10).outcome
+        );
+        assertEquals("https://api.example/api/playback/continuation", transport.url);
+        transport.response = new NativeContinuationClient.Response(500, "");
+        assertEquals(
+            NativeContinuationClient.Outcome.FAILED,
+            client.fetchContinuation(REFILL_CONFIG, tracks, 10).outcome
+        );
+    }
+
     @Test
     public void aTokenIsUsableOnlyBeforeItExpires() {
         assertTrue(CONFIG.isUsable(1_999_999L));

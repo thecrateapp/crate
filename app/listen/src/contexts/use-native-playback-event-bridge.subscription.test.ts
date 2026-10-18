@@ -88,4 +88,29 @@ describe("useNativePlaybackEventBridge subscription", () => {
     unmount();
     expect(subscriptions[0]?.dispose).toHaveBeenCalledTimes(1);
   });
+
+  it("adopts natively appended tracks before reconciling on resume", async () => {
+    const { useNativePlaybackEventBridge } = await import(
+      "@/contexts/use-native-playback-event-bridge"
+    );
+    const { androidNativeEngine } = await import("@/lib/android-native-engine");
+    const order: string[] = [];
+    vi.mocked(androidNativeEngine.getState).mockImplementation(() => {
+      order.push("reconcile");
+      return Promise.resolve(null);
+    });
+    const adoptNativeAppendedTracks = vi.fn(async () => {
+      order.push("adopt");
+    });
+    const { unmount } = renderHook(() =>
+      useNativePlaybackEventBridge(params({ adoptNativeAppendedTracks })),
+    );
+    await vi.waitFor(() => expect(order).toContain("reconcile"));
+    order.length = 0;
+
+    window.dispatchEvent(new CustomEvent("crate:app-resumed"));
+
+    await vi.waitFor(() => expect(order).toEqual(["adopt", "reconcile"]));
+    unmount();
+  });
 });

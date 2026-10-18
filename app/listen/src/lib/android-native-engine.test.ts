@@ -7,6 +7,7 @@ const nativePlaybackMock = vi.hoisted(() => ({
   setQueue: vi.fn(),
   setTransitionPlans: vi.fn(),
   setContinuation: vi.fn(),
+  getAppendedTracks: vi.fn(),
   appendTracks: vi.fn(),
   insertTrack: vi.fn(),
   removeTrack: vi.fn(),
@@ -779,6 +780,8 @@ describe("android native engine flags", () => {
       source: "playlist",
       preferredDurationMs: 12000,
       allowBeatmatch: false,
+      delivery: "balanced",
+      descriptor: null,
     };
 
     async function loadQueue(crossfadeMs: number) {
@@ -814,7 +817,11 @@ describe("android native engine flags", () => {
           token: "crv_continuation",
           expiresAtMs: 1_800_000_000_000,
           apiBase: "https://api.example",
-          ...context,
+          source: "playlist",
+          preferredDurationMs: 12000,
+          allowBeatmatch: false,
+          delivery: "balanced",
+          refill: false,
         }),
       );
       expect(nativePlaybackMock.setQueue.mock.calls[0]![0]).not.toHaveProperty(
@@ -831,6 +838,77 @@ describe("android native engine flags", () => {
         }),
       );
       expect(continuationTokenMock).not.toHaveBeenCalled();
+    });
+
+    it("asks native to refill when the queue has a continuation descriptor", async () => {
+      vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+      nativePlaybackMock.getState.mockResolvedValue(state);
+      nativePlaybackMock.setQueue.mockResolvedValue(state);
+      continuationTokenMock.mockResolvedValue({
+        token: "crv_radio",
+        expiresAtMs: 1_800_000_000_000,
+        apiBase: "https://api.example",
+      });
+      const nativeEngineModule = await import("@/lib/android-native-engine");
+      const engine = new nativeEngineModule.AndroidNativeEngine();
+      const descriptor = {
+        kind: "shaped_radio" as const,
+        sessionId: "radio-1",
+      };
+
+      await engine.loadQueue({
+        revision: "queue-rev-1",
+        tracks: [],
+        currentIndex: 0,
+        positionMs: 0,
+        autoplay: false,
+        repeat: "off",
+        crossfadeMs: 12000,
+        volume: 1,
+        continuation: { ...context, descriptor },
+      });
+
+      await vi.waitFor(() =>
+        expect(nativePlaybackMock.setContinuation).toHaveBeenCalledWith(
+          expect.objectContaining({ token: "crv_radio", refill: true }),
+        ),
+      );
+      expect(continuationTokenMock).toHaveBeenCalledWith(descriptor);
+    });
+
+    it("takes each natively appended track once per queue revision", async () => {
+      await loadQueue(12000);
+      const nativeEngineModule = await import("@/lib/android-native-engine");
+      const engine = nativeEngineModule.androidNativeEngine;
+      await engine.loadQueue({
+        revision: "queue-rev-1",
+        tracks: [],
+        currentIndex: 0,
+        positionMs: 0,
+        autoplay: false,
+        repeat: "off",
+        crossfadeMs: 12000,
+        volume: 1,
+      });
+      const entry = {
+        sequence: 3,
+        id: "uid-9",
+        entityUid: "uid-9",
+        durationMs: 180000,
+        source: { entity_uid: "uid-9" },
+      };
+      nativePlaybackMock.getAppendedTracks
+        .mockResolvedValueOnce({ revision: "queue-rev-1", tracks: [entry] })
+        .mockResolvedValueOnce({ revision: "queue-rev-1", tracks: [] })
+        .mockResolvedValueOnce({ revision: "other-rev", tracks: [entry] });
+
+      expect(await engine.takeAppendedTracks()).toEqual([entry]);
+      expect(await engine.takeAppendedTracks()).toEqual([]);
+      expect(nativePlaybackMock.getAppendedTracks).toHaveBeenLastCalledWith({
+        revision: "queue-rev-1",
+        afterSequence: 3,
+      });
+      expect(await engine.takeAppendedTracks()).toEqual([]);
     });
   });
 });

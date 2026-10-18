@@ -38,6 +38,7 @@ type NativePlaybackRuntimeOptions = {
   ) => void;
   lastNonZeroVolumeRef: ValueRef<number>;
   playSourceRef: ValueRef<PlaySource | null>;
+  adoptNativeAppendedTracks?: () => Promise<void>;
   queueRef: ValueRef<Track[]>;
   recordProgress: (positionSeconds: number) => void;
   rememberActiveTrack: (track: Track | undefined) => void;
@@ -53,6 +54,7 @@ type NativePlaybackRuntimeOptions = {
 };
 
 export function useNativePlaybackRuntime({
+  adoptNativeAppendedTracks,
   beginSoftInterruption,
   bufferingIntentRef,
   commitCurrentIndex,
@@ -126,6 +128,7 @@ export function useNativePlaybackRuntime({
   });
 
   useNativePlaybackEventBridge({
+    adoptNativeAppendedTracks,
     applyNativePosition,
     applyNativeState,
     applyNativeTrackChange,

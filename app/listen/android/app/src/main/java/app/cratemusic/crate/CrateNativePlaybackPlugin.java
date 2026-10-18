@@ -300,6 +300,14 @@ public class CrateNativePlaybackPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void getAppendedTracks(PluginCall call) {
+        if (!ensureService(call)) return;
+        String revision = call.getString("revision", "");
+        long afterSequence = call.getData().optLong("afterSequence", 0L);
+        runOnMain(call, () -> call.resolve(service.getAppendedTracks(revision, afterSequence)));
+    }
+
+    @PluginMethod
     public void setContinuation(PluginCall call) {
         if (!ensureService(call)) return;
         NativeContinuationClient.Config config =

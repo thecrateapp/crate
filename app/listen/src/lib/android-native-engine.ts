@@ -6,6 +6,7 @@ import {
 
 import { isAndroidNative } from "@/lib/capacitor-runtime";
 import type {
+  EngineAppendedTrack,
   EngineContinuationContext,
   EngineEventListener,
   EngineEventMap,
@@ -77,12 +78,21 @@ type CrateNativePlaybackPlugin = {
   setContinuation(
     options:
       | { token: "" }
-      | ({
+      | {
           token: string;
           apiBase: string;
           expiresAtMs: number;
-        } & EngineContinuationContext),
+          source: string;
+          preferredDurationMs: number;
+          allowBeatmatch: boolean;
+          delivery: string;
+          refill: boolean;
+        },
   ): Promise<void>;
+  getAppendedTracks(options: {
+    revision: string;
+    afterSequence: number;
+  }): Promise<{ revision: string; tracks?: EngineAppendedTrack[] }>;
   appendTracks(options: {
     revision: string;
     tracks: EngineTrack[];
@@ -212,6 +222,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
   private planInstallGeneration = 0;
   private installedPlans: EngineTransitionPlan[] = [];
   private continuationContext: EngineContinuationContext | undefined;
+  private adoptedSequence = 0;
 
   constructor() {
     subscribeSmartMixCapabilities(() => {
@@ -349,6 +360,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
     this.replanTransitionPlans = replanTransitionPlans;
     this.installedPlans = [];
     this.continuationContext = continuation;
+    this.adoptedSequence = 0;
     this.queueMixRequested = queue.crossfadeMs > 0;
     this.appliedCrossfadeMs = effectiveNativeCrossfadeMs(queue.crossfadeMs);
     const pendingGeneration = ++this.planInstallGeneration;
@@ -368,6 +380,22 @@ export class AndroidNativeEngine implements PlaybackEngine {
     return state;
   }
 
+  async takeAppendedTracks(): Promise<EngineAppendedTrack[]> {
+    const revision = this.queueRevision;
+    const result = await nativePlayback.getAppendedTracks({
+      revision,
+      afterSequence: this.adoptedSequence,
+    });
+    if (result.revision !== revision || revision !== this.queueRevision) {
+      return [];
+    }
+    const tracks = result.tracks ?? [];
+    for (const track of tracks) {
+      this.adoptedSequence = Math.max(this.adoptedSequence, track.sequence);
+    }
+    return tracks;
+  }
+
   private async configureContinuation(): Promise<void> {
     const context = this.continuationContext;
     try {
@@ -379,11 +407,17 @@ export class AndroidNativeEngine implements PlaybackEngine {
         await nativePlayback.setContinuation({ token: "" });
         return;
       }
-      const continuationToken = await getPlaybackContinuationToken();
+      const continuationToken = await getPlaybackContinuationToken(
+        context.descriptor,
+      );
       if (context !== this.continuationContext) return;
       await nativePlayback.setContinuation({
         ...continuationToken,
-        ...context,
+        source: context.source,
+        preferredDurationMs: context.preferredDurationMs,
+        allowBeatmatch: context.allowBeatmatch,
+        delivery: context.delivery,
+        refill: context.descriptor !== null,
       });
     } catch (error) {
       console.warn("[native-playback] continuation not configured:", error);

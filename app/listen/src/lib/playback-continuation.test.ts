@@ -33,6 +33,7 @@ describe("getPlaybackContinuationToken", () => {
     expect(apiMock).toHaveBeenCalledWith(
       "/api/playback/continuation-token",
       "POST",
+      undefined,
     );
     expect(reused).toEqual(first);
     expect(first).toEqual({
@@ -67,5 +68,106 @@ describe("getPlaybackContinuationToken", () => {
       token: "crv_other",
       apiBase: "https://other.example",
     });
+  });
+
+  it("sends the queue descriptor and keys the cached token on it", async () => {
+    apiMock.mockResolvedValue({
+      token: "crv_radio",
+      expiresAt: "2099-01-01T00:00:00Z",
+    });
+    const { getPlaybackContinuationToken } = await load();
+    const descriptor = { kind: "shaped_radio" as const, sessionId: "radio-1" };
+
+    await getPlaybackContinuationToken(descriptor);
+    await getPlaybackContinuationToken(descriptor);
+    await getPlaybackContinuationToken(null);
+
+    expect(apiMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/playback/continuation-token",
+      "POST",
+      { descriptor },
+    );
+    expect(apiMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/playback/continuation-token",
+      "POST",
+      undefined,
+    );
+    expect(apiMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("describes radio and infinite queues for native continuation", async () => {
+    const { continuationDescriptor } = await load();
+    const off = { shuffle: false, infinite: false };
+    const infinite = { shuffle: false, infinite: true };
+
+    expect(
+      continuationDescriptor(
+        {
+          type: "radio",
+          name: "Radio",
+          radio: { seedType: "track", seedId: 4, shapedSessionId: "radio-1" },
+        },
+        off,
+      ),
+    ).toEqual({ kind: "shaped_radio", sessionId: "radio-1" });
+    expect(
+      continuationDescriptor(
+        {
+          type: "radio",
+          name: "Radio",
+          radio: { seedType: "track", seedId: 4, seedEntityUid: "uid-4" },
+        },
+        off,
+      ),
+    ).toEqual({ kind: "seeded_radio", seedType: "track", seedId: "uid-4" });
+    expect(
+      continuationDescriptor(
+        {
+          type: "playlist",
+          name: "Mix",
+          radio: { seedType: "playlist", seedId: 7 },
+        },
+        infinite,
+      ),
+    ).toEqual({ kind: "seeded_radio", seedType: "playlist", seedId: "7" });
+    expect(
+      continuationDescriptor(
+        {
+          type: "playlist",
+          name: "Mix",
+          radio: { seedType: "playlist", seedId: "daily" },
+        },
+        infinite,
+      ),
+    ).toEqual({
+      kind: "seeded_radio",
+      seedType: "home_playlist",
+      seedId: "daily",
+    });
+    expect(
+      continuationDescriptor(
+        {
+          type: "album",
+          name: "Album",
+          radio: { seedType: "album", seedId: 3 },
+        },
+        off,
+      ),
+    ).toBeNull();
+    expect(
+      continuationDescriptor(
+        {
+          type: "album",
+          name: "Album",
+          radio: { seedType: "album", seedId: 3 },
+        },
+        { shuffle: true, infinite: true },
+      ),
+    ).toBeNull();
+    expect(
+      continuationDescriptor({ type: "queue", name: "Queue" }, infinite),
+    ).toBeNull();
   });
 });

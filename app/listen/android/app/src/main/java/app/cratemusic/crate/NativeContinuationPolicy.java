@@ -19,6 +19,7 @@ final class NativeContinuationPolicy {
 
     private boolean inFlight;
     private boolean unauthorized;
+    private boolean exhausted;
     private int failures;
     private long retryAtMs;
 
@@ -45,6 +46,27 @@ final class NativeContinuationPolicy {
         return new Window(currentIndex, Math.min(MAX_EDGES, remainingEdges));
     }
 
+    boolean nextRefill(
+        boolean foreground,
+        boolean configured,
+        int currentIndex,
+        int queueSize,
+        long nowMs
+    ) {
+        if (foreground || !configured || unauthorized || exhausted || inFlight) {
+            return false;
+        }
+        if (nowMs < retryAtMs || currentIndex < 0) return false;
+        if (queueSize - 1 - currentIndex > MIN_PLANNED_EDGES) return false;
+        inFlight = true;
+        return true;
+    }
+
+    void onExhausted() {
+        inFlight = false;
+        exhausted = true;
+    }
+
     void onSuccess() {
         inFlight = false;
         failures = 0;
@@ -65,6 +87,7 @@ final class NativeContinuationPolicy {
     void reset() {
         inFlight = false;
         unauthorized = false;
+        exhausted = false;
         failures = 0;
         retryAtMs = 0L;
     }

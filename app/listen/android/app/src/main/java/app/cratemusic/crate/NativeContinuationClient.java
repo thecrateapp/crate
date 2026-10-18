@@ -20,6 +20,8 @@ import org.json.JSONObject;
 final class NativeContinuationClient {
     static final String PLANNER_VERSION = "smart-mix-v2";
     private static final String PLANS_PATH = "/api/playback/transition-plans";
+    private static final String CONTINUATION_PATH = "/api/playback/continuation";
+    static final int MAX_RECENT_ENTITY_UIDS = 200;
     private static final int CONNECT_TIMEOUT_MS = 10_000;
     private static final int READ_TIMEOUT_MS = 15_000;
 
@@ -30,6 +32,8 @@ final class NativeContinuationClient {
         final String source;
         final long preferredDurationMs;
         final boolean allowBeatmatch;
+        final String delivery;
+        final boolean refill;
 
         Config(
             String apiBase,
@@ -39,12 +43,27 @@ final class NativeContinuationClient {
             long preferredDurationMs,
             boolean allowBeatmatch
         ) {
+            this(apiBase, token, expiresAtMs, source, preferredDurationMs, allowBeatmatch, "", false);
+        }
+
+        Config(
+            String apiBase,
+            String token,
+            long expiresAtMs,
+            String source,
+            long preferredDurationMs,
+            boolean allowBeatmatch,
+            String delivery,
+            boolean refill
+        ) {
             this.apiBase = trimTrailingSlash(apiBase);
             this.token = token == null ? "" : token;
             this.expiresAtMs = expiresAtMs;
             this.source = source == null || source.isEmpty() ? "manual" : source;
             this.preferredDurationMs = Math.max(0L, preferredDurationMs);
             this.allowBeatmatch = allowBeatmatch;
+            this.delivery = delivery == null || delivery.isEmpty() ? "original" : delivery;
+            this.refill = refill;
         }
 
         @Nullable
@@ -57,7 +76,9 @@ final class NativeContinuationClient {
                 payload.optLong("expiresAtMs", 0L),
                 payload.optString("source", "manual"),
                 payload.optLong("preferredDurationMs", 0L),
-                payload.optBoolean("allowBeatmatch", false)
+                payload.optBoolean("allowBeatmatch", false),
+                payload.optString("delivery", ""),
+                payload.optBoolean("refill", false)
             );
         }
 
@@ -84,6 +105,38 @@ final class NativeContinuationClient {
         PLANNED,
         UNAUTHORIZED,
         FAILED
+    }
+
+    static final class Continuation {
+        final Outcome outcome;
+        final List<NativeTrack> tracks;
+        final List<String> sources;
+        final List<JSONObject> plans;
+        final boolean exhausted;
+
+        Continuation(
+            Outcome outcome,
+            List<NativeTrack> tracks,
+            List<String> sources,
+            List<JSONObject> plans,
+            boolean exhausted
+        ) {
+            this.outcome = outcome;
+            this.tracks = tracks;
+            this.sources = sources;
+            this.plans = plans;
+            this.exhausted = exhausted;
+        }
+
+        static Continuation failed(Outcome outcome) {
+            return new Continuation(
+                outcome,
+                Collections.emptyList(),
+                Collections.emptyList(),
+                Collections.emptyList(),
+                false
+            );
+        }
     }
 
     static final class Result {
@@ -133,6 +186,111 @@ final class NativeContinuationClient {
         }
     }
 
+    Continuation fetchContinuation(Config config, List<NativeTrack> queue, int limit) {
+        try {
+            Response response = transport.post(
+                config.apiBase + CONTINUATION_PATH,
+                config.token,
+                continuationBody(config, queue, limit).toString()
+            );
+            if (response.status == 401 || response.status == 403) {
+                return Continuation.failed(Outcome.UNAUTHORIZED);
+            }
+            if (response.status != 200) {
+                return Continuation.failed(Outcome.FAILED);
+            }
+            return parseContinuation(response.body, config, queue);
+        } catch (IOException | JSONException error) {
+            return Continuation.failed(Outcome.FAILED);
+        }
+    }
+
+    static JSONObject continuationBody(Config config, List<NativeTrack> queue, int limit)
+        throws JSONException {
+        JSONArray recent = new JSONArray();
+        String after = "";
+        for (int index = queue.size() - 1; index >= 0; index--) {
+            String entityUid = queue.get(index).entityUid;
+            if (entityUid.isEmpty()) continue;
+            if (after.isEmpty()) after = entityUid;
+            if (recent.length() >= MAX_RECENT_ENTITY_UIDS) break;
+            recent.put(entityUid);
+        }
+        JSONObject body = new JSONObject()
+            .put("plannerVersion", PLANNER_VERSION)
+            .put("recentEntityUids", recent)
+            .put("limit", limit)
+            .put("delivery", config.delivery)
+            .put("context", edgeContext(config));
+        if (!after.isEmpty()) body.put("afterTrackEntityUid", after);
+        return body;
+    }
+
+    static Continuation parseContinuation(String body, Config config, List<NativeTrack> queue)
+        throws JSONException {
+        JSONObject response = new JSONObject(body);
+        JSONArray rawTracks = response.optJSONArray("tracks");
+        List<NativeTrack> tracks = new ArrayList<>();
+        List<String> sources = new ArrayList<>();
+        if (rawTracks != null) {
+            for (int index = 0; index < rawTracks.length(); index++) {
+                JSONObject raw = rawTracks.optJSONObject(index);
+                if (raw == null) continue;
+                String url = raw.optString("url", "");
+                if (url.isEmpty()) continue;
+                tracks.add(
+                    new NativeTrack(
+                        raw.optString("id", ""),
+                        raw.optString("entityUid", ""),
+                        url.startsWith("/") ? config.apiBase + url : url,
+                        "",
+                        raw.optString("title", "Unknown"),
+                        raw.optString("artist", ""),
+                        raw.optString("album", ""),
+                        "",
+                        "",
+                        raw.optLong("durationMs", 0L),
+                        null
+                    )
+                );
+                JSONObject source = raw.optJSONObject("source");
+                sources.add(source == null ? "{}" : source.toString());
+            }
+        }
+        List<NativeTrack> extended = new ArrayList<>(queue);
+        extended.addAll(tracks);
+        int fromIndex = Math.max(0, queue.size() - 1);
+        JSONObject planResponse = new JSONObject()
+            .put("plannerVersion", PLANNER_VERSION)
+            .put("plans", response.optJSONArray("plans") == null
+                ? new JSONArray()
+                : response.optJSONArray("plans"));
+        List<JSONObject> plans = parsePlans(
+            planResponse.toString(),
+            extended,
+            fromIndex,
+            extended.size() - 1 - fromIndex
+        );
+        return new Continuation(
+            Outcome.PLANNED,
+            tracks,
+            sources,
+            plans,
+            response.optBoolean("exhausted", false)
+        );
+    }
+
+    private static JSONObject edgeContext(Config config) throws JSONException {
+        return new JSONObject()
+            .put("source", config.source)
+            .put("automatic", true)
+            .put("offline", false)
+            .put("preferredDurationMs", config.preferredDurationMs)
+            .put("userCueProfile", "default")
+            .put("allowBeatmatch", config.allowBeatmatch)
+            .put("allowTempoAdjustment", config.allowBeatmatch);
+    }
+
     static JSONObject requestBody(
         Config config,
         List<NativeTrack> tracks,
@@ -147,14 +305,7 @@ final class NativeContinuationClient {
             if (outgoing.entityUid.isEmpty() || incoming.entityUid.isEmpty()) {
                 continue;
             }
-            JSONObject context = new JSONObject()
-                .put("source", config.source)
-                .put("automatic", true)
-                .put("offline", false)
-                .put("preferredDurationMs", config.preferredDurationMs)
-                .put("userCueProfile", "default")
-                .put("allowBeatmatch", config.allowBeatmatch)
-                .put("allowTempoAdjustment", config.allowBeatmatch);
+            JSONObject context = edgeContext(config);
             edges.put(
                 new JSONObject()
                     .put("outgoingTrackEntityUid", outgoing.entityUid)

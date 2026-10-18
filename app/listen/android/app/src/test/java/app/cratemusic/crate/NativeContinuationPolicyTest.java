@@ -1,8 +1,10 @@
 package app.cratemusic.crate;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -86,5 +88,23 @@ public class NativeContinuationPolicyTest {
 
         policy.reset();
         assertNotNull(background(11, 50, 0, 600_000L));
+    }
+
+    @Test
+    public void refillsInTheBackgroundWhenThreeOrFewerTracksRemain() {
+        assertFalse(policy.nextRefill(true, true, 47, 50, 0L));
+        assertFalse(policy.nextRefill(false, true, 45, 50, 0L));
+        assertTrue(policy.nextRefill(false, true, 46, 50, 0L));
+        assertFalse(policy.nextRefill(false, true, 46, 50, 0L));
+    }
+
+    @Test
+    public void stopsRefillingOnceTheSourceIsExhausted() {
+        assertTrue(policy.nextRefill(false, true, 48, 50, 0L));
+        policy.onExhausted();
+
+        assertFalse(policy.nextRefill(false, true, 49, 50, 600_000L));
+        policy.reset();
+        assertTrue(policy.nextRefill(false, true, 49, 50, 600_000L));
     }
 }

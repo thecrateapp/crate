@@ -98,12 +98,18 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private final NativeQueueState queueState = new NativeQueueState();
     private final NativeContinuationPolicy continuationPolicy =
         new NativeContinuationPolicy();
+    private final NativeContinuationPolicy refillPolicy = new NativeContinuationPolicy();
+    private static final int REFILL_BATCH = 10;
+    private static final int MAX_APPENDED_LOG = 200;
+    private final List<JSObject> appendedLog = new ArrayList<>();
+    private String appendedLogRevision = "";
+    private long appendSequence = 0L;
     private final NativeContinuationClient continuationClient =
         new NativeContinuationClient(NativeContinuationClient.httpTransport());
     private final ExecutorService continuationExecutor =
         Executors.newSingleThreadExecutor();
     @Nullable
-    private NativeContinuationClient.Config continuationConfig;
+    private volatile NativeContinuationClient.Config continuationConfig;
     private boolean appInForeground = true;
     private final NativePlaybackTelemetry telemetry =
         new NativePlaybackTelemetry(MAX_BUFFERED_EVENTS);
@@ -414,6 +420,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 payload.put("isPlaying", player.isPlaying());
                 emit("trackChanged", payload);
                 maybeRequestContinuation();
+                maybeRefillQueue();
                 emitNearQueueEndIfNeeded();
                 syncNativeMixTicker();
             }
@@ -660,7 +667,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         ResolvingDataSource.Factory authorizedDataSourceFactory =
             new ResolvingDataSource.Factory(
                 dataSourceFactory,
-                dataSpec -> withAuthorization(dataSpec, streamAuthorizationByOrigin)
+                this::authorizeStream
             );
         DefaultHttpDataSource.Factory artworkHttpDataSourceFactory =
             new DefaultHttpDataSource.Factory()
@@ -1222,14 +1229,128 @@ public class CrateNativePlaybackService extends MediaSessionService {
     ) {
         continuationConfig = config;
         continuationPolicy.reset();
+        refillPolicy.reset();
         maybeRequestContinuation();
+        maybeRefillQueue();
     }
 
     public void setAppInForeground(boolean foreground) {
         appInForeground = foreground;
         if (!foreground) {
             maybeRequestContinuation();
+            maybeRefillQueue();
         }
+    }
+
+    private void maybeRefillQueue() {
+        NativeContinuationClient.Config config = continuationConfig;
+        if (player == null) return;
+        boolean configured =
+            config != null && config.refill && config.isUsable(System.currentTimeMillis());
+        if (
+            !refillPolicy.nextRefill(
+                appInForeground,
+                configured,
+                player.getCurrentMediaItemIndex(),
+                queueState.size(),
+                SystemClock.elapsedRealtime()
+            )
+        ) {
+            return;
+        }
+        String revision = queueState.revision();
+        List<NativeTrack> queue = queueState.snapshot();
+        continuationExecutor.execute(() -> {
+            NativeContinuationClient.Continuation result =
+                continuationClient.fetchContinuation(config, queue, REFILL_BATCH);
+            mainHandler.post(() -> applyRefill(revision, result));
+        });
+    }
+
+    private void applyRefill(
+        String revision,
+        NativeContinuationClient.Continuation result
+    ) {
+        if (result.outcome == NativeContinuationClient.Outcome.UNAUTHORIZED) {
+            refillPolicy.onUnauthorized();
+            Log.i(NativeMixAudioProcessor.QOE_TAG, "continuation refill unauthorized");
+            return;
+        }
+        if (result.outcome == NativeContinuationClient.Outcome.FAILED) {
+            refillPolicy.onFailure(SystemClock.elapsedRealtime());
+            Log.i(NativeMixAudioProcessor.QOE_TAG, "continuation refill failed");
+            return;
+        }
+        if (result.tracks.isEmpty()) {
+            if (result.exhausted) {
+                refillPolicy.onExhausted();
+            } else {
+                refillPolicy.onSuccess();
+            }
+            Log.i(
+                NativeMixAudioProcessor.QOE_TAG,
+                "continuation refill empty exhausted=" + result.exhausted
+            );
+            return;
+        }
+        refillPolicy.onSuccess();
+        if (!revision.equals(queueState.revision())) return;
+        int before = queueState.size();
+        appendTracks(revision, result.tracks);
+        if (queueState.size() == before) return;
+        recordAppended(revision, result);
+        queueState.mergeTransitionPlans(
+            revision,
+            resolveTransitionPlans(queueState.snapshot(), result.plans)
+        );
+        Log.i(
+            NativeMixAudioProcessor.QOE_TAG,
+            "continuation appended=" + result.tracks.size()
+                + " sequence=" + appendSequence
+                + " plans=" + result.plans.size()
+        );
+    }
+
+    private void recordAppended(
+        String revision,
+        NativeContinuationClient.Continuation result
+    ) {
+        if (!revision.equals(appendedLogRevision)) {
+            appendedLog.clear();
+            appendedLogRevision = revision;
+        }
+        for (int index = 0; index < result.tracks.size(); index++) {
+            NativeTrack track = result.tracks.get(index);
+            JSObject entry = new JSObject();
+            entry.put("sequence", ++appendSequence);
+            entry.put("id", track.id);
+            entry.put("entityUid", track.entityUid);
+            entry.put("durationMs", track.durationMs);
+            try {
+                entry.put("source", new JSObject(result.sources.get(index)));
+            } catch (JSONException error) {
+                entry.put("source", new JSObject());
+            }
+            appendedLog.add(entry);
+        }
+        while (appendedLog.size() > MAX_APPENDED_LOG) {
+            appendedLog.remove(0);
+        }
+    }
+
+    public JSObject getAppendedTracks(String revision, long afterSequence) {
+        JSArray tracks = new JSArray();
+        if (revision != null && revision.equals(appendedLogRevision)) {
+            for (JSObject entry : appendedLog) {
+                if (entry.optLong("sequence", 0L) > afterSequence) {
+                    tracks.put(entry);
+                }
+            }
+        }
+        JSObject result = new JSObject();
+        result.put("revision", appendedLogRevision);
+        result.put("tracks", tracks);
+        return result;
     }
 
     private void maybeRequestContinuation() {
@@ -1426,6 +1547,28 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
     private static boolean isLoopbackHost(String host) {
         return "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host);
+    }
+
+    private DataSpec authorizeStream(DataSpec dataSpec) {
+        String origin = trustedOrigin(dataSpec.uri.toString());
+        NativeContinuationClient.Config config = continuationConfig;
+        long nowWallMs = System.currentTimeMillis();
+        String continuationToken =
+            config != null &&
+            config.isUsable(nowWallMs) &&
+            !origin.isEmpty() &&
+            origin.equals(trustedOrigin(config.apiBase))
+                ? config.token
+                : null;
+        String authorization = NativeStreamAuthorization.choose(
+            streamAuthorizationByOrigin.get(origin),
+            continuationToken,
+            nowWallMs
+        );
+        if (authorization == null || authorization.isEmpty()) return dataSpec;
+        return dataSpec.withAdditionalHeaders(
+            Collections.singletonMap("Authorization", authorization)
+        );
     }
 
     private static DataSpec withAuthorization(
