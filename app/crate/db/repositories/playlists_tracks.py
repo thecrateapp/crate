@@ -424,15 +424,16 @@ def regenerate_playlist_tracks(
             ):
                 raise ValueError("Playlist changed during generation")
         preserved = _get_preserved_playlist_tracks(s, playlist_id)
-        exclusions = _get_playlist_track_exclusion_keys(s, playlist_id)
-        preserved_keys = {_track_identity_key(track) for track in preserved}
+        exclusions = _get_playlist_track_exclusions(s, playlist_id)
         generated: list[dict] = []
         for track in tracks:
             resolved = _resolve_playlist_track(track, session=s)
             if resolved is None:
                 continue
-            key = _track_identity_key(resolved)
-            if key in exclusions or key in preserved_keys:
+            if any(
+                _track_identities_match(resolved, existing)
+                for existing in (*exclusions, *preserved)
+            ):
                 continue
             generated.append({**resolved, "source": "generated", "locked": False})
 
@@ -530,7 +531,7 @@ def _get_preserved_playlist_tracks(s: Session, playlist_id: int) -> list[dict]:
     return [dict(row) for row in rows]
 
 
-def _get_playlist_track_exclusion_keys(s: Session, playlist_id: int) -> set[tuple]:
+def _get_playlist_track_exclusions(s: Session, playlist_id: int) -> list[dict]:
     rows = (
         s.execute(
             text(
@@ -546,17 +547,24 @@ def _get_playlist_track_exclusion_keys(s: Session, playlist_id: int) -> set[tupl
         .mappings()
         .all()
     )
-    return {_track_identity_key(dict(row)) for row in rows}
+    return [dict(row) for row in rows]
 
 
-def _track_identity_key(track: dict) -> tuple:
-    return (
-        str(track.get("global_track_uid") or ""),
-        str(track.get("track_entity_uid") or ""),
-        str(track.get("track_storage_id") or ""),
-        str(track.get("track_path") or ""),
-        str(track.get("track_id") or ""),
-    )
+def _track_identities_match(left: dict, right: dict) -> bool:
+    # Use the strongest identity both rows know. A global-only override survives
+    # gaining a local source, while a different UID cannot match a reused path.
+    for aliases in (
+        ("global_track_uid",),
+        ("track_entity_uid", "track_uid"),
+        ("track_storage_id", "storage_id"),
+        ("track_id",),
+        ("track_path", "path"),
+    ):
+        left_value = next((left[key] for key in aliases if left.get(key)), None)
+        right_value = next((right[key] for key in aliases if right.get(key)), None)
+        if left_value is not None and right_value is not None:
+            return str(left_value) == str(right_value)
+    return False
 
 
 def _merge_preserved_and_generated(

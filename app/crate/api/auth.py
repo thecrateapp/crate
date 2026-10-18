@@ -14,6 +14,7 @@ import requests
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.exc import IntegrityError as SAIntegrityError
 from starlette.concurrency import run_in_threadpool
+from starlette.requests import cookie_parser
 from starlette.responses import JSONResponse, RedirectResponse, Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -1438,6 +1439,30 @@ def _is_agent_resource(path: str) -> bool:
         return False
 
 
+def _has_machine_credential(request: Request) -> bool:
+    credentials = request.headers.getlist("Authorization")
+    credentials.extend(
+        value
+        for name, value in request.query_params.multi_items()
+        if name in {"token", "media_ticket"}
+    )
+    cookie_names = {
+        COOKIE_NAME,
+        COOKIE_NAME_LISTEN,
+        COOKIE_NAME_LISTEN_REFRESH,
+        "crate_token",
+    }
+    # Inspect each value before normal cookie lookup collapses duplicate names.
+    for header in request.headers.getlist("Cookie"):
+        for cookie in header.split(";"):
+            credentials.extend(
+                value
+                for name, value in cookie_parser(cookie).items()
+                if name in cookie_names
+            )
+    return any("crate_mcp_" in value for value in credentials)
+
+
 class AuthMiddleware:
     """Resolve auth via Bearer header, query param, or cookie (in that order).
 
@@ -1493,14 +1518,7 @@ class AuthMiddleware:
 
     async def resolve_user(self, request: Request) -> dict | None:
         # Machine credentials never participate in the human fallback chain.
-        if _is_agent_resource(request.url.path) or any(
-            "crate_mcp_" in value
-            for value in [
-                request.headers.get("Authorization", ""),
-                *request.query_params.values(),
-                *request.cookies.values(),
-            ]
-        ):
+        if _is_agent_resource(request.url.path) or _has_machine_credential(request):
             return None
         user = None
 
@@ -1584,13 +1602,8 @@ class AuthMiddleware:
             return
 
         request = Request(scope, receive=receive)
-        if not _is_agent_resource(request.url.path) and any(
-            "crate_mcp_" in value
-            for value in [
-                request.headers.get("Authorization", ""),
-                *request.query_params.values(),
-                *request.cookies.values(),
-            ]
+        if not _is_agent_resource(request.url.path) and _has_machine_credential(
+            request
         ):
             response = JSONResponse(
                 {"error": "MCP_CREDENTIAL_WRONG_RESOURCE"}, status_code=401

@@ -571,6 +571,169 @@ def test_editorial_exclusion_survives_regeneration_with_global_mapping(pg_db):
     assert get_playlist_tracks(playlist_id) == []
 
 
+@pytest.mark.parametrize("becomes_local", [False, True], ids=["remote", "local"])
+@pytest.mark.parametrize("override", ["exclusion", "manual", "locked"])
+def test_editorial_regeneration_keeps_global_identity_overrides(
+    pg_db, becomes_local, override
+):
+    from sqlalchemy import text
+    from crate.db.tx import transaction_scope
+    from crate.db.repositories.editorial_plans import snapshot_system_playlist
+    from crate.db.repositories.playlists_tracks import remove_playlist_track
+    from tests.test_global_catalog_playlists import _seed_playlist_and_global_track
+
+    first, local, last = (_track(pg_db, number) for number in (81, 82, 83))
+    _other, _artist, _album, global_uid = _seed_playlist_and_global_track(pg_db)
+    playlist_id = create_playlist(
+        "Global override",
+        scope="system",
+        generation_mode="smart",
+        is_smart=True,
+        smart_rules={
+            "rules": [
+                {"field": "artist", "op": "eq", "value": "Editorial Test Artist"}
+            ],
+            "limit": 4,
+            "sort": "title",
+        },
+    )
+    source = "manual" if override == "manual" else "generated"
+    locked = override == "locked"
+    add_playlist_tracks(
+        playlist_id,
+        [
+            {"track_id": first["id"], "source": "generated"},
+            {"global_track_uid": global_uid, "source": source, "locked": locked},
+            {"track_id": last["id"], "source": "generated"},
+        ],
+    )
+    original_global_row_id = get_playlist_tracks(playlist_id)[1]["id"]
+    if override == "exclusion":
+        remove_playlist_track(playlist_id, 2, record_exclusion=True)
+    before = snapshot_system_playlist(playlist_id)
+    if override == "exclusion":
+        assert len(before["exclusions"]) == 1
+        assert before["exclusions"][0] == {
+            "id": before["exclusions"][0]["id"],
+            "track_id": None,
+            "track_uid": None,
+            "storage_id": None,
+            "global_track_uid": global_uid,
+            "path": None,
+        }
+
+    if becomes_local:
+        with transaction_scope() as session:
+            session.execute(
+                text("""UPDATE global_catalog_tracks SET local_track_id=:id,
+                local_track_entity_uid=CAST(:uid AS uuid),has_local=TRUE
+                WHERE global_track_uid=CAST(:global_uid AS uuid)"""),
+                {
+                    "id": local["id"],
+                    "uid": str(local["entity_uid"]),
+                    "global_uid": global_uid,
+                },
+            )
+
+    planned = _compile({"kind": "regenerate", "playlist_id": playlist_id})
+    result = apply_editorial_execution(planned["execution"])
+    after = snapshot_system_playlist(playlist_id)
+
+    first_identity = (str(first["entity_uid"]), None, "generated", False)
+    last_identity = (str(last["entity_uid"]), None, "generated", False)
+    local_identity = (str(local["entity_uid"]), None, "generated", False)
+    global_identity = (None, global_uid, source, locked)
+    if override == "exclusion":
+        expected = (
+            [first_identity, last_identity]
+            if becomes_local
+            else [first_identity, local_identity, last_identity]
+        )
+    else:
+        expected = (
+            [first_identity, global_identity, last_identity]
+            if becomes_local
+            else [first_identity, global_identity, local_identity, last_identity]
+        )
+    for rows in (planned["document"]["selection"], after["tracks"]):
+        assert [
+            (row["track_uid"], row["global_track_uid"], row["source"], row["locked"])
+            for row in rows
+        ] == expected
+        assert [row["position"] for row in rows] == list(range(1, len(expected) + 1))
+        if override != "exclusion":
+            assert rows[1]["row_id"] == original_global_row_id
+    assert after["exclusions"] == before["exclusions"]
+    assert result["track_count"] == after["playlist"]["track_count"] == len(expected)
+    for row in after["tracks"]:
+        if row["track_uid"]:
+            original = next(
+                track
+                for track in (first, local, last)
+                if str(track["entity_uid"]) == row["track_uid"]
+            )
+            assert row["track_id"] == original["id"]
+            assert row["storage_id"] == (
+                str(original["storage_id"]) if original["storage_id"] else None
+            )
+            assert row["path"] == original["path"]
+        else:
+            assert (row["track_id"], row["storage_id"], row["path"]) == (
+                None,
+                None,
+                None,
+            )
+
+
+@pytest.mark.parametrize("kind", ["edit", "refine"])
+@pytest.mark.parametrize(("source", "locked"), [("manual", False), ("generated", True)])
+def test_editorial_cannot_exclude_protected_global_row_by_local_uid(
+    pg_db, kind, source, locked
+):
+    from sqlalchemy import text
+    from crate.db.tx import transaction_scope
+    from crate.db.repositories.editorial_plans import snapshot_system_playlist
+    from tests.test_global_catalog_playlists import _seed_playlist_and_global_track
+
+    local = _track(pg_db, 84)
+    _other, _artist, _album, global_uid = _seed_playlist_and_global_track(pg_db)
+    playlist_id = create_playlist(
+        "Protected global override",
+        scope="system",
+        generation_mode="smart",
+        is_smart=True,
+        smart_rules={"rules": [], "limit": 2, "sort": "title"},
+    )
+    add_playlist_tracks(
+        playlist_id,
+        [{"global_track_uid": global_uid, "source": source, "locked": locked}],
+    )
+    with transaction_scope() as session:
+        session.execute(
+            text("""UPDATE global_catalog_tracks SET local_track_id=:id,
+            local_track_entity_uid=CAST(:uid AS uuid),has_local=TRUE
+            WHERE global_track_uid=CAST(:global_uid AS uuid)"""),
+            {
+                "id": local["id"],
+                "uid": str(local["entity_uid"]),
+                "global_uid": global_uid,
+            },
+        )
+    before = snapshot_system_playlist(playlist_id)
+
+    with pytest.raises(DiagnosticError) as protected:
+        _compile(
+            {
+                "kind": kind,
+                "playlist_id": playlist_id,
+                "exclude_track_uids": [str(local["entity_uid"])],
+            }
+        )
+
+    assert protected.value.code == "INVALID_ARGUMENT"
+    assert snapshot_system_playlist(playlist_id) == before
+
+
 def test_editorial_edit_and_duplicate_fall_back_to_available_global_track(pg_db):
     from sqlalchemy import text
     from crate.db.tx import transaction_scope

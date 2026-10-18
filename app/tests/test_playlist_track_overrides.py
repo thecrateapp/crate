@@ -258,3 +258,153 @@ def test_regeneration_falls_back_to_remote_global_when_local_row_disappears(pg_d
     assert after[0]["global_track_uid"] == global_uid
     assert after[0]["track_entity_uid"] is None
     assert after[0]["source"] == "manual" and after[0]["locked"] is True
+
+
+@pytest.mark.parametrize("mapping", ["none", "same", "different"])
+@pytest.mark.parametrize("override", ["exclusion", "manual", "locked"])
+def test_regeneration_matches_global_overrides_across_local_mapping(
+    pg_db, mapping, override
+):
+    from sqlalchemy import text
+    from crate.db.tx import transaction_scope
+    from crate.db.repositories.editorial_plans import snapshot_system_playlist
+    from crate.db.repositories.playlists_create import create_playlist
+    from crate.db.repositories.playlists_detail_reads import get_playlist_tracks
+    from crate.db.repositories.playlists_tracks import (
+        add_playlist_tracks,
+        regenerate_playlist_tracks,
+        remove_playlist_track,
+    )
+    from tests.test_global_catalog_playlists import _seed_playlist_and_global_track
+
+    first = _seed_track(pg_db, title="First", filename="40-first.flac")
+    local = _seed_track(pg_db, title="Wring It Out", filename="41-local.flac")
+    _other, _artist, _album, global_uid = _seed_playlist_and_global_track(pg_db)
+    playlist_id = create_playlist(
+        "Global override",
+        scope="system",
+        generation_mode="smart",
+        is_smart=True,
+        smart_rules={"rules": [], "limit": 3},
+    )
+    source = "manual" if override == "manual" else "generated"
+    locked = override == "locked"
+    add_playlist_tracks(
+        playlist_id,
+        [
+            {"track_id": first["id"], "source": "generated"},
+            {"global_track_uid": global_uid, "source": source, "locked": locked},
+        ],
+    )
+    if override == "exclusion":
+        remove_playlist_track(playlist_id, 2, record_exclusion=True)
+    before_exclusions = snapshot_system_playlist(playlist_id)["exclusions"]
+    mapped_uid = None
+    if mapping != "none":
+        mapped_uid = global_uid
+        if mapping == "different":
+            _other, _artist, _album, mapped_uid = _seed_playlist_and_global_track(pg_db)
+        with transaction_scope() as session:
+            session.execute(
+                text("""UPDATE global_catalog_tracks SET local_track_id=:id,
+                local_track_entity_uid=CAST(:uid AS uuid),has_local=TRUE
+                WHERE global_track_uid=CAST(:global_uid AS uuid)"""),
+                {
+                    "id": local["id"],
+                    "uid": str(local["entity_uid"]),
+                    "global_uid": mapped_uid,
+                },
+            )
+
+    count = regenerate_playlist_tracks(
+        playlist_id,
+        [{"track_id": first["id"]}, {"track_id": local["id"]}],
+        target_count=3,
+    )
+    rows = get_playlist_tracks(playlist_id)
+    expected = [(str(first["entity_uid"]), None, "generated", False)]
+    if override != "exclusion":
+        expected.append((None, global_uid, source, locked))
+    if mapping != "same":
+        expected.append((str(local["entity_uid"]), mapped_uid, "generated", False))
+    assert [
+        (
+            row["track_entity_uid"],
+            row["global_track_uid"],
+            row["source"],
+            row["locked"],
+        )
+        for row in rows
+    ] == expected
+    assert [row["position"] for row in rows] == list(range(1, len(expected) + 1))
+    assert count == len(expected)
+    assert snapshot_system_playlist(playlist_id)["exclusions"] == before_exclusions
+    if override != "exclusion":
+        assert rows[1]["track_id"] is None
+        assert rows[1]["track_storage_id"] is None
+        assert rows[1]["track_path"] is None
+
+
+@pytest.mark.parametrize("strong_identity", ["entity_uid", "storage_id"])
+def test_regeneration_does_not_exclude_replacement_at_the_same_path(
+    pg_db, strong_identity
+):
+    import uuid
+    from sqlalchemy import text
+    from crate.db.tx import transaction_scope
+    from crate.db.repositories.editorial_plans import snapshot_system_playlist
+    from crate.db.repositories.playlists_create import create_playlist
+    from crate.db.repositories.playlists_detail_reads import get_playlist_tracks
+    from crate.db.repositories.playlists_tracks import (
+        add_playlist_tracks,
+        regenerate_playlist_tracks,
+        remove_playlist_track,
+    )
+
+    original = _seed_track(pg_db, title="Original", filename="42-reused.flac")
+    old_storage_id = str(uuid.uuid4())
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "UPDATE library_tracks SET storage_id=CAST(:storage AS uuid) WHERE id=:id"
+            ),
+            {"storage": old_storage_id, "id": original["id"]},
+        )
+    playlist_id = create_playlist(
+        "Replacement at excluded path", scope="system", generation_mode="smart"
+    )
+    add_playlist_tracks(
+        playlist_id, [{"track_id": original["id"], "source": "generated"}]
+    )
+    remove_playlist_track(playlist_id, 1, record_exclusion=True)
+    with transaction_scope() as session:
+        session.execute(
+            text("""UPDATE playlist_track_exclusions SET track_id=NULL,
+            track_entity_uid=CASE WHEN :identity='entity_uid' THEN track_entity_uid END,
+            track_storage_id=CASE WHEN :identity='storage_id' THEN track_storage_id END
+            WHERE playlist_id=:id"""),
+            {"identity": strong_identity, "id": playlist_id},
+        )
+        session.execute(
+            text("DELETE FROM library_tracks WHERE id=:id"), {"id": original["id"]}
+        )
+    replacement = _seed_track(pg_db, title="Replacement", filename="42-reused.flac")
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "UPDATE library_tracks SET storage_id=CAST(:storage AS uuid) WHERE id=:id"
+            ),
+            {"storage": str(uuid.uuid4()), "id": replacement["id"]},
+        )
+    assert replacement["entity_uid"] != original["entity_uid"]
+    before = snapshot_system_playlist(playlist_id)["exclusions"]
+
+    regenerate_playlist_tracks(
+        playlist_id, [{"track_id": replacement["id"]}], target_count=1
+    )
+
+    rows = get_playlist_tracks(playlist_id)
+    assert [row["track_entity_uid"] for row in rows] == [str(replacement["entity_uid"])]
+    assert rows[0]["track_id"] == replacement["id"]
+    assert rows[0]["track_path"] == original["path"]
+    assert snapshot_system_playlist(playlist_id)["exclusions"] == before

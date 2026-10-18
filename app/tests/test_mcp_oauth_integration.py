@@ -421,6 +421,45 @@ def test_http_consent_discovery_code_refresh_revocation(oauth_env):
     assert store.resolve_oauth_access_token(rotated.json()["access_token"]) is None
 
 
+@pytest.mark.parametrize(
+    "client_id,state,preference",
+    [
+        pytest.param("test-client", "opaque-state", None, id="ordinary"),
+        pytest.param("crate_mcp_desktop", "opaque-state", None, id="client-id"),
+        pytest.param("test-client", "crate_mcp_session_nonce", None, id="oauth-state"),
+        pytest.param(
+            "test-client", "opaque-state", "crate_mcp_recent", id="unrelated-cookie"
+        ),
+    ],
+)
+def test_authorize_with_auth_middleware_accepts_noncredential_mcp_values(
+    oauth_env, client_id, state, preference
+):
+    from crate.api.auth import AuthMiddleware
+
+    if client_id != "test-client":
+        store.register_oauth_client(
+            client_id, "Crate desktop", ["https://client.example/callback"], SCOPES
+        )
+    app = FastAPI()
+    app.add_middleware(AuthMiddleware)
+    app.include_router(router)
+    cookie = auth.create_jwt(
+        oauth_env["id"], oauth_env["email"], "admin", session_id=oauth_env["session_id"]
+    )
+    with TestClient(app, base_url=ISSUER) as client:
+        client.cookies.set("crate_session", cookie)
+        if preference:
+            client.cookies.set("ui_preference", preference)
+        page = client.get(
+            "/oauth/authorize", params=_parameters(client_id=client_id, state=state)
+        )
+
+    assert page.status_code == 200, page.text
+    assert "Allow access" in page.text
+    assert oauth_env["email"] in page.text
+
+
 def test_two_named_oauth_clients_complete_discovery_consent_mcp_refresh_revoke_over_tcp(
     oauth_env, monkeypatch, isolated_redis
 ):

@@ -139,6 +139,48 @@ def test_lineup_identity_preview_normalizes_every_artist_and_does_not_write(
     assert row(saved["show_id"])["revision"] == saved["revision"]
 
 
+@pytest.mark.parametrize("lookup", ["single", "batch", "locked_batch"])
+@pytest.mark.parametrize("performer_field", ["artist_name", "lineup"])
+def test_identity_matching_normalizes_legacy_performers_with_outer_tabs(
+    pg_db, lookup, performer_field
+):
+    from crate.db.repositories.show_identities import (
+        match_show_candidates,
+        preview_show,
+    )
+    from crate.db.tx import transaction_scope
+
+    saved = put(candidate())
+    with transaction_scope() as session:
+        statement = (
+            "UPDATE shows SET artist_name=:name, lineup=ARRAY[]::text[] WHERE id=:id"
+            if performer_field == "artist_name"
+            else "UPDATE shows SET artist_name='Other Band', lineup=ARRAY[CAST(:name AS text)] WHERE id=:id"
+        )
+        session.execute(
+            text(statement),
+            {"id": saved["show_id"], "name": "\t PRIMARY \t Band \n"},
+        )
+    selected = candidate(lineup=[])
+
+    if lookup == "single":
+        matched = preview_show(selected, {"provider": "manual"})
+    elif lookup == "locked_batch":
+        with transaction_scope() as session:
+            matched = match_show_candidates([selected], lock=True, session=session)[
+                "date-1"
+            ]
+    else:
+        matched = match_show_candidates([selected])["date-1"]
+
+    if performer_field == "lineup":
+        assert matched["status"] == "conflict"
+        assert matched["matches"] == [saved["show_id"]]
+    else:
+        assert matched["status"] == "already_exists"
+        assert matched["show"]["id"] == saved["show_id"]
+
+
 @pytest.mark.parametrize(
     "changes",
     [
@@ -606,6 +648,95 @@ def test_provider_rechecks_a_row_consolidated_between_match_and_lock(
     assert result["status"] == "conflict"
     assert row(second["show_id"])["identity_key"] is None
     assert row(second["show_id"])["merged_into_id"] == first["show_id"]
+
+
+def test_provider_rechecks_semantic_match_after_manual_identity_correction(
+    pg_db, monkeypatch
+):
+    from crate.db.repositories import show_identities as identities
+
+    original = candidate(lineup=["Primary Band"])
+    saved = put(original)
+    matched, resume = Event(), Event()
+    real_match = identities._match
+
+    def pause_provider_match(current, selected, source):
+        result = real_match(current, selected, source)
+        if source["provider"] == "ticketmaster":
+            assert result["show"]["id"] == saved["show_id"]
+            matched.set()
+            assert resume.wait(timeout=10)
+        return result
+
+    monkeypatch.setattr(identities, "_match", pause_provider_match)
+    provider = {
+        "provider": "ticketmaster",
+        "actor": "ticketmaster",
+        "event_id": "new-provider-event",
+    }
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        waiting = pool.submit(identities.upsert_canonical_show, original, provider)
+        try:
+            assert matched.wait(timeout=5)
+            corrected = put(
+                candidate(
+                    existing_show_id=saved["show_id"],
+                    expected_revision=saved["revision"],
+                    artist_name="Other Band",
+                    lineup=["Other Band"],
+                    date="2027-03-07",
+                    venue="Other Venue",
+                    city="Other City",
+                )
+            )
+            assert corrected["show_id"] == saved["show_id"]
+            with read_scope() as session:
+                assert real_match(session, original, provider)["status"] == "created"
+        finally:
+            resume.set()
+        result = waiting.result(timeout=10)
+
+    assert result["status"] == "conflict" or result["show_id"] != saved["show_id"], (
+        result
+    )
+    actual = row(saved["show_id"])
+    assert actual["artist_name"] == "Other Band"
+    assert actual["lineup"] == ["Other Band"]
+    assert str(actual["date"]) == "2027-03-07"
+    assert actual["venue"] == "Other Venue"
+    with read_scope() as session:
+        aliases = (
+            session.execute(
+                text(
+                    "SELECT show_id FROM show_source_aliases WHERE event_id='new-provider-event'"
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert saved["show_id"] not in aliases
+
+
+def test_fresh_provider_does_not_match_a_manually_corrected_identity(pg_db):
+    original = candidate(lineup=["Primary Band"])
+    saved = put(original)
+    corrected = put(
+        candidate(
+            existing_show_id=saved["show_id"],
+            expected_revision=saved["revision"],
+            artist_name="Other Band",
+            lineup=["Other Band"],
+            date="2027-03-07",
+            venue="Other Venue",
+            city="Other City",
+        )
+    )
+
+    fresh = put(original, "ticketmaster", "fresh-provider-event")
+
+    assert corrected["show_id"] == saved["show_id"]
+    assert fresh["status"] == "created"
+    assert fresh["show_id"] != saved["show_id"]
 
 
 @pytest.mark.parametrize("action", ["attend", "remind", "unattend"])

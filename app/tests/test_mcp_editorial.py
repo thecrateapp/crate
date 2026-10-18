@@ -336,6 +336,115 @@ def test_refresh_policy_requires_publish_and_human_approval(
     )
 
 
+@pytest.mark.parametrize("override", ["exclusion", "manual", "locked"])
+def test_editorial_worker_preserves_global_override_after_local_mapping(
+    pg_db, human_actor, monkeypatch, override
+):
+    from sqlalchemy import text
+    from crate.db.tx import transaction_scope
+    from crate.db.repositories.editorial_plans import snapshot_system_playlist
+    from crate.db.repositories.playlists_create import create_playlist
+    from crate.db.repositories.playlists_tracks import (
+        add_playlist_tracks,
+        remove_playlist_track,
+    )
+    from tests.test_editorial_plans import _track
+    from tests.test_global_catalog_playlists import _seed_playlist_and_global_track
+
+    monkeypatch.setenv("CRATE_MCP_ENABLED", "true")
+    monkeypatch.setenv("CRATE_MCP_ACTIONS_ENABLED", "true")
+    monkeypatch.setattr("crate.worker_handlers.is_cancelled", lambda _: False)
+    monkeypatch.setattr(
+        "crate.db.repositories.tasks_mutations.dispatch_task", lambda *_: None
+    )
+    principal = _principal(
+        ["editorial.prepare", "editorial.write", "editorial.publish"]
+    )
+    local = _track(pg_db, 141)
+    _other, _artist, _album, global_uid = _seed_playlist_and_global_track(pg_db)
+    playlist_id = create_playlist(
+        "Worker global override",
+        scope="system",
+        generation_mode="smart",
+        is_smart=True,
+        smart_rules={
+            "rules": [
+                {"field": "artist", "op": "eq", "value": "Editorial Test Artist"}
+            ],
+            "limit": 2,
+            "sort": "title",
+        },
+    )
+    source = "manual" if override == "manual" else "generated"
+    locked = override == "locked"
+    add_playlist_tracks(
+        playlist_id,
+        [{"global_track_uid": global_uid, "source": source, "locked": locked}],
+    )
+    original_row_id = get_playlist_tracks(playlist_id)[0]["id"]
+    if override == "exclusion":
+        remove_playlist_track(playlist_id, 1, record_exclusion=True)
+    before = snapshot_system_playlist(playlist_id)
+    with transaction_scope() as session:
+        session.execute(
+            text("""UPDATE global_catalog_tracks SET local_track_id=:id,
+            local_track_entity_uid=CAST(:uid AS uuid),has_local=TRUE
+            WHERE global_track_uid=CAST(:global_uid AS uuid)"""),
+            {
+                "id": local["id"],
+                "uid": str(local["entity_uid"]),
+                "global_uid": global_uid,
+            },
+        )
+
+    plan = _prepare(principal, {"kind": "regenerate", "playlist_id": playlist_id})
+    reviewed = agent_editorial.editorial_plan_get(principal, plan_id=plan["plan_id"])[
+        "data"
+    ]
+    decide(human_actor, get_plan(plan["plan_id"]))
+    accepted = agent_editorial.editorial_plan_apply(
+        principal,
+        plan_id=plan["plan_id"],
+        plan_version=plan["plan_version"],
+        idempotency_key="global-override-apply",
+    )["data"]
+    start_task(accepted["job_id"])
+    result = agent_library_operations.execute_operation_job(accepted["job_id"], {})
+    after = snapshot_system_playlist(playlist_id)
+
+    assert result["execution"]["status"] == "completed", result
+    expected = (
+        []
+        if override == "exclusion"
+        else [(original_row_id, None, global_uid, source, locked, 1)]
+    )
+    for rows in (reviewed["selection"], after["tracks"]):
+        assert [
+            (
+                row["row_id"],
+                row["track_uid"],
+                row["global_track_uid"],
+                row["source"],
+                row["locked"],
+                row["position"],
+            )
+            for row in rows
+        ] == expected
+    assert after["exclusions"] == before["exclusions"]
+    assert result["verification"] == {"status": "passed", "track_count": len(expected)}
+    replay = agent_editorial.editorial_plan_apply(
+        principal,
+        plan_id=plan["plan_id"],
+        plan_version=plan["plan_version"],
+        idempotency_key="global-override-apply",
+    )["data"]
+    assert replay["job_id"] == accepted["job_id"]
+    assert (
+        agent_library_operations.execute_operation_job(accepted["job_id"], {}) == result
+    )
+    assert snapshot_system_playlist(playlist_id) == after
+
+
 def test_remote_sdk_create_reviews_and_applies_exact_selection(
     pg_db, action_transport, human_actor, monkeypatch
 ):

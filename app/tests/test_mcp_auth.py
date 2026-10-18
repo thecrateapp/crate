@@ -4,6 +4,7 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 from threading import get_ident
 from unittest.mock import Mock
+from urllib.parse import urlencode
 
 import httpx
 import pytest
@@ -180,7 +181,23 @@ def test_database_credential_state_takes_effect_on_the_next_request(pg_db, state
     "path",
     ["/api/private", "/api/stream/private", "/rest/private", "/api/federation/private"],
 )
-@pytest.mark.parametrize("placement", ["bearer", "cookie", "query"])
+@pytest.mark.parametrize(
+    "placement",
+    [
+        "bearer",
+        "cookie",
+        "session_cookie",
+        "listen_cookie",
+        "refresh_cookie",
+        "query",
+        "media_ticket",
+        "duplicate_bearer",
+        "duplicate_query",
+        "duplicate_media_ticket",
+        "duplicate_cookie",
+        "duplicate_cookie_headers",
+    ],
+)
 def test_machine_credential_cannot_authenticate_other_surfaces(
     monkeypatch, path, placement
 ):
@@ -200,10 +217,78 @@ def test_machine_credential_cannot_authenticate_other_surfaces(
     headers = {"Remote-User": "owner@example.test", "Remote-Groups": "admins"}
     if placement == "bearer":
         headers["Authorization"] = f"Bearer {token}"
-    elif placement == "cookie":
-        headers["Cookie"] = f"crate_token={token}"
+    elif placement == "duplicate_bearer":
+        headers = [
+            *headers.items(),
+            ("Authorization", "Bearer human.jwt.token"),
+            ("Authorization", f"Bearer {token}"),
+        ]
+    elif placement == "duplicate_cookie_headers":
+        headers = [
+            *headers.items(),
+            ("Cookie", "crate_session=human.jwt.token"),
+            ("Cookie", f"crate_session_listen={token}"),
+        ]
+    elif placement == "duplicate_cookie":
+        headers["Cookie"] = f"crate_session={token}; crate_session=human.jwt.token"
+    elif placement == "duplicate_query":
+        path += f"?token={token}&token=human.jwt.token"
+    elif placement == "duplicate_media_ticket":
+        path += f"?media_ticket={token}&media_ticket=human"
+    elif placement.endswith("cookie"):
+        cookie_name = {
+            "cookie": "crate_token",
+            "session_cookie": "crate_session",
+            "listen_cookie": "crate_session_listen",
+            "refresh_cookie": "crate_refresh_listen",
+        }[placement]
+        headers["Cookie"] = f"{cookie_name}={token}"
+    elif placement == "media_ticket":
+        path += f"?media_ticket={token}"
     else:
         path += f"?token={token}"
 
     response = TestClient(app, client=("127.0.0.1", 50000)).get(path, headers=headers)
     assert response.status_code == 401
+
+
+@pytest.mark.parametrize(
+    "query,cookies",
+    [
+        pytest.param({"search": "archive crate_mcp_collection"}, {}, id="query"),
+        pytest.param({}, {"ui_preference": "crate_mcp_recent"}, id="cookie"),
+    ],
+)
+def test_human_resolver_ignores_mcp_substrings_outside_credential_carriers(
+    monkeypatch, query, cookies
+):
+    from crate.api.auth import AuthMiddleware
+
+    monkeypatch.setenv("FORWARD_AUTH_SECRET", "test-forward-auth-secret")
+    headers = {
+        "remote-user": "owner@example.test",
+        "remote-groups": "admins",
+        "x-forward-auth-secret": "test-forward-auth-secret",
+    }
+    if cookies:
+        headers["cookie"] = "; ".join(
+            f"{key}={value}" for key, value in cookies.items()
+        )
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/private",
+            "query_string": urlencode(query).encode(),
+            "headers": [
+                (key.encode(), value.encode()) for key, value in headers.items()
+            ],
+            "client": ("127.0.0.1", 50000),
+            "scheme": "http",
+            "server": ("testserver", 80),
+        }
+    )
+
+    user = asyncio.run(AuthMiddleware(_identity).resolve_user(request))
+
+    assert user == {"id": None, "email": "owner@example.test", "role": "admin"}

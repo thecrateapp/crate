@@ -18,7 +18,10 @@ from crate.db.repositories.editorial_plans import (
     validate_editorial_execution,
 )
 from crate.db.repositories.playlists_rule_engine_executor import execute_smart_rules
-from crate.db.repositories.playlists_tracks import _merge_preserved_and_generated
+from crate.db.repositories.playlists_tracks import (
+    _merge_preserved_and_generated,
+    _track_identities_match,
+)
 from crate.mcp.editorial_schemas import EditorialPrepare
 from crate.playlist_blueprints import build_playlist_blueprints
 from crate.playlist_rule_contract import validate_smart_rules
@@ -356,13 +359,28 @@ def compile_operation(
         raise DiagnosticError(
             "LIMIT_EXCEEDED", "Editorial plan cannot review more than 100 exclusions"
         )
+    new_exclusions = sorted(exclusions - existing_exclusions)
+    resolved_exclusions = resolve_track_uids(new_exclusions)
+    if len(resolved_exclusions) != len(new_exclusions):
+        raise DiagnosticError("INVALID_ARGUMENT", "An excluded track is unavailable")
+    requested_exclusions = [
+        *resolved_exclusions.values(),
+        *[
+            item
+            for item in source_state["exclusions"]
+            if item.get("track_uid") in exclusions
+        ],
+    ]
     if kind in {"visibility", "refresh_policy"}:
         selection = []
     elif kind == "refine":
         selection = [
             item
             for item in _existing_selection(source_state["tracks"])
-            if item.get("track_uid") not in exclusions
+            if not any(
+                _track_identities_match(item, excluded)
+                for excluded in requested_exclusions
+            )
         ]
     elif kind == "duplicate":
         selection = _existing_selection(source_state["tracks"], duplicate=True)
@@ -395,15 +413,19 @@ def compile_operation(
             if state and kind != "create"
             else []
         )
-        protected = {row.get("track_uid") for row in preserved}
-        if protected & exclusions:
+        if any(
+            _track_identities_match(row, excluded)
+            for row in preserved
+            for excluded in requested_exclusions
+        ):
             raise DiagnosticError(
                 "INVALID_ARGUMENT", "A locked or manual track cannot be excluded"
             )
+        blocked = [*source_state["exclusions"], *requested_exclusions, *preserved]
         generated = [
             row
             for row in generated
-            if row["track_uid"] not in (exclusions | existing_exclusions | protected)
+            if not any(_track_identities_match(row, existing) for existing in blocked)
         ]
         selection = _merge_preserved_and_generated(
             preserved,
@@ -450,15 +472,12 @@ def compile_operation(
         )
     for index, item in enumerate(selection, 1):
         item["position"] = index
-    new_exclusions = sorted(exclusions - existing_exclusions)
-    resolved_exclusions = {}
     if new_exclusions:
-        resolved_exclusions = resolve_track_uids(new_exclusions)
-        if len(resolved_exclusions) != len(new_exclusions):
-            raise DiagnosticError(
-                "INVALID_ARGUMENT", "An excluded track is unavailable"
-            )
-        if any(item.get("track_uid") in exclusions for item in selection):
+        if any(
+            _track_identities_match(item, excluded)
+            for item in selection
+            for excluded in requested_exclusions
+        ):
             raise DiagnosticError(
                 "INVALID_ARGUMENT", "An excluded track remains selected"
             )

@@ -11,6 +11,7 @@ from sqlalchemy import text
 from crate.db.jobs.analysis_shared import (
     append_pipeline_event,
     claim_batch_sql,
+    claim_locked_batch_sql,
     ensure_processing_rows,
     mark_ops_snapshot_dirty,
     pipeline_name_for_state_column,
@@ -62,14 +63,28 @@ def claim_tracks(state_column: str, *, limit: int = 1) -> list[dict]:
         ).scalar()
         if not pending:
             return []
-        rows = (
+        track_ids = list(
             session.execute(
                 text(claim_batch_sql(col)),
                 {
                     "pipeline": pipeline,
+                    "limit": batch_size,
+                },
+            ).scalars()
+        )
+        if not track_ids:
+            return []
+        # A candidate statement can retain an old processing-state snapshot
+        # after locking a newer track row. Recheck in a fresh statement before
+        # assigning tokens, with the track locks held until commit.
+        rows = (
+            session.execute(
+                text(claim_locked_batch_sql(col)),
+                {
+                    "pipeline": pipeline,
                     "claimed_at": claimed_at,
                     "claimed_by": claimed_by,
-                    "limit": batch_size,
+                    "track_ids": track_ids,
                 },
             )
             .mappings()

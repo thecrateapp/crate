@@ -42,6 +42,12 @@ def _fail_changed_sources(session, track_ids: set[int], pipeline: str) -> None:
 def lock_processing_rows(
     session, track_ids: list[int], pipelines: list[str]
 ) -> list[dict]:
+    # Library writers lock tracks before cascading into processing state. Keep
+    # the same order for every DSP lifecycle operation, including resets.
+    session.execute(
+        text("SELECT id FROM library_tracks WHERE id=ANY(:ids) ORDER BY id FOR UPDATE"),
+        {"ids": sorted(set(track_ids))},
+    ).all()
     return [
         dict(row)
         for row in session.execute(

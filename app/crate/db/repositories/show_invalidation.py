@@ -7,10 +7,11 @@ from crate.db.domain_events import append_domain_event
 
 def invalidate_show_views(artist_names: list[str | None], *, session=None) -> None:
     with optional_scope(session) as current:
-        names = list({name.lower() for name in artist_names if name})
+        names = list({" ".join(name.lower().split()) for name in artist_names if name})
         existing = (
             current.execute(
-                text("SELECT name FROM library_artists WHERE lower(name)=ANY(:names)"),
+                text("""SELECT name FROM library_artists
+                    WHERE lower(btrim(regexp_replace(name,'\\s+',' ','g')))=ANY(:names)"""),
                 {"names": names},
             )
             .scalars()

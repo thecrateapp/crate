@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 from crate.db.queries.show_search import search_canonical_shows
 from crate.db.repositories.show_identities import upsert_canonical_show
-from crate.db.tx import transaction_scope
+from crate.db.tx import read_scope, transaction_scope
 
 
 def _today():
@@ -100,6 +100,116 @@ def test_canonical_lineup_search_keeps_date_archive_and_consolidation_filters(pg
     )
 
     assert [row["id"] for row in found["items"]] == [saved_id]
+
+
+@pytest.mark.parametrize("performer_field", ["artist_name", "lineup"])
+@pytest.mark.parametrize(
+    "imported_name",
+    [
+        "Distinctive Support",
+        "  DISTINCTIVE   support  ",
+        "Distinctive\tSupport",
+        "\t DISTINCTIVE \t support \n",
+    ],
+)
+def test_canonical_artist_uid_search_normalizes_performer_names(
+    pg_db, performer_field, imported_name
+):
+    pg_db.upsert_artist({"name": "Distinctive Support"})
+    with read_scope() as session:
+        artist_uid = session.execute(
+            text(
+                "SELECT entity_uid::text FROM library_artists WHERE name='Distinctive Support'"
+            )
+        ).scalar_one()
+    changes = (
+        {"artist_name": imported_name, "lineup": []}
+        if performer_field == "artist_name"
+        else {"lineup": [imported_name]}
+    )
+    saved_id = _save_show(**changes)
+
+    found = search_canonical_shows(artist_uid=artist_uid)
+
+    assert [row["id"] for row in found["items"]] == [saved_id]
+    if performer_field == "artist_name":
+        assert found["items"][0]["artist_uid"] == artist_uid
+
+
+def test_canonical_artist_uid_search_keeps_exact_names_and_visibility_filters(pg_db):
+    pg_db.upsert_artist({"name": "Distinctive Support"})
+    with read_scope() as session:
+        artist_uid = session.execute(
+            text(
+                "SELECT entity_uid::text FROM library_artists WHERE name='Distinctive Support'"
+            )
+        ).scalar_one()
+    saved_id = _save_show(lineup=["Distinctive\tSupport"])
+    _save_show(venue="Unrelated Venue", lineup=["Distinctive Support Ensemble"])
+    _save_show(venue="Past Venue", date=(_today() - timedelta(days=1)).isoformat())
+    _save_show(venue="Later Venue", date=(_today() + timedelta(days=60)).isoformat())
+    archived_id = _save_show(venue="Archived Venue")
+    merged_id = _save_show(venue="Merged Venue")
+    with transaction_scope() as session:
+        session.execute(
+            text("UPDATE shows SET archived_at=NOW() WHERE id=:id"),
+            {"id": archived_id},
+        )
+        session.execute(
+            text("UPDATE shows SET merged_into_id=:canonical_id WHERE id=:id"),
+            {"canonical_id": saved_id, "id": merged_id},
+        )
+
+    found = search_canonical_shows(
+        artist_uid=artist_uid,
+        date_from=_today(),
+        date_to=_today() + timedelta(days=45),
+    )
+
+    assert [row["id"] for row in found["items"]] == [saved_id]
+
+
+def test_canonical_artist_search_leaves_ambiguous_normalized_primary_uid_empty(pg_db):
+    pg_db.upsert_artist({"name": "Distinctive Support"})
+    with transaction_scope() as session:
+        session.execute(
+            text("""INSERT INTO library_artists(name,entity_uid)
+                VALUES('Distinctive  Support',gen_random_uuid())""")
+        )
+    saved_id = _save_show(artist_name="Distinctive Support", lineup=[])
+
+    found = search_canonical_shows(show_id=saved_id)
+
+    assert [row["id"] for row in found["items"]] == [saved_id]
+    assert found["items"][0]["artist_uid"] is None
+
+
+@pytest.mark.parametrize("performer_field", ["artist_name", "lineup"])
+@pytest.mark.parametrize(
+    "imported_name", ["Distinctive Support", "\t DISTINCTIVE \t support \n"]
+)
+def test_show_write_invalidates_library_artists_with_normalized_performer_names(
+    pg_db, performer_field, imported_name
+):
+    pg_db.upsert_artist({"name": "Distinctive Support"})
+    changes = (
+        {"artist_name": imported_name, "lineup": []}
+        if performer_field == "artist_name"
+        else {"lineup": [imported_name]}
+    )
+
+    _save_show(**changes)
+
+    with read_scope() as session:
+        scopes = (
+            session.execute(
+                text("""SELECT payload_json->>'scope' FROM domain_event_outbox
+                WHERE event_type='ui.invalidate' AND payload_json->>'source'='show_write'""")
+            )
+            .scalars()
+            .all()
+        )
+    assert "artist:Distinctive Support" in scopes
 
 
 @pytest.mark.parametrize("view", ["artist", "feed", "following"])

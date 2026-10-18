@@ -1047,6 +1047,75 @@ persistent review are checked again on the follow-up commit:
 ../.venv/bin/python -m pytest tests/test_agent_library_operations.py tests/test_mcp_operations.py tests/test_agent_job_controls.py -q
 ```
 
+### Five confirmed identity and concurrency corrections (2026-10-18)
+
+The final review of `a83ed3ac` found five P2 defects despite its 20 successful CI checks and
+completed persistent review with no major issues. Each correction has permanent focused
+regressions reproduced against the broken implementation before applying the fix:
+
+1. **DSP and library writer lock order.** Processing lifecycle operations now lock local tracks
+   in ID order before their processing rows. Sync removal, which locks tracks before cascading
+   into processing state, can complete while an analysis/bliss result, refresh, legacy requeue,
+   reset, release or failure waits. A removed refresh target returns `SOURCE_CHANGED` rather
+   than raising during the locked reread. Claims skip tracks held by library writers. Twelve
+   PostgreSQL cases reproduced actual deadlocks, and two more reproduced blocked claims.
+   Independent review of the first fix identified a stale-statement claim race: three further
+   cases reproduced token replacement and a stale bliss/analysis exclusion. Claim selection
+   now only locks tracks; a second statement rechecks pending state and the analysis exclusion
+   with a fresh snapshot before assigning tokens. Both statements share one transaction and
+   retain the generation, token, path and physical-source fences.
+2. **Editorial global/local identity.** Persistent exclusions and manual/locked entries match
+   their generated counterparts when a global track acquires a local source. Both editorial
+   plans and the existing Admin regeneration repository use the same identity comparison:
+   global UID, local UID, storage identity, local ID, then path. The first identity known by both
+   rows decides the match; disagreement on a stronger identity never falls back to a reused
+   path. Edit/refine also reject excluding a protected global entry through its equivalent
+   local UID. Thirteen regressions failed before correction; eleven positive controls cover
+   remote-only entries, distinct global identities and replacement tracks at an old path.
+   Worker tests verify exact approval, persisted selection, overrides, positions and replay.
+3. **OAuth data versus credential carriers.** `client_id`, `state` and preference cookies may
+   contain `crate_mcp_` without being treated as machine credentials. Both human resolution and
+   middleware inspect actual credential carriers: all Authorization headers, every `token`
+   and `media_ticket` query value, and each supported authentication cookie before duplicate
+   names collapse. Machine credentials in those carriers still prevent human fallback. Five
+   OAuth/resolver regressions and sixteen duplicate-carrier cases failed before correction;
+   ordinary consent and existing isolation controls remain covered.
+4. **Provider match after a manual show correction.** A semantic match is rechecked after
+   acquiring the selected show's write lock. If a manual correction changed its identity while
+   the provider waited, the provider receives a conflict before linking its source or evidence.
+   Exact provider aliases and explicitly selected IDs retain their rescheduling contract.
+   A concurrent PostgreSQL regression reproduces the stale match, with a fresh-match control.
+5. **Show artist UID reads.** Canonical UID filtering, unambiguous primary-artist references,
+   single/batch identity matching and invalidation now collapse whitespace before trimming and
+   compare names case-insensitively. This includes lineup performers and legacy outer tabs or
+   newlines. Distinct longer names, visibility/date restrictions and ambiguous normalized
+   library names remain explicit controls; ambiguity never invents a primary artist UID.
+   Sixteen regressions reproduced missing matches/invalidations and an ambiguous UID.
+
+Concurrency tests observe the expected PostgreSQL backend PID and `pg_blocking_pids` before
+releasing the writer or advisory gate. Timeouts only bound failures. The claim gate fixes an
+old statement snapshot before a second real claim commits; it does not replace the claim SQL
+or its row locks. DSP payloads and scanner metadata are synthetic, while source files,
+transactions, cascades and persistence are real. Provider scheduling is controlled locally;
+these cases do not contact live providers or assess DSP/model quality. OAuth consent uses the
+actual AuthMiddleware, router, registered client and database session.
+
+Focused Python 3.13/PostgreSQL validation passed **683 distinct cases without skips** in these
+two sequential selections (368 and 315 cases respectively):
+
+```sh
+cd app
+../.venv/bin/python -m pytest tests/test_mcp_auth.py tests/test_mcp_oauth_integration.py tests/test_mcp_oauth.py tests/test_mcp_oauth_concurrency.py tests/test_editorial_plans.py tests/test_mcp_editorial.py tests/test_playlist_track_overrides.py tests/test_show_identity.py tests/test_show_lineup_reads.py tests/test_show_import_plans.py tests/test_shows_queries.py tests/test_shows_shared.py tests/test_mcp_shows.py tests/test_show_import_api.py -q
+../.venv/bin/python -m pytest tests/test_analysis_writer_serialization.py tests/test_agent_analysis_sync.py tests/test_analysis_source_fence.py tests/test_analysis_daemon.py tests/test_agent_sync_identity_regressions.py tests/test_mcp_phase4_review_regressions.py tests/test_agent_repairs.py tests/test_db_access_boundaries.py tests/test_runtime_boundaries.py -q
+```
+
+They ran in the disposable Linux image described above with repository dependencies and real
+PostgreSQL/Testcontainers. Independent SPEC and QUALITY reviews, including a second look at the
+claim fix, found no remaining P1/P2. Directed Ruff check/format and Pyright passed for all twenty
+changed Python files. No full local suite, migration rewrite, deployment or flag activation is
+part of this correction. CI and persistent review must be checked against its newly published
+exact HEAD.
+
 ### Repair readiness and effects
 
 `get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,

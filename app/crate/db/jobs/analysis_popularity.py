@@ -110,15 +110,15 @@ def requeue_tracks(
         if not ids:
             return 0
         if requested:
+            from crate.db.jobs.analysis_generations import lock_processing_rows
+
+            lock_processing_rows(session, ids, requested)
             session.execute(
                 text(
                     "INSERT INTO track_processing_state(track_id,pipeline,state) SELECT t.id,p.pipeline,'pending' FROM library_tracks t CROSS JOIN unnest(CAST(:pipelines AS text[])) p(pipeline) WHERE t.id=ANY(:ids) ON CONFLICT(track_id,pipeline) DO NOTHING"
                 ),
                 {"ids": ids, "pipelines": requested},
             )
-            from crate.db.jobs.analysis_generations import lock_processing_rows
-
-            lock_processing_rows(session, ids, requested)
             session.execute(
                 text(
                     "UPDATE track_processing_state SET state='pending',generation=generation+1,claim_token=NULL,pipeline_signature=NULL,claimed_by=NULL,claimed_at=NULL,last_error=NULL,completed_at=NULL,updated_at=NOW() WHERE track_id=ANY(:ids) AND pipeline=ANY(:pipelines)"

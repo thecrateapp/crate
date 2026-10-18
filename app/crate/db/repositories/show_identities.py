@@ -143,9 +143,9 @@ def _rows(current, candidate, source):
         current.execute(
             text("""SELECT * FROM shows WHERE date=CAST(:date AS date)
         AND merged_into_id IS NULL
-        AND (lower(regexp_replace(btrim(artist_name),'\\s+',' ','g'))=ANY(:artists)
+        AND (lower(btrim(regexp_replace(artist_name,'\\s+',' ','g')))=ANY(:artists)
             OR EXISTS(SELECT 1 FROM unnest(lineup) AS performer(name)
-                WHERE lower(regexp_replace(btrim(performer.name),'\\s+',' ','g'))=ANY(:artists)))
+                WHERE lower(btrim(regexp_replace(performer.name,'\\s+',' ','g')))=ANY(:artists)))
         ORDER BY id"""),
             {
                 "date": candidate.get("date"),
@@ -319,9 +319,9 @@ def match_show_candidates(
             LEFT JOIN alias_items a ON a.show_id=s.id WHERE a.show_id IS NOT NULL OR s.id=ANY(:ids)
             OR s.id IN (SELECT merged_into_id FROM shows WHERE id=ANY(:ids))
             OR (s.merged_into_id IS NULL AND EXISTS(SELECT 1 FROM wanted w WHERE s.date=w.date
-                AND (lower(regexp_replace(btrim(s.artist_name),'\\s+',' ','g'))=ANY(w.artists)
+                AND (lower(btrim(regexp_replace(s.artist_name,'\\s+',' ','g')))=ANY(w.artists)
                     OR EXISTS(SELECT 1 FROM unnest(s.lineup) AS performer(name)
-                        WHERE lower(regexp_replace(btrim(performer.name),'\\s+',' ','g'))=ANY(w.artists)))))
+                        WHERE lower(btrim(regexp_replace(performer.name,'\\s+',' ','g')))=ANY(w.artists)))))
             ORDER BY s.id"""
         if lock:
             statement += " FOR UPDATE OF s"
@@ -421,6 +421,18 @@ def upsert_canonical_show(
                 "matches": [existing["merged_into_id"]],
                 "reason": "Show was consolidated while waiting for its write lock; retry the canonical alias",
             }
+        if existing and _matched is None:
+            rows, exact = _rows(current, candidate, source)
+            if not exact:
+                rechecked = _match_rows(candidate, rows, False)
+                if rechecked.get("show", {}).get("id") != existing["id"]:
+                    return {
+                        "status": "conflict",
+                        "matches": sorted(
+                            {existing["id"], *rechecked.get("matches", [])}
+                        ),
+                        "reason": "Show identity changed while waiting for its write lock; review the match",
+                    }
         values = {key: (existing or {}).get(key) for key in _FIELDS}
         provenance = dict((existing or {}).get("field_provenance") or {})
         for key in _FIELDS:

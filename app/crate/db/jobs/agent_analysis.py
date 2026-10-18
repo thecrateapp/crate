@@ -29,15 +29,15 @@ def requeue_analysis_targets(
     with optional_scope(session) as current:
         before = read_analysis_targets(track_uids, pipelines, session=current)
         ids = [t["id"] for t in before["tracks"]]
+        lock_processing_rows(current, ids, pipelines)
         current.execute(
             text(
                 "INSERT INTO track_processing_state(track_id,pipeline,state) SELECT t.id,p.pipeline,CASE WHEN p.pipeline='analysis' THEN COALESCE(t.analysis_state,'pending') ELSE COALESCE(t.bliss_state,'pending') END FROM library_tracks t CROSS JOIN unnest(CAST(:pipelines AS text[])) p(pipeline) WHERE t.id=ANY(:ids) ON CONFLICT(track_id,pipeline) DO NOTHING"
             ),
             {"ids": ids, "pipelines": pipelines},
         )
-        lock_processing_rows(current, ids, pipelines)
         state = read_analysis_targets(
-            track_uids, pipelines, session=current, locked=True
+            track_uids, pipelines, session=current, locked=True, require_all=False
         )
         if analysis_targets_version(state) != expected_version:
             return {"status": "conflict", "code": "SOURCE_CHANGED", "references": []}
