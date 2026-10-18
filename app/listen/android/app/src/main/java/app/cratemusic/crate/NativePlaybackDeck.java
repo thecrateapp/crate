@@ -19,6 +19,14 @@ interface NativePlaybackDeck {
     void setSpeed(float speed);
     long positionMs();
 
+    boolean holdStart();
+
+    long busFrame();
+
+    void startAtBusFrame(long busFrame);
+
+    void releaseHold();
+
     void startEnvelope(
         NativeMixAudioProcessor.Role role,
         long durationMs,

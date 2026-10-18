@@ -216,11 +216,15 @@ public class CrateNativePlaybackService extends MediaSessionService {
         configurePhysicalPlayer(deckBPlayer);
         deckA = new ExoPlayerNativePlaybackDeck(
             deckAPlayer,
-            deckAAudioProcessor
+            deckAAudioProcessor,
+            USE_PCM_BUS ? pcmBusMixer : null,
+            0
         );
         deckB = new ExoPlayerNativePlaybackDeck(
             deckBPlayer,
-            deckBAudioProcessor
+            deckBAudioProcessor,
+            USE_PCM_BUS ? pcmBusMixer : null,
+            1
         );
         player = new CrateMixPlayer(
             deckAPlayer,
@@ -1925,7 +1929,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         if (player == null || mixController == null) return;
         long nowElapsedMs = SystemClock.elapsedRealtime();
         if (activeTransitionPlan != null) {
-            float phaseErrorMs = mixController.correctPhase(nowElapsedMs);
+            float phaseErrorMs = mixController.measurePhase();
             if (
                 mixController.isBeatmatching() &&
                 nowElapsedMs - lastBeatmatchLogElapsedMs >= BEATMATCH_LOG_INTERVAL_MS
@@ -1935,7 +1939,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
                     NativeMixAudioProcessor.QOE_TAG,
                     "beatmatch phase progress=" + mixController.transitionProgress()
                         + " errorMs=" + phaseErrorMs
-                        + " speed=" + mixController.appliedIncomingSpeed()
+                        + " speed=" + mixController.beatmatchSpeed()
                 );
             }
             float progress = mixController.transitionProgress();
@@ -1958,10 +1962,19 @@ public class CrateNativePlaybackService extends MediaSessionService {
         int outgoingIndex = player.getCurrentMediaItemIndex();
         NativeTransitionPlan plan = pendingTransitionPlan();
         if (plan == null) return;
-        maybeBeginPreroll(plan);
         if (mixController.isPrerolling()) {
-            mixController.correctPhase(nowElapsedMs);
+            mixController.scheduleHeldStart();
+            float phaseErrorMs = mixController.measurePhase();
+            if (nowElapsedMs - lastBeatmatchLogElapsedMs >= BEATMATCH_LOG_INTERVAL_MS) {
+                lastBeatmatchLogElapsedMs = nowElapsedMs;
+                Log.i(
+                    NativeMixAudioProcessor.QOE_TAG,
+                    "beatmatch preroll phase " + mixController.phaseDebug()
+                        + " errorMs=" + phaseErrorMs
+                );
+            }
         }
+        maybeBeginPreroll(plan);
         NativeMixTrigger.Decision decision = evaluatePendingMix(plan);
         logMixDiagnostic(
             "decision edge=" + plan.outgoingTrackId + ">" + plan.incomingTrackId
@@ -2028,7 +2041,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         if (positionMs < startsAtMs || positionMs >= cueMs - NativeMixTrigger.START_SAFETY_LEAD_MS) {
             return;
         }
-        if (mixController.beginPreroll(plan, positionMs)) {
+        if (mixController.beginPreroll(plan)) {
             Log.i(
                 NativeMixAudioProcessor.QOE_TAG,
                 "beatmatch preroll " + mixController.phaseDebug()

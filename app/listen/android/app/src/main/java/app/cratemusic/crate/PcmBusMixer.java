@@ -6,6 +6,7 @@ import android.media.AudioTrack;
 import android.util.Log;
 
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicLong;
 
 final class PcmBusMixer {
     static final int SAMPLE_RATE = 48_000;
@@ -17,6 +18,7 @@ final class PcmBusMixer {
         new PcmBusChannel(CHANNEL_CAPACITY_FRAMES),
         new PcmBusChannel(CHANNEL_CAPACITY_FRAMES),
     };
+    private final AtomicLong busFrames = new AtomicLong();
     private AudioTrack track;
     private Thread thread;
     private volatile boolean running;
@@ -25,15 +27,31 @@ final class PcmBusMixer {
         return channels[index];
     }
 
-    static int mixBlock(PcmBusChannel[] channels, float[] mix, float[] scratch, int frames) {
+    long busFrame() {
+        return busFrames.get();
+    }
+
+    static int mixBlock(
+        PcmBusChannel[] channels,
+        float[] mix,
+        float[] scratch,
+        int frames,
+        long blockStartFrame
+    ) {
         Arrays.fill(mix, 0, frames * CHANNELS, 0.0f);
         for (PcmBusChannel channel : channels) {
             if (channel.blocksMix()) return 0;
         }
         int mixedFrames = 0;
+        boolean scheduled = false;
         for (PcmBusChannel channel : channels) {
-            mixedFrames = Math.max(mixedFrames, channel.mixInto(mix, scratch, frames));
+            scheduled |= channel.isScheduled();
+            mixedFrames = Math.max(
+                mixedFrames,
+                channel.mixInto(mix, scratch, frames, blockStartFrame)
+            );
         }
+        if (mixedFrames == 0 && scheduled) return frames;
         for (int index = 0; index < mixedFrames * CHANNELS; index++) {
             mix[index] = Math.max(-1.0f, Math.min(1.0f, mix[index]));
         }
@@ -76,7 +94,8 @@ final class PcmBusMixer {
         float[] mix = new float[BLOCK_FRAMES * CHANNELS];
         float[] scratch = new float[BLOCK_FRAMES * CHANNELS];
         while (running) {
-            int frames = mixBlock(channels, mix, scratch, BLOCK_FRAMES);
+            int frames = mixBlock(channels, mix, scratch, BLOCK_FRAMES, busFrames.get());
+            busFrames.addAndGet(frames);
             if (frames == 0) {
                 try {
                     Thread.sleep(2L);

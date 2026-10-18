@@ -11,6 +11,10 @@ final class FakeNativePlaybackDeck implements NativePlaybackDeck {
     float volume = 1.0f;
     float speed = 1.0f;
     boolean failSpeed;
+    boolean supportsHold = true;
+    boolean held;
+    long busFrame;
+    long startFrame = -1L;
     boolean playing;
     boolean released;
     boolean failPreparation;
@@ -96,6 +100,30 @@ final class FakeNativePlaybackDeck implements NativePlaybackDeck {
     @Override
     public long positionMs() {
         return positionMs;
+    }
+
+    @Override
+    public boolean holdStart() {
+        if (!supportsHold) return false;
+        calls.add("hold");
+        held = true;
+        return true;
+    }
+
+    @Override
+    public long busFrame() {
+        return busFrame;
+    }
+
+    @Override
+    public void startAtBusFrame(long requestedFrame) {
+        startFrame = requestedFrame;
+    }
+
+    @Override
+    public void releaseHold() {
+        calls.add("release-hold");
+        held = false;
     }
 
     @Override

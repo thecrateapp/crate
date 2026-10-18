@@ -47,6 +47,12 @@ final class PcmRingBuffer {
         return count;
     }
 
+    int skip(int frames) {
+        int count = Math.min(frames, availableFrames());
+        readFrames += count;
+        return count;
+    }
+
     void clear() {
         readFrames = writtenFrames;
     }

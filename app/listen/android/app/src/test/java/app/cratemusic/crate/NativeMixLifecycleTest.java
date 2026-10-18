@@ -341,16 +341,17 @@ public class NativeMixLifecycleTest {
     @Test
     public void beatmatchPreparesAPrerollBeforeThePhaseAlignedCue() {
         assertEquals(8104L, beatmatchPlan().startIncomingCueMs());
-        assertEquals(8104L - 2600L, beatmatchPlan().prepareIncomingCueMs());
+        assertEquals(8104L - 1040L, beatmatchPlan().prepareIncomingCueMs());
         assertEquals(0L, plan().startIncomingCueMs());
         assertEquals(0L, plan().prepareIncomingCueMs());
     }
 
     @Test
-    public void prerollStartsTheIncomingDeckMutedAtTheTempoRatio() {
+    public void prerollHoldsTheIncomingDeckMutedAtTheTempoRatio() {
         preroll();
 
         assertTrue(controller.isPrerolling());
+        assertTrue(deckB.held);
         assertTrue(deckB.playing);
         assertEquals(0.0f, deckB.volume, 0.0f);
         assertEquals(1.04f, deckB.speed, 0.0001f);
@@ -358,12 +359,58 @@ public class NativeMixLifecycleTest {
     }
 
     @Test
+    public void aDeckThatCannotHoldItsStartDoesNotPreroll() {
+        deckB.supportsHold = false;
+        controller.prepareStandbyAt(beatmatchPlan().prepareIncomingCueMs(), 0L);
+
+        assertFalse(controller.beginPreroll(beatmatchPlan()));
+        assertFalse(deckB.playing);
+    }
+
+    @Test
+    public void theHeldStartIsScheduledWhereTheIncomingCueMeetsTheOutgoingCue() {
+        preroll();
+        deckA.positionMs = 167600L;
+        deckB.busFrame = 1_000L;
+
+        assertTrue(controller.scheduleHeldStart());
+
+        long delayMs = (170000L - 167600L) - 1000L;
+        assertEquals(1_000L + delayMs * 48L, deckB.startFrame);
+    }
+
+    @Test
+    public void theHeldStartUsesTheMedianOfItsEstimates() {
+        preroll();
+        deckB.busFrame = 0L;
+        deckA.positionMs = 167600L;
+        controller.scheduleHeldStart();
+        deckA.positionMs = 167000L;
+        controller.scheduleHeldStart();
+        deckA.positionMs = 167600L;
+        controller.scheduleHeldStart();
+
+        assertEquals(1400L * 48L, deckB.startFrame);
+    }
+
+    @Test
+    public void theHeldStartIsNotRescheduledOnceTheIncomingDeckMoves() {
+        preroll();
+        deckA.positionMs = 167600L;
+        controller.scheduleHeldStart();
+        deckB.positionMs += 20L;
+
+        assertFalse(controller.scheduleHeldStart());
+    }
+
+    @Test
     public void anInPhasePrerollMixesWithTheTempoRatio() {
         preroll();
+        controller.scheduleHeldStart();
         alignPositions(0L);
-        controller.correctPhase(0L);
-        controller.correctPhase(20L);
-        controller.correctPhase(40L);
+        controller.measurePhase();
+        controller.measurePhase();
+        controller.measurePhase();
 
         assertTrue(controller.beginTransition(mixPlan()));
 
@@ -376,17 +423,46 @@ public class NativeMixLifecycleTest {
     @Test
     public void anOutOfPhasePrerollMixesAsAdaptive() {
         preroll();
+        controller.scheduleHeldStart();
         alignPositions(0L);
-        controller.correctPhase(0L);
-        controller.correctPhase(20L);
+        controller.measurePhase();
         alignPositions(100L);
-        controller.correctPhase(40L);
+        controller.measurePhase();
+        controller.measurePhase();
 
         assertTrue(controller.beginTransition(mixPlan()));
 
         assertFalse(controller.isBeatmatching());
+        assertFalse(deckB.held);
         assertEquals(1.0f, deckB.speed, 0.0f);
         assertTrue(deckB.calls.contains("envelope:INCOMING:4000:0.0"));
+    }
+
+    @Test
+    public void aSingleNoisyPhaseSampleDoesNotPreventTheBeatmatch() {
+        preroll();
+        controller.scheduleHeldStart();
+        alignPositions(0L);
+        controller.measurePhase();
+        controller.measurePhase();
+        alignPositions(30L);
+        controller.measurePhase();
+        alignPositions(0L);
+        controller.measurePhase();
+
+        assertTrue(controller.beginTransition(mixPlan()));
+
+        assertTrue(controller.isBeatmatching());
+    }
+
+    @Test
+    public void aPrerollThatNeverStartedReleasesTheHeldDeck() {
+        preroll();
+
+        assertTrue(controller.beginTransition(mixPlan()));
+
+        assertFalse(controller.isBeatmatching());
+        assertFalse(deckB.held);
     }
 
     @Test
@@ -401,25 +477,16 @@ public class NativeMixLifecycleTest {
     }
 
     @Test
-    public void prerollCorrectsHarderThanTheAudibleMix() {
+    public void theMixNeverChangesTheIncomingSpeed() {
         preroll();
-        alignPositions(50L);
-        controller.correctPhase(0L);
-        assertEquals(1.04f * 1.05f, deckB.speed, 0.0001f);
-
-        alignPositions(30L);
-        controller.correctPhase(100L);
-        assertEquals(1.04f * 1.05f, deckB.speed, 0.0001f);
-
+        controller.scheduleHeldStart();
         alignPositions(0L);
-        controller.correctPhase(1_000L);
-        controller.correctPhase(1_020L);
-        controller.correctPhase(1_040L);
+        controller.measurePhase();
+        controller.measurePhase();
+        controller.measurePhase();
         assertTrue(controller.beginTransition(mixPlan()));
         alignPositions(50L);
-        controller.correctPhase(2_000L);
-        controller.correctPhase(2_200L);
-        controller.correctPhase(2_400L);
+        controller.measurePhase();
 
         assertEquals(50.0f, controller.lastPhaseErrorMs(), 1.0f);
         assertEquals(1.04f, deckB.speed, 0.0001f);
@@ -428,10 +495,11 @@ public class NativeMixLifecycleTest {
     @Test
     public void completionLeavesTheTempoRestorePending() {
         preroll();
+        controller.scheduleHeldStart();
         alignPositions(0L);
-        controller.correctPhase(0L);
-        controller.correctPhase(20L);
-        controller.correctPhase(40L);
+        controller.measurePhase();
+        controller.measurePhase();
+        controller.measurePhase();
         assertTrue(controller.beginTransition(mixPlan()));
 
         controller.applyProgress(controller.executionId(), 1.0f);
@@ -444,8 +512,9 @@ public class NativeMixLifecycleTest {
     @Test
     public void aPrerolledMixStartsEvenWhenTheDeckDriftedFromItsCue() {
         preroll();
+        controller.scheduleHeldStart();
         alignPositions(400L);
-        controller.correctPhase(0L);
+        controller.measurePhase();
 
         assertTrue(controller.isStandbyReadyAt(8104L, 1_000L));
         assertTrue(controller.beginTransition(mixPlan()));
@@ -453,20 +522,12 @@ public class NativeMixLifecycleTest {
     }
 
     @Test
-    public void aLatePrerollSeeksTheIncomingDeckToTheAlignedPosition() {
-        controller.prepareStandbyAt(beatmatchPlan().prepareIncomingCueMs(), 0L);
+    public void aPrerollSeeksAStandbyPreparedElsewhereToTheHeldCue() {
+        controller.prepareStandbyAt(0L, 0L);
 
-        assertTrue(controller.beginPreroll(beatmatchPlan(), 169000L));
+        assertTrue(controller.beginPreroll(beatmatchPlan()));
 
         assertEquals(8104L - 1040L, deckB.positionMs);
-    }
-
-    @Test
-    public void aPrerollWaitsUntilTheIncomingTrackHasRoomToAlign() {
-        controller.prepareStandbyAt(beatmatchPlan().prepareIncomingCueMs(), 0L);
-
-        assertFalse(controller.beginPreroll(beatmatchPlan(), 160000L));
-        assertFalse(controller.isPrerolling());
     }
 
     @Test
@@ -476,24 +537,22 @@ public class NativeMixLifecycleTest {
         NativeTransitionPlan shifted = early.withPrerollRoom(240000L);
 
         long roomMs = Math.round(104L / 1.04);
-        long shiftMs = NativeMixController.PREROLL_MS - roomMs;
+        long shiftMs = NativeMixController.PREROLL_LEAD_MS - roomMs;
         assertEquals(170000L + shiftMs, shifted.outgoingCueMs);
         assertEquals(Math.round(shiftMs * 1.04), shifted.incomingCueMs);
         NativeTransitionPlan roomy = beatmatchPlan();
         assertSame(roomy, roomy.withPrerollRoom(240000L));
-        assertEquals(170000L, early.withPrerollRoom(175000L).outgoingCueMs);
+        assertEquals(170000L, early.withPrerollRoom(174000L).outgoingCueMs);
     }
 
     @Test
-    public void prerollHoldsTheCorrectionUntilTheIncomingDeckStartsMoving() {
+    public void phaseIsNotMeasuredUntilTheHeldDeckStartsMoving() {
         preroll();
+        controller.scheduleHeldStart();
         deckA.positionMs = 168000L;
-        deckB.positionMs = beatmatchPlan().prepareIncomingCueMs();
 
-        controller.correctPhase(0L);
-        controller.correctPhase(300L);
+        controller.measurePhase();
 
-        assertEquals(1.04f, deckB.speed, 0.0001f);
         assertEquals(0.0f, controller.lastPhaseErrorMs(), 0.0f);
     }
 
@@ -504,6 +563,7 @@ public class NativeMixLifecycleTest {
         controller.cancelPreroll();
 
         assertFalse(controller.isPrerolling());
+        assertFalse(deckB.held);
         assertEquals(1.0f, deckB.speed, 0.0f);
         assertFalse(deckB.playing);
     }
@@ -513,13 +573,15 @@ public class NativeMixLifecycleTest {
         deckB.failSpeed = true;
         controller.prepareStandbyAt(beatmatchPlan().prepareIncomingCueMs(), 0L);
 
-        assertFalse(controller.beginPreroll(beatmatchPlan(), 167500L));
+        assertFalse(controller.beginPreroll(beatmatchPlan()));
         assertFalse(controller.isPrerolling());
+        assertFalse(deckB.held);
     }
 
     private void preroll() {
         controller.prepareStandbyAt(beatmatchPlan().prepareIncomingCueMs(), 0L);
-        assertTrue(controller.beginPreroll(beatmatchPlan(), 167500L));
+        deckA.positionMs = 167500L;
+        assertTrue(controller.beginPreroll(beatmatchPlan()));
     }
 
     private void alignPositions(long incomingLagMs) {

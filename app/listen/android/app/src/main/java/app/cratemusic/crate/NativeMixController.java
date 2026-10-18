@@ -36,26 +36,22 @@ final class NativeMixController {
     private boolean handoffComplete;
     static final long STANDBY_RETRY_MS = 10_000L;
     static final long PREROLL_MS = 2_500L;
+    static final long PREROLL_LEAD_MS = 1_000L;
     static final long PREROLL_SEEK_TOLERANCE_MS = 20L;
     static final long PREROLL_STARTED_MS = 5L;
-    private long prerollIncomingStartMs;
-    static final float PHASE_DEADBAND_MS = 4.0f;
-    static final float PREROLL_MAX_CORRECTION = 0.10f;
-    static final float MIX_MAX_CORRECTION = 0.01f;
     static final float MAX_START_PHASE_ERROR_MS = 10.0f;
-    static final long SPEED_UPDATE_INTERVAL_MS = 200L;
-    static final float SPEED_STEP = 0.001f;
+    static final int MIN_PHASE_SAMPLES_TO_ENGAGE = 3;
     @Nullable
     private NativeTransitionPlan prerollPlan;
     private long phaseOutgoingCueMs;
     private long phaseIncomingCueMs;
-    private long lastSpeedUpdateMs = Long.MIN_VALUE;
-    private final float[] recentPhaseErrorsMs = new float[3];
+    private long prerollIncomingStartMs;
+    private final long[] startFrameEstimates = new long[15];
+    private int startEstimates;
+    private long scheduledStartFrame;
+    private final float[] recentPhaseErrorsMs = new float[9];
     private int phaseSamples;
-    private int inPhaseSamples;
-    static final int IN_PHASE_SAMPLES_TO_ENGAGE = 3;
     private float beatmatchSpeed = 1.0f;
-    private float appliedIncomingSpeed = 1.0f;
     private float lastPhaseErrorMs;
     private float pendingTempoRestoreSpeed = 1.0f;
     private boolean standbyPreparationFailed;
@@ -239,7 +235,11 @@ final class NativeMixController {
         stateMachine.transitionTo(NativeTransitionState.ARMED);
 
         boolean prerolled = isPrerollingFor(plan);
-        boolean beatmatch = prerolled && inPhaseSamples >= IN_PHASE_SAMPLES_TO_ENGAGE;
+        boolean beatmatch = (
+            prerolled &&
+            phaseSamples >= MIN_PHASE_SAMPLES_TO_ENGAGE &&
+            Math.abs(medianPhaseErrorMs()) <= MAX_START_PHASE_ERROR_MS
+        );
         prerollPlan = null;
         executionId++;
         observedProgress = -1.0f;
@@ -247,13 +247,11 @@ final class NativeMixController {
         mixOutgoingDeck = activeDeck;
         mixIncomingDeck = standbyDeck;
         handoffComplete = false;
-        if (prerolled && !beatmatch) {
-            mixIncomingDeck.setSpeed(1.0f);
-        } else if (beatmatch && appliedIncomingSpeed != plan.incomingTempoRatio) {
-            mixIncomingDeck.setSpeed(plan.incomingTempoRatio);
+        if (prerolled) {
+            mixIncomingDeck.releaseHold();
+            if (!beatmatch) mixIncomingDeck.setSpeed(1.0f);
         }
         beatmatchSpeed = beatmatch ? plan.incomingTempoRatio : 1.0f;
-        appliedIncomingSpeed = beatmatchSpeed;
         mixOutgoingDeck.startEnvelope(
             NativeMixAudioProcessor.Role.OUTGOING,
             plan.durationMs,
@@ -270,7 +268,7 @@ final class NativeMixController {
         return true;
     }
 
-    boolean beginPreroll(NativeTransitionPlan plan, long outgoingPositionMs) {
+    boolean beginPreroll(NativeTransitionPlan plan) {
         if (
             activePlan != null ||
             prerollPlan != null ||
@@ -287,20 +285,19 @@ final class NativeMixController {
         if (
             !outgoing.id.equals(plan.outgoingTrackId) ||
             !incoming.id.equals(plan.incomingTrackId) ||
-            !standbyDeck.isReadyFor(incoming)
+            !standbyDeck.isReadyFor(incoming) ||
+            !standbyDeck.holdStart()
         ) {
             return false;
         }
-        long alignedIncomingMs = plan.startIncomingCueMs()
-            - Math.round((plan.outgoingCueMs - outgoingPositionMs) * (double) plan.incomingTempoRatio);
-        if (alignedIncomingMs < 0L) return false;
-        if (Math.abs(standbyDeck.positionMs() - alignedIncomingMs) > PREROLL_SEEK_TOLERANCE_MS) {
-            standbyDeck.seekTo(alignedIncomingMs);
+        long heldIncomingMs = plan.prepareIncomingCueMs();
+        if (Math.abs(standbyDeck.positionMs() - heldIncomingMs) > PREROLL_SEEK_TOLERANCE_MS) {
+            standbyDeck.seekTo(heldIncomingMs);
         }
-        prerollIncomingStartMs = standbyDeck.positionMs();
         try {
             standbyDeck.setSpeed(plan.incomingTempoRatio);
         } catch (RuntimeException error) {
+            standbyDeck.releaseHold();
             return false;
         }
         standbyDeck.setVolume(0.0f);
@@ -308,12 +305,32 @@ final class NativeMixController {
         prerollPlan = plan;
         phaseOutgoingCueMs = plan.outgoingCueMs;
         phaseIncomingCueMs = plan.startIncomingCueMs();
+        prerollIncomingStartMs = heldIncomingMs;
+        startEstimates = 0;
         beatmatchSpeed = plan.incomingTempoRatio;
-        appliedIncomingSpeed = beatmatchSpeed;
         lastPhaseErrorMs = 0.0f;
         phaseSamples = 0;
-        inPhaseSamples = 0;
-        lastSpeedUpdateMs = Long.MIN_VALUE;
+        return true;
+    }
+
+    boolean scheduleHeldStart() {
+        if (prerollPlan == null || activePlan != null) return false;
+        if (!standbyDeck.isReadyFor(queue.get(logicalIndex + 1))) return false;
+        long incomingPositionMs = standbyDeck.positionMs();
+        if (startEstimates > 0 && incomingPositionMs >= prerollIncomingStartMs + PREROLL_STARTED_MS) {
+            return false;
+        }
+        double delayMs = (phaseOutgoingCueMs - activeDeck.positionMs())
+            - (phaseIncomingCueMs - incomingPositionMs) / (double) beatmatchSpeed;
+        startFrameEstimates[startEstimates % startFrameEstimates.length] =
+            standbyDeck.busFrame() + Math.round(delayMs * PcmBusMixer.SAMPLE_RATE / 1_000.0);
+        startEstimates++;
+        int count = Math.min(startEstimates, startFrameEstimates.length);
+        long[] estimates = Arrays.copyOf(startFrameEstimates, count);
+        Arrays.sort(estimates);
+        scheduledStartFrame = estimates[count / 2];
+        standbyDeck.startAtBusFrame(scheduledStartFrame);
+        prerollIncomingStartMs = incomingPositionMs;
         return true;
     }
 
@@ -324,7 +341,12 @@ final class NativeMixController {
             + " inPos=" + incomingDeck.positionMs()
             + " outCue=" + phaseOutgoingCueMs
             + " inCue=" + phaseIncomingCueMs
-            + " speed=" + beatmatchSpeed;
+            + " speed=" + beatmatchSpeed
+            + " heldAt=" + prerollIncomingStartMs
+            + " startEstimates=" + startEstimates
+            + " startInFrames=" + (scheduledStartFrame - incomingDeck.busFrame())
+            + " phaseSamples=" + phaseSamples
+            + " medianErrorMs=" + medianPhaseErrorMs();
     }
 
     boolean isPrerolling() {
@@ -343,7 +365,7 @@ final class NativeMixController {
         if (prerollPlan == null) return;
         prerollPlan = null;
         beatmatchSpeed = 1.0f;
-        appliedIncomingSpeed = 1.0f;
+        standbyDeck.releaseHold();
         standbyDeck.pause();
         standbyDeck.setSpeed(1.0f);
         standbyDeck.releasePreparedSource();
@@ -354,14 +376,17 @@ final class NativeMixController {
         return (activePlan != null || prerollPlan != null) && beatmatchSpeed != 1.0f;
     }
 
-    float correctPhase(long nowMs) {
+    float measurePhase() {
         if (!isBeatmatching()) return 0.0f;
         boolean prerolling = activePlan == null;
         NativePlaybackDeck outgoingDeck = prerolling ? activeDeck : mixOutgoingDeck;
         NativePlaybackDeck incomingDeck = prerolling ? standbyDeck : mixIncomingDeck;
         long incomingPositionMs = incomingDeck.positionMs();
-        if (prerolling && incomingPositionMs < prerollIncomingStartMs + PREROLL_STARTED_MS) {
-            inPhaseSamples = 0;
+        if (
+            prerolling &&
+            (startEstimates == 0 || incomingPositionMs < prerollIncomingStartMs + PREROLL_STARTED_MS)
+        ) {
+            phaseSamples = 0;
             return lastPhaseErrorMs;
         }
         long outgoingElapsedMs = outgoingDeck.positionMs() - phaseOutgoingCueMs;
@@ -369,44 +394,19 @@ final class NativeMixController {
         lastPhaseErrorMs = outgoingElapsedMs - incomingElapsedMs / beatmatchSpeed;
         recentPhaseErrorsMs[phaseSamples % recentPhaseErrorsMs.length] = lastPhaseErrorMs;
         phaseSamples++;
-        float filteredPhaseErrorMs = medianPhaseErrorMs();
-        inPhaseSamples = Math.abs(lastPhaseErrorMs) <= MAX_START_PHASE_ERROR_MS
-            ? inPhaseSamples + 1
-            : 0;
-        if (
-            lastSpeedUpdateMs != Long.MIN_VALUE &&
-            nowMs - lastSpeedUpdateMs < SPEED_UPDATE_INTERVAL_MS
-        ) {
-            return lastPhaseErrorMs;
-        }
-        if (!prerolling) return lastPhaseErrorMs;
-        float maxCorrection = PREROLL_MAX_CORRECTION;
-        float gainPerMs = prerolling ? 1.0f / 1_000.0f : 1.0f / 2_000.0f;
-        float correction = Math.abs(filteredPhaseErrorMs) < PHASE_DEADBAND_MS
-            ? 0.0f
-            : Math.max(
-                -maxCorrection,
-                Math.min(maxCorrection, filteredPhaseErrorMs * gainPerMs)
-            );
-        float targetSpeed = beatmatchSpeed * (1.0f + correction);
-        if (Math.abs(targetSpeed - appliedIncomingSpeed) >= SPEED_STEP) {
-            incomingDeck.setSpeed(targetSpeed);
-            appliedIncomingSpeed = targetSpeed;
-            lastSpeedUpdateMs = nowMs;
-        }
         return lastPhaseErrorMs;
-    }
-
-    float appliedIncomingSpeed() {
-        return appliedIncomingSpeed;
     }
 
     private float medianPhaseErrorMs() {
         int count = Math.min(phaseSamples, recentPhaseErrorsMs.length);
-        float[] samples = new float[count];
-        System.arraycopy(recentPhaseErrorsMs, 0, samples, 0, count);
+        if (count == 0) return lastPhaseErrorMs;
+        float[] samples = Arrays.copyOf(recentPhaseErrorsMs, count);
         Arrays.sort(samples);
         return samples[count / 2];
+    }
+
+    float beatmatchSpeed() {
+        return beatmatchSpeed;
     }
 
     float lastPhaseErrorMs() {
@@ -710,7 +710,6 @@ final class NativeMixController {
 
     private void resetTransition() {
         beatmatchSpeed = 1.0f;
-        appliedIncomingSpeed = 1.0f;
         activePlan = null;
         mixOutgoingDeck = null;
         mixIncomingDeck = null;

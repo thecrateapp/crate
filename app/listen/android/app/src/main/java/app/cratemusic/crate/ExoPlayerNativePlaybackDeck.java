@@ -1,5 +1,6 @@
 package app.cratemusic.crate;
 
+import androidx.annotation.Nullable;
 import androidx.media3.common.PlaybackParameters;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
@@ -15,11 +16,17 @@ final class ExoPlayerNativePlaybackDeck implements NativePlaybackDeck {
 
     private final ExoPlayer player;
     private final NativeMixAudioProcessor audioProcessor;
+    @Nullable
+    private final PcmBusMixer busMixer;
+    @Nullable
+    private final PcmBusChannel busChannel;
     private final List<NativeTrack> queue = new ArrayList<>();
 
     ExoPlayerNativePlaybackDeck(
         ExoPlayer player,
-        NativeMixAudioProcessor audioProcessor
+        NativeMixAudioProcessor audioProcessor,
+        @Nullable PcmBusMixer busMixer,
+        int busChannelIndex
     ) {
         if (player == null) {
             throw new IllegalArgumentException("ExoPlayer is required");
@@ -31,6 +38,8 @@ final class ExoPlayerNativePlaybackDeck implements NativePlaybackDeck {
         }
         this.player = player;
         this.audioProcessor = audioProcessor;
+        this.busMixer = busMixer;
+        this.busChannel = busMixer == null ? null : busMixer.channel(busChannelIndex);
     }
 
     void replaceQueue(
@@ -106,6 +115,7 @@ final class ExoPlayerNativePlaybackDeck implements NativePlaybackDeck {
                 "Track is not part of the deck queue"
             );
         }
+        releaseHold();
         player.seekTo(index, Math.max(0L, startPositionMs));
         player.prepare();
     }
@@ -175,6 +185,28 @@ final class ExoPlayerNativePlaybackDeck implements NativePlaybackDeck {
     }
 
     @Override
+    public boolean holdStart() {
+        if (busChannel == null) return false;
+        busChannel.hold();
+        return true;
+    }
+
+    @Override
+    public long busFrame() {
+        return busMixer == null ? 0L : busMixer.busFrame();
+    }
+
+    @Override
+    public void startAtBusFrame(long busFrame) {
+        if (busChannel != null) busChannel.startAt(busFrame);
+    }
+
+    @Override
+    public void releaseHold() {
+        if (busChannel != null) busChannel.releaseHold();
+    }
+
+    @Override
     public void setVolume(float volume) {
         audioProcessor.setTargetGain(volume);
     }
@@ -200,6 +232,7 @@ final class ExoPlayerNativePlaybackDeck implements NativePlaybackDeck {
 
     @Override
     public void releasePreparedSource() {
+        releaseHold();
         player.pause();
         player.stop();
         audioProcessor.clearEnvelope();

@@ -195,8 +195,8 @@ final class NativeTransitionPlan {
     NativeTransitionPlan withPrerollRoom(long outgoingDurationMs) {
         if (!isBeatmatch() || incomingTempoRatio <= 0.0f) return this;
         long roomMs = Math.round(startIncomingCueMs() / (double) incomingTempoRatio);
-        if (roomMs >= NativeMixController.PREROLL_MS) return this;
-        long shiftMs = NativeMixController.PREROLL_MS - roomMs;
+        if (roomMs >= NativeMixController.PREROLL_LEAD_MS) return this;
+        long shiftMs = NativeMixController.PREROLL_LEAD_MS - roomMs;
         if (
             outgoingDurationMs > 0L &&
             outgoingCueMs + shiftMs + durationMs + NativeMixTrigger.START_SAFETY_LEAD_MS >
@@ -216,7 +216,7 @@ final class NativeTransitionPlan {
         return Math.max(
             0L,
             startIncomingCueMs()
-                - Math.round(NativeMixController.PREROLL_MS * (double) incomingTempoRatio)
+                - Math.round(NativeMixController.PREROLL_LEAD_MS * (double) incomingTempoRatio)
         );
     }
 
