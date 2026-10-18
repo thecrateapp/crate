@@ -1,0 +1,71 @@
+{
+  "count": 4,
+  "items": [
+    {
+      "id": 1,
+      "user_id": 11,
+      "user_name": "Lucía de muestra",
+      "user_username": "lucia",
+      "user_email": "lucia@example.test",
+      "source": "bandcamp",
+      "source_ref": "https://example.test/bandcamp/luz-de-octubre",
+      "album_id": 41,
+      "album_entity_uid": "album-sample-41",
+      "album_slug": "luz-de-octubre",
+      "artist_name": "Costa Norte",
+      "album_name": "Luz de octubre",
+      "status": "imported",
+      "imported_at": "2026-10-18T09:00:00Z",
+      "has_cover": false,
+      "track_count": 8,
+      "total_duration": 1853
+    },
+    {
+      "id": 2,
+      "user_id": 12,
+      "user_username": "mar-de-muestra",
+      "source": "listen_upload",
+      "source_ref": "uploads/sample/caminos-que-siguen-mas-alla-del-horizonte-y-del-final-de-la-linea.flac",
+      "album_id": 42,
+      "album_slug": "caminos-de-la-costa",
+      "artist_name": "El conjunto de músicos de la costa y sus alrededores",
+      "album_name": "Caminos que siguen más allá del horizonte y del final de la línea",
+      "status": "imported",
+      "imported_at": "2026-10-17T09:00:00Z",
+      "has_cover": false,
+      "track_count": 12,
+      "total_duration": 2442
+    },
+    {
+      "id": 3,
+      "user_id": 13,
+      "user_email": "curadora@example.test",
+      "source": "admin_upload",
+      "source_ref": "uploads/sample/sin-album-asociado.flac",
+      "album_id": null,
+      "artist_name": "Dársena",
+      "album_name": "Mareas",
+      "status": "withdrawn",
+      "withdrawn_at": "2026-10-18T10:00:00Z",
+      "imported_at": null,
+      "has_cover": false,
+      "track_count": 0,
+      "total_duration": 0
+    },
+    {
+      "id": 4,
+      "user_id": 14,
+      "source": "external_sample",
+      "source_ref": "sample/ref-004",
+      "album_id": 43,
+      "album_slug": "puerto",
+      "artist_name": "Viento Sur",
+      "album_name": "Puerto",
+      "status": "imported",
+      "imported_at": "2026-10-16T09:00:00Z",
+      "has_cover": false,
+      "track_count": 6,
+      "total_duration": 1430
+    }
+  ]
+}

@@ -14,6 +14,13 @@ export default defineConfig({
       resolveId(source, importer) {
         if (!importer?.includes("/app/ui/") || !source.startsWith("@/")) return;
         if (
+          importer.endsWith("/app/ui/src/pages/Contributions.tsx") &&
+          source === "@/lib/api"
+        )
+          return fileURLToPath(
+            new URL("admin-contributions-fixtures.ts", import.meta.url),
+          );
+        if (
           importer.endsWith("/app/ui/src/pages/Trash.tsx") &&
           ["@/lib/api", "@/lib/tasks"].includes(source)
         )
@@ -96,6 +103,9 @@ export default defineConfig({
         ),
         adminTrash: fileURLToPath(
           new URL("admin-trash-demo.html", import.meta.url),
+        ),
+        adminContributions: fileURLToPath(
+          new URL("admin-contributions-demo.html", import.meta.url),
         ),
         adminOperations: fileURLToPath(
           new URL("admin-operations-demo.html", import.meta.url),

@@ -843,3 +843,13 @@ all previous specimens, including published 1AD, remain. Live policy now covers 
 whole Task 1b.8 or phase 6.4's Trash index/pagination/data work. Evidence/review/limits are in the
 main handover and [execution plan](2026-10-18-crate-v3-library-trash-icons.md).
 **Stop at local 1AE for Diego before commit/push or another group. Keep preview :5186 active.**
+
+## 1AF execution record — Contributions, 2026-10-18
+
+1AE Library Trash approved/published `638f4b0debe3adcca2b7b31f1b3e89323c58ad7b`, verified at
+origin. The next authorised group is Contributions alone, extending the existing DS §1.7 decision,
+not creating another icon policy: redundant header/idle refresh removed, two named loading glyphs
+retained. Real attribution, source/status fields, album/cover helpers and GET limit150 stay intact.
+Only rendering/shared-identity containment changes; no backend, new foundation variant or Listen
+change. Exact preview isolation and source policy continue. 1AF stays local for Diego before
+publication; no next group. See final handover for focused evidence and remaining QA.

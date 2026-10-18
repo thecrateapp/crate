@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { HandHeart, Loader2, RefreshCw } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@crate/ui/shadcn/button";
@@ -79,41 +79,47 @@ export function Contributions() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-white/10 bg-card/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
+      <section className="border-b border-border-quiet pb-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
-              <HandHeart size={22} />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">
-                Contributions
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Review what users brought into the shared library and who owns
-                each import.
-              </p>
-            </div>
+          <div>
+            <h1 className="font-display text-3xl font-bold text-foreground">
+              Contributions
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Review what users brought into the shared library and who owns
+              each import.
+            </p>
           </div>
           <Button
             type="button"
             variant="outline"
+            className="min-h-11"
             disabled={loading}
+            aria-busy={loading}
             onClick={() => void load()}
           >
-            <RefreshCw
-              size={15}
-              className={loading ? "mr-2 animate-spin" : "mr-2"}
-            />
+            {loading ? (
+              <Loader2
+                data-admin-ux="contributions-refresh-loading"
+                aria-hidden="true"
+                size={16}
+                className="mr-2 animate-spin"
+              />
+            ) : null}
             Refresh
           </Button>
         </div>
       </section>
 
-      <Card className="border-white/10 bg-card/70">
+      <Card className="border-border-quiet bg-card">
         {loading ? (
           <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-            <Loader2 size={16} className="animate-spin" />
+            <Loader2
+              data-admin-ux="contributions-list-loading"
+              aria-hidden="true"
+              size={16}
+              className="animate-spin"
+            />
             Loading contributions...
           </div>
         ) : items.length === 0 ? (
@@ -126,7 +132,7 @@ export function Contributions() {
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-white/8">
+          <div className="divide-y divide-border-quiet">
             {items.map((item) => {
               const albumPath = item.album_id
                 ? albumPagePath({
@@ -150,10 +156,10 @@ export function Contributions() {
               return (
                 <div
                   key={item.id}
-                  className="flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between"
+                  className="flex flex-col gap-4 px-5 py-4 xl:flex-row xl:items-center xl:justify-between"
                 >
-                  <div className="flex min-w-0 items-center gap-4">
-                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-white/[0.04]">
+                  <div className="flex min-w-0 flex-1 items-center gap-4">
+                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-border-quiet bg-muted">
                       {coverUrl ? (
                         <img
                           src={coverUrl}
@@ -166,12 +172,12 @@ export function Contributions() {
                       {albumPath ? (
                         <Link
                           to={albumPath}
-                          className="truncate text-sm font-semibold text-white/90 hover:text-primary"
+                          className="inline-flex min-h-11 min-w-11 max-w-full items-center text-sm font-semibold text-foreground hover:text-accent-action-hi"
                         >
-                          {item.album_name}
+                          <span className="truncate">{item.album_name}</span>
                         </Link>
                       ) : (
-                        <div className="truncate text-sm font-semibold text-white/90">
+                        <div className="truncate text-sm font-semibold text-foreground">
                           {item.album_name}
                         </div>
                       )}
@@ -196,14 +202,14 @@ export function Contributions() {
                       </div>
                     </div>
                   </div>
-                  <div className="text-left md:text-right">
-                    <div className="text-sm font-medium text-white/80">
+                  <div className="w-full min-w-0 text-left xl:w-auto xl:max-w-xs xl:text-right">
+                    <div className="break-words text-sm font-medium text-foreground">
                       {contributorName(item)}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {item.imported_at ? timeAgo(item.imported_at) : "unknown"}
                     </div>
-                    <div className="mt-1 max-w-[320px] truncate font-mono text-[11px] text-white/35">
+                    <div className="mt-1 max-w-full truncate font-mono text-label text-text-muted">
                       {item.source_ref}
                     </div>
                   </div>

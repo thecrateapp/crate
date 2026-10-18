@@ -30,6 +30,7 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
     "app/ui/src/pages/SystemHealth.tsx",
     "app/ui/src/pages/Health.tsx",
     "app/ui/src/pages/Trash.tsx",
+    "app/ui/src/pages/Contributions.tsx",
   ]);
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
@@ -85,6 +86,8 @@ const approvedControls = new Map([
 ]);
 // Diego's 1W steering explicitly retains UX glyphs. Each concrete site remains bounded.
 const approvedUx = new Map([
+  ["Contributions:contributions-refresh-loading", ["lucide-react", "Loader2"]],
+  ["Contributions:contributions-list-loading", ["lucide-react", "Loader2"]],
   ["Trash:trash-refresh-loading", ["lucide-react", "Loader2"]],
   ["Trash:trash-empty-loading", ["lucide-react", "Loader2"]],
   ["Trash:trash-list-loading", ["lucide-react", "Loader2"]],

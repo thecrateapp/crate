@@ -4,38 +4,44 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — 1AD published; 1AE local review
+## Active Linux workspace — 1AE published; 1AF local review
 
 Use `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing feat/crate_v3 tracking origin.
-Published HEAD/remote is **5e1d9c8f287804a834b3143f6367f7e5a2ef8e31** (1AD, verified push/ref).
+Published HEAD/remote is **638f4b0debe3adcca2b7b31f1b3e89323c58ad7b** (1AE, verified push/ref).
 Original 53177736 remains an ancestor. Leave `/home/diego/Code/Ninja/crate` (feat/crate_mcp) alone.
 Node 22.23.3 is `/home/diego/.nvm/versions/node/v22.23.3/bin`; dependencies are installed.
 
-Diego approved/published the corrected Health issue queue and authorised the next group.
-1AE is Library Trash alone: redundant header/idle action icons removed, four bounded loading
-sites retained. All helper/request/task/effect/disabled/confirmation code is unchanged; controls
-keep 44 px targets and shared fonts/solid identity. No shared/API/backend/provider work in 1AE.
-The live policy covers 14 whole files / 44 UX sites; original 1V inventory remains unchanged.
+Diego approved/published Library Trash and authorised the next bounded group. Local 1AF covers
+Contributions alone: redundant HandHeart/header tile and idle RefreshCw removed; two exact
+Loader2 loading sites retained. Helpers, GET limit150, state/effect, callbacks and disabling
+remain unchanged. Attribution, source/status, duration/count metadata and real album/cover
+helpers stay. 44px refresh/album links, Bricolage heading, Poppins body and Mono source reference
+follow shared identity. Rows stack untilxl so the real sidebar cannot squeeze album links.
+No shared/API/backend/data/permission redesign. The live policy covers 15 whole files /46 UX sites;
+original 1V inventory is untouched. Full 1b.8 is not complete.
 
-Review <http://127.0.0.1:5186/admin-trash-demo.html> or persistent `/#papelera-admin`. Actual Trash
-with labelled fictional tracks, local task success/failure/completion, no API/SSE/library writes.
-Earlier specimens, especially approved 1AD accents/spacing, remain. Sample fields measure 8 px.
+Review <http://127.0.0.1:5186/admin-contributions-demo.html> or persistent `/#aportes-admin`.
+Actual page, labelled fictional users/contributions, local ready/loading/empty/error reads and explicit
+sample album destinations; no backend/SSE/writes. Sample field gap is actual 8 px. All previous
+specimens remain, including published 1AE and Health's approved accents/spacing.
 
-Scoped evidence: 26 Vitest, four preview/three built-Admin Chromium, three strict TS configs,
-lint/format/audit, Admin and ten-entry preview builds pass. Admin 526755 / 532480 B gzip,
-ten assets, 5725 B margin (12 B below 1AD). Final review: Critical 0 / Important 0 / Minor 2; proof/rulings are in the main handover.
-Deferred: dedicated bulk cancel/busy/failure tests and technical-line typography (Poppins; paths Mono).
-Known build cache restored. 1AE remains uncommitted; no next group before Diego's review.
+Current scoped evidence:26 Vitest,4 preview/3 built-Admin Chromium,3 strict TS configs,
+scoped lint/format/audit, Admin/11-entry preview builds pass;526770/532480B initial gzip,
+5710B margin. Fresh review:0 Critical/0 Important/1 Minor (long-contributor/full-long-title
+coverage deferred). Actual IAB advisory proof saved, tab retained; service active/HTTP200.
+Known generated cache restored. The final main handover owns full rulings and QA limits.
+Existing initial-error toast/empty and refresh-error/older-items behavior are preserved, not a
+freshness redesign. Native disabled Refresh releases focus during a held read as before1AF;
+keyboard activation and subsequent Tab navigation are tested, no automatic focus restoration.
+Live auth/ownership/import data, artwork rendering and large/over150 lists are integration QA.
 
-Keep `crate-v3-preview.service` active on loopback :5186 (this worktree/Node 22, restart-on-failure).
-No full suites/CI/canonical captures or actual worker/backend/native/AT/other-engine QA. Existing
-Trash list/error/toast semantics and later phase 6.4 index/pagination remain; no data redesign.
-The 33 canonical PNGs/manifest remain 1M; pin 258bbaee unchanged/unavailable. Whole 1b.8 is pending.
-**Stop at 1AE before commit/push or another group; no PR/merge/rebase/deploy/release.**
+Keep `crate-v3-preview.service` active on loopback :5186 (this worktree/Node22, restart-on-failure).
+No full suites/CI/canonical refresh, real backend/worker operations or native/AT/other-engine QA.
+The33 canonical PNGs/manifest remain1M; pin258bbaee unchanged/unavailable. No Smart Mix integration.
+**Stop at 1AF uncommitted for Diego, no next group/publication/PR/merge/rebase/deploy/release.**
 
-Diego retains Listen's layered play/halo/progress ring and luminous seek trail from 1S; preserve
-these. 1AD's approved 1 px accent rail, primary review hierarchy and typography/spacing remain.
-The generic bootstrap below is historical for a fresh machine; it does not replace this worktree.
+Diego retains Listen's layered play/halo/progress ring and luminous seek trail from1S. The
+bootstrap below is historical for a fresh machine; it does not replace this isolated worktree.
 
 ## Prepare the checkout
 

@@ -11,9 +11,11 @@ continuation on Linux; this final publication record supersedes earlier local-on
 Its three-block Dashboard, producer interpretation fixes and Ops/Analysis typography remain intact.
 **1AC System Health is approved and published as `439b3e78daf2719d86cee72dd5726f7bc210c504`.**
 **1AD Library Health is approved and published as `5e1d9c8f287804a834b3143f6367f7e5a2ef8e31`.**
-Task 1b.8 / checkpoint **1AE Library Trash is local for Diego review**, with retained UX and
-unchanged real worker/confirmation contracts. Next stop: 1AE before commit/push.
-Review <http://127.0.0.1:5186/admin-trash-demo.html> or persistent `/#papelera-admin`.
+**1AE Library Trash is approved and published as `638f4b0debe3adcca2b7b31f1b3e89323c58ad7b`.**
+Task 1b.8 / checkpoint **1AF Contributions is local for Diego review**, preserving functional
+loading glyphs, attribution, source/status metadata, real album/cover helpers and read contract.
+Review <http://127.0.0.1:5186/admin-contributions-demo.html> or persistent `/#aportes-admin`.
+Next stop: 1AF before commit/push or another group.
 
 Published **1AD Health** context: Diego approved the issue-queue sketch and explicitly authorised
 its implementation on 2026-10-18.
@@ -28,7 +30,7 @@ The final composition record below and
 [`2026-10-18-crate-v3-health-inbox.md`](2026-10-18-crate-v3-health-inbox.md) supersede the
 historical icon-only and awaiting-sketch-approval stops. **The former 1AD stop is superseded by Diego's publication approval.**
 Earlier provisional/publication stops are historical and superseded by Diego's approval and
-next-group request on 2026-10-18. **Next stop: 1AE before commit/push or another group.**
+next-group request on 2026-10-18. **Next stop: 1AF before commit/push or another group.**
 The retained Listen play/halo/ring and luminous seek trail
 from 1S remain intact. Resume on Linux with
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
@@ -37,7 +39,7 @@ Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 ## Where the work lives
 
 - Active Linux worktree: `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing branch
-  `feat/crate_v3`, published HEAD `5e1d9c8f287804a834b3143f6367f7e5a2ef8e31` (1AD);
+  `feat/crate_v3`, published HEAD `638f4b0debe3adcca2b7b31f1b3e89323c58ad7b` (1AE);
   transfer checkpoint `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. Node 22.23.3, root
   dependencies and persistent :5186 preview are prepared. This isolates the MCP agent's
   `/home/diego/Code/Ninja/crate` checkout (`feat/crate_mcp`); leave its files untouched.
@@ -234,7 +236,8 @@ is a token-based chart configuration, not a selectable product skin.
 | 1b.8 / Checkpoint 1AB                                        | Approved/published `2d047fec`: three-block Dashboard plus Ops/Analysis fonts. Origin SHA verified; scoped publication replay89Vitest/5Chromium green.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 1b.8 / Checkpoint 1AC                                        | Approved/published `439b3e78`: System Health icon retirement, shared window/text refresh and preserved instruments. Origin SHA verified; publication replay 27 Vitest / four preview Chromium green.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 1b.8 / Checkpoint 1AD                                        | Approved and published as 5e1d9c8f: corrected issue queue, retained UX and real contracts. Next local group: Library Trash / 1AE.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| 1b.8 / Checkpoint 1AE                                        | Local for Diego review: Library Trash icon retirement, real worker/confirmation contracts and retained UX. 26 Vitest / seven Chromium green; 526755 B gzip. No commit/push.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 1b.8 / Checkpoint 1AE                                        | Approved/published `638f4b0d`: Library Trash text actions, retained UX and real task/confirmation contracts. Publication replay 26 Vitest / one embedding Chromium pass.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 1b.8 / Checkpoint 1AF                                        | Local for Diego review: Contributions, retained UX/data/routes. 26 Vitest / seven Chromium; 526770 B gzip, 5710 B margin. Review 0 Critical/0 Important/1 Minor deferred. No commit/push.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -3136,3 +3139,119 @@ icon group, with functional UX retained. This supersedes every older 1AE local-o
 reviewed source remains unchanged; preview label/footer now say published. Earlier scoped
 validation and deferred limits remain recorded. Remote publication SHA will be recorded after
 push verification; next implementation stops at 1AF before another commit/push.
+
+## Final Linux record — 1AE published; 1AF Contributions local (2026-10-18)
+
+Diego approved1AE and authorised commit/push plus the next bounded Admin group with functional
+UX retained. Published `638f4b0debe3adcca2b7b31f1b3e89323c58ad7b`, `feat(ui): retire redundant
+Library Trash icons`, is verified by push and remote ref. Publication metadata replay passes
+26 scoped Vitest +one embedding Chromium. The worktree was clean before1AF. Earlier Trash
+minor coverage/typography limits remain; this group does not widen that work.
+
+**1AF production scope: pages/Contributions.tsx alone.** Retire HandHeart/decorative header tile
+and idle RefreshCw. Retain two conditional Loader2 sites: contributions-refresh-loading and
+contributions-list-loading, both aria-hidden, with busy from existing loading. Refresh and album
+links have44px targets; Bricolage heading, Poppins body and Mono source references follow the
+shared solid identity. Rows/metadata stack untilxl so the Sidebar cannot squeeze the links.
+All contributor/source fallbacks, status, timestamps, track/duration metadata and real album/cover
+helpers stay. Source policy expands to15 complete files/46 concrete UX sites; original1V records
+remain. No new tokens, foundation variant, dependency, backend/API, auth/permission/shared source
+or Listen/Desktop change. This does not complete1b.8 or contribution-management product work.
+
+Read-only AST audit against published1AE: all three helper/action functions, four component
+pre-render declarations/statements, one API request/limit, two album/cover helper calls, three
+state/effect calls, existing disable condition and callback unchanged. The actual route and
+Sidebar remain library.import.manage. Existing initial error toast→empty and refresh error→older
+items remain; this group does not claim those states are fresh/complete data. Missing album_id
+remains non-link text; the sample includes named/username/email/unknown identity fallbacks.
+
+Real Contributions specimen: <http://127.0.0.1:5186/admin-contributions-demo.html>, persistent
+`/#aportes-admin`. Only this page's API import is redirected; response-shaped fictional data,
+local ready/loading/empty/error reads, manual completion and explicit sample album destinations.
+Actual album route helpers still generate destinations; covers are tested at component-src level
+(the sample has_cover=false), not certified visually. No fetch/EventSource/writes in the adapter;
+unknown methods/paths fail closed. All earlier checkpoints remain,1AE label/footer published.
+
+Validation: observed4 expected unit failures/22 passes before production rendering edits, then
+**26 scoped Vitest** (10 page +16 policy). Missing preview entry RED, then **four preview and
+three built-Admin Chromium** at1440/768/390 with one worker. Two actual layout findings corrected:
+preview implicit grid track expanded to603px, fixed with explicit grid-cols-1; real Sidebar
+squeezed links to30px at768, fixed by stacking untilxl and min44px link width. Target/overflow
+assertions kept. Real limit150, no write, held busy/disable, source attribution, keyboard Enter/Tab,
+real hrefs and local navigation covered. Sample field gap measures8px.
+
+Ruling: the original plan/test demanded automatic focus return after a held refresh. Baseline
+and current native disabled={loading}, effect and callback code are identical; Chromium drops
+focus while disabled. Preserve existing behavior and verify keyboard activation plus subsequent
+Tab access, rather than introduce focus orchestration in an icon group. Cost: automatic focus
+restoration is a separate accessibility follow-up, not a verified promise. The immediate-promise
+jsdom focus assertion was removed because it did not model that native behavior; real read and
+keyboard assertions remain. No timeout inflation, forced clicks, hidden overflow or new product
+error-state behavior.
+
+Three strict scoped TS configs pass, scoped ESLint/format and Admin/11-entry preview builds pass.
+Admin initialJS **526770/532480 B gzip**,10 assets, **5710B margin**,15B above1AE; ceiling unchanged.
+Initial lint cwd lacked app/ui's config; corrected scoped command passes. Known generated build
+cache restored. No complete suite/CI/canonical refresh. Full validation remains phase-close;
+real auth/backend/ownership/import integration, actual covers, large/over150 data, native/AT/zoom
+and other engines are pending. Canonical33 PNGs/manifest remain1M; app/web@258bbaee unchanged.
+One fresh review, final rulings and advisory proof follow; **stop at1AF uncommitted for Diego**.
+
+### 1AF fresh review, rulings and final stop
+
+One fresh read-only review covered all 20 pending files, including nine untracked, against
+published 1AE. Verdict: ready for Diego visual review, **Critical 0 / Important 0 / Minor 1**.
+No product repair or second review loop. The review did not run tests, browser or network.
+
+Deferred Minor: the fixture exercises long album/artist/source strings but not a long contributor;
+browser checks assert the short title's accessible name, not explicitly the full long title.
+Current viewport checks therefore do not certify either case. Existing min-width/word wrapping
+and link text remain; no production failure was observed. Add those assertions in a future
+focused coverage change; no claim that review-focus item 1 is completely covered.
+
+Executor rulings, in review order:
+
+1. Live access control: actual route/sidebar declarations still agree on library.import.manage.
+   Keep them unchanged; mocked login is not live authorization evidence. Cost: real enforcement QA pending.
+2. Import ownership: retain supplied attribution and precedence, without backend edits. Cost:
+   tests prove rendering, not correctness of production ownership records.
+3. Artwork: helper/src output is covered and unmodified; sample has no covers. Cost: actual cover
+   delivery/appearance is not certified by the specimen.
+4. Over150/pagination/performance: preserve the bounded GET, no invented completeness/count claim.
+   Cost: this group establishes neither full-library coverage nor large-list performance.
+5. Error data semantics: preserve tested toast→empty and refresh error→older items. Cost: their
+   existing potentially misleading freshness presentation remains for separate product work.
+6. Refresh focus: preserve the native disabled loading contract, with Enter/Tab checks. Cost:
+   automatic focus restoration is absent, not claimed by jsdom or keyboard re-entry tests.
+7. Native/AT/zoom/other engines: retain the scoped Chromium boundary. Cost: device/runtime
+   qualification remains pending, not inferred from local tests.
+8. Full suites/CI/canonical parity/pin: honor Diego's development restriction; no complete suite,
+   CI dispatch or baseline regeneration.33 PNGs/manifest remain1M and pin258bbaee unchanged.
+   Cost: scoped passes do not close phase QA or certify canonical/reference visual parity.
+9. Earlier Trash limits and other Admin icon scopes: keep published1AE and its limits intact;
+   no additional page changes. Cost: dedicated Trash bulk tests/technical typography and global
+   icon migration remain separate work, not completed by1AF.
+10. Preview/proof/acceptance: executor inspected the actual IAB page, exercised Refresh and
+    manual completion, marked the tab deliverable and saved advisory proof. User service active,
+    entry HTTP200. Cost: local availability/inspection does not constitute Diego's acceptance.
+11. Publication: only1AE's commit/push was authorized. Keep1AF uncommitted at HEAD/origin638f4b0d;
+    no next group, PR/merge/rebase/deploy/release. Cost: local changes require subsequent approval
+    before publication, as explicitly requested.
+
+Final evidence:26 scoped Vitest,4 preview +3 built-Admin Chromium, three strict configs,
+scoped lint/format, AST audit, Admin build and11-entry preview build pass. Admin526770/532480B
+initial gzip,10 assets,5710B margin. Known tsbuildinfo restored; diff/format checks pass. Source
+was frozen during review; final closure changes only records/proof, no repeated passing suites
+for bookkeeping. Original checkpoint ancestor and published remote ref verified.
+
+Proof `.artifacts/review/checkpoint-1af-contributions.jpg` is the actual IAB1310×1424 page, not a
+canonical baseline. Review <http://127.0.0.1:5186/admin-contributions-demo.html> or persistent
+`/#aportes-admin`. All previous specimens remain, especially1AD's approved visual accents and
+Listen's retained1S play/ring/seek. **Stop at1AF for Diego, no commit/push or further group.**
+
+## 1AF publication approval — 2026-10-18
+
+Diego approved Contributions and requested commit/push followed by the next bounded Admin icon
+group with UX retained. Earlier 1AF local-only stops are superseded; scoped checks and documented
+limits remain. Only preview publication labels change before commit. Remote SHA follows push
+verification. Next implementation stops at 1AG before publication or another group.

@@ -1,7 +1,7 @@
 # Crate v3 design system
 
-Current implementation: checkpoints through 1AD are approved and published (`5e1d9c8f`).
-1AD is published as 5e1d9c8f. Local 1AE retires redundant Library Trash icons, preserving UX and real task contracts.
+Current implementation: checkpoints through 1AE are approved and published (`638f4b0d`).
+Local 1AF retires redundant Contributions icons, preserving loading UX, attribution and real album/read contracts.
 Stop for Diego before commit/push. See the final handover for evidence and limits.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
@@ -4464,3 +4464,19 @@ all previous specimens, including published 1AD, remain. Live policy now covers 
 whole Task 1b.8 or phase 6.4's Trash index/pagination/data work. Evidence/review/limits are in the
 main handover and [execution plan](2026-10-18-crate-v3-library-trash-icons.md).
 **Stop at local 1AE for Diego before commit/push or another group. Keep preview :5186 active.**
+
+## Linux 1AF — bounded Contributions icon group (2026-10-18)
+
+Diego approved/published Library Trash as `638f4b0debe3adcca2b7b31f1b3e89323c58ad7b` and
+authorised the next bounded Admin group. Local 1AF covers `pages/Contributions.tsx`: remove
+HandHeart/header tile and idle RefreshCw; keep two exact conditional Loader2 sites, loading
+disabling/aria-busy, real response metadata and album/cover route helpers. Display heading, solid
+shared surfaces and 44px refresh/album links follow the existing V3 contract. No new shared
+variant/token/API, backend/data/permission redesign or Listen/Desktop change. Original 1V inventory
+is preserved; the live policy expands to 15 complete files / 46 concrete UX sites.
+
+The real page is at /admin-contributions-demo.html and persistent #aportes-admin with labelled
+fictional data, local reads and explicit sample album destinations. No real API/SSE/write traffic.
+Authoritative scope, evidence and limits: final handover and
+`2026-10-18-crate-v3-contributions-icons.md`. This does not complete 1b.8 or contribution-management
+product work. Stop at 1AF before commit/push; no full suites/CI/canonical baseline refresh.

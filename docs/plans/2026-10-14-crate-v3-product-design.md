@@ -2,9 +2,9 @@
 
 Status: product design, revised 2026-10-15. Canonical clone `/Users/diego/Code/crate-v3`, branch
 `feat/crate_v3`. The handover records implementation and QA status; historical analysis is not a
-current progress report. Checkpoints through 1AD are approved and published (`5e1d9c8f`).
-1AD is published as 5e1d9c8f. Local 1AE retires redundant Library Trash icons while preserving UX and real task
-contracts; stop for Diego before commit/push. The final handover and later amendments below
+current progress report. Checkpoints through 1AE are approved and published (`638f4b0d`).
+Local 1AF retires redundant Contributions icons while preserving loading UX, attribution and real
+album/read contracts; stop for Diego before commit/push. The final handover and later amendments below
 supersede earlier provisional stops. Diego's 1S review explicitly
 preserves the current Listen play essence (halo, layers and progress ring) and seek trail,
 adapted to V3 with 1–2 px strokes; see DS §5.5.
@@ -3678,3 +3678,19 @@ all previous specimens, including published 1AD, remain. Live policy now covers 
 whole Task 1b.8 or phase 6.4's Trash index/pagination/data work. Evidence/review/limits are in the
 main handover and [execution plan](2026-10-18-crate-v3-library-trash-icons.md).
 **Stop at local 1AE for Diego before commit/push or another group. Keep preview :5186 active.**
+
+## Linux 1AF — bounded Contributions icon group (2026-10-18)
+
+Diego approved/published Library Trash as `638f4b0debe3adcca2b7b31f1b3e89323c58ad7b` and
+authorised the next bounded Admin group. Local 1AF covers `pages/Contributions.tsx`: remove
+HandHeart/header tile and idle RefreshCw; keep two exact conditional Loader2 sites, loading
+disabling/aria-busy, real response metadata and album/cover route helpers. Display heading, solid
+shared surfaces and 44px refresh/album links follow the existing V3 contract. No new shared
+variant/token/API, backend/data/permission redesign or Listen/Desktop change. Original 1V inventory
+is preserved; the live policy expands to 15 complete files / 46 concrete UX sites.
+
+The real page is at /admin-contributions-demo.html and persistent #aportes-admin with labelled
+fictional data, local reads and explicit sample album destinations. No real API/SSE/write traffic.
+Authoritative scope, evidence and limits: final handover and
+`2026-10-18-crate-v3-contributions-icons.md`. This does not complete 1b.8 or contribution-management
+product work. Stop at 1AF before commit/push; no full suites/CI/canonical baseline refresh.
