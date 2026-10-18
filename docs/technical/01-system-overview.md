@@ -5,7 +5,7 @@ section: architecture
 audience: [developer, operator]
 status: canonical
 order: 50
-verified: 2026-07-21
+verified: 2026-10-18
 sources: [docker-compose.yaml, app/crate, app/readplane]
 ---
 
@@ -93,6 +93,14 @@ The canonical telemetry path is now `user_play_events`, not the old
 - stats recompute and scrobble happen asynchronously after commit
 - read surfaces such as history, recent activity, and stats derive from the
   new telemetry model
+
+### 6. Agent actions share the existing execution model
+
+Remote agents connect to the optional `/mcp` endpoint in `crate-api`. Scoped
+service credentials or delegated OAuth connections admit only catalogued
+operations. Exact plans, human approvals, durable jobs and worker effects use
+the same domain model as Admin, including editorial playlists and shows.
+See [Agents and MCP](11-crate-mcp.md) for the architecture and reading paths.
 
 ## Runtime stack
 

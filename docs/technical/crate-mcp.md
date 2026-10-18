@@ -5,11 +5,18 @@ section: operations
 audience: [operator, developer]
 status: canonical
 order: 170
-verified: 2026-10-16
+verified: 2026-10-18
 sources:
   [
     app/crate/agent_operations.py,
     app/crate/agent_editorial.py,
+    app/crate/agent_shows.py,
+    app/crate/mcp/show_schemas.py,
+    app/crate/api/show_imports.py,
+    app/crate/show_extraction.py,
+    app/crate/show_ocr.py,
+    app/crate/db/repositories/show_identities.py,
+    app/crate/db/repositories/show_import_selection.py,
     app/crate/mcp/editorial_schemas.py,
     app/crate/db/repositories/editorial_plans.py,
     app/crate/db/schema_sections/editorial_v116.py,
@@ -74,14 +81,19 @@ sources:
 
 # Crate MCP
 
-Crate exposes an optional MCP endpoint for remote agents to inspect and maintain the local library.
-OAuth/service credentials, integration management and exact human approval share one persisted
-plan/job engine. Phase 4 extends it with selected checks, quality, repairs, metadata, enrichment,
-analysis, indexed-album sync and metadata portability. Phase 5 adds scoped instance operations,
-schedules and revisioned runtime policy. Phase 6 adds private editorial plans, exact system-playlist
-publication and a versioned client skill. Phase 7 provides the [distribution contract and
-acceptance/rollout evidence](crate-mcp-distribution.md). Assisted shows remain phase 8.
-Deployment and action flags remain disabled by default.
+Crate exposes an optional MCP endpoint for remote agents to inspect the instance, maintain the
+local library and curate system playlists and shows. OAuth/service credentials, integration
+management and exact human approval share one persisted plan/job engine. The catalog includes
+selected checks, quality, repairs, metadata, enrichment, analysis, indexed-album sync, metadata
+portability, instance job controls, schedules and revisioned runtime policy. Editorial plans
+preserve system-playlist rules/overrides; show imports share identity and dedupe with Admin and
+provider syncs. Admin also offers manual, local OCR and explicitly selected model assistance;
+MCP submits structured show candidates without invoking server extraction.
+
+Start with [Agents and MCP](11-crate-mcp.md) for architecture and normal workflows. This page is
+the detailed connection/operations reference; its dated sections retain implementation evidence.
+The [distribution contract and acceptance guide](crate-mcp-distribution.md) covers tool schemas,
+client examples and rollout gates. Deployment and action flags remain disabled by default.
 
 ## Connection and deployment
 
@@ -97,7 +109,7 @@ producer. Existing migrations must be applied before issuing credentials. Keepin
 disabled leaves the endpoint unavailable and does not start its health snapshot producer.
 Actions additionally require `CRATE_MCP_ACTIONS_ENABLED=true` in the API and maintenance worker.
 Both flags default to false; granting an action scope alone does not enable actions.
-Apply migrations through 116 before using the current catalog. Migration 114 extends the existing
+Apply migrations through 119 before using the current catalog. Migration 114 extends the existing
 plan/job tables and adds private artifacts and DSP generation/claim provenance; it does not create
 a second agent execution engine.
 
@@ -911,7 +923,13 @@ provenance edge case: successful vision with `candidates=[]` left its manual fal
 source reference. One-image and two-image worker→draft→manual correction→preview/apply tests
 failed before the minimal fix. They now retain the image references and hashes durably, while
 failed vision remains unconfirmed and existing per-block OCR/text references remain intact.
-Final independent reviews have no outstanding P1/P2 findings.
+Final independent reviews have no outstanding P1/P2 findings. The published correction commit
+`da275ce455de2a17b9980857d2967f0d1a5c35e7` passed all 20 CI checks. Its completed persistent
+review reported only a P3 in the older relation-write/consolidation test. That test now observes
+the consolidation backend blocked by the relation writer's PID before releasing it, then verifies
+the actual outcome. All three attendance/reminder/removal variants passed with real PostgreSQL;
+an in-memory control removing the shared redirect lock failed all three at the lock assertion.
+No runtime change was needed for that follow-up.
 
 Focused validation used Python 3.13 and real PostgreSQL, with executions sharing the test
 database run sequentially:

@@ -5,7 +5,7 @@ section: operations
 audience: [operator, developer]
 status: canonical
 order: 171
-verified: 2026-10-16
+verified: 2026-10-18
 sources:
   - app/crate/mcp/contract.py
   - app/crate/mcp/telemetry.py
@@ -19,9 +19,12 @@ sources:
 
 # Crate MCP distribution and acceptance
 
-This is the phase-7 distribution cut. Phase 8 (manual/assisted shows), complete feature suites and
-production rollout remain later gates. No flags were enabled outside disposable tests. The
-[connection guide](crate-mcp.md) covers provisioning, OAuth endpoints and exact Admin review.
+This guide describes distribution of the current MCP contract and its acceptance/rollout gates.
+The dated phase-7 measurements below retain their original scope; manual/assisted shows and the
+final feature validation are recorded in the [connection guide](crate-mcp.md). Production rollout
+and real target-client/proxy acceptance remain separate gates. No flags were enabled outside
+disposable tests. Start with [Agents and MCP](11-crate-mcp.md) for the architecture; the connection
+guide covers provisioning, OAuth endpoints and exact Admin review.
 
 ## Versioned distribution
 
@@ -58,7 +61,7 @@ Discovery can be followed by a target-specific conflict.
 ## Remote connection and skill
 
 Use the exact HTTPS API `/mcp` endpoint, without a trailing slash or `/sse`. Apply migrations
-through **116** and configure the canonical issuer, TLS proxy and explicit Host/Origin allowlists
+through **119** and configure the canonical issuer, TLS proxy and explicit Host/Origin allowlists
 as described in the connection guide. Do not send human cookies or forward-auth headers to MCP.
 
 For human-delegated access, register the client's exact ID and redirect URIs in Admin. Discover

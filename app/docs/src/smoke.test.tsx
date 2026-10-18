@@ -12,6 +12,24 @@ afterEach(() => {
 });
 
 describe("docs app", () => {
+  it("publishes the MCP architecture guide with operational reading paths", async () => {
+    window.history.pushState(null, "", "/architecture/agents-and-mcp");
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", { name: "Agents and MCP", level: 1 }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("link", { name: "connection and operations" })
+        .getAttribute("href"),
+    ).toBe("/operations/crate-mcp");
+    expect(
+      screen
+        .getByRole("link", { name: "contract and acceptance" })
+        .getAttribute("href"),
+    ).toBe("/operations/crate-mcp-distribution");
+  });
+
   it("publishes the MCP distribution guide and links back to connection guidance", async () => {
     window.history.pushState(null, "", "/operations/crate-mcp-distribution");
     render(<App />);

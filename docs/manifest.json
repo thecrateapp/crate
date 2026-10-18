@@ -108,6 +108,15 @@
     "order": 99
   },
   {
+    "sourcePath": "docs/technical/11-crate-mcp.md",
+    "route": "/architecture/agents-and-mcp",
+    "section": "architecture",
+    "title": "Agents and MCP",
+    "summary": "How remote agents use Crate's shared plans, permissions and workers for diagnostics and curation.",
+    "keywords": ["mcp", "agents", "oauth", "plans", "editorial", "shows"],
+    "order": 100
+  },
+  {
     "sourcePath": "docs/operators/cast-receiver.md",
     "route": "/operations/cast-receiver",
     "section": "operations",
