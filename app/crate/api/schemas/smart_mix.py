@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class SmartMixApiModel(BaseModel):
@@ -188,6 +188,63 @@ class TransitionPlanResponse(SmartMixApiModel):
 class TransitionPlanBatchResponse(SmartMixApiModel):
     planner_version: Literal["smart-mix-v2"] = Field(alias="plannerVersion")
     plans: list[TransitionPlanResponse]
+
+
+class ContinuationDescriptor(SmartMixRequestModel):
+    kind: Literal["shaped_radio", "seeded_radio"]
+    session_id: str | None = Field(
+        default=None, alias="sessionId", min_length=1, max_length=128
+    )
+    seed_type: (
+        Literal["artist", "track", "album", "playlist", "home_playlist"] | None
+    ) = Field(default=None, alias="seedType")
+    seed_id: str | None = Field(
+        default=None, alias="seedId", min_length=1, max_length=256
+    )
+
+    @model_validator(mode="after")
+    def _require_kind_fields(self) -> "ContinuationDescriptor":
+        if self.kind == "shaped_radio" and not self.session_id:
+            raise ValueError("shaped_radio needs sessionId")
+        if self.kind == "seeded_radio" and not (self.seed_type and self.seed_id):
+            raise ValueError("seeded_radio needs seedType and seedId")
+        return self
+
+
+class PlaybackContinuationTokenRequest(SmartMixRequestModel):
+    descriptor: ContinuationDescriptor | None = None
+
+
+class PlaybackContinuationRequest(SmartMixRequestModel):
+    planner_version: Literal["smart-mix-v2"] = Field(alias="plannerVersion")
+    after_track_entity_uid: UUID | None = Field(
+        default=None, alias="afterTrackEntityUid"
+    )
+    recent_entity_uids: list[UUID] = Field(
+        default_factory=list, alias="recentEntityUids", max_length=200
+    )
+    limit: int = Field(default=10, ge=1, le=30)
+    delivery: str = Field(
+        default="original", min_length=1, max_length=32, pattern=r"^[a-z_]+$"
+    )
+    context: TransitionContextRequest
+
+
+class ContinuationTrackResponse(SmartMixApiModel):
+    id: str
+    entity_uid: UUID = Field(alias="entityUid")
+    url: str
+    title: str
+    artist: str
+    album: str | None = None
+    duration_ms: int | None = Field(default=None, alias="durationMs")
+    source: dict
+
+
+class PlaybackContinuationResponse(SmartMixApiModel):
+    tracks: list[ContinuationTrackResponse]
+    plans: list[TransitionPlanResponse]
+    exhausted: bool
 
 
 class PlaybackContinuationTokenResponse(SmartMixApiModel):

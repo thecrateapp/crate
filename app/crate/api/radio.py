@@ -94,6 +94,94 @@ def _resolve_track_path(
 _RADIO_CACHE_TTL = 300  # 5 minutes
 
 
+def continuation_radio_tracks(
+    descriptor: dict,
+    *,
+    user: dict,
+    limit: int,
+    exclude_entity_uids: set[str],
+) -> tuple[list[dict], bool]:
+    """Next radio tracks for a native continuation, skipping known entities."""
+    user_id = _effective_user_id(user)
+    fetch = min(100, limit + len(exclude_entity_uids))
+    if descriptor["kind"] == "shaped_radio":
+        from crate.radio_engine import get_session_user_id, next_tracks
+
+        session_id = descriptor["sessionId"]
+        if user_id is None or get_session_user_id(session_id) != user_id:
+            return [], True
+        result = next_tracks(session_id, min(50, fetch))
+        if not result:
+            return [], True
+        rows = result.get("tracks") or []
+        exhausted = bool(result.get("exhausted"))
+    else:
+        rows = _seeded_radio_rows(descriptor, user=user, user_id=user_id, limit=fetch)
+        if rows is None:
+            return [], True
+        rows = _sanitize_radio_tracks(_enrich_radio_tracks(rows))
+        exhausted = not rows
+    selected: list[dict] = []
+    seen = set(exclude_entity_uids)
+    for row in rows:
+        entity_uid = row.get("track_entity_uid") or row.get("entity_uid")
+        if not entity_uid or str(entity_uid) in seen:
+            continue
+        seen.add(str(entity_uid))
+        selected.append(row)
+        if len(selected) >= limit:
+            break
+    return selected, exhausted and not selected
+
+
+def _seeded_radio_rows(
+    descriptor: dict, *, user: dict, user_id: int | None, limit: int
+) -> list[dict] | None:
+    seed_type = descriptor["seedType"]
+    seed_id = str(descriptor["seedId"])
+    if seed_type in {"artist", "album", "playlist"} and not seed_id.isdigit():
+        return None
+    if seed_type == "artist":
+        if not get_library_artist_by_id(int(seed_id)):
+            return None
+        return generate_artist_radio(int(seed_id), limit=limit, user_id=user_id)
+    if seed_type == "album":
+        if not get_album_for_radio(int(seed_id)):
+            return None
+        return generate_album_radio(int(seed_id), limit=limit, user_id=user_id)
+    if seed_type == "playlist":
+        row = get_playlist_for_radio(int(seed_id))
+        if not row or (
+            row.get("scope") == "system" and not row.get("is_active", False)
+        ):
+            return None
+        if (
+            row.get("scope") != "system"
+            and row.get("user_id") != user_id
+            and user.get("role") != "admin"
+        ):
+            return None
+        return generate_playlist_radio(int(seed_id), limit=limit, user_id=user_id)
+    if seed_type == "home_playlist":
+        from crate.db.home import get_home_playlist
+
+        playlist = get_home_playlist(
+            user_id or user["id"], seed_id, limit=max(limit, 40)
+        )
+        if not playlist:
+            return None
+        return generate_virtual_playlist_radio(
+            playlist.get("tracks") or [], limit=limit, user_id=user_id
+        )
+    resolved_path = _resolve_track_path(
+        track_id=int(seed_id) if seed_id.isdigit() else 0,
+        entity_uid="" if seed_id.isdigit() else seed_id,
+    )
+    if not resolved_path:
+        return None
+    return generate_track_radio(resolved_path, limit=limit, user_id=user_id)
+
+
 @router.get(
     "/api/radio/stations",
     response_model=PersonalizedRadioStationsResponse,
@@ -409,9 +497,11 @@ def api_radio_start(request: Request, body: RadioStartRequest):
     summary="Get next batch of radio tracks",
 )
 def api_radio_next(request: Request, body: RadioNextRequest):
-    _require_auth(request)
-    from crate.radio_engine import next_tracks
+    user = _require_auth(request)
+    from crate.radio_engine import get_session_user_id, next_tracks
 
+    if get_session_user_id(body.session_id) != _effective_user_id(user):
+        return JSONResponse({"error": "Session not found or expired"}, status_code=404)
     result = next_tracks(body.session_id, body.count)
     if not result:
         return JSONResponse({"error": "Session not found or expired"}, status_code=404)

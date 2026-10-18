@@ -36,3 +36,4 @@ class UserAccessToken(Base):
         Text,
         ForeignKey("sessions.id", ondelete="CASCADE"),
     )
+    continuation_descriptor: Mapped[dict | None] = mapped_column(JSON)

@@ -73,6 +73,7 @@ def _insert_token(
     now: datetime,
     token_type: str = ACCESS_TOKEN_TYPE,
     session_id: str | None = None,
+    continuation_descriptor: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     secret = _generate_secret()
     token_prefix = secret[:ACCESS_TOKEN_PREFIX_LENGTH]
@@ -82,11 +83,12 @@ def _insert_token(
                 """
                 INSERT INTO user_access_tokens (
                     user_id, name, token_type, token_digest, token_prefix,
-                    scopes, expires_at, created_at, session_id
+                    scopes, expires_at, created_at, session_id,
+                    continuation_descriptor
                 ) VALUES (
                     :user_id, :name, :token_type, :token_digest, :token_prefix,
                     CAST(:scopes AS jsonb), :expires_at, :created_at,
-                    :session_id
+                    :session_id, CAST(:continuation_descriptor AS jsonb)
                 )
                 RETURNING id, user_id, name, token_type, token_digest,
                           token_prefix, scopes, expires_at, revoked_at,
@@ -103,6 +105,11 @@ def _insert_token(
                 "expires_at": expires_at,
                 "created_at": now,
                 "session_id": session_id,
+                "continuation_descriptor": (
+                    json.dumps(continuation_descriptor)
+                    if continuation_descriptor is not None
+                    else None
+                ),
             },
         )
         .mappings()
@@ -139,6 +146,7 @@ def issue_playback_continuation_token(
     *,
     user_id: int,
     session_id: str,
+    descriptor: dict[str, Any] | None = None,
     now: datetime | None = None,
     session=None,
 ) -> dict[str, Any]:
@@ -168,7 +176,37 @@ def issue_playback_continuation_token(
             now=issued_at,
             token_type=PLAYBACK_CONTINUATION_TOKEN_TYPE,
             session_id=session_id,
+            continuation_descriptor=descriptor,
         )
+
+
+def get_continuation_descriptor(
+    token_id: int,
+    *,
+    session=None,
+) -> dict[str, Any] | None:
+    def _impl(current) -> dict[str, Any] | None:
+        value = current.execute(
+            text(
+                """
+                SELECT continuation_descriptor
+                FROM user_access_tokens
+                WHERE id = :token_id AND token_type = :token_type
+                """
+            ),
+            {
+                "token_id": token_id,
+                "token_type": PLAYBACK_CONTINUATION_TOKEN_TYPE,
+            },
+        ).scalar_one_or_none()
+        if isinstance(value, str):
+            return json.loads(value)
+        return value
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
 
 
 def _token_query(where: str) -> str:
@@ -440,6 +478,7 @@ __all__ = [
     "create_access_token",
     "get_access_token",
     "get_access_token_by_secret",
+    "get_continuation_descriptor",
     "issue_playback_continuation_token",
     "list_access_tokens",
     "resolve_access_token",

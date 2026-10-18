@@ -209,7 +209,15 @@ _VDJ_ACCESS_TOKEN_ROUTES: tuple[tuple[frozenset[str], re.Pattern[str]], ...] = t
 
 _CONTINUATION_ACCESS_TOKEN_ROUTES: tuple[
     tuple[frozenset[str], re.Pattern[str]], ...
-] = ((frozenset({"POST"}), re.compile(r"/api/playback/transition-plans")),)
+] = tuple(
+    (frozenset(methods), re.compile(pattern))
+    for methods, pattern in (
+        ({"POST"}, r"/api/playback/transition-plans"),
+        ({"POST"}, r"/api/playback/continuation"),
+        ({"GET", "HEAD"}, rf"/api/tracks/by-entity/{_ENTITY_SEGMENT}/stream"),
+        ({"GET", "HEAD"}, rf"/api/catalog/tracks/{_ENTITY_SEGMENT}/stream"),
+    )
+)
 
 
 def _is_vdj_access_token_request(method: str, path: str) -> bool:
@@ -1740,7 +1748,7 @@ def _require_vdj_scope(request: Request, scope: str) -> dict:
     return user
 
 
-def _require_transition_plan_access(request: Request) -> dict:
+def _continuation_token_user(request: Request) -> dict | None:
     from crate.db.repositories.access_tokens import (
         PLAYBACK_CONTINUATION_SCOPE,
         PLAYBACK_CONTINUATION_TOKEN_TYPE,
@@ -1748,19 +1756,40 @@ def _require_transition_plan_access(request: Request) -> dict:
 
     user = _require_auth(request)
     if (
-        user.get("auth_type") == "access_token"
-        and user.get("token_type") == PLAYBACK_CONTINUATION_TOKEN_TYPE
+        user.get("auth_type") != "access_token"
+        or user.get("token_type") != PLAYBACK_CONTINUATION_TOKEN_TYPE
     ):
-        if PLAYBACK_CONTINUATION_SCOPE not in set(user.get("scopes") or []):
-            raise HTTPException(
-                status_code=403,
-                detail=(
-                    "Access token is missing required scope: "
-                    f"{PLAYBACK_CONTINUATION_SCOPE}"
-                ),
-            )
-        return user
-    return _require_vdj_scope(request, "vdj.smart_mix.read")
+        return None
+    if PLAYBACK_CONTINUATION_SCOPE not in set(user.get("scopes") or []):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"Access token is missing required scope: {PLAYBACK_CONTINUATION_SCOPE}"
+            ),
+        )
+    return user
+
+
+def _require_continuation_token(request: Request) -> dict:
+    user = _continuation_token_user(request)
+    if user is None:
+        raise HTTPException(
+            status_code=403,
+            detail="A playback continuation token is required",
+        )
+    return user
+
+
+def _require_stream_access(request: Request) -> dict:
+    return _continuation_token_user(request) or _require_vdj_scope(
+        request, "vdj.media.read"
+    )
+
+
+def _require_transition_plan_access(request: Request) -> dict:
+    return _continuation_token_user(request) or _require_vdj_scope(
+        request, "vdj.smart_mix.read"
+    )
 
 
 # ── Routes ───────────────────────────────────────────────────────

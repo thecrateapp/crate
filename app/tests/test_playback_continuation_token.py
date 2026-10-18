@@ -51,15 +51,24 @@ def _resolve(middleware, method: str, path: str, *, session_user):
     return resolved, session_check
 
 
-def test_continuation_token_resolves_only_for_transition_plans():
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("POST", "/api/playback/transition-plans"),
+        ("GET", f"/api/tracks/by-entity/{uuid.uuid4()}/stream"),
+        ("HEAD", f"/api/tracks/by-entity/{uuid.uuid4()}/stream"),
+        ("GET", "/api/catalog/tracks/global-track-1/stream"),
+    ],
+)
+def test_continuation_token_resolves_on_its_routes(method, path):
     from crate.api.auth import AuthMiddleware
 
     middleware = AuthMiddleware(lambda scope, receive, send: None)
 
     resolved, session_check = _resolve(
         middleware,
-        "POST",
-        "/api/playback/transition-plans",
+        method,
+        path,
         session_user={"id": 42},
     )
 
@@ -77,6 +86,9 @@ def test_continuation_token_resolves_only_for_transition_plans():
         ("POST", "/api/me/play-events"),
         ("GET", "/api/me"),
         ("POST", "/api/playback/continuation-token"),
+        ("PUT", f"/api/tracks/by-entity/{uuid.uuid4()}/stream"),
+        ("GET", f"/api/tracks/by-entity/{uuid.uuid4()}/playback"),
+        ("GET", f"/api/vdj/tracks/by-entity/{uuid.uuid4()}/stream"),
     ],
 )
 def test_continuation_token_is_rejected_outside_its_route(method, path):
@@ -188,6 +200,42 @@ def test_transition_plans_reject_a_continuation_token_without_its_scope(test_app
     assert response.status_code == 403
 
 
+def test_stream_accepts_a_continuation_token_without_vdj(test_app, monkeypatch):
+    from fastapi.responses import Response
+
+    from crate.api import browse_media
+
+    monkeypatch.setattr(
+        browse_media,
+        "get_track_delivery_row_by_entity_uid",
+        lambda entity_uid: {"entity_uid": entity_uid},
+    )
+    monkeypatch.setattr(
+        browse_media,
+        "_stream_track",
+        lambda request, track, delivery: Response(b"audio", media_type="audio/flac"),
+    )
+
+    with (
+        patch("crate.api.auth.AuthMiddleware.resolve_user", _continuation_user()),
+        patch("crate.api.auth.vdj_enabled", return_value=False),
+    ):
+        response = test_app.get(f"/api/tracks/by-entity/{uuid.uuid4()}/stream")
+
+    assert response.status_code == 200
+    assert response.content == b"audio"
+
+
+def test_stream_rejects_a_continuation_token_without_its_scope(test_app):
+    with patch(
+        "crate.api.auth.AuthMiddleware.resolve_user",
+        _continuation_user(scopes=()),
+    ):
+        response = test_app.get(f"/api/tracks/by-entity/{uuid.uuid4()}/stream")
+
+    assert response.status_code == 403
+
+
 def test_continuation_token_is_issued_for_the_current_session(test_app, monkeypatch):
     from crate.api import smart_mix
 
@@ -210,7 +258,7 @@ def test_continuation_token_is_issued_for_the_current_session(test_app, monkeypa
         "token": "crv_issued",
         "expiresAt": "2026-10-17T02:00:00Z",
     }
-    assert issued == [{"user_id": 42, "session_id": "session-7"}]
+    assert issued == [{"user_id": 42, "session_id": "session-7", "descriptor": None}]
 
 
 @pytest.mark.parametrize(

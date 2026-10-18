@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from urllib.parse import quote
 from typing import Literal
 from uuid import UUID
 
@@ -9,9 +10,11 @@ from fastapi import APIRouter, Body, HTTPException, Query, Request
 
 from crate.api.auth import (
     _require_auth,
+    _require_continuation_token,
     _require_transition_plan_access,
     _require_vdj_scope,
 )
+from crate.api.radio import continuation_radio_tracks
 from crate.api.openapi_responses import COMMON_ERROR_RESPONSES
 from crate.api.schemas.smart_mix import (
     CompatibilityScoreResponse,
@@ -20,6 +23,10 @@ from crate.api.schemas.smart_mix import (
     MixProfileResponse,
     TransitionContextRequest,
     TransitionEdgeRequest,
+    ContinuationTrackResponse,
+    PlaybackContinuationRequest,
+    PlaybackContinuationResponse,
+    PlaybackContinuationTokenRequest,
     PlaybackContinuationTokenResponse,
     TransitionPlanBatchRequest,
     TransitionPlanBatchResponse,
@@ -30,7 +37,10 @@ from crate.db.cache_store import (
     set_smart_mix_plan_caches,
 )
 from crate.db.queries.smart_mix_compatible import get_compatible_track_inputs
-from crate.db.repositories.access_tokens import issue_playback_continuation_token
+from crate.db.repositories.access_tokens import (
+    get_continuation_descriptor,
+    issue_playback_continuation_token,
+)
 from crate.db.repositories.smart_mix import (
     get_track_mix_profile_by_entity_uid,
     get_track_mix_profiles_by_entity_uids,
@@ -139,6 +149,7 @@ def compatible_tracks(
 )
 def playback_continuation_token(
     request: Request,
+    payload: PlaybackContinuationTokenRequest | None = Body(None),
 ) -> PlaybackContinuationTokenResponse:
     user = _require_auth(request)
     session_id = user.get("session_id")
@@ -147,13 +158,95 @@ def playback_continuation_token(
             status_code=403,
             detail="An interactive session is required",
         )
+    descriptor = (
+        payload.descriptor.model_dump(by_alias=True, exclude_none=True)
+        if payload and payload.descriptor
+        else None
+    )
     issued = issue_playback_continuation_token(
         user_id=user["id"],
         session_id=str(session_id),
+        descriptor=descriptor,
     )
     return PlaybackContinuationTokenResponse(
         token=issued["token"],
         expires_at=issued["expires_at"],
+    )
+
+
+@router.post(
+    "/playback/continuation",
+    response_model=PlaybackContinuationResponse,
+    response_model_exclude_none=True,
+    responses=COMMON_ERROR_RESPONSES,
+    summary="Continue a radio or infinite queue for native background playback",
+)
+def playback_continuation(
+    request: Request,
+    payload: PlaybackContinuationRequest = Body(...),
+) -> PlaybackContinuationResponse:
+    user = _require_continuation_token(request)
+    descriptor = get_continuation_descriptor(int(user["access_token_id"]))
+    if not descriptor:
+        return PlaybackContinuationResponse(tracks=[], plans=[], exhausted=True)
+    known = {str(uid) for uid in payload.recent_entity_uids}
+    if payload.after_track_entity_uid:
+        known.add(str(payload.after_track_entity_uid))
+    rows, exhausted = continuation_radio_tracks(
+        descriptor,
+        user=user,
+        limit=payload.limit,
+        exclude_entity_uids=known,
+    )
+    tracks = [
+        track
+        for track in (_continuation_track(row, payload.delivery) for row in rows)
+        if track is not None
+    ]
+    chain = (
+        [str(payload.after_track_entity_uid)] if payload.after_track_entity_uid else []
+    )
+    chain.extend(str(track.entity_uid) for track in tracks)
+    edges = [
+        TransitionEdgeRequest(
+            outgoing_track_entity_uid=outgoing,
+            incoming_track_entity_uid=incoming,
+            context=payload.context,
+        )
+        for outgoing, incoming in zip(chain, chain[1:])
+    ][:32]
+    return PlaybackContinuationResponse(
+        tracks=tracks,
+        plans=_plan_transition_edges(edges) if edges else [],
+        exhausted=exhausted,
+    )
+
+
+def _continuation_track(row: dict, delivery: str) -> ContinuationTrackResponse | None:
+    entity_uid = row.get("track_entity_uid") or row.get("entity_uid")
+    if not entity_uid:
+        return None
+    path = row.get("track_path") or row.get("path")
+    track_id = row.get("track_id")
+    playable_id = (
+        row.get("global_track_uid")
+        or entity_uid
+        or path
+        or (str(track_id) if track_id is not None else None)
+    )
+    duration = row.get("duration")
+    return ContinuationTrackResponse(
+        id=str(playable_id),
+        entity_uid=entity_uid,
+        url=(
+            f"/api/tracks/by-entity/{quote(str(entity_uid), safe='')}/stream"
+            f"?delivery={quote(delivery, safe='')}"
+        ),
+        title=row.get("title") or "Unknown",
+        artist=row.get("artist") or "",
+        album=row.get("album") or None,
+        duration_ms=round(float(duration) * 1000) if duration else None,
+        source=row,
     )
 
 
@@ -169,7 +262,18 @@ def transition_plans(
     payload: TransitionPlanBatchRequest = Body(...),
 ) -> TransitionPlanBatchResponse:
     _require_transition_plan_access(request)
-    unique_edges = _deduplicate_edges(payload.edges)
+    return TransitionPlanBatchResponse.model_validate(
+        {
+            "plannerVersion": payload.planner_version,
+            "plans": _plan_transition_edges(payload.edges),
+        }
+    )
+
+
+def _plan_transition_edges(
+    edges: list[TransitionEdgeRequest],
+) -> list[TransitionPlanResponse]:
+    unique_edges = _deduplicate_edges(edges)
     entity_uids = _ordered_entity_uids(unique_edges)
     profiles = get_track_mix_profiles_by_entity_uids(entity_uids)
     profiles_by_uid = dict(zip(entity_uids, profiles, strict=True))
@@ -197,12 +301,7 @@ def transition_plans(
             computed[cache_key] = serialized
         plans.append(TransitionPlanResponse.model_validate(serialized))
     set_smart_mix_plan_caches(computed)
-    return TransitionPlanBatchResponse.model_validate(
-        {
-            "plannerVersion": payload.planner_version,
-            "plans": plans,
-        }
-    )
+    return plans
 
 
 def _deduplicate_edges(
