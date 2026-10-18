@@ -853,3 +853,24 @@ retained. Real attribution, source/status fields, album/cover helpers and GET li
 Only rendering/shared-identity containment changes; no backend, new foundation variant or Listen
 change. Exact preview isolation and source policy continue. 1AF stays local for Diego before
 publication; no next group. See final handover for focused evidence and remaining QA.
+
+## 1AG execution record — Timeline, 2026-10-18
+
+1AF Contributions approved/published `1b8ab82362f696f16ea481b3789436443b199d5d`, verified at
+origin. The next bounded group applies existing DS1.7 to Timeline: retire decorative stats and
+cover fallback glyphs, retain three exact loading/disclosure sites and shared loading/error UX.
+Private StatCard drops its icon prop, uses shared display/Mono and8px field recipe. Data, bars,
+order/ties, toggle/navigation/asset/retry contracts remain. No new foundation/API or Listen change.
+The real local specimen is #cronologia-admin. Whole1b.8 and Timeline/A14 are not completed. Stop
+at1AG for Diego before commit/push; final handover owns exact focused evidence and limits.
+
+## Diego amendment — remove Library Timeline (2026-10-18)
+
+After reviewing local1AG Diego explicitly requested removal of Timeline. Retire Admin Library
+Timeline page/navigation/active mockup and withdraw its future A14/phase6.4 target. This
+supersedes earlier1AG icon-retirement records, not the separate release/artist/ops chronologies.
+Keep old /timeline as a library.view-protected replace redirect to Browse; keep the old specimen
+URL only as a redirect to its persistent retirement record. Preserve the withdrawn proposal and
+proof in ignored review storage and historical documentation; no active feature is retained.
+Backend endpoint remains compatible; no API/data removal. Published1AF is1b8ab823. Current1AG
+is the uncommitted retirement, awaiting Diego; no publication or next-group authorization.

@@ -107,6 +107,9 @@ export default defineConfig({
         adminContributions: fileURLToPath(
           new URL("admin-contributions-demo.html", import.meta.url),
         ),
+        retiredTimeline: fileURLToPath(
+          new URL("admin-timeline-demo.html", import.meta.url),
+        ),
         adminOperations: fileURLToPath(
           new URL("admin-operations-demo.html", import.meta.url),
         ),

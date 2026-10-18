@@ -4,44 +4,45 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — 1AE published; 1AF local review
+## Active Linux workspace — 1AG approved for publication; next stop 1AH
 
-Use `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing feat/crate_v3 tracking origin.
-Published HEAD/remote is **638f4b0debe3adcca2b7b31f1b3e89323c58ad7b** (1AE, verified push/ref).
-Original 53177736 remains an ancestor. Leave `/home/diego/Code/Ninja/crate` (feat/crate_mcp) alone.
-Node 22.23.3 is `/home/diego/.nvm/versions/node/v22.23.3/bin`; dependencies are installed.
+Use /home/diego/.codex/worktrees/crate-v3-1q/crate, existing feat/crate_v3 tracking origin.
+Published HEAD/ref1b8ab82362f696f16ea481b3789436443b199d5d (1AF); original53177736 ancestor retained.
+Leave /home/diego/Code/Ninja/crate (feat/crate_mcp) alone. Node22.23.3/dependencies prepared.
 
-Diego approved/published Library Trash and authorised the next bounded group. Local 1AF covers
-Contributions alone: redundant HandHeart/header tile and idle RefreshCw removed; two exact
-Loader2 loading sites retained. Helpers, GET limit150, state/effect, callbacks and disabling
-remain unchanged. Attribution, source/status, duration/count metadata and real album/cover
-helpers stay. 44px refresh/album links, Bricolage heading, Poppins body and Mono source reference
-follow shared identity. Rows stack untilxl so the real sidebar cannot squeeze album links.
-No shared/API/backend/data/permission redesign. The live policy covers 15 whole files /46 UX sites;
-original 1V inventory is untouched. Full 1b.8 is not complete.
+Diego's latest instruction removes Library Timeline after reviewing the local1AG specimen.
+This supersedes the preceding icon-only proposal; no1AG approval/publication occurred. Current
+local1AG deletes pages/Timeline.tsx and lazy import, removes Sidebar destination, and keeps the
+old /timeline alias library.view-protected with Navigate replace to /browse. CommandPalette
+already lacked that destination. No Timeline API fetch or page chunk remains in Admin.
 
-Review <http://127.0.0.1:5186/admin-contributions-demo.html> or persistent `/#aportes-admin`.
-Actual page, labelled fictional users/contributions, local ready/loading/empty/error reads and explicit
-sample album destinations; no backend/SSE/writes. Sample field gap is actual 8 px. All previous
-specimens remain, including published 1AE and Health's approved accents/spacing.
+The old standalone preview URL is a lightweight HTML redirect to /#cronologia-admin. That
+section is now a retirement record without iframe/data/cover module. Real navigation preview:
+http://127.0.0.1:5186/admin-navigation-demo.html. Active PD/phase6.4 withdraw Timeline/A14; do
+not resurrect it. Other release/artist/operational timelines and public /api/timeline remain
+compatible; no backend/data change. Live icon policy returns15 whole files/46 exact sites.
 
-Current scoped evidence:26 Vitest,4 preview/3 built-Admin Chromium,3 strict TS configs,
-scoped lint/format/audit, Admin/11-entry preview builds pass;526770/532480B initial gzip,
-5710B margin. Fresh review:0 Critical/0 Important/1 Minor (long-contributor/full-long-title
-coverage deferred). Actual IAB advisory proof saved, tab retained; service active/HTTP200.
-Known generated cache restored. The final main handover owns full rulings and QA limits.
-Existing initial-error toast/empty and refresh-error/older-items behavior are preserved, not a
-freshness redesign. Native disabled Refresh releases focus during a held read as before1AF;
-keyboard activation and subsequent Tab navigation are tested, no automatic focus restoration.
-Live auth/ownership/import data, artwork rendering and large/over150 lists are integration QA.
+Withdrawn1AG proposal/proof/source snapshot: ignored
+.superpowers/sdd/2026-10-18-crate-v3-timeline-removal/withdrawn-1ag/manifest.json (23 files, SHA256).
+Earlier checkpoint captures/records retained. Historical icon plan is explicitly withdrawn;
+replacement plan: docs/plans/2026-10-18-crate-v3-timeline-removal.md. Main handover owns current
+scoped checks/budget/final review and proof; earlier1AG icon evidence is historical, not current.
 
-Keep `crate-v3-preview.service` active on loopback :5186 (this worktree/Node22, restart-on-failure).
-No full suites/CI/canonical refresh, real backend/worker operations or native/AT/other-engine QA.
-The33 canonical PNGs/manifest remain1M; pin258bbaee unchanged/unavailable. No Smart Mix integration.
-**Stop at 1AF uncommitted for Diego, no next group/publication/PR/merge/rebase/deploy/release.**
+Current retirement validation: 31 scoped Vitest, six serial Chromium cases (three preview and
+three built Admin at 1440/768/390), two scoped strict TS configs, scoped lint and both builds.
+Admin initial JS 526680 / 532480 B gzip, 10 assets, 5800 B margin. Generated cache restored.
+Actual IAB retirement/navigation inspected; advisory proof
+`.artifacts/review/checkpoint-1ag-timeline-retired.jpg`. Earlier tab connection-reset state was
+resolved by opening the normal HTTP preview in a fresh tab; service active and HTTP 200 verified.
+Fresh final review covered all 19 pending files and verified the archive: Critical 0,
+Important 0, Minor 1. Deferred stale Timeline StatCard reference in the design-system consumer
+table; explicit retirement amendments prevail. Source frozen; final rulings are in main handover.
 
-Diego retains Listen's layered play/halo/progress ring and luminous seek trail from1S. The
-bootstrap below is historical for a fresh machine; it does not replace this isolated worktree.
+Keep crate-v3-preview.service active on127.0.0.1:5186, this worktree/Node22/restart-on-failure.
+No full suites/CI/canonical capture/refresh.33 canonical PNGs/manifest stay1M, pin258bbaee unchanged.
+Native/AT/other engines/live auth/backend/full phase validation remain pending. Preserve1AD
+Health accents and Listen1S playback. **Stop1AG uncommitted, no next group/commit/push/PR/merge/
+rebase/deploy/release.** Historical bootstrap below does not replace this worktree.
 
 ## Prepare the checkout
 
@@ -210,3 +211,10 @@ typechecks, scoped lint, builds and budgets. Admin is now **529,065 / 532,480 B 
 with Diego's placement approval; the whole checkpoint remains at review stop. The preview was
 restarted with forced dependency optimisation after a stale HMR module left the IAB tab blank;
 rendering and the final browser replay are verified. Use Node 22 and keep :5186 running.
+
+## Latest approval — 2026-10-18
+
+Diego approved 1AG removal and authorised commit/push, correction of the obsolete StatStrip
+reference and the next bounded Admin icon group. The reference is corrected. Earlier 1AG
+local-stop notes are historical; stop the next group at 1AH before its commit/push. Keep the
+same worktree and active preview; preserve UX glyphs and all published checkpoints.

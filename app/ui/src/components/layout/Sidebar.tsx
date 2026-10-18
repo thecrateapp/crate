@@ -103,11 +103,6 @@ const navItems = [
     label: "Genres",
     capabilities: ["library.view"],
   },
-  {
-    to: "/timeline",
-    label: "Timeline",
-    capabilities: ["library.view"],
-  },
   { section: "System" },
   {
     to: "/system",

@@ -1,7 +1,7 @@
 # Crate v3 design system
 
-Current implementation: checkpoints through 1AE are approved and published (`638f4b0d`).
-Local 1AF retires redundant Contributions icons, preserving loading UX, attribution and real album/read contracts.
+Current implementation: checkpoints through 1AF are approved and published (`1b8ab823`).
+Approved 1AG removes Library Timeline at Diego's request; it is no longer a V3 page target.
 Stop for Diego before commit/push. See the final handover for evidence and limits.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
@@ -976,10 +976,8 @@ interface StatNumberProps {
 #### `HairlineList` / `HairlineRow`
 
 ```ts
-interface HairlineRowProps extends Omit<
-  LiHTMLAttributes<HTMLLIElement>,
-  "children"
-> {
+interface HairlineRowProps
+  extends Omit<LiHTMLAttributes<HTMLLIElement>, "children"> {
   index?: number; // zero-padded mono index, 2.4ch to 3ch
   trailing?: ReactNode; // fixed-ch mono meta or a StatusDot
   muted?: boolean; // title in text-subtle
@@ -1195,7 +1193,7 @@ Admin (`app/ui`):
 | Block                                         | Home                                                                | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | --------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PageHeading`                                 | `src/components/layout/PageHeading.tsx`                             | replaces `OpsPageHero` and seven ad-hoc `h1` recipes (5.2)                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `StatStrip`                                   | `src/components/admin/StatStrip.tsx`                                | 2 to 6 `StatNumber`s on hairlines; replaces `OpsStatTile`, Settings `StatTile`, Timeline `StatCard`; also the Admin legend recipe. Moves to `@crate/ui/primitives/StatStrip.tsx` in Listen's first adoption (Library stat strip, plan Task 6.14; product design 4.20), deleting the Admin copy in the same change                                                                                                                                              |
+| `StatStrip`                                   | `src/components/admin/StatStrip.tsx`                                | 2 to 6 `StatNumber`s on hairlines; replaces `OpsStatTile`, Settings `StatTile`; also the Admin legend recipe. Moves to `@crate/ui/primitives/StatStrip.tsx` in Listen's first adoption (Library stat strip, plan Task 6.14; product design 4.20), deleting the Admin copy in the same change                                                                                                                                                                   |
 | `RiskMeter`                                   | `src/components/health/RiskMeter.tsx`                               | three 4×10 px segments, `gap-0.5`, off fg .14, on fg-2, plus the word (Safe, Needs review, Destructive)                                                                                                                                                                                                                                                                                                                                                        |
 | `StepRail`                                    | `src/components/admin/StepRail.tsx`                                 | horizontal rail with stages, `--p` progress, vertical under 900 px container; release rail, setup, key rotation. Stages are drawn only for phases a handler actually emits. Moves to `@crate/ui/domain/tasks/StepRail.tsx` in Listen's first adoption (Upload phase rail from the `library_upload` phases `preparing`, `importing`, `syncing` emitted through `TaskProgress`; plan Task 6.15; product design 4.22), deleting the Admin copy in the same change |
 | `AdminLiveProvider` + `useAdminLive(surface)` | `src/contexts/AdminLiveProvider.tsx`, `src/hooks/use-admin-live.ts` | one `/api/admin/live-stream` EventSource per tab (OpsSnapshotContext pattern); replaces six copies of the reconnect effect and `useSse`. Unlike `OpsSnapshotContext`, which keeps its stream open in hidden tabs, it closes the stream once `document.visibilityState` has been `hidden` for 30 s and reopens it (with a GET of each mounted surface) on `visible`, so a background tab stops renewing viewer keys (3.9)                                       |
@@ -1860,7 +1858,6 @@ locked` to `other`, so the Provenance mode (shipped read-only in plan Task 3.7) 
   trailing-edge coalescing (3.9) over a window of at least 120 s: the key `genre-wheel:local` in
   the `crate:coalesce:due` set, drained by the service loop. Triggers come from the places that
   change genre membership or the taxonomy, not from a list of tasks:
-
   - the membership choke points `set_artist_genres` and `set_album_genres`
     (`db/repositories/genres_assignments.py:72,200`) schedule after commit, and only when the
     stored genre set changed. This covers `enrich_artist` and `enrich_artists`
@@ -1911,7 +1908,6 @@ digest}` only, families without counts, nodes with `rollup {artists, albums}` on
   approval) counts nodes by origin, orphans, unmapped raw tags, and edges grouped by `source`,
   `locked` and `created_by IS NULL`; the thresholds below are set from those numbers.
 - Preconditions, all in plan Task 2.18d, which lands in the Genres group before the wheel (3.7):
-
   - G1. The pre-v3 seeder runs on every boot (`init_db`) and upserts `eq_gains`, `name`,
     `description` and `origin` for core genres, so overrides cannot live in those columns. The
     migration adds `genre_taxonomy_nodes.local_eq_gains`, `eq_override` (`none | set | cleared`,
@@ -4480,3 +4476,31 @@ fictional data, local reads and explicit sample album destinations. No real API/
 Authoritative scope, evidence and limits: final handover and
 `2026-10-18-crate-v3-contributions-icons.md`. This does not complete 1b.8 or contribution-management
 product work. Stop at 1AF before commit/push; no full suites/CI/canonical baseline refresh.
+
+## Linux 1AG — bounded Timeline icon group (2026-10-18)
+
+Diego approved/published Contributions as `1b8ab82362f696f16ea481b3789436443b199d5d` and
+authorised the next bounded Admin group. Local 1AG covers `pages/Timeline.tsx` and its private
+StatCard rendering contract: remove Calendar/Disc3/Trophy statistics and the Disc3 cover fallback.
+Keep exact ChevronUp/ChevronDown disclosure and Loader2 computing sites, shared loading/error
+contracts and actual counts, year order/ties, bar widths, toggle, route/cover inputs and callbacks.
+Statistics use existing shared typography and8px .crate-form-field pairs; year/album targets44px.
+No new shared token/variant/API/dependency/backend, no data or chart redesign, no Listen/Desktop
+change. Whole Timeline adds the16th full file and three sites,49 concrete UX sites total; original
+1V records remain. This continues1b.8 without completing it or Timeline/A14/phase6.4.
+
+Real page at /admin-timeline-demo.html and #cronologia-admin: fictional response-shaped albums,
+local data states/retry, existing asset-resolver extension for good/broken fictional covers and
+explicit sample album destinations. Actual route helper remains; no backend/API/SSE/write traffic.
+Focused evidence/review/limits are in the final handover and 2026-10-18-crate-v3-timeline-icons.md.
+Stop at1AG before commit/push or another group; canonical33 PNGs/manifest remain1M, pin unchanged.
+
+## 1AG replacement scope — Library Timeline retirement (2026-10-18)
+
+Diego withdraws the local Timeline icon proposal and removes this Admin page. There is no new
+shared recipe/variant/token or replacement visualization. Private Timeline StatCard/page and
+its three glyph sites are deleted; live icon policy returns to15 complete files/46 exact sites.
+Other shared UX glyphs and earlier checkpoints remain. Timeline/A14 is removed from active PD/
+phase6.4 targets. Old route/preview links redirect; #cronologia-admin is now a retirement record
+without iframe/data/cover loading. The historical proposal/proof is archived, not shipped.
+See final handover and 2026-10-18-crate-v3-timeline-removal.md;1AG remains local for Diego.

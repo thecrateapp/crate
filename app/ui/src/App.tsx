@@ -51,9 +51,6 @@ const Stack = lazy(() =>
 const Genres = lazy(() =>
   import("@/pages/Genres").then((m) => ({ default: m.Genres })),
 );
-const Timeline = lazy(() =>
-  import("@/pages/Timeline").then((m) => ({ default: m.Timeline })),
-);
 const Login = lazy(() =>
   import("@/pages/Login").then((m) => ({ default: m.Login })),
 );
@@ -367,7 +364,7 @@ export default function App() {
                   path="timeline"
                   element={
                     <RequireCapabilities anyOf={LIBRARY_VIEW}>
-                      <Timeline />
+                      <Navigate to="/browse" replace />
                     </RequireCapabilities>
                   }
                 />

@@ -3,8 +3,8 @@
 > **For agents:** REQUIRED SUB-SKILL: use `viterbit-ai-tools:executing-plans` to run this plan task
 > by task. One task is one commit unless the task says otherwise. Stop at every checkpoint and wait
 > for Diego. Commit messages below describe future commits; do not create a commit without
-> Diego's go-ahead. Published checkpoints through 1AE (`638f4b0d`) are recorded in the handover.
-> Contributions / 1AF is local; stop for Diego before publication.
+> Diego's go-ahead. Published checkpoints through 1AF (`1b8ab823`) are recorded in the handover.
+> 1AG now removes Library Timeline at Diego's request; local, no publication approval.
 
 **Goal:** Ship Crate v3. Admin (`app/ui`) and Listen (`app/listen`, also shipped as Capacitor
 iOS/Android and inside the Tauri shell `app/listen-desktop`) adopt the visual language of the new
@@ -127,7 +127,6 @@ simulated thread pools. Do not read or use any other design branch.
   operational approval; there is no unconditional `alembic stamp` step.
 
   Migration numbers are written `NNN` below. Every migration:
-
   - puts its DDL in an immutable `app/crate/db/schema_sections/<area>_vNNN.py` called from
     `upgrade()` and from the bootstrap;
   - uses `ADD COLUMN IF NOT EXISTS`, nullable columns, and `autocommit_block` for concurrent
@@ -138,7 +137,6 @@ simulated thread pools. Do not read or use any other design branch.
 
 - New task types are registered in five places, checked by `app/tests/test_task_runtime_contract.py`
   and `test_task_queue_routing.py`:
-
   1. `app/crate/actors.py` `TASK_POOL_CONFIG`;
   2. a `TaskTypeInfo` in `app/crate/task_registry.py`;
   3. a handler in a `*_TASK_HANDLERS` dict;
@@ -2446,7 +2444,6 @@ Commits:
 **Files:**
 
 - Create: `app/crate/api/admin_live.py`. Route `GET /api/admin/live-stream?surfaces=...`:
-
   - surface registry `{name: (capability, channel, kind, reader)}`;
   - at connect, filter to allowed surfaces; 403 only when none is allowed; 400 on an unknown name;
   - snapshot surfaces re-read the row by primary key with `asyncio.to_thread(get_ui_snapshot)` on
@@ -2528,7 +2525,6 @@ priority, created_at LIMIT :n`, plus a `pool IS NULL` branch read as `default`),
   never the serial service loop, where it would stall behind `ImportQueue.refresh_pending_state()`
   and the scheduler). `publish_tasks_surface_signal` fires on every `update_task` progress write,
   so with any active task the dirty flag is always set; the cadence therefore is:
-
   - while `admin:live:viewers:queues` exists: rebuild when `GETDEL crate:ops:queues:dirty` is set,
     at most once per 3 s;
   - otherwise: rebuild every 15 s, only for `worker_live`.
@@ -2588,7 +2584,6 @@ priority, created_at LIMIT :n`, plus a `pool IS NULL` branch read as `default`),
 - Modify: `app/crate/api/admin_live.py` (`queues` surface)
 - Modify: `app/crate/db/queries/tasks.py` and `app/crate/api/tasks.py` (`list_tasks` gains a `pool` filter for `?queue=`)
 - Test: `app/tests/test_tasks_api.py`
-
   - the endpoint never builds;
   - permission is enforced;
   - catalog flags equal `TASK_POOL_CONFIG` and the frozensets;
@@ -5194,7 +5189,6 @@ Merge rules for the Smart Mix merge, whichever side lands second:
    clock from `resolveNativeCrossfadeTransition`. `includeProfiles` is behind a server capability,
    because the request model is `extra='forbid'`. Tests include an old-server compatibility case.
 2. **Access tokens.** Covers:
-
    - `app/listen/src/components/settings/access-tokens/*`;
    - `GET /api/auth/access-tokens/policy`, with route metadata defined after
      `_is_vdj_access_token_request`;
@@ -5207,10 +5201,8 @@ Merge rules for the Smart Mix merge, whichever side lands second:
    (`sm:app/crate/api/smart_mix_admin.py`: `GET /api/admin/smart-mix/status`, `POST /backfill`,
    `/backfill/pause`, `/backfill/resume`, `/backfill/cancel`; `SmartMixCoverage.tsx` with
    `idle | running | paused`).
-
    - Files: `app/ui/src/components/SmartMixCoverage.tsx` (from `sm:`) restyled as a row of the
      3.9b Coverage panel on `app/ui/src/pages/Analysis.tsx`:
-
      - the stacked hairline bar reads counters added to the 120 s `analysis_status` block (never
        counted in a request);
      - campaign state as `StatusDot` plus the word `idle`, `running` or `paused`;
@@ -5261,7 +5253,7 @@ Phase 1b (this phase depends on it). Rules:
 | 6.1  | Admin Browse (A4)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | `app/ui/src/pages/Browse.tsx`                                                                                                                                                                             | `Browse.test.tsx`                                                                    | `feat(ui): restyle Browse as a media grid`                            |
 | 6.2  | Admin Artist residue (A5)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `pages/Artist.tsx`, `components/artist/*` (tabs in `?tab=`, `ArtistNetworkGraph` retinted by tokens)                                                                                                      | `Artist.test.tsx`                                                                    | `feat(ui): restyle the artist page`                                   |
 | 6.3  | Admin Album residue (A6)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `pages/Album.tsx`, `TrackTable.tsx`, `TagEditor`, `MatchCard`                                                                                                                                             | `Album.test.tsx`                                                                     | `feat(ui): restyle the album page`                                    |
-| 6.4  | Timeline (A14), Trash (A7: `StatStrip` of files and size plus paginated rows, read from the 2.17e index), Contributions                                                                                                                                                                                                                                                                                                                                                                                                 | `pages/Timeline.tsx`, `pages/Trash.tsx`, `pages/Contributions.tsx`                                                                                                                                        | page tests; Trash paginates and never triggers a disk walk                           | `feat(ui): restyle timeline, trash and contributions`                 |
+| 6.4  | Trash (A7: `StatStrip` of files and size plus paginated rows, read from the 2.17e index), Contributions                                                                                                                                                                                                                                                                                                                                                                                                                 | `pages/Trash.tsx`, `pages/Contributions.tsx`                                                                                                                                                              | page tests; Trash paginates and never triggers a disk walk                           | `feat(ui): restyle trash and contributions`                           |
 | 6.5  | Upcoming calendar (A9; `source` per show on `/api/upcoming`, PD §4.4), Bandcamp (A10), Discover (A11, after B5)                                                                                                                                                                                                                                                                                                                                                                                                         | `api/upcoming` router and schema (additive `source`), `pages/Upcoming.tsx`, `pages/Bandcamp.tsx`, `pages/Discover.tsx`                                                                                    | pytest for `source` plus `test_openapi_contract.py`; page tests                      | one commit per page                                                   |
 | 6.6  | Users (A18; B17 presence rewrite first), Roles (A19)                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `db/queries/auth_presence.py:48-82` (`LATERAL` top-1, one `MGET`), `pages/Users.tsx`, `pages/Roles.tsx`                                                                                                   | pytest plus `EXPLAIN`; page tests                                                    | `perf(users): find each user's last play with one lateral` + restyles |
 | 6.7  | Global catalog (A24; B17 status snapshot at reconcile completion)                                                                                                                                                                                                                                                                                                                                                                                                                                                       | `db/queries/admin_global_catalog.py`, reconcile handler, `pages/GlobalCatalog.tsx`                                                                                                                        | pytest, page test                                                                    | `perf(catalog): write global catalog status at reconcile end`         |
@@ -5737,3 +5729,37 @@ fictional data, local reads and explicit sample album destinations. No real API/
 Authoritative scope, evidence and limits: final handover and
 `2026-10-18-crate-v3-contributions-icons.md`. This does not complete 1b.8 or contribution-management
 product work. Stop at 1AF before commit/push; no full suites/CI/canonical baseline refresh.
+
+## Linux 1AG — bounded Timeline icon group (2026-10-18)
+
+Diego approved/published Contributions as `1b8ab82362f696f16ea481b3789436443b199d5d` and
+authorised the next bounded Admin group. Local 1AG covers `pages/Timeline.tsx` and its private
+StatCard rendering contract: remove Calendar/Disc3/Trophy statistics and the Disc3 cover fallback.
+Keep exact ChevronUp/ChevronDown disclosure and Loader2 computing sites, shared loading/error
+contracts and actual counts, year order/ties, bar widths, toggle, route/cover inputs and callbacks.
+Statistics use existing shared typography and8px .crate-form-field pairs; year/album targets44px.
+No new shared token/variant/API/dependency/backend, no data or chart redesign, no Listen/Desktop
+change. Whole Timeline adds the16th full file and three sites,49 concrete UX sites total; original
+1V records remain. This continues1b.8 without completing it or Timeline/A14/phase6.4.
+
+Real page at /admin-timeline-demo.html and #cronologia-admin: fictional response-shaped albums,
+local data states/retry, existing asset-resolver extension for good/broken fictional covers and
+explicit sample album destinations. Actual route helper remains; no backend/API/SSE/write traffic.
+Focused evidence/review/limits are in the final handover and 2026-10-18-crate-v3-timeline-icons.md.
+Stop at1AG before commit/push or another group; canonical33 PNGs/manifest remain1M, pin unchanged.
+
+## Authoritative 1AG replacement — Library Timeline removed (2026-10-18)
+
+Diego reviewed the local Timeline proposal and instructed: remove Timeline. This supersedes
+the preceding1AG icon-only proposal and its future Timeline/A14 work. Active phase6.4 now covers
+Trash and Contributions only; do not recreate Library Timeline as a later redesign. Production
+page/lazy import and Sidebar destination are removed. Old /timeline URLs remain library.view
+gated and replace-navigate to /browse; no Timeline API request. The CommandPalette already had
+no Timeline destination. Other release/artist/operational timelines are distinct and unchanged.
+
+Current1AG is local retirement review, not approved/published. The former specimen sources/tests
+are archived and removed from active execution; old preview URL is HTML redirect to a retirement
+record at #cronologia-admin. No active iframe/page/data hook/asset resolver remains. Public
+backend /api/timeline is retained for compatibility, no backend/data removal claimed. Published
+checkpoints and original1V inventory remain. Exact scope/evidence/limits: final handover and
+2026-10-18-crate-v3-timeline-removal.md. Stop1AG before commit/push or any further group.

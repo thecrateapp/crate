@@ -2,9 +2,9 @@
 
 Status: product design, revised 2026-10-15. Canonical clone `/Users/diego/Code/crate-v3`, branch
 `feat/crate_v3`. The handover records implementation and QA status; historical analysis is not a
-current progress report. Checkpoints through 1AE are approved and published (`638f4b0d`).
-Local 1AF retires redundant Contributions icons while preserving loading UX, attribution and real
-album/read contracts; stop for Diego before commit/push. The final handover and later amendments below
+current progress report. Checkpoints through 1AF are approved and published (`1b8ab823`).
+Approved 1AG removes Library Timeline at Diego's request; its old route redirects to Browse.
+Stop for Diego before commit/push. The final handover and later amendments below
 supersede earlier provisional stops. Diego's 1S review explicitly
 preserves the current Listen play essence (halo, layers and progress ring) and seek trail,
 adapted to V3 with 1–2 px strokes; see DS §5.5.
@@ -313,7 +313,7 @@ ever differ, the spec wins.
 | Toaster config                                                        | two `richColors` toasters                                                                                                                                                                                                                                | shared class names and durations, no `richColors`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | `@crate/ui/lib/toaster-config.ts`                                                                                                                                                                             |
 | `PageHeading`                                                         | `OpsPageHero` plus 7 ad-hoc `h1` recipes                                                                                                                                                                                                                 | Admin-local page header                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `app/ui/src/components/layout/PageHeading.tsx`                                                                                                                                                                |
 | `PageHeader`                                                          | Listen, shared                                                                                                                                                                                                                                           | restyle in place                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | `@crate/ui/domain/navigation`                                                                                                                                                                                 |
-| `StatStrip`                                                           | `OpsStatTile`, Settings `StatTile`, Timeline `StatCard`                                                                                                                                                                                                  | 2–6 `StatNumber`s on hairlines (DS 2.5); also the legend recipe                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | `app/ui/src/components/admin/StatStrip.tsx`; moves to `@crate/ui/primitives` in the Listen Library change (4.20), deleting the Admin copy                                                                     |
+| `StatStrip`                                                           | `OpsStatTile`, Settings `StatTile`                                                                                                                                                                                                                       | 2–6 `StatNumber`s on hairlines (DS 2.5); also the legend recipe                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | `app/ui/src/components/admin/StatStrip.tsx`; moves to `@crate/ui/primitives` in the Listen Library change (4.20), deleting the Admin copy                                                                     |
 | `StepRail`                                                            | ad-hoc rails                                                                                                                                                                                                                                             | stages with a `--p` progress, vertical under 900 px container width                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `app/ui/src/components/admin/StepRail.tsx`; moves to `@crate/ui/domain/tasks/StepRail.tsx` (`app/shared/ui/domain/tasks/StepRail.tsx`) in the Listen Upload change (4.22, plan 6.15), deleting the Admin copy |
 | `nivoTheme`                                                           | 3 `NIVO_THEME` constants (`AudioProfileCard.tsx:30`, `ArtistStats.tsx:9`, `Insights.tsx:67`) plus 6 inline `theme={{…}}` objects (`TrackTable.tsx:647`, `ArtistStats.tsx:237`, `Dashboard.tsx:1080`, `:1124`, `:1177`, `SystemHealth.tsx:483`), 9 in all | one token-resolved chart configuration per app for the single Crate v3 identity, `animate={!reducedMotion}`; the nivo-theme task replaces all 9                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | per app                                                                                                                                                                                                       |
 
@@ -420,7 +420,7 @@ so the sidebar group, eyebrow and breadcrumb agree; the Sidebar test (plan Task 
 | Group                  | Pages                                                                                            |
 | ---------------------- | ------------------------------------------------------------------------------------------------ |
 | (top)                  | Dashboard                                                                                        |
-| Library                | Browse, Timeline                                                                                 |
+| Library                | Browse                                                                                           |
 | 01 Health              | Health, Library Trash                                                                            |
 | 02 Imports             | Imports (new, PD16), Contributions                                                               |
 | 03 Acquisition         | Acquisition (`/download`), New Releases, Upcoming, Bandcamp, Discover (discography completeness) |
@@ -457,7 +457,7 @@ so the sidebar group, eyebrow and breadcrumb agree; the Sidebar test (plan Task 
 | `/stack`                                                                                                                                                                               | Stack         | 07                 | SystemMap (`site:src/components/architecture/SystemMap.astro`)                                                                                                          | P1 · L   |
 | `/logs`                                                                                                                                                                                | Logs          | 07                 | terminal console                                                                                                                                                        | P1 · M   |
 | `/federation`                                                                                                                                                                          | Federation    |                    | topology (`site:src/components/viz/Federation.astro`)                                                                                                                   | P2 · L   |
-| `/browse`, `/timeline`, `/users`, `/roles`, `/playlists*`, `/i18n`, `/settings`, `/global-catalog`, `/login`, `/setup`                                                                 |               |                    | recipes only (4.9, 4.10)                                                                                                                                                | P1–P2    |
+| `/browse`, `/users`, `/roles`, `/playlists*`, `/i18n`, `/settings`, `/global-catalog`, `/login`, `/setup`                                                                              |               |                    | recipes only (4.9, 4.10)                                                                                                                                                | P1–P2    |
 | Route-level states: `PageSpinner` (`App.tsx:108`, `components/auth/ProtectedRoute.tsx:5`), "Admin console access required", "Permission required", "No console landing page available" |               |                    | `ErrorState` page variant (4.10)                                                                                                                                        | P1 · S   |
 
 Orphans: `pages/Shows.tsx` and `pages/Profile.tsx` are unrouted; delete them. Verify whether
@@ -1549,7 +1549,11 @@ interface GenreWheelPayload {
     target: string;
     type: RelationType;
     provenance:
-      "crate-core" | "manual" | "musicbrainz" | "ai_proposal" | "other"; // see Modes
+      | "crate-core"
+      | "manual"
+      | "musicbrainz"
+      | "ai_proposal"
+      | "other"; // see Modes
     locked: boolean;
     suppressed: boolean;
     confidence: number;
@@ -1628,7 +1632,6 @@ Backend, in order (genres.md section 10 with the verification corrections):
    key `genre-wheel:local`) and a window of at least 120 s; the handler clears the dirty key before
    building and schedules again if it is set during the build. Triggers come from the choke points
    that change genre membership or taxonomy, not from a list of tasks:
-
    - `set_artist_genres` and `set_album_genres` (`db/repositories/genres_assignments.py`) call it
      after commit, only when the stored set changed. That covers `index_genres`
      (`genre_indexer.py`), `enrich_artist`/`enrich_artists` writing Last.fm tags
@@ -1657,7 +1660,6 @@ Backend, in order (genres.md section 10 with the verification corrections):
    in new columns the pre-v3 seeder never writes, so an image rollback cannot overwrite them (the
    old seeder runs on every boot and rewrites `eq_gains`, `name` and `description` of core genres,
    `db/jobs/genre_taxonomy.py:219-252`).
-
    - `genre_taxonomy_nodes.local_eq_gains`, `eq_override` (`none | set | cleared`; `cleared` makes
      "clear to inherit" representable on a core node), `local_name`, `local_description`;
      `genre_taxonomy_edges.suppressed` (PD18; the seeder never clears it and the runtime graph
@@ -1759,7 +1761,6 @@ site's `src/data/scale.json`.
   `portable_audio_tag_tracks`, `portable_tag_errors`, `rich_export_albums` and
   `rich_export_tracks`. Nothing declares them, so the GET drops them. The Coverage rows read these
   existing names. Changes (plan 3.9a, 3.10a):
-
   - `AnalysisStatusResponse` and `_empty_analysis_payload` declare the existing lyrics and
     portable fields plus `recent`, `stale`, `unavailable` and `updated_at`.
   - New: `fingerprint_failed` (one more `FILTER` in the existing query); `recent` (6 items) in the
@@ -1999,7 +2000,6 @@ COALESCE(pool,'default') …)`, which sorts every pending row on each run (thous
   loop (there it would stall behind `ImportQueue.refresh_pending_state()`, a filesystem walk, and
   the scheduler). `publish_tasks_surface_signal` fires after every `update_task` progress write, so
   with any active task the dirty flag is always set; the writer therefore:
-
   - while `admin:live:viewers:queues` exists (5.3.1): honours the dirty flag, never rebuilding more
     often than every 3 s, and upserts `ui_snapshots('ops:queues','global')` when the hash changes,
     the row is missing (for example after a `*` invalidation) or 30 s have passed (keepalive; the
@@ -2288,7 +2288,6 @@ ago`; `SAMPLER STALLED` computed client-side from server time), partial.
   is written only when a node's state, health, restart count or the container set changes, or at
   most once per 60 s, never on every 10 s sample. The GET reads the Redis key, else the row; the
   stack-stream forwards published payloads.
-
   - Sampler placement is PD54. As proposed: crate-api is the only service with the Docker socket
     and also serves all Admin and the Listen fallback traffic, while `docker_ctl._request` is
     synchronous Unix-socket I/O (30 s timeout today). So the sampler is a dedicated daemon thread in
@@ -2377,7 +2376,6 @@ user input (shared with the sidecar); worker roster as hairline rows (seen withi
 | Browse        | media grid with mono `12 albums · 143 tracks`; filter and sort chips; list mode as a table; header shows filtered and total counts                                                                                                                                                                                                                                                                                                                      | `/api/artists`, `/api/browse/filters` | P1 · M   |
 | Artist        | entity header (`ARTIST · 12 albums · 143 tracks · MBID linked · enriched 2 d ago`); text tabs in `?tab=`; overview lede and mono facts; top tracks as track rows; discography grouped under `MonoLabel`s; Similar graph retinted through tokens with `/api/shows/artists-with-shows` fetched once per page; Stats with the Nivo theme; artwork editor chrome; Shows use the ticket; Setlist tab uses the shared setlist rows (4.18); Enrichment tab 4.5 | existing                              | P1 · L   |
 | Album         | entity header (`ALBUM · 2019 · 10 tracks · 41 min · FLAC 16/44.1`); `TrackTable` per the track-row recipe with analysis and bliss dots; `TagEditor` with mono keys and file-tag diff highlighted; `MatchCard` with a confidence meter; readout 4.7; sidecar 4.3                                                                                                                                                                                         | existing                              | P1 · M   |
-| Timeline      | hairline year bars (`--v` = count/max), decade dividers, `StatStrip` (span, total, peak year), expanded year as a cover row                                                                                                                                                                                                                                                                                                                             | `/api/timeline` (fine at 4.4K albums) | P2 · S   |
 | Trash         | `StatStrip` (files, size); hairline rows with restore/delete chips. Precondition: `/api/manage/tracks/quarantine` walks the disk per request; the worker maintains the index                                                                                                                                                                                                                                                                            |                                       | P2 · S   |
 | Contributions | hairline review queue with status dots                                                                                                                                                                                                                                                                                                                                                                                                                  |                                       | P2 · S   |
 
@@ -2572,7 +2570,6 @@ fallback` (the current word scrambles for 420 ms when it changes; this is Listen
   `useEqualizerRuntime` re-runs its effect, which on Android native is a Capacitor bridge call
   `androidNativeEngine.setEq(…, 80)` (`hooks/use-equalizer-runtime.ts:96-101`). Batching that to
   one write per frame is still 60 writes a second (DS 3.8 rule 4). So, during a drag or key repeat:
-
   - gains go to the engine imperatively through a ref: Web Audio `setTargetAtTime` on web and
     desktop; native `setEq` throttled to 15–20 Hz with its ramp;
   - curve and handles are drawn by ref; the live store (glyph) gets at most one publish per
@@ -3226,7 +3223,6 @@ Small bug seen on the way: `api/curation.py` deletes `listen:explore_page:v1:{us
   whose `updated_at` is older than 300 s. Creating the row up front and sending the Dramatiq message
   with `delay=window` would collapse every window over 300 s (mood map 900 s, insights 30 min, bliss
   map 6 h) to about 5 minutes, and the delayed message would then fire a second build. Recipe:
-
   - the first trigger sets `<key>:dirty` and `ZADD NX crate:coalesce:due <now + window> <key>`;
     later triggers only set the dirty key (`NX` keeps the first due time);
   - a due check in the crate-worker service loop (the projector loop for projector actions) reads
@@ -3694,3 +3690,35 @@ fictional data, local reads and explicit sample album destinations. No real API/
 Authoritative scope, evidence and limits: final handover and
 `2026-10-18-crate-v3-contributions-icons.md`. This does not complete 1b.8 or contribution-management
 product work. Stop at 1AF before commit/push; no full suites/CI/canonical baseline refresh.
+
+## Linux 1AG — bounded Timeline icon group (2026-10-18)
+
+Diego approved/published Contributions as `1b8ab82362f696f16ea481b3789436443b199d5d` and
+authorised the next bounded Admin group. Local 1AG covers `pages/Timeline.tsx` and its private
+StatCard rendering contract: remove Calendar/Disc3/Trophy statistics and the Disc3 cover fallback.
+Keep exact ChevronUp/ChevronDown disclosure and Loader2 computing sites, shared loading/error
+contracts and actual counts, year order/ties, bar widths, toggle, route/cover inputs and callbacks.
+Statistics use existing shared typography and8px .crate-form-field pairs; year/album targets44px.
+No new shared token/variant/API/dependency/backend, no data or chart redesign, no Listen/Desktop
+change. Whole Timeline adds the16th full file and three sites,49 concrete UX sites total; original
+1V records remain. This continues1b.8 without completing it or Timeline/A14/phase6.4.
+
+Real page at /admin-timeline-demo.html and #cronologia-admin: fictional response-shaped albums,
+local data states/retry, existing asset-resolver extension for good/broken fictional covers and
+explicit sample album destinations. Actual route helper remains; no backend/API/SSE/write traffic.
+Focused evidence/review/limits are in the final handover and 2026-10-18-crate-v3-timeline-icons.md.
+Stop at1AG before commit/push or another group; canonical33 PNGs/manifest remain1M, pin unchanged.
+
+## Product amendment — retire Library Timeline / A14 (2026-10-18)
+
+Diego explicitly removes the Admin Library Timeline page after reviewing1AG. This supersedes
+the historical Timeline row/A14 recipe and the1AG icon-only specimen. Active navigation is
+Browse without a Timeline destination; active route/recipe tables omit it, and phase6.4 does
+not restore it. Existing /timeline links replace-navigate to Browse through library.view.
+
+The mockup retains a retirement record at #cronologia-admin, not a Timeline feature. Its former
+proposal/capture are archived for history; no Timeline data/covers/iframe mount remains. Other
+chronologies in New Releases, Artist Stats and Settings are distinct product functions. Public
+API compatibility is unchanged; this is an Admin-screen removal, not backend/data deletion.
+The replacement scope/evidence is in 2026-10-18-crate-v3-timeline-removal.md and final handover.
+Stop1AG uncommitted for Diego, no next group/publication or full-suite/CI/baseline work.

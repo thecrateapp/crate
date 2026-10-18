@@ -12,10 +12,13 @@ Its three-block Dashboard, producer interpretation fixes and Ops/Analysis typogr
 **1AC System Health is approved and published as `439b3e78daf2719d86cee72dd5726f7bc210c504`.**
 **1AD Library Health is approved and published as `5e1d9c8f287804a834b3143f6367f7e5a2ef8e31`.**
 **1AE Library Trash is approved and published as `638f4b0debe3adcca2b7b31f1b3e89323c58ad7b`.**
-Task 1b.8 / checkpoint **1AF Contributions is local for Diego review**, preserving functional
-loading glyphs, attribution, source/status metadata, real album/cover helpers and read contract.
-Review <http://127.0.0.1:5186/admin-contributions-demo.html> or persistent `/#aportes-admin`.
-Next stop: 1AF before commit/push or another group.
+**1AF Contributions is approved and published as `1b8ab82362f696f16ea481b3789436443b199d5d`.**
+**1AG Library Timeline removal is approved for commit/push by Diego (2026-10-18).** The earlier local
+icon-restyle proposal is withdrawn, not approved/published. Page/lazy/menu removed; old
+/timeline redirects to Browse with its library.view gate. The old specimen URL redirects to
+<http://127.0.0.1:5186/#cronologia-admin>, now a retirement record without a Timeline iframe.
+Review navigation at <http://127.0.0.1:5186/admin-navigation-demo.html>. The obsolete StatStrip
+reference is corrected; continuation is authorised through the next bounded Admin group.
 
 Published **1AD Health** context: Diego approved the issue-queue sketch and explicitly authorised
 its implementation on 2026-10-18.
@@ -30,7 +33,7 @@ The final composition record below and
 [`2026-10-18-crate-v3-health-inbox.md`](2026-10-18-crate-v3-health-inbox.md) supersede the
 historical icon-only and awaiting-sketch-approval stops. **The former 1AD stop is superseded by Diego's publication approval.**
 Earlier provisional/publication stops are historical and superseded by Diego's approval and
-next-group request on 2026-10-18. **Next stop: 1AF before commit/push or another group.**
+next-group request on 2026-10-18. **Next stop: 1AH before commit/push or another group.**
 The retained Listen play/halo/ring and luminous seek trail
 from 1S remain intact. Resume on Linux with
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
@@ -39,7 +42,7 @@ Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 ## Where the work lives
 
 - Active Linux worktree: `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing branch
-  `feat/crate_v3`, published HEAD `638f4b0debe3adcca2b7b31f1b3e89323c58ad7b` (1AE);
+  `feat/crate_v3`, published HEAD `1b8ab82362f696f16ea481b3789436443b199d5d` (1AF);
   transfer checkpoint `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. Node 22.23.3, root
   dependencies and persistent :5186 preview are prepared. This isolates the MCP agent's
   `/home/diego/Code/Ninja/crate` checkout (`feat/crate_mcp`); leave its files untouched.
@@ -237,7 +240,8 @@ is a token-based chart configuration, not a selectable product skin.
 | 1b.8 / Checkpoint 1AC                                        | Approved/published `439b3e78`: System Health icon retirement, shared window/text refresh and preserved instruments. Origin SHA verified; publication replay 27 Vitest / four preview Chromium green.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 1b.8 / Checkpoint 1AD                                        | Approved and published as 5e1d9c8f: corrected issue queue, retained UX and real contracts. Next local group: Library Trash / 1AE.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | 1b.8 / Checkpoint 1AE                                        | Approved/published `638f4b0d`: Library Trash text actions, retained UX and real task/confirmation contracts. Publication replay 26 Vitest / one embedding Chromium pass.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| 1b.8 / Checkpoint 1AF                                        | Local for Diego review: Contributions, retained UX/data/routes. 26 Vitest / seven Chromium; 526770 B gzip, 5710 B margin. Review 0 Critical/0 Important/1 Minor deferred. No commit/push.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 1b.8 / Checkpoint 1AF                                        | Approved/published `1b8ab823`: Contributions, retained UX and actual data/routes. Publication replay 26 Vitest / one embedding Chromium pass.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 1b.8 / Checkpoint 1AG                                        | Replacement scope: Library Timeline retired at Diego's request, old route/preview redirects, A14 withdrawn. Earlier icon proposal archived. Current retirement is local for review; no commit/push.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -3255,3 +3259,174 @@ Diego approved Contributions and requested commit/push followed by the next boun
 group with UX retained. Earlier 1AF local-only stops are superseded; scoped checks and documented
 limits remain. Only preview publication labels change before commit. Remote SHA follows push
 verification. Next implementation stops at 1AG before publication or another group.
+
+## Final Linux record — 1AF published; 1AG Timeline local (2026-10-18)
+
+Diego approved Contributions and requested commit/push and the next bounded Admin group, UX
+retained. Published `1b8ab82362f696f16ea481b3789436443b199d5d`, `feat(ui): retire redundant
+Contributions icons`, verified by push and remote ref. Publication26 Vitest/one embedding
+Chromium pass after labels changed. Clean worktree before1AG. Earlier Contributions long-name
+coverage/native-disabled-focus limits remain recorded, no extension of that page here.
+
+**1AG production only pages/Timeline.tsx and its private StatCard rendering contract.** Retire
+Calendar/Disc3/Trophy stat decoration, private icon prop and Disc3 fallback. Keep three bounded
+UX sites: timeline-computing Loader2, timeline-collapse ChevronUp, timeline-expand ChevronDown,
+aria-hidden. Existing ErrorState/GridSkeleton retained. Whole-file policy grows to16 files/49
+exact glyph sites, one bounded shared ErrorState use; original1V inventory untouched.
+
+Readings use existing Bricolage/Mono with .crate-form-field actual8px pairs and top rules;
+body remains Poppins. Year/album targets44px, type=button, aria-expanded and full accessible
+album names. All actual counts, chronological sorting/ties, bar width/minimum, data hook/URL,
+year toggle, album/asset helper inputs, callbacks and existing loading/error branches preserved.
+No new foundation/token/dependency/shared export/API/backend/permission/Listen change. Actual
+route/sidebar retain library.view. This does not complete1b.8, Timeline/A14, chart migration or
+phase6.4. Existing bars and no-data 'being computed' semantics remain, not a new runtime job claim.
+
+AST audit against published1AF:11 data statements/declarations,2 pure/toggle helpers,4 data/state
+hook calls,3 navigation/asset calls, existing ErrorState/GridSkeleton JSX,3 activation/image
+callbacks, percentage style and5 branch conditions unchanged. Audit normalizes only nonsemantic
+parentheses/whitespace; changed private StatCard/JSX metadata are explicit. No data/effect rewrite.
+
+Real specimen <http://127.0.0.1:5186/admin-timeline-demo.html>, persistent `/#cronologia-admin`.
+Exact Timeline hook alias only; actual page and routing helpers, fictional response-shaped
+albums, local loading/computing/error/retry and sample destinations clearly labelled. Existing
+per-window asset URL resolver maps only four sample IDs to local generated fictional covers,
+one deliberately invalid for original onError handling. Shared helper source unchanged; no
+API/SSE/write requests. This is mock isolation, not live auth/backend/asset certification.
+
+Observed unit RED8 expected/18 pass after correcting a harness textContent whitespace assumption;
+then **26 scoped Vitest** (10 Timeline +16 policy). Scoped strict types caught invalid Testing
+Library ByRole exact options; removed them, since string names are exact already. Final named
+task-done replay26/26 passes after that test correction. Missing preview entry RED, then **four
+preview +three built-Admin Chromium**,1440/768/390, serial workers1. Counts/order/ties, disclosure
+Enter/Space/focus, full long title/artist accessible name, actual8px/44px, bounds, cover src/lazy/
+error, local image success/failure, sample routing, loading/retry and no specimenAPI traffic
+covered. Built test uses the actual hook/route mount and leaves independent Album rendering to
+its own scope; unit/specimen verify actual router destination. No arbitrary timeout/forcedclick.
+
+Three strict configs, scoped ESLint/format, Admin build/types and12-entry preview build pass.
+Admin **526769/532480 B initial gzip**,10 assets, **5711B margin**,1B below published1AF. Known
+generated tsbuildinfo restored. No complete suites/CI/canonical refresh.33 PNGs/manifest remain
+1M; app/web@258bbaee unchanged/unavailable. Actual backend/auth/full data/assets, native/AT/zoom/
+other engines and phase validation stay pending. Other Admin pages remain unmigrated.
+
+Actual IAB inspected with2020 expanded, good/broken artwork and retained disclosure; proof
+`.artifacts/review/checkpoint-1ag-timeline.jpg`1310×1424, tab deliverable. Service active/HTTP200
+verified in final closure. Fresh review and executor rulings follow. **Stop1AG uncommitted for
+Diego; no next group, commit/push, PR/merge/rebase/deploy/release.**
+
+### 1AG fresh review, executor rulings and final stop
+
+One fresh read-only review read all20 pending files, including nine untracked, actual source,
+original source, plan/ledger/audit and validation logs. Verdict: **ready for Diego visual review;
+Critical0 / Important0 / Minor0 requiring changes in this checkpoint**. No product fix or second
+review loop. The reviewer did not execute tests/builds/browser/network or mutate files.
+
+Executor rulings on every declined area, in review order:
+
+1. Live auth, permissions and backend integration: route/sidebar library.view and data contracts unchanged; mocks do not prove operational enforcement. Cost: live integration and authorization QA pending.
+2. Actual artwork delivery, caching and recovery: local good/broken covers prove rendering only, actual asset helper calls unchanged. Cost: production asset transport/auth/cache not certified.
+3. Independent Album rendering: actual helper destinations tested in unit/specimen; no Album source change. Cost: destination-page behavior relies on its separate scope/tests.
+4. Complete production counts, scale and data quality: bounded fictional response plus unchanged aggregation. Cost: full-library accuracy/performance require real-data QA.
+5. Empty-array/malformed year buckets: inspected API creates nonempty numeric buckets; keep aggregation unchanged in icon group. Cost: defensive handling/possible invalid widths for unsupported buckets remain existing limitations.
+6. Indefinite computing for null/empty data: preserve existing branch/copy without claiming a real running job. Cost: empty-data distinction and truthful job-state UX remain later data-state work.
+7. Year-prefix stripping and earliest-year ties: preserve tested existing product semantics and raw helper inputs. Cost: no alternative naming/tie policy introduced.
+8. Full Timeline/A14/Nivo layout: keep current bars; retire only decorative stats/cover icons and apply shared render recipes. Cost: future chart/page migration is not completed.
+9. Native/AT/zoom/other engines and widths: only recorded1440/768/390 Chromium plus1310 IAB inspection. Cost: runtime/device and broader responsive qualification pending.
+10. Full suites/CI/canonical/pin/unrelated surfaces: honor scoped development validation;33PNG/manifest1M and pin258bbaee unchanged, no other production app change. Cost: no phase-close or reference-parity certification.
+11. Current preview/proof/acceptance: executor inspected2020 expanded, saved actual IAB proof and retained tab; serviceactiveHTTP200. Cost: local inspection/availability is not Diego visual approval.
+12. Publication/deployment/release: only1AF publication authorized; keep1AG local on1b8ab823. Cost: 1AG needs subsequent review approval before commit/push; no next group or release action.
+
+All code remains frozen from final review; only final records/proof added afterward. Final actual
+26 Vitest (task-done after correcting the unsupported test option),4 preview +3 built-Admin
+Chromium,3 strict configs, scoped lint/format/AST, Admin/12-entry preview builds and bundle pass.
+InitialJS526769/532480B gzip,10 assets,5711B margin. Known cache restored and whitespace/format
+checks pass. No full suite/CI/canonical recording. Original53177736 ancestor retained; HEAD/origin
+remain published1AF `1b8ab82362f696f16ea481b3789436443b199d5d`.
+
+Actual IAB proof `.artifacts/review/checkpoint-1ag-timeline.jpg`1310×1424 shows2020 expanded,
+retained disclosure and local good/broken cover samples. User service active, specimenHTTP200,
+tab marked deliverable. Review <http://127.0.0.1:5186/admin-timeline-demo.html> or persistent
+`/#cronologia-admin`. All earlier checkpoints retained. **Stop1AG uncommitted for Diego; no
+commit/push, next group, PR/merge/rebase/deploy/release.**
+
+### 1AG replacement scope — Library Timeline retired at Diego's request
+
+This final record supersedes the preceding local 1AG icon proposal and its review. Diego
+requested removal after inspecting that specimen; neither version of 1AG is approved or
+published. Published HEAD/origin remain 1AF `1b8ab82362f696f16ea481b3789436443b199d5d`.
+
+Deleted Admin `pages/Timeline.tsx`, its lazy import and Sidebar destination. The old `/timeline`
+URL retains the existing authentication and `library.view` gate, then replaces the history
+entry with `/browse`, discarding obsolete query/hash. CommandPalette already had no Timeline
+destination. Admin no longer loads that page chunk or calls `/api/timeline`. The public backend
+endpoint remains compatible; no library data or backend contract was changed. Release, artist
+and operational timelines are distinct functions and remain available.
+
+The old standalone preview is now a static HTML redirect to `/#cronologia-admin`, a retirement
+record with no Timeline iframe, hook, fixture or asset resolver. The active product and phase
+6.4 targets withdraw Timeline/A14; historical inventories and published checkpoints remain.
+The withdrawn proposal and proof were copied before deletion into ignored review storage:
+`.superpowers/sdd/2026-10-18-crate-v3-timeline-removal/withdrawn-1ag/manifest.json`, 23 files with
+SHA256 hashes. Its historical plan is explicitly marked withdrawn. Source icon policy returns
+to the published 1AF scope: 15 whole files and 46 bounded functional glyph sites.
+
+Observed RED: three expected retirement failures (actual App redirect, deleted source/lazy
+import and Sidebar destination), with seven existing/gate checks green. Final scoped Vitest:
+**31 tests across five files** (App retirement, existing App/bundle checks, Sidebar and icon
+policy). **Six Chromium tests**, serial `--workers=1`: three preview compatibility/navigation
+and three built-Admin old-route/Browse/palette/no-Timeline-request cases at 1440/768/390 px.
+The initial mobile preview assertion addressed the hidden desktop Sidebar; opening the actual
+mobile drawer corrected the harness without a product change, forced click or timeout increase.
+
+Two scoped strict TypeScript configs, scoped ESLint, Admin build/types and preview build pass.
+Preview has 12 HTML entries: 11 actual specimens plus the static retired-URL redirect. Admin
+initial JS is **526680 / 532480 B gzip**, 10 assets, **5800 B margin** (90 B below published 1AF).
+Generated `tsconfig.tsbuildinfo` restored. Validation logs use `.artifacts/review/1ag-removal-*`.
+No full suites, CI dispatch or canonical refresh; 33 PNGs/manifest remain 1M and pin 258bbaee is
+unchanged. Live auth/backend, native/AT/zoom/other engines and full phase validation are pending.
+
+Actual IAB navigation and the retirement record were inspected. A fresh HTTP tab rendered
+successfully after an earlier tab retained a connection-reset error from Vite's restart; no
+browser security interstitial was bypassed. Advisory proofs are
+`.artifacts/review/checkpoint-1ag-navigation-without-timeline.jpg` and
+`.artifacts/review/checkpoint-1ag-timeline-retired.jpg`. The latter shows the visible final record;
+the tab remains open. `crate-v3-preview.service` is active and the navigation URL responds 200.
+Review <http://127.0.0.1:5186/#cronologia-admin> or
+<http://127.0.0.1:5186/admin-navigation-demo.html>. **Stop at 1AG before commit/push or next group.**
+
+### 1AG retirement — final review and stop
+
+One fresh read-only reviewer examined all 19 pending files against published 1AF and independently
+verified the 23-file preservation archive. Verdict: **ready for Diego's review; Critical 0,
+Important 0, Minor 1**. No product repair or second review. Deferred minor: the design-system
+StatStrip table still names Timeline StatCard as an old consumer (line 1196 at review); the
+explicit retirement amendments and corrected product-design table prevail. This stale label
+does not restore the page or authorize its future migration.
+
+Executor rulings on every declined area:
+
+1. Public Timeline endpoint/computation/storage: retain the existing compatibility contract; this is Admin-page removal. Cost: unused first-party endpoint and maintenance remain, with API retirement requiring separate scope.
+2. Release, artist and operational timelines: preserve distinct unchanged product functions. Cost: this checkpoint makes no claim about their UI or data quality.
+3. Live authentication/session/server capability enforcement: retain the actual route gates and focused mock coverage. Cost: live integration and server authorization QA remain pending.
+4. Independent Browse data/artwork/performance/workflows: exercise the actual destination and navigation without changing that page. Cost: complete Browse behavior relies on its own scope and tests.
+5. Former Timeline aggregation, malformed buckets, computing/order/artwork states: remove the entire UI, so these rendering contracts no longer apply. Cost: no retained UI for those historical readings; public backend compatibility remains.
+6. Native/AT/zoom/other engines/viewports: accept recorded Chromium 1440/768/390 checks plus actual IAB inspection. Cost: broader runtime/accessibility certification remains pending.
+7. Full suites/CI/canonicals/pin/unrelated surfaces: honor scoped iteration rules and preserve the 1M references/pin 258bbaee. Cost: no phase-close or reference-parity certification.
+8. Preview availability/visual acceptance: executor verified active service, HTTP 200 and rendered IAB record/navigation; reviewer did not browse. Cost: local readiness is not Diego's approval.
+9. Commit/push/merge/deploy/release/next groups: stop at uncommitted 1AG on published 1AF. Cost: retirement is local until Diego reviews and authorizes publication.
+
+Source hashes stayed frozen after final review; only closure records/proof changed. Formatting,
+whitespace, archive integrity, original ancestor, HEAD/tracking ref and preview service were
+checked. No rerun of already-green tests for bookkeeping alone. Ignored preservation archive
+is deliberately retained. **1AG is ready for review, with no commit/push or further group.**
+
+### 1AG approval and publication preparation — 2026-10-18
+
+Diego approved the Timeline retirement, explicitly requested correction of the stale StatStrip
+consumer reference, and authorised commit/push followed by the next bounded Admin icon group.
+That reference is removed from the active design-system table; the historical deferred-minor
+record above describes the previous review, not an outstanding item. The retirement specimen
+and footer now say 1AG published. Its compatibility test follows the updated publication label.
+Earlier local stops are superseded by this approval; the next implementation stops at 1AH
+before another commit/push. No full-suite/CI/canonical or release work is authorised.

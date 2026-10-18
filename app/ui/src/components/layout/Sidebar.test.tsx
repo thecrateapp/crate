@@ -18,6 +18,24 @@ function Location() {
 }
 describe("Sidebar", () => {
   beforeEach(() => localStorage.removeItem(SIDEBAR_KEY));
+  it("keeps library destinations without the retired Timeline page", () => {
+    renderWithAdminProviders(<Sidebar />, { auth: only("library.view") });
+    expect(
+      screen.queryByRole("link", { name: "Timeline" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Browse" })).toHaveAttribute(
+      "href",
+      "/browse",
+    );
+    expect(screen.getByRole("link", { name: "Insights" })).toHaveAttribute(
+      "href",
+      "/insights",
+    );
+    expect(screen.getByRole("link", { name: "Genres" })).toHaveAttribute(
+      "href",
+      "/genres",
+    );
+  });
   it("links settings administrators to translation review", () => {
     renderWithAdminProviders(<Sidebar />, { auth: only("admin.access") });
     expect(screen.getByRole("link", { name: "Translations" })).toHaveAttribute(
