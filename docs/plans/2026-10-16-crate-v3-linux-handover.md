@@ -4,29 +4,31 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — 1AJ published; 1AK Global Catalog local
+## Active Linux workspace — 1AK published; 1AL Roles local
 
 Use /home/diego/.codex/worktrees/crate-v3-1q/crate, existing feat/crate_v3 tracking origin.
-Published HEAD/ref `235b892f5dadab07faf3ae7a1a1727864b7a06c9`(1AJ);53177736 ancestor retained.
+Published HEAD/ref `44d5f16a1eb20d6b7c89e6b22aee768d86c5bac2` (1AK);53177736 ancestor retained.
 Leave /home/diego/Code/Ninja/crate(feat/crate_mcp) alone. Node22.23.3/dependencies prepared.
 
-Diego approved/published1AJ and authorised another bounded Admin group preserving UX glyphs.
-1AK changes GlobalCatalog.tsx production rendering only: two retained mode-loading sites,
-existing status word/dot in content, shared readouts/8px and44px native local-view controls/fonts.
-19-file policy/64UX sites. Three GETs/limits, capability, POST bodies/handler and formatters stay.
-Actual refetch returns void: POST lock releases while status/runs reads may still be pending;
-preview/tests distinguish enqueue, reads and actual work. No new backend/auth/shared/Listen logic.
+Diego approved/published1AK with the requested Global Catalog specimen-copy correction and
+another bounded Admin group. Local1AL changes Roles.tsx rendering only: no decorative header
+shield, shared typography and8px readouts, wrapping metadata and textual loading status.
+GET/interfaces/state/effect/group order/counts/null/empty and roles.view gates are unchanged.
+Read-only catalog: no edit/create/mutation. Existing rejected-read path has no catch/error
+surface and remains an integration limit.20-file policy/64 retained UX sites; no Roles exception.
 
-Review http://127.0.0.1:5186/admin-global-catalog-demo.html or /#catalogo-global-admin.42scoped
-Vitest +4preview+3builtAdmin Chromium at1440/768/390 pass; strict TS/lint/AST/Admin and16-entry
-preview builds pass. InitialJS526533/532480Bgzip,5947Bmargin. Generatedcache restored. ActualIAB
-proof .artifacts/review/checkpoint-1ak-global-catalog.jpg. Main handover owns finalreview/QA limits;
-plan2026-10-18-crate-v3-global-catalog-icons.md. Keep preview service active5186.
+Review http://127.0.0.1:5186/admin-roles-demo.html or /#roles-admin.23scoped Vitest,4preview and
+6builtAdmin Chromium cases pass; strict TS/lint/AST/Admin and17-entry preview builds pass.
+InitialJS526505/532480Bgzip,5975Bmargin; generatedcache restored. ActualIAB proof
+.artifacts/review/checkpoint-1al-roles.jpg. Main handover owns finalreview and QA limits;
+plan2026-10-18-crate-v3-roles-icons.md. Keep preview service active5186.
 
+Accepted future Users amendment: remove map, list principal user data/state per row, modal
+for detail. Supersedes older map targets; Users/UserMap source is untouched in1AL.
 All earlier checkpoints/Timeline retirement/redirect/withdrawn proposal archive remain. Shared
-Select-label minor deferred from1AJ.33canonicalPNG/manifest stay1M, pin258bbaee unchanged.
+Select-label minor remains deferred from1AJ.33canonicalPNG/manifest stay1M; pin258bbaee unchanged.
 No full suites/CI/canonical refresh. Native/AT/live backend/server auth/phase QA pending;
-1b.8/B17/A24/phase6.7 incomplete. **Stop1AK uncommitted for Diego; no next group, commit/push,
+1b.8/A19/phase6.6 incomplete. **Stop1AL uncommitted for Diego before next group, commit/push,
 PR/merge/rebase/deploy/release.** Historical bootstrap below does not replace this worktree.
 
 ## Prepare the checkout
@@ -264,3 +266,12 @@ void-refetch handler remain unchanged. Earlier1AK local/Minor-deferral stops are
 this instruction. Shared Select label minor from1AJ remains separate and deferred.
 Next stop1AL covers Roles & Permissions; preserve UX, preview and all checkpoints. No full
 suite/CI/canonical refresh, PR/merge/rebase/deploy/release or other checkout.
+
+## 1AL approval and publication authorization — 2026-10-18
+
+Diego approved1AL and explicitly authorized commit/push on feat/crate_v3 followed by one further
+bounded Admin icon group, preserving functional UX glyphs and the persistent preview. Previous
+local1AL stops are historical and superseded by this approval. Approved production source and
+all13pre-publication source hashes were verified; only specimen/footer publication labels and
+the affected persistent check change for publication. No full suites/CI/canonical refresh,
+PR/merge/rebase/deploy/release. Next stop is1AM, uncommitted for Diego before publication.

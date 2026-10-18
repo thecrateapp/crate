@@ -18,8 +18,7 @@ icon-restyle proposal is withdrawn, not approved/published. Page/lazy/menu remov
 /timeline redirects to Browse with its library.view gate. The old specimen URL redirects to
 <http://127.0.0.1:5186/#cronologia-admin>, now a retirement record without a Timeline iframe.
 Review navigation at <http://127.0.0.1:5186/admin-navigation-demo.html>. The obsolete StatStrip
-reference is corrected; **1AH Bandcamp is approved and published as `58b2695b39bbd91c477a968192ff74332a220e71`.** **1AI Discovery is approved and published as `a304ecf9c41bc254dab98b9f52668e18f4d87852`.** **1AJ New Releases is approved and published as `235b892f5dadab07faf3ae7a1a1727864b7a06c9`.** Local1AK covers Global Catalog only;
-loading glyphs and data/capability/action contracts remain.
+reference is corrected; **1AH Bandcamp is approved and published as `58b2695b39bbd91c477a968192ff74332a220e71`.** **1AI Discovery is approved and published as `a304ecf9c41bc254dab98b9f52668e18f4d87852`.** **1AJ New Releases is approved and published as `235b892f5dadab07faf3ae7a1a1727864b7a06c9`.** **1AK Global Catalog is approved and published as `44d5f16a1eb20d6b7c89e6b22aee768d86c5bac2`.** Local1AL covers Roles rendering only; read-only data/capability contracts remain.
 
 Published **1AD Health** context: Diego approved the issue-queue sketch and explicitly authorised
 its implementation on 2026-10-18.
@@ -34,7 +33,7 @@ The final composition record below and
 [`2026-10-18-crate-v3-health-inbox.md`](2026-10-18-crate-v3-health-inbox.md) supersede the
 historical icon-only and awaiting-sketch-approval stops. **The former 1AD stop is superseded by Diego's publication approval.**
 Earlier provisional/publication stops are historical and superseded by Diego's approval and
-next-group request on 2026-10-18. **Next stop: 1AK before commit/push or another group.**
+next-group request on 2026-10-18. **Next stop: 1AL before commit/push or another group.**
 The retained Listen play/halo/ring and luminous seek trail
 from 1S remain intact. Resume on Linux with
 [`2026-10-16-crate-v3-linux-handover.md`](2026-10-16-crate-v3-linux-handover.md).
@@ -43,7 +42,7 @@ Canonical 1N–1P Linux recording/comparison and native QA remain pending.
 ## Where the work lives
 
 - Active Linux worktree: `/home/diego/.codex/worktrees/crate-v3-1q/crate`, existing branch
-  `feat/crate_v3`, published HEAD `235b892f5dadab07faf3ae7a1a1727864b7a06c9` (1AJ);
+  `feat/crate_v3`, published HEAD `44d5f16a1eb20d6b7c89e6b22aee768d86c5bac2` (1AK);
   transfer checkpoint `53177736a7643c232cbb19e744a2b2ee9077efaf` remains an ancestor. Node 22.23.3, root
   dependencies and persistent :5186 preview are prepared. This isolates the MCP agent's
   `/home/diego/Code/Ninja/crate` checkout (`feat/crate_mcp`); leave its files untouched.
@@ -246,7 +245,8 @@ is a token-based chart configuration, not a selectable product skin.
 | 1b.8 / Checkpoint 1AH                                        | Bandcamp redundant icons retired with six retained loading/external UX sites. Approved and published as 58b2695b.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | 1b.8 / Checkpoint 1AI                                        | Discovery redundant icons retired with four retained search/loading UX sites. Approved and published as a304ecf9.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | 1b.8 / Checkpoint 1AJ                                        | New Releases icons retired with six retained search/loading/dismiss UX sites. Approved and published as235b892f. Shared Select label minor deferred.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| 1b.8 / Checkpoint 1AK                                        | Local Global Catalog icon group, two retained reconciliation-loading sites, standard readouts and content status word/dot; data/capabilities/actions preserved. Stop for Diego before commit/push.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 1b.8 / Checkpoint 1AK                                        | Approved and published as44d5f16a, including requested specimen-copy correction. Global Catalog keeps two loading UX sites and its real void-refetch contract.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 1b.8 / Checkpoint 1AL                                        | Local Roles rendering group; decorative header shield removed, shared typography/8px and textual loading semantics. Data/roles.view/read-only contract preserved. Stop for Diego before commit/push.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 1.5–1.6 / Checkpoint 1B                                      | Committed/pushed as `c28a97e0`; Shared 696, Admin 248, Listen 2,853 and Desktop 50 tests pass (3,847 total; Listen has 4 skipped). Seven preview browser checks pass. Four typechecks, both app lints, shared/app builds, 21 gate tests, token sync and 15 drift metrics pass. Spec/quality reviews have no remaining findings. Approved and published as `c28a97e0` on 2026-10-15                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 1.6a / Checkpoint 1C                                         | Percentage-preserving GenrePill restyle visually approved by Diego on 2026-10-15; committed as `e60e6f50`, publication authorised. Its 27 focused tests pass; integrated suites/builds and cumulative browser checks are recorded with 1D. Commit/push explicitly authorised for this checkpoint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 1.1 / Checkpoint 1D                                          | Published as d881a728 with explicit approval and provisionally accepted by Diego to keep moving; focus-fade visual polish is deferred (not final visual parity approval). Available at #foco. Full suites run serially with maxWorkers=2: Shared 738, Admin 248, Listen 2,853 and Desktop 50 pass (3,889 total; 4 Listen skipped). This includes 15 focus-motion unit tests. Preview 22 and appearance 26 Chrome checks pass, including initial/intermediate/final on/off frames against the original native search transition, interruption, reduced motion, forced colours and real portal/TopBar geometry. Four typechecks, both app lints, shared/app/preview builds, 22 gate tests, token sync, 15 drift metrics and layer policy pass. Spec/quality review has no remaining findings. CI baselines/WebKit/runtime/device QA remain pending |
@@ -3851,3 +3851,126 @@ void-refetch handler remain unchanged. Earlier1AK local/Minor-deferral stops are
 this instruction. Shared Select label minor from1AJ remains separate and deferred.
 Next stop1AL covers Roles & Permissions; preserve UX, preview and all checkpoints. No full
 suite/CI/canonical refresh, PR/merge/rebase/deploy/release or other checkout.
+
+## Accepted Users direction — 2026-10-18 (Diego)
+
+When the Admin Users group is reached, remove its map. The primary view will be a user list,
+with the principal available user data and current state shown in each row. User detail opens
+in a modal, rather than adding detail content to the list. This explicit direction supersedes
+older Users map proposals/targets. Preserve existing capability gates, actual data and actions;
+choose concrete columns/detail content against available contracts in that group's review.
+No Users/UserMap implementation or backend work is part of current1AL Roles. Keep the normal
+visual checkpoint before publication of that later Users group.
+
+## Final Linux continuation — 1AK published; 1AL Roles local (2026-10-18)
+
+1AK is published as **44d5f16a1eb20d6b7c89e6b22aee768d86c5bac2**,
+`feat(ui): retire redundant Global Catalog icons`. Diego's explicit copy correction is included:
+“bloqueo durante el envío y lecturas posteriores asíncronas.” The affected persistent preview
+case passes; approved product code and unaffected source hashes stay intact. Push/remote ref
+verified; clean before1AL. The1AK mockup-copy minor is resolved; earlier Select-label minor from
+1AJ remains deferred. The current preset-editing question was answered as a current limitation,
+not treated as authorization for a custom-role editor.
+
+**Production scope is Roles.tsx rendering only.** Remove ShieldCheck and its decorative header
+tile. Display font on page/section titles and role names; MonoLabel/mono on slugs, group labels
+and capability IDs. Role-name/slug and group/capability pairs share .crate-form-field, measured8px.
+Metadata wraps at narrow widths without expanding the grid. Existing loading text gains
+role=status and an accessible name; no functional glyph was present here to preserve/remove.
+Whole-file icon policy now covers20 files and retains64 UX sites; no new exception/allowlist.
+
+Literal-preserving AST audit against published1AK proves identical capabilityGroup, two state
+hooks, one full mount effect/GET, one full grouped memo and two response interfaces; four map
+receivers/parameters/keys and capability counts stay. Group alphabetical order, within-group
+API order, role order, role counts and null/empty rendering remain. The real router/sidebar
+roles.view gates are untouched; admin and a read-only role can view the actual built page.
+No POST, role editor, creation, permission mutation or new action. No backend, shared, Listen,
+dependencies, URL/view contract or Users/UserMap source changes. A19/phase6.6/global1b.8 remain
+incomplete. The existing .finally read chain has no catch/error UI or cancellation cleanup;
+that pre-existing integration limitation is neither changed nor certified here.
+
+**Review:** <http://127.0.0.1:5186/admin-roles-demo.html> and persistent `/#roles-admin`.
+Actual Roles mounts with an importer-only API fixture, response-shaped fictional presets and
+real known capability strings. Only ready/loading/empty/null samples; pending read resolves
+manually. No auth simulation inside the isolated page, backend/external requests, real mutation,
+preferences or rejected-promise specimen. Earlier frames/checkpoints remain; footer says1AK
+published/1AL in review. Actual IAB ready-page composition inspected; proof saved at
+`.artifacts/review/checkpoint-1al-roles.jpg`. Preview systemd user service remains active5186.
+
+**Scoped evidence, serial:**
+
+- Vitest new Roles rendering6 + existing Roles1 + source policy16 = **23pass/3files**,
+  --maxWorkers=1. Expected RED3/20pass before implementation, then GREEN. Real component/effect;
+  external API only is stubbed. Data/order/count/group/loading/read-only/null/empty covered.
+- Preview Chromium **4pass**, standalone1440/768/390 + persistent. Real fonts, measured8px,
+  wrapping/no overflow/no glyph/actions, keyboard sample loading/manual finish and empty/null;
+  no page errors/backend/external traffic. Corrected1AK copy and earlier frames retained.
+- BuiltAdmin Chromium **6pass**,1440/768/390 × admin/read-only auth fixtures. Real /roles route,
+  actual GET client, roles.view gate, rendered payload and no role-edit/POST UI. Fictional user
+  grants admin.access and roles.view only. Client/browser proof does not certify server auth.
+- Strict scoped unit/preview TypeScript and scoped ESLint exit0; Admin build/types and preview
+  build pass (**17HTML entries:16specimens + Timeline redirect**). Literal-preserving AST audit
+  passes. The first audit over-compared entire map JSX; corrected projection to business
+  receivers/parameters/keys/count while retaining full effect/memo/interface checks. No logic
+  change was made to satisfy that harness correction.
+- **Initial JS526505/532480Bgzip**,10assets, **5975B margin**,28B below1AK526533. Existing chunk
+  warning only. Generated tsbuildinfo restored. No dependency/budget-ceiling change.
+
+Logs: `.artifacts/review/1al-{red,unit,preview,admin-browser,types,lint,contract-audit,bundle,preview-build}.log`.
+Plan/ledger: `2026-10-18-crate-v3-roles-icons.md` and
+`.superpowers/sdd/2026-10-18-crate-v3-roles-icons/`. One fresh final read-only review follows.
+The future Users map removal/list/status/modal decision above remains binding for that later
+group, with real data/actions/capability gates and its own visual review.
+
+Executor rulings before review:
+
+1. Scoped checkpoint tests and preserved evidence override generic full-suite/commit/cleanup/
+   finish-branch skill steps. Cost: phase/native/live/canonical QA remains pending; no phase
+   completion or release claim.
+2. Preserve existing rejected-read/unmount behavior because changing data effects/error/
+   cancellation exceeds this rendering group. Cost: Roles read-error handling and live/native
+   integration remain pending; no successful-error-recovery claim.
+
+No full suite/CI/canonical refresh.33canonicalPNGs/manifest remain1M and sitepin258bbaee unchanged.
+Native/AT/live backend/server enforcement and final phase QA remain pending. **Stop1AL uncommitted
+for Diego before commit/push, another group, PR/merge/rebase/deploy/release.**
+
+### 1AL final review and checkpoint stop
+
+One fresh independent read-only reviewer (gpt-6-astra high) reviewed all20pending files,
+including9untracked, against published1AK44d5f16a. Manifest/patch agree and all13source hashes
+match the freeze. **Critical0 / Important0 / newMinor0.** Ready for Diego visual review only;
+no corrective pass/re-review is indicated. Existing1AJ shared Select-label association remains
+deferred. Report: `.artifacts/review/1al-final-review.md`; freeze/package in this plan's retained
+.superpowers workspace. Prettier20files and diffcheck pass; source unchanged by formatting.
+
+Executor rulings on every behavior the reviewer set aside (in addition to the two workflow/
+existing-error rulings above):
+
+1. Rejected read/error/retry: preserve the pre-existing catch-less chain; no error recovery claim in a rendering-only change. Cost if wrong: failed reads still lack a page error/retry surface until a separate integration fix.
+2. Unmount/cancellation: preserve the unchanged mount effect and document the lifecycle limit. Cost if wrong: late completions remain unguarded; no cancellation/lifecycle guarantee.
+3. Live backend/session/server auth: fixture evidence demonstrates client behavior only. Cost if wrong: live payload/session/enforcement integration remains unverified.
+4. Denied capability combinations: keep inspected unchanged roles.view router/sidebar gates and tested authorized admin/read-only fixtures. Cost if wrong: exhaustive denial combinations remain untested; no expanded authorization certification.
+5. Preset editor/custom roles/mutations: retain the existing read-only catalog; Diego asked about its current limitation, not for an editor. Cost if wrong: creation/editing still requires separately scoped product/backend work.
+6. Future Users implementation: record accepted no-map/list+state/modal direction, leave Users code for its own group. Cost if wrong: future actual columns/actions/modal and integration still need implementation and review.
+7. Existing shared Select-label minor: carry prior1AJ deferred association issue; no shared edits in Roles. Cost if wrong: that shared accessible-name association still needs its own affected-consumer follow-up.
+8. Other Admin icons/A19/phase6.6/global1b.8: claim completion of the bounded Roles icon group only. Cost if wrong: remaining app/phase work has no renewed certification.
+9. Native/AT/other browsers/full accessibility: limit proof to scoped Chromium/DOM/fonts/spacing and saved IAB composition. Cost if wrong: native/real AT/other engines/full a11y behavior remains unverified.
+10. Fullsuite/CI/canonical/finalphase: honor Diego scoped iteration and keep canonical1M/sitepin258bbaee. Cost if wrong: broader regressions/canonical comparison and finalphase QA remain pending.
+11. Publication/deploy/release/finalvisual acceptance: stop1AL uncommitted on published1AK with preview active for Diego. Cost if wrong: the new rendering stays local until approved; no next group or publication.
+
+Task1 is complete for local review; documentation-only review closure follows the source freeze.
+HEAD/origin/remote remain **44d5f16a1eb20d6b7c89e6b22aee768d86c5bac2**, original53177736ancestor
+retained.13source hashes and20pending-file scope match; backend/shared/Listen/Users/dependencies/
+site/canonical/generatedcache are unchanged.17previewHTML entries verified, serviceactive and
+standalone/persistent HTTP200. No full suites/CI/baselines/PR/merge/rebase/deploy/release.
+**Stop1AL uncommitted for Diego; no next group.**
+
+## 1AL approval and publication authorization — 2026-10-18
+
+Diego approved1AL and explicitly authorized commit/push on feat/crate_v3 followed by one further
+bounded Admin icon group, preserving functional UX glyphs and the persistent preview. Previous
+local1AL stops are historical and superseded by this approval. Approved production source and
+all13pre-publication source hashes were verified; only specimen/footer publication labels and
+the affected persistent check change for publication. No full suites/CI/canonical refresh,
+PR/merge/rebase/deploy/release. Next stop is1AM, uncommitted for Diego before publication.

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ShieldCheck } from "lucide-react";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 import { Badge } from "@crate/ui/shadcn/badge";
 import {
@@ -52,11 +52,8 @@ export function Roles() {
     <div className="space-y-6">
       <section className="rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary shadow-none">
-            <ShieldCheck size={22} />
-          </div>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-white">
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-white">
               Roles & Permissions
             </h1>
             <p className="text-sm text-white/55">
@@ -68,7 +65,7 @@ export function Roles() {
 
       <Card className="border-white/10 bg-panel-surface">
         <CardHeader>
-          <CardTitle>Role presets</CardTitle>
+          <CardTitle className="font-display">Role presets</CardTitle>
           <CardDescription>
             These presets are code-defined for now. Custom role editing can come
             later without changing the authorization model.
@@ -76,7 +73,13 @@ export function Roles() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="py-12 text-sm text-white/45">Loading roles...</div>
+            <div
+              role="status"
+              aria-label="Loading roles"
+              className="py-12 text-sm text-white/45"
+            >
+              Loading roles...
+            </div>
           ) : (
             <div className="space-y-4">
               {(data?.roles ?? []).map((role) => (
@@ -85,13 +88,13 @@ export function Roles() {
                   className="rounded-md border border-white/8 bg-black/15 p-4"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <div className="text-lg font-semibold text-white">
+                    <div className="crate-form-field min-w-0">
+                      <div className="font-display text-lg font-semibold text-white">
                         {role.name}
                       </div>
-                      <div className="text-xs uppercase tracking-[0.16em] text-white/35">
+                      <MonoLabel as="div" className="break-all text-white/35">
                         {role.slug}
-                      </div>
+                      </MonoLabel>
                     </div>
                     <Badge variant="outline">
                       {role.capabilities.length} capabilities
@@ -102,7 +105,7 @@ export function Roles() {
                       <Badge
                         key={capability}
                         variant="secondary"
-                        className="font-mono text-[11px]"
+                        className="max-w-full whitespace-normal break-all font-mono text-[11px]"
                       >
                         {capability}
                       </Badge>
@@ -117,27 +120,27 @@ export function Roles() {
 
       <Card className="border-white/10 bg-panel-surface">
         <CardHeader>
-          <CardTitle>Capability catalog</CardTitle>
+          <CardTitle className="font-display">Capability catalog</CardTitle>
           <CardDescription>
             The backend primitive is the capability. Roles are just readable
             presets over this list.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 lg:grid-cols-2">
+        <CardContent className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {groupedCapabilities.map(([group, capabilities]) => (
             <div
               key={group}
-              className="rounded-md border border-white/8 bg-black/15 p-4"
+              className="crate-form-field min-w-0 rounded-md border border-white/8 bg-black/15 p-4"
             >
-              <div className="mb-3 text-xs uppercase tracking-[0.16em] text-accent-action-hi">
+              <MonoLabel as="div" className="text-accent-action-hi">
                 {group}
-              </div>
+              </MonoLabel>
               <div className="flex flex-wrap gap-1.5">
                 {capabilities.map((capability) => (
                   <Badge
                     key={capability}
                     variant="outline"
-                    className="font-mono text-[11px] text-white/68"
+                    className="max-w-full whitespace-normal break-all font-mono text-[11px] text-white/68"
                   >
                     {capability}
                   </Badge>

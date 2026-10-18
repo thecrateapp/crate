@@ -1,0 +1,23 @@
+{
+  "capabilities": [
+    "users.view",
+    "library.view",
+    "roles.view",
+    "users.status.manage",
+    "library.metadata.write"
+  ],
+  "roles": [
+    {
+      "slug": "librarian",
+      "name": "Librarian",
+      "capabilities": ["library.view", "library.metadata.write", "users.view"],
+      "system": true
+    },
+    {
+      "slug": "observer",
+      "name": "Observer",
+      "capabilities": ["library.view", "roles.view"],
+      "system": true
+    }
+  ]
+}

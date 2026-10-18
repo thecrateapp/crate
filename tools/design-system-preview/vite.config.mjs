@@ -14,6 +14,13 @@ export default defineConfig({
       resolveId(source, importer) {
         if (!importer?.includes("/app/ui/") || !source.startsWith("@/")) return;
         if (
+          importer.endsWith("/app/ui/src/pages/Roles.tsx") &&
+          source === "@/lib/api"
+        )
+          return fileURLToPath(
+            new URL("admin-roles-fixtures.ts", import.meta.url),
+          );
+        if (
           importer.endsWith("/app/ui/src/pages/GlobalCatalog.tsx") &&
           ["@/lib/api", "@/hooks/use-api"].includes(source)
         )
@@ -136,6 +143,9 @@ export default defineConfig({
         ),
         adminContributions: fileURLToPath(
           new URL("admin-contributions-demo.html", import.meta.url),
+        ),
+        adminRoles: fileURLToPath(
+          new URL("admin-roles-demo.html", import.meta.url),
         ),
         adminGlobalCatalog: fileURLToPath(
           new URL("admin-global-catalog-demo.html", import.meta.url),

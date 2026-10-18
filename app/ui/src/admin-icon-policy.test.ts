@@ -35,6 +35,7 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
     "app/ui/src/pages/Discover.tsx",
     "app/ui/src/pages/NewReleases.tsx",
     "app/ui/src/pages/GlobalCatalog.tsx",
+    "app/ui/src/pages/Roles.tsx",
   ]);
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.

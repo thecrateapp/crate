@@ -2,9 +2,9 @@
 
 Status: product design, revised 2026-10-15. Canonical clone `/Users/diego/Code/crate-v3`, branch
 `feat/crate_v3`. The handover records implementation and QA status; historical analysis is not a
-current progress report. Checkpoints through 1AJ are approved and published (`235b892f`).
-Library Timeline is removed; its old route redirects to Browse. Local 1AK covers Global Catalog
-redundant icons with preserved loading glyphs and data/action contracts. Stop for Diego before its commit/push. The final handover and later amendments below
+current progress report. Checkpoints through 1AK are approved and published (`44d5f16a`).
+Library Timeline is removed; its old route redirects to Browse. Local 1AL covers Roles
+redundant header icon and typography with preserved read-only data and authorization contracts. Stop for Diego before its commit/push. The final handover and later amendments below
 supersede earlier provisional stops. Diego's 1S review explicitly
 preserves the current Listen play essence (halo, layers and progress ring) and seek trail,
 adapted to V3 with 1–2 px strokes; see DS §5.5.
@@ -3809,3 +3809,52 @@ void-refetch handler remain unchanged. Earlier1AK local/Minor-deferral stops are
 this instruction. Shared Select label minor from1AJ remains separate and deferred.
 Next stop1AL covers Roles & Permissions; preserve UX, preview and all checkpoints. No full
 suite/CI/canonical refresh, PR/merge/rebase/deploy/release or other checkout.
+
+## Accepted Users direction — 2026-10-18 (Diego)
+
+When the Admin Users group is reached, remove its map. The primary view will be a user list,
+with the principal available user data and current state shown in each row. User detail opens
+in a modal, rather than adding detail content to the list. This explicit direction supersedes
+older Users map proposals/targets. Preserve existing capability gates, actual data and actions;
+choose concrete columns/detail content against available contracts in that group's review.
+No Users/UserMap implementation or backend work is part of current1AL Roles. Keep the normal
+visual checkpoint before publication of that later Users group.
+
+## Linux 1AL — bounded Roles & Permissions icon group (2026-10-18)
+
+1AK Global Catalog is approved and published as `44d5f16a1eb20d6b7c89e6b22aee768d86c5bac2`.
+Diego's requested specimen-copy correction is included; its actual enqueue/refetch contract is
+unchanged. Shared Select-label association remains the separate deferred1AJ minor.
+
+Local1AL changes Roles.tsx rendering only: remove the decorative header shield, use Bricolage
+for headings/role names and MonoLabel/mono for slugs, group labels and capability identifiers.
+Role-name/slug and group/capability readouts use the shared8px .crate-form-field recipe; narrow
+metadata wraps. Existing textual loading gains status semantics. There are no functional glyph
+sites on this page. Whole-file policy now covers20 files and retains64 UX sites elsewhere.
+
+GET /api/auth/roles, response interfaces, state/effect, grouping/sort, API order, counts and
+null/empty behavior are unchanged. The actual route/sidebar roles.view gates remain; the page
+is read-only, with no editor, role creation or permission mutation. Diego's question about
+editing presets was answered as a description of the current limitation, not an editor request.
+The existing rejected-read path has no catch/error surface; this rendering group does not
+change or certify that behavior. No backend/shared/Listen/dependency change.
+
+Review /admin-roles-demo.html or /#roles-admin on the persistent5186 preview. The real page
+uses importer-only API fixtures and manual read completion; ready/loading/empty/null sample
+states do not call a backend. Evidence:23 scoped unit cases,4preview and6builtAdmin Chromium
+cases at1440/768/390; strict scoped types/lint, literal-preserving AST audit, Admin and17-entry
+preview builds pass. Initial JS526505/532480Bgzip,5975Bmargin. The handover owns final review,
+proof and QA limits. A19/phase6.6/global1b.8 remain incomplete. The accepted future Users
+list/status/modal direction stays separate; Users/UserMap code is untouched.
+
+**Stop1AL uncommitted for Diego before publication or another group.** No full suites/CI,
+canonical refresh, PR/merge/rebase/deploy/release. Canonical1M and app/web@258bbaee remain.
+
+## 1AL approval and publication authorization — 2026-10-18
+
+Diego approved1AL and explicitly authorized commit/push on feat/crate_v3 followed by one further
+bounded Admin icon group, preserving functional UX glyphs and the persistent preview. Previous
+local1AL stops are historical and superseded by this approval. Approved production source and
+all13pre-publication source hashes were verified; only specimen/footer publication labels and
+the affected persistent check change for publication. No full suites/CI/canonical refresh,
+PR/merge/rebase/deploy/release. Next stop is1AM, uncommitted for Diego before publication.
