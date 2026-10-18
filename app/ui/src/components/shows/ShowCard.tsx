@@ -1,13 +1,6 @@
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
-import { ExternalLink, MapPin, Ticket, X } from "lucide-react";
+import { ExternalLink, X } from "lucide-react";
 
 import {
   artistBackgroundApiUrl,
@@ -309,11 +302,10 @@ function CollapsedShowCard({ show }: { show: NormalizedShow }) {
       </div>
 
       <div className="min-w-0 flex-1 px-3 py-2.5">
-        <div className="truncate text-[13px] font-semibold text-foreground">
+        <div className="font-display truncate text-[13px] font-semibold text-foreground">
           {show.primaryArtist?.name ?? show.title}
         </div>
         <div className="mt-1 flex items-center gap-1 text-[11px] text-white/40">
-          <MapPin size={10} className="flex-shrink-0 text-primary/60" />
           <span className="truncate">{show.venue}</span>
           {show.city ? (
             <>
@@ -335,13 +327,13 @@ function CollapsedShowCard({ show }: { show: NormalizedShow }) {
       </div>
 
       <div className="flex flex-shrink-0 flex-col items-center justify-center px-2">
-        <span className="text-[8px] font-bold leading-none tracking-[0.12em] text-primary/55">
+        <span className="font-mono text-[8px] font-normal leading-none tracking-[0.12em] text-primary/55">
           {monthLabel}
         </span>
-        <span className="text-[20px] font-black leading-tight text-primary">
+        <span className="font-mono text-[20px] font-normal leading-tight text-primary">
           {dayLabel}
         </span>
-        <span className="text-[8px] font-medium leading-none text-white/40">
+        <span className="font-mono text-[8px] font-normal leading-none text-white/40">
           {weekdayLabel}
         </span>
       </div>
@@ -354,9 +346,13 @@ function CollapsedShowCard({ show }: { show: NormalizedShow }) {
             rel="noopener noreferrer"
             onClick={(event) => event.stopPropagation()}
             title="Open tickets"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-white/30 transition-colors hover:bg-white/8 hover:text-white/70"
+            className="flex h-11 w-11 items-center justify-center rounded-md text-white/30 transition-colors hover:bg-white/8 hover:text-white/70"
           >
-            <ExternalLink size={15} />
+            <ExternalLink
+              data-admin-ux="show-tickets-external"
+              aria-hidden="true"
+              size={15}
+            />
           </a>
         ) : (
           <div className="h-8 w-8" />
@@ -369,12 +365,10 @@ function CollapsedShowCard({ show }: { show: NormalizedShow }) {
 function ActionButton({
   href,
   label,
-  icon,
   tone = "neutral",
 }: {
   href?: string;
   label: string;
-  icon: ReactNode;
   tone?: "neutral" | "primary";
 }) {
   if (!href) return null;
@@ -385,13 +379,12 @@ function ActionButton({
       target={href.startsWith("http") ? "_blank" : undefined}
       rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
       className={cn(
-        "flex flex-1 items-center justify-center gap-1.5 rounded-md border py-2.5 text-[11px] font-semibold transition-colors",
+        "flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md border py-2.5 text-[11px] font-semibold transition-colors",
         tone === "primary"
           ? "border-primary/20 bg-primary/10 text-primary hover:bg-primary/18"
           : "border-white/10 text-muted-foreground hover:border-primary/20 hover:text-primary",
       )}
     >
-      {icon}
       {label}
       {href.startsWith("http") ? (
         <span className="h-[5px] w-[5px] rounded-full bg-accent-action" />
@@ -445,19 +438,21 @@ function ExpandedShowCardBody({
           <button
             type="button"
             onClick={onClose}
-            className="absolute left-2.5 top-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-md bg-black/40 text-white/60 backdrop-blur-sm transition-colors hover:text-white"
+            className="absolute left-2.5 top-2.5 z-10 flex h-11 w-11 items-center justify-center rounded-md bg-black/40 text-white/60 backdrop-blur-sm transition-colors hover:text-white"
             aria-label="Close show details"
           >
-            <X size={14} />
+            <X data-admin-ux="show-close" aria-hidden="true" size={14} />
           </button>
         ) : null}
 
         <div className="absolute right-3 top-2.5 z-10 text-right">
-          <div className="text-[10px] font-bold tracking-wide text-primary/70">
+          <div className="font-mono text-[10px] font-normal tracking-wide text-primary/70">
             {dateLabel}
           </div>
           {timeLabel ? (
-            <div className="text-[10px] text-white/40">{timeLabel}</div>
+            <div className="font-mono font-normal text-[10px] text-white/40">
+              {timeLabel}
+            </div>
           ) : null}
         </div>
 
@@ -477,12 +472,12 @@ function ExpandedShowCardBody({
               {artistHref ? (
                 <Link
                   to={artistHref}
-                  className="block truncate text-sm font-bold text-white transition-colors hover:text-primary"
+                  className="block truncate font-display text-sm font-bold text-white transition-colors hover:text-primary"
                 >
                   {show.primaryArtist?.name ?? show.title}
                 </Link>
               ) : (
-                <div className="truncate text-sm font-bold text-white">
+                <div className="truncate font-display text-sm font-bold text-white">
                   {show.primaryArtist?.name ?? show.title}
                 </div>
               )}
@@ -503,7 +498,6 @@ function ExpandedShowCardBody({
 
       <div className="relative flex-1 px-3 pb-3 pt-2.5">
         <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
-          <MapPin size={11} className="mt-0.5 flex-shrink-0 text-primary/60" />
           <div className="min-w-0">
             <span className="font-medium text-white/70">{show.venue}</span>
             {addressLabel ? (
@@ -529,17 +523,8 @@ function ExpandedShowCardBody({
         ) : null}
 
         <div className="mt-3 flex gap-2">
-          <ActionButton
-            href={artistHref}
-            label="Open Artist"
-            icon={<MapPin size={13} />}
-          />
-          <ActionButton
-            href={show.url}
-            label="Get Tickets"
-            icon={<Ticket size={13} />}
-            tone="primary"
-          />
+          <ActionButton href={artistHref} label="Open Artist" />
+          <ActionButton href={show.url} label="Get Tickets" tone="primary" />
         </div>
       </div>
     </div>

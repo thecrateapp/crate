@@ -38,10 +38,20 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
     "app/ui/src/pages/Roles.tsx",
     "app/ui/src/pages/Users.tsx",
     "app/ui/src/pages/I18nReview.tsx",
+    "app/ui/src/pages/Upcoming.tsx",
+    "app/ui/src/components/shows/ShowCard.tsx",
   ]);
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
 const approvedControls = new Map([
+  [
+    "app/ui/src/pages/Upcoming.tsx:@/components/ui/AdminSelect",
+    { component: "AdminSelect", limit: 2 },
+  ],
+  [
+    "app/ui/src/pages/Upcoming.tsx:@/components/shows/ShowCard",
+    { component: "ShowCard", limit: 2 },
+  ],
   [
     "app/ui/src/pages/Users.tsx:@crate/ui/shadcn/dialog",
     { component: "DialogContent", limit: 4 },
@@ -113,6 +123,19 @@ const approvedControls = new Map([
 ]);
 // Diego's 1W steering explicitly retains UX glyphs. Each concrete site remains bounded.
 const approvedUx = new Map([
+  ["Upcoming:upcoming-view-list", ["lucide-react", "List"]],
+  ["Upcoming:upcoming-view-calendar", ["lucide-react", "CalendarDays"]],
+  ["Upcoming:upcoming-sync", ["lucide-react", "Loader2"]],
+  ["Upcoming:upcoming-search", ["lucide-react", "Search"]],
+  ["Upcoming:upcoming-loading", ["lucide-react", "Loader2"]],
+  ["Upcoming:upcoming-download-loading", ["lucide-react", "Loader2"]],
+  ["Upcoming:upcoming-dismiss", ["lucide-react", "X"]],
+  ["Upcoming:upcoming-previous", ["lucide-react", "ChevronLeft"]],
+  ["Upcoming:upcoming-next", ["lucide-react", "ChevronRight"]],
+  ["Upcoming:upcoming-popover-loading", ["lucide-react", "Loader2"]],
+  ["ShowCard:show-tickets-external", ["lucide-react", "ExternalLink"]],
+  ["ShowCard:show-close", ["lucide-react", "X"]],
+
   ["I18nReview:translations-refresh", ["lucide-react", "Loader2"]],
   ["I18nReview:translations-draft", ["lucide-react", "Loader2"]],
   ["I18nReview:translations-export", ["lucide-react", "Loader2"]],
@@ -216,6 +239,7 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
         "owned-icon-consumer",
         "owned-vector-consumer",
         "icon-prop",
+        "icon-property",
       ].includes(entry.kind)
     ) {
       found.push(entry.id);
@@ -240,7 +264,35 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
       ts.ScriptKind.TSX,
     );
     let attributes: ts.JsxAttributes | undefined;
+    let reviewedInstrument = false;
     function visit(node: ts.Node) {
+      // Existing Leaflet marker assets are instrument data, not action glyph slots.
+      if (
+        entry.kind === "icon-property" &&
+        entry.path === "app/ui/src/pages/Upcoming.tsx" &&
+        ts.isPropertyAssignment(node)
+      ) {
+        const pos = tree.getLineAndCharacterOfPosition(node.getStart(tree));
+        const call = ts.isObjectLiteralExpression(node.parent)
+          ? node.parent.parent
+          : undefined;
+        const expected =
+          entry.name === "iconUrl"
+            ? "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png"
+            : entry.name === "iconRetinaUrl"
+              ? "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png"
+              : undefined;
+        if (
+          pos.line + 1 === entry.line &&
+          pos.character + 1 === entry.column &&
+          call &&
+          ts.isCallExpression(call) &&
+          call.expression.getText(tree) === "L.Icon.Default.mergeOptions" &&
+          ts.isStringLiteral(node.initializer) &&
+          node.initializer.text === expected
+        )
+          reviewedInstrument = true;
+      }
       if (entry.kind === "icon-prop" && ts.isJsxAttribute(node)) {
         const pos = tree.getLineAndCharacterOfPosition(node.getStart(tree));
         if (
@@ -258,6 +310,11 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
       ts.forEachChild(node, visit);
     }
     visit(tree);
+    const instrumentKey = `Upcoming:marker-${entry.name}`;
+    if (reviewedInstrument && !usedUx.has(instrumentKey)) {
+      usedUx.add(instrumentKey);
+      continue;
+    }
     if (!attributes) {
       found.push(entry.id);
       continue;
@@ -353,6 +410,20 @@ describe("Admin icon retirement policy — migrated Admin surfaces", () => {
       scope.map((path) => [path, readFileSync(join(repo, path), "utf8")]),
     );
     expect(violations(sources, inventory.entries)).toEqual([]);
+  });
+  it("bounds Leaflet marker asset properties to their original instrument call and literals", () => {
+    const path = "app/ui/src/pages/Upcoming.tsx";
+    for (const source of [
+      'const view = {iconUrl:"https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png"};',
+      "L.Icon.Default.mergeOptions({iconUrl: OtherIcon});",
+      'L.Icon.Default.mergeOptions({iconUrl:"https://elsewhere.invalid/icon.svg"});',
+    ])
+      expect(
+        violations(
+          new Map([[path, source]]),
+          analyzeSource(path, source).entries,
+        ).length,
+      ).toBeGreaterThan(0);
   });
   it("does not turn the aiConfigured inventory false positive into an icon channel", () => {
     const path = "app/ui/src/pages/I18nReview.tsx";

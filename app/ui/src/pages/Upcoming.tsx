@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { Link } from "react-router";
-import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { AdminSelect } from "@/components/ui/AdminSelect";
 import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { Button } from "@crate/ui/shadcn/button";
@@ -23,21 +22,12 @@ import {
 import { toast } from "sonner";
 import {
   Loader2,
-  Download,
   X,
-  RefreshCw,
-  Disc3,
-  Calendar,
-  Ticket,
-  Sparkles,
-  List,
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
-  Check,
-  Clock,
   Search,
-  Trash2,
+  List,
+  CalendarDays,
 } from "lucide-react";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -292,112 +282,175 @@ export function Upcoming() {
   const releaseDismiss = canCurateReleases ? dismissRelease : undefined;
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <section className="rounded-md border border-white/10 bg-panel-surface/95 p-4 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl md:p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary shadow-none">
-                <Calendar size={22} />
-              </div>
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-white">
+          <div className="min-w-0 flex-1 space-y-4">
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <h1 className="font-display text-2xl font-semibold tracking-tight text-white">
                   Upcoming
                 </h1>
-                <p className="text-sm text-white/55">
-                  Release radar and live dates, with quick triage for what lands
-                  next in Crate.
-                </p>
+                <div
+                  role="group"
+                  aria-label="View"
+                  className="flex shrink-0 items-center gap-1"
+                >
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label="List"
+                    title="List"
+                    aria-pressed={view === "list"}
+                    onClick={() => setView("list")}
+                    className={cn(
+                      "size-11 min-h-11 min-w-11 border",
+                      view === "list"
+                        ? "border-accent-action-hi bg-accent-action/10 text-accent-action-hi"
+                        : "border-transparent text-text-muted",
+                    )}
+                  >
+                    <List
+                      data-admin-ux="upcoming-view-list"
+                      aria-hidden="true"
+                      size={18}
+                    />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label="Calendar"
+                    title="Calendar"
+                    aria-pressed={view === "calendar"}
+                    onClick={() => setView("calendar")}
+                    className={cn(
+                      "size-11 min-h-11 min-w-11 border",
+                      view === "calendar"
+                        ? "border-accent-action-hi bg-accent-action/10 text-accent-action-hi"
+                        : "border-transparent text-text-muted",
+                    )}
+                  >
+                    <CalendarDays
+                      data-admin-ux="upcoming-view-calendar"
+                      aria-hidden="true"
+                      size={18}
+                    />
+                  </Button>
+                </div>
               </div>
+              <p className="text-sm text-white/55">
+                Release radar and live dates, with quick triage for what lands
+                next in Crate.
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <CrateChip active>{releaseCount} releases</CrateChip>
               <CrateChip className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
                 {showCount} shows
               </CrateChip>
-              <CrateChip icon={Clock}>{upcoming.length} upcoming</CrateChip>
+              <CrateChip>{upcoming.length} upcoming</CrateChip>
               {past.length > 0 && <CrateChip>{past.length} archived</CrateChip>}
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] p-1">
-              <CratePill
-                active={view === "list"}
-                onClick={() => setView("list")}
-                icon={List}
-              >
-                List
-              </CratePill>
-              <CratePill
-                active={view === "calendar"}
-                onClick={() => setView("calendar")}
-                icon={CalendarDays}
-              >
-                Calendar
-              </CratePill>
-            </div>
             {canCurateShows ? (
-              <Button size="sm" onClick={syncShows} disabled={syncing}>
-                <RefreshCw
-                  size={14}
-                  className={cn("mr-1", syncing && "animate-spin")}
-                />
+              <Button
+                className="min-h-11"
+                size="sm"
+                onClick={syncShows}
+                disabled={syncing}
+              >
+                {syncing ? (
+                  <Loader2
+                    data-admin-ux="upcoming-sync"
+                    aria-hidden="true"
+                    size={14}
+                    className="animate-spin"
+                  />
+                ) : null}
                 Sync shows
               </Button>
             ) : null}
             {isAdmin ? (
-              <ActionIconButton onClick={clearCaches} title="Clear caches">
-                <Trash2 size={15} />
-              </ActionIconButton>
+              <Button
+                className="min-h-11"
+                size="sm"
+                variant="outline"
+                onClick={clearCaches}
+                title="Clear caches"
+              >
+                Clear caches
+              </Button>
             ) : null}
           </div>
         </div>
 
         <div className="mt-5 rounded-md border border-white/8 bg-white/[0.03] p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[240px] flex-1">
-              <Search
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
-              />
-              <Input
-                type="text"
-                placeholder="Filter by artist..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-10 rounded-md border-white/10 bg-white/[0.04] pl-9"
-              />
+          <div className="flex flex-wrap items-start gap-4">
+            <div className="crate-form-field min-w-0 flex-1 basis-60">
+              <label
+                htmlFor="upcoming-artist"
+                className="font-mono text-meta text-text-muted"
+              >
+                Artist
+              </label>
+              <div className="relative">
+                <Search
+                  data-admin-ux="upcoming-search"
+                  aria-hidden="true"
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+                />
+                <Input
+                  id="upcoming-artist"
+                  type="text"
+                  placeholder="Filter by artist..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-11 rounded-md border-white/10 bg-white/[0.04] pl-9"
+                />
+              </div>
             </div>
 
             {availableGenres.length > 0 && (
-              <AdminSelect
-                value={genreFilter}
-                onChange={setGenreFilter}
-                options={availableGenres.map(([name, count]) => ({
-                  value: name,
-                  label: name,
-                  count,
-                }))}
-                placeholder="All genres"
-                searchable
-                searchPlaceholder="Search genres..."
-              />
+              <div className="crate-form-field">
+                <span className="font-mono text-meta text-text-muted">
+                  Genre
+                </span>
+                <AdminSelect
+                  value={genreFilter}
+                  onChange={setGenreFilter}
+                  options={availableGenres.map(([name, count]) => ({
+                    value: name,
+                    label: name,
+                    count,
+                  }))}
+                  placeholder="All genres"
+                  searchable
+                  searchPlaceholder="Search genres..."
+                />
+              </div>
             )}
 
             {availableCities.length > 0 && (
-              <AdminSelect
-                value={cityFilter}
-                onChange={setCityFilter}
-                options={availableCities.map(([name, count]) => ({
-                  value: name,
-                  label: name,
-                  count,
-                }))}
-                placeholder="All cities"
-                searchable
-                searchPlaceholder="Search cities..."
-              />
+              <div className="crate-form-field">
+                <span className="font-mono text-meta text-text-muted">
+                  City
+                </span>
+                <AdminSelect
+                  value={cityFilter}
+                  onChange={setCityFilter}
+                  options={availableCities.map(([name, count]) => ({
+                    value: name,
+                    label: name,
+                    count,
+                  }))}
+                  placeholder="All cities"
+                  searchable
+                  searchPlaceholder="Search cities..."
+                />
+              </div>
             )}
           </div>
 
@@ -406,9 +459,6 @@ export function Upcoming() {
               <CratePill
                 key={f}
                 active={filter === f}
-                icon={
-                  f === "releases" ? Disc3 : f === "shows" ? Ticket : undefined
-                }
                 onClick={() => {
                   setFilter(f);
                   if (f !== "shows") {
@@ -425,18 +475,24 @@ export function Upcoming() {
       </section>
 
       {loading && (
-        <div className="flex items-center justify-center py-24">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <div
+          role="status"
+          aria-label="Loading upcoming items"
+          className="flex items-center justify-center py-24"
+        >
+          <Loader2
+            data-admin-ux="upcoming-loading"
+            aria-hidden="true"
+            className="h-6 w-6 animate-spin text-primary"
+          />
         </div>
       )}
 
       {!loading && items.length === 0 && (
         <div className="rounded-md border border-white/10 bg-panel-surface px-6 py-24 text-center shadow-[0_28px_80px_rgba(0,0,0,0.24)]">
-          <Calendar
-            size={48}
-            className="text-primary mx-auto mb-3 opacity-30"
-          />
-          <div className="text-lg font-semibold">Nothing upcoming</div>
+          <div className="font-display text-lg font-semibold">
+            Nothing upcoming
+          </div>
           <div className="text-sm text-muted-foreground mt-1">
             Check for new releases or sync shows
           </div>
@@ -448,8 +504,8 @@ export function Upcoming() {
         <div className="space-y-8">
           {upcoming.length > 0 && (
             <section>
-              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.24em] text-primary/90">
-                <Sparkles size={14} /> Coming Up
+              <h2 className="mb-4 font-display flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.24em] text-primary/90">
+                Coming Up
               </h2>
               {groupByMonth(upcoming).map(([month, monthItems]) => (
                 <MonthGroup
@@ -466,7 +522,7 @@ export function Upcoming() {
           )}
           {past.length > 0 && (
             <section>
-              <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.24em] text-white/45">
+              <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-[0.24em] text-white/45">
                 Recently Released
               </h2>
               {groupByMonth(past).map(([month, monthItems]) => (
@@ -533,7 +589,7 @@ function MonthGroup({
   return (
     <div className="mb-6">
       <div className="mb-3 flex items-center gap-2 border-b border-white/8 pb-2">
-        <div className="text-xs font-medium uppercase tracking-[0.22em] text-white/35">
+        <div className="font-mono text-xs font-normal uppercase tracking-[0.22em] text-white/35">
           {label}
         </div>
         <CrateChip>{items.length} items</CrateChip>
@@ -612,7 +668,7 @@ function EventCard({
           "bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.14),transparent_48%)]",
         )}
       />
-      <div className="relative flex items-center gap-4">
+      <div className="relative flex flex-wrap items-center gap-4">
         {/* Thumbnail */}
         <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-md bg-secondary/60 shadow-[0_16px_36px_rgba(0,0,0,0.22)]">
           {item.cover_url ? (
@@ -624,28 +680,28 @@ function EventCard({
           ) : null}
           {item.status === "downloading" && (
             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-              <Loader2 size={16} className="text-primary animate-spin" />
-            </div>
-          )}
-          {item.status === "downloaded" && (
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-              <Check size={16} className="text-accent-action-hi" />
+              <Loader2
+                data-admin-ux="upcoming-download-loading"
+                aria-hidden="true"
+                size={16}
+                className="text-primary animate-spin"
+              />
             </div>
           )}
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1 basis-40">
           <div className="flex flex-wrap items-center gap-2">
             {albumHref ? (
               <Link
                 to={albumHref}
-                className="truncate text-sm font-medium text-white transition-colors hover:text-primary"
+                className="font-display truncate text-sm font-medium text-white transition-colors hover:text-primary"
               >
                 {item.title}
               </Link>
             ) : (
-              <span className="truncate text-sm font-medium text-white">
+              <span className="font-display truncate text-sm font-medium text-white">
                 {item.title}
               </span>
             )}
@@ -664,7 +720,7 @@ function EventCard({
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <CrateChip>{item.status}</CrateChip>
             {item.is_upcoming && <CrateChip active>Upcoming</CrateChip>}
-            {timeStr && <CrateChip icon={Clock}>{timeStr}</CrateChip>}
+            {timeStr && <CrateChip>{timeStr}</CrateChip>}
           </div>
         </div>
 
@@ -675,17 +731,17 @@ function EventCard({
             "border-primary/20 bg-primary/10 text-primary",
           )}
         >
-          <div className="text-xs font-semibold">{dateStr}</div>
+          <div className="font-mono text-xs font-normal">{dateStr}</div>
           {timeStr && (
-            <div className="text-[10px] text-white/45">{timeStr}</div>
+            <div className="font-mono text-[10px] text-white/45">{timeStr}</div>
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5 flex-shrink-0">
           {albumHref ? (
             <Link
               to={albumHref}
-              className="inline-flex h-9 items-center rounded-md border border-primary/20 bg-primary/10 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
+              className="inline-flex min-h-11 items-center rounded-md border border-primary/20 bg-primary/10 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
               onClick={(event) => event.stopPropagation()}
             >
               Open album
@@ -695,28 +751,36 @@ function EventCard({
             item.tidal_url &&
             onDownload &&
             item.release_id && (
-              <ActionIconButton
-                tone="primary"
+              <Button
+                size="sm"
+                className="min-h-11"
+                aria-label="Download release"
                 onClick={(e) => {
                   e.stopPropagation();
                   onDownload(item.release_id!);
                 }}
                 title="Download release"
               >
-                <Download size={16} />
-              </ActionIconButton>
+                Download
+              </Button>
             )}
           {onDismiss && item.release_id && item.status === "detected" && (
-            <ActionIconButton
-              tone="default"
+            <Button
+              variant="ghost"
+              size="icon"
+              className="min-h-11 min-w-11"
               onClick={(e) => {
                 e.stopPropagation();
                 onDismiss(item.release_id!);
               }}
               title="Dismiss release"
             >
-              <X size={14} />
-            </ActionIconButton>
+              <X
+                data-admin-ux="upcoming-dismiss"
+                aria-hidden="true"
+                size={14}
+              />
+            </Button>
           )}
         </div>
       </div>
@@ -773,87 +837,109 @@ function CalendarView({
     <div className="rounded-md border border-white/10 bg-panel-surface p-4 shadow-[0_28px_80px_rgba(0,0,0,0.24)]">
       {/* Month navigation */}
       <div className="flex items-center justify-between mb-4">
-        <ActionIconButton
+        <Button
+          variant="ghost"
+          size="icon"
+          className="min-h-11 min-w-11"
           onClick={() => onMonthChange(-1)}
           title="Previous month"
         >
-          <ChevronLeft size={16} />
-        </ActionIconButton>
-        <span className="text-sm font-semibold text-white/85">
+          <ChevronLeft
+            data-admin-ux="upcoming-previous"
+            aria-hidden="true"
+            size={16}
+          />
+        </Button>
+        <span className="font-display text-sm font-semibold text-white/85">
           {month.toLocaleDateString("en-US", {
             month: "long",
             year: "numeric",
           })}
         </span>
-        <ActionIconButton onClick={() => onMonthChange(1)} title="Next month">
-          <ChevronRight size={16} />
-        </ActionIconButton>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="min-h-11 min-w-11"
+          onClick={() => onMonthChange(1)}
+          title="Next month"
+        >
+          <ChevronRight
+            data-admin-ux="upcoming-next"
+            aria-hidden="true"
+            size={16}
+          />
+        </Button>
       </div>
 
-      {/* Day headers */}
-      <div className="grid grid-cols-7 gap-px mb-1">
-        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-          <div
-            key={d}
-            className="py-1 text-center text-[10px] uppercase tracking-[0.2em] text-white/30"
-          >
-            {d}
-          </div>
-        ))}
-      </div>
-
-      {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-px">
-        {Array.from({ length: startOffset }, (_, slot) => `empty-${slot}`).map(
-          (key) => (
-            <div
-              key={key}
-              className="min-h-[92px] rounded-md border border-white/5 bg-white/[0.02]"
-            />
-          ),
-        )}
-        {Array.from({ length: daysInMonth }, (_, i) => {
-          const day = i + 1;
-          const dayItems = byDay.get(day) || [];
-          const isToday = day === todayDay;
-          return (
-            <div
-              key={day}
-              className={cn(
-                "min-h-[92px] rounded-md border p-2 shadow-[0_12px_32px_rgba(0,0,0,0.16)]",
-                isToday
-                  ? "border-primary/30 bg-primary/8"
-                  : "border-white/6 bg-white/[0.03]",
-                dayItems.length > 0 && "bg-white/[0.05]",
-              )}
-            >
+      <div className="overflow-x-auto">
+        <div className="min-w-[630px]">
+          {/* Day headers */}
+          <div className="grid grid-cols-7 gap-px mb-1">
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
               <div
-                className={cn(
-                  "mb-1 text-[10px]",
-                  isToday ? "text-primary" : "text-white/35",
-                )}
+                key={d}
+                className="font-mono font-normal py-1 text-center text-[10px] uppercase tracking-[0.2em] text-white/30"
               >
-                {day}
+                {d}
               </div>
-              <div className="space-y-0.5">
-                {dayItems.slice(0, 3).map((item) => (
-                  <CalendarPill
-                    key={itemKey(item)}
-                    item={item}
-                    onDownload={onDownload}
-                    onDismiss={onDismiss}
-                    onShowClick={() => onShowClick(item)}
-                  />
-                ))}
-                {dayItems.length > 3 && (
-                  <div className="text-[9px] text-muted-foreground/40">
-                    +{dayItems.length - 3} more
+            ))}
+          </div>
+
+          {/* Calendar grid */}
+          <div className="grid grid-cols-7 gap-px">
+            {Array.from(
+              { length: startOffset },
+              (_, slot) => `empty-${slot}`,
+            ).map((key) => (
+              <div
+                key={key}
+                className="min-h-[92px] rounded-md border border-white/5 bg-white/[0.02]"
+              />
+            ))}
+            {Array.from({ length: daysInMonth }, (_, i) => {
+              const day = i + 1;
+              const dayItems = byDay.get(day) || [];
+              const isToday = day === todayDay;
+              return (
+                <div
+                  key={day}
+                  className={cn(
+                    "min-h-[92px] rounded-md border p-2 shadow-[0_12px_32px_rgba(0,0,0,0.16)]",
+                    isToday
+                      ? "border-primary/30 bg-primary/8"
+                      : "border-white/6 bg-white/[0.03]",
+                    dayItems.length > 0 && "bg-white/[0.05]",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "mb-1 font-mono font-normal text-[10px]",
+                      isToday ? "text-primary" : "text-white/35",
+                    )}
+                  >
+                    {day}
                   </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+                  <div className="space-y-0.5">
+                    {dayItems.slice(0, 3).map((item) => (
+                      <CalendarPill
+                        key={itemKey(item)}
+                        item={item}
+                        onDownload={onDownload}
+                        onDismiss={onDismiss}
+                        onShowClick={() => onShowClick(item)}
+                      />
+                    ))}
+                    {dayItems.length > 3 && (
+                      <div className="text-[9px] text-muted-foreground/40">
+                        +{dayItems.length - 3} more
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -879,7 +965,7 @@ function CalendarPill({
       <PopoverTrigger asChild>
         <button
           className={cn(
-            "w-full truncate rounded-md px-2 py-1 text-left text-[10px] transition-colors",
+            "min-h-11 w-full truncate rounded-md px-2 py-1 text-left text-[10px] transition-colors",
             isShow
               ? "bg-accent-action/15 text-accent-action-hi hover:bg-accent-action/25"
               : "bg-primary/15 text-accent-action-hi hover:bg-primary/25",
@@ -888,7 +974,10 @@ function CalendarPill({
           {item.artist}
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-[340px] p-0" align="start">
+      <PopoverContent
+        className="w-[340px] max-w-[calc(100vw-2rem)] p-0"
+        align="start"
+      >
         {isShow ? (
           <div>
             <div className="p-3">
@@ -897,7 +986,7 @@ function CalendarPill({
             <div className="px-3 pb-3">
               <button
                 onClick={onShowClick}
-                className="w-full text-center text-xs text-accent-action-hi hover:text-accent-action-hi transition-colors py-1.5 rounded-md bg-accent-action/5 hover:bg-accent-action/10"
+                className="min-h-11 w-full text-center text-xs text-accent-action-hi hover:text-accent-action-hi transition-colors py-1.5 rounded-md bg-accent-action/5 hover:bg-accent-action/10"
               >
                 View full details
               </button>
@@ -948,22 +1037,20 @@ function ReleasePopoverContent({
               alt=""
               className="w-full h-full object-cover"
             />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Disc3 size={20} className="text-muted-foreground/30" />
-            </div>
-          )}
+          ) : null}
         </div>
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1 basis-40">
           {albumHref ? (
             <Link
               to={albumHref}
-              className="font-bold text-sm truncate block hover:text-foreground transition-colors"
+              className="font-display font-bold text-sm truncate block hover:text-foreground transition-colors"
             >
               {item.title}
             </Link>
           ) : (
-            <div className="font-bold text-sm truncate">{item.title}</div>
+            <div className="font-display font-bold text-sm truncate">
+              {item.title}
+            </div>
           )}
           <ArtistTextLink
             artist={getPrimaryArtist(item)}
@@ -979,8 +1066,8 @@ function ReleasePopoverContent({
       </div>
 
       <div className="px-3 pb-3">
-        <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-          <Calendar size={11} /> {dateStr}
+        <div className="font-mono font-normal text-xs text-muted-foreground mb-2 flex items-center gap-1">
+          {dateStr}
         </div>
 
         {item.status === "detected" &&
@@ -990,15 +1077,15 @@ function ReleasePopoverContent({
               {item.tidal_url && onDownload && (
                 <button
                   onClick={() => onDownload(item.release_id!)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-xs font-medium"
+                  className="min-h-11 flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-xs font-medium"
                 >
-                  <Download size={12} /> Download
+                  Download
                 </button>
               )}
               {onDismiss ? (
                 <button
                   onClick={() => onDismiss(item.release_id!)}
-                  className="px-3 py-1.5 rounded-md bg-white/5 text-muted-foreground hover:bg-white/10 transition-colors text-xs"
+                  className="min-h-11 px-3 py-1.5 rounded-md bg-white/5 text-muted-foreground hover:bg-white/10 transition-colors text-xs"
                 >
                   Dismiss
                 </button>
@@ -1011,8 +1098,14 @@ function ReleasePopoverContent({
           </CrateChip>
         )}
         {item.status === "downloading" && (
-          <div className="flex items-center gap-1.5 text-xs text-primary">
-            <Loader2 size={12} className="animate-spin" /> Downloading...
+          <div className="font-mono font-normal flex items-center gap-1.5 text-xs text-primary">
+            <Loader2
+              data-admin-ux="upcoming-popover-loading"
+              aria-hidden="true"
+              size={12}
+              className="animate-spin"
+            />{" "}
+            Downloading...
           </div>
         )}
       </div>

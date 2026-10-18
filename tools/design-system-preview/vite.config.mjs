@@ -12,6 +12,15 @@ export default defineConfig({
       name: "admin-navigation-preview-only",
       enforce: "pre",
       resolveId(source, importer) {
+        if (
+          (importer?.endsWith("/app/ui/src/pages/Upcoming.tsx") &&
+            source === "@/lib/api") ||
+          (importer?.endsWith("/app/ui/src/components/shows/ShowCard.tsx") &&
+            source === "@/lib/library-routes")
+        )
+          return fileURLToPath(
+            new URL("admin-upcoming-fixtures.ts", import.meta.url),
+          );
         if (!importer?.includes("/app/ui/") || !source.startsWith("@/")) return;
         if (
           importer.endsWith("/app/ui/src/pages/I18nReview.tsx") &&
@@ -157,6 +166,9 @@ export default defineConfig({
         ),
         adminContributions: fileURLToPath(
           new URL("admin-contributions-demo.html", import.meta.url),
+        ),
+        adminUpcoming: fileURLToPath(
+          new URL("admin-upcoming-demo.html", import.meta.url),
         ),
         adminTranslations: fileURLToPath(
           new URL("admin-translations-demo.html", import.meta.url),

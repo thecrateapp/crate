@@ -4,22 +4,22 @@ Prepared 2026-10-16 for a Codex agent starting without a local V3 checkout or br
 This document travels with the checkpoint that closes 1N, 1O and 1P. Read the latest
 publication/verification record in `2026-10-15-crate-v3-handover.md` before making changes.
 
-## Active Linux workspace — 1AM published; 1AN Translations local
+## Active Linux workspace — 1AN published; 1AO Upcoming local
 
 Use /home/diego/.codex/worktrees/crate-v3-1q/crate, feat/crate_v3 tracking origin.
-Published HEAD/ref `b0f20194fb364e24cd3edb18e9b1c6084cb34f96` (1AM);53177736ancestor retained.
+PublishedHEAD/origin `2df63f31177da67b48eec11c5da575b76d17d394` (1AN), original53177736ancestor retained.
 Leave /home/diego/Code/Ninja/crate(feat/crate_mcp) alone. Node22.23.3/dependencies prepared.
 
-Diego approved/published1AM and authorized next bounded Admin group. Local1AN changes actual
-Translations rendering only, retaining8UX loaders, all data/actions/capabilities and existing
-state/native filter contracts.22whole-file policy/84UX sites; fonts/actual8px fields/readouts.
-Real specimen http://127.0.0.1:5186/admin-translations-demo.html or /#traducciones-admin, fictional
-boundary data/local manual actions/dev-catalog simulation; no real backend/files/preferences.
-31scopedunits +5preview +3builtAdmin pass; types/lint/audit/builds pass, initial526475/532480Bgzip.
-Main handover owns final review/limits. Preview stays active via crate-v3-preview.service.
-Previous checkpoints preserved. Users sticky-header/shared Select-label minors remain deferred.
-33canonicalPNG/manifest remain1M, pin258bbaee unchanged. No broadCI/native/live cert;
-A21/phase6.8/global1b.8 pending. **Stop1AN uncommitted for Diego before next group or publication.**
+Diego approved1AN, French counter corrected and published. Local1AO is Upcoming and Admin
+ShowCard rendering/icon retirement only, all data/effects/gates/actions/timers retained.
+24whole-file policy/94UX sites, real8px fields and existing threefont identity. Real specimen:
+http://127.0.0.1:5186/admin-upcoming-demo.html or /#proximamente-admin. Fictional boundaries,
+manual actions, no backend/external/persistence. Preview stays active via crate-v3-preview.service.
+30units +5preview +6builtAdmin Chromium scoped pass; types/lint/build/audit pass. Initial526437/
+532480Bgzip6043Bmargin. Main handover owns finalreview, rulings andlimits. Prior checkpoints stay;
+French Minor resolved, Users stickyheader/sharedSelect-label deferred. Canonical1M/pin258bbaee
+remain, native/live/fullphaseQA and global1b.8/A9/phase6.5 pending. **Stop1AO uncommitted for
+Diego before nextgroup or publication.** Historical bootstrap below does not replace thisworktree.
 
 ## Prepare the checkout
 
@@ -371,3 +371,98 @@ fixture coherence regression observed RED1fail/3pass before correction. No produ
 or action change. Publication labels updated; next stop1AO uncommitted, UX/preview retained.
 This resolves the French specimen Minor; earlier Users stickyheader/Selectlabel minors remain.
 No PR/merge/rebase/deploy/release, broadCI or canonical refresh.
+
+### 1AN published; 1AO Upcoming and show cards local — 2026-10-18
+
+Diego approved1AN and requested the French counter fix. Published1AN is
+`2df63f31177da67b48eec11c5da575b76d17d394`, origin matches. French fictional summary/detail
+now report1message and match the single editor row: focused fixture test RED1fail/3pass→GREEN4/4,
+plus2targeted preview checks (French row and published persistent label) pass. That Minor is
+resolved. Previous local1AN stop is superseded by Diego's explicit approval; earlier Users
+sticky-header/sharedSelect-label minors remain.
+
+Local1AO covers actual Upcoming.tsx and Admin ShowCard.tsx only. Remove redundant title/metric/
+location/labelled-action glyphs; Download and Clear caches are text. Keep8Upcoming UX sites:
+search,4busy/loading sites, dismissX and calendar previous/next. ShowCard retains external-ticket
+link and closeX sites; its labelled/location glyphs retire.24whole-file policy/94UX sites. Two
+AdminSelect and two ShowCard mounts remain bounded. Existing Leaflet default marker config
+stays: its2icon-property scanner matches are accepted only as exact original static literals at
+L.Icon.Default.mergeOptions, with negative tests. No general icon-slot whitelist.
+
+Bricolage titles/Poppins body/JetBrains metadata, actual8px labelled fields through crate-form-field.
+Release actions wrap; controls44px; seven-day calendar geometry is bounded by local horizontal
+scroll on narrow views. All input types/normalization/helpers/state/effects/filters/grouping/
+counts/status/API/mutations/toasts/timer/refetch gates stay. AST74declarations/21event bindings
+for Upcoming and36/3 for ShowCard match published1AN. Internal ActionButton's icon-only parameter
+and calls retire; exported ShowCard props/compact/static/controlled variants remain. No shared,
+Listen/backend/auth/dependency/map/library-writing change, or A9/phase6.5 feature completion.
+
+Review http://127.0.0.1:5186/admin-upcoming-demo.html or persistent /#proximamente-admin. Real
+components/router/AuthContext value, full fictional response data and importer-only API/image
+helpers. Manual loading/failure/download/dismiss/sync/clear samples. The actual sync handler's
+10second wait after response remains and is tested. Internal destinations retain real paths
+and land in local sample placeholders; tickets are localized, images dataURI only. No backend,
+external request, real worker/library operation or preference persistence.
+
+Before final review:30scoped Vitest/4files (9new UI/3existingfilter/18policy),5preview+6builtAdmin
+Chromium at1440/768/390 workers1. Actual admin and acquire-only route/context/gates/payloads,
+calendar/detail popovers, expansion keyboard, closed/expanded/static/compact cards, filters,
+empty/loading/failure/sync timer and font/8px/overflow checks. Strict scoped unit/preview TS,
+Admin build/types, scoped ESLint,20entry preview build and AST/diffchecks pass. InitialJS526437/
+532480Bgzip,9assets,6043Bmargin,38B below1AN526475. Logs .artifacts/review/1ao-\*; actualIAB proof
+checkpoint-1ao-upcoming.jpg. Generated buildcache restored. Existing chunk/NO_COLOR warnings only.
+
+Test adaptations were boundary corrections, not production logic repairs: shared searchable
+Select keeps its placeholder accessible name after selection; JSON fixture string type narrowed
+at the test; acquire-only auth must omit admin.access because the actual context derives isAdmin
+from it. Demo Admin includes admin.access consistently. Real gates stay unchanged. Fixture lineup
+artists include the known primary id to avoid duplicate primary as support, using existing data.
+One fresh full pending review follows. Stop1AO uncommitted for Diego; previewactive5186. Keep all
+previous checkpoints, canonical33PNG/manifest at1M and sitepin258bbaee. No fullsuite/CI/baseline
+refresh/native or live certification. Global1b.8/A9/phase6.5 stay incomplete. No nextgroup,
+commit/push/PR/merge/rebase/deploy/release before review.
+
+### 1AO final independent review and stop
+
+One fresh gpt-6-astra high reviewer checked all22pending paths,10untracked files and15source
+hashes against published1AN2df63f31; all matched. Full report .artifacts/review/1ao-final-review.md.
+Critical0/Important0/Minor1. Executor agrees with Minor severity: inconsistent metadata family/
+weight affects visual consistency, without a functional regression. No source repair pass or
+re-review is needed. Final source15freeze remains unchanged, pending22filemanifest matches,
+indexempty and HEAD=origin1AN.30unit/4files,5preview+6builtAdmin Chromium, scopedtypes/lint,
+AST74/21+36/3, Admin/20entrypreviewbuilds and526437/532480Bgzip6043Bmargin remain applicable.
+Actual IAB list and expanded card inspected; proofs checkpoint-1ao-upcoming.jpg and
+checkpoint-1ao-show-card.jpg. Preview serviceactive5186/HTTP200; generatedcache restored.
+
+New Minor deferred: finish metadata typography in ShowCard/Upcoming. New font-mono+font-black/
+font-bold dates should use DS400; adjacent time, release-popover date and downloading status
+still use body font. A later focused typography pass needs family/weight geometry assertions.
+Earlier Users sticky-header/sharedSelect-label minors stay. French fixture Minor was resolved
+before1ANpublication and is not pending. No fullsuite/CI/canonical/native/live certification or
+phase/global completion claim. All previous checkpoints and pin258bbaee/canonical1M preserved.
+**Stop1AO uncommitted for Diego before next group, commit/push, PR/merge/rebase/deploy/release.**
+
+### 1AO approval amendments and publication — 2026-10-18
+
+Diego approved1AO, requested the metadata correction and explicitly authorized commit/push and
+next Admin group. Approved15source hashes matched before changes. Date/month/day/weekday/time
+and downloading metadata now use JetBrains Mono400; remove introduced bold/black/medium mono
+weights and complete the adjacent popover/status families. Browser RED observed500 instead400,
+then computed family/weight checks cover list, collapsed/expanded show and release popovers.
+The metadata Minor is resolved; Users stickyheader/sharedSelectlabel remain deferred.
+
+Diego additionally requested List/Calendar as icon-only buttons to the right of the card title.
+Use existing shared Button44px, lucide List/CalendarDays, accessible names List/Calendar, titles
+and aria-pressed. Preserve setView callbacks/state; buttons align beside Upcoming at1440/768/390
+and native Enter/Space switches views. This explicit functional UX amendment adds2bounded
+reviewed sites, now10Upcoming/2ShowCard and96totalUX across24checked files. It does not restore
+redundant content/action glyphs elsewhere. Source types/effects/requests/gates stay unchanged.
+
+The first targeted view test was outside its describe fixture setup and failed before its
+assertion; move it into the actual setup. Reproduce text-control failure with only those local
+button children temporarily changed, restore exact source in finally, then GREEN. No gitreset
+or user changes overwritten. Targeted computed typography/placement/keyboard tests pass.
+Publication labels updated; retain previewactive5186 and stop next1AP uncommitted for review.
+No PR/merge/rebase/deploy/release, broadCI or canonical refresh.
+
+Publication validation:28affected unit cases/3files,9preview+6builtAdmin Chromium, scoped types/lint and unchanged AST contracts pass. Actual bundle in1ao-publication-bundle.log; generatedcache restored, source15publicationfreeze retained.

@@ -4,6 +4,7 @@ import { AdminSystemHealthCheckpoint } from "./admin-system-health-checkpoint";
 import { AdminHealthCheckpoint } from "./admin-health-checkpoint";
 import { AdminTrashCheckpoint } from "./admin-trash-checkpoint";
 import { AdminContributionsCheckpoint } from "./admin-contributions-checkpoint";
+import { AdminUpcomingCheckpoint } from "./admin-upcoming-checkpoint";
 import { AdminTranslationsCheckpoint } from "./admin-translations-checkpoint";
 import { AdminUsersCheckpoint } from "./admin-users-checkpoint";
 import { AdminRolesCheckpoint } from "./admin-roles-checkpoint";
@@ -1668,6 +1669,7 @@ function App() {
       <AdminRolesCheckpoint />
       <AdminUsersCheckpoint />
       <AdminTranslationsCheckpoint />
+      <AdminUpcomingCheckpoint />
       <AppModal
         open={sampleModalOpen}
         onClose={() => setSampleModalOpen(false)}
@@ -1764,7 +1766,7 @@ function App() {
             "1AJ publicado",
             "1AK publicado",
             "1AL publicado",
-            "1AM publicado · 1AN publicado",
+            "1AM publicado · 1AN publicado · 1AO publicado",
           ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>
