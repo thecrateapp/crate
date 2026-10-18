@@ -144,8 +144,41 @@ def test_smart_selection_is_frozen_and_refresh_is_separate(pg_db):
             "auto_refresh_enabled": True,
         }
     )
-    apply_editorial_execution(policy["execution"])
+    policy_result = apply_editorial_execution(policy["execution"])
+    assert policy_result["playlist_id"] == result["playlist_id"]
+    assert policy_result["auto_refresh_enabled"] is True
+    assert policy_result["is_active"] is True
+    assert policy_result["track_count"] == 2
     assert get_playlist(result["playlist_id"])["auto_refresh_enabled"] is True
+
+
+def test_refresh_policy_rejects_concurrent_playlist_change(pg_db):
+    from crate.db.repositories.playlists_collection_reads import get_playlist
+    from crate.db.repositories.editorial_plans import read_editorial_playlist
+
+    playlist_id = create_playlist(
+        "Refresh policy conflict",
+        scope="system",
+        generation_mode="smart",
+        is_smart=True,
+        smart_rules={"rules": [], "limit": 2, "sort": "title"},
+        auto_refresh_enabled=False,
+    )
+    compiled = _compile(
+        {
+            "kind": "refresh_policy",
+            "playlist_id": playlist_id,
+            "auto_refresh_enabled": True,
+        }
+    )
+    update_playlist(playlist_id, description="Concurrent editor")
+
+    with pytest.raises(DiagnosticError) as conflict:
+        apply_editorial_execution(compiled["execution"])
+
+    assert conflict.value.code == "PLAN_STALE"
+    assert get_playlist(playlist_id)["auto_refresh_enabled"] is False
+    assert read_editorial_playlist(playlist_id, section="history")["items"] == []
 
 
 def test_old_generation_cannot_overwrite_editorial_apply(pg_db):

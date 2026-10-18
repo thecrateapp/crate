@@ -619,10 +619,15 @@ def cancel_job(
         if (
             job is None
             or job["principal_id"] != principal.id
-            or (job.get("authorization_context") or {}).get("authorization_id")
-            != principal.authorization_id
+            or job.get("authorization_context") != authorization_context(principal)
         ):
             raise DiagnosticError("NOT_FOUND", "Owned agent job was not found")
+        if job["operation"] not in {"run_health_check", "apply_repairs"}:
+            raise DiagnosticError(
+                "NOT_EXECUTABLE",
+                "Only directed health checks and pilot repairs can be cancelled",
+            )
+        _authorize(current, principal, job["required_grants"])
         if job["status"] == "cancelled":
             return _summary(job, True)
         if job["status"] != "pending":

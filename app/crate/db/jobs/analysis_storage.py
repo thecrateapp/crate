@@ -39,6 +39,7 @@ def mark_done(track_id: int, state_column: str, *, claim: dict | None = None) ->
             track_ids=[track_id],
             pipeline=pipeline,
             claims={track_id: claim} if claim is not None else None,
+            verify_source=True,
         ):
             return
         session.execute(
@@ -169,6 +170,7 @@ def store_bliss_vectors(
             track_ids=[row["track_id"] for row in rows],
             pipeline="bliss",
             claims=claims,
+            verify_source=True,
         )
         rows = [row for row in rows if row["track_id"] in accepted]
         if not rows:
@@ -292,6 +294,7 @@ def store_analysis_results(
             track_ids=[row["track_id"] for row in rows],
             pipeline="analysis",
             claims=claims,
+            verify_source=True,
         )
         rows = [row for row in rows if row["track_id"] in accepted]
         if not rows:

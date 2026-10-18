@@ -152,13 +152,17 @@ def get_feed_shows(followed_names: list[str], today: date, limit: int) -> list[d
             SELECT 'show' AS type, s.artist_name AS artist, s.venue AS title,
                    s.city, s.country, s.date, s.url, s.image_url
             FROM shows s
-            WHERE (s.artist_name = ANY(:followed_names) OR s.lineup && CAST(:followed_names AS text[]))
+            WHERE (lower(btrim(regexp_replace(s.artist_name, '\\s+', ' ', 'g'))) = ANY(:followed_names)
+                OR EXISTS(SELECT 1 FROM unnest(s.lineup) AS performer(name)
+                    WHERE lower(btrim(regexp_replace(performer.name, '\\s+', ' ', 'g'))) = ANY(:followed_names)))
             AND s.date >= :today AND s.merged_into_id IS NULL
             ORDER BY s.date
             LIMIT :limit
         """),
                 {
-                    "followed_names": list(followed_names),
+                    "followed_names": [
+                        " ".join(name.lower().split()) for name in followed_names
+                    ],
                     "today": today,
                     "limit": limit,
                 },
@@ -253,7 +257,7 @@ def get_upcoming_shows(
     limit: int,
 ) -> list[dict]:
     params: dict = {
-        "followed_names": followed_names,
+        "followed_names": [" ".join(name.lower().split()) for name in followed_names],
         "today": today,
         "limit": limit * 3,
     }
@@ -308,7 +312,9 @@ def get_upcoming_shows(
                     s.source, s.lastfm_attendance, s.lastfm_url, s.tickets_url
                 FROM shows s
                 LEFT JOIN library_artists la ON la.name = s.artist_name
-                WHERE (s.artist_name = ANY(:followed_names) OR s.lineup && CAST(:followed_names AS text[]))
+                WHERE (lower(btrim(regexp_replace(s.artist_name, '\\s+', ' ', 'g'))) = ANY(:followed_names)
+                    OR EXISTS(SELECT 1 FROM unnest(s.lineup) AS performer(name)
+                        WHERE lower(btrim(regexp_replace(performer.name, '\\s+', ' ', 'g'))) = ANY(:followed_names)))
                   AND s.date >= :today
                   AND s.merged_into_id IS NULL
                   AND s.status != 'cancelled'

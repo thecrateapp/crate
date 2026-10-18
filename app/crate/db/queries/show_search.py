@@ -22,7 +22,8 @@ def search_canonical_shows(*, session=None, **parameters) -> dict:
         WHERE s.merged_into_id IS NULL
           AND (:show_id IS NULL OR s.id=COALESCE((SELECT merged_into_id FROM shows WHERE id=CAST(:show_id AS integer)),CAST(:show_id AS integer)))
           AND (CAST(:show_id AS integer) IS NOT NULL OR (s.archived_at IS NULL AND s.date>=CURRENT_DATE))
-          AND (:query='' OR s.artist_name ILIKE :pattern ESCAPE '!' OR s.venue ILIKE :pattern ESCAPE '!' OR s.city ILIKE :pattern ESCAPE '!')
+          AND (:query='' OR s.artist_name ILIKE :pattern ESCAPE '!' OR s.venue ILIKE :pattern ESCAPE '!' OR s.city ILIKE :pattern ESCAPE '!'
+            OR EXISTS(SELECT 1 FROM unnest(s.lineup) AS performer(name) WHERE performer.name ILIKE :pattern ESCAPE '!'))
           AND (CAST(:artist_uid AS uuid) IS NULL OR EXISTS(SELECT 1 FROM library_artists x WHERE x.entity_uid=CAST(:artist_uid AS uuid) AND (LOWER(x.name)=LOWER(s.artist_name) OR EXISTS(SELECT 1 FROM unnest(s.lineup) n WHERE LOWER(n)=LOWER(x.name)))))
           AND (CAST(:date_from AS date) IS NULL OR s.date>=CAST(:date_from AS date))
           AND (CAST(:date_to AS date) IS NULL OR s.date<=CAST(:date_to AS date))

@@ -660,6 +660,177 @@ def test_spotify_identity_fetch_does_not_query_top_tracks_or_related_artists(
     assert not state["artist"]["similar_json"]
 
 
+@pytest.mark.parametrize("source", ["fresh", "normalized_cache", "explicit_url_cache"])
+def test_spotify_urls_from_real_search_preserve_unselected_facets(
+    enrichment_artist, monkeypatch, source
+):
+    from requests import Response
+
+    from crate import spotify
+
+    normalized = {
+        "id": "4Z8W4fKeB5YxbusRsdQVPb",
+        "name": "Scoped Artist",
+        "popularity": 87,
+        "followers": 12345,
+        "genres": ["provider rock"],
+        "images": [{"url": "https://images.example/artist.jpg"}],
+    }
+    if source == "explicit_url_cache":
+        normalized["url"] = (
+            "https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb?si=preserved"
+        )
+    cache_key = "spotify:artist:scoped artist"
+    cache = {} if source == "fresh" else {cache_key: normalized}
+
+    def cached_artist(key, *, max_age_seconds):
+        assert key == cache_key
+        assert max_age_seconds == 86400
+        return copy.deepcopy(cache.get(key))
+
+    def cache_artist(key, value):
+        assert key == cache_key
+        cache[key] = copy.deepcopy(value)
+
+    def response(payload):
+        result = Response()
+        result.status_code = 200
+        result._content = json.dumps(payload).encode()
+        return result
+
+    def token_request(url, **kwargs):
+        assert source == "fresh", "Cached Spotify search made an HTTP request"
+        assert url == "https://accounts.spotify.com/api/token"
+        return response({"access_token": "fixture-token", "expires_in": 3600})
+
+    def api_request(url, **kwargs):
+        assert source == "fresh", "Cached Spotify search made an HTTP request"
+        assert url == "https://api.spotify.com/v1/search"
+        assert kwargs["params"] == {
+            "q": "Scoped Artist",
+            "type": "artist",
+            "limit": 1,
+        }
+        return response(
+            {
+                "artists": {
+                    "items": [
+                        {
+                            **normalized,
+                            "followers": {"total": 12345},
+                            "external_urls": {
+                                "spotify": "https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb"
+                            },
+                        }
+                    ]
+                }
+            }
+        )
+
+    monkeypatch.setattr(spotify, "get_cache", cached_artist)
+    monkeypatch.setattr(spotify, "set_cache", cache_artist)
+    monkeypatch.setattr(spotify, "_token", None)
+    monkeypatch.setattr(spotify, "_token_expires", 0)
+    monkeypatch.setenv("SPOTIFY_ID", "fixture-client")
+    monkeypatch.setenv("SPOTIFY_SECRET", "fixture-secret")
+    monkeypatch.setattr(spotify.requests, "post", token_request)
+    monkeypatch.setattr(spotify.requests, "get", api_request)
+    monkeypatch.setattr(
+        "crate.agent_enrichment.wait_for_provider_slot", lambda *_: None
+    )
+    set_artist_genres(
+        enrichment_artist["name"],
+        [("manual rock", 1, "manual"), ("existing rock", 0.5, "enrichment:spotify")],
+    )
+    before = read_enrichment_state(enrichment_artist["uid"])
+
+    result = _apply(
+        _plan(
+            enrichment_artist,
+            providers=["spotify"],
+            facets=["urls"],
+            mode="refresh",
+        )
+    )
+
+    state = read_enrichment_state(enrichment_artist["uid"])
+    expected_url = (
+        "https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb?si=preserved"
+        if source == "explicit_url_cache"
+        else "https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb"
+    )
+    assert state["artist"]["urls_json"] == {
+        "home": "https://artist.example",
+        "spotify": expected_url,
+    }
+    assert result["execution"]["status"] == "completed"
+    assert result["verification"]["status"] == "passed"
+    provider = result["execution"]["items"][0]["providers"][0]
+    assert provider["provider"] == "spotify"
+    assert [(facet["facet"], facet["status"]) for facet in provider["facets"]] == [
+        ("urls", "applied")
+    ]
+    changed_fields = {"urls_json", "enriched_at", "updated_at"}
+    assert {
+        key: value
+        for key, value in state["artist"].items()
+        if key not in changed_fields
+    } == {
+        key: value
+        for key, value in before["artist"].items()
+        if key not in changed_fields
+    }
+    assert state["genres"] == before["genres"]
+    assert state["locks"] == before["locks"]
+    assert state["setlists"] == before["setlists"]
+
+
+@pytest.mark.parametrize(
+    "identifier", [None, "", 12345, "../other?query=value#fragment"]
+)
+def test_spotify_urls_do_not_construct_links_from_invalid_cached_identifiers(
+    enrichment_artist, monkeypatch, identifier
+):
+    from crate import spotify
+
+    def cached_artist(key, *, max_age_seconds):
+        assert key == "spotify:artist:scoped artist"
+        return {
+            "id": identifier,
+            "name": "Scoped Artist",
+            "popularity": 87,
+            "followers": 12345,
+            "genres": ["provider rock"],
+            "images": [],
+        }
+
+    def unexpected_request(*args, **kwargs):
+        pytest.fail("Cached Spotify URL enrichment made an HTTP request")
+
+    monkeypatch.setattr(spotify, "get_cache", cached_artist)
+    monkeypatch.setattr(spotify.requests, "get", unexpected_request)
+    monkeypatch.setattr(spotify.requests, "post", unexpected_request)
+    monkeypatch.setattr(
+        "crate.agent_enrichment.wait_for_provider_slot", lambda *_: None
+    )
+    before = read_enrichment_state(enrichment_artist["uid"])
+
+    result = _apply(
+        _plan(
+            enrichment_artist,
+            providers=["spotify"],
+            facets=["urls"],
+            mode="refresh",
+        )
+    )
+
+    assert read_enrichment_state(enrichment_artist["uid"]) == before
+    facets = result["execution"]["items"][0]["providers"][0]["facets"]
+    assert [(facet["facet"], facet["status"]) for facet in facets] == [
+        ("urls", "no_data")
+    ]
+
+
 def test_spotify_similarity_fetch_is_explicit_and_preserves_manual_similarity_projection(
     enrichment_artist, monkeypatch
 ):

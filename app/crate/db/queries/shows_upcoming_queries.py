@@ -20,9 +20,11 @@ def get_upcoming_shows(
     params: dict[str, object] = {"today": today, "lim": limit * 5}
     if artist_name:
         conditions.append(
-            "(artist_name = :artist_name OR :artist_name = ANY(COALESCE(lineup, ARRAY[]::text[])))"
+            """(lower(btrim(regexp_replace(artist_name, '\\s+', ' ', 'g'))) = :artist_name
+                OR EXISTS(SELECT 1 FROM unnest(lineup) AS performer(name)
+                    WHERE lower(btrim(regexp_replace(performer.name, '\\s+', ' ', 'g'))) = :artist_name))"""
         )
-        params["artist_name"] = artist_name
+        params["artist_name"] = " ".join(artist_name.lower().split())
     if city:
         conditions.append("LOWER(city) = LOWER(:city)")
         params["city"] = city

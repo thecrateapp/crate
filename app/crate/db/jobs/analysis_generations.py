@@ -4,6 +4,40 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
+from crate.analysis_provenance import source_identity
+from crate.db.jobs.analysis_state_events import (
+    append_pipeline_event,
+    mark_ops_snapshot_dirty,
+)
+
+
+def _fail_changed_sources(session, track_ids: set[int], pipeline: str) -> None:
+    if not track_ids:
+        return
+    state_column = {"analysis": "analysis_state", "bliss": "bliss_state"}[pipeline]
+    parameters = {"ids": sorted(track_ids), "pipeline": pipeline}
+    session.execute(
+        text(
+            "UPDATE track_processing_state SET state='failed', claim_token=NULL, "
+            "claimed_by=NULL, claimed_at=NULL, last_error='SOURCE_CHANGED', updated_at=NOW() "
+            "WHERE track_id=ANY(:ids) AND pipeline=:pipeline"
+        ),
+        parameters,
+    )
+    session.execute(
+        text(f"UPDATE library_tracks SET {state_column}='failed' WHERE id=ANY(:ids)"),
+        parameters,
+    )
+    for track_id in sorted(track_ids):
+        append_pipeline_event(
+            session,
+            pipeline=pipeline,
+            track_id=track_id,
+            state="failed",
+            error_message="SOURCE_CHANGED",
+        )
+    mark_ops_snapshot_dirty(session)
+
 
 def lock_processing_rows(
     session, track_ids: list[int], pipelines: list[str]
@@ -21,7 +55,12 @@ def lock_processing_rows(
 
 
 def accepted_claim_ids(
-    session, *, track_ids: list[int], pipeline: str, claims: dict[int, dict] | None
+    session,
+    *,
+    track_ids: list[int],
+    pipeline: str,
+    claims: dict[int, dict] | None,
+    verify_source: bool = False,
 ) -> set[int]:
     accepted = set()
     for row in lock_processing_rows(session, track_ids, [pipeline]):
@@ -57,6 +96,22 @@ def accepted_claim_ids(
             if "path" not in claims[track_id]
             or claims[track_id]["path"] == paths.get(track_id)
         }
+        if verify_source:
+            changed = set()
+            for track_id in accepted:
+                claim = claims[track_id]
+                # Older internal callers have no physical-source snapshot. Daemons
+                # supply one; check it after row locks, including any lock wait.
+                if "_source" not in claim:
+                    continue
+                try:
+                    if source_identity(paths[track_id]) == claim["_source"]:
+                        continue
+                except (OSError, ValueError):
+                    pass
+                changed.add(track_id)
+            _fail_changed_sources(session, changed, pipeline)
+            accepted -= changed
     return accepted
 
 

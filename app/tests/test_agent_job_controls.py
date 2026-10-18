@@ -1,11 +1,15 @@
 """Job controls preserve ownership, state transitions and retry budgets."""
 
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from threading import Barrier
 
 import pytest
+from crate.agent_access import authorization_context
 from crate.agent_diagnostics import DiagnosticError
+from crate.db.repositories import agent_operation_jobs as operation_jobs
 from crate.db.repositories import agent_requests as requests
+from crate.db.repositories import mcp_oauth as oauth_store
 from crate.db.repositories.tasks_updates import start_task
 
 from tests.agent_command_fixtures import (
@@ -15,8 +19,228 @@ from tests.agent_command_fixtures import (
     other_principal,
     scalar,
 )
+from tests.test_mcp_oauth_integration import _code, _exchange, _refresh
 
-pytest_plugins = ["tests.agent_command_fixtures"]
+pytest_plugins = [
+    "tests.agent_command_fixtures",
+    "tests.test_mcp_oauth_integration",
+]
+
+
+@pytest.fixture
+def delegated_cancel_world(command_world, oauth_env):
+    scopes = {
+        "library.health.run",
+        "ops.jobs.cancel_pending",
+        "ops.jobs.cancel",
+        "ops.status.read",
+    }
+    oauth_store.update_oauth_client("test-client", scopes=scopes)
+    exchanged = _exchange(_code(oauth_env, scope=" ".join(sorted(scopes))))
+    assert exchanged[0] == 200, exchanged
+    tokens = exchanged[1]
+    principal = oauth_store.resolve_oauth_access_token(tokens["access_token"])[0]
+    return {**command_world, "principal": principal, "tokens": tokens}
+
+
+@pytest.mark.parametrize("status", ["pending", "cancelled"])
+@pytest.mark.parametrize("retain_original_grant", [False, True])
+def test_cancel_denies_reduced_oauth_context_even_with_same_authorization(
+    delegated_cancel_world, status, retain_original_grant
+):
+    world = delegated_cancel_world
+    original = world["principal"]
+    job = requests.accept_health_check(original, UID, "scope-context-job")
+    if status == "cancelled":
+        requests.cancel_job(original, job["job_id"])
+    previous_result = scalar(
+        "SELECT result FROM agent_jobs WHERE task_id=:id", {"id": job["job_id"]}
+    )
+    scopes = {"ops.jobs.cancel", "ops.jobs.cancel_pending"}
+    if retain_original_grant:
+        scopes.add("library.health.run")
+    refreshed = _refresh(
+        world["tokens"]["refresh_token"], scope=" ".join(sorted(scopes))
+    )
+    assert refreshed[0] == 200, refreshed
+    narrowed = oauth_store.resolve_oauth_access_token(refreshed[1]["access_token"])[0]
+    assert original.authorization_id == narrowed.authorization_id
+    assert authorization_context(original) != authorization_context(narrowed)
+
+    with pytest.raises(DiagnosticError) as error:
+        requests.cancel_job(narrowed, job["job_id"])
+
+    assert error.value.code == "NOT_FOUND"
+    assert (
+        scalar("SELECT status FROM tasks WHERE id=:id", {"id": job["job_id"]}) == status
+    )
+    assert (
+        scalar("SELECT result FROM agent_jobs WHERE task_id=:id", {"id": job["job_id"]})
+        == previous_result
+    )
+    assert scalar(
+        "SELECT COUNT(*) FROM audit_log WHERE action='agent.command.cancelled'"
+    ) == (1 if status == "cancelled" else 0)
+
+
+def test_cancel_after_refresh_with_identical_oauth_context_remains_idempotent(
+    delegated_cancel_world,
+):
+    world = delegated_cancel_world
+    original = world["principal"]
+    job = requests.accept_health_check(original, UID, "same-context-job")
+    refreshed = _refresh(world["tokens"]["refresh_token"])
+    assert refreshed[0] == 200, refreshed
+    principal = oauth_store.resolve_oauth_access_token(refreshed[1]["access_token"])[0]
+    assert authorization_context(original) == authorization_context(principal)
+
+    cancelled = requests.cancel_job(principal, job["job_id"])
+    replayed = requests.cancel_job(principal, job["job_id"])
+
+    assert cancelled["status"] == replayed["status"] == "cancelled"
+    assert replayed["result"] == cancelled["result"]
+    assert replayed["replayed"] is True
+    assert start_task(job["job_id"]) is None
+    assert (
+        scalar("SELECT COUNT(*) FROM audit_log WHERE action='agent.command.cancelled'")
+        == 1
+    )
+
+
+@pytest.mark.parametrize(
+    ("operation", "original_grant"),
+    [
+        ("health_check", "library.health.run"),
+        ("repair", "library.repair.photo_flag"),
+    ],
+)
+@pytest.mark.parametrize("grant_source", ["caller", "stored"])
+def test_cancel_requires_the_original_operation_grant(
+    command_world, operation, original_grant, grant_source
+):
+    principal = command_world["principal"]
+    if operation == "repair":
+        _, plan = observed_plan(command_world)
+        job = requests.accept_apply(
+            principal, plan["plan_id"], plan["plan_version"], "original-grant"
+        )
+    else:
+        job = requests.accept_health_check(principal, UID, "original-grant")
+    if grant_source == "caller":
+        principal = replace(principal, grants=principal.grants - {original_grant})
+    else:
+        change(
+            "UPDATE agent_principals SET grants=array_remove(grants,:grant) WHERE id=:id",
+            {"grant": original_grant, "id": principal.id},
+        )
+
+    with pytest.raises(DiagnosticError) as error:
+        requests.cancel_job(principal, job["job_id"])
+
+    assert error.value.code == "FORBIDDEN"
+    assert (
+        scalar("SELECT status FROM tasks WHERE id=:id", {"id": job["job_id"]})
+        == "pending"
+    )
+    assert (
+        scalar("SELECT result FROM agent_jobs WHERE task_id=:id", {"id": job["job_id"]})
+        is None
+    )
+    assert (
+        scalar("SELECT COUNT(*) FROM audit_log WHERE action='agent.command.cancelled'")
+        == 0
+    )
+    if operation == "repair":
+        assert scalar("SELECT state FROM agent_repair_plans") == "queued"
+
+
+def test_cancel_replay_revalidates_the_original_grant(command_world):
+    principal = command_world["principal"]
+    job = requests.accept_health_check(principal, UID, "cancel-before-revocation")
+    cancelled = requests.cancel_job(principal, job["job_id"])
+    change(
+        "UPDATE agent_principals SET grants=array_remove(grants,'library.health.run') WHERE id=:id",
+        {"id": principal.id},
+    )
+
+    with pytest.raises(DiagnosticError) as error:
+        requests.cancel_job(principal, job["job_id"])
+
+    assert error.value.code == "FORBIDDEN"
+    assert (
+        scalar("SELECT result FROM agent_jobs WHERE task_id=:id", {"id": job["job_id"]})
+        == cancelled["result"]
+    )
+    assert (
+        scalar("SELECT COUNT(*) FROM audit_log WHERE action='agent.command.cancelled'")
+        == 1
+    )
+
+
+@pytest.mark.parametrize(
+    "kind", ["prepare_operation", "apply_operation", "agent_control"]
+)
+def test_legacy_cancel_rejects_catalog_jobs_outside_the_pilot(command_world, kind):
+    principal = command_world["principal"]
+    if kind == "agent_control":
+        source = requests.accept_health_check(principal, UID, "control-source")
+        job = operation_jobs.prepare_operation(
+            principal,
+            "job_cancel",
+            {"job_id": source["job_id"], "scope": "own"},
+            "catalog-control",
+        )
+    else:
+        job = operation_jobs.prepare_operation(
+            principal,
+            "metadata_update",
+            {"entity_uid": UID, "patch": {"bio": "New biography"}},
+            "catalog-prepare",
+        )
+        if kind == "apply_operation":
+            start_task(job["job_id"])
+            result = operation_jobs.publish_plan(
+                job["job_id"],
+                {
+                    "document": {
+                        "operation": "metadata_update",
+                        "targets": [{"entity_type": "artist", "entity_uid": UID}],
+                        "changes": [
+                            {"field": "bio", "before": None, "after": "New biography"}
+                        ],
+                        "impact": {"scope": "selected", "filesystem": False},
+                        "risk": "safe",
+                    },
+                    "execution": {"target_keys": ["artist:" + UID]},
+                },
+            )
+            plan = result["plan"]
+            job = operation_jobs.apply_operation(
+                principal,
+                "metadata_update",
+                plan["plan_id"],
+                plan["plan_version"],
+                "catalog-apply",
+            )
+
+    with pytest.raises(DiagnosticError) as error:
+        requests.cancel_job(principal, job["job_id"])
+
+    assert error.value.code == "NOT_EXECUTABLE"
+    assert (
+        scalar("SELECT status FROM tasks WHERE id=:id", {"id": job["job_id"]})
+        == "pending"
+    )
+    assert (
+        scalar("SELECT result FROM agent_jobs WHERE task_id=:id", {"id": job["job_id"]})
+        is None
+    )
+    assert (
+        scalar("SELECT COUNT(*) FROM audit_log WHERE action='agent.command.cancelled'")
+        == 0
+    )
+    if kind == "apply_operation":
+        assert scalar("SELECT state FROM agent_repair_plans") == "queued"
 
 
 def test_retry_is_owned_server_derived_idempotent_and_budgeted(command_world):
@@ -135,7 +359,12 @@ def test_cancel_pending_repair_consumes_plan_without_library_effect(command_worl
     job = requests.accept_apply(
         principal, plan["plan_id"], plan["plan_version"], "repair"
     )
-    requests.cancel_job(principal, job["job_id"])
+    cancelled = requests.cancel_job(principal, job["job_id"])
+    replayed = requests.cancel_job(principal, job["job_id"])
+    assert cancelled["status"] == replayed["status"] == "cancelled"
+    assert replayed["result"] == cancelled["result"]
+    assert replayed["replayed"] is True
+    assert start_task(job["job_id"]) is None
     assert scalar("SELECT state FROM agent_repair_plans") == "cancelled"
     assert scalar("SELECT has_photo FROM library_artists WHERE name='Echo'") == 0
     assert (
@@ -143,6 +372,10 @@ def test_cancel_pending_repair_consumes_plan_without_library_effect(command_worl
             principal, plan["plan_id"], plan["plan_version"], "again"
         )["status"]
         == "cancelled"
+    )
+    assert (
+        scalar("SELECT COUNT(*) FROM audit_log WHERE action='agent.command.cancelled'")
+        == 1
     )
 
 

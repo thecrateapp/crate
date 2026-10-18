@@ -155,6 +155,187 @@ def test_editorial_read_tool_schemas_are_closed_and_grants_are_separate(
         )
 
 
+@pytest.mark.parametrize(
+    ("is_active", "auto_refresh_before", "auto_refresh_after"),
+    [
+        (True, False, True),
+        (True, True, False),
+        (False, False, True),
+        (False, True, False),
+    ],
+    ids=["enable-active", "disable-active", "enable-inactive", "disable-inactive"],
+)
+def test_editorial_refresh_policy_worker_reports_committed_success(
+    pg_db,
+    human_actor,
+    monkeypatch,
+    is_active,
+    auto_refresh_before,
+    auto_refresh_after,
+):
+    from crate.db.repositories.playlists_collection_reads import get_playlist
+    from crate.db.repositories.playlists_create import create_playlist
+    from crate.db.repositories.playlists_tracks import add_playlist_tracks
+    from tests.test_editorial_plans import _track
+
+    monkeypatch.setenv("CRATE_MCP_ENABLED", "true")
+    monkeypatch.setenv("CRATE_MCP_ACTIONS_ENABLED", "true")
+    monkeypatch.setenv("CRATE_PUBLIC_LISTEN_BASE_URL", "https://listen.example.test")
+    monkeypatch.setattr("crate.worker_handlers.is_cancelled", lambda _: False)
+    monkeypatch.setattr(
+        "crate.db.repositories.tasks_mutations.dispatch_task", lambda *_: None
+    )
+    principal = _principal(
+        ["editorial.prepare", "editorial.write", "editorial.publish"]
+    )
+    first, second = _track(pg_db, 121), _track(pg_db, 122)
+    playlist_id = create_playlist(
+        "Reviewed refresh policy",
+        scope="system",
+        generation_mode="smart",
+        is_smart=True,
+        smart_rules={"rules": [], "limit": 2, "sort": "title"},
+        auto_refresh_enabled=auto_refresh_before,
+        is_active=is_active,
+    )
+    add_playlist_tracks(
+        playlist_id,
+        [
+            {"track_id": first["id"], "source": "manual", "locked": True},
+            {"track_id": second["id"], "source": "generated", "locked": False},
+        ],
+    )
+    original_tracks = get_playlist_tracks(playlist_id)
+    original_epoch = get_playlist(playlist_id)["generation_epoch"]
+    plan = _prepare(
+        principal,
+        {
+            "kind": "refresh_policy",
+            "playlist_id": playlist_id,
+            "auto_refresh_enabled": auto_refresh_after,
+        },
+    )
+    reviewed = agent_editorial.editorial_plan_get(principal, plan_id=plan["plan_id"])[
+        "data"
+    ]
+    assert reviewed["changes"][0]["auto_refresh_before"] is auto_refresh_before
+    assert reviewed["changes"][0]["auto_refresh_after"] is auto_refresh_after
+    assert reviewed["changes"][0]["track_count"] == 2
+    assert get_playlist(playlist_id)["auto_refresh_enabled"] is auto_refresh_before
+    decide(human_actor, get_plan(plan["plan_id"]))
+    accepted = agent_editorial.editorial_plan_apply(
+        principal,
+        plan_id=plan["plan_id"],
+        plan_version=plan["plan_version"],
+        idempotency_key="refresh-policy-apply",
+    )["data"]
+    start_task(accepted["job_id"])
+
+    result = agent_library_operations.execute_operation_job(accepted["job_id"], {})
+
+    assert get_playlist(playlist_id)["auto_refresh_enabled"] is auto_refresh_after
+    assert result["execution"]["status"] == "completed", result
+    assert result["execution"]["playlist_id"] == playlist_id
+    assert result["execution"]["auto_refresh_enabled"] is auto_refresh_after
+    assert result["execution"]["is_active"] is is_active
+    assert result["verification"] == {"status": "passed", "track_count": 2}
+    expected_url = (
+        f"https://listen.example.test/curation/playlist/{playlist_id}"
+        if is_active
+        else None
+    )
+    assert result["execution"]["listen_url"] == expected_url
+    assert get_playlist_tracks(playlist_id) == original_tracks
+    assert get_playlist(playlist_id)["is_active"] is is_active
+    assert get_playlist(playlist_id)["generation_epoch"] == original_epoch + 1
+    history = agent_editorial.editorial_playlist_get(
+        principal, playlist_id=playlist_id, section="history"
+    )["data"]
+    assert history["playlist"]["listen_url"] == expected_url
+    assert history["total"] == 1
+    assert history["items"][0]["event_type"] == "editorial"
+    assert history["items"][0]["status"] == "applied"
+    assert history["items"][0]["kind"] == "refresh_policy"
+    assert history["items"][0]["actor_principal_id"] == principal.id
+    assert history["items"][0]["track_count"] == 2
+
+    replay = agent_editorial.editorial_plan_apply(
+        principal,
+        plan_id=plan["plan_id"],
+        plan_version=plan["plan_version"],
+        idempotency_key="refresh-policy-apply",
+    )["data"]
+    assert replay["job_id"] == accepted["job_id"]
+    assert replay["result"]["execution"]["status"] == "completed"
+    assert (
+        agent_library_operations.execute_operation_job(accepted["job_id"], {}) == result
+    )
+    assert get_playlist(playlist_id)["generation_epoch"] == original_epoch + 1
+    assert (
+        agent_editorial.editorial_playlist_get(
+            principal, playlist_id=playlist_id, section="history"
+        )["data"]["total"]
+        == 1
+    )
+
+
+def test_refresh_policy_requires_publish_and_human_approval(
+    pg_db, human_actor, monkeypatch
+):
+    from crate.db.repositories.playlists_collection_reads import get_playlist
+    from crate.db.repositories.playlists_create import create_playlist
+
+    monkeypatch.setenv("CRATE_MCP_ENABLED", "true")
+    monkeypatch.setenv("CRATE_MCP_ACTIONS_ENABLED", "true")
+    monkeypatch.setattr("crate.worker_handlers.is_cancelled", lambda _: False)
+    monkeypatch.setattr(
+        "crate.db.repositories.tasks_mutations.dispatch_task", lambda *_: None
+    )
+    principal = _principal(
+        ["editorial.prepare", "editorial.write", "editorial.publish"]
+    )
+    playlist_id = create_playlist(
+        "Unapproved refresh policy",
+        scope="system",
+        generation_mode="smart",
+        is_smart=True,
+        smart_rules={"rules": [], "limit": 2, "sort": "title"},
+        auto_refresh_enabled=False,
+    )
+    plan = _prepare(
+        principal,
+        {
+            "kind": "refresh_policy",
+            "playlist_id": playlist_id,
+            "auto_refresh_enabled": True,
+        },
+    )
+    assert plan["approval_required"] is True
+    apply_parameters = {
+        "plan_id": plan["plan_id"],
+        "plan_version": plan["plan_version"],
+        "idempotency_key": "refresh-policy-denied",
+    }
+    with pytest.raises(DiagnosticError) as unapproved:
+        agent_editorial.editorial_plan_apply(principal, **apply_parameters)
+    assert unapproved.value.code == "APPROVAL_REQUIRED"
+
+    decide(human_actor, get_plan(plan["plan_id"]))
+    no_publish = replace(
+        principal, grants=frozenset({"editorial.prepare", "editorial.write"})
+    )
+    with pytest.raises(DiagnosticError) as denied:
+        agent_editorial.editorial_plan_apply(no_publish, **apply_parameters)
+    assert denied.value.code == "FORBIDDEN"
+    assert get_playlist(playlist_id)["auto_refresh_enabled"] is False
+    assert (
+        agent_editorial.editorial_playlist_get(
+            principal, playlist_id=playlist_id, section="history"
+        )["data"]["items"]
+        == []
+    )
+
+
 def test_remote_sdk_create_reviews_and_applies_exact_selection(
     pg_db, action_transport, human_actor, monkeypatch
 ):

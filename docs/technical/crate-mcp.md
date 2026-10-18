@@ -960,6 +960,78 @@ No production file was mutated for that control. No full local suite was rerun, 
 not changed and no deployment or flags were activated. CI and persistent review must be read
 against the exact newly published HEAD.
 
+### Six confirmed follow-up corrections (2026-10-18)
+
+The next final review identified six P2 defects on `f1a777a0`, whose exact-HEAD CI had
+20 successful checks. Focused regression selections reproduced **51 expected failures** before
+their respective fixes, with positive controls distinguishing each defect from setup failures:
+
+1. **Legacy job cancellation.** `cancel_job` now compares the complete accepted authorization
+   context, restricts the legacy endpoint to directed health checks and pilot repairs, and
+   reauthorizes the original required grants before effects or idempotent replay. A refreshed
+   OAuth token with reduced scopes cannot cancel a job accepted under its wider context, even
+   with the same authorization ID. An unchanged refreshed context remains valid. PostgreSQL
+   tests cover both service credentials and actual Authlib refreshes, grant removal and replay,
+   non-pilot operations, ownership and the existing cancellation/claim race.
+2. **Physical DSP source at persistence.** Successful analysis/bliss writes recheck the daemon's
+   captured device, inode, size and nanosecond timestamps after acquiring the processing and
+   track row locks. Replaced, missing or symlinked sources terminalize the still-owned claim as
+   `failed` / `SOURCE_CHANGED`, clear its token and write neither stale output nor its signature.
+   Single/batch storage and completion helpers share the fence. A changed batch member does
+   not prevent valid neighbors from completing. Failure/release cleanup still works after a
+   source disappears, and internal compatibility writes without a physical-source snapshot
+   retain their previous generation/token/path contract. This is a fresh observation under
+   database locks, not an atomic filesystem/database snapshot against uncoordinated writers.
+3. **Editorial refresh policy result.** The repository returns `is_active` from the playlist
+   snapshot it locked. The adapter can therefore report an already committed policy change as
+   `completed`, without a post-commit `KeyError` or false reconciliation requirement. Worker
+   regressions cover enabling/disabling refresh for active/inactive playlists, exact approval,
+   preserved selection, history, Listen URL, private result and idempotent replay. Concurrent
+   edits still conflict.
+4. **Spotify URL enrichment.** The URL facet accepts the normalized result actually returned
+   by `spotify.search_artist`, including existing cached entries without `url`. When an explicit
+   valid URL is absent, a valid 22-character base62 artist ID yields the canonical Spotify artist
+   URL. Invalid IDs produce no invented URL. Tests use the real search wrapper, compiler,
+   adapter and PostgreSQL persistence, isolating only cache, HTTP and rate limiting; unselected
+   identity, popularity, tags, genres, locks and setlists remain unchanged.
+5. **Lineup text search.** Canonical show search includes each lineup performer in its escaped
+   `ILIKE` filter. Tests verify literal `%`, `_` and `!`, plus date, archive and consolidation
+   restrictions.
+6. **Lineup artist/following reads.** Artist upcoming, feed and following-upcoming queries compare
+   primary and lineup names using case-insensitive, whitespace-normalized exact equality. Tests
+   import a real manual lineup and find its differently cased/spaced support act through all
+   three readers. Similar longer names, past and merged shows remain excluded; each reader
+   retains its existing cancellation policy. No alternative event model or matching rule is added.
+
+The DSP concurrency regression holds a real track row lock, observes the storage backend PID
+waiting on that writer via `pg_stat_activity` / `pg_blocking_pids`, replaces the audio at the same
+path and commits its metadata update before allowing persistence to continue. A control changes
+only database metadata and accepts the unchanged audio. Timeouts only bound test failure; they
+never count as evidence of exclusion. DSP tests use temporary synthetic audio and explicit result
+payloads, not a live DSP computation. Spotify HTTP responses are simulated, not production-provider
+validation. No migration, merge, deployment or feature activation is part of this correction.
+
+Independent SPEC and QUALITY reviews found no outstanding P1/P2 in these corrections. QUALITY
+also identified outer tabs/newlines in legacy performer rows: SQL now collapses whitespace before
+trimming, matching the request-side normalization. Six additional PostgreSQL cases failed before
+that adjustment, covering primary/lineup names through all three readers.
+
+Focused validation with Python 3.13 and real PostgreSQL passed **481 distinct cases without
+skips** in sequential runs:
+
+```sh
+cd app
+../.venv/bin/python -m pytest tests/test_analysis_source_fence.py tests/test_agent_job_controls.py tests/test_show_lineup_reads.py tests/test_mcp_editorial.py tests/test_editorial_plans.py tests/test_agent_enrichment.py tests/test_agent_analysis_sync.py tests/test_agent_oauth_jobs.py tests/test_mcp_phase4_review_regressions.py tests/test_agent_sync_identity_regressions.py -q
+../.venv/bin/python -m pytest tests/test_shows_queries.py tests/test_show_identity.py tests/test_shows_shared.py tests/test_home_upcoming.py tests/test_mcp_shows.py tests/test_analysis_daemon.py tests/test_db_access_boundaries.py tests/test_runtime_boundaries.py -q
+../.venv/bin/python -m pytest tests/test_show_lineup_reads.py -q
+```
+
+The initial runs passed 266 and 209 cases respectively; the lineup file then passed all 21,
+including the six added legacy-whitespace controls. All used the same disposable Linux image
+described above. Directed Ruff check/format and Pyright passed for all fourteen changed Python files;
+documentation integrity passed for 44 canonical documents. No full local suite was rerun.
+CI and persistent review must be checked against this correction's newly published exact HEAD.
+
 ### Repair readiness and effects
 
 `get_operation_catalog` publishes the contract of every check, conditional variant, preconditions,

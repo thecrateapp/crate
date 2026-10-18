@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Callable
 from uuid import UUID
 
@@ -371,11 +372,19 @@ def _extract(provider: str, payload) -> dict:
         followers = artist.get("followers")
         if isinstance(followers, dict):
             followers = followers.get("total")
+        urls = _urls({"spotify": artist.get("url")})
+        identifier = artist.get("id")
+        if (
+            not urls
+            and isinstance(identifier, str)
+            and re.fullmatch(r"[A-Za-z0-9]{22}", identifier)
+        ):
+            urls["spotify"] = f"https://open.spotify.com/artist/{identifier}"
         return {
             "tags": {"fields": {"tags_json": genres}},
             "genres": {"genres": genres},
             "identity": {"fields": {"spotify_id": _text(artist.get("id"))}},
-            "urls": {"fields": {"urls_json": _urls({"spotify": artist.get("url")})}},
+            "urls": {"fields": {"urls_json": urls}},
             "popularity": {
                 "fields": {
                     "spotify_popularity": min(100, value)

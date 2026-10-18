@@ -499,6 +499,7 @@ def apply_editorial_execution(execution: dict, *, session=None) -> dict:
             return {
                 "playlist_id": playlist_id,
                 "auto_refresh_enabled": execution["auto_refresh_enabled"],
+                "is_active": state["playlist"]["is_active"],
                 "track_count": len(state["tracks"]),
             }
         if playlist_id is None:
