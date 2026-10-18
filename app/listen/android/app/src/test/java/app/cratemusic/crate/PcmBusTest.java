@@ -212,4 +212,11 @@ public class PcmBusTest {
         second.setPlaying(true);
         assertEquals(2L, PcmBusMixer.idleSleepMs(channels));
     }
+
+    @Test
+    public void theOutputPausesOnlyAfterTheBusStaysIdle() {
+        assertEquals(false, PcmBusMixer.shouldPauseOutput(-1L, 10_000L));
+        assertEquals(false, PcmBusMixer.shouldPauseOutput(10_000L, 10_499L));
+        assertEquals(true, PcmBusMixer.shouldPauseOutput(10_000L, 10_500L));
+    }
 }

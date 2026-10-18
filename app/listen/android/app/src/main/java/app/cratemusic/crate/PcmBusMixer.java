@@ -3,6 +3,7 @@ package app.cratemusic.crate;
 import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioTrack;
+import android.os.SystemClock;
 import android.util.Log;
 
 import java.util.Arrays;
@@ -19,10 +20,13 @@ final class PcmBusMixer {
         new PcmBusChannel(CHANNEL_CAPACITY_FRAMES),
     };
     private final AtomicLong busFrames = new AtomicLong();
-    private AudioTrack track;
     private Thread thread;
     private final PcmBusEqualizer equalizer = new PcmBusEqualizer(SAMPLE_RATE, CHANNELS);
+    static final long IDLE_PAUSE_MS = 500L;
+
     private volatile boolean running;
+    private volatile AudioTrack track;
+    private int audioSessionId;
 
     PcmBusChannel channel(int index) {
         return channels[index];
@@ -60,11 +64,19 @@ final class PcmBusMixer {
         return mixedFrames;
     }
 
-    static long idleSleepMs(PcmBusChannel[] channels) {
+    static boolean anyPlaying(PcmBusChannel[] channels) {
         for (PcmBusChannel channel : channels) {
-            if (channel.isPlaying()) return 2L;
+            if (channel.isPlaying()) return true;
         }
-        return 20L;
+        return false;
+    }
+
+    static long idleSleepMs(PcmBusChannel[] channels) {
+        return anyPlaying(channels) ? 2L : 20L;
+    }
+
+    static boolean shouldPauseOutput(long idleSinceMs, long nowMs) {
+        return idleSinceMs >= 0L && nowMs - idleSinceMs >= IDLE_PAUSE_MS;
     }
 
     static void toPcm16(float[] mix, short[] output, int samples) {
@@ -78,6 +90,16 @@ final class PcmBusMixer {
 
     synchronized void ensureStarted(int audioSessionId) {
         if (running) return;
+        this.audioSessionId = audioSessionId;
+        track = buildTrack();
+        track.play();
+        running = true;
+        thread = new Thread(this::run, "crate-pcm-bus");
+        thread.setPriority(Thread.MAX_PRIORITY);
+        thread.start();
+    }
+
+    private AudioTrack buildTrack() {
         int minimumBytes = AudioTrack.getMinBufferSize(
             SAMPLE_RATE,
             AudioFormat.CHANNEL_OUT_STEREO,
@@ -100,22 +122,42 @@ final class PcmBusMixer {
             .setBufferSizeInBytes(Math.max(minimumBytes, BLOCK_FRAMES * CHANNELS * 2 * 4))
             .setTransferMode(AudioTrack.MODE_STREAM);
         if (audioSessionId > 0) builder.setSessionId(audioSessionId);
-        track = builder.build();
+        return builder.build();
+    }
+
+    // TEST_GAP: AudioTrack invalidation needs a real audio route change; covered by device testing.
+    private synchronized boolean rebuildTrack() {
+        if (!running) return false;
+        if (track != null) track.release();
+        track = buildTrack();
         track.play();
-        running = true;
-        thread = new Thread(this::run, "crate-pcm-bus");
-        thread.setPriority(Thread.MAX_PRIORITY);
-        thread.start();
+        Log.i(NativeMixAudioProcessor.QOE_TAG, "pcm bus output rebuilt");
+        return true;
     }
 
     private void run() {
         float[] mix = new float[BLOCK_FRAMES * CHANNELS];
         float[] scratch = new float[BLOCK_FRAMES * CHANNELS];
         short[] output = new short[BLOCK_FRAMES * CHANNELS];
+        long idleSinceMs = -1L;
         while (running) {
             int frames = mixBlock(channels, mix, scratch, BLOCK_FRAMES, busFrames.get());
             busFrames.addAndGet(frames);
             if (frames == 0) {
+                long nowMs = SystemClock.elapsedRealtime();
+                if (anyPlaying(channels)) {
+                    idleSinceMs = -1L;
+                } else if (idleSinceMs < 0L) {
+                    idleSinceMs = nowMs;
+                }
+                AudioTrack current = track;
+                if (
+                    shouldPauseOutput(idleSinceMs, nowMs) &&
+                    current != null &&
+                    current.getPlayState() == AudioTrack.PLAYSTATE_PLAYING
+                ) {
+                    current.pause();
+                }
                 try {
                     Thread.sleep(idleSleepMs(channels));
                 } catch (InterruptedException error) {
@@ -123,9 +165,16 @@ final class PcmBusMixer {
                 }
                 continue;
             }
+            idleSinceMs = -1L;
             equalizer.process(mix, frames);
             toPcm16(mix, output, frames * CHANNELS);
-            int written = track.write(output, 0, frames * CHANNELS, AudioTrack.WRITE_BLOCKING);
+            AudioTrack current = track;
+            if (current == null) return;
+            if (current.getPlayState() != AudioTrack.PLAYSTATE_PLAYING) current.play();
+            int written = current.write(output, 0, frames * CHANNELS, AudioTrack.WRITE_BLOCKING);
+            if (written == AudioTrack.ERROR_DEAD_OBJECT && rebuildTrack()) {
+                written = track.write(output, 0, frames * CHANNELS, AudioTrack.WRITE_BLOCKING);
+            }
             if (written < 0) {
                 Log.w(NativeMixAudioProcessor.QOE_TAG, "pcm bus write failed=" + written);
             }
