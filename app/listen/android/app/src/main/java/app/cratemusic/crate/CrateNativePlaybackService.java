@@ -35,6 +35,7 @@ import androidx.media3.datasource.DataSpec;
 import androidx.media3.datasource.HttpDataSource;
 import androidx.media3.datasource.ResolvingDataSource;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
+import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.analytics.AnalyticsListener;
 import androidx.media3.exoplayer.audio.AudioSink;
@@ -101,6 +102,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     };
     static final boolean USE_PCM_BUS = true;
     static final long DEFAULT_EQ_RAMP_MS = 80L;
+    static final int DECK_BACK_BUFFER_MS = 5_000;
     private final PcmBusMixer pcmBusMixer = new PcmBusMixer();
     private final NativeQueueState queueState = new NativeQueueState();
     private final NativeContinuationPolicy continuationPolicy =
@@ -171,6 +173,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         audioFocusChangeListener = this::handleAudioFocusChange;
     static final String CAPTURE_START_ACTION = BuildConfig.APPLICATION_ID + ".BUS_CAPTURE_START";
     static final String CAPTURE_STOP_ACTION = BuildConfig.APPLICATION_ID + ".BUS_CAPTURE_STOP";
+    static final String SEEK_TO_CUE_ACTION = BuildConfig.APPLICATION_ID + ".BUS_SEEK_TO_CUE";
     private boolean captureReceiverRegistered;
     private final BroadcastReceiver captureReceiver =
         new BroadcastReceiver() {
@@ -735,6 +738,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
             renderersFactory,
             mediaSourceFactory
         )
+            .setLoadControl(
+                new DefaultLoadControl.Builder()
+                    .setBackBuffer(DECK_BACK_BUFFER_MS, true)
+                    .build()
+            )
             .experimentalSetDynamicSchedulingEnabled(USE_PCM_BUS)
             .build();
     }
@@ -908,6 +916,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         if (!BuildConfig.DEBUG || !USE_PCM_BUS || captureReceiverRegistered) return;
         IntentFilter filter = new IntentFilter(CAPTURE_START_ACTION);
         filter.addAction(CAPTURE_STOP_ACTION);
+        filter.addAction(SEEK_TO_CUE_ACTION);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(captureReceiver, filter, Context.RECEIVER_EXPORTED);
         } else {
@@ -922,7 +931,27 @@ public class CrateNativePlaybackService extends MediaSessionService {
         captureReceiverRegistered = false;
     }
 
+    private void seekBeforeNextCue(long leadMs) {
+        NativeTransitionPlan plan = pendingTransitionPlan();
+        if (player == null || plan == null) {
+            Log.i(NativeMixAudioProcessor.QOE_TAG, "bus seek skipped: no pending transition");
+            return;
+        }
+        long cueMs = NativeMixTrigger.effectiveCueMs(plan, currentTrackDurationMs());
+        long targetMs = Math.max(0L, cueMs - leadMs);
+        player.seekTo(targetMs);
+        Log.i(
+            NativeMixAudioProcessor.QOE_TAG,
+            "bus seek edge=" + plan.outgoingTrackId + ">" + plan.incomingTrackId
+                + " mode=" + plan.mode + " cueMs=" + cueMs + " targetMs=" + targetMs
+        );
+    }
+
     private void handleCaptureIntent(Intent intent) {
+        if (SEEK_TO_CUE_ACTION.equals(intent.getAction())) {
+            seekBeforeNextCue(intent.getLongExtra("leadMs", 12_000L));
+            return;
+        }
         String name = intent.getStringExtra("name");
         String safeName = name == null || name.isEmpty()
             ? "capture-" + System.currentTimeMillis()
