@@ -20,12 +20,15 @@ import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.OptIn;
+import androidx.core.content.ContextCompat;
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.audio.AudioProcessor;
+import androidx.media3.common.util.ExperimentalApi;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
@@ -677,6 +680,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         );
     }
 
+    @OptIn(markerClass = ExperimentalApi.class)
     private ExoPlayer buildPlayer(
         NativeMixAudioProcessor audioProcessor,
         int busChannel
@@ -923,11 +927,12 @@ public class CrateNativePlaybackService extends MediaSessionService {
         IntentFilter filter = new IntentFilter(CAPTURE_START_ACTION);
         filter.addAction(CAPTURE_STOP_ACTION);
         filter.addAction(SEEK_TO_CUE_ACTION);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(captureReceiver, filter, Context.RECEIVER_EXPORTED);
-        } else {
-            registerReceiver(captureReceiver, filter);
-        }
+        ContextCompat.registerReceiver(
+            this,
+            captureReceiver,
+            filter,
+            ContextCompat.RECEIVER_EXPORTED
+        );
         captureReceiverRegistered = true;
     }
 

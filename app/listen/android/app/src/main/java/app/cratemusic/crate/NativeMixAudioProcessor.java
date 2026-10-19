@@ -1,8 +1,10 @@
 package app.cratemusic.crate;
 
+import androidx.annotation.OptIn;
 import androidx.media3.common.C;
 import androidx.media3.common.audio.AudioProcessor;
 import androidx.media3.common.audio.BaseAudioProcessor;
+import androidx.media3.common.util.UnstableApi;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -10,6 +12,7 @@ import java.nio.ShortBuffer;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+@OptIn(markerClass = UnstableApi.class)
 final class NativeMixAudioProcessor extends BaseAudioProcessor {
     private short[] pcm16Scratch = new short[0];
     enum Role {

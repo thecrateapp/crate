@@ -1,16 +1,19 @@
 package app.cratemusic.crate;
 
 import androidx.annotation.Nullable;
-import androidx.media3.common.PlaybackParameters;
+import androidx.annotation.OptIn;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.PlaybackParameters;
 import androidx.media3.common.Player;
+import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.ExoPlayer;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+@OptIn(markerClass = UnstableApi.class)
 final class ExoPlayerNativePlaybackDeck implements NativePlaybackDeck {
     private static final long READY_POSITION_TOLERANCE_MS = 250L;
 

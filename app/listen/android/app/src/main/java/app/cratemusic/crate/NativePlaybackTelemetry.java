@@ -1,6 +1,8 @@
 package app.cratemusic.crate;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.OptIn;
+import androidx.media3.common.util.UnstableApi;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -9,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+@OptIn(markerClass = UnstableApi.class)
 final class NativePlaybackTelemetry {
     interface EventSink {
         void emit(String eventName, JSObject payload);
