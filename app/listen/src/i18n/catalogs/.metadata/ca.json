@@ -6299,6 +6299,22 @@
     "sourceHash": "sha256:04c22490929850748771b2e9ab9fdc33339de2f3de78848e80bf6424b3804175",
     "reviewedAt": "2026-10-09T06:58:36.945Z"
   },
+  "settings.playback.smartMixBassHandoff": {
+    "sourceHash": "sha256:f4e3c4fe6941b6031f120ce9415ebff977121d90ccb94b395b65621d47182d7e",
+    "reviewedAt": "2026-10-19T09:10:06.084Z"
+  },
+  "settings.playback.smartMixBassHandoffDescription": {
+    "sourceHash": "sha256:e3a43b4655850b8b3a6c4e9b2797247a8cfb11b1a8c2325a57251bab57584be2",
+    "reviewedAt": "2026-10-19T09:10:06.084Z"
+  },
+  "settings.playback.smartMixBeatmatch": {
+    "sourceHash": "sha256:38a1def773cc5e32cf293fee65c07156aea5dde419abcfe9a1691914649d78c4",
+    "reviewedAt": "2026-10-19T09:10:06.084Z"
+  },
+  "settings.playback.smartMixBeatmatchDescription": {
+    "sourceHash": "sha256:1e769190b71a04ae05e5d73828bbea1d3c453f8e906de9a92e2ae51542885c96",
+    "reviewedAt": "2026-10-19T09:10:06.084Z"
+  },
   "settings.playback.smartMixDescription": {
     "sourceHash": "sha256:0c66ccddddee74dd0209c1c18fe8652df42946f1a8b3fda3932fa0c4de8ff32b",
     "reviewedAt": "2026-10-09T06:58:36.945Z"

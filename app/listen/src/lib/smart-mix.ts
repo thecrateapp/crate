@@ -2,6 +2,8 @@ import type { PlaySource, Track } from "@/contexts/player-types";
 import type { EngineTransitionPlan } from "@/lib/playback-engine";
 import {
   getCrossfadeDurationPreference,
+  getNativeBassHandoffPreference,
+  getNativeBeatmatchPreference,
   isNativeMixRuntime,
   PLAYER_PLAYBACK_PREFS_EVENT,
 } from "@/lib/player-playback-prefs";
@@ -43,6 +45,7 @@ export interface SmartMixCapabilities {
   available: boolean;
   androidNativeCrossfade: boolean;
   androidBeatmatch: boolean;
+  androidBassHandoff: boolean;
   plannerVersion?: string | null;
 }
 
@@ -50,6 +53,7 @@ const DISABLED_SMART_MIX_CAPABILITIES: SmartMixCapabilities = {
   available: false,
   androidNativeCrossfade: false,
   androidBeatmatch: false,
+  androidBassHandoff: false,
   plannerVersion: null,
 };
 
@@ -65,6 +69,7 @@ export function setSmartMixCapabilities(
     available: capabilities.available === true,
     androidNativeCrossfade: capabilities.androidNativeCrossfade === true,
     androidBeatmatch: capabilities.androidBeatmatch === true,
+    androidBassHandoff: capabilities.androidBassHandoff === true,
     plannerVersion: capabilities.plannerVersion ?? null,
   };
   notifyCapabilityListeners();
@@ -100,11 +105,19 @@ export function getServerSmartMixCapabilities(): SmartMixCapabilities {
 export function getSmartMixCapabilities(): SmartMixCapabilities {
   const userEnabled =
     !isNativeMixRuntime() || getCrossfadeDurationPreference() > 0;
+  const beatmatch =
+    smartMixCapabilities.androidBeatmatch &&
+    userEnabled &&
+    getNativeBeatmatchPreference();
   return {
     ...smartMixCapabilities,
     androidNativeCrossfade:
       smartMixCapabilities.androidNativeCrossfade && userEnabled,
-    androidBeatmatch: smartMixCapabilities.androidBeatmatch && userEnabled,
+    androidBeatmatch: beatmatch,
+    androidBassHandoff:
+      beatmatch &&
+      smartMixCapabilities.androidBassHandoff &&
+      getNativeBassHandoffPreference(),
   };
 }
 
@@ -370,6 +383,9 @@ export class SmartMixTransitionPlanner {
               userCueProfile: "default",
               allowBeatmatch: input.capabilities.androidBeatmatch,
               allowTempoAdjustment: input.capabilities.androidBeatmatch,
+              ...(input.capabilities.androidBassHandoff
+                ? { allowBassHandoff: true }
+                : {}),
             },
           })),
         },

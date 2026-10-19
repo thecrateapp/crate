@@ -65,6 +65,7 @@ export interface EngineContinuationContext {
   source: string;
   preferredDurationMs: number;
   allowBeatmatch: boolean;
+  allowBassHandoff: boolean;
   delivery: string;
   descriptor: EngineContinuationDescriptor | null;
 }

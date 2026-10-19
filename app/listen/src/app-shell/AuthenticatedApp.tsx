@@ -17,6 +17,7 @@ type CapabilitiesResponse = {
     planner_version: string | null;
     android_native_crossfade: boolean;
     android_beatmatch: boolean;
+    android_bass_handoff?: boolean;
   };
 };
 
@@ -33,6 +34,7 @@ export function AuthenticatedApp() {
           plannerVersion: smartMix.planner_version,
           androidNativeCrossfade: smartMix.android_native_crossfade,
           androidBeatmatch: smartMix.android_beatmatch,
+          androidBassHandoff: smartMix.android_bass_handoff === true,
         });
       })
       .catch(() => {
@@ -42,6 +44,7 @@ export function AuthenticatedApp() {
           plannerVersion: null,
           androidNativeCrossfade: false,
           androidBeatmatch: false,
+          androidBassHandoff: false,
         });
       });
 

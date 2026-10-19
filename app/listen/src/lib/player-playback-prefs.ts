@@ -20,6 +20,8 @@ const PLAYBACK_DELIVERY_POLICY_KEY = "listen-player-delivery-policy";
 const MOBILE_ENHANCED_AUDIO_KEY = "listen-player-mobile-enhanced-audio";
 const NATIVE_SMART_MIX_KEY = "listen-player-native-smart-mix";
 const NATIVE_SMART_MIX_SECONDS_KEY = "listen-player-native-smart-mix-seconds";
+const NATIVE_BEATMATCH_KEY = "listen-player-native-beatmatch";
+const NATIVE_BASS_HANDOFF_KEY = "listen-player-native-bass-handoff";
 const LEGACY_NATIVE_SMART_MIX_ROLLOUT_KEY =
   "crate-native-smart-mix-rollout-enabled";
 const DEFAULT_NATIVE_SMART_MIX_SECONDS = 6;
@@ -214,6 +216,45 @@ export function setNativeSmartMixEnabledPreference(enabled: boolean) {
   } catch {
     // ignore localStorage failures in private mode or restricted environments
   }
+}
+
+function getOptInPreference(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function setOptInPreference(key: string, enabled: boolean, detail: object) {
+  try {
+    localStorage.setItem(key, enabled ? "true" : "false");
+    window.dispatchEvent(
+      new CustomEvent(PLAYER_PLAYBACK_PREFS_EVENT, { detail }),
+    );
+  } catch {
+    // ignore localStorage failures in private mode or restricted environments
+  }
+}
+
+export function getNativeBeatmatchPreference(): boolean {
+  return getOptInPreference(NATIVE_BEATMATCH_KEY);
+}
+
+export function setNativeBeatmatchPreference(enabled: boolean) {
+  setOptInPreference(NATIVE_BEATMATCH_KEY, enabled, {
+    nativeBeatmatch: enabled,
+  });
+}
+
+export function getNativeBassHandoffPreference(): boolean {
+  return getOptInPreference(NATIVE_BASS_HANDOFF_KEY);
+}
+
+export function setNativeBassHandoffPreference(enabled: boolean) {
+  setOptInPreference(NATIVE_BASS_HANDOFF_KEY, enabled, {
+    nativeBassHandoff: enabled,
+  });
 }
 
 export function getNativeSmartMixSecondsPreference(): number {

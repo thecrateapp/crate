@@ -261,6 +261,7 @@ describe("android native engine flags", () => {
       available: true,
       androidNativeCrossfade: true,
       androidBeatmatch: false,
+      androidBassHandoff: false,
     });
 
     await vi.waitFor(() =>
@@ -446,6 +447,7 @@ describe("android native engine flags", () => {
       available: true,
       androidNativeCrossfade: true,
       androidBeatmatch: false,
+      androidBassHandoff: false,
     });
     await vi.waitFor(() =>
       expect(nativePlaybackMock.setTransitionPlans).toHaveBeenCalledTimes(1),
@@ -546,6 +548,7 @@ describe("android native engine flags", () => {
       available: true,
       androidNativeCrossfade: true,
       androidBeatmatch: false,
+      androidBassHandoff: false,
     });
     await engine.loadQueue(queue);
     expect(nativePlaybackMock.setQueue).toHaveBeenLastCalledWith(
@@ -581,6 +584,7 @@ describe("android native engine flags", () => {
       available: true,
       androidNativeCrossfade: true,
       androidBeatmatch: false,
+      androidBassHandoff: false,
     });
     const engine = new nativeEngineModule.AndroidNativeEngine();
     await engine.loadQueue({
@@ -780,6 +784,7 @@ describe("android native engine flags", () => {
       source: "playlist",
       preferredDurationMs: 12000,
       allowBeatmatch: false,
+      allowBassHandoff: false,
       delivery: "balanced",
       descriptor: null,
     };
@@ -820,6 +825,7 @@ describe("android native engine flags", () => {
           source: "playlist",
           preferredDurationMs: 12000,
           allowBeatmatch: false,
+          allowBassHandoff: false,
           delivery: "balanced",
           refill: false,
         }),
@@ -827,6 +833,33 @@ describe("android native engine flags", () => {
       expect(nativePlaybackMock.setQueue.mock.calls[0]![0]).not.toHaveProperty(
         "continuation",
       );
+    });
+
+    it("follows Smart Mix mode changes in the continuation context", async () => {
+      vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+      const { continuationWithModes } = await import(
+        "@/lib/android-native-engine"
+      );
+      const capabilities = {
+        available: true,
+        androidNativeCrossfade: true,
+        androidBeatmatch: true,
+        androidBassHandoff: true,
+      };
+
+      expect(continuationWithModes(undefined, capabilities)).toBeNull();
+      expect(
+        continuationWithModes(context, {
+          ...capabilities,
+          androidBeatmatch: false,
+          androidBassHandoff: false,
+        }),
+      ).toBeNull();
+      expect(continuationWithModes(context, capabilities)).toEqual({
+        ...context,
+        allowBeatmatch: true,
+        allowBassHandoff: true,
+      });
     });
 
     it("clears native continuation when the queue does not mix", async () => {

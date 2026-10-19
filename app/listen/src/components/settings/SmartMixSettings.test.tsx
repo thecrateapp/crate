@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SmartMixSettings } from "@/components/settings/SmartMixSettings";
 import {
   getCrossfadeDurationPreference,
+  getNativeBassHandoffPreference,
+  getNativeBeatmatchPreference,
   getNativeSmartMixEnabledPreference,
   registerNativeMixRuntime,
 } from "@/lib/player-playback-prefs";
@@ -18,12 +20,14 @@ const ENABLED = {
   available: true,
   androidNativeCrossfade: true,
   androidBeatmatch: true,
+  androidBassHandoff: false,
   plannerVersion: "smart-mix-v2",
 };
 const DISABLED = {
   available: false,
   androidNativeCrossfade: false,
   androidBeatmatch: false,
+  androidBassHandoff: false,
   plannerVersion: null,
 };
 
@@ -45,8 +49,36 @@ describe("SmartMixSettings", () => {
     expect(
       screen.getByRole("slider", { name: "Maximum transition" }),
     ).toHaveValue("6");
-    expect(screen.queryByText(/beatmatch/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/bass/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Beatmatch" })).not.toBeChecked();
+    expect(
+      screen.queryByRole("switch", { name: "Bass swap" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides beatmatch when the server does not offer it", () => {
+    setSmartMixCapabilities({ ...ENABLED, androidBeatmatch: false });
+
+    renderWithListenProviders(<SmartMixSettings />);
+
+    expect(
+      screen.queryByRole("switch", { name: "Beatmatch" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("enables the bass swap only after opting into beatmatch", async () => {
+    const user = userEvent.setup();
+    setSmartMixCapabilities({ ...ENABLED, androidBassHandoff: true });
+    renderWithListenProviders(<SmartMixSettings />);
+
+    const bassSwap = screen.getByRole("switch", { name: "Bass swap" });
+    expect(bassSwap).toBeDisabled();
+
+    await user.click(screen.getByRole("switch", { name: "Beatmatch" }));
+    expect(getNativeBeatmatchPreference()).toBe(true);
+    expect(bassSwap).toBeEnabled();
+
+    await user.click(bassSwap);
+    expect(getNativeBassHandoffPreference()).toBe(true);
   });
 
   it("persists an opt-out and disables the duration", async () => {

@@ -63,6 +63,7 @@ describe("player engine adapter", () => {
       available: false,
       androidNativeCrossfade: false,
       androidBeatmatch: false,
+      androidBassHandoff: false,
       plannerVersion: null,
     });
   });
@@ -487,6 +488,7 @@ describe("player engine adapter", () => {
         available: true,
         androidNativeCrossfade: true,
         androidBeatmatch: false,
+        androidBassHandoff: false,
         plannerVersion: "smart-mix-v2",
       });
     });
@@ -530,6 +532,7 @@ describe("player engine adapter", () => {
         available: false,
         androidNativeCrossfade: false,
         androidBeatmatch: false,
+        androidBassHandoff: false,
         plannerVersion: null,
       });
       apiMock.mockResolvedValue(null);
@@ -553,6 +556,7 @@ describe("player engine adapter", () => {
         available: true,
         androidNativeCrossfade: true,
         androidBeatmatch: false,
+        androidBassHandoff: false,
         plannerVersion: "smart-mix-v2",
       });
       await snapshot.replanTransitionPlans?.();
@@ -672,6 +676,7 @@ describe("player engine adapter", () => {
         source: "playlist",
         preferredDurationMs: 3000,
         allowBeatmatch: false,
+        allowBassHandoff: false,
         descriptor: null,
       });
     });
@@ -724,6 +729,7 @@ describe("player engine adapter", () => {
         available: false,
         androidNativeCrossfade: false,
         androidBeatmatch: false,
+        androidBassHandoff: false,
         plannerVersion: null,
       });
 

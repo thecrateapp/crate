@@ -90,6 +90,7 @@ describe("AuthenticatedApp", () => {
       available: true,
       androidNativeCrossfade: true,
       androidBeatmatch: false,
+      androidBassHandoff: false,
       plannerVersion: "smart-mix-v2",
     });
   });

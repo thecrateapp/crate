@@ -3,9 +3,13 @@ import { useTranslation } from "react-i18next";
 
 import { RangeRow, ToggleRow } from "@/components/settings/SettingsPrimitives";
 import {
+  getNativeBassHandoffPreference,
+  getNativeBeatmatchPreference,
   getNativeSmartMixEnabledPreference,
   getNativeSmartMixSecondsPreference,
   isNativeMixRuntime,
+  setNativeBassHandoffPreference,
+  setNativeBeatmatchPreference,
   setNativeSmartMixEnabledPreference,
   setNativeSmartMixSecondsPreference,
 } from "@/lib/player-playback-prefs";
@@ -14,27 +18,31 @@ import {
   subscribeSmartMixCapabilities,
 } from "@/lib/smart-mix";
 
-function serverEnablesNativeMix(): boolean {
-  const capabilities = getServerSmartMixCapabilities();
-  return capabilities.available && capabilities.androidNativeCrossfade;
-}
-
 export function SmartMixSettings() {
   const { t } = useTranslation();
   const [nativeRuntime] = useState(isNativeMixRuntime);
-  const [serverEnabled, setServerEnabled] = useState(serverEnablesNativeMix);
+  const [capabilities, setCapabilities] = useState(
+    getServerSmartMixCapabilities,
+  );
+  const [beatmatch, setBeatmatch] = useState(getNativeBeatmatchPreference);
+  const [bassHandoff, setBassHandoff] = useState(
+    getNativeBassHandoffPreference,
+  );
   const [enabled, setEnabled] = useState(getNativeSmartMixEnabledPreference);
   const [seconds, setSeconds] = useState(getNativeSmartMixSecondsPreference);
 
   useEffect(
     () =>
       subscribeSmartMixCapabilities(() =>
-        setServerEnabled(serverEnablesNativeMix()),
+        setCapabilities(getServerSmartMixCapabilities()),
       ),
     [],
   );
 
   if (!nativeRuntime) return null;
+
+  const serverEnabled =
+    capabilities.available && capabilities.androidNativeCrossfade;
 
   if (!serverEnabled) {
     return (
@@ -78,6 +86,30 @@ export function SmartMixSettings() {
           setNativeSmartMixSecondsPreference(value);
         }}
       />
+      {capabilities.androidBeatmatch ? (
+        <ToggleRow
+          label={t("settings.playback.smartMixBeatmatch")}
+          description={t("settings.playback.smartMixBeatmatchDescription")}
+          checked={beatmatch}
+          disabled={!enabled}
+          onChange={(value) => {
+            setBeatmatch(value);
+            setNativeBeatmatchPreference(value);
+          }}
+        />
+      ) : null}
+      {capabilities.androidBeatmatch && capabilities.androidBassHandoff ? (
+        <ToggleRow
+          label={t("settings.playback.smartMixBassHandoff")}
+          description={t("settings.playback.smartMixBassHandoffDescription")}
+          checked={bassHandoff}
+          disabled={!enabled || !beatmatch}
+          onChange={(value) => {
+            setBassHandoff(value);
+            setNativeBassHandoffPreference(value);
+          }}
+        />
+      ) : null}
     </>
   );
 }

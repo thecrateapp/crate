@@ -20,6 +20,8 @@ import {
 } from "@/lib/smart-mix";
 import {
   registerNativeMixRuntime,
+  setNativeBassHandoffPreference,
+  setNativeBeatmatchPreference,
   setNativeSmartMixEnabledPreference,
 } from "@/lib/player-playback-prefs";
 
@@ -30,6 +32,7 @@ const ENABLED_CAPABILITIES: SmartMixCapabilities = {
   available: true,
   androidNativeCrossfade: true,
   androidBeatmatch: true,
+  androidBassHandoff: false,
   plannerVersion: "smart-mix-v2",
 };
 
@@ -134,6 +137,54 @@ describe("SmartMixTransitionPlanner", () => {
       ["runtime-2", "runtime-3"],
       ["runtime-3", "runtime-4"],
     ]);
+  });
+
+  it("asks for a bass handoff only when the capability allows it", async () => {
+    const request = vi.fn().mockResolvedValue({
+      plannerVersion: "smart-mix-v2",
+      plans: [serverPlan(TRACKS[1]!, TRACKS[2]!)],
+    });
+    const planner = new SmartMixTransitionPlanner(request);
+
+    await planner.plan({
+      revision: "queue-revision-bass",
+      tracks: TRACKS.slice(0, 3),
+      currentIndex: 1,
+      playSource: PLAYLIST_SOURCE,
+      shuffle: false,
+      offline: false,
+      preferredDurationMs: 4000,
+      capabilities: { ...ENABLED_CAPABILITIES, androidBassHandoff: true },
+    });
+
+    const [, , body] = request.mock.calls[0]!;
+    expect(body.edges[0].context).toMatchObject({
+      allowBeatmatch: true,
+      allowTempoAdjustment: true,
+      allowBassHandoff: true,
+    });
+  });
+
+  it("leaves bass handoff out of requests that do not ask for it", async () => {
+    const request = vi.fn().mockResolvedValue({
+      plannerVersion: "smart-mix-v2",
+      plans: [serverPlan(TRACKS[1]!, TRACKS[2]!)],
+    });
+    const planner = new SmartMixTransitionPlanner(request);
+
+    await planner.plan({
+      revision: "queue-revision-no-bass",
+      tracks: TRACKS.slice(0, 3),
+      currentIndex: 1,
+      playSource: PLAYLIST_SOURCE,
+      shuffle: false,
+      offline: false,
+      preferredDurationMs: 4000,
+      capabilities: ENABLED_CAPABILITIES,
+    });
+
+    const [, , body] = request.mock.calls[0]!;
+    expect(body.edges[0].context).not.toHaveProperty("allowBassHandoff");
   });
 
   it("uses local gapless plans for a known album order without network", async () => {
@@ -682,6 +733,7 @@ describe("effective Smart Mix capabilities", () => {
       available: false,
       androidNativeCrossfade: false,
       androidBeatmatch: false,
+      androidBassHandoff: false,
     });
   });
 
@@ -693,6 +745,33 @@ describe("effective Smart Mix capabilities", () => {
     expect(getSmartMixCapabilities().androidNativeCrossfade).toBe(false);
     expect(getSmartMixCapabilities().androidBeatmatch).toBe(false);
     expect(getServerSmartMixCapabilities().androidNativeCrossfade).toBe(true);
+  });
+
+  it("keeps beatmatch and bass handoff opt-in", () => {
+    runtime.androidNative = true;
+    setSmartMixCapabilities({
+      ...ENABLED_CAPABILITIES,
+      androidBassHandoff: true,
+    });
+
+    expect(getSmartMixCapabilities().androidBeatmatch).toBe(false);
+    expect(getSmartMixCapabilities().androidBassHandoff).toBe(false);
+
+    setNativeBassHandoffPreference(true);
+    expect(getSmartMixCapabilities().androidBassHandoff).toBe(false);
+
+    setNativeBeatmatchPreference(true);
+    expect(getSmartMixCapabilities().androidBeatmatch).toBe(true);
+    expect(getSmartMixCapabilities().androidBassHandoff).toBe(true);
+  });
+
+  it("never enables bass handoff without the server capability", () => {
+    runtime.androidNative = true;
+    setSmartMixCapabilities(ENABLED_CAPABILITIES);
+    setNativeBeatmatchPreference(true);
+    setNativeBassHandoffPreference(true);
+
+    expect(getSmartMixCapabilities().androidBassHandoff).toBe(false);
   });
 
   it("notifies subscribers when the user turns Smart Mix off", () => {

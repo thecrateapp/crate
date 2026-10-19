@@ -67,6 +67,7 @@ const COMPLETED_LOCALIZATION_PREFIXES = [
 
 export const COMPLETED_ENGLISH_FALLBACK_ALLOWLIST = new Set<string>([
   "settings.playback.crossfade",
+  "settings.playback.smartMixBeatmatch",
   "settings.sleep.modes.15min",
   "settings.sleep.modes.30min",
   "settings.sleep.modes.45min",

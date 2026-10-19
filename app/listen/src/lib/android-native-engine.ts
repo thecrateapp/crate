@@ -85,6 +85,7 @@ type CrateNativePlaybackPlugin = {
           source: string;
           preferredDurationMs: number;
           allowBeatmatch: boolean;
+          allowBassHandoff: boolean;
           delivery: string;
           refill: boolean;
         },
@@ -166,6 +167,24 @@ export function setAndroidNativePlayerEnabled(enabled: boolean): void {
   }
 }
 
+export function continuationWithModes(
+  context: EngineContinuationContext | undefined,
+  capabilities: SmartMixCapabilities,
+): EngineContinuationContext | null {
+  if (
+    !context ||
+    (context.allowBeatmatch === capabilities.androidBeatmatch &&
+      context.allowBassHandoff === capabilities.androidBassHandoff)
+  ) {
+    return null;
+  }
+  return {
+    ...context,
+    allowBeatmatch: capabilities.androidBeatmatch,
+    allowBassHandoff: capabilities.androidBassHandoff,
+  };
+}
+
 export function setAndroidNativeSmartMixCapabilities(
   capabilities: AndroidNativeSmartMixCapabilities,
 ): void {
@@ -225,9 +244,17 @@ export class AndroidNativeEngine implements PlaybackEngine {
   private adoptedSequence = 0;
 
   constructor() {
-    subscribeSmartMixCapabilities(() => {
+    subscribeSmartMixCapabilities((capabilities) => {
       void this.applySmartMixPreference();
       this.replanForCapabilities();
+      const context = continuationWithModes(
+        this.continuationContext,
+        capabilities,
+      );
+      if (context) {
+        this.continuationContext = context;
+        void this.configureContinuation();
+      }
     });
     if (typeof window !== "undefined") {
       window.addEventListener("crate:app-resumed", () => {
@@ -416,6 +443,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
         source: context.source,
         preferredDurationMs: context.preferredDurationMs,
         allowBeatmatch: context.allowBeatmatch,
+        allowBassHandoff: context.allowBassHandoff,
         delivery: context.delivery,
         refill: context.descriptor !== null,
       });
