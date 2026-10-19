@@ -82,6 +82,38 @@ describe("JobProgress", () => {
     expect(container.textContent).not.toContain(JOB_ID);
   });
 
+  it("keeps the poll timer across a new inline onComplete and calls only the latest one", () => {
+    const callbacks: ReturnType<typeof vi.fn>[] = [];
+    const view = render(
+      <JobProgress job={accepted} kind="refresh" onComplete={vi.fn()} />,
+    );
+    function rerenderWithFreshCallback() {
+      const callback = vi.fn();
+      callbacks.push(callback);
+      view.rerender(
+        <JobProgress job={accepted} kind="refresh" onComplete={callback} />,
+      );
+      return callback;
+    }
+
+    // A parent re-rendering every 500 ms with a brand-new inline onComplete
+    // must not reset the 1500 ms poll timer.
+    for (let tick = 0; tick < 6; tick++) {
+      act(() => vi.advanceTimersByTime(500));
+      rerenderWithFreshCallback();
+    }
+    expect(refetch).toHaveBeenCalled();
+
+    job = finished("completed", { status: "succeeded", model_count: 3 });
+    const latest = rerenderWithFreshCallback();
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loaded 3 models");
+    expect(latest).toHaveBeenCalledTimes(1);
+    for (const callback of callbacks.slice(0, -1)) {
+      expect(callback).not.toHaveBeenCalled();
+    }
+  });
+
   it("reports a failed refresh, with or without a result", () => {
     job = finished("failed", { status: "failed", error_code: "AI_JOB_FAILED" });
     const { onComplete, unmount } = renderProgress("refresh");

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useApi } from "@/hooks/use-api";
@@ -59,6 +59,14 @@ function JobStatusReader({
     job.task_id ? `${AI_ROOT}/jobs/${encodeURIComponent(job.task_id)}` : null,
   );
 
+  // The parent often passes a new inline onComplete on every render. Read it
+  // from a ref so the polling effect below does not depend on it and restart
+  // its timer each time, which would stall polling under frequent re-renders.
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  });
+
   useEffect(() => {
     setFinished(false);
   }, [job.task_id]);
@@ -67,12 +75,12 @@ function JobStatusReader({
     if (!data || finished) return;
     if (TERMINAL_STATUSES.includes(data.status)) {
       setFinished(true);
-      onComplete();
+      onCompleteRef.current();
       return;
     }
     const timer = setTimeout(refetch, 1500);
     return () => clearTimeout(timer);
-  }, [data, finished, refetch, onComplete]);
+  }, [data, finished, refetch]);
 
   if (!job.task_id) {
     const message = job.deduplicated
