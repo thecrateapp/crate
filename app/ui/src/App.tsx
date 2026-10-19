@@ -60,9 +60,9 @@ const Users = lazy(() =>
 const Roles = lazy(() =>
   import("@/pages/Roles").then((m) => ({ default: m.Roles })),
 );
-const AgentIntegrations = lazy(() =>
-  import("@/pages/AgentIntegrations").then((m) => ({
-    default: m.AgentIntegrations,
+const AgentConnections = lazy(() =>
+  import("@/pages/agents/AgentConnections").then((m) => ({
+    default: m.AgentConnections,
   })),
 );
 const AgentPlanDetail = lazy(() =>
@@ -286,7 +286,7 @@ export default function App() {
                     path="connections"
                     element={
                       <RequireCapabilities anyOf={AGENT_INTEGRATIONS}>
-                        <AgentIntegrations />
+                        <AgentConnections />
                       </RequireCapabilities>
                     }
                   />
