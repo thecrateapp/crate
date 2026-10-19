@@ -1,4 +1,4 @@
-import type { MouseEvent } from "react";
+import type { HTMLAttributes, MouseEvent } from "react";
 import { Link, type To } from "react-router";
 
 import { ArrowLeft, CRATE_ICON_SIZE } from "@crate/ui/icons";
@@ -6,7 +6,8 @@ import { cn } from "@crate/ui/lib/cn";
 
 export type BackLinkVariant = "text" | "icon";
 
-export interface BackLinkProps {
+export interface BackLinkProps
+  extends Omit<HTMLAttributes<HTMLElement>, "onClick"> {
   to?: To;
   onClick?: (event: MouseEvent<HTMLElement>) => void;
   label?: string;
@@ -16,8 +17,8 @@ export interface BackLinkProps {
 }
 
 const VARIANT_CLASS_NAME: Record<BackLinkVariant, string> = {
-  text: "link-meta inline-flex items-center gap-2 text-sm",
-  icon: "relative inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-border-quiet text-text-primary/70 transition-colors hover:bg-text-primary/5 hover:text-text-primary after:absolute after:top-1/2 after:left-1/2 after:size-11 after:-translate-x-1/2 after:-translate-y-1/2 pointer-fine:after:hidden",
+  text: "link-meta inline-flex min-h-11 items-center gap-2 text-sm font-normal",
+  icon: "relative inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-border-quiet text-text-primary/70 transition-colors hover:bg-text-primary/5 hover:text-text-primary pointer-coarse:size-11",
 };
 
 export function BackLink({
@@ -27,6 +28,7 @@ export function BackLink({
   variant = "text",
   replace,
   className,
+  ...props
 }: BackLinkProps) {
   const isIcon = variant === "icon";
   const content = (
@@ -36,8 +38,9 @@ export function BackLink({
     </>
   );
   const sharedProps = {
-    "aria-label": isIcon ? label : undefined,
-    title: isIcon ? label : undefined,
+    ...props,
+    "aria-label": isIcon ? label : props["aria-label"],
+    title: props.title ?? (isIcon ? label : undefined),
     "data-testid": "back-link",
     className: cn(VARIANT_CLASS_NAME[variant], className),
   };

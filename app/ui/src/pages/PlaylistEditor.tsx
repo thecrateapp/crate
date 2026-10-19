@@ -1,9 +1,10 @@
+import { PageHeader } from "@crate/ui/domain/navigation/PageHeader";
+import { BackLink } from "@crate/ui/domain/navigation/BackLink";
 import { FilterChip } from "@crate/ui/primitives/FilterChip";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import {
   PageHeaderAction,
   PageHeaderActions,
-  PageHeaderLayout,
 } from "@/components/layout/PageHeader";
 import { SeverityMeter } from "@/components/admin/status-indicators";
 import { cn } from "@crate/ui/lib/cn";
@@ -20,7 +21,6 @@ import {
 } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
-  ArrowLeft,
   Copy,
   Eye,
   GripVertical,
@@ -898,22 +898,13 @@ export function PlaylistEditor() {
 
   return (
     <div className="min-w-0 space-y-6">
-      <Button
-        variant="ghost"
-        size="sm"
+      <BackLink
+        data-admin-ux="editor-back"
+        label="Back to playlists"
         onClick={() => navigate("/playlists")}
-        className="w-fit min-h-11"
-      >
-        <ArrowLeft
-          data-admin-ux="editor-back"
-          aria-hidden="true"
-          size={14}
-          className="mr-1"
-        />{" "}
-        Back to playlists
-      </Button>
+      />
       <section className="@container rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-        <PageHeaderLayout
+        <PageHeader
           artwork={
             <PlaylistArtwork
               name={playlist.name}
@@ -991,8 +982,12 @@ export function PlaylistEditor() {
               </PageHeaderAction>
             </PageHeaderActions>
           }
-        >
-          <div className="min-w-0 flex-1 space-y-4">
+          title={name || playlist.name}
+          subtitle={
+            description ||
+            "No editorial description yet. Add one so the playlist reads like a first-class surface in listen."
+          }
+          eyebrow={
             <div className="flex flex-wrap gap-2">
               <InfoBadge active={isSmart}>
                 {isSmart ? "smart" : "static"}
@@ -1004,42 +999,35 @@ export function PlaylistEditor() {
               ) : null}
               <StatusChip status={playlist.generation_status} />
             </div>
-
-            <div className="space-y-2">
-              <h1 className="min-w-0 break-words font-display text-3xl font-semibold tracking-tight">
-                {name || playlist.name}
-              </h1>
-              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                {description ||
-                  "No editorial description yet. Add one so the playlist reads like a first-class surface in listen."}
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-1.5">
-              <InfoBadge>{playlist.track_count} tracks</InfoBadge>
-              <InfoBadge>{formatMinutes(playlist.total_duration)}</InfoBadge>
-              <InfoBadge>
-                {playlist.follower_count} follower
-                {playlist.follower_count === 1 ? "" : "s"}
-              </InfoBadge>
-              {category ? <InfoBadge>{category}</InfoBadge> : null}
-              {featuredRank != null ? (
-                <InfoBadge>Rank {featuredRank}</InfoBadge>
-              ) : null}
-              {playlist.last_generated_at ? (
+          }
+          meta={
+            <>
+              <div className="flex flex-wrap gap-1.5">
+                <InfoBadge>{playlist.track_count} tracks</InfoBadge>
+                <InfoBadge>{formatMinutes(playlist.total_duration)}</InfoBadge>
                 <InfoBadge>
-                  Generated {timeAgo(playlist.last_generated_at)}
+                  {playlist.follower_count} follower
+                  {playlist.follower_count === 1 ? "" : "s"}
                 </InfoBadge>
-              ) : null}
-            </div>
-
-            {playlist.generation_error ? (
-              <div className="rounded-md border border-state-warning/20 bg-state-warning/10 px-3 py-2 text-sm text-state-warning-text">
-                {playlist.generation_error}
+                {category ? <InfoBadge>{category}</InfoBadge> : null}
+                {featuredRank != null ? (
+                  <InfoBadge>Rank {featuredRank}</InfoBadge>
+                ) : null}
+                {playlist.last_generated_at ? (
+                  <InfoBadge>
+                    Generated {timeAgo(playlist.last_generated_at)}
+                  </InfoBadge>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-        </PageHeaderLayout>
+
+              {playlist.generation_error ? (
+                <div className="rounded-md border border-state-warning/20 bg-state-warning/10 px-3 py-2 text-sm text-state-warning-text">
+                  {playlist.generation_error}
+                </div>
+              ) : null}
+            </>
+          }
+        />
       </section>
 
       <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">

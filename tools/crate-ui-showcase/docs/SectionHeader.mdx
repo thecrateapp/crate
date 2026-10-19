@@ -1,0 +1,30 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/SectionHeader.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">SectionHeader</DocHeading>
+<EntryDetails
+  id="domain-lists-sectionheader"
+  review="Visual review pending · 1AU"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+Content-section heading, optional context/count and text action.
+
+A content or rail heading, distinct from InstrumentPanel's Mono caption. Bricolage700 at18/24/30px for md/lg/display; native heading defaults h2 and accepts h1–h4/id. Optional eyebrow is uppercase MonoLabel. Count is normal-weight12px tabular Mono;0is visible and absence is omitted. Subtitle uses the body-font variable at14px, remains readable and is not line-clamped. Grid8px gaps own context/title/subtitle spacing. Long/unbroken names and sibling actions wrap without widening the container. The default text action has a native callback and44px hit height; an injected action retains its native behavior. Existing props and heading levels remain compatible. General panels use InstrumentPanel.
+
+The approved mockup and Diego’s confirmed amendments are the visual reference. Shared components own their contracts; stories add layout only. Consumer adoption and native/AT/phase QA remain separate.
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Large} />
+
+<Canvas of={Stories.Display} />
+
+<Canvas of={Stories.WithoutContext} />
+
+<Canvas of={Stories.LongContent} />
+
+<Controls of={Stories.Base} />

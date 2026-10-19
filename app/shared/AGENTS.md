@@ -165,3 +165,14 @@ IconButton retains compact round/glow controls; ActionIconButton/ActionIconLink 
 row/card compatibility. Coarse targets reserve44px in layout, not overlapping pseudo-elements.
 Do not use an icon-only control for ambiguous domain operations or final confirmations. AI
 availability, BackLink/navigation and specialized PlayButton/progress remain separate contracts.
+
+
+## Headers — local 1AU
+
+PageHeader owns ordinary title/context/subtitle/meta typography and delegates positioning to
+PageHeaderLayout, also used by the Admin compatibility adapter. Keep Back outside identity;
+container width determines action wrapping/placement. SectionHeader is the content/rail role,
+not an InstrumentPanel caption. PageHero preserves its four roles and compact-title option;
+height="content" is the shared contract for content-sized CrateHero, without per-caller min-height
+repairs. HeroActionBar preserves playback/menu semantics and bounds long labels within its
+available width. Preserve existing native Album/safe-area composition until its owning phase.

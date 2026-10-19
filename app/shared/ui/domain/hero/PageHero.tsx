@@ -1,5 +1,6 @@
 import { Fragment, useId, type ReactNode } from "react";
 
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { cn } from "@crate/ui/lib/cn";
 
 export type PageHeroVariant = "media" | "artist" | "editorial" | "card";
@@ -32,13 +33,15 @@ export interface PageHeroProps {
   contentClassName?: string;
   artworkClassName?: string;
   titleClassName?: string;
+  titleSize?: "default" | "compact";
+  height?: "default" | "content";
   actionsClassName?: string;
 }
 
 const ROOT_CLASS_NAME: Record<PageHeroVariant, string> = {
-  media: "relative h-hero-md overflow-hidden lg:h-hero-xl",
-  artist: "relative h-hero-md overflow-hidden sm:h-hero-sm",
-  editorial: "relative h-hero-md overflow-hidden sm:h-hero-sm",
+  media: "relative flex min-h-hero-md overflow-hidden lg:min-h-hero-xl",
+  artist: "relative flex min-h-hero-md overflow-hidden sm:min-h-hero-sm",
+  editorial: "relative flex min-h-hero-md overflow-hidden sm:min-h-hero-sm",
   card: "relative overflow-hidden rounded-xl p-5 sm:p-6",
 };
 
@@ -63,7 +66,7 @@ const TITLE_CLASS_NAME: Record<PageHeroVariant, string> = {
   media: "text-3xl font-bold text-text-primary sm:text-4xl",
   artist: "text-3xl font-bold text-text-primary sm:text-4xl",
   editorial:
-    "text-4xl font-black leading-none tracking-tight text-text-primary sm:text-6xl",
+    "text-4xl font-extrabold leading-none tracking-tight text-text-primary sm:text-6xl",
   card: "text-3xl font-bold leading-tight text-text-primary",
 };
 
@@ -180,6 +183,8 @@ export function PageHero({
   contentClassName,
   artworkClassName,
   titleClassName,
+  titleSize = "default",
+  height = "default",
   actionsClassName,
 }: PageHeroProps) {
   const generatedId = useId();
@@ -196,16 +201,33 @@ export function PageHero({
         isCard ? "flex-1" : "max-w-3xl pb-1",
       )}
     >
-      {eyebrow ? (
-        <div className="mb-2 flex flex-wrap items-center gap-2">{eyebrow}</div>
+      {eyebrow !== null &&
+      eyebrow !== undefined &&
+      eyebrow !== false &&
+      eyebrow !== "" ? (
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          {typeof eyebrow === "string" || typeof eyebrow === "number" ? (
+            <MonoLabel>{eyebrow}</MonoLabel>
+          ) : (
+            eyebrow
+          )}
+        </div>
       ) : null}
       <h1
         id={titleId}
-        className={cn("break-words", TITLE_CLASS_NAME[variant], titleClassName)}
+        className={cn(
+          "min-w-0 wrap-anywhere font-display",
+          TITLE_CLASS_NAME[variant],
+          titleSize === "compact" && "text-2xl sm:text-4xl",
+          titleClassName,
+        )}
       >
         {title}
       </h1>
-      {subtitle ? (
+      {subtitle !== null &&
+      subtitle !== undefined &&
+      subtitle !== false &&
+      subtitle !== "" ? (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-text-muted">
           {subtitle}
         </div>
@@ -250,6 +272,7 @@ export function PageHero({
         className={cn(ROOT_CLASS_NAME.card, className)}
         data-testid="page-hero"
         data-variant={variant}
+        data-height={height}
       >
         {background ? <HeroBackground background={background} /> : null}
         <div
@@ -276,10 +299,14 @@ export function PageHero({
   }
 
   return (
-    <div data-testid="page-hero" data-variant={variant}>
+    <div data-testid="page-hero" data-variant={variant} data-height={height}>
       <section
         aria-labelledby={titleId}
-        className={cn(ROOT_CLASS_NAME[variant], className)}
+        className={cn(
+          ROOT_CLASS_NAME[variant],
+          height === "content" && "h-auto min-h-0 lg:min-h-0",
+          className,
+        )}
       >
         {background ? <HeroBackground background={background} /> : null}
         <div

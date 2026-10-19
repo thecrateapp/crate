@@ -7,17 +7,18 @@ sus stops locales anteriores quedan superados por las aprobaciones y publicacion
 | Concepto                | Estado vigente                                                                                                                                                              |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Workspace               | `/home/diego/.codex/worktrees/crate-v3-1q/crate`; rama `feat/crate_v3`                                                                                                      |
-| Publicado               | 1AS publicado: `9b5356862db1cef1d014c0b56c7a7e61bd7cad18`; conserva el ancestro `53177736`                                                                                  |
-| Checkpoint local        | **1AT aprobado por Diego**: publicación autorizada; siguiente grupo 1AU, cabeceras                                                                                          |
-| Revisión actual         | `http://127.0.0.1:5186/review-1at-surfaces.html`; misma escena en Storybook `Reviews/1AT/Surfaces`; vistas anteriores conservadas                                           |
+| Publicado               | 1AT publicado: `67486e4c7414d7c6bca7a6701b35c73440f0dfce`; conserva el ancestro `53177736`                                                                                  |
+| Checkpoint local        | **1AU en revisión local**: familia de cabeceras y consumidores iniciales; sin commit                                                                                          |
+| Prioridad de continuación | **Listen primero**, por indicación de Diego; después se retoman las migraciones específicas de Admin. Inventario y plan por recorridos en revisión documental.           |
+| Revisión actual         | `http://127.0.0.1:5186/review-1au-headers.html`; misma escena en Storybook `Reviews/1AU/Headers`; vistas anteriores conservadas                                           |
 | Auditoría               | A1 contraste, A2/A3 tipografía, A4 chips, A7 copy, A6 guardas y A8 estados documentales publicados en 1AP. A5 conserva su deuda explícita por fase, según el orden aprobado |
 | Preview                 | `http://127.0.0.1:5186/`, `crate-v3-preview.service`; editor real en `/admin-playlist-editor-demo.html` y `/#editor-playlists-admin`                                        |
-| Storybook               | `http://127.0.0.1:6006/?path=/docs/system-introduction--docs`; `crate-ui-storybook.service`; 28 entradas documentadas / 65 pendientes                                       |
+| Storybook               | `http://127.0.0.1:6006/?path=/docs/system-introduction--docs`; `crate-ui-storybook.service`; 33 entradas documentadas / 60 pendientes                                       |
 | Próximo grupo de iconos | Pausado por Diego: auditar sistema completo y aprobar catálogo/contratos antes de más migraciones                                                                           |
 | Identidad y referencia  | Mockup aprobado5186 y ajustes confirmados de Diego; una identidad, fuentes/excepciones nativas. Pin histórico `app/web@258bbaee` conservado                                 |
 | Evidencia canónica      | 33 PNG y manifest de 1M; comparación Linux posterior y QA nativa pendientes                                                                                                 |
 | Cierre pendiente        | Global 1b.8, migraciones de página/A20/6.8, validación completa de fase, datos vivos, AT y plataformas nativas                                                              |
-| Restricción             | 1AT aprobado: commit/push autorizados; 1AU se revisa antes de publicar. Sin PR, merge, rebase, deploy ni release                                                                                 |
+| Restricción             | 1AT publicado; 1AU se revisa antes de commit/push. Sin PR, merge, rebase, deploy ni release                                                                                 |
 
 La validación vigente de la extensión de cabeceras/filas se registra al final de este documento;
 los resultados cronológicos previos no certifican los cambios posteriores. El bundle permanece
@@ -411,3 +412,64 @@ de commit/push**.
 Diego aprueba1AT y autoriza commit/push. Continúa1AU con PageHeader, SectionHeader, PageHero,
 HeroActionBar y BackLink, usando el mockup como referencia y actualizando Storybook y la vista
 pequeña del checkpoint. Ambos previews permanecen activos;1AU se detiene antes de commit/push.
+
+
+## 1AT publicado; 1AU — familia de cabeceras
+
+1AT publicado en `67486e4c7414d7c6bca7a6701b35c73440f0dfce`. 1AU completa PageHeader y su
+PageHeaderLayout, SectionHeader, PageHero, HeroActionBar y BackLink con contratos reales en
+Storybook. PageHeader posee h1 Bricolage60024/30, contexto MonoLabel, subtítulo, artwork y
+metadata; SectionHeader usa Bricolage70018/24/30 y contador Mono12, incluido0. Los captions de
+muestra usan FormField con8px reales. Acciones upper-right conservan ActionGroup y44px.
+
+Admin PageHeaderLayout es un adaptador al layout compartido. PlaylistEditor usa la identidad,
+metadata y BackLink comunes sin cambiar acciones, estados, gates o payloads. Back conserva su
+texto/destino; su glyph ahora procede de Solar compartido, registrado en la guarda de iconos.
+Listen Settings conserva PageHeader; AlbumHero usa su título compacto24/36 compartido. CrateHero
+adopta height=content y el mismo título compacto para conservar el tamaño por contenido de las
+crates vacías. No se migra todo Admin, ni OpsHero/tiles, perfiles, portadas o reproducción.
+
+La revisión independiente confirmó dos P2: los mínimos nuevos imponían460px al hero vacío y
+las acciones largas desbordaban280px en escritorio. Se reproducen antes del fix y se corrigen
+en las recetas compartidas, con casos de consumidor/viewport. También se reproducen y corrigen
+los gaps de fragmentos:8px entre acciones y16px antes del error de generación. Las captions no
+usan margins locales. El contrato de cuerpo respeta la variable de fuente nativa; esto no
+certifica ejecución nativa. Los controles de reproducción conservan su papel48px mínimo/56px;
+las etiquetas largas pueden aumentar su altura.
+
+[Review pequeña](http://127.0.0.1:5186/review-1au-headers.html), Storybook `Reviews/1AU/Headers` y
+[plan/evidencia](2026-10-19-crate-v3-headers-reconciliation.md). Misma escena para ambos hosts;
+no se amplía el mockup histórico. El documento de próximos grupos sigue siendo una propuesta.
+Ambos previews activos; **parada1AU antes de commit/push**.
+
+
+Validación final1AU:158unitarias focalizadas (74shared,51Admin,33Listen),20browser de cabeceras
+más2del editor real,5typechecks y lint/builds/guarda33/93/120 verdes. Admin527180/532480Bgzip
+(5300Bde margen); Listen200109/307200B. Las dos incidencias importantes de la revisión y los gaps
+de slots tienen regresiones RED→GREEN; no queda Critical/Important ni Minor diferido de esa
+revisión. Se preservan los overrides nativos de Album, cuya composición/QA sigue en su fase;
+no se certifican AT, backend vivo, plataformas nativas ni comparación canónica.1AU continúa
+sin commit/push, con ambos previews activos.
+
+## Dirección de Diego después de 1AU — Listen primero
+
+Diego pide centrar la continuación en las primitivas, componentes y superficies que necesita
+Listen para llegar antes a una experiencia V3 usable, y retomar después Admin. Se solicita un
+análisis por agente con inventario y plan de implementación. El
+[inventario de Listen](2026-10-19-crate-v3-listen-inventory.md) y el
+[plan propuesto](2026-10-19-crate-v3-listen-implementation-plan.md) distinguen el primer recorrido
+de escucha de la cobertura restante del producto. La secuencia futura del
+[roadmap anterior de familias](2026-10-19-crate-v3-component-checkpoint-groups.md) deja de ser el
+orden de continuación; sus contratos y deuda siguen como referencia.
+
+Esta dirección no aprueba nuevos checkpoints ni publica 1AU, que continúa pendiente de revisión
+antes de commit/push. Tampoco modifica el alcance de release conjunta, integra Smart Mix o
+certifica datos, dispositivos o QA pendientes. Se conserva Admin y se verifican sus consumidores
+afectados por cada cambio compartido. Ambos previews permanecen activos.
+
+### Aprobación de 1AU y del plan de Listen
+
+Diego aprueba1AU y el plan de Listen, autoriza commit/push y ejecutar1AV Imagen e identidad.
+La nueva prioridad Listen primero ya está aprobada; Admin conserva sus contratos y comprobaciones
+de consumidores afectados.1AV usa mockup/Storybook y review pequeña, con stop antes de commit.
+Se solicita además Listen vivo en5174 con API habitual `https://api.lespedants.org`.

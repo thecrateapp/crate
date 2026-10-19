@@ -2,6 +2,13 @@
 
 2026-10-19 · propuesta solicitada por Diego durante la continuación de 1AS a 1AT.
 
+**Enmienda posterior de prioridad:** durante la revisión de 1AU, Diego pide terminar primero
+Listen V3 y después continuar Admin. La secuencia futura de este documento se conserva como
+inventario histórico, no como orden vigente. Véanse el
+[inventario de Listen](2026-10-19-crate-v3-listen-inventory.md), su
+[plan propuesto](2026-10-19-crate-v3-listen-implementation-plan.md) y el
+[estado vigente](2026-10-19-crate-v3-current-state.md). 1AU sigue pendiente de aprobación.
+
 ## Decisión propuesta
 
 Continuar por **familias con una responsabilidad compartida**, completando su contrato,

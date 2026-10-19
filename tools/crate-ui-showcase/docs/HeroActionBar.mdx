@@ -1,0 +1,30 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/HeroActionBar.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">HeroActionBar</DocHeading>
+<EntryDetails
+  id="domain-hero-heroactionbar"
+  review="Visual review pending · 1AU"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+Playback primary actions, contextual secondary controls and optional menu.
+
+Playback composition retains its distinct48px primary pill and56px secondary icon/caption targets. Groups wrap against available container width, including narrow containers at desktop viewports. Buttons and labels stay within those bounds; primary height can grow; captions are not truncated. Primary busy actions expose aria-busy and cannot repeat; disabled, pressed and callbacks are preserved. Optional named groups keep native Tab order, with no toolbar role. Empty input, including a non-actionable menu, renders no bar. Injected primary/secondary extras and leading controls retain their order. Menus keep their existing desktop trigger and single mobile portal, focus restoration, Escape and open-state callbacks. Review composition uses mobileMenuPortal=false to keep the example inside its section; MobilePortal demonstrates the production default separately. Playback/ring/seek behavior is untouched; ordinary header actions use ActionGroup.
+
+The approved mockup and Diego’s confirmed amendments are the visual reference. Shared components own their contracts; stories add layout only. Consumer adoption and native/AT/phase QA remain separate.
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Busy} />
+
+<Canvas of={Stories.LongContent} />
+
+<Canvas of={Stories.UnbrokenActions} />
+
+<Canvas of={Stories.Empty} />
+
+<Controls of={Stories.Base} />

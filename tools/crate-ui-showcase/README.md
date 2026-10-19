@@ -16,8 +16,8 @@ The historical preview remains at 5186. Preserve its checkpoints and canonical c
 
 Each review step now has a small standalone page with only the components and states under
 review. Cover the full approved checkpoint scope. Do not grow the historical main mockup.
-Current: http://127.0.0.1:5186/review-1at-surfaces.html and Storybook `Reviews/1AT/Surfaces`.
-Both import `reviews/SurfacesReview.tsx`; earlier actions/forms/labels review URLs stay available. No copied
+Current: http://127.0.0.1:5186/review-1au-headers.html and Storybook `Reviews/1AU/Headers`.
+Both import `reviews/HeadersReview.tsx`; earlier actions/forms/labels review URLs stay available. No copied
 markup, local component repairs or Storybook runtime in the standalone page. Component entries
 and their documentation still require updates in the same change.
 
@@ -85,7 +85,7 @@ Navigation, Actions, Overlays, Media and Layout hold canonical components; Compa
 legacy adapters. Foundations remains in System. Category definitions live in Maintenance.
 Pending entries are categorized too; a category does not imply validated documentation.
 
-93 entries link 120 sources: 28 documented entries and 65 pending by family. Adoption and visual
+93 entries link 120 sources: 33 documented entries and 60 pending by family. Adoption and visual
 review remain explicitly separate; these are not counts of certified consumers. SegmentedControl
 demonstrates real-prop controls, radio mode and tabs with persistent linked panels. HairlineRow
 owns its inset/alignment and supports wrapping
@@ -111,3 +111,14 @@ Review captions use FormField kind="group", its named sample and real 8 px grid 
 controls use the same canonical component/size/variant. Explicit compatibility or size galleries
 retain their separate contracts. Browser checks measure these relationships in both hosts;
 passing intrinsic component checks alone does not validate composition.
+
+
+## Header family — local 1AU
+
+PageHeader and PageHeaderLayout own ordinary identity/metadata and container-aware artwork/action
+positioning. SectionHeader owns rail headings/counts. PageHero preserves media/artist/editorial/card
+roles, with compact titles and an explicit content-height mode for CrateHero. HeroActionBar keeps
+playback/menu composition; BackLink preserves text and native router/button behavior with real
+coarse targets. See five live entries and Reviews/1AU/Headers. Slot gaps live in shared components,
+including action/metadata fragments. Native Album/safe-area overrides and broader page adoption
+remain separate; this group does not certify them.

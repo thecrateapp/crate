@@ -66,3 +66,46 @@ describe("PageHeader", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveClass("text-2xl");
   });
 });
+
+it("keeps page identity, artwork and zero-valued metadata named while preserving footer content", () => {
+  render(
+    <PageHeader
+      title="Crates"
+      artwork={<img alt="Collection artwork" />}
+      meta={0}
+      aria-describedby="page-context"
+    >
+      <p id="page-context">Collection tools</p>
+    </PageHeader>,
+  );
+  const header = screen.getByRole("banner", { name: "Crates" });
+  expect(header).toContainElement(
+    screen.getByRole("img", { name: "Collection artwork" }),
+  );
+  expect(header).toHaveAccessibleDescription("Collection tools");
+  expect(screen.getByText("0")).toBeVisible();
+  expect(screen.getByText("Collection tools")).toBeVisible();
+});
+
+it("preserves zero subtitles instead of treating numeric content as absent", () => {
+  render(<PageHeader title="Pending" subtitle={0} />);
+  expect(screen.getByText("0")).toBeVisible();
+});
+
+it("forwards native BackLink descriptions and preserves keyboard route navigation", async () => {
+  render(
+    <MemoryRouter>
+      <p id="return-context">Return to the saved collection</p>
+      <BackLink
+        to="/collection?tab=playlists"
+        label="Back to playlists"
+        aria-describedby="return-context"
+      />
+    </MemoryRouter>,
+  );
+  const link = screen.getByRole("link", { name: "Back to playlists" });
+  expect(link).toHaveAccessibleDescription("Return to the saved collection");
+  expect(link).toHaveAttribute("href", "/collection?tab=playlists");
+  await userEvent.tab();
+  expect(link).toHaveFocus();
+});

@@ -296,3 +296,24 @@ describe("HeroActionBar", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+it("omits an empty hero action bar including menus with no actionable entries", () => {
+  const { rerender } = render(<HeroActionBar />);
+  expect(screen.queryByTestId("hero-action-bar")).not.toBeInTheDocument();
+  rerender(
+    <HeroActionBar
+      menu={{
+        actions: [
+          { key: "divider", type: "divider" },
+          { key: "label", type: "label", label: "Details" },
+        ],
+      }}
+    />,
+  );
+  expect(screen.queryByTestId("hero-action-bar")).not.toBeInTheDocument();
+});
+
+it("keeps zero-valued hero context visible alongside its heading", () => {
+  render(<PageHero title="Pending imports" eyebrow={0} subtitle={0} />);
+  expect(screen.getAllByText("0")).toHaveLength(2);
+});

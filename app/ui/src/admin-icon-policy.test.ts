@@ -269,7 +269,10 @@ const approvedUx = new Map([
   ["PlaylistEditor:editor-remove-cover", ["lucide-react", "Trash2"]],
   ["Playlists:playlists-remove-rule", ["lucide-react", "Trash2"]],
   ["PlaylistEditor:editor-loading", ["lucide-react", "Loader2"]],
-  ["PlaylistEditor:editor-back", ["lucide-react", "ArrowLeft"]],
+  [
+    "PlaylistEditor:editor-back",
+    ["@crate/ui/domain/navigation/BackLink", "BackLink"],
+  ],
   ["PlaylistEditor:editor-preview", ["lucide-react", "Loader2"]],
   ["PlaylistEditor:editor-generate", ["lucide-react", "Loader2"]],
   ["PlaylistEditor:editor-save", ["lucide-react", "Loader2"]],
@@ -571,7 +574,9 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
     }
     const marker = prop("data-admin-ux")?.initializer;
     if (marker && ts.isStringLiteral(marker)) {
-      const key = `${entry.path.split("/").pop()?.replace(".tsx", "")}:${marker.text}`;
+      const key = `${entry.path.split("/").pop()?.replace(".tsx", "")}:${
+        marker.text
+      }`;
       const approved = approvedUx.get(key);
       if (
         !unknownSpread &&
@@ -853,7 +858,9 @@ function operationalIconViolations(path: string, source: string) {
           (ts.isJsxAttribute(attr) && attr.name.getText(tree) === "icon")
         )
           found.push(
-            `${path}:${tree.getLineAndCharacterOfPosition(attr.getStart(tree)).line + 1}`,
+            `${path}:${
+              tree.getLineAndCharacterOfPosition(attr.getStart(tree)).line + 1
+            }`,
           );
       }
     }

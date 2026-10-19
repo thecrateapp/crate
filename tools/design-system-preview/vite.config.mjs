@@ -202,6 +202,9 @@ export default defineConfig({
     rolldownOptions: {
       input: {
         main: fileURLToPath(new URL("index.html", import.meta.url)),
+        review1auHeaders: fileURLToPath(
+          new URL("review-1au-headers.html", import.meta.url),
+        ),
         review1atSurfaces: fileURLToPath(
           new URL("review-1at-surfaces.html", import.meta.url),
         ),

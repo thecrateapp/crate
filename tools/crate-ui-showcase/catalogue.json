@@ -68,7 +68,7 @@
         "app/shared/ui/tokens/typography.css": "f8e1546208fd2daf1f0d9d1b34f059cefd92506f50a63997b6b8b342d9d29fb3",
         "app/shared/ui/tokens/z-index.css": "6eabb7a2757ecf11bc8266ca27af019c8df51a5214fb272478dec3402b8e374b",
         "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "e0db11fdd48259ff5d1e41749bf2ed3e4bfd4dd53589311ed06c4c0f89436c99",
-        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "ecdda6b694000a8efe97d90888fa890483d5a2eaa92c3208e402dacc5a5fa5a8"
+        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "723dc4dc0cfedaa05b89ca7d3b74a7b618fc5dac462f502ac33a9470714a2078"
       },
       "category": "Foundations"
     },
@@ -657,36 +657,40 @@
     {
       "id": "domain-hero-heroactionbar",
       "name": "HeroActionBar",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Playback primary actions, contextual secondary controls and optional menu.",
+      "coverage": "documented",
+      "adoption": "Partial; 1AU reference consumers only, broader adoption and platform QA pending",
+      "storyId": "components-heroactionbar",
+      "story": "tools/crate-ui-showcase/stories/HeroActionBar.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/HeroActionBar.mdx",
       "sources": [
         "app/shared/ui/domain/hero/HeroActionBar.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/hero/HeroActionBar.tsx": "3a00b5334f8f69a13d96f3308adc64d101d974d4f3bba9c46f50b7d38ab7ed36"
+        "app/shared/ui/domain/hero/HeroActionBar.tsx": "1e1cfefd9d685be06d8f50d84ddf8870c461cfef12b00611e2df9e50c5c3b4aa",
+        "tools/crate-ui-showcase/stories/HeroActionBar.stories.tsx": "257fc4a5f6fe7b1d8bae249c89b74e2d89cf1ef3dc5b0948bf5e7da0f0041c28",
+        "tools/crate-ui-showcase/docs/HeroActionBar.mdx": "781281139fa0575b0a1c648d9381ffa688c132f75577c9858ff90bf47b341ad3"
       },
       "category": "Actions"
     },
     {
       "id": "domain-hero-pagehero",
       "name": "PageHero",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Media, artist, editorial and card hero identity with injected artwork/actions.",
+      "coverage": "documented",
+      "adoption": "Partial; 1AU reference consumers only, broader adoption and platform QA pending",
+      "storyId": "components-pagehero",
+      "story": "tools/crate-ui-showcase/stories/PageHero.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/PageHero.mdx",
       "sources": [
         "app/shared/ui/domain/hero/PageHero.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/hero/PageHero.tsx": "904706ada3a77da77bda8a42eb79b80e09358a5930458c60cb35ddec06661246"
+        "app/shared/ui/domain/hero/PageHero.tsx": "12d61794c3f466e53c0e4ffd801a12c05e0bd1f30aa024ecc7a32ad77fb755e7",
+        "tools/crate-ui-showcase/stories/PageHero.stories.tsx": "f1aa60bedcbe624d99a963b92e22b374dc4dc7a963a8d4917bf54617b6e9684c",
+        "tools/crate-ui-showcase/docs/PageHero.mdx": "b62f9cf90117c518281cc121fa32a674b279830d66bac6199cdc7ca817b475b5"
       },
       "category": "Layout"
     },
@@ -747,18 +751,20 @@
     {
       "id": "domain-lists-sectionheader",
       "name": "SectionHeader",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Content-section heading, optional context/count and text action.",
+      "coverage": "documented",
+      "adoption": "Partial; 1AU reference consumers only, broader adoption and platform QA pending",
+      "storyId": "components-sectionheader",
+      "story": "tools/crate-ui-showcase/stories/SectionHeader.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/SectionHeader.mdx",
       "sources": [
         "app/shared/ui/domain/lists/SectionHeader.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/lists/SectionHeader.tsx": "4c25c26850afbaeac539c3811922bdca81cb5a2ce89c89739c781956eaff90a7"
+        "app/shared/ui/domain/lists/SectionHeader.tsx": "903421ed6dd21b140560b5824288f1e05cee1d198cd9d5491d727e63903acb68",
+        "tools/crate-ui-showcase/stories/SectionHeader.stories.tsx": "86199fb03beb6710bc2dd7097af0b9a0a06d097e4989a097449549381ec5d340",
+        "tools/crate-ui-showcase/docs/SectionHeader.mdx": "2ff1505ce0f16db2c15a1efdf2907970e9e4beeda8644e991f3cdbb48addad59"
       },
       "category": "Layout"
     },
@@ -801,36 +807,40 @@
     {
       "id": "domain-navigation-backlink",
       "name": "BackLink",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Native router navigation or callback Back control with preserved labels.",
+      "coverage": "documented",
+      "adoption": "Partial; 1AU reference consumers only, broader adoption and platform QA pending",
+      "storyId": "components-backlink",
+      "story": "tools/crate-ui-showcase/stories/BackLink.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/BackLink.mdx",
       "sources": [
         "app/shared/ui/domain/navigation/BackLink.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/navigation/BackLink.tsx": "446447c3a632cdb6c26987e63986a7d2eb75c381f72d4c35474d6b1bf501d528"
+        "app/shared/ui/domain/navigation/BackLink.tsx": "ff7f5fb182bc4648501693a31f81067f8bd897b10b8de96aed712ab3ce0c8be7",
+        "tools/crate-ui-showcase/stories/BackLink.stories.tsx": "2f21da1d2ee3cb3926083db104f3b7c7b897ff76fdf19b6e185280f4b2f20d00",
+        "tools/crate-ui-showcase/docs/BackLink.mdx": "6ce3f1907c263282634589f19aed74c3c845d45167fd37b02153fbf9e17c9504"
       },
       "category": "Navigation"
     },
     {
       "id": "domain-navigation-pageheader",
       "name": "PageHeader",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Ordinary page identity and shared container-aware header layout.",
+      "coverage": "documented",
+      "adoption": "Partial; 1AU reference consumers only, broader adoption and platform QA pending",
+      "storyId": "components-pageheader",
+      "story": "tools/crate-ui-showcase/stories/PageHeader.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/PageHeader.mdx",
       "sources": [
         "app/shared/ui/domain/navigation/PageHeader.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/navigation/PageHeader.tsx": "280268963f46767e5a38d713e01861c1352fb3790114311b891001e333a8a084"
+        "app/shared/ui/domain/navigation/PageHeader.tsx": "d808bd201d58fc4f54f0961ef09b4605200e783d7c391807caa09b3ff4ab0c76",
+        "tools/crate-ui-showcase/stories/PageHeader.stories.tsx": "52db7c47c382316cd9678b900c11fc206a86983bb325d9620737206b27844ddd",
+        "tools/crate-ui-showcase/docs/PageHeader.mdx": "b7e9eba3877e9e4ffa561b6903c25503b7f11328313d1cfb2c5d567e2d831115"
       },
       "category": "Layout"
     },

@@ -37,7 +37,9 @@ async function geometry(page: Page, root: Locator) {
         .querySelector("h1")!;
       const header = title.closest("section")!;
       const art = header.querySelector(".h-28.w-28")!.getBoundingClientRect();
-      const copy = title.closest(".min-w-0.space-y-4")!.getBoundingClientRect();
+      const copy = title
+        .closest('[data-slot="page-header-identity"]')!
+        .getBoundingClientRect();
       return {
         backInsideHeader: header.contains(back),
         backBottom: back.getBoundingClientRect().bottom,

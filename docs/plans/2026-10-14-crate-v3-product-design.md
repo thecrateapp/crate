@@ -4360,3 +4360,16 @@ controls use the same canonical component/size. No repair CSS or new main-mockup
 [1AT scope and limits](2026-10-19-crate-v3-surfaces-reconciliation.md), and
 [requested future groups proposal](2026-10-19-crate-v3-component-checkpoint-groups.md).
 Both previews active; stop before1AT commit/push. Broader adoption and phase/native/canonical QA remain open.
+
+
+## 1AT publication and 1AU header reconciliation — 2026-10-19
+
+1AT published `67486e4c7414d7c6bca7a6701b35c73440f0dfce`. 1AU completes the five header families
+and their catalogue, using the approved mockup and later confirmations: shared container-aware
+PageHeaderLayout, PageHeader identity/meta, SectionHeader, PageHero, HeroActionBar and BackLink.
+Initial consumers: Admin compatibility layout/PlaylistEditor and Listen Settings/AlbumHero;
+CrateHero content sizing is preserved through a shared option. Actions/metadata fragments own
+8/16px gaps; sample captions use FormField8px. Broader adoption/native composition remain open.
+[Current state](2026-10-19-crate-v3-current-state.md) and
+[1AU plan/evidence](2026-10-19-crate-v3-headers-reconciliation.md) supersede older stops.
+Both previews active; stop before1AU commit/push. No main-mockup growth, baselines or full CI.

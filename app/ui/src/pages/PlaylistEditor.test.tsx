@@ -127,6 +127,24 @@ describe("PlaylistEditor", () => {
     });
   });
 
+  it("keeps metadata and actions in the named page identity, with Back outside it", () => {
+    render(<PlaylistEditor />);
+    const title = screen.getByRole("heading", {
+      level: 1,
+      name: "Screamo Core",
+    });
+    const header = title.closest("header");
+    expect(header).not.toBeNull();
+    expect(header).toHaveAttribute("aria-labelledby", title.id);
+    expect(header).toContainElement(screen.getByText("0 followers"));
+    expect(header).toContainElement(
+      screen.getByRole("button", { name: "Save changes" }),
+    );
+    expect(header).not.toContainElement(
+      screen.getByRole("button", { name: "Back to playlists" }),
+    );
+  });
+
   it("renders the curator track search and AI refinement controls", () => {
     render(<PlaylistEditor />);
 
