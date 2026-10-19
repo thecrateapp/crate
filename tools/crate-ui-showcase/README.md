@@ -16,8 +16,8 @@ The historical preview remains at 5186. Preserve its checkpoints and canonical c
 
 Each review step now has a small standalone page with only the components and states under
 review. Cover the full approved checkpoint scope. Do not grow the historical main mockup.
-Current: http://127.0.0.1:5186/review-1aw-collections.html and Storybook `Reviews/1AW/Collections`.
-Both import `reviews/CollectionsReview.tsx`; earlier actions/forms/labels review URLs stay available. No copied
+Current: http://127.0.0.1:5186/review-1ax-layers.html and Storybook `Reviews/1AX/Layers`.
+Both import `reviews/LayersReview.tsx`; earlier actions/forms/labels review URLs stay available. No copied
 markup, local component repairs or Storybook runtime in the standalone page. Component entries
 and their documentation still require updates in the same change.
 

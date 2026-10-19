@@ -311,7 +311,7 @@ export function PageHero({
         {background ? <HeroBackground background={background} /> : null}
         <div
           className={cn(
-            "relative mx-auto flex size-full max-w-content items-end px-4 pb-6 pt-[var(--listen-mobile-page-top,0px)] sm:px-6 sm:pt-0",
+            "relative mx-auto flex w-full self-stretch max-w-content items-end px-4 pb-6 pt-[var(--listen-mobile-page-top,0px)] sm:px-6 sm:pt-0",
             contentClassName,
           )}
         >

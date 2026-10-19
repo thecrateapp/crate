@@ -138,6 +138,8 @@ export function useTopBarSearchSelection({
         selectRecent(recents[activeIdx]);
       }
     } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
       closeSearch();
     }
   }

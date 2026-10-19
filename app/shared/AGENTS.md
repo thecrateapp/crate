@@ -201,3 +201,15 @@ TrackList keeps injected virtualization at80 and stable entry keys; Grid/Rail re
 navigation and reserve geometry. Listen playback remains local: white18px glyph in a24px visual slot over48px cover,
 40px active ring with aura/core/effects, real coarse hit area and progress-only leaf subscriptions.
 No row hover background. Do not replace the specialized player/EQ controls.
+
+## Layers, feedback and minimum navigation — local1AX
+
+AppModal retains its facade/drag and owns nested custom-modal Escape/Tab priority and document
+scroll locking until the last locking owner closes. Preserve Select/Tooltip portal dismissal and
+focus return; use semantic layer tokens. AppPopover is a surface; its caller owns positioning,
+roles and dismissal. Static floating-surface specimens isolate their layout context so they cannot
+cover a portalled modal. AppErrorBoundary composes ErrorState; keep app reporting/reset/custom
+fallbacks. Route LoadingState retains its200ms threshold; SkipLink targets the app main landmark.
+Tabs retain1Q; each app owns its URL helper and coalesces duplicate pre-render selection writes.
+PageHero stretches its inner frame through the used hero height; do not restore percentage height
+inside a minimum-height-only parent or compensate the resulting clipping in individual pages.

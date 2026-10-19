@@ -259,3 +259,11 @@ el renderer, la autenticación, el motor, el drag ni la virtualización.
 Las validaciones focalizadas y sus límites finales se consolidan en el estado vigente. Sin suites
 completas/CI, sin regenerar33PNG/manifest1M, sin PR/merge/rebase/deploy/release. Las tres instancias
 permanecen activas; conservar los checkpoints y el pin histórico app/web@258bbaee.
+
+## Estado posterior de H0 — 1AX local para revisión
+
+1AV/1AW aprobados y publicados;1AW=`5ff7296c`.1AX implementa el kit mínimo en sus consumidores
+reales, completa siete fichas (incluida Tabs pendiente desde1Q) y corrige el recorte PageHero
+reportado por Diego. [Plan1AX](2026-10-19-crate-v3-layers-feedback-navigation.md) y
+[validación vigente](2026-10-19-crate-v3-current-state.md). La aprobación visual de1AX aún no está
+concedida; sin commit/push local ni avance a1AY. H0 no certifica Listen completo ni QA de fase.

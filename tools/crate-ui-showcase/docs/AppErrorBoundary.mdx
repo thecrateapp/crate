@@ -1,0 +1,20 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/AppErrorBoundary.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">AppErrorBoundary</DocHeading>
+<EntryDetails
+  id="primitives-apperrorboundary"
+  review="Visual review approved · 1AX"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+Catches render failures, reports the original error/info and preserves injected fallback/reset behavior. The default presentation composes ErrorState rather than duplicating a failure screen. Without an injected reset, Go home retains the existing full navigation to /. This does not catch async request failures or replace route data error handling.
+
+The approved mockup and Diego's confirmed adjustments remain the visual reference. Documented,
+adopted and validated are separate statuses; broader native/AT/canonical QA remains pending.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />

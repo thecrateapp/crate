@@ -234,7 +234,7 @@ describe("Library", () => {
     expect(
       screen.getByRole("heading", { name: "Artists" }),
     ).toBeInTheDocument();
-    const sortButton = screen.getByRole("button", {
+    const sortButton = screen.getByRole("combobox", {
       name: "Sort artists: Recently added",
     });
     expect(sortButton).toBeVisible();
@@ -242,12 +242,12 @@ describe("Library", () => {
       screen.queryByRole("option", { name: "Name" }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(sortButton);
+    fireEvent.keyDown(sortButton, { key: "ArrowDown" });
 
     expect(screen.getByRole("listbox", { name: "Sort artists" })).toBeVisible();
     expect(
       screen.getByRole("option", { name: "Recently added" }),
-    ).toHaveAttribute("aria-selected", "true");
+    ).toHaveAttribute("data-state", "checked");
     expect(screen.getByRole("option", { name: "Name" })).toBeInTheDocument();
     expect(
       screen.getByRole("option", { name: "Popularity" }),
@@ -258,11 +258,11 @@ describe("Library", () => {
     renderLibrary("/collection/albums", "/collection/:section");
 
     expect(screen.getByRole("heading", { name: "Albums" })).toBeInTheDocument();
-    const sortButton = screen.getByRole("button", {
+    const sortButton = screen.getByRole("combobox", {
       name: "Sort albums: Recently added",
     });
 
-    fireEvent.click(sortButton);
+    fireEvent.keyDown(sortButton, { key: "ArrowDown" });
 
     expect(screen.getByRole("listbox", { name: "Sort albums" })).toBeVisible();
     expect(screen.getByRole("option", { name: "Artist" })).toBeInTheDocument();
@@ -275,11 +275,11 @@ describe("Library", () => {
     expect(
       screen.getByRole("heading", { name: "Liked tracks" }),
     ).toBeInTheDocument();
-    const sortButton = screen.getByRole("button", {
+    const sortButton = screen.getByRole("combobox", {
       name: "Sort liked tracks: Recently added",
     });
 
-    fireEvent.click(sortButton);
+    fireEvent.keyDown(sortButton, { key: "ArrowDown" });
 
     expect(
       screen.getByRole("listbox", { name: "Sort liked tracks" }),

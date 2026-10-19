@@ -2,7 +2,14 @@ import { type ChangeEvent, type Dispatch } from "react";
 import { useTranslation } from "react-i18next";
 import { CRATE_ICON_SIZE, ImagePlus, Upload } from "@crate/ui/icons";
 import { FormField } from "@crate/ui/primitives/FormField";
-import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
+import { Switch } from "@crate/ui/primitives/Switch";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@crate/ui/shadcn/select";
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
 import { Textarea } from "@crate/ui/shadcn/textarea";
@@ -12,10 +19,6 @@ import type {
   PlaylistComposerAction,
   PlaylistComposerState,
 } from "@/components/playlists/playlist-composer-model";
-import { cn } from "@/lib/utils";
-
-const FIELD_LABEL_CLASS_NAME =
-  "text-xs font-medium uppercase tracking-eyebrow text-text-primary/40";
 
 type PlaylistIdentityState = Pick<
   PlaylistComposerState,
@@ -67,16 +70,16 @@ export function PlaylistIdentitySection({
           name={name || t("playlistComposer.newPlaylist")}
           coverDataUrl={coverDataUrl}
           tracks={tracks}
-          className="size-24 rounded-xl shadow-2xl sm:size-28"
+          className="size-24 sm:size-28"
         />
-        <button
-          type="button"
-          className="inline-flex w-full items-center justify-center gap-1 rounded-full bg-text-primary/5 px-2 py-1.5 text-center text-xs font-medium leading-4 text-text-primary transition-colors hover:bg-text-primary/10"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => fileInputRef.current?.click()}
         >
-          <Upload size={CRATE_ICON_SIZE.micro} className="shrink-0" />
+          <Upload size={CRATE_ICON_SIZE.sm} aria-hidden="true" />
           {t("playlistComposer.editCover")}
-        </button>
+        </Button>
         <input
           ref={fileInputRef}
           type="file"
@@ -87,10 +90,7 @@ export function PlaylistIdentitySection({
       </div>
 
       <div className="min-w-0 flex-1 space-y-3 pt-1">
-        <FormField
-          label={t("playlistComposer.playlistLabel")}
-          labelClassName={FIELD_LABEL_CLASS_NAME}
-        >
+        <FormField label={t("playlistComposer.playlistLabel")}>
           {(control) =>
             titleEditing ? (
               <Input
@@ -105,12 +105,13 @@ export function PlaylistIdentitySection({
                 onBlur={() =>
                   dispatch({ type: "set-title-editing", value: false })
                 }
-                className="h-auto rounded-lg bg-text-primary/5 px-3 py-2.5 text-xl font-semibold placeholder:text-text-muted md:text-xl"
               />
             ) : (
               <button
+                {...control}
                 type="button"
-                className="w-full text-left text-xl font-semibold text-text-primary transition-colors hover:text-text-primary"
+                data-slot="form-field-value"
+                className="min-h-10 w-full text-left pointer-coarse:min-h-11"
                 onClick={() =>
                   dispatch({ type: "set-title-editing", value: true })
                 }
@@ -121,10 +122,7 @@ export function PlaylistIdentitySection({
           }
         </FormField>
 
-        <FormField
-          label={t("playlistComposer.descriptionLabel")}
-          labelClassName={FIELD_LABEL_CLASS_NAME}
-        >
+        <FormField label={t("playlistComposer.descriptionLabel")}>
           {(control) =>
             descriptionEditing ? (
               <Textarea
@@ -145,12 +143,13 @@ export function PlaylistIdentitySection({
                     value: false,
                   })
                 }
-                className="min-h-0 resize-none rounded-lg bg-text-primary/5 px-3 py-2.5 placeholder:text-text-muted md:text-base"
               />
             ) : (
               <button
+                {...control}
                 type="button"
-                className="w-full text-left text-sm leading-6 text-text-muted transition-colors hover:text-text-primary"
+                data-slot="form-field-value"
+                className="min-h-10 w-full text-left pointer-coarse:min-h-11"
                 onClick={() =>
                   dispatch({
                     type: "set-description-editing",
@@ -168,7 +167,6 @@ export function PlaylistIdentitySection({
           <Button
             variant="outline"
             size="sm"
-            className="rounded-lg"
             onClick={() => dispatch({ type: "set-cover", value: null })}
           >
             <ImagePlus size={CRATE_ICON_SIZE.xs} />
@@ -177,33 +175,43 @@ export function PlaylistIdentitySection({
         ) : null}
 
         {canManageSettings ? (
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <SegmentedControl
-              as="radio"
-              size="sm"
-              label={t("library.crates.visibility")}
-              value={visibility}
-              onValueChange={(value) =>
-                dispatch({ type: "set-visibility", value })
-              }
-              items={[
-                { value: "private", label: t("playlist.visibility.private") },
-                { value: "public", label: t("playlist.visibility.public") },
-              ]}
-            />
-            <button
-              type="button"
-              aria-pressed={isCollaborative}
-              className={cn(
-                "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-                isCollaborative
-                  ? "bg-accent-action text-accent-action-foreground"
-                  : "bg-text-primary/5 text-text-muted",
+          <div className="grid items-end gap-4 sm:grid-cols-2">
+            <FormField label={t("library.crates.visibility")}>
+              {(control) => (
+                <Select
+                  value={visibility}
+                  onValueChange={(value) =>
+                    dispatch({
+                      type: "set-visibility",
+                      value: value as "private" | "public",
+                    })
+                  }
+                >
+                  <SelectTrigger {...control}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    <SelectItem value="private">
+                      {t("playlist.visibility.private")}
+                    </SelectItem>
+                    <SelectItem value="public">
+                      {t("playlist.visibility.public")}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               )}
-              onClick={() => dispatch({ type: "toggle-collaborative" })}
+            </FormField>
+            <FormField
+              label={t("playlist.badges.collaborative")}
+              layout="inline"
             >
-              {t("playlist.badges.collaborative")}
-            </button>
+              <Switch
+                checked={isCollaborative}
+                onCheckedChange={() =>
+                  dispatch({ type: "toggle-collaborative" })
+                }
+              />
+            </FormField>
           </div>
         ) : null}
       </div>

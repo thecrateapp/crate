@@ -19,3 +19,5 @@ body {
 @source "../../app/listen/src/components/cards/TrackRowView.tsx";
 @source "../../app/listen/src/components/cards/TrackRowContent.tsx";
 @source "../../app/listen/src/components/cards/TrackRowPlaybackControl.tsx";
+
+@source "../../app/listen/src/components/layout/topbar/TopBarSearchDropdownView.tsx";

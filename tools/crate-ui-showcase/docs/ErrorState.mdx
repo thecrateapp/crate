@@ -1,0 +1,21 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/ErrorState.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">ErrorState</DocHeading>
+<EntryDetails id="primitives-errorstate" review="Visual review approved · 1AX" />
+<DocHeading as="h2">Contract</DocHeading>
+
+Page and compact roles retain their approved typography, state dot placement and actions. Errors announce an alert; unavailable/not-found retain group semantics. Real messages and optional status codes are data. Retry/back/custom actions are injected and do not invent backend behavior. A page error uses its owning heading level; user copy can be translated by the app.
+
+The approved mockup and Diego's confirmed adjustments remain the visual reference. Documented,
+adopted and validated are separate statuses; broader native/AT/canonical QA remains pending.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />
+
+<Canvas of={Stories.Compact} />
+<Canvas of={Stories.NotFound} />
+<Canvas of={Stories.Unavailable} />

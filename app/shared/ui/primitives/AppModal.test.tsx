@@ -517,3 +517,38 @@ describe("ModalCloseButton", () => {
     expect(button).not.toHaveClass("focus-visible:shadow-focus");
   });
 });
+
+it("lets only the top nested custom modal consume Escape", () => {
+  const parentClose = vi.fn(),
+    childClose = vi.fn();
+  render(
+    <AppModal open onClose={parentClose} title="Parent">
+      <AppModal open onClose={childClose} title="Child">
+        Child content
+      </AppModal>
+    </AppModal>,
+  );
+  fireEvent.keyDown(screen.getByRole("dialog", { name: "Child" }), {
+    key: "Escape",
+  });
+  expect(childClose).toHaveBeenCalledTimes(1);
+  expect(parentClose).not.toHaveBeenCalled();
+});
+it("keeps the scroll lock if the older locking modal unmounts before the newer one", () => {
+  document.body.style.overflow = "auto";
+  const first = render(
+    <AppModal open onClose={() => {}} title="Older">
+      Older
+    </AppModal>,
+  );
+  const second = render(
+    <AppModal open onClose={() => {}} title="Newer">
+      Newer
+    </AppModal>,
+  );
+  first.unmount();
+  expect(document.body.style.overflow).toBe("hidden");
+  second.unmount();
+  expect(document.body.style.overflow).toBe("auto");
+  document.body.style.overflow = "";
+});

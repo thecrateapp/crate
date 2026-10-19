@@ -7,18 +7,18 @@ sus stops locales anteriores quedan superados por las aprobaciones y publicacion
 | Concepto                | Estado vigente                                                                                                                                                              |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Workspace               | `/home/diego/.codex/worktrees/crate-v3-1q/crate`; rama `feat/crate_v3`                                                                                                      |
-| Publicado               | 1AV publicado: `a2b374f3`; plan Listen aprobado; conserva el ancestro `53177736`                                                                                  |
-| Checkpoint local        | **1AW aprobado por Diego**: publicación autorizada; siguiente bloque1AX                                                                                          |
+| Publicado               | 1AW publicado: `5ff7296c`; plan Listen aprobado; conserva el ancestro `53177736`                                                                                  |
+| Checkpoint local        | **1AX local para revisión**: capas, feedback y navegación mínima; sin commit/push                                                                                          |
 | Prioridad de continuación | **Listen primero**, por indicación de Diego; después se retoman las migraciones específicas de Admin. Inventario y plan por recorridos aprobados.           |
-| Revisión actual         | `http://127.0.0.1:5186/review-1aw-collections.html`; misma escena en Storybook `Reviews/1AW/Collections`; vistas anteriores conservadas                                           |
+| Revisión actual         | `http://127.0.0.1:5186/review-1ax-layers.html`; misma escena en Storybook `Reviews/1AX/Layers`; vistas anteriores conservadas                                           |
 | Auditoría               | A1 contraste, A2/A3 tipografía, A4 chips, A7 copy, A6 guardas y A8 estados documentales publicados en 1AP. A5 conserva su deuda explícita por fase, según el orden aprobado |
 | Preview                 | `http://127.0.0.1:5186/`, `crate-v3-preview.service`; editor real en `/admin-playlist-editor-demo.html` y `/#editor-playlists-admin`                                        |
-| Storybook               | `http://127.0.0.1:6006/?path=/docs/system-introduction--docs`; `crate-ui-storybook.service`; 39 entradas documentadas / 54 pendientes                                       |
+| Storybook               | `http://127.0.0.1:6006/?path=/docs/system-introduction--docs`; `crate-ui-storybook.service`; 52 entradas documentadas / 41 pendientes                                       |
 | Próximo grupo de iconos | Pausado por Diego: auditar sistema completo y aprobar catálogo/contratos antes de más migraciones                                                                           |
 | Identidad y referencia  | Mockup aprobado5186 y ajustes confirmados de Diego; una identidad, fuentes/excepciones nativas. Pin histórico `app/web@258bbaee` conservado                                 |
 | Evidencia canónica      | 33 PNG y manifest de 1M; comparación Linux posterior y QA nativa pendientes                                                                                                 |
 | Cierre pendiente        | Global 1b.8, migraciones de página/A20/6.8, validación completa de fase, datos vivos, AT y plataformas nativas                                                              |
-| Restricción             | 1AW aprobado; commit/push autorizados.1AX se revisará antes de publicar. Sin PR, merge, rebase, deploy ni release                                                                                 |
+| Restricción             | 1AW publicado5ff7296c.1AX sin commit/push hasta revisión de Diego. Sin PR, merge, rebase, deploy ni release                                                                                 |
 
 La validación vigente de la extensión de cabeceras/filas se registra al final de este documento;
 los resultados cronológicos previos no certifican los cambios posteriores. El bundle permanece
@@ -583,3 +583,57 @@ conservando la aprobación1AV de las otras familias de imagen. No se ha cambiado
 Diego aprueba1AW y autoriza commit/push. Continúa1AX: capas, feedback y navegación mínima
 según el plan Listen aprobado. Mantener5186/6006/5174 activos y detener1AX antes de commit/push.
 La aprobación visual1AW no cierra QA nativa/AT ni los baselines pendientes.
+
+1AW publicado en5ff7296c21e4d91bb8d639e1e00e52b43939a2da. Alcance1AX: [plan local](2026-10-19-crate-v3-layers-feedback-navigation.md).
+
+
+## Cierre local 1AX — pendiente de revisión de Diego
+
+1AW publicado5ff7296c;1AX no se publica ni avanza a1AY. Escena pequeña en
+[preview1AX](http://127.0.0.1:5186/review-1ax-layers.html) y
+[Storybook1AX](http://127.0.0.1:6006/?path=/story/reviews-1ax-layers--complete).
+Las tres instancias persistentes5186/6006/5174 siguen activas; Listen usa la API aprobada.
+
+Siete fichas cerradas documentalmente: AppModal, AppPopover, AppErrorBoundary, ErrorState,
+LoadingState, SkipLink y Tabs. Las seis primeras estaban pendientes; Tabs tenía la receta1Q
+pero su ficha seguía pendiente. Catálogo52/93,120fuentes,41pendientes. La revisión visual1AX
+sigue pendiente y no equivale a adopción de todas las páginas.
+
+Consumidores reales: Sort y visibilidad de playlist usan Select; FormField/Switch preservan
+valores y capacidades. TopBarSearch usa SearchInput/superficie sólida, ARIA activo, IME sin
+emisiones prematuras, foco de retorno, posición acotada y scroll de la opción activa. La vista
+pura local de resultados se usa en ambos hosts; artwork, traducciones, recents, resolución remota
+y navegación siguen en Listen. AppModal conserva1N/drag con propiedad de teclado anidada y
+bloqueo de scroll hasta el último propietario. AppErrorBoundary compone ErrorState.
+Ambos helpers URL evitan duplicar historial antes del render, preservando query/hash/state.
+
+Diego detectó el recorte de páginas de artista/género. Causa: el frame interno PageHero tenía
+height100% dentro de una sección con solo min-height; ahora se estira por el eje transversal.
+No se añaden parches en cada página. Regresiones de roles media/artist/editorial y consumidores
+ArtistHeroSection/GenreHero reales a390/1200; CrateHero content-height conserva su contrato.
+
+Revisión fuente independiente: tres hallazgos importantes corregidos con RED→GREEN — texto
+readonly largo de playlist, opción activa fuera del popup y falta de búsqueda en la escena.
+La muestra estática AppPopover aísla su contexto para no interceptar el modal de la escena.
+Sin revisión repetida. No quedan hallazgos importantes abiertos en el alcance implementado.
+
+Validación focalizada:112shared (63+49),58Listen,37Admin (26+11),26Desktop:233pruebas. Tipos
+shared/Listen/Admin/Desktop/Storybook y fixtures; lint de fuentes modificadas.17comprobaciones
+browser de capas/búsqueda/URL/readonly y cabeceras, con un worker. Las escenas no hacen llamadas
+API; la integración Listen usa red interceptada y no escribe en producción. Builds Admin,
+Listen, Storybook y preview correctos. Admin527168/532480Bgzip (margen5312B),
+Listen201557/307200B. Catálogo y correspondencia documental correctos.
+
+Decisiones y costes: se mantienen los helpers sin migración masiva (adopción por página1AY/H1);
+se conserva la infraestructura de modal/Radix (interop y QA nativa acotadas, sin reemplazo);
+se añade la ficha Tabs que el brief describía erróneamente como completa (una ficha adicional,
+sin nueva API runtime); quedan fuera comportamientos previos de búsqueda stale/completion e
+inertness general (límites lifecycle/AT para su fase). Ver el plan1AX y el registro de ejecución.
+No se cierran QA nativa/AT/datos vivos ni la grabación/comparación Linux de los33baselines1M.
+No suites/CI completas, nuevos baselines, PR, merge, rebase, deploy ni release.
+
+### Aprobación final de 1AX — 2026-10-19
+
+Diego aprueba 1AX y autoriza commit/push y continuar con 1AY (Shell, búsqueda y colección),
+con el mockup aprobado como referencia, Storybook actualizado y las tres instancias activas.
+1AY se detiene para revisión antes de su commit/push. Se mantienen los límites de QA registrados.

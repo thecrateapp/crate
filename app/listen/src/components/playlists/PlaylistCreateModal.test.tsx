@@ -75,6 +75,26 @@ describe("PlaylistCreateModal", () => {
     ).toBeNull();
   });
 
+  it("uses a labelled Select for visibility and an inline collaboration switch", () => {
+    render(
+      <I18nProvider initialLocale="en">
+        <PlaylistCreateModal
+          open
+          initialTracks={[]}
+          submitting={false}
+          onClose={vi.fn()}
+          onSubmit={vi.fn(async () => {})}
+        />
+      </I18nProvider>,
+    );
+    expect(
+      screen.getByRole("combobox", { name: "Visibility" }),
+    ).toHaveAttribute("data-slot", "select-trigger");
+    expect(
+      screen.getByRole("switch", { name: /Collaborative/i }),
+    ).toBeInTheDocument();
+  });
+
   it("adds global catalog tracks to the submit payload", async () => {
     vi.useFakeTimers();
     vi.mocked(api).mockResolvedValue({
@@ -116,7 +136,7 @@ describe("PlaylistCreateModal", () => {
       );
     });
     fireEvent.click(screen.getByRole("button", { name: /Talk For Hours/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Add a title" }));
+    fireEvent.click(screen.getByRole("button", { name: "Playlist" }));
     fireEvent.change(screen.getByPlaceholderText("My next obsession"), {
       target: { value: "Favourites" },
     });

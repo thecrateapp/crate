@@ -86,6 +86,7 @@ describe("TopBarSearch", () => {
 
     await waitFor(() => {
       expect(searchButton.getAttribute("aria-expanded")).toBe("false");
+      expect(document.activeElement).toBe(searchButton);
     });
   });
 
@@ -112,51 +113,14 @@ describe("TopBarSearch", () => {
     ).toBeInTheDocument();
   });
 
-  it("uses the shared glass surface for the mobile search shell", () => {
-    mockHoverPointer(false);
+  it("uses canonical solid SearchInput geometry on mobile and desktop", async () => {
+    const user = userEvent.setup();
     renderWithListenProviders(<TopBarSearch />);
-
-    const searchButton = screen.getByRole("button", { name: "Search" });
-
-    expect(searchButton.closest(".listen-glass-panel")).toBeInTheDocument();
-  });
-
-  it("keeps the desktop search shell on the non-glass main style", () => {
-    mockHoverPointer(true);
-    renderWithListenProviders(<TopBarSearch />);
-
-    const searchButton = screen.getByRole("button", { name: "Search" });
-    const searchShell = searchButton.parentElement?.parentElement;
-
-    expect(searchShell).toBeInTheDocument();
-    expect(searchShell).toHaveClass("bg-transparent", "border-0");
-    expect(searchShell).not.toHaveClass(
-      "listen-glass-panel",
-      "listen-search-glass",
-    );
-  });
-
-  it("keeps the collapsed desktop search trigger fully transparent", async () => {
-    mockHoverPointer(true);
-    renderWithListenProviders(<TopBarSearch />);
-
-    const searchButton = screen.getByRole("button", { name: "Search" });
-    const searchShell = searchButton.closest('div[data-state="closed"]');
-
-    await waitFor(() => {
-      expect(searchShell).toHaveClass(
-        "border-0",
-        "bg-transparent",
-        "shadow-none",
-        "backdrop-blur-0",
-      );
-      expect(searchButton).toHaveClass(
-        "border-0",
-        "bg-transparent",
-        "shadow-none",
-        "backdrop-blur-0",
-      );
-    });
+    await user.click(screen.getByRole("button", { name: "Search" }));
+    expect(screen.getByRole("combobox")).toHaveClass("crate-form-control");
+    expect(
+      screen.getByRole("combobox").closest(".listen-glass-panel"),
+    ).toBeNull();
   });
 
   it("opens on hover and collapses again when idle", async () => {
@@ -210,20 +174,6 @@ describe("TopBarSearch", () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(input);
     });
-  });
-
-  it("leaves keyboard focus to the shared outline without a second shell shadow", () => {
-    renderWithListenProviders(<TopBarSearch />);
-
-    const searchButton = screen.getByRole("button", { name: "Search" });
-
-    expect(searchButton.closest("div[data-state]")).not.toHaveClass(
-      "focus-within:shadow-focus",
-    );
-    expect(searchButton).toHaveClass("crate-focus-inset");
-    expect(
-      screen.getByPlaceholderText("Search artists, albums, tracks..."),
-    ).toHaveClass("crate-focus-inset");
   });
 
   it("collapses when focus tabs away with an empty query", async () => {
@@ -311,8 +261,8 @@ describe("TopBarSearch", () => {
 
     expect(screen.getByText("High Vis")).toHaveClass("text-text-primary/80");
     expect(screen.getByText("High Vis").closest(".z-app-dropdown")).toHaveClass(
-      "listen-glass-panel",
-      "rounded-panel",
+      "crate-overlay-surface",
+      "bg-surface-popover",
     );
   });
 
@@ -537,5 +487,37 @@ describe("TopBarSearch", () => {
     expect(
       localStorage.getItem(TOP_BAR_SEARCH_RECENTS_STORAGE_KEY),
     ).not.toBeNull();
+  });
+  it("defers API search during IME composition and exposes the active option", async () => {
+    vi.useFakeTimers();
+    mockSearchBoxRect();
+    vi.mocked(api).mockResolvedValue({
+      artists: [{ id: 52, slug: "high-vis", name: "High Vis" }],
+      albums: [],
+      tracks: [],
+    });
+    renderWithListenProviders(<TopBarSearch />);
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
+    fireEvent.focus(input);
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "high" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(api).not.toHaveBeenCalled();
+    fireEvent.compositionEnd(input);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(input).toHaveAttribute("role", "combobox");
+    const option = screen.getByRole("option", { name: /High Vis/ });
+    expect(input).toHaveAttribute("aria-activedescendant", option.id);
+    expect(input).toHaveAttribute(
+      "aria-controls",
+      screen.getByRole("listbox").id,
+    );
   });
 });

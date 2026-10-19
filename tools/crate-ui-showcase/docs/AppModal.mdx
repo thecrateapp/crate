@@ -1,0 +1,17 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/AppModal.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">AppModal</DocHeading>
+<EntryDetails id="primitives-appmodal" review="Visual review approved · 1AX" />
+<DocHeading as="h2">Contract</DocHeading>
+
+The existing 1N solid surface, header, body, footer and close control remain. Size, labels, mobile safe area and close gates belong to the facade. Nested Select/Tooltip portals remain above the panel and own their dismissal. Only the top custom modal handles Escape/Tab; locking modals retain document scroll lock until the last owner closes. Focus returns to the owning trigger when it remains connected. Apps keep workflow, capability and busy state. Editable playlist fields use canonical controls; readonly fields retain FormField body typography and content-sized text, so long names/descriptions reserve their full height.
+
+The approved mockup and Diego's confirmed adjustments remain the visual reference. Documented,
+adopted and validated are separate statuses; broader native/AT/canonical QA remains pending.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />

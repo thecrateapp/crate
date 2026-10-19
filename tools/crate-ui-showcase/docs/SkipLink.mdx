@@ -1,0 +1,17 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/SkipLink.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">SkipLink</DocHeading>
+<EntryDetails id="primitives-skiplink" review="Visual review approved · 1AX" />
+<DocHeading as="h2">Contract</DocHeading>
+
+The app supplies the translated caption and a focusable target landmark. Activation moves focus into existing content without rewriting query/hash/history; the next Tab reaches its first control. With a missing target the native href fallback remains. Native focus appearance is shared; no app-specific offset or copied skip control is introduced.
+
+The approved mockup and Diego's confirmed adjustments remain the visual reference. Documented,
+adopted and validated are separate statuses; broader native/AT/canonical QA remains pending.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />

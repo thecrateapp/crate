@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 
 interface TabParamOptions {
@@ -18,6 +18,10 @@ export function useTabParam<T extends string>(
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const pendingWrite = useRef<string | null>(null);
+  useEffect(() => {
+    pendingWrite.current = null;
+  }, [location.key, location.search]);
   const rawValue = searchParams.get(param);
   const tab = values.find((value) => value === rawValue) ?? defaultValue;
 
@@ -30,6 +34,11 @@ export function useTabParam<T extends string>(
         return;
       const next = new URLSearchParams(searchParams);
       next.set(param, value);
+      const destination = `${location.pathname}?${next}${location.hash}`;
+      // Radix can emit the same selection on pointer-down and focus before the
+      // router commits. One gesture must add only one history entry.
+      if (pendingWrite.current === destination) return;
+      pendingWrite.current = destination;
       void navigate(
         {
           pathname: location.pathname,

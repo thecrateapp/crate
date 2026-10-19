@@ -1,0 +1,23 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/LoadingState.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">LoadingState</DocHeading>
+<EntryDetails
+  id="domain-states-loadingstate"
+  review="Visual review approved · 1AX"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+Section loading reserves the consumer layout and hides its placeholder content from assistive technology. Route/page/screen indicators appear only after 200 ms; short loads show no flash. The route mark remains the approved 120 px hairline and caption. Labels are app-translated; no marketing phrases, backend polls or fake counts are introduced.
+
+The approved mockup and Diego's confirmed adjustments remain the visual reference. Documented,
+adopted and validated are separate statuses; broader native/AT/canonical QA remains pending.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />
+
+<Canvas of={Stories.Route} />
+<Canvas of={Stories.Page} />

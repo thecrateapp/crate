@@ -93,6 +93,19 @@ describe("app-local URL tabs", () => {
     expect(result.current.location.pathname).toBe("/previous");
   });
 
+  it("coalesces repeated writes before the router commits a render", async () => {
+    const { result, router } = setup();
+    act(() => {
+      result.current.setTab("shows");
+      result.current.setTab("shows");
+    });
+    await waitFor(() => expect(result.current.tab).toBe("shows"));
+    await act(() => router.navigate(-1));
+    expect(result.current.tab).toBe("albums");
+    act(() => result.current.setTab("shows"));
+    await waitFor(() => expect(result.current.tab).toBe("shows"));
+  });
+
   it("pushes tab changes and follows back, forward and external navigation", async () => {
     const { result, router } = setup();
     act(() => result.current.setTab("shows"));

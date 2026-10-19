@@ -4928,3 +4928,18 @@ permanecen activas; conservar los checkpoints y el pin histórico app/web@258bba
 
 Diego aprueba1AW; autoriza commit y push y continuar con1AX, con las tres instancias activas.
 La siguiente revisión precede al commit/push de1AX. Se mantienen los límites de QA registrados.
+
+### Continuación 1AX — 2026-10-19
+
+1AW aprobado y publicado en`5ff7296c21e4d91bb8d639e1e00e52b43939a2da`.1AX local para revisión
+antes de commit/push: capas, feedback y navegación mínima, además del recorte de PageHero
+reportado por Diego. [Alcance y decisiones](2026-10-19-crate-v3-layers-feedback-navigation.md);
+[validación y estado vigentes](2026-10-19-crate-v3-current-state.md). Revisión pequeña5186 en
+`/review-1ax-layers.html` y misma escena Storybook`Reviews/1AX/Layers`; Listen5174 sigue activo.
+No avanzar a1AY antes de revisión. No se cierran QA nativa/AT ni los33baselines1M pendientes.
+
+### Aprobación final de 1AX — 2026-10-19
+
+Diego aprueba 1AX y autoriza commit/push y continuar con 1AY (Shell, búsqueda y colección),
+con el mockup aprobado como referencia, Storybook actualizado y las tres instancias activas.
+1AY se detiene para revisión antes de su commit/push. Se mantienen los límites de QA registrados.

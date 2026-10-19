@@ -30,6 +30,7 @@ export function TopBarSearch() {
     recents,
     expanded,
     queryRef,
+    setComposing,
     setQuery,
     setResults,
     setCompletedQuery,
@@ -111,6 +112,7 @@ export function TopBarSearch() {
         containerRef: lifecycle.containerRef,
         dropdownRef: lifecycle.dropdownRef,
         inputRef: lifecycle.inputRef,
+        triggerRef: lifecycle.triggerRef,
         dropdownStyle: lifecycle.dropdownStyle,
       }}
       actions={{
@@ -119,6 +121,7 @@ export function TopBarSearch() {
         scheduleCollapseIfIdle: lifecycle.scheduleCollapseIfIdle,
         collapseOnFocusExit: lifecycle.collapseOnFocusExit,
         setQuery,
+        setComposing,
         setResults,
         setCompletedQuery,
         setSearchError,

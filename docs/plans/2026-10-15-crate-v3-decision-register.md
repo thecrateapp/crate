@@ -1538,3 +1538,15 @@ glyph blanco18px (slot24px) sobre cover48px y control activo40px con ring2px, au
 hoja activa. Sin círculo azul que tape la portada. Selección no implica aria-current; títulos
 de entidad mantienen14/500 y HairlineRow12/18. Catálogo y consumidores actualizados, adopción
 completa y QA de fase pendientes. Ver el estado vigente y la reconciliación de1AW; sin commit.
+
+### 1AX — capas y navegación mínima (local, pendiente de revisión)
+
+Se conserva AppModal/drag y la infraestructura Radix existente; la prioridad de teclado y el
+bloqueo de scroll se corrigen en la base. AppPopover sigue siendo superficie, no controlador.
+Las páginas adoptarán los helpers URL en su fase; ambos helpers evitan ahora duplicar historial
+por emisiones pointer/focus antes del render. Tabs cierra su ficha pendiente1Q sin cambiar receta.
+Readonly de playlist es texto con altura por contenido y tipografía FormField, no un Input de
+altura fija. La presentación de resultados Listen es local e inyecta traducciones/artwork;
+se reutiliza en ambas revisiones y conserva visible la opción activa. PageHero corrige el frame
+interno de altura porcentual que recortaba títulos; no requiere parches en cada página.
+Los límites y costes de alcance están en el plan1AX y su registro de ejecución.

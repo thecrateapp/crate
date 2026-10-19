@@ -78,3 +78,23 @@ export const ContentHeight: Story = {
     description: undefined,
   },
 };
+
+/** Listen's overlay-header composition: content must sit below the chrome. */
+export const OverlayHeader: Story = {
+  args: {
+    variant: "artist",
+    title: "The Lovecraft Sextet",
+    eyebrow: undefined,
+  },
+  decorators: [
+    (Story) => (
+      <div className="relative">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 z-10 h-20 bg-surface-chrome/80"
+        />
+        <Story />
+      </div>
+    ),
+  ],
+};

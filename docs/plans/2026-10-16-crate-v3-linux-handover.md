@@ -942,3 +942,12 @@ el renderer, la autenticación, el motor, el drag ni la virtualización.
 Las validaciones focalizadas y sus límites finales se consolidan en el estado vigente. Sin suites
 completas/CI, sin regenerar33PNG/manifest1M, sin PR/merge/rebase/deploy/release. Las tres instancias
 permanecen activas; conservar los checkpoints y el pin histórico app/web@258bbaee.
+
+### Continuación 1AX — 2026-10-19
+
+1AW aprobado y publicado en`5ff7296c21e4d91bb8d639e1e00e52b43939a2da`.1AX local para revisión
+antes de commit/push: capas, feedback y navegación mínima, además del recorte de PageHero
+reportado por Diego. [Alcance y decisiones](2026-10-19-crate-v3-layers-feedback-navigation.md);
+[validación y estado vigentes](2026-10-19-crate-v3-current-state.md). Revisión pequeña5186 en
+`/review-1ax-layers.html` y misma escena Storybook`Reviews/1AX/Layers`; Listen5174 sigue activo.
+No avanzar a1AY antes de revisión. No se cierran QA nativa/AT ni los33baselines1M pendientes.

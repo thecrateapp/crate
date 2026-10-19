@@ -700,9 +700,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/hero/PageHero.tsx": "12d61794c3f466e53c0e4ffd801a12c05e0bd1f30aa024ecc7a32ad77fb755e7",
-        "tools/crate-ui-showcase/stories/PageHero.stories.tsx": "f1aa60bedcbe624d99a963b92e22b374dc4dc7a963a8d4917bf54617b6e9684c",
-        "tools/crate-ui-showcase/docs/PageHero.mdx": "119351bbf78158c80e0de762dc8b3a43666ddbf0a3b3d568e15e99071a89e4c7"
+        "app/shared/ui/domain/hero/PageHero.tsx": "5e4596cd02a7138e1e6f8d17a14cbdf0d811a930db07f772b4d7b2f52ee36a3b",
+        "tools/crate-ui-showcase/stories/PageHero.stories.tsx": "d38c9d7e81898c3e8fd7e450575076acc149606aa9a0dae34ebc95b1fee21fc4",
+        "tools/crate-ui-showcase/docs/PageHero.mdx": "8313a59694f333452af455d586f3b2c132a29f84bfea1154e3dd7faed04e49e1"
       },
       "category": "Layout"
     },
@@ -921,18 +921,20 @@
     {
       "id": "domain-states-loadingstate",
       "name": "LoadingState",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Reserved section geometry and delayed route loading feedback.",
+      "coverage": "documented",
+      "adoption": "Existing Listen and Admin consumers; focused1AX reconciliation, broader route/native/AT QA pending.",
+      "storyId": "components-loadingstate",
+      "story": "tools/crate-ui-showcase/stories/LoadingState.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/LoadingState.mdx",
       "sources": [
         "app/shared/ui/domain/states/LoadingState.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/states/LoadingState.tsx": "8c38accdcf65342375b5e1fe8003bb26fa0f1ef98d86a30b339c2e5325e54055"
+        "app/shared/ui/domain/states/LoadingState.tsx": "8c38accdcf65342375b5e1fe8003bb26fa0f1ef98d86a30b339c2e5325e54055",
+        "tools/crate-ui-showcase/stories/LoadingState.stories.tsx": "400c8ec4ad060ad87bf5d92175827816c0f0af2aaaf939097f66deddf5dc382e",
+        "tools/crate-ui-showcase/docs/LoadingState.mdx": "87da02bf2c60864f9bdf34d2ce6117adc81a5cd23d314f86248501d6d91a0973"
       },
       "category": "Feedback"
     },
@@ -997,54 +999,60 @@
     {
       "id": "primitives-apperrorboundary",
       "name": "AppErrorBoundary",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Render failure reporting with canonical error presentation and reset.",
+      "coverage": "documented",
+      "adoption": "Existing Listen and Admin consumers; focused1AX reconciliation, broader route/native/AT QA pending.",
+      "storyId": "components-apperrorboundary",
+      "story": "tools/crate-ui-showcase/stories/AppErrorBoundary.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/AppErrorBoundary.mdx",
       "sources": [
         "app/shared/ui/primitives/AppErrorBoundary.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/AppErrorBoundary.tsx": "3304b4a1c2055d1300bb818b77251d5b29040c780fbea85ca596d8f13f5adc5f"
+        "app/shared/ui/primitives/AppErrorBoundary.tsx": "634d14c0bf2d571b86721b456417c42646311d2e06dffc40df47f9dcd133b096",
+        "tools/crate-ui-showcase/stories/AppErrorBoundary.stories.tsx": "00e2db2ffbe19fbeaf336a4316674ebbafc194f12fa8b90e56ea8cb4ec2b09e4",
+        "tools/crate-ui-showcase/docs/AppErrorBoundary.mdx": "03f7947952bc136a82e99ebc92518f84bbd7058108b621601ad112d5a56a65fb"
       },
       "category": "Feedback"
     },
     {
       "id": "primitives-appmodal",
       "name": "AppModal",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "A shared modal facade with native labels, focus, scroll ownership and mobile drag.",
+      "coverage": "documented",
+      "adoption": "Existing Listen and Admin consumers; focused1AX reconciliation, broader route/native/AT QA pending.",
+      "storyId": "components-appmodal",
+      "story": "tools/crate-ui-showcase/stories/AppModal.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/AppModal.mdx",
       "sources": [
         "app/shared/ui/primitives/AppModal.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/AppModal.tsx": "491c3727d3785623c09f651a841ad03fe416f4d31e51f26ffd821156a43b24ce"
+        "app/shared/ui/primitives/AppModal.tsx": "ccc17862833c8a7d5edf7e310f33409ea29c3b1cfe49f6730658ee2fd63f55a9",
+        "tools/crate-ui-showcase/stories/AppModal.stories.tsx": "1616a5a6c5bf4c99cb7beba536cd10a012ebf66f63926218341758cbe1b1f96d",
+        "tools/crate-ui-showcase/docs/AppModal.mdx": "f7ee487183ba6b702e02e99c5a3f4285e58377c19ba27974dcb12f10eead06e1"
       },
       "category": "Overlays"
     },
     {
       "id": "primitives-apppopover",
       "name": "AppPopover",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "The shared solid floating surface and menu-row recipe.",
+      "coverage": "documented",
+      "adoption": "Existing Listen and Admin consumers; focused1AX reconciliation, broader route/native/AT QA pending.",
+      "storyId": "components-apppopover",
+      "story": "tools/crate-ui-showcase/stories/AppPopover.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/AppPopover.mdx",
       "sources": [
         "app/shared/ui/primitives/AppPopover.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/AppPopover.tsx": "bfa0ca2e9f19093db1ab499f3c7203201e41611d4b8d418136f4c15079dae97f"
+        "app/shared/ui/primitives/AppPopover.tsx": "bfa0ca2e9f19093db1ab499f3c7203201e41611d4b8d418136f4c15079dae97f",
+        "tools/crate-ui-showcase/stories/AppPopover.stories.tsx": "82437e3d079ed83e705c1b9fecef976049a04b34ea1b25df6937cf250a2f10c4",
+        "tools/crate-ui-showcase/docs/AppPopover.mdx": "3910b4b966fb5119bb246b6ff83d22afde115645fafe67798b8e83eb4f9c6fb9"
       },
       "category": "Overlays"
     },
@@ -1091,18 +1099,20 @@
     {
       "id": "primitives-errorstate",
       "name": "ErrorState",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Shared compact and page error, unavailable and missing states.",
+      "coverage": "documented",
+      "adoption": "Existing Listen and Admin consumers; focused1AX reconciliation, broader route/native/AT QA pending.",
+      "storyId": "components-errorstate",
+      "story": "tools/crate-ui-showcase/stories/ErrorState.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ErrorState.mdx",
       "sources": [
         "app/shared/ui/primitives/ErrorState.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/ErrorState.tsx": "91510d21eb0d4369010bae9d171d70292d6027017bb8fb07793fb7066f831b4a"
+        "app/shared/ui/primitives/ErrorState.tsx": "91510d21eb0d4369010bae9d171d70292d6027017bb8fb07793fb7066f831b4a",
+        "tools/crate-ui-showcase/stories/ErrorState.stories.tsx": "5845cc60ae75f5f318c68602d48ec4b53883f47bfce38508f1cf4268b999c108",
+        "tools/crate-ui-showcase/docs/ErrorState.mdx": "fc29205aa1dd6291277a4d64abf9f3be5fbfcdba7780235c4c1ba58ee5cc7b3c"
       },
       "category": "Feedback"
     },
@@ -1337,18 +1347,20 @@
     {
       "id": "primitives-skiplink",
       "name": "SkipLink",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "The first keyboard stop into the app main landmark.",
+      "coverage": "documented",
+      "adoption": "Existing Listen and Admin consumers; focused1AX reconciliation, broader route/native/AT QA pending.",
+      "storyId": "components-skiplink",
+      "story": "tools/crate-ui-showcase/stories/SkipLink.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/SkipLink.mdx",
       "sources": [
         "app/shared/ui/primitives/SkipLink.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/SkipLink.tsx": "1da215bcfa8015b04bab0968ef8dbd9876684a44e0c59224c1db4c3c4d6c7e5a"
+        "app/shared/ui/primitives/SkipLink.tsx": "1da215bcfa8015b04bab0968ef8dbd9876684a44e0c59224c1db4c3c4d6c7e5a",
+        "tools/crate-ui-showcase/stories/SkipLink.stories.tsx": "616c994f2f7028f2d929d668b6bc34c3239a10a0c5628642d759f8ac6697a22c",
+        "tools/crate-ui-showcase/docs/SkipLink.mdx": "4f86b57309ad96c340c189cd07eeb78287fc862953019ebe0d86f771f3eae088"
       },
       "category": "Navigation"
     },
@@ -1726,19 +1738,21 @@
     },
     {
       "id": "shadcn-tabs",
-      "name": "tabs",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "name": "Tabs",
+      "purpose": "Text panel navigation with native ARIA/keyboard and app-owned URL state.",
+      "coverage": "documented",
+      "adoption": "Existing both-app consumers; URL page adoption remains phased after 1AX",
+      "storyId": "components-tabs",
+      "story": "tools/crate-ui-showcase/stories/Tabs.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Tabs.mdx",
       "sources": [
         "app/shared/ui/shadcn/tabs.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/shadcn/tabs.tsx": "65ad50a81807ba99231c1bccf23e1900140ab6785c40e1e681e126ae83fb477a"
+        "app/shared/ui/shadcn/tabs.tsx": "65ad50a81807ba99231c1bccf23e1900140ab6785c40e1e681e126ae83fb477a",
+        "tools/crate-ui-showcase/stories/Tabs.stories.tsx": "135dbc2d44411f3c9d4b6356d0ded5a1c24a0e3187307bc31f0188972d74fd6c",
+        "tools/crate-ui-showcase/docs/Tabs.mdx": "7b70c82a2affca0f3d52c1137f6f5fbe9fb4cd0a59aece5978b57df0617f482e"
       },
       "category": "Navigation"
     },
