@@ -1,7 +1,25 @@
 """Safe queued acceptance references and private invocation arguments for domains."""
 
 from crate.ai import configuration
+from crate.ai.actions import get_action
 from crate.ai.contracts import AIConfigurationError
+from crate.api.permissions import has_capability
+from crate.db.repositories.auth_user_accounts import get_user_by_id
+
+
+def require_action_authority(action_id: str, actor_id: int | None) -> None:
+    """Re-read captured humans; actorless service calls keep domain authorization."""
+    if actor_id is None:
+        return
+    user = get_user_by_id(actor_id)
+    if (
+        not user
+        or user.get("status") != "active"
+        or not has_capability(user, get_action(action_id).permission)
+    ):
+        raise AIConfigurationError(
+            "AI_AUTHORITY_REVOKED", "Current actor is not authorized for this action"
+        )
 
 
 def acceptance_reference(context: dict) -> dict:
@@ -33,6 +51,7 @@ def resume_action(
         raise AIConfigurationError(
             "AI_CONTEXT_STALE", "Queued action requires renewed acceptance"
         )
+    require_action_authority(action_id, actor_id)
     context = configuration.resolve_action(
         action_id, expected_fingerprint=accepted["fingerprint"]
     )
@@ -40,11 +59,13 @@ def resume_action(
 
 
 def resolve_call(action_id: str, *, actor_id=None) -> dict:
+    require_action_authority(action_id, actor_id)
     return {"context": configuration.resolve_action(action_id), "actor_id": actor_id}
 
 
 def revalidate_call(call: dict | None) -> None:
     if call is not None:
+        require_action_authority(call["context"]["action_id"], call.get("actor_id"))
         configuration.revalidate_context(call["context"])
 
 

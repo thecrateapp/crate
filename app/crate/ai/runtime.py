@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from crate.ai import configuration, transport
 from crate.ai.actions import get_action
 from crate.ai.contracts import AIConfigurationError, ProfileConfig
+from crate.ai.consumers import require_action_authority
 from crate.db.repositories import ai_usage as usage
 
 T = TypeVar("T", bound=BaseModel)
@@ -205,6 +206,7 @@ def execute_structured(
                 "AI_INPUT_TOO_LARGE", "Input exceeds the profile token allowance"
             )
     configuration.revalidate_context(pinned)
+    require_action_authority(action_id, actor_id)
     api_key = configuration.load_context_key(pinned)
     admitted = deepcopy(pinned)
     admitted["prompt_fingerprint"] = _hash(
@@ -235,6 +237,7 @@ def execute_structured(
     try:
         # Close the acceptance-to-network race; the loaded key remains pinned in memory.
         configuration.revalidate_context(pinned)
+        require_action_authority(action_id, actor_id)
         call = transport.generate_legacy if legacy else transport.generate
         result = call(
             pinned,
@@ -268,6 +271,7 @@ def execute_structured(
             raise AIConfigurationError(
                 "AI_RESPONSE_INVALID", "Provider returned invalid structured data"
             ) from None
+        require_action_authority(action_id, actor_id)
         # Domain services can stamp the actual model without rereading global config.
         object.__setattr__(
             value, "_ai_model_id", result.reported_model or pinned["model_id"]

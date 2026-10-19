@@ -358,7 +358,7 @@ class TestGenreTaxonomyAPI:
         assert create_task.call_args.args[1]["slug"] == "post-hardcore"
 
     def test_infer_taxonomy_node_proposal_returns_reviewable_diff(
-        self, test_app, monkeypatch
+        self, test_app, monkeypatch, pg_db
     ):
         pin_actions(monkeypatch)
         proposal = {
@@ -395,7 +395,7 @@ class TestGenreTaxonomyAPI:
         build_proposal.assert_called_once_with("post-hardcore", ai_call=ANY)
 
     def test_infer_taxonomy_node_proposal_allows_raw_unmapped_genres(
-        self, test_app, monkeypatch
+        self, test_app, monkeypatch, pg_db
     ):
         pin_actions(monkeypatch)
         proposal = {

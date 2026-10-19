@@ -6,6 +6,16 @@ from types import SimpleNamespace
 import pytest
 
 
+@pytest.fixture
+def domain_actor(pg_db):
+    from crate.db.repositories.auth_user_accounts import create_user
+    from crate.db.repositories.auth_user_roles import set_user_roles
+
+    actor = create_user("consumer@example.test", role="editor")
+    set_user_roles(actor["id"], ["editor", "curator"])
+    return actor
+
+
 @pytest.mark.parametrize(
     ("module", "function", "arguments", "action"),
     [
@@ -138,9 +148,7 @@ def test_queue_acceptance_persists_only_safe_identity_and_rejects_stale_worker(
         "profile_version": 2,
         "fingerprint": "accepted",
     }
-    call = consumers.resume_action(
-        "artists.bio.research", accepted, actor_id=7, job_id="job"
-    )
+    call = consumers.resume_action("artists.bio.research", accepted, job_id="job")
     assert call["context"]["endpoint"] == "http://private"
     assert seen == [None, "accepted"]
     context["config_fingerprint"] = "rotated"
@@ -296,7 +304,7 @@ def test_i18n_enqueue_accepts_context_and_manual_when_action_disabled(monkeypatc
 
 @pytest.mark.parametrize("operation", ["eq", "playlist"])
 def test_configuration_revoked_after_generation_blocks_application(
-    monkeypatch, operation
+    monkeypatch, operation, domain_actor
 ):
     from crate.ai.contracts import AIConfigurationError
     from tests.ai_consumer_fakes import pin_actions
@@ -311,7 +319,7 @@ def test_configuration_revoked_after_generation_blocks_application(
     if operation == "eq":
         from crate.api import genres as api
 
-        monkeypatch.setattr(api, "_require_genre_curator", lambda _: {"id": 7})
+        monkeypatch.setattr(api, "_require_genre_curator", lambda _: domain_actor)
         monkeypatch.setattr(api, "get_genre_taxonomy_node_id", lambda _: 1)
         monkeypatch.setattr(api, "get_genre_detail", lambda _: {})
         monkeypatch.setattr(api, "set_genre_eq_gains", lambda *a, **k: writes.append(k))
@@ -328,7 +336,7 @@ def test_configuration_revoked_after_generation_blocks_application(
     else:
         from crate.api import system_playlists as api
 
-        monkeypatch.setattr(api, "_require_playlist_curator", lambda _: {"id": 7})
+        monkeypatch.setattr(api, "_require_playlist_curator", lambda _: domain_actor)
         monkeypatch.setattr(api, "_require_system_playlist", lambda _: {"name": "Mix"})
         monkeypatch.setattr(api, "get_playlist_tracks", lambda _: [])
         monkeypatch.setattr(api, "update_playlist", lambda *a, **k: writes.append(k))
@@ -426,7 +434,6 @@ def test_batch_item_identity_and_preapply_guard(monkeypatch):
     call = consumers.resume_action(
         "genres.description.generate",
         consumers.accept_action("genres.description.generate"),
-        actor_id=7,
         job_id="job",
     )
     first = consumers.item_call(call, "rock")
@@ -526,7 +533,7 @@ def test_bound_generators_execute_runtime_without_global_model(
         ),
     )
     result = getattr(import_module("crate.llm.prompts." + module), function)(
-        **arguments, ai_call={"context": accepted, "actor_id": 7}
+        **arguments, ai_call={"context": accepted}
     )
     assert calls[0]["action_id"] == action
     assert calls[0]["model_id"] == "model-one"
@@ -594,7 +601,7 @@ def test_action_availability_for_bio_and_show_modes_uses_bindings(monkeypatch):
     ],
 )
 def test_queued_workers_keep_accepted_context_and_actor(
-    monkeypatch, handler, target, action
+    monkeypatch, handler, target, action, domain_actor
 ):
     from crate.ai import consumers
     from crate.worker_handlers import analysis, enrichment
@@ -612,12 +619,18 @@ def test_queued_workers_keep_accepted_context_and_actor(
     monkeypatch.setattr(module, "emit_progress", lambda *a, **k: None)
     accepted = consumers.accept_action(action)
     assert getattr(module, handler)(
-        "job", {"artist_id": 1, "actor_user_id": 7, "ai_acceptance": accepted}, {}
+        "job",
+        {
+            "artist_id": 1,
+            "actor_user_id": domain_actor["id"],
+            "ai_acceptance": accepted,
+        },
+        {},
     ) == {"ok": True}
     assert (
         calls[0]["ai_call"]["context"]["config_fingerprint"] == accepted["fingerprint"]
     )
-    assert calls[0]["ai_call"]["actor_id"] == 7
+    assert calls[0]["ai_call"]["actor_id"] == domain_actor["id"]
     assert calls[0]["ai_call"]["job_id"] == "job"
 
 
@@ -657,7 +670,7 @@ def test_batch_items_execute_separately_and_repeat_does_not_call_provider(monkey
             )
         ),
     )
-    call = {"context": accepted, "actor_id": 7, "job_id": "batch"}
+    call = {"context": accepted, "job_id": "batch"}
     for slug in ["rock", "jazz"]:
         generate_genre_node_description(
             genre_name=slug, slug=slug, ai_call=consumers.item_call(call, slug)

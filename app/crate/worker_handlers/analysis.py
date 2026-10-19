@@ -753,7 +753,7 @@ def _handle_index_genres(task_id: str, params: dict, config: dict) -> dict:
 
 def _handle_infer_genre_taxonomy(task_id: str, params: dict, config: dict) -> dict:
     from crate.genre_taxonomy_inference import infer_genre_taxonomy_batch
-    from crate.ai.consumers import resume_action
+    from crate.ai.consumers import resume_action, revalidate_call
 
     ai_call = resume_action(
         "genres.description.generate",
@@ -801,6 +801,7 @@ def _handle_infer_genre_taxonomy(task_id: str, params: dict, config: dict) -> di
         event_callback=lambda data: emit_task_event(task_id, "info", data),
         ai_call=ai_call,
     )
+    revalidate_call(ai_call)
     emit_task_event(
         task_id,
         "info",
@@ -818,7 +819,7 @@ def _handle_rebuild_genre_taxonomy_proposals(
     task_id: str, params: dict, config: dict
 ) -> dict:
     from crate.genre_taxonomy_proposals import build_genre_taxonomy_rebuild_proposal
-    from crate.ai.consumers import resume_action
+    from crate.ai.consumers import resume_action, revalidate_call
 
     ai_call = resume_action(
         "genres.taxonomy.propose",
@@ -879,6 +880,7 @@ def _handle_rebuild_genre_taxonomy_proposals(
         event_callback=lambda data: emit_task_event(task_id, "info", data),
         ai_call=ai_call,
     )
+    revalidate_call(ai_call)
     summary = result.get("summary") or {}
     emit_task_event(
         task_id,
