@@ -1162,7 +1162,15 @@ def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) 
             "track_id": track_id,
         }
 
-    outcome = publish_smart_mix_profile(capture, draft)
+    try:
+        outcome = publish_smart_mix_profile(capture, draft)
+    except Exception as exc:
+        record_smart_mix_failure(track_id, path, str(exc), claim_token=claim_token)
+        log.warning("Smart Mix profile publication failed for %s", path, exc_info=True)
+        return {
+            "error": f"Smart Mix profile publication failed: {exc}",
+            "track_id": track_id,
+        }
     stored = outcome is SmartMixPublication.PUBLISHED
     if stored:
         emit_task_event(

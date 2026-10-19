@@ -83,7 +83,7 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
     beat_grid_ms = tuple(
         sorted(
             {
-                round(float(frame) * HOP_LENGTH * 1_000 / sample_rate)
+                max(1, round(float(frame) * HOP_LENGTH * 1_000 / sample_rate))
                 for frame in beat_frames
             }
         )

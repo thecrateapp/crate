@@ -304,6 +304,50 @@ def test_compute_profile_handler_resolves_track_inside_worker(monkeypatch) -> No
     assert captured == [(7, "/music/artist/album/track.flac", "worker:claim")]
 
 
+def test_a_profile_that_cannot_be_stored_is_recorded_as_failed(monkeypatch) -> None:
+    from crate.smart_mix.beat_grid import BeatGridCodecError
+    from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
+    from crate.worker_handlers import analysis
+
+    monkeypatch.setattr(
+        analysis,
+        "resolve_smart_mix_track",
+        lambda **_kwargs: {"id": 7, "path": "/music/artist/album/track.flac"},
+    )
+    monkeypatch.setattr(
+        analysis, "capture_smart_mix_source", lambda *_args, **_kwargs: "capture"
+    )
+    monkeypatch.setattr(
+        "crate.audio_analysis.analyze_mix_profile",
+        lambda _path: TrackMixProfileDraft(
+            analyzer="crate-rust",
+            analyzer_version=ANALYZER_VERSION,
+            duration_ms=10_000,
+            quality=MixProfileQuality.FULL,
+        ),
+    )
+
+    def unstorable(_capture, _draft):
+        raise BeatGridCodecError("beat positions must be positive")
+
+    monkeypatch.setattr(analysis, "publish_smart_mix_profile", unstorable)
+    failures: list[tuple[int, str, str | None]] = []
+    monkeypatch.setattr(
+        analysis,
+        "record_smart_mix_failure",
+        lambda track_id, _path, reason, *, claim_token=None: failures.append(
+            (track_id, reason, claim_token)
+        ),
+    )
+
+    result = analysis._handle_compute_smart_mix_profile(
+        "task-1", {"track_id": 7, "claim_token": "worker:claim"}, {}
+    )
+
+    assert "publication failed" in result["error"]
+    assert failures == [(7, "beat positions must be positive", "worker:claim")]
+
+
 def _create_tracks(tmp_path: Path, *, count: int) -> list[int]:
     suffix = uuid.uuid4().hex
     artist = f"Backfill Artist {suffix}"

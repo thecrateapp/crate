@@ -578,9 +578,7 @@ pub fn refine_beat_times_ms(samples: &[f32], sample_rate: u32, beat_frames: &[us
             }
             _ => frame_ms.round() as u64,
         };
-        if let Some(last) = previous {
-            position = position.max(last + 1);
-        }
+        position = position.max(previous.map_or(1, |last| last + 1));
         previous = Some(position);
         refined.push(position);
     }
@@ -631,6 +629,16 @@ mod tests {
             .fold(0.0_f64, |acc, value| acc.max(value.abs()));
         assert!(mean.abs() <= 2.0, "mean bias {mean} ms");
         assert!(worst <= 3.0, "worst error {worst} ms");
+    }
+
+    #[test]
+    fn a_beat_on_the_first_frame_stays_inside_the_positive_grid() {
+        let silence = vec![0.0_f32; SAMPLE_RATE as usize * 4];
+
+        let refined = refine_beat_times_ms(&silence, SAMPLE_RATE, &[0, 0, 43]);
+
+        assert_eq!(refined[0], 1);
+        assert!(refined.windows(2).all(|pair| pair[0] < pair[1]));
     }
 
     #[test]
