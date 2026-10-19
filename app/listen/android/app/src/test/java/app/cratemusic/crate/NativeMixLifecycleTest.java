@@ -159,6 +159,44 @@ public class NativeMixLifecycleTest {
     }
 
     @Test
+    public void aStarvedIncomingDeckCancelsTheMixAndKeepsTheOutgoingDeck() {
+        long execution = begin();
+        controller.observeProgress(execution, 0.25f, 1_000L);
+
+        deckB.starvations++;
+        controller.observeProgress(execution, 0.3f, 1_100L);
+
+        assertFalse(controller.isTransitionActive());
+        assertEquals(0, controller.logicalIndex());
+        assertEquals("incoming_deck_starved", listener.lastCancellationReason);
+        assertSingleAudibleDeck("incoming_starved", deckA, deckB);
+    }
+
+    @Test
+    public void aStarvedOutgoingDeckHandsOffToTheIncomingDeck() {
+        long execution = begin();
+        controller.observeProgress(execution, 0.25f, 1_000L);
+
+        deckA.starvations++;
+        controller.observeProgress(execution, 0.3f, 1_100L);
+
+        assertFalse(controller.isTransitionActive());
+        assertEquals(1, controller.logicalIndex());
+        assertEquals(Arrays.asList(execution), listener.completions);
+        assertSingleAudibleDeck("outgoing_starved", deckB, deckA);
+    }
+
+    @Test
+    public void starvationsBeforeTheMixDoNotCancelIt() {
+        deckB.starvations = 3;
+        long execution = begin();
+
+        controller.observeProgress(execution, 0.25f, 1_000L);
+
+        assertTrue(controller.isTransitionActive());
+    }
+
+    @Test
     public void outgoingDeckErrorBeforeHandoffHandsOffToTheIncomingDeck() {
         long execution = begin();
         controller.applyProgress(execution, 0.25f);

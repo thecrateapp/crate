@@ -23,6 +23,8 @@ interface NativePlaybackDeck {
 
     long busFrame();
 
+    long starvations();
+
     void startAtBusFrame(long busFrame);
 
     void releaseHold();

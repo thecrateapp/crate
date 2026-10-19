@@ -14,6 +14,7 @@ final class FakeNativePlaybackDeck implements NativePlaybackDeck {
     boolean supportsHold = true;
     boolean held;
     long busFrame;
+    long starvations;
     long startFrame = -1L;
     boolean playing;
     boolean released;
@@ -114,6 +115,11 @@ final class FakeNativePlaybackDeck implements NativePlaybackDeck {
     @Override
     public long busFrame() {
         return busFrame;
+    }
+
+    @Override
+    public long starvations() {
+        return starvations;
     }
 
     @Override

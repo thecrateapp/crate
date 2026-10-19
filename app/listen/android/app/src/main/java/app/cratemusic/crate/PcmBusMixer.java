@@ -86,6 +86,7 @@ final class PcmBusMixer {
             )
             .put("busStallPolls", busStalls.get() - captureStallsAtStart)
             .put("startedAtMs", captureStartedAtMs)
+            .put("stoppedAtMs", System.currentTimeMillis())
             .put("markers", markers);
     }
 
@@ -104,7 +105,7 @@ final class PcmBusMixer {
         int frames,
         long blockStartFrame
     ) {
-        return mixBlock(channels, mix, null, scratch, frames, blockStartFrame);
+        return mixBlock(channels, mix, null, scratch, frames, blockStartFrame, 0L);
     }
 
     static int mixBlock(
@@ -115,12 +116,24 @@ final class PcmBusMixer {
         int frames,
         long blockStartFrame
     ) {
+        return mixBlock(channels, mix, taps, scratch, frames, blockStartFrame, 0L);
+    }
+
+    static int mixBlock(
+        PcmBusChannel[] channels,
+        float[] mix,
+        float[][] taps,
+        float[] scratch,
+        int frames,
+        long blockStartFrame,
+        long nowMs
+    ) {
         Arrays.fill(mix, 0, frames * CHANNELS, 0.0f);
         if (taps != null) {
             for (float[] tap : taps) Arrays.fill(tap, 0, frames * CHANNELS, 0.0f);
         }
         for (PcmBusChannel channel : channels) {
-            if (channel.blocksMix()) return 0;
+            if (channel.blocksMix(nowMs)) return 0;
         }
         int mixedFrames = 0;
         boolean scheduled = false;
@@ -230,7 +243,8 @@ final class PcmBusMixer {
                 activeRecorder == null ? null : taps,
                 scratch,
                 BLOCK_FRAMES,
-                busFrames.get()
+                busFrames.get(),
+                SystemClock.elapsedRealtime()
             );
             busFrames.addAndGet(frames);
             if (frames == 0) {

@@ -1,6 +1,8 @@
 package app.cratemusic.crate;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -101,6 +103,59 @@ public class PcmBusTest {
 
         incoming.markEndOfStream();
         assertEquals(0, PcmBusMixer.mixBlock(channels, mix, scratch, 1, 0L));
+    }
+
+    @Test
+    public void aStarvedChannelReleasesTheBusAfterTheGraceWindow() {
+        PcmBusChannel outgoing = new PcmBusChannel(16);
+        PcmBusChannel incoming = new PcmBusChannel(16);
+        outgoing.write(frames(0.4f, 0.4f, 0.4f, 0.4f, 0.4f, 0.4f), 3);
+        outgoing.setPlaying(true);
+        incoming.write(frames(0.2f, 0.2f), 1);
+        incoming.setPlaying(true);
+        PcmBusChannel[] channels = { outgoing, incoming };
+        float[] mix = new float[2];
+        float[] scratch = new float[2];
+        long graceMs = PcmBusChannel.STARVATION_RELEASE_MS;
+
+        assertEquals(1, PcmBusMixer.mixBlock(channels, mix, null, scratch, 1, 0L, 1_000L));
+        assertEquals(0, PcmBusMixer.mixBlock(channels, mix, null, scratch, 1, 1L, 1_000L));
+        assertEquals(
+            0,
+            PcmBusMixer.mixBlock(channels, mix, null, scratch, 1, 1L, 1_000L + graceMs - 1L)
+        );
+        assertEquals(0L, incoming.starvations());
+
+        assertEquals(
+            1,
+            PcmBusMixer.mixBlock(channels, mix, null, scratch, 1, 1L, 1_000L + graceMs)
+        );
+        assertEquals(0.4f, mix[0], 0.0001f);
+        assertEquals(1L, incoming.starvations());
+        assertEquals(
+            1,
+            PcmBusMixer.mixBlock(channels, mix, null, scratch, 1, 2L, 2_000L)
+        );
+        assertEquals(1L, incoming.starvations());
+    }
+
+    @Test
+    public void aRecoveredChannelGetsAFreshGraceWindow() {
+        PcmBusChannel channel = new PcmBusChannel(8);
+        channel.write(frames(0.2f, 0.2f), 1);
+        channel.setPlaying(true);
+        float[] scratch = new float[2];
+        channel.mixInto(new float[2], scratch, 1, 0L);
+        long graceMs = PcmBusChannel.STARVATION_RELEASE_MS;
+
+        assertTrue(channel.blocksMix(0L));
+        assertFalse(channel.blocksMix(graceMs));
+        channel.write(frames(0.2f, 0.2f), 1);
+        assertFalse(channel.blocksMix(graceMs + 1L));
+        channel.mixInto(new float[2], scratch, 1, 1L);
+
+        assertTrue(channel.blocksMix(graceMs + 2L));
+        assertEquals(1L, channel.starvations());
     }
 
     @Test

@@ -668,7 +668,13 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
     private void requestNotificationUpdate() {
         if (mediaSession == null || player == null) return;
-        onUpdateNotification(mediaSession, player.isPlaying());
+        onUpdateNotification(
+            mediaSession,
+            NativeForegroundPolicy.shouldRunInForeground(
+                player.getPlayWhenReady(),
+                player.getPlaybackState()
+            )
+        );
     }
 
     private ExoPlayer buildPlayer(

@@ -83,4 +83,16 @@ public class PcmBusRecorderTest {
         assertEquals(0.25f, taps[0][0], 0.0001f);
         assertEquals(0.25f, taps[1][0], 0.0001f);
     }
+
+    @Test
+    public void captureSummaryCarriesTheWallClockSpanToDetectGaps() throws Exception {
+        PcmBusMixer mixer = new PcmBusMixer();
+        mixer.startCapture(folder.newFile("span.wav"));
+        Thread.sleep(5L);
+
+        org.json.JSONObject summary = mixer.stopCapture();
+
+        assertEquals(0L, summary.getLong("frames"));
+        assertTrue(summary.getLong("stoppedAtMs") >= summary.getLong("startedAtMs") + 5L);
+    }
 }

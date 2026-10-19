@@ -29,6 +29,8 @@ final class NativeMixController {
     private NativePlaybackDeck standbyDeck;
     private NativePlaybackDeck mixOutgoingDeck;
     private NativePlaybackDeck mixIncomingDeck;
+    private long outgoingStarvationsAtStart;
+    private long incomingStarvationsAtStart;
     private NativeTransitionPlan activePlan;
     private int logicalIndex;
     private boolean enabled;
@@ -248,6 +250,8 @@ final class NativeMixController {
         activePlan = plan;
         mixOutgoingDeck = activeDeck;
         mixIncomingDeck = standbyDeck;
+        outgoingStarvationsAtStart = mixOutgoingDeck.starvations();
+        incomingStarvationsAtStart = mixIncomingDeck.starvations();
         handoffComplete = false;
         if (prerolled) {
             mixIncomingDeck.releaseHold();
@@ -445,6 +449,14 @@ final class NativeMixController {
         if (activePlan == null || requestedExecutionId != executionId) {
             return;
         }
+        if (mixOutgoingDeck.starvations() != outgoingStarvationsAtStart) {
+            abandonMixDeck(mixOutgoingDeck, "starved");
+            return;
+        }
+        if (mixIncomingDeck.starvations() != incomingStarvationsAtStart) {
+            abandonMixDeck(mixIncomingDeck, "starved");
+            return;
+        }
         if (progress > observedProgress) {
             observedProgress = progress;
             observedProgressAtMs = nowMs;
@@ -469,6 +481,10 @@ final class NativeMixController {
             }
             return false;
         }
+        return abandonMixDeck(deck, "error");
+    }
+
+    private boolean abandonMixDeck(NativePlaybackDeck deck, String cause) {
         if (deck == mixOutgoingDeck) {
             completeTransition();
             return true;
@@ -478,7 +494,7 @@ final class NativeMixController {
                 standbyPreparationFailed = true;
                 standbyFailureSeenAtMs = -1L;
             }
-            cancel(handoffComplete ? "active_deck_error" : "incoming_deck_error");
+            cancel((handoffComplete ? "active_deck_" : "incoming_deck_") + cause);
         }
         return false;
     }

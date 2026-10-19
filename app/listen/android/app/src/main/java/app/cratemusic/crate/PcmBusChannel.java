@@ -5,10 +5,14 @@ import java.util.concurrent.atomic.AtomicLong;
 final class PcmBusChannel {
     static final long RUNNING = Long.MIN_VALUE;
     static final long HELD = Long.MAX_VALUE;
+    static final long STARVATION_RELEASE_MS = 200L;
 
     private final PcmRingBuffer buffer;
     private final AtomicLong startFrame = new AtomicLong(RUNNING);
     private final AtomicLong consumedFrames = new AtomicLong();
+    private final AtomicLong starvations = new AtomicLong();
+    private long starvedSinceMs = -1L;
+    private boolean starvationReleased;
     private volatile boolean playing;
     private volatile float volume = 1.0f;
     private volatile boolean endOfStream;
@@ -57,14 +61,28 @@ final class PcmBusChannel {
         return playing && start != RUNNING && start != HELD;
     }
 
-    boolean blocksMix() {
-        return (
+    synchronized boolean blocksMix(long nowMs) {
+        boolean starved =
             playing &&
             delivered &&
             !endOfStream &&
             startFrame.get() == RUNNING &&
-            buffer.availableFrames() == 0
-        );
+            buffer.availableFrames() == 0;
+        if (!starved) {
+            starvedSinceMs = -1L;
+            starvationReleased = false;
+            return false;
+        }
+        if (starvationReleased) return false;
+        if (starvedSinceMs < 0L) starvedSinceMs = nowMs;
+        if (nowMs - starvedSinceMs < STARVATION_RELEASE_MS) return true;
+        starvationReleased = true;
+        starvations.incrementAndGet();
+        return false;
+    }
+
+    long starvations() {
+        return starvations.get();
     }
 
     boolean isPlaying() {
@@ -82,6 +100,8 @@ final class PcmBusChannel {
     synchronized void flush() {
         endOfStream = false;
         delivered = false;
+        starvedSinceMs = -1L;
+        starvationReleased = false;
         buffer.clear();
         consumedFrames.set(0L);
     }

@@ -197,6 +197,11 @@ final class ExoPlayerNativePlaybackDeck implements NativePlaybackDeck {
     }
 
     @Override
+    public long starvations() {
+        return busChannel == null ? 0L : busChannel.starvations();
+    }
+
+    @Override
     public void startAtBusFrame(long busFrame) {
         if (busChannel != null) busChannel.startAt(busFrame);
     }
