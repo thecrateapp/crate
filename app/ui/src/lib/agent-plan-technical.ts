@@ -327,9 +327,12 @@ function hiddenLeaves(value: unknown, path: string[], whole: boolean) {
  * Field rows are classified on the raw values, so a changed identifier is
  * never shown as unchanged. A row that changes or clears an identifier shows
  * both raw values (the reviewer must see what changes) and also lists them in
- * Technical details. Added identifiers and unchanged rows are redacted;
- * internal identifier keys (`*_id`, `*_hash`, …) that are only added or kept
- * are listed in Technical details alone.
+ * Technical details. An identifier added to a key the record did not have (a
+ * brand-new record) is listed in Technical details alone — the record itself
+ * is the change. An identifier added to a key the record already had, even
+ * set to null, stays on the card as an added row pointing to Technical
+ * details: the record's existing value changed and must stay visible.
+ * Unchanged identifier keys are listed in Technical details alone.
  */
 function diffRows(rows: FieldDiffRow[], sink: TechnicalLeaf[]): DiffRowView[] {
   const views: DiffRowView[] = [];
@@ -348,7 +351,21 @@ function diffRows(rows: FieldDiffRow[], sink: TechnicalLeaf[]): DiffRowView[] {
       views.push({ ...row, seeTechnical: true });
       continue;
     }
-    if (technicalKey) continue;
+    if (technicalKey) {
+      // `row.before === undefined` means the key is absent from `before`: a
+      // brand-new record, where there is nothing to compare against. A
+      // present key (even null) means an existing record just gained this
+      // identifier, so the row must stay visible.
+      if (row.status !== "added" || row.before === undefined) continue;
+      views.push({
+        key: row.key,
+        status: row.status,
+        before: row.before,
+        after: after.visible,
+        seeTechnical: true,
+      });
+      continue;
+    }
     views.push({
       key: row.key,
       status: row.status,

@@ -1467,7 +1467,7 @@ function indexedTrack(overrides: Record<string, unknown> = {}) {
 }
 
 // Mirrors agent_sync.compile_operation for one indexed album.
-function syncPlan(): AgentPlan {
+function syncPlan(overrides: Partial<AgentPlan> = {}): AgentPlan {
   const targets = [
     { entity_type: "track", entity_uid: introUid },
     { entity_type: "track", entity_uid: outroUid },
@@ -1519,6 +1519,7 @@ function syncPlan(): AgentPlan {
     },
     reversibility:
       "removed indexes can affect references; rescan does not restore deleted references",
+    ...overrides,
   });
 }
 
@@ -1647,6 +1648,36 @@ describe("AgentPlanDetail completeness", () => {
     expect(screen.getByText("Track 1")).toBeInTheDocument();
     expect(screen.getByText("Track 2")).toBeInTheDocument();
     expect(screen.getByText("Echo/Night/01 Intro.flac")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Technical details" }));
+    expect(
+      screen.getByText("Track 1 · Proposed › Musicbrainz trackid")
+        .parentElement,
+    ).toHaveTextContent(mbNew);
+  });
+
+  it("shows an identifier newly set on an existing record", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue(
+      syncPlan({
+        changes: [
+          {
+            entity_uid: introUid,
+            action: "update_index",
+            relative_path: "Echo/Night/01 Intro.flac",
+            before: indexedTrack({ musicbrainz_trackid: null }),
+            after: indexedTrack({ musicbrainz_trackid: mbNew }),
+          },
+        ],
+      }),
+    );
+    renderReview();
+    const list = await screen.findByRole("list", { name: "Proposed changes" });
+    expect(screen.queryByText("No field changes.")).not.toBeInTheDocument();
+    const row = within(list).getByRole("row", { name: /Musicbrainz trackid/ });
+    expect(row).toHaveAttribute("data-status", "added");
+    expect(row).toHaveTextContent("Added · see Technical details");
+    expect(row).not.toHaveTextContent(mbNew);
+    expect(document.body.textContent ?? "").not.toContain(mbNew);
     await user.click(screen.getByRole("button", { name: "Technical details" }));
     expect(
       screen.getByText("Track 1 · Proposed › Musicbrainz trackid")

@@ -258,6 +258,80 @@ describe("planChangeViews", () => {
     ]);
   });
 
+  // Mirrors agent_sync.py:172-196: update_index always emits every key, with
+  // missing ones as null. A newly tagged MBID on an existing record must not
+  // vanish from the card.
+  it("keeps an identifier newly set on an existing record visible", () => {
+    const view = one({
+      entity_uid: "track-1",
+      action: "update_index",
+      relative_path: "Echo/Album/01 Song.flac",
+      before: {
+        title: "Song",
+        musicbrainz_albumid: null,
+        musicbrainz_trackid: null,
+      },
+      after: {
+        title: "Song",
+        musicbrainz_albumid: null,
+        musicbrainz_trackid: mbidAfter,
+      },
+    });
+    expect(view.body).toEqual({
+      kind: "diff",
+      rows: [
+        {
+          key: "title",
+          before: "Song",
+          after: "Song",
+          status: "unchanged",
+          seeTechnical: false,
+        },
+        {
+          key: "musicbrainz_trackid",
+          before: null,
+          after: TECHNICAL_PLACEHOLDER,
+          status: "added",
+          seeTechnical: true,
+        },
+      ],
+    });
+    expect(view.technical).toContainEqual({
+      label: "Missing track · Proposed › Musicbrainz trackid",
+      value: mbidAfter,
+    });
+  });
+
+  it("still hides a newly set identifier on a brand-new record", () => {
+    const view = one({
+      entity_uid: "track-1",
+      action: "add_index",
+      relative_path: "Echo/Album/02 Song.flac",
+      before: null,
+      after: {
+        title: "Song",
+        musicbrainz_albumid: null,
+        musicbrainz_trackid: mbidAfter,
+      },
+    });
+    expect(view.body).toEqual({
+      kind: "diff",
+      rows: [
+        {
+          key: "title",
+          before: undefined,
+          after: "Song",
+          status: "added",
+          seeTechnical: false,
+        },
+      ],
+    });
+    expect(view.technical).toContainEqual({
+      label: "Missing track · Proposed › Musicbrainz trackid",
+      value: mbidAfter,
+    });
+  });
+
   it("keeps both values of a changed identifier field on the card", () => {
     const view = one(
       {
