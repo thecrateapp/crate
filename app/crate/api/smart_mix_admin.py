@@ -149,7 +149,7 @@ def reanalyze_smart_mix_track(
         dedup_key=f"smart-mix-profile:{int(track['id'])}",
     )
     return SmartMixReanalyzeResponse(
-        task_id=task_id, status="queued" if task_id else "already_queued"
+        taskId=task_id, status="queued" if task_id else "already_queued"
     )
 
 

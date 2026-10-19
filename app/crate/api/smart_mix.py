@@ -171,7 +171,7 @@ def playback_continuation_token(
     )
     return PlaybackContinuationTokenResponse(
         token=issued["token"],
-        expires_at=issued["expires_at"],
+        expiresAt=issued["expires_at"],
     )
 
 
@@ -210,8 +210,8 @@ def playback_continuation(
     chain.extend(str(track.entity_uid) for track in tracks)
     edges = [
         TransitionEdgeRequest(
-            outgoing_track_entity_uid=outgoing,
-            incoming_track_entity_uid=incoming,
+            outgoingTrackEntityUid=UUID(outgoing),
+            incomingTrackEntityUid=UUID(incoming),
             context=payload.context,
         )
         for outgoing, incoming in zip(chain, chain[1:])
@@ -238,7 +238,7 @@ def _continuation_track(row: dict, delivery: str) -> ContinuationTrackResponse |
     duration = row.get("duration")
     return ContinuationTrackResponse(
         id=str(playable_id),
-        entity_uid=entity_uid,
+        entityUid=entity_uid,
         url=(
             f"/api/tracks/by-entity/{quote(str(entity_uid), safe='')}/stream"
             f"?delivery={quote(delivery, safe='')}"
@@ -246,7 +246,7 @@ def _continuation_track(row: dict, delivery: str) -> ContinuationTrackResponse |
         title=row.get("title") or "Unknown",
         artist=row.get("artist") or "",
         album=row.get("album") or None,
-        duration_ms=round(float(duration) * 1000) if duration else None,
+        durationMs=round(float(duration) * 1000) if duration else None,
         source=row,
     )
 
